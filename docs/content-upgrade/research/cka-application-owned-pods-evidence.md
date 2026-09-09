@@ -9,7 +9,7 @@ Retrieved September 9, 2026. Bodies and the retrieval receipt are retained priva
 | Body | Official locator | Bytes | SHA256 |
 |---|---|---:|---|
 | Kubernetes 1.35 memory exercise | [Assign Memory Resources](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/#exceed-a-container-s-memory-limit), exceeding a limit and termination status | 519694 | `d556f450a1d14eff9f2103ee50630999dbfa9d3620beb46e635f72ed65f2fdb9` |
-| Python 3.12 built-ins | [bytearray](https://docs.python.org/3.12/library/functions.html#bytearray), integer source argument | 298516 | `6fc45db13e6c5b1aa6c1116dd4d79e6deec71dd58e91fdced4dcb6d6cf16390e` |
+| Python 3.12 built-ins | [bytearray](https://docs.python.org/3.12/library/functions.html#func-bytearray), integer source argument | 298516 | `6fc45db13e6c5b1aa6c1116dd4d79e6deec71dd58e91fdced4dcb6d6cf16390e` |
 | Official Python image catalog | [library/python](https://github.com/docker-library/official-images/blob/master/library/python), `3.12-alpine` tag group | 10263 | `d32af55168fbf58179b22f152f0927b67f832f472a9eabcc20a8930cac144fb4` |
 
 The accepted [methodology ownership card](cka-methodology-ownership-evidence.md) supplies the already-inspected Kubernetes 1.35 CLI target flags and API UID/delete-precondition sources. Reusing that design requires module-specific names, fresh creation receipts and new integration tests; the earlier execution does not validate these scenarios.
