@@ -8,14 +8,14 @@ sidebar:
 lab:
   id: cka-5.1-methodology
   url: https://killercoda.com/kubedojo/scenario/cka-5.1-methodology
-  duration: "60 min"
+  duration: "50-65 min"
   difficulty: intermediate
   environment: kubernetes
 ---
 
 > **Complexity**: `[MEDIUM]` - Foundation for every CKA troubleshooting task and for real production response work
 >
-> **Time to Complete**: 50-65 minutes
+> **Time to Complete**: 50-65 minutes — an unmeasured planning estimate for the full reading, exercise, and reflection; fixture provisioning is excluded.
 >
 > **Prerequisites**: Parts 1-4 completed, including cluster architecture, workloads, networking, storage, and basic kubectl fluency
 
@@ -23,19 +23,21 @@ lab:
 
 ## Learning Outcomes
 
-After this module, you will be able to:
+This module practices the following workload troubleshooting skills:
 
 - **Apply** a systematic troubleshooting loop that moves from symptom capture to hypothesis testing, repair, and validation without random changes.
-- **Diagnose** Kubernetes failures by identifying whether the first broken layer is application, container, pod, service, node, storage, network, or control plane.
-- **Evaluate** diagnostic evidence from `describe`, Events, logs, resource status, object YAML, and node conditions to choose the next investigation step.
-- **Compare** similar-looking failure states such as `Pending`, `ContainerCreating`, `CrashLoopBackOff`, `Running but not Ready`, and `Service has no endpoints`.
+- **Distinguish** configuration defects in the supplied workload spec from symptoms actually reported by the cluster.
+- **Evaluate** pod descriptions, Events, previous container logs, termination status, Service selectors, EndpointSlices, and node capacity to choose the next workload investigation step.
+- **Validate** the repaired workload through its Service and explain an observed container exit or scheduling refusal using evidence.
 - **Design** a short exam-time troubleshooting plan that protects time, preserves evidence, and proves the fix before moving to the next task.
+
+The wider node, control-plane, network, and storage material is introductory guidance, not a set of failures demonstrated by this exercise. The hosted scenario link and duration metadata do not independently validate its behavior or the time estimate.
 
 ---
 
 ## Why This Module Matters
 
-A platform engineer named Mira is on call when a rollout begins failing during a payment-service release. The dashboard says error rate is rising, the deployment controller says progress has stalled, and three teammates are already suggesting fixes in chat. One person wants to restart every pod, another wants to roll back immediately, and another says the problem must be DNS because that was the last incident they remember. If Mira follows the loudest guess, she may erase the evidence, make the outage wider, and still not know what actually failed.
+Consider this hypothetical scenario: Mira, an invented platform engineer, is on call when a rollout begins failing during a payment-service release. The dashboard says error rate is rising, the deployment controller says progress has stalled, and three teammates are already suggesting fixes in chat. One person wants to restart every pod, another wants to roll back immediately, and another says the problem must be DNS because that was the last incident they remember. If Mira follows the loudest guess, she may erase the evidence, make the outage wider, and still not know what actually failed.
 
 Kubernetes troubleshooting rewards disciplined curiosity more than command memorization. The cluster is constantly reconciling desired state into actual state, so every failure leaves clues in different places: scheduler events, kubelet events, container logs, endpoint objects, node conditions, controller status, and sometimes the raw object spec. The operator's job is to read those clues in the right order, form a small hypothesis, test it, and change only the thing that evidence supports.
 
@@ -45,7 +47,7 @@ This matters on the CKA because [troubleshooting is a large exam domain and the 
 >
 > A strong emergency-room physician does not start with surgery because a patient says "it hurts." They stabilize, observe symptoms, check vital signs, order targeted tests, decide which system is failing, and only then treat. Kubernetes troubleshooting works the same way. You start with the visible symptom, gather low-risk evidence, isolate the failing layer, then apply the smallest fix that addresses the diagnosed cause.
 
-Before the commands begin, confirm that your `kubectl` client is available and pointed at the intended cluster. This module writes every runnable example with the full `kubectl` command because copied shell blocks should work in non-interactive terminals, scripts, and exam environments without relying on local aliases.
+Before the commands begin, confirm that your `kubectl` client is available and pointed at the intended cluster. Examples outside the hands-on exercise use full `kubectl` commands. The exercise defines a `lab` helper for its selected fixture and owned namespace; those blocks require the same Bash session and successful setup.
 
 ```bash
 kubectl version --client
@@ -996,7 +998,9 @@ Validate the requested service path, not just pod phase. Run `kubectl rollout st
 
 ### Scenario
 
-You will create broken resources, diagnose them with the five-step method, repair only confirmed causes, and validate through the workload path. The exercise intentionally combines image, ConfigMap, readiness, service selector, and resource failures because real incidents rarely arrive as single neat errors.
+You will inspect deliberately faulty resources, separate configured defects from observed symptoms, repair the supplied workload, and validate its Service path. The faults are disclosed: the Deployment uses `nginx:latestt` and references a missing `nginx-config`; the Service selects `app: broken-api` instead of `app: broken-app`; a later Pod exits with code `1`; another requests `100` CPU and `100Gi` memory. The readiness probe checks `/ready`, which the supplied ConfigMap repair serves; it is not a separately demonstrated readiness failure.
+
+Inspecting the manifests is part of the exercise. Record which defects you can establish from the spec and which symptoms the cluster actually reports. The supplied startup solution repairs both image and ConfigMap before checking rollout, so it does not demonstrate the effect of each repair independently.
 
 ### Setup
 
@@ -1063,7 +1067,7 @@ lab() {
 lab_setup
 ```
 
-Continue only after setup succeeds. The fault manifest below contains intentional mistakes to discover using evidence; its namespace comes from `lab`.
+Continue only after setup succeeds. Inspect the fault manifest below and predict one observable symptom before applying it; its namespace comes from `lab`. A prediction is a hypothesis to check, not an Event you can claim to have seen.
 
 ```bash
 cat <<'EOF' | lab apply -f -
@@ -1148,16 +1152,19 @@ POD_NAME="$(lab get pods -l app=broken-app -o jsonpath='{.items[0].metadata.name
 lab describe pod "$POD_NAME"
 ```
 
-You should discover at least two pod-startup blockers over the course of the repair. The exact order depends on what Kubernetes reports first, but the image typo and missing ConfigMap are both real issues. Fix one confirmed issue at a time and re-observe after each fix.
+Distinguish the two configured startup defects from the symptoms you observe. A missing ConfigMap can block volume setup before image-pull failure is reported. The checked fixture showed `FailedMount`, but did not demonstrate `ErrImagePull` or `ImagePullBackOff` before repair. Identify the image typo from the manifest or pod spec; do not invent an image Event to complete the checklist. If no useful Event has appeared yet, repeat the read-only observations after the controllers have had time to act.
 
-- [ ] Identified the image typo from Events or container state.
-- [ ] Identified the missing `nginx-config` ConfigMap from Events after or alongside the image problem.
+- [ ] Identified the image typo from the manifest or pod spec, separately recording any observed image Events.
+- [ ] Recorded the observed mount symptom and its relation to the missing `nginx-config`, or noted that the observation is still pending.
 - [ ] Avoided using logs before the container had actually started.
 - [ ] Wrote a short hypothesis for each blocker before applying its repair.
 
 ### Task 3: Repair the Confirmed Startup Blockers
 
-Apply the smallest repairs for the image typo and missing ConfigMap. Use commands that directly address the confirmed causes. Then watch the rollout long enough to see the next layer of failure, because fixing startup blockers may reveal readiness or service problems.
+Before opening the supplied solution, write the evidence for each configured defect, your proposed repair, and the observation that would support recovery. The solution below changes the image and creates the ConfigMap consecutively, then checks rollout. It does not pause for observation between those two mutations; keep that limitation in your explanation of what caused recovery.
+
+<details>
+<summary>Show supplied startup repairs and rollout check</summary>
 
 ```bash
 lab set image deployment/broken-app app=nginx:1.27
@@ -1166,11 +1173,13 @@ lab rollout status deployment/broken-app --timeout=90s
 lab get pods -l app=broken-app
 ```
 
-If the rollout still does not complete, inspect the newest pod again. Do not assume the first repair fixed everything. Kubernetes troubleshooting often reveals one blocker at a time because later lifecycle stages cannot fail until earlier stages succeed.
+</details>
+
+If the rollout still does not complete, inspect the newest pod again. Treat readiness as a condition to verify, not a failure you must encounter. These combined repairs can allow startup and readiness to succeed together while the Service selector remains wrong.
 
 - [ ] Fixed the image reference to a valid nginx image tag.
 - [ ] Created the missing ConfigMap in the same namespace as the pod.
-- [ ] Re-ran `describe` or rollout status after each repair.
+- [ ] Recorded rollout and pod state after the combined repairs, without attributing recovery to one change alone.
 - [ ] Confirmed the deployment pods are `Running` and ready before moving to service validation.
 
 ### Task 4: Validate the Service Path
@@ -1183,7 +1192,10 @@ lab get endpointslices -l kubernetes.io/service-name=broken-app -o wide
 lab get pods --show-labels
 ```
 
-Patch the service selector only after you can explain the mismatch. Then create a temporary client pod and test the service through its cluster DNS name and port.
+Before opening the solution, write down the selector mismatch, your proposed patch, and the response you expect through the Service. Then use the supplied patch, create a temporary client pod, and test the cluster DNS name and port.
+
+<details>
+<summary>Show supplied selector repair and Service request</summary>
 
 ```bash
 lab patch svc broken-app --type='merge' -p '{"spec":{"selector":{"app":"broken-app"}}}'
@@ -1193,16 +1205,18 @@ lab wait --for=condition=Ready pod/client --timeout=90s
 lab exec client -- wget -qO- http://broken-app:8080/
 ```
 
-The validation should return the response from nginx through the service. If it fails, inspect endpoints, targetPort, pod readiness, and the temporary client pod status before changing anything else. Remember that service reachability is a path, not a single object.
+</details>
+
+The configured response is `ok` from nginx through the Service. Record the actual response; a successful patch or ready client alone does not prove it. If the request fails, inspect endpoints, targetPort, pod readiness, and client status before changing anything else.
 
 - [ ] Proved the original service selector did not match the backend pod labels.
 - [ ] Patched the service selector to `app: broken-app`.
 - [ ] Confirmed the service has endpoints after the patch.
 - [ ] Tested traffic through `http://broken-app:8080/` from inside the namespace.
 
-### Task 5: Diagnose a CrashLoopBackOff Pod
+### Task 5: Diagnose a Repeated Container Exit
 
-Create a separate crashing pod and apply the worked-example sequence without looking back at the solution. This pod starts, prints output, and exits with a nonzero code. Your goal is to capture previous logs and termination details before making a repair.
+Inspect the Pod's command before creating it: once the container starts, it prints output and exits with code `1`. Predict the termination evidence, then capture previous logs and status before proposing a repair. A sampled status need not show `CrashLoopBackOff` for you to prove that a container instance exited.
 
 ```bash
 cat <<'EOF' | lab apply -f -
@@ -1221,7 +1235,7 @@ spec:
 EOF
 ```
 
-Use the method in order. Observe status, inspect `describe`, read previous logs, and confirm exit code. Then decide what change would make the pod stop crashing.
+Observe status and inspect `describe` first. `logs --previous` requires a previous container instance; it may fail while the Pod is still starting or before a restart has supplied that history. If so, record the current state and repeat these observations later. Confirm the previous termination exit code when available, then propose a change and explain how you would validate it.
 
 ```bash
 lab get pod crash-pod
@@ -1232,14 +1246,14 @@ lab get pod crash-pod -o jsonpath='{.status.containerStatuses[0].lastState.termi
 
 You do not need to repair this standalone pod unless you want extra practice. The important outcome is explaining why `--previous` matters and why the failure is application process behavior rather than scheduling, image pull, or volume setup.
 
-- [ ] Confirmed the pod reached `CrashLoopBackOff`.
+- [ ] Recorded actual Pod/container state and a previous termination with exit code `1`; did not require a sampled `CrashLoopBackOff` status.
 - [ ] Used `kubectl logs --previous` to inspect the terminated container instance.
 - [ ] Retrieved the last exit code with JSONPath.
 - [ ] Explained why the failure is inside the container process after startup.
 
 ### Task 6: Diagnose a Pending Pod
 
-Create a pod that requests unrealistic resources. It should remain `Pending` because the scheduler cannot find a suitable node. Your job is to prove that no application logs can exist yet and that the scheduler event is the relevant evidence.
+Inspect the request of `100` CPU and `100Gi` memory. This exercise expects a disposable fixture where no node can fit those requests; on a larger fixture, this manifest does not guarantee a resource-related scheduling failure. Compare the request with node capacity and record scheduler evidence rather than assuming `Pending` from the YAML alone.
 
 ```bash
 cat <<'EOF' | lab apply -f -
@@ -1258,7 +1272,7 @@ spec:
 EOF
 ```
 
-Inspect scheduler evidence and node capacity. Do not attempt to exec or read logs from a pod that has not started. The failure is a scheduling decision, not an application error.
+Inspect scheduler evidence and node capacity. For an unscheduled Pod whose container has never started, application logs cannot explain the failure. If scheduling observations are still pending, repeat the read-only checks rather than inventing an Event.
 
 ```bash
 lab get pod pending-pod
@@ -1267,10 +1281,10 @@ lab get nodes
 lab describe node "$(lab get nodes -o jsonpath='{.items[0].metadata.name}')" | sed -n '/Allocatable/,/System Info/p'
 ```
 
-A good answer identifies the scheduler as the component refusing placement because no node can satisfy the resource request. The repair would be to lower requests to realistic values, add suitable capacity, or change scheduling constraints depending on the real workload requirement.
+A supported answer connects an observed `FailedScheduling` message to the resource request and available capacity. If the Pod schedules, record that the fixture did not reproduce the intended resource failure. Propose a repair appropriate to the observed constraint; this task does not execute or validate that repair.
 
-- [ ] Confirmed the pod stayed `Pending`.
-- [ ] Found the `FailedScheduling` event.
+- [ ] Recorded whether the Pod remained unscheduled on this fixture.
+- [ ] Captured the actual `FailedScheduling` message, or documented that the intended failure was not reproduced.
 - [ ] Explained why logs are not useful for an unscheduled pod.
 - [ ] Proposed a repair that addresses requests or capacity rather than restarting the pod.
 
