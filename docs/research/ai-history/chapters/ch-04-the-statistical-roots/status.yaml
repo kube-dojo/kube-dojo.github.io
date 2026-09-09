@@ -23,11 +23,11 @@ secondary_sources_verified_at_page_level:
   - "Link 2006 Chains to the West (Science in Context 19(4):561-589, page-level)"
   - "Seneta 2006 Markov and the Creation of Markov Chains (Markov Anniversary Meeting, page-level)"
 sources_attempted_dead_ended:
-  - "Basharin Langville Naumov 2004 (LAA 386:3-26) - 404 / 403 on all routes"
   - "Sheynin 1989 (AHES 39:337-377) - Springer paywall"
   - "Seneta 2003 (ISR 71:319-334) - Wiley paywall"
-  - "Markov 1906 Russian original - not anchored at page level; content via Seneta 2006"
   - "Nekrasov 1902 Russian original - not anchored; content via Seneta 2006 + Hayes 2013"
+  - "Ondar 1981 Markov-Chuprov correspondence - not retrieved 2026-09-09"
+source_record_recheck: "2026-09-09 source-record-2026-09-09.md; Basharin 2004 and Sheynin 2004 now retrieved; Kazan 1906 pagination and Ondar still unverified; storage/computer close deferred. Lifecycle labels below are not current acceptance."
 needs_review_from:
   - codex_anchor_verification
   - gemini_gap_analysis
@@ -54,3 +54,4 @@ review_coverage:
     overall: true
   backfill_pending: false
   last_audited: 2026-05-01
+  source_record_2026_09_09: research_only_not_acceptance

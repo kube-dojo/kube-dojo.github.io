@@ -63,7 +63,7 @@
 
 ### Maurice Fréchet (1878–1973)
 
-- French mathematician whose 1938 *Méthode des fonctions arbitraires. Théorie des événements en chaîne dans le cas d'un nombre fini d'états possibles* (Paris, Gauthier-Villars) is the work Shannon 1948 footnote 6 cites for "detailed treatment" of Markoff processes. The bibliographic bridge between Markov and Shannon. (Shannon 1948 §5 footnote 6.)
+- French mathematician whose 1938 *Méthode des fonctions arbitraires. Théorie des événements en chaîne dans le cas d'un nombre fini d'états possibles* (Paris, Gauthier-Villars) is the work Shannon 1948 footnote 6 cites for "detailed treatment" of Markoff processes. The bibliographic bridge between Markov and Shannon. (Shannon 1948 §4 footnote 6; locator corrected 2026-09-09.)
 - Used only as the citation route by which Shannon reached Markov's mathematics without citing Markov's papers directly.
 
 ### Claude Elwood Shannon (1916–2001)
