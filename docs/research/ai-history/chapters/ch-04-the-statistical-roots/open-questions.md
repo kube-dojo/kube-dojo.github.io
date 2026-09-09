@@ -24,7 +24,7 @@
 
 **Tractability.** Yellow. Russian-language reading or Sheynin 2004 access required. Sheynin 2004 may be findable via inter-library loan or a German academic library (NG Verlag is based in Berlin).
 
-**Status.** Open. Currently anchored via Seneta 2006 secondary description (Green at the secondary level; Yellow at the primary level).
+**Status.** Open. 2026-09-09: Sheynin 2004 item 11 (English rendering, PDF pp.91–95) and an image-only JEHPS 2006 reprint are now retrieved; Kazan 1906 pagination is still unverified. Keep Yellow at the original-page level. Do not add proof detail because a translation exists. See `source-record-2026-09-09.md`.
 
 ---
 
@@ -38,7 +38,7 @@
 
 **Tractability.** Yellow. Single library trip would resolve.
 
-**Status.** Open. Anchored at Yellow; chapter prose handles by using Hayes attribution and avoiding stand-alone primary-quote framing.
+**Status.** Open. 2026-09-09: Ondar still unseen. Hayes print pp.94–95 remain the published mediators. Basharin 2004 printed p.17, citing Ondar, dates the “abuse of mathematics” phrasing to a 2 Nov 1910 postcard about Chuprov’s *Essays* p.195. The “pure analysis… indifference” sentence is still Hayes-only in this recheck. Keep quotation marks Hayes/Basharin-attributed.
 
 ---
 
@@ -94,7 +94,7 @@
 
 **Tractability.** Yellow. Bell Labs / MIT archive access required. The Soni and Goodman 2017 biography *A Mind at Play* (Simon & Schuster) reportedly covers his pre-1948 reading; not personally accessed.
 
-**Status.** Open. The chapter's framing is correct as stated (Shannon does not cite Markov); resolving this question would let Scene 4 say "Shannon does not cite Markov, but evidence X suggests he encountered the chain formalism through pathway Y." Useful but not blocking.
+**Status.** Open for Shannon’s unread working notes. 2026-09-09 recheck: Shannon 1948 footnote 6 (Harvard PDF pp.7–8, §4) cites Fréchet 1938 only. Kolmogorov 1950 Chelsea §6 (printed pp.12–13) defines Markov chains but is not a Shannon citation. Link 2006 *Chains* pp.571–572 (Bru/Hostinský) is the secondary transmission sketch. Separate those layers; do not treat Kolmogorov as Shannon’s source.
 
 ---
 
