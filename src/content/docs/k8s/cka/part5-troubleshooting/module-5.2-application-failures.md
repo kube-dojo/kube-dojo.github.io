@@ -1015,7 +1015,7 @@ Registry availability and error wording can differ in your environment.
 
 ### Scenario 4: Resource Constraint (OOM)
 
-This Pod intentionally asks the stress process to allocate more memory than the container limit allows. The intended result is `OOMKilled`, which must be observed rather than inferred from the limit. This retained `polinux/stress` image has not yet been tested on the arm64 fixture; registry architecture metadata is not execution proof. Keep the failing Pod and create a distinct Pod with a higher limit for comparison. Actual OOM and corrected-workload behavior remain validation gates.
+This Pod intentionally asks the stress process to allocate more memory than the container limit allows. The intended result is `OOMKilled`, which must be observed rather than inferred from the limit. The checked Kubernetes 1.35 arm64 fixture observed that termination with `polinux/stress`; this does not establish portability or verify the higher-limit Pod. Keep the failing Pod and create a distinct Pod with a higher limit for comparison, then record its actual behavior before claiming a successful repair.
 
 ```bash
 cat <<'EOF' | app_lab apply -f -
