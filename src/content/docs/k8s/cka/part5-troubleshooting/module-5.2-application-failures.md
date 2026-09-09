@@ -48,6 +48,10 @@ You should also notice the difference between repair and explanation. Repair get
 
 ## Reading the Pod Startup Path
 
+Outside the guided exercise, Bash blocks and practice drills are reference templates, not a second executed lab. Replace every `<...>` placeholder before use: select a known disposable kubeconfig and context, the intended namespace and object name, and the specific app or init container. Keep the same target in both sides of a pipeline and nested lookups. Commands that change objects require a diagnosed cause; do not run these blocks as a bundle.
+
+[Explicit container selection](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/#options) avoids an annotation or first-container default targeting the wrong container. JSONPath examples with `[0]` inspect only the first app container; confirm its name or select the intended container before interpreting the value. Container commands require their binaries in that actual image, including `sh` for shell commands and `cat` for file reads; missing tools are not application-health evidence. Do not install tools automatically as part of diagnosis.
+
 Kubernetes surfaces application failures as status words, but those words are shorthand for checkpoints in a longer path. A Pod starts with scheduling, then kubelet preparation, then image pulls and volume setup, then init containers, then app containers, then readiness gates. Treating those checkpoints as a timeline prevents a common beginner mistake: looking at container logs when the container has never started, or editing a Deployment image when the scheduler never found a node.
 
 The startup sequence below is the first protected diagnostic asset from the original lesson. Keep it in mind as a map rather than as a list of commands. When the Pod is `Pending`, the scheduler and cluster capacity are the likely focus. When the Pod is stuck during creation, kubelet preparation, image pulling, volume mounting, ConfigMaps, Secrets, or CNI setup become more likely. When the Pod has a restart count, the application process or a liveness probe has entered the story.
@@ -88,7 +92,7 @@ In Kubernetes 1.35 and current exam-style clusters, Events remain one of the hig
 
 ```bash
 # Check why pod is pending
-kubectl describe pod <pod> | grep -A 10 Events
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep -A 10 Events
 ```
 
 Pending is a scheduling problem until evidence proves otherwise. The scheduler does not ask whether a node has free memory in the casual sense; it evaluates declared requests, taints, affinity, selectors, and volume rules. That is why a node may have unused physical memory while the scheduler still reports `Insufficient memory`: previously scheduled Pods have already reserved the allocatable budget through their requests.
@@ -109,14 +113,14 @@ The supporting commands should match the hypothesis produced by Events. If Event
 
 ```bash
 # Check node resources
-kubectl describe nodes | grep -A 5 "Allocated resources"
-kubectl top nodes
+kubectl --kubeconfig <kubeconfig> --context <context> describe nodes | grep -A 5 "Allocated resources"
+kubectl --kubeconfig <kubeconfig> --context <context> top nodes
 
 # Check node taints
-kubectl get nodes -o custom-columns='NAME:.metadata.name,TAINTS:.spec.taints[*].key'
+kubectl --kubeconfig <kubeconfig> --context <context> get nodes -o custom-columns='NAME:.metadata.name,TAINTS:.spec.taints[*].key'
 
 # Check node labels (for nodeSelector)
-kubectl get nodes --show-labels
+kubectl --kubeconfig <kubeconfig> --context <context> get nodes --show-labels
 ```
 
 `ContainerCreating` means the scheduler has already placed the Pod on a node, so the investigation moves from the scheduler to kubelet preparation. At this stage kubelet may be pulling images, mounting volumes, reading ConfigMaps and Secrets, preparing the network namespace, and asking the container runtime to create containers. Logs are often empty here because the main process has not started yet.
@@ -127,7 +131,7 @@ Pause and predict: if a Pod is stuck in `ContainerCreating` for several minutes 
 
 ```bash
 # Always check Events first
-kubectl describe pod <pod> | grep -A 15 Events
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep -A 15 Events
 ```
 
 The table below preserves the original preparation-failure map, but the important habit is to read the message as a component clue. `ImagePullBackOff` points toward the registry and image reference, while `MountVolume.SetUp failed` points toward storage or projected configuration. A missing ConfigMap or Secret is not an application bug yet; it is Kubernetes refusing to start the container because the declared dependency does not exist.
@@ -146,15 +150,15 @@ The next commands verify the dependency named by the Event instead of guessing. 
 
 ```bash
 # Check image pull issues
-kubectl get events --field-selector involvedObject.name=<pod>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get events --field-selector involvedObject.name=<pod>
 
 # Check if ConfigMap/Secret exists
-kubectl get configmap <name>
-kubectl get secret <name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get configmap <name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get secret <name>
 
 # Check PVC status
-kubectl get pvc
-kubectl describe pvc <name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pvc
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pvc <name>
 ```
 
 ## Diagnosing CrashLoopBackOff and Exit Evidence
@@ -193,22 +197,22 @@ Pause and predict: if a Pod has restarted many times but currently shows `Runnin
 
 ```bash
 # Step 1: Check pod status and restart count
-kubectl get pod <pod>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod>
 # Look at RESTARTS column
 
 # Step 2: Check events
-kubectl describe pod <pod> | grep -A 10 Events
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep -A 10 Events
 
 # Step 3: Check current container state
-kubectl describe pod <pod> | grep -A 10 "State:"
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep -A 10 "State:"
 
 # Step 4: Check PREVIOUS container logs (crucial!)
 # For multi-container pods, identify the failing container and specify it with -c
-# kubectl get pod <pod> -o jsonpath='{range .status.containerStatuses[*]}{.name}{"\t"}{.restartCount}{"\n"}{end}'
-kubectl logs <pod> --previous # add -c <container-name> if multiple containers
+# kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o jsonpath='{range .status.containerStatuses[*]}{.name}{"\t"}{.restartCount}{"\n"}{end}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> logs <pod> -c <container> --previous
 
 # Step 5: Check exit code
-kubectl get pod <pod> -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}'
 ```
 
 Exit codes are compact evidence, not magic answers. Code `1` usually means the application chose to exit with a generic error, so logs and configuration become important. Code `127` points toward a command or entrypoint that does not exist in the image. Code `137` means SIGKILL, which may be an OOM kill or another forced termination, so you must check the termination reason rather than assuming every `137` is a memory leak.
@@ -232,16 +236,16 @@ The CKA exam usually rewards the direct correction, but production work requires
 
 ```bash
 # Check for OOMKilled status
-kubectl describe pod <pod> | grep -i oom
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep -i oom
 
 # Check memory limits
-kubectl get pod <pod> -o jsonpath='{.spec.containers[0].resources.limits.memory}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o jsonpath='{.spec.containers[0].resources.limits.memory}'
 
 # Check actual memory usage (if pod is running)
-kubectl top pod <pod>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> top pod <pod>
 
 # Fix: Increase memory limit
-kubectl patch deployment <name> -p '{"spec":{"template":{"spec":{"containers":[{"name":"<container>","resources":{"limits":{"memory":"512Mi"}}}]}}}}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> patch deployment <name> -p '{"spec":{"template":{"spec":{"containers":[{"name":"<container>","resources":{"limits":{"memory":"512Mi"}}}]}}}}'
 ```
 
 The most useful CrashLoop diagnosis combines three views: what the process logged, why Kubernetes says it terminated, and what the Pod spec asked Kubernetes to run. If the logs say a file is missing and the spec mounts that file from a ConfigMap key, you have a configuration dependency failure. If the exit code says command not found and the spec overrides `command`, you probably replaced the image entrypoint incorrectly.
@@ -286,7 +290,7 @@ Start with the exact error text from the pull attempt. `manifest unknown` means 
 
 ```bash
 # Check events for specific error
-kubectl describe pod <pod> | grep -A 5 "Failed to pull"
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep -A 5 "Failed to pull"
 
 # Common error messages:
 # "manifest unknown" - Image tag doesn't exist
@@ -301,37 +305,37 @@ Image names carry several pieces of meaning at once: registry host, repository p
 
 ```bash
 # Check current image
-kubectl get pod <pod> -o jsonpath='{.spec.containers[0].image}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o jsonpath='{.spec.containers[0].image}'
 
 # Fix with set image
-kubectl set image deployment/<name> <container>=<correct-image>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> set image deployment/<name> <container>=<correct-image>
 
 # Or edit directly
-kubectl edit deployment <name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> edit deployment <name>
 ```
 
 Private registry failures require matching the Secret, namespace, ServiceAccount, and Pod template. A Docker registry Secret in the wrong namespace is invisible to the Pod. A Secret that exists but is not referenced through `imagePullSecrets` is also invisible during the pull. Patching the default ServiceAccount can be a good namespace-level fix in a lab, while production teams often make that choice explicitly through workload-specific ServiceAccounts.
 
 ```bash
 # Create registry secret
-kubectl create secret docker-registry regcred \
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create secret docker-registry regcred \
   --docker-server=registry.example.com \
   --docker-username=user \
   --docker-password=your-registry-password-here \
   --docker-email=user@example.com
 
 # Add to pod spec
-kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"regcred"}]}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> patch serviceaccount default -p '{"imagePullSecrets":[{"name":"regcred"}]}'
 
 # Or add to specific deployment
-kubectl patch deployment <name> -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"regcred"}]}}}}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> patch deployment <name> -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"regcred"}]}}}}'
 ```
 
 Rate limiting is different from a bad image reference because the same image may work for one node and fail for another depending on pull history and credentials. Authentication, internal registries, pre-pulled images, and alternative public registries are all valid mitigations, but the right choice depends on cluster policy. In an exam environment, the most likely fix is a corrected image reference or an existing pull secret, not a registry architecture redesign.
 
 ```bash
 # Option 1: Use authenticated pulls
-kubectl create secret docker-registry dockerhub \
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create secret docker-registry dockerhub \
   --docker-server=https://index.docker.io/v1/ \
   --docker-username=<username> \
   --docker-password=<TOKEN>
@@ -352,14 +356,14 @@ The diagnosis begins by reading the Pod spec for declared inputs and then checki
 
 ```bash
 # Check what ConfigMaps/Secrets the pod needs
-kubectl get pod <pod> -o yaml | grep -A 5 "configMap\|secret"
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o yaml | grep -A 5 "configMap\|secret"
 
 # Verify they exist
-kubectl get configmap
-kubectl get secret
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get configmap
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get secret
 
 # Check specific one
-kubectl describe configmap <name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe configmap <name>
 ```
 
 Creating the missing object can be a valid emergency fix when the desired data is known and safe to create. In a controlled exam lab, a literal key is often enough to prove you identified the dependency. In production, you should confirm ownership and data source before inventing values, because an application that starts with the wrong configuration may fail more quietly than one that refuses to start.
@@ -368,24 +372,24 @@ Secrets deserve special caution because their presence can satisfy Kubernetes wh
 
 ```bash
 # Create missing ConfigMap
-kubectl create configmap <name> --from-literal=key=value
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create configmap <name> --from-literal=key=value
 
 # Create missing Secret
-kubectl create secret generic <name> --from-literal=password=your-password-here
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create secret generic <name> --from-literal=password=your-password-here
 
 # If you have the data file
-kubectl create configmap <name> --from-file=config.yaml
-kubectl create secret generic <name> --from-file=credentials.json
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create configmap <name> --from-file=config.yaml
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create secret generic <name> --from-file=credentials.json
 ```
 
 Wrong keys are subtler than missing objects. A ConfigMap named `app-settings` may exist and still lack the `REDIS_HOST` key that the container expects. If the application reads a mounted file path, logs might show `file not found`. If it reads an environment variable, logs might show a missing variable error and exit code `1`, which means Kubernetes successfully started the process but the application rejected its inputs.
 
 ```bash
 # Check what keys exist in ConfigMap
-kubectl get configmap <name> -o yaml
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get configmap <name> -o yaml
 
 # Check pod's expected keys
-kubectl get pod <pod> -o yaml | grep -A 10 configMapKeyRef
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o yaml | grep -A 10 configMapKeyRef
 
 # Compare expected vs actual
 ```
@@ -394,24 +398,24 @@ Patching a ConfigMap changes the object, but it does not always update a running
 
 ```bash
 # Add missing key to ConfigMap
-kubectl patch configmap <name> -p '{"data":{"missing-key":"value"}}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> patch configmap <name> -p '{"data":{"missing-key":"value"}}'
 
 # Or recreate
-kubectl create configmap <name> --from-literal=key1=val1 --from-literal=key2=val2 --dry-run=client -o yaml | kubectl apply -f -
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create configmap <name> --from-literal=key1=val1 --from-literal=key2=val2 --dry-run=client -o yaml | kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> apply -f -
 ```
 
 Environment variable debugging is most useful after the container is running or briefly running. Compare the values inside the process environment with the values declared in the Pod template. If the Pod crashes too quickly for `exec`, use previous logs and the Pod spec instead. In multi-container Pods, remember that each container has its own environment and mounts.
 
 ```bash
 # Check environment variables in running container
-kubectl exec <pod> -- env
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> exec <pod> -c <container> -- env
 
 # Check what's defined in spec
-kubectl get pod <pod> -o jsonpath='{.spec.containers[0].env[*]}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o jsonpath='{.spec.containers[0].env[*]}'
 
 # Common issue: ConfigMap key name doesn't match env var name
 # Check with:
-kubectl get pod <pod> -o yaml | grep -A 5 valueFrom
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o yaml | grep -A 5 valueFrom
 ```
 
 ## Tracing Deployment Rollout Failures
@@ -426,14 +430,14 @@ The first pass is to read the Deployment, then its ReplicaSets, then the Pods ow
 
 ```bash
 # Check deployment status
-kubectl get deployment <name>
-kubectl describe deployment <name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get deployment <name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe deployment <name>
 
 # Check ReplicaSets
-kubectl get rs -l app=<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get rs -l app=<name>
 
 # Check pods from new ReplicaSet
-kubectl get pods -l app=<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pods -l app=<name>
 ```
 
 The rollout-state diagram from the original module captures the operational risk. A rollout can be partially successful, with old Pods still carrying traffic while new Pods fail. That is a safer failure mode than replacing everything at once, but it can still leave you under capacity. Your decision is whether to fix forward quickly, rollback, or pause and investigate while the previous version remains available.
@@ -466,48 +470,48 @@ ReplicaSets are valuable because they preserve rollout history in object form. T
 
 ```bash
 # Check deployment conditions
-kubectl describe deployment <name> | grep -A 10 Conditions
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe deployment <name> | grep -A 10 Conditions
 
 # Check new ReplicaSet's pods
-NEW_RS=$(kubectl get rs -l app=<name> --sort-by='.metadata.creationTimestamp' -o name | tail -1)
-kubectl describe "$NEW_RS"
+NEW_RS=$(kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get rs -l app=<name> --sort-by='.metadata.creationTimestamp' -o name | tail -1)
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe "$NEW_RS"
 
 # Check why pods aren't ready
-kubectl get pods -l app=<name> | grep -v Running
-kubectl describe pod <failing-pod>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pods -l app=<name> | grep -v Running
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <failing-pod>
 ```
 
 Rollback is a service-restoration tool, not an admission of defeat. If the new revision is breaking capacity and the old revision is known good, `kubectl rollout undo` moves the Deployment back to the previous Pod template while preserving the controller's normal behavior. After service is stable, you can investigate the failed revision with less pressure and build a corrected forward fix.
 
 ```bash
 # Check rollout history
-kubectl rollout history deployment/<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout history deployment/<name>
 
 # Rollback to previous version
-kubectl rollout undo deployment/<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout undo deployment/<name>
 
 # Rollback to specific revision
-kubectl rollout undo deployment/<name> --to-revision=2
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout undo deployment/<name> --to-revision=2
 
 # Verify rollback
-kubectl rollout status deployment/<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout status deployment/<name>
 ```
 
 Fix-forward is appropriate when the root cause is obvious and safe to correct, such as a typoed image tag or a missing ConfigMap key. Rollback is better when the failure is ambiguous, customer-facing capacity is low, or the fix requires application code. Forced restarts and scale-down operations are powerful, but they can hide evidence and interrupt healthy Pods, so keep them as deliberate choices rather than reflexes.
 
 ```bash
 # Option 1: Fix the issue and let rollout continue
-kubectl set image deployment/<name> <container>=<fixed-image>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> set image deployment/<name> <container>=<fixed-image>
 
 # Option 2: Rollback
-kubectl rollout undo deployment/<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout undo deployment/<name>
 
 # Option 3: Force restart (deletes and recreates pods)
-kubectl rollout restart deployment/<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout restart deployment/<name>
 
 # Option 4: Scale down then up (nuclear option)
-kubectl scale deployment/<name> --replicas=0
-kubectl scale deployment/<name> --replicas=3
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> scale deployment/<name> --replicas=0
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> scale deployment/<name> --replicas=3
 ```
 
 ## Readiness, Liveness, and Probe-Caused Failures
@@ -540,18 +544,20 @@ The preserved probe diagram shows the two most common probe consequences. A fail
 
 Probe diagnosis starts with the configured path, port, command, timing, and Events. If Events show repeated liveness failures followed by restarts, the probe may be killing the container before the application is actually broken. If readiness fails without restarts, traffic may be blocked because the readiness endpoint returns an error, the port is wrong, or the app depends on a backend that is not ready yet.
 
-Manual probe testing should happen from the same network perspective as the probe whenever possible. Executing a command inside the container and calling `127.0.0.1` checks the local listener and path, which is close to what an HTTP probe against the Pod IP is trying to validate. If the manual check works but Events still show failures, compare port names, container ports, scheme, timeout, and whether the endpoint sometimes exceeds the configured timeout under load.
+A container-local loopback request is supplementary evidence about its listener, not an equivalent kubelet probe. [Kubelet makes the HTTP probe request](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-liveness-http-request), and [HTTPGetAction defaults the connection host to the Pod IP](https://github.com/kubernetes/api/blob/v0.35.0/core/v1/types.go). Compare the actual configured host, scheme, resolved port, path, headers and timing with Events. A successful loopback request does not prove kubelet-to-Pod reachability or reproduce those settings.
+
+A bounded Kubernetes 1.35 arm64 inspection of `nginx:1.25`, pulled as `docker.io/library/nginx@sha256:a484819eb60211f5299034ac80f6a681b06f89e65866ce91f356ed7c72af059c`, found `sh`, `cat` and `curl` on PATH, but no `wget`. Curl returned HTTP 200 from that image's default listener at `127.0.0.1:80/`. This is not a universal nginx tool inventory or proof of a configured probe. Confirm tools in the actual selected image; use its configured port and path below, with the path's leading `/`. The file read applies only when that file is relevant to the configured check; no `/tmp/healthy` file is assumed.
 
 ```bash
 # Check probe configuration
-kubectl get pod <pod> -o yaml | grep -A 10 "livenessProbe\|readinessProbe"
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o yaml | grep -A 10 "livenessProbe\|readinessProbe"
 
 # Check for probe failures in events
-kubectl describe pod <pod> | grep -i "unhealthy\|probe"
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep -i "unhealthy\|probe"
 
-# Test probe manually (nginx images ship curl, not wget)
-kubectl exec <pod> -- curl -sf http://127.0.0.1:8080/health
-kubectl exec <pod> -- cat /tmp/healthy
+# Supplementary local checks; require tools in the selected container
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> exec <pod> -c <container> -- curl -sf "<scheme>://127.0.0.1:<port><path>"
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> exec <pod> -c <container> -- cat <configured-file-path>
 ```
 
 Probe timing is where many otherwise correct configurations fail. A Java service, database migration, cache warmup, or model-loading application may need time before it can answer `/health`. If liveness begins too early, Kubernetes restarts the container during normal startup and guarantees it never reaches readiness. A startup probe or a longer initial delay allows slow startup without weakening the long-term liveness contract.
@@ -1188,68 +1194,68 @@ There is no automatic EXIT cleanup when an interactive command is interrupted. I
 
 ### Practice Drills
 
-These drills preserve the original quick-command practice while using full runnable `kubectl` commands. Treat them as timed recall only after you understand the evidence path, because speed without diagnosis can make you confidently wrong. The goal is to make the correct next command feel automatic once the Pod phase and Events have pointed you in the right direction.
+These optional drills use the same reference-template targeting rules; substitute the placeholders before considering any command. Treat them as timed recall only after you understand the evidence path, because speed without diagnosis can make you confidently wrong. The goal is to make the correct next command feel automatic once the Pod phase and Events have pointed you in the right direction.
 
 ### Drill 1: Quick Pod Status (30 sec)
 
 ```bash
-# Task: Show all pods with restart count > 0
-kubectl get pods -A -o custom-columns='NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount' | awk '$2 > 0'
+# Task: Show Pods whose first app container has restart count > 0
+kubectl --kubeconfig <kubeconfig> --context <context> get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount' | awk 'NR > 1 && $3 ~ /^[0-9]+$/ && $3 > 0'
 ```
 
 ### Drill 2: Previous Logs (30 sec)
 
 ```bash
 # Task: Get last 50 lines from previous container instance
-kubectl logs <pod> --previous --tail=50
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> logs <pod> -c <container> --previous --tail=50
 ```
 
 ### Drill 3: Exit Code Check (1 min)
 
 ```bash
 # Task: Get exit code from crashed container
-kubectl get pod <pod> -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}'
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}'
 # Or from describe:
-kubectl describe pod <pod> | grep "Exit Code"
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> describe pod <pod> | grep "Exit Code"
 ```
 
 ### Drill 4: Image Fix (1 min)
 
 ```bash
 # Task: Update image in deployment
-kubectl set image deployment/<name> <container>=<new-image>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> set image deployment/<name> <container>=<new-image>
 ```
 
 ### Drill 5: Create Missing ConfigMap (1 min)
 
 ```bash
 # Task: Create ConfigMap from literal
-kubectl create configmap <name> --from-literal=key=value
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create configmap <name> --from-literal=key=value
 # From file
-kubectl create configmap <name> --from-file=<filename>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> create configmap <name> --from-file=<filename>
 ```
 
 ### Drill 6: Environment Variable Debug (1 min)
 
 ```bash
 # Task: Check all env vars in running container
-kubectl exec <pod> -- env | sort
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> exec <pod> -c <container> -- env | sort
 ```
 
 ### Drill 7: Rollback Deployment (1 min)
 
 ```bash
 # Task: Rollback to previous version
-kubectl rollout undo deployment/<name>
-kubectl rollout status deployment/<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout undo deployment/<name>
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> rollout status deployment/<name>
 ```
 
 ### Drill 8: Check Probe Config (1 min)
 
 ```bash
 # Task: View probe configuration
-kubectl get pod <pod> -o yaml | grep -A 15 livenessProbe
-kubectl get pod <pod> -o yaml | grep -A 15 readinessProbe
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o yaml | grep -A 15 livenessProbe
+kubectl --kubeconfig <kubeconfig> --context <context> -n <namespace> get pod <pod> -o yaml | grep -A 15 readinessProbe
 ```
 
 ## Learner check
