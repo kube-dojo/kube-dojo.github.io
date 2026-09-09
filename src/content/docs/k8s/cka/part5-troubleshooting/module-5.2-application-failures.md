@@ -1015,7 +1015,9 @@ Registry availability and error wording can differ in your environment.
 
 ### Scenario 4: Resource Constraint (OOM)
 
-This Pod intentionally asks the stress process to allocate more memory than the container limit allows. The intended result is `OOMKilled`, which must be observed rather than inferred from the limit. The checked Kubernetes 1.35 arm64 fixture observed that termination with `polinux/stress`; this does not establish portability or verify the higher-limit Pod. Keep the failing Pod and create a distinct Pod with a higher limit for comparison, then record its actual behavior before claiming a successful repair.
+This experiment retains a 500 MiB Python `bytearray`, writes to it at 4 KiB intervals, prints an allocation marker, and sleeps. [Python documents the zero-initialized allocation](https://docs.python.org/3.12/library/functions.html#func-bytearray); the writes do not create a second same-size bytes object. The failing Pod has a 100Mi memory request and limit. Require Kubernetes' observed [`OOMKilled` termination reason](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/#exceed-a-container-s-memory-limit), not exit code 137 alone, before creating the 600Mi comparison Pod.
+
+Both Pods use the [official Python image](https://github.com/docker-library/official-images/blob/master/library/python) tag `python:3.12.14-alpine3.24`. A tag or manifest is not execution evidence: record image identity and actual behavior on your fixture. The scheduler accounts for 700Mi in their combined memory requests, in addition to the other exercise workloads; check available capacity before continuing. This synthetic comparison is not a production recommendation to raise memory limits.
 
 ```bash
 cat <<'EOF' | app_lab apply -f -
@@ -1026,28 +1028,74 @@ metadata:
 spec:
   containers:
   - name: app
-    image: polinux/stress
-    command: ["stress"]
-    args: ['--vm', '1', '--vm-bytes', '500M']
+    image: python:3.12.14-alpine3.24
+    command: ["python", "-c"]
+    args:
+    - |
+      import time
+      allocation = bytearray(500 * 1024 * 1024)
+      for offset in range(0, len(allocation), 4096):
+          allocation[offset] = 1
+      print("allocated=524288000", flush=True)
+      time.sleep(3600)
     resources:
+      requests:
+        memory: "100Mi"
       limits:
         memory: "100Mi"
 EOF
 ```
 
-**Task**: Determine whether the observed termination reason is `OOMKilled`. If the image cannot run on the fixture, record that limitation and stop this scenario; an image or architecture failure is not OOM evidence.
+**Task**: Predict the termination evidence, then inspect the actual result. If the image cannot run or the Pod cannot schedule, record that limitation; those failures are not OOM evidence. The solution refuses comparison creation without `OOMKilled` in a 120-second observation window. Existing helper request timeouts still apply to API calls; a response arriving after the observation deadline cannot pass the gate.
 
 <details>
 <summary>Solution</summary>
 
 ```bash
-# Diagnose
-app_lab describe pod oom-app | grep -i oom
-app_lab get pod oom-app -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
-# Require an observed OOMKilled reason; a generic exit is not proof.
+app_lab_wait_oom() {
+  local deadline=$((SECONDS + 120)) reasons previous current
+  while (( SECONDS < deadline )); do
+    reasons=$(app_lab get pod oom-app -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}{"|"}{.status.containerStatuses[0].state.terminated.reason}') || return
+    (( SECONDS < deadline )) || break
+    IFS='|' read -r previous current <<< "$reasons"
+    if [[ $previous == OOMKilled || $current == OOMKilled ]]; then
+      printf 'Observed oom-app termination reason: OOMKilled\n'; return 0
+    fi
+    sleep 2
+  done
+  echo 'No OOMKilled evidence within 120 seconds; comparison refused.' >&2
+  return 1
+}
+app_lab_verify_oom() {
+  local path baseline after_marker after logs attempt marker=false
+  local uid container started restarts ready extra
+  path='{.metadata.uid}{"|"}{.status.containerStatuses[0].containerID}{"|"}{.status.containerStatuses[0].state.running.startedAt}{"|"}{.status.containerStatuses[0].restartCount}{"|"}{.status.conditions[?(@.type=="Ready")].status}'
+  app_lab wait --for=condition=Ready pod/oom-app-fixed --timeout=90s || return
+  baseline=$(app_lab get pod oom-app-fixed -o "jsonpath=$path") || return
+  IFS='|' read -r uid container started restarts ready extra <<< "$baseline"
+  [[ -n $uid && -n $container && -n $started && $restarts == 0 && $ready == True && -z $extra ]] || {
+    echo 'Comparison Pod lacks a fresh running, ready container; stop.' >&2; return 1;
+  }
+  for ((attempt=0; attempt<30; attempt++)); do
+    logs=$(app_lab logs oom-app-fixed -c app) || return
+    case $'\n'"$logs"$'\n' in
+      *$'\nallocated=524288000\n'*) marker=true; break;;
+    esac
+    sleep 2
+  done
+  [[ $marker == true ]] || { echo 'Allocation marker not observed; stop.' >&2; return 1; }
+  after_marker=$(app_lab get pod oom-app-fixed -o "jsonpath=$path") || return
+  [[ "$after_marker" == "$baseline" ]] || { echo 'Container changed during allocation; stop.' >&2; return 1; }
+  sleep 15
+  after=$(app_lab get pod oom-app-fixed -o "jsonpath=$path") || return
+  [[ "$after" == "$baseline" ]] || { echo 'Comparison state changed during observation; stop.' >&2; return 1; }
+  printf 'allocated=524288000; matching state samples 15 seconds apart: %s\n' "$after"
+}
+app_lab_compare_oom() {
+  app_lab_wait_oom || return
 
-# Create a separate comparison Pod; retain oom-app.
-cat <<'EOF' | app_lab create -f -
+# Create only after the evidence gate; retain oom-app.
+cat <<'EOF' | app_lab create -f - || return
 apiVersion: v1
 kind: Pod
 metadata:
@@ -1055,17 +1103,28 @@ metadata:
 spec:
   containers:
   - name: app
-    image: polinux/stress
-    command: ["stress"]
-    args: ['--vm', '1', '--vm-bytes', '500M']
+    image: python:3.12.14-alpine3.24
+    command: ["python", "-c"]
+    args:
+    - |
+      import time
+      allocation = bytearray(500 * 1024 * 1024)
+      for offset in range(0, len(allocation), 4096):
+          allocation[offset] = 1
+      print("allocated=524288000", flush=True)
+      time.sleep(3600)
     resources:
+      requests:
+        memory: "600Mi"
       limits:
         memory: "600Mi"
 EOF
-app_lab get pod oom-app oom-app-fixed
+  app_lab_verify_oom
+}
+app_lab_compare_oom
 ```
 
-A sampled Running/Ready state does not prove the memory problem is fixed. Record actual termination reasons, restart history and corrected-workload behavior before claiming success. Keeping both Pods also requires capacity for both; do not delete the failing Pod to manufacture a passing comparison.
+The verifier requires the exact allocation marker, then compares Pod UID, container ID, running start time, zero restart count and Ready=True before and after a 15-second interval. It also rejects an identity change while waiting for the marker. Log polling is limited to 30 attempts with two-second pauses; any failed API call stops verification. These are bounded state samples, not continuous monitoring or proof of long-term stability. Ready alone, a higher configured limit, or successful creation cannot satisfy the comparison.
 
 </details>
 
@@ -1075,7 +1134,7 @@ A sampled Running/Ready state does not prove the memory problem is fixed. Record
 - [ ] Create `crash-app-fixed`, verify it becomes Ready, and retain the original failed Pod for comparison.
 - [ ] Fix application failures caused by missing ConfigMaps by creating `app-settings` in the correct namespace.
 - [ ] Diagnose the new ReplicaSet's image-pull failure, roll back `image-rollout`, and verify two ready replicas in its dedicated namespace.
-- [ ] Record `OOMKilled` for `oom-app` before creating the higher-limit `oom-app-fixed`; report an unreproduced failure instead of claiming OOM from an image or architecture error.
+- [ ] Observe `OOMKilled` before comparison creation; then capture `allocated=524288000` and matching running/ready identity samples with zero restarts 15 seconds apart for `oom-app-fixed`, or report the unmet gate without claiming a repair.
 
 ### Cleanup
 
@@ -1175,9 +1234,9 @@ kubectl get pod <pod> -o yaml | grep -A 15 readinessProbe
 
 ## Learner check
 
-> `image: polinux/stress` with `command: ["stress"]` and `args: ['--vm', '1', '--vm-bytes', '500M']` replaces the schema-v1 `progrium/stress` image so the OOM lab runs on Kubernetes 1.35.
+> The checked Kubernetes 1.35 arm64 fixture produced `OOMKilled` at 100Mi and completed the allocation-marker and state comparison at 600Mi. This is a bounded observation, not a portability or long-term stability claim.
 
-You applied Scenario 4 with a 100Mi memory limit and the stress container requesting 500M. What termination reason should `kubectl get pod oom-app -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'` return before you raise the limit?
+The 600Mi comparison Pod is Ready, but its allocation marker is absent. Can you claim a repair? Explain what else the verifier must observe, and why the failed 100Mi Pod remains available for comparison.
 
 ---
 
