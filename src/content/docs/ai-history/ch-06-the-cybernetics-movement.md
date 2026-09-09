@@ -60,7 +60,7 @@ timeline
 - **Teleology (cybernetic sense)** — In the Rosenblueth-Wiener-Bigelow 1943 paper, "teleological behavior" is recast in strictly mechanical terms: behaviour controlled by negative feedback. Metaphysical readings of teleology as a future-cause-acting-on-the-present are dropped.
 - **Macy Conferences** — A series of ten closed interdisciplinary meetings (1946–1953), sponsored by the Josiah Macy, Jr. Foundation, organised by Frank Fremont-Smith and chaired by McCulloch. Approximately 20 attendees per meeting under a strict disciplinary-parity policy. The first five had no stenographic record; conferences 6–10 (1949–1953) were transcribed by Heinz von Foerster.
 - **Servo-mechanism** — The control-engineering term for a feedback-driven system that drives an output to match a target input — gun aimers, autopilots, factory positioners. The 1943 paper deliberately equated "servo-mechanism" with cybernetic teleology.
-- **Homeostat** — Ashby's 1948 electromechanical demonstration of an *ultrastable* system: four units with pivoted magnets, water-trough electrodes, triode outputs, and stepping switches that searched for a configuration returning the magnets to centre. Demonstrated equilibrium-finding, not symbol manipulation. Ashby refused the adjective "homeostatic" — that priority belonged to Cannon's 1932 coinage.
+- **Homeostat** — Ashby's electromechanical demonstration of an *ultrastable* system: four units with pivoted magnets, water-trough electrodes, triode outputs, and stepping switches that searched for a configuration returning the magnets to centre. Demonstrated equilibrium-finding, not symbol manipulation. Ashby refused the adjective "homeostatic" — that priority belonged to Cannon's 1932 coinage.
 
 </details>
 
