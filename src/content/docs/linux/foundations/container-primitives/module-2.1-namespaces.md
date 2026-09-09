@@ -306,7 +306,7 @@ ipcs
 exit
 ```
 
-In Kubernetes, IPC sharing is a deliberate pod-level design choice. Containers in a pod may share IPC depending on runtime and pod configuration, while containers in separate pods should not. This can be useful for tightly coupled sidecars but risky if one container is less trusted than another. Shared memory is not just a performance feature; it is also a data exposure surface.
+In ordinary Linux pods, [Kubernetes 1.35 documents same-pod network sharing and communication through OS-level IPC](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/#pod-networking). Containers share the pod's IPC namespace; this is not an optional per-container runtime choice. [`hostIPC: true` instead shares the host's IPC namespace](https://v1-35.docs.kubernetes.io/docs/concepts/security/pod-security-standards/#baseline), removing that pod boundary. Same-pod IPC can help tightly coupled sidecars, but it also exposes IPC objects to other containers in that pod; it does not promise unrestricted IPC between separate pods.
 
 A useful decision rule is to treat UTS and IPC as "small surface, sharp edge" namespaces. UTS rarely causes deep incidents by itself, but wrong host identity can confuse observability and clustering. IPC is invisible until an application depends on it, and then it can become either a required coupling mechanism or an unexpected security risk.
 
@@ -422,14 +422,14 @@ After the incident, translate the observation into a durable fix. Do not leave a
 
 ## Kubernetes Pod Namespace Layout
 
-Kubernetes uses namespaces to make a pod feel like one deployable unit while still running one or more containers. The most important default is that [containers in the same pod share a network namespace](https://kubernetes.io/docs/concepts/workloads/pods/). This is why they have the same pod IP and can communicate through `localhost`. It is also why two containers in the same pod cannot both bind the same TCP port on the same address.
+Kubernetes uses namespaces to make a pod feel like one deployable unit while still running one or more containers. In ordinary Linux pods, [containers in the same pod share a network namespace](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/#pod-networking). This is why they have the same pod IP and can communicate through `localhost`. It is also why two containers in the same pod cannot both bind the same TCP port on the same address. They see the same configured pod hostname; that observable behavior does not require us to assume a shared UTS namespace in every runtime.
 
 ```mermaid
 flowchart TD
     subgraph Pod["One Kubernetes pod"]
         NetNs["Shared network namespace\none pod IP, one loopback, one port space"]
-        UtsNs["Shared UTS namespace\npod hostname view"]
-        IpcNs["IPC namespace\nshared when configured by runtime and pod settings"]
+        PodHostname["Same configured pod hostname\nUTS implementation not assumed"]
+        IpcNs["Shared pod IPC namespace\nordinary Linux pod"]
         subgraph AppContainer["app container"]
             AppMnt["app mount namespace\napp image filesystem"]
             AppPid["app PID namespace by default"]
@@ -440,16 +440,16 @@ flowchart TD
         end
         NetNs --> AppContainer
         NetNs --> SidecarContainer
-        UtsNs --> AppContainer
-        UtsNs --> SidecarContainer
+        PodHostname --> AppContainer
+        PodHostname --> SidecarContainer
         IpcNs --> AppContainer
         IpcNs --> SidecarContainer
     end
 ```
 
-The mount namespace story is different. Containers in a pod usually have separate root filesystems because each container comes from its own image. [They share files only through volumes that Kubernetes mounts into both containers.](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/) This is why a logging sidecar cannot read an application file merely because it is in the same pod. Both containers need a shared volume mounted at agreed paths.
+The mount namespace story is different. Containers in a pod usually have separate root filesystems because each container comes from its own image. [A shared volume gives both containers an explicit common file location.](https://kubernetes.io/docs/tasks/access-application-cluster/communicate-containers-same-pod-shared-volume/) Merely being in the same pod does not make an application's log path appear in the sidecar's filesystem. With process namespace sharing enabled, however, [another container's filesystem can be accessed through `/proc/<pid>/root`, subject to filesystem permissions](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/#understanding-process-namespace-sharing). Separate root filesystems therefore do not guarantee that files are inaccessible across containers. The logging example below uses a shared volume mounted at agreed paths.
 
-The Kubernetes examples in this module target Kubernetes 1.35 and newer API behavior unless a cluster distribution documents a different runtime default. Linux namespace inspection commands still run as host commands.
+The pod-sharing explanation here is checked against Kubernetes 1.35 documentation. Linux namespace inspection commands still run as host commands.
 
 ```yaml
 apiVersion: v1
@@ -477,7 +477,7 @@ spec:
 
 In this BusyBox example, `-F` keeps retrying if `app.log` does not exist yet. An initial `can't open` message can therefore precede the log output when the writer creates the file. Retrying does not order the containers or establish application health: check that the sidecar actually prints the writer's lines. The shared volume supplies the common file location; the reader still needs to handle a file that has not appeared yet.
 
-Kubernetes can also [share the process namespace inside a pod when `shareProcessNamespace: true` is set](https://kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/). This lets containers see each other's processes, which can help sidecars send signals or collect diagnostics. It also weakens process isolation inside the pod, so it should be an explicit design decision rather than a default assumption.
+Ordinary Linux pods have separate container PID namespaces by default, as distinguished from the lower-level CRI default in the [Kubernetes v1.35.0 namespace API comments](https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto). Setting [`spec.shareProcessNamespace: true` shares the process namespace inside the pod](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/). Containers can then see each other's processes, which can help sidecars send signals or collect diagnostics when permissions allow. It also weakens process isolation inside the pod, so it should be an explicit design decision rather than a default assumption.
 
 ```yaml
 apiVersion: v1
@@ -495,7 +495,7 @@ spec:
     command: ["sh", "-c", "ps -ef; sleep 3600"]
 ```
 
-Host namespace options are stronger exceptions. [`hostNetwork: true` places the pod in the node's network namespace. `hostPID: true` gives the pod visibility into node processes. `hostIPC: true` shares host IPC.](https://kubernetes.io/docs/concepts/security/pod-security-standards/) These options are legitimate for some system agents, but they are dangerous defaults for application workloads because they remove important boundaries.
+Host namespace options are stronger exceptions. [`hostNetwork: true` places the pod in the node's network namespace. `hostPID: true` gives the pod visibility into node processes. `hostIPC: true` shares host IPC.](https://v1-35.docs.kubernetes.io/docs/concepts/security/pod-security-standards/#baseline) These options are legitimate for some system agents, but they are dangerous defaults for application workloads because they remove important boundaries.
 
 ```yaml
 apiVersion: v1
@@ -530,7 +530,7 @@ The third pattern is layered isolation. Namespaces answer what a process can see
 
 The common anti-pattern is using host namespace options as a shortcut when the team has not found the real boundary. `hostNetwork: true` can make a connection test pass by moving the pod into the node network namespace, but it also imports node port conflicts and exposes a wider surface. Mounting host paths to "just get the file" can bypass the mount namespace design that kept application data scoped. Entering every namespace with `nsenter --all` can be useful for a controlled debug shell, but it is a poor first move because it hides which boundary explained the symptom.
 
-Another anti-pattern is assuming that same-pod means same-everything. Same-pod containers share the pod IP and loopback, but they normally keep separate root filesystems and often separate process views. A sidecar that tails a file needs a volume, not a lecture about pod networking. A process inspector needs `shareProcessNamespace: true` or host PID visibility when justified, not a guess based on container names.
+Another anti-pattern is assuming that same-pod means same-everything. Ordinary Linux pod containers share the pod IP, loopback, and IPC namespace, but have separate PID namespaces by default and normally keep separate root filesystems. Use a shared volume for the logging sidecar's agreed file path. Enable `shareProcessNamespace: true` only when shared process visibility is needed, remembering that it also permits filesystem access through `/proc/<pid>/root` subject to permissions.
 
 The last anti-pattern is trusting tool output without checking the namespace behind the tool. `ps`, `ip`, `ss`, `findmnt`, and `hostname` all report the world visible to the process that runs them. If you run the command from the host, you get the host view. If you run the host binary through `nsenter -t "$PID" -n`, you get the target network view while still using host tooling. The difference is not cosmetic; it decides whether the evidence belongs to the failing workload.
 
