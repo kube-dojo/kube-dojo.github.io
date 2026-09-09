@@ -702,7 +702,7 @@ spec:
 
 ## Part 7: CLI, Observability, and Troubleshooting
 
-Hubble is Cilium's integrated network observability platform, providing real-time service maps and L3-L7 flow visibility. Hubble provides a Relay component that aggregates flow data from all nodes for cluster-wide observability. Note that while Hubble Relay is stable, the Hubble UI is technically in Beta status as of Cilium 1.20.x stable.
+Hubble is Cilium's integrated network observability platform, providing real-time service maps and L3-L7 flow visibility. Hubble provides a Relay component that aggregates flow data from all nodes for cluster-wide observability. As of Cilium 1.20.1 stable docs (checked 2026-09), the Hubble UI guide no longer marks the UI as beta—`beta.rst` is only a generic include stub, not a Hubble UI maturity label—so treat Relay and the UI as the documented observability path on current stable.
 
 Good Cilium troubleshooting is a disciplined narrowing process. Start by asking whether the packet entered the Cilium-managed datapath, whether it matched the expected source and destination identities, whether it was forwarded, redirected, translated, or dropped, and whether the drop was L3/L4 or L7. Hubble is valuable because it turns those hidden datapath decisions into timestamped flow records. The CLI and agent commands are valuable because they let you compare those records against endpoint state, identity state, service maps, connection tracking, and current configuration.
 
