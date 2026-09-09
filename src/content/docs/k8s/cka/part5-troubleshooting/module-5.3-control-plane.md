@@ -124,19 +124,22 @@ Static pods also create a useful mental boundary between "Kubernetes object" and
 # Changes to these files = automatic restart of component
 ```
 
-Before you dig through logs, establish a baseline with the least invasive checks available. In a healthy API path, `kubectl` can show whether the mirrored static pods appear in `kube-system`; in a broken API path, you should not waste minutes waiting for `kubectl` timeouts. The deprecated `componentstatuses` API still appears in older training material, but modern Kubernetes 1.35 troubleshooting should prefer pod status, component logs, `/readyz` and `/livez` endpoints, and direct node-level inspection when the API is unavailable.
+Establish API health before choosing the local runtime route. [`/livez` and `/readyz`](https://v1-35.docs.kubernetes.io/docs/reference/using-api/health-checks/#api-endpoints-for-health) answer different questions: liveness and readiness to accept traffic. HTTP 200 is success for the requested endpoint; a readiness failure can reflect initialization or an unavailable dependency. A connection, authentication or TLS error is not a returned failing health check, and API readiness does not prove scheduling or reconciliation.
 
-Baseline checks are most valuable when you write down both the command and the interpretation. "API timeout from my laptop" could mean a local kubeconfig issue, a firewall problem, a load balancer problem, or a dead API server. "API timeout from a control plane node, no API server container in `crictl ps`, kubelet log shows bad certificate path" is a diagnosis. The second statement is slower by a minute, but it is dramatically safer because it identifies the component boundary and the first broken dependency.
+Run this Bash block from your diagnostic workstation with an explicitly identified disposable kubeconfig and context. Set `API_KUBECONFIG` to its absolute path and `API_CONTEXT` to that context; do not guess a host or switch global context. Verbose check details are for human interpretation, not a stable machine-parsing contract. Record the actual result and error; stop rather than assuming API failure means the process is absent.
 
 ```bash
-# Quick legacy health check; deprecated, may be unavailable on newer clusters, and is not sufficient by itself.
-kubectl get componentstatuses
-
-# Check control plane pods through the API when the API is reachable
-kubectl -n kube-system get pods | grep -E 'etcd|api|controller|scheduler'
-
-# Verify all mirrored static pods are reporting from expected nodes
-kubectl -n kube-system get pods -o wide | grep -E 'kube-'
+(
+  : "${API_KUBECONFIG:?Set the known disposable kubeconfig path}"
+  : "${API_CONTEXT:?Set its explicit context}"
+  [[ "$API_KUBECONFIG" == /* && -r "$API_KUBECONFIG" ]] || exit 1
+  api=(kubectl --kubeconfig "$API_KUBECONFIG" --context "$API_CONTEXT" --request-timeout=10s)
+  for endpoint in livez readyz; do
+    printf '\nAPI %s diagnostic:\n' "$endpoint"
+    "${api[@]}" get --raw="/$endpoint?verbose" || exit 1
+  done
+  "${api[@]}" -n kube-system get pods -o wide
+)
 ```
 
 Pause and predict: if `kubectl -n kube-system get pods` hangs, but `crictl ps` on the control plane node shows the API server container repeatedly restarting, which layer are you actually observing? You are no longer testing workload scheduling or controller reconciliation; you are testing whether the local kubelet can keep a static pod alive from its manifest and dependencies.
@@ -167,42 +170,62 @@ Treat API outage triage as a layer-by-layer reduction. First prove whether the p
 
 The most common mistake in this phase is treating all connection failures as equivalent. `connection refused` means something actively declined the TCP connection or nothing is listening where you expected. A TLS error means the process may be listening but trust failed. A timeout can mean routing, firewalling, overload, or a hung endpoint. Those differences change the next diagnostic step. Good responders read the exact error string aloud, then choose the command that tests the next smallest assumption.
 
-```bash
-# From a control plane node, check whether the static pod container is running.
-sudo crictl ps | grep kube-apiserver
+### Select an API server container explicitly
 
-# Confirm the manifest exists at the expected kubeadm path.
-sudo ls -la /etc/kubernetes/manifests/kube-apiserver.yaml
+The following route runs in a root Bash shell on the independently identified disposable Linux control-plane node, not on the workstation. Require `jq`, a Kubernetes-matched crictl 1.35 client and the known local CRI endpoint. Set `CRI_RUNTIME_ENDPOINT` from fixture provisioning; `unix:///run/containerd/containerd.sock` is a containerd example, not automatic discovery. `CRICTL_BIN` may name the version-matched executable; otherwise the block uses `crictl` on PATH. A known endpoint and client version are prerequisites, not proof that a connection will work.
+
+The [CRI guide](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-cluster/crictl/) supports listing containers and requesting a selected container's logs. This helper validates one component-specific listing and displays full IDs, state and raw creation timestamps. Select the relevant attempt using incident evidence; neither first nor last row is assumed newest. It conservatively accepts only nonempty IDs using letters, digits, `_`, `.`, `:` or `-`, and digit-string timestamps; these are this helper's validation rules, not a universal CRI format claim. It does not convert nanosecond strings to jq numbers.
+
+```bash
+(
+  [[ $EUID == 0 ]] || { echo 'Use the identified disposable node root shell.' >&2; exit 1; }
+  : "${CRI_RUNTIME_ENDPOINT:?Set the known local CRI endpoint}"
+  [[ "$CRI_RUNTIME_ENDPOINT" == unix:///* ]] || { echo 'Expected a known Linux Unix-socket endpoint.' >&2; exit 1; }
+  cri=${CRICTL_BIN:-crictl}
+  command -v "$cri" >/dev/null && command -v jq >/dev/null || exit 1
+  client_version=$("$cri" --version) || exit 1
+  [[ "$client_version" =~ ^crictl\ version\ v?1\.35\.[0-9]+$ ]] || {
+    echo 'This route requires a version-matched crictl 1.35 client.' >&2; exit 1;
+  }
+  containers=$("$cri" --runtime-endpoint "$CRI_RUNTIME_ENDPOINT" --timeout=10s ps -a --name kube-apiserver -o json) || exit 1
+  jq -e -s '
+    length == 1 and (.[0] |
+    type == "object" and (.containers | type == "array") and
+    (.containers | length > 0) and
+    all(.containers[];
+      type == "object" and
+      (.id | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_.:-]*$")) and
+      (.metadata.name == "kube-apiserver") and
+      (.state | type == "string" and length > 0) and
+      (.createdAt | type == "string" and test("^[0-9]+$"))))
+  ' <<< "$containers" >/dev/null || {
+    echo 'Empty, malformed or wrong-component container listing; stop.' >&2; exit 1;
+  }
+  printf 'ID\tSTATE\tCREATED_AT (raw)\n'
+  jq -r '.containers[] | [.id, .state, .createdAt] | @tsv' <<< "$containers" || exit 1
+  printf 'Select one full kube-apiserver container ID from this listing: '
+  IFS= read -r selected_id || exit 1
+  [[ "$selected_id" =~ ^[A-Za-z0-9][A-Za-z0-9_.:-]*$ ]] || {
+    echo 'Empty or malformed selection; stop.' >&2; exit 1;
+  }
+  jq -e --arg id "$selected_id" '
+    [.containers[] | select(.id == $id and .metadata.name == "kube-apiserver")] | length == 1
+  ' <<< "$containers" >/dev/null || {
+    echo 'Selected ID absent or ambiguous in the validated listing; stop.' >&2; exit 1;
+  }
+  "$cri" --runtime-endpoint "$CRI_RUNTIME_ENDPOINT" --timeout=10s logs --tail=100 "$selected_id" || {
+    echo 'Log request failed; the container may have disappeared. Preserve the error.' >&2; exit 1;
+  }
+)
 ```
 
-If the API server is not present in the running container list, widen the view to stopped containers and kubelet logs. A crash-looping API server may leave several recent container attempts behind, and those previous logs are often more useful than the current empty attempt. The kubelet journal explains manifest parsing errors, missing host paths, failed image pulls, and lifecycle failures that `kubectl logs` cannot show when the API is offline.
+The log request does not follow a stream and returns at most the requested tail; a vanished container or runtime error must remain a failed observation. Multiple stopped attempts are evidence to correlate with the incident, not permission to restart manifests. Record the selected ID and compare the error with its component dependencies.
+
+From the same identified node root shell, inspect the manifest and journal without changing them. This requires `journalctl` and a retained kubelet journal; no matching entries do not establish that the kubelet is healthy or that no error occurred.
 
 ```bash
-sudo crictl ps -a | grep kube-apiserver
-sudo journalctl -u kubelet --since "20 minutes ago" | grep -i apiserver
-```
-
-When the pod exists, inspect logs through the most reliable path for the current failure mode. If the API is healthy enough, `kubectl logs` is convenient. If the API is not healthy, use `crictl logs` against the container ID so you are talking directly to the runtime. This is the difference between asking the front desk why the front desk is closed and walking into the server room to read the process output.
-
-```bash
-# If the API is reachable enough for Kubernetes logs.
-kubectl -n kube-system logs kube-apiserver-<node>
-
-# If the API is down, use the container runtime directly.
-# In this lab output, the last matching ID is the newest stopped attempt.
-latest_apiserver_id="$(sudo crictl ps -a --name kube-apiserver -q | tail -1)"
-sudo crictl logs "$latest_apiserver_id"
-
-# Check kubelet's view of why the static pod is not starting.
-sudo journalctl -u kubelet --since "20 minutes ago" | grep -i apiserver
-```
-
-Multiple stopped containers usually mean the kubelet is doing its job by retrying, while the component is rejecting its environment. In that situation, do not keep moving the manifest in and out of the directory hoping the next restart will be different. Capture the latest container ID, read the logs, and connect the error to a concrete dependency such as a certificate file, a bind address, an etcd endpoint, or a command-line flag.
-
-This is where timestamps matter. A control plane node may have several failed API server containers from previous experiments, automated restarts, or another responder's actions. Always look for the newest relevant container attempt and correlate it with the kubelet journal window around the same time. If the container log says a certificate file cannot be read and the kubelet journal says a hostPath volume was mounted successfully, your next check is file existence and permissions inside the host path. If both logs are silent, the runtime or kubelet may be failing before the component process starts.
-
-```bash
-sudo crictl ps -a | grep kube-apiserver | head
+ls -la /etc/kubernetes/manifests/kube-apiserver.yaml
+journalctl --no-pager -u kubelet --since "20 minutes ago" -n 100 | grep -i apiserver
 ```
 
 Certificates deserve special attention because kubeadm-managed non-CA control plane certificates have short enough lifetimes to create predictable maintenance incidents. Mutual TLS is not decorative in Kubernetes; it is how the API server trusts kubelets, clients, and peer components. An expired API server serving certificate, client certificate, or etcd client certificate can make a previously stable control plane fail without any workload deployment or manifest change.
@@ -606,20 +629,11 @@ sudo head -20 /etc/kubernetes/manifests/kube-apiserver.yaml
 # - Missing required pod fields or broken hostPath mounts.
 ```
 
-Lower-level debugging closes the loop when both the API and component logs are unavailable. `journalctl` shows kubelet behavior, `crictl ps -a` shows containers the runtime knows about, and `crictl logs` shows stdout and stderr for a specific container attempt. Together they let you diagnose a dead control plane from the node where it is supposed to run.
+Use the reusable API-server container-selection block above for local runtime logs, preserving its endpoint, client-version and ID checks. The journal route below provides kubelet evidence when API access is unavailable; it does not infer which container is newest.
 
 ```bash
-# If a static pod will not start, follow kubelet logs.
-sudo journalctl -u kubelet -f
-
-# Look for errors about specific manifests.
-sudo journalctl -u kubelet --since "20 minutes ago" | grep -i "kube-apiserver\\|error\\|failed"
-
-# Check if containers exist but are unhealthy.
-sudo crictl ps -a | grep kube-
-
-# Get container logs directly.
-sudo crictl logs <container-id>
+# In the identified disposable node root shell, inspect a bounded journal window.
+journalctl --no-pager -u kubelet --since "20 minutes ago" -n 100 | grep -i "kube-apiserver\\|error\\|failed"
 ```
 
 ## Patterns & Anti-Patterns
@@ -1091,19 +1105,13 @@ sudo journalctl -u kubelet --since "10 minutes ago" | grep -i "error\\|failed"
 <details>
 <summary>Drill 7: Container Runtime Forensics, 30 sec</summary>
 
-```bash
-# Task: List all control plane containers.
-sudo crictl ps | grep kube
-```
+Use the reusable API-server container-selection block above. Explain why empty results, malformed JSON or an ID outside the validated component listing must stop the log request. This drill does not broaden that block to every control-plane component.
 </details>
 
 <details>
 <summary>Drill 8: API Server Network Test, 30 sec</summary>
 
-```bash
-# Task: Test API server live endpoint.
-curl -k https://localhost:6443/livez
-```
+Use the explicit-kubeconfig/context API baseline above. Record liveness and readiness separately, and distinguish an HTTP health response from inability to reach or authenticate to the API. Do not replace certificate verification with an insecure loopback request.
 </details>
 
 ### Success Criteria
