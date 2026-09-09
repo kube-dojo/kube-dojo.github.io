@@ -16,10 +16,10 @@
     "check": "npm run build && npm test && npm run lint && python3 scripts/check_site_health.py"
   },
   "dependencies": {
-    "@astrojs/markdown-remark": "^7.2.2",
-    "@astrojs/starlight": "^0.41.6",
-    "astro": "^7.1.6",
-    "mermaid": "^11.16.1",
+    "@astrojs/markdown-remark": "^7.3.0",
+    "@astrojs/starlight": "^0.41.11",
+    "astro": "^7.2.10",
+    "mermaid": "^11.17.2",
     "sharp": "^0.35.1"
   },
   "overrides": {
@@ -34,13 +34,13 @@
     "brace-expansion": "^5.0.9"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.66.0",
+    "@typescript-eslint/eslint-plugin": "^8.69.0",
     "@typescript-eslint/parser": "^8.57.2",
-    "eslint": "^10.8.0",
-    "happy-dom": "^20.11.1",
-    "katex": "^0.18.1",
+    "eslint": "^10.9.1",
+    "happy-dom": "^20.12.2",
+    "katex": "^0.18.5",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
