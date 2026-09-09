@@ -22,12 +22,12 @@ lab:
 
 ## What You'll Be Able to Do
 
-After completing this module, you will be able to move from ordinary workload debugging into cluster rescue work where the API may be slow, unavailable, or misleading. The goal is not to memorize a pile of commands; it is to diagnose the failing layer, choose the least destructive next action, and protect evidence while you bring the Kubernetes 1.35 control plane back to a trustworthy state.
+This module combines control-plane inspection and recovery planning with one practical scheduler-restoration exercise. The guided work does not include certificate renewal or etcd restore. Use the inspection evidence to choose a next action and state what would disprove your diagnosis.
 
 - **Diagnose API server and static pod failures** by cross-referencing manifests, container runtime state, and kubelet journal evidence.
-- **Implement certificate and manifest recovery** for kubeadm-managed control plane components without relying on fragile shell aliases.
-- **Evaluate etcd quorum and storage health** before restarting stateless components that only report the downstream failure.
-- **Design recovery workflows** that preserve forensic evidence, isolate blast radius, and restore scheduling and reconciliation safely.
+- **Inspect certificate evidence and plan recovery** by identifying the affected certificate, its manager and consumer, and the validation required before and after a change.
+- **Interpret etcd diagnostics and assess a recovery proposal** without treating snapshot metadata or endpoint health as proof of restored Kubernetes state.
+- **Demonstrate scheduler restoration** in the owned Task 4 fixture using its API, runtime and Pod scheduling checks; do not extend that result to certificate, etcd or controller recovery.
 
 ## Why This Module Matters
 
@@ -209,66 +209,43 @@ Certificates deserve special attention because kubeadm-managed non-CA control pl
 
 Certificate failures often feel mysterious because they can appear suddenly after months of normal operation. Nothing changed in Git, no one edited a manifest, and the same automation that worked yesterday now fails with `x509` errors. That is exactly why expiration checks belong in routine maintenance rather than only in incident response. During an outage, the certificate dates help you decide whether the failure is time-driven or whether the TLS error is caused by wrong file paths, wrong certificate authorities, or a component presenting the wrong identity.
 
+Run these read-only inspections from an explicitly identified disposable kubeadm node's root shell with `openssl` and `kubeadm` installed. Do not infer that the current terminal is on that node or that the fixture has an expired certificate. Record tool failures and missing files as missing evidence.
+
 ```bash
 # Inspect the API server certificate validity window.
-sudo openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout | grep -A 2 "Validity"
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout | grep -A 2 "Validity"
 
 # Let kubeadm summarize certificate expiration for the cluster.
-sudo kubeadm certs check-expiration
+kubeadm certs check-expiration
 ```
 
-Certificate remediation should be deliberate. `kubeadm certs renew all` can refresh kubeadm-managed certificates, but the renewed files are only useful after affected static pods restart and reload them. In an incident, record the expiration output first, renew only when certificate failure matches the symptoms, then watch the kubelet restart the relevant static pods rather than deleting mirrored pods through the API.
+### Certificate inspection and recovery decision
+
+Use the preceding inspection commands only on the identified disposable kubeadm fixture. Record their actual output and the relevant TLS error; if inspection cannot run, record the missing evidence. Expiration output alone does not demonstrate an outage or its recovery.
+
+Before opening the explanation, write a decision note:
+
+- **Evidence:** which named certificate and consumer are implicated, what validity dates were observed, and whether kubeadm reports external management.
+- **Competing hypothesis:** could the failure instead be an unreadable certificate path, wrong trust chain, or unreachable etcd endpoint?
+- **Rejecting observation:** first match the certificate to the identity implicated in the error. A validity window covering the relevant time rejects expiry of that certificate; it does not rule out another expired certificate or an unrelated dependency failure. Record the observation rather than inventing it.
+- **Proposed validation:** specify baseline function, changed certificate identity, consumer reload evidence and recovered function. Renewal alone would not prove recovery from expiry.
+
+<details>
+<summary>Compare your certificate recovery decision</summary>
+
+[Kubernetes 1.35 certificate management](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#manual-certificate-renewal) distinguishes kubeadm-managed and externally managed certificates. Identify the manager before proposing a renewal. A consuming control-plane Pod must reload renewed files; deleting its API mirror Pod is not the static Pod restart mechanism. A separate execution contract must preserve original credentials and manifests, identify the one certificate and consumer, and handle interruptions before any renewal or reload is attempted. This exercise does not supply or execute those mutations.
+
+</details>
+
+### Manifest evidence before a proposed change
+
+Manifest damage is another hypothesis: compare the observed component error with its configured flags and paths. Do not edit the watched directory as a diagnostic test. Run the read-only inspection below from the identified disposable node's root shell. It shows selected endpoint and certificate flags, not the complete manifest, and neither creates a backup nor applies a repair.
 
 ```bash
-# Check certificate status before changing anything.
-sudo kubeadm certs check-expiration
-
-# Renew kubeadm-managed certificates when expiration is the verified fault.
-sudo kubeadm certs renew all
-
-# Restart static pods so renewed certificate files are loaded by running containers.
-for manifest in kube-apiserver.yaml kube-controller-manager.yaml kube-scheduler.yaml etcd.yaml; do
-  if [ -f "/etc/kubernetes/manifests/${manifest}" ]; then
-    sudo mv "/etc/kubernetes/manifests/${manifest}" "/tmp/${manifest}.cert-renew-hold"
-  fi
-done
-
-# Give kubelet time to stop the old containers before returning the manifests.
-sleep 20
-
-# Bring local stacked etcd back first if this control plane node runs it.
-if [ -f /tmp/etcd.yaml.cert-renew-hold ]; then
-  sudo mv /tmp/etcd.yaml.cert-renew-hold /etc/kubernetes/manifests/etcd.yaml
-  sleep 20
-fi
-
-# Return API server and peer component manifests so kubelet recreates them.
-for manifest in kube-apiserver.yaml kube-controller-manager.yaml kube-scheduler.yaml; do
-  if [ -f "/tmp/${manifest}.cert-renew-hold" ]; then
-    sudo mv "/tmp/${manifest}.cert-renew-hold" "/etc/kubernetes/manifests/${manifest}"
-  fi
-done
-
-# Confirm the renewed static pods report through the API after restart.
-kubectl -n kube-system get pods | grep -E 'etcd|api|controller|scheduler'
+grep -E -- '--(etcd-servers|client-ca-file|tls-cert-file|tls-private-key-file)=' /etc/kubernetes/manifests/kube-apiserver.yaml
 ```
 
-Manifest damage is the other common API server failure class. A human may edit the wrong flag, break a volume mount, point `--etcd-servers` at a dead endpoint, or leave a command line in a state that the binary rejects. Static pod manifests are ordinary YAML files, so your correction path is local and fast, but you should still make a timestamped copy before editing because the broken version is evidence.
-
-The backup copy is not bureaucracy. It lets you compare the exact before-and-after change, revert if your hypothesis is wrong, and explain the incident later without relying on memory. If two engineers are responding together, one should own observation and notes while the other edits, because simultaneous edits to static pod manifests create confusing restart storms. A calm workflow is slower than frantic typing for the first minute and faster for every minute after that.
-
-```bash
-# Edit static pod manifest after taking a backup copy.
-sudo cp /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/kube-apiserver.yaml.before-fix
-sudo vim /etc/kubernetes/manifests/kube-apiserver.yaml
-
-# Common fixes:
-# - Fix typos in flags.
-# - Correct certificate paths.
-# - Fix etcd endpoints.
-
-# kubelet automatically detects changes and restarts the pod.
-```
+Record the suspect flag or path, a competing dependency failure, and the observation that distinguishes them. Propose how an owned recovery fixture would preserve the original manifest, refuse destination collisions, restore it after interruption, and verify component function. The schematic YAML below is an inspection aid, not a replacement manifest to apply.
 
 ```yaml
 apiVersion: v1
@@ -287,14 +264,14 @@ spec:
 
 | Issue | Symptom | Fix |
 |-------|---------|-----|
-| Certificate expired | `x509: certificate has expired` | Run `kubeadm certs check-expiration`, renew verified expired certs, restart affected static pods |
+| Certificate expired | `x509: certificate has expired` | Inspect expiration and ownership; plan renewal and consumer reload under a separate recovery contract |
 | etcd unreachable | `etcd cluster is unavailable` | Check etcd health directly before changing API server flags |
 | Wrong etcd endpoints | Startup failure or repeated backend errors | Check `--etcd-servers` in the API server manifest |
 | Port conflict | `bind: address already in use` | Identify the process holding TCP 6443 before restarting services |
 | Out of memory | OOMKilled or very slow responses | Preserve logs, check node pressure, then increase resources or reduce load |
 | Incorrect flags | Component exits immediately | Compare manifest flags with the Kubernetes 1.35 component reference |
 
-Before running the renewal or manifest edit commands, ask yourself which evidence would prove your hypothesis wrong. If certificate dates are still valid and the API server log says it cannot reach `127.0.0.1:2379`, renewing every certificate is not a careful fix; the better move is to interrogate etcd directly.
+Before proposing renewal or manifest editing, state what evidence would reject your hypothesis. A valid certificate window with an etcd connection error points toward dependency inspection; it does not justify blanket certificate renewal.
 
 ## Restoring Scheduling and Reconciliation
 
@@ -548,57 +525,31 @@ Snapshots are the boundary between inconvenience and disaster. A consistent etcd
 
 Snapshot discipline includes verification, storage, and rehearsal. A backup file that no one has restored is only a hopeful artifact. You should know where snapshots are stored, how they are protected, which encryption and access controls apply, and which Kubernetes version and etcd version produced them. Because Secrets live in etcd, snapshot handling is also credential handling. Treat the file as sensitive data, and avoid moving it through casual channels just because the extension looks like an ordinary database dump.
 
-```bash
-sudo ETCDCTL_API=3 etcdctl snapshot save /tmp/etcd-backup.db \
-  --endpoints=https://127.0.0.1:2379 \
-  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
-  --cert=/etc/kubernetes/pki/etcd/server.crt \
-  --key=/etc/kubernetes/pki/etcd/server.key
+### Inspect a supplied snapshot; assess a recovery plan
 
-# Verify backup metadata before trusting it.
-sudo ETCDCTL_API=3 etcdctl snapshot status /tmp/etcd-backup.db
-```
+Do not create or restore a snapshot in this exercise. Use only a snapshot supplied by the disposable fixture owner with recorded provenance, expected contents and compatible tool version. [The etcd 3.6 recovery guide](https://etcd.io/docs/v3.6/op-guide/recovery/) uses `etcdutl snapshot status`; that documentation does not establish which etcd version or tool is installed on your node.
 
-Restore workflows are version-sensitive, so verify whether your environment expects `etcdutl` for offline snapshot restore. The key operational idea is stable across versions: stop API writes before replacing the data directory, restore into a clean directory, update the etcd manifest to point to the restored data, and only then bring the API server back. Do not restore over a live database while the API server is still writing new state.
+Use owner-supplied metadata evidence with recorded provenance and tool version; do not generate a snapshot or assume etcd tools are installed on the node. If no compatible metadata inspection evidence exists, mark that part of the plan unverified. Do not copy production state to fill the gap.
 
-The hardest part of restore is often deciding that restore is actually required. Disk pressure, certificate expiration, and peer network failure can all make etcd look unhealthy without requiring data replacement. A snapshot restore is appropriate when the data directory is lost, corrupt, or intentionally being rolled back under a controlled recovery plan. If the failure is a bad certificate or broken disk mount, restore may add risk without addressing the root cause. Evaluate reversible fixes before crossing into state replacement.
+Metadata inspection is not a restore rehearsal. Distinguish a snapshot created with an integrity hash from a copied backend file; describe how integrity will be checked rather than assuming that a successful status command accepts the artifact.
 
-```bash
-# Step 1: stop API server first so no new Kubernetes writes reach etcd.
-sudo mv /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/kube-apiserver.yaml.restore-hold
-while sudo crictl ps --name kube-apiserver -q | grep -q .; do
-  sleep 2
-done
+Before opening the explanation, prepare an etcd recovery decision:
 
-# Step 2: stop the local etcd static pod before replacing its host data directory.
-sudo mv /etc/kubernetes/manifests/etcd.yaml /tmp/etcd.yaml.restore-hold
-while sudo crictl ps --name etcd -q | grep -q .; do
-  sleep 2
-done
+- **Evidence:** record actual endpoint/member diagnostics, the suspected loss or corruption, and the supplied snapshot's provenance and metadata. Mark unavailable observations as unknown.
+- **Competing hypothesis:** consider disk pressure, TLS failure or peer connectivity before deciding that data replacement is necessary.
+- **Rejecting observation:** specify what would reject the data-loss hypothesis and support repairing that dependency instead. A failed API request alone is insufficient.
+- **Proposed validation:** define a marker object and expected restored contents, a post-snapshot change, and fresh API/controller operations that distinguish correct recovery from an endpoint merely answering.
 
-# Step 3: restore the snapshot into a fresh host data directory.
-sudo rm -rf /var/lib/etcd-restored
-sudo etcdutl snapshot restore /tmp/etcd-backup.db \
-  --data-dir=/var/lib/etcd-restored
+<details>
+<summary>Compare your etcd recovery decision</summary>
 
-# Step 4: point etcd at the restored host data directory before restarting it.
-# kubeadm mounts hostPath.path into the container at /var/lib/etcd; update the hostPath, not the container path.
-sudo sed -i.bak 's#path: /var/lib/etcd#path: /var/lib/etcd-restored#' /tmp/etcd.yaml.restore-hold
+Restore creates a new logical etcd cluster. A safe execution plan must name the topology and compatible tools, coordinate writers, preserve the original data, refuse existing restore destinations, and define interruption and rollback behavior. For Kubernetes, revisions moving backward can leave controller caches inconsistent; the etcd guide's revision-bump and compaction options therefore belong in the plan. Do not invent values without the fixture's revision history and contract.
 
-# Step 5: return etcd first, wait for kubelet, and verify storage health before API writes resume.
-sudo mv /tmp/etcd.yaml.restore-hold /etc/kubernetes/manifests/etcd.yaml
-sleep 30
-sudo ETCDCTL_API=3 etcdctl endpoint health \
-  --endpoints=https://127.0.0.1:2379 \
-  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
-  --cert=/etc/kubernetes/pki/etcd/server.crt \
-  --key=/etc/kubernetes/pki/etcd/server.key
+A successful endpoint health response does not prove the intended Kubernetes contents were recovered. Require the expected marker state and subsequent API/controller behavior in a separate owned restore experiment. This module's scheduler fixture proves neither snapshot integrity nor certificate/etcd recovery.
 
-# Step 6: bring the API server back only after restored etcd answers.
-sudo mv /tmp/kube-apiserver.yaml.restore-hold /etc/kubernetes/manifests/kube-apiserver.yaml
-```
+</details>
 
-Static pod mechanics explain why the restore sequence works. The kubelet is continuously watching a local directory, so moving a manifest is a controlled way to stop a component without needing the API. When you return or modify the manifest, the kubelet asks the runtime to create the pod again, and the mirrored pod object in the API follows only after the API path is healthy enough to report it.
+The diagrams below explain static Pod lifecycle mechanics, not an approved restore sequence. Changes in the watched directory affect running components; a separate recovery contract must protect those changes and their reversal.
 
 ```mermaid
 sequenceDiagram
@@ -760,9 +711,9 @@ Start by checking whether the API server static pod container exists through the
 </details>
 
 <details>
-<summary>Question 2: Implement certificate and manifest recovery after kubeadm reports expired API server certificates. What sequence avoids hiding the original evidence?</summary>
+<summary>Question 2: Plan certificate recovery after kubeadm reports expired API server certificates. What evidence and safeguards are required before mutation?</summary>
 
-Record `sudo kubeadm certs check-expiration` output first, then renew only when the expiration matches the observed TLS failure with `sudo kubeadm certs renew all`. After renewal, let affected static pods restart through kubelet or trigger a controlled static pod restart by touching or carefully moving the relevant manifest. This sequence preserves the original diagnosis, uses the kubeadm-supported recovery path, and avoids deleting mirrored pods as if they were ordinary Deployment replicas.
+Record expiration output, the affected certificate and consumer, and the actual TLS error. Check whether kubeadm or an external process manages that certificate, and test competing path, trust or dependency explanations. A separate execution contract must preserve originals and handle interruption, then prove changed certificate identity, consumer reload and recovered function. This answer plans recovery; it does not demonstrate renewal or recovery from expiry.
 </details>
 
 <details>
@@ -792,12 +743,12 @@ Deleting the mirrored pod object does not change the local file that kubelet wat
 <details>
 <summary>Question 7: You need to design recovery workflows after suspected etcd data corruption. What must happen before restoring a snapshot?</summary>
 
-Stop API writes before replacing the etcd data directory, usually by moving the API server static pod manifest away in a controlled manner. Restore the snapshot into a clean data directory with the version-appropriate tool, update the etcd manifest, verify health, and only then return the API server manifest. This order prevents the API server from writing conflicting state during restore and keeps the recovery auditable.
+Establish that data replacement is warranted rather than a TLS, disk-pressure or connectivity repair. The plan must identify topology, compatible tools, snapshot provenance and integrity, preserved original data, unused destinations, writer coordination, revision/compaction handling and interruption recovery. Define the expected restored marker and subsequent API/controller checks; endpoint health alone does not prove correct Kubernetes state.
 </details>
 
 ## Hands-On Exercise: Control Plane Troubleshooting
 
-Tasks 1–3 show inspection and health checks for a kubeadm-based sandbox with control-plane access; follow your environment's change policy for any etcd health action. Task 4 is a separate, optional, explicitly destructive local Docker/kind fixture: it does not run in the hosted Killercoda scenario and it does not touch a host scheduler manifest. Do not run the destructive portions of either path on a shared or production cluster.
+Tasks 1–3 cover inspection, health diagnostics and recovery planning for an identified kubeadm sandbox; they do not renew certificates or restore etcd. Run inspection only on the appropriate disposable fixture and record failures as missing evidence; follow its change policy for any etcd health action. Task 4 is a separate, optional, explicitly destructive local Docker/kind fixture: it does not run in the hosted Killercoda scenario and it does not touch a host scheduler manifest. Do not run the destructive portions of either path on a shared or production cluster.
 
 ### Setup
 
@@ -834,23 +785,23 @@ sudo grep -A 5 "command:" /etc/kubernetes/manifests/kube-apiserver.yaml
 
 ### Task 2: Implement certificate inspection
 
-Check the internal expiration dates of the core certificates so you can recognize a certificate-driven control plane outage before it happens.
+From the identified disposable node's root shell, record the observed expiration dates and management status, then complete the certificate decision note above. Name a competing cause, an observation that would reject it, and the proposed recovery validation. Valid dates or successful inspection do not demonstrate renewal, consumer reload or expiry recovery.
 
 <details>
 <summary>View Solution</summary>
 
 ```bash
 # Use kubeadm to check all certificates.
-sudo kubeadm certs check-expiration
+kubeadm certs check-expiration
 
 # Manually check a specific certificate.
-sudo openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout | grep -A 2 Validity
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout | grep -A 2 Validity
 ```
 </details>
 
 ### Task 3: Evaluate etcd health
 
-Run etcd health checks with explicit TLS flags. The point is to practice the full command so you can reproduce it from incident notes without relying on shell-specific shortcuts.
+On the identified fixture, record the actual authenticated health, membership and status results, or why they are unavailable. Complete the etcd decision note above using those observations. These diagnostics do not establish snapshot integrity, recovered contents or successful restore.
 
 <details>
 <summary>View Solution</summary>
@@ -1158,15 +1109,13 @@ curl -k https://localhost:6443/livez
 ### Success Criteria
 
 - [ ] Diagnose API server and static pod state by listing manifests and comparing mirrored control plane pods.
-- [ ] Implement certificate inspection with `kubeadm certs check-expiration` and direct `openssl` validation.
-- [ ] Evaluate etcd quorum and member health using explicit authenticated `etcdctl` commands.
-- [ ] Design recovery workflows by simulating scheduler failure and restoring the manifest safely.
+- [ ] Record actual certificate inspection results or missing evidence, and justify a recovery plan without claiming renewal or expiry recovery.
+- [ ] Interpret observed etcd diagnostics and supplied snapshot metadata; document competing causes, rejecting observations and proposed restored-state verification.
+- [ ] Complete the owned scheduler fixture's scheduling-restoration checks without extending that evidence to certificate, etcd or controller recovery.
 
 ## Learner check
 
-> `sudo sed -i.bak 's#path: /var/lib/etcd#path: /var/lib/etcd-restored#' /tmp/etcd.yaml.restore-hold`
-
-Before you restore control plane service, explain why this command changes the host data directory that kubeadm mounts into etcd rather than changing the container's internal `/var/lib/etcd` path.
+A proposed etcd restore makes its endpoint healthy, but the expected marker object is absent and no fresh controller operation has been checked. Can you accept recovery? Explain which evidence is missing, why endpoint health is insufficient, and why the separate scheduler exercise cannot fill that gap. For a certificate proposal, name the equivalent distinction between inspecting validity dates and proving consumer reload plus recovered function.
 
 ## Sources
 
