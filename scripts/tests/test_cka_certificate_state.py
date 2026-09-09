@@ -7,6 +7,46 @@ from pathlib import Path
 
 
 class TestCertificateStateSource(unittest.TestCase):
+    def test_backup_state_schema_with_injected_filesystem(self):
+        library = Path(__file__).resolve().parents[1] / "cka_certificate_state.sh"
+        names = ("apiserver.crt", "apiserver.key", "kube-apiserver.yaml")
+        baseline = {"fingerprint": "a" * 64, "public_key": "b" * 64,
+                    "hashes": dict.fromkeys(names, "c" * 64),
+                    "metadata": {name: {"uid": 0, "gid": 0, "mode": "600"} for name in names}}
+        valid = [{"schema": 1, "identity": {}, "revision": revision,
+                  "recovery": {"direction": "forward", "stage": stage}, "baseline": baseline}
+                 for revision, stage in ((1, "backup_requested"), (2, "backup_verified"))]
+        invalid = [dict(valid[0], revision=2), dict(valid[1], revision=1),
+                   dict(valid[0], schema=2), dict(valid[0], extra=True), dict(valid[0], baseline={})]
+        for field, bad in (("fingerprint", "invalid"), ("public_key", None), ("hashes", {})):
+            invalid.append(dict(valid[0], baseline=dict(baseline, **{field: bad})))
+        for field, bad in (("uid", 1), ("gid", -1), ("gid", 0.5), ("mode", "644")):
+            broken = json.loads(json.dumps(valid[0]))
+            broken["baseline"]["metadata"]["apiserver.key"][field] = bad
+            invalid.append(broken)
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "state.json"
+            cases = [(v, "accepted", "") for v in valid] + [(v, "refused", "") for v in invalid]
+            cases.append((valid[1], "refused", "fail-revision"))
+            for value, expected, fault in cases:
+                with self.subTest(value=value):
+                    fixture.write_text(json.dumps(value))
+                    result = subprocess.run(["bash", "-c", r'''
+source "$1"; fixture=$2; fault=$3
+cka_cert_state_directory() { return 0; }
+cka_cert_state_file() { return 0; }
+cka_cert_state_backup_verify() { return 0; }
+jq() {
+  [[ $1 != -r || $2 != .revision || $fault != fail-revision ]] || return 1
+  if [[ ${!#} == /var/lib/cka-certificate-transaction/state.json ]]; then
+    command jq "${@:1:$#-1}" "$fixture"
+  else command jq "$@"; fi
+}
+if cka_cert_state_read '{}' >/dev/null; then printf accepted; else printf refused; fi
+''', "--", str(library), str(fixture), fault], capture_output=True, text=True, check=False)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, expected)
+
     def test_explicit_identity_schema_under_conditional_caller(self):
         library = Path(__file__).resolve().parents[1] / "cka_certificate_state.sh"
         identity = {"transaction_id": "a" * 32, "fixture_cluster": "cert-fixture-" + "b" * 32,
