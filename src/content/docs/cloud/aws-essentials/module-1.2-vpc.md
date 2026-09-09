@@ -219,7 +219,7 @@ Before managed NAT Gateways, teams routinely ran NAT on bespoke EC2 instances wi
 | **Bandwidth** | Up to 100 Gbps | Depends on instance type |
 | **Maintenance** | None | You patch the OS and software |
 | **Security Groups** | Cannot associate | Can associate |
-| **Cost** | ~$0.045/hr + data | Instance cost + data |
+| **Cost** | Hourly + per-GB processed; regional. The [VPC pricing](https://aws.amazon.com/vpc/pricing/) Ohio examples are not a universal lab quote; each partial NAT hour bills as a full hour | Instance hours + data |
 | **Use today?** | Yes (recommended) | Only for very specific edge cases |
 
 ### VPC Endpoints: Bypassing NAT Entirely
@@ -450,7 +450,7 @@ The Flow Log `ACCEPT` means the **Security Group and NACL** allowed the traffic 
 <details>
 <summary>Question 5: Your engineering team needs to connect private subnets to both Amazon S3 and AWS Systems Manager (SSM) without using the public internet. They are confused about which endpoint types to deploy to optimize for cost and compatibility. How should they choose between a VPC Gateway Endpoint and a VPC Interface Endpoint for these services?</summary>
 
-The team should use a **Gateway Endpoint** for Amazon S3 and an **Interface Endpoint** for AWS Systems Manager. Gateway Endpoints are available exclusively for S3 and DynamoDB, adding a route directly to your route table without incurring any hourly or data charges. Interface Endpoints (PrivateLink) must be used for most other AWS services, including SSM, as they create an Elastic Network Interface (ENI) with a private IP in your subnet. Interface Endpoints cost approximately $0.01 per hour per AZ plus data processing charges, but they crucially support Security Groups and provide a resolvable DNS hostname. Using Gateway Endpoints whenever possible optimizes costs, while Interface Endpoints provide the necessary connectivity for the rest of the AWS ecosystem.
+The team should use a **Gateway Endpoint** for Amazon S3 and an **Interface Endpoint** for AWS Systems Manager. Gateway Endpoints are available exclusively for S3 and DynamoDB, adding a route directly to your route table without incurring any hourly or data charges. Interface Endpoints (PrivateLink) must be used for most other AWS services, including SSM, as they create an Elastic Network Interface (ENI) with a private IP in your subnet. Interface Endpoints bill hourly per provisioned AZ/ENI plus per-GB data processing; confirm the current regional rates on [AWS PrivateLink pricing](https://aws.amazon.com/privatelink/pricing/) rather than treating any single hourly figure as universal. They support Security Groups and provide a resolvable DNS hostname. Using Gateway Endpoints whenever possible optimizes costs, while Interface Endpoints provide the necessary connectivity for the rest of the AWS ecosystem.
 </details>
 
 <details>
@@ -467,11 +467,11 @@ In this exercise you will use the AWS CLI to build a production-style VPC: multi
 
 ### Preflight: Account, Region, Cost, and Cleanup
 
-Run this preflight in a Bash shell before creating anything. Use AWS CLI v2 with an isolated AWS account and a role authorized to create and delete the lab resources. Confirm that the role permits the EC2 networking create/describe/delete operations used below, `iam:CreateRole`, `iam:CreatePolicy`, `iam:AttachRolePolicy`, `iam:DetachRolePolicy`, `iam:DeletePolicy`, `iam:DeleteRole`, and `iam:PassRole` for the flow-log task. It also needs CloudWatch Logs create, retention, describe, and delete operations. Review your VPC/NAT/EIP quotas and confirm that `10.0.0.0/16` does not overlap with connected networks you need to keep reachable. Check command exit status and returned data: stop on any non-zero result, and record every resource ID as soon as it is returned so a partial run can be cleaned up.
+Run this preflight in a Bash shell before creating anything. Read **Clean Up** and **Task 9** first; stopping the terminal does not delete billable resources. Use AWS CLI v2 with an isolated AWS account and a role authorized to create and delete the lab resources. Confirm that the role permits the EC2 networking create/describe/delete operations used below, plus `ec2:RunInstances`, `ec2:TerminateInstances`, `ec2:DescribeInstances`, `ec2:GetConsoleOutput`, `ec2:RevokeSecurityGroupEgress`, `ssm:GetParameter` (AL2023 public AMI parameter), `iam:CreateRole`, `iam:CreatePolicy`, `iam:AttachRolePolicy`, `iam:DetachRolePolicy`, `iam:DeletePolicy`, `iam:DeleteRole`, and `iam:PassRole` for the flow-log and probe tasks. It also needs CloudWatch Logs create, retention, describe, filter, and delete operations. Review your VPC/NAT/EIP/EC2 quotas and confirm that `10.0.0.0/16` does not overlap with connected networks you need to keep reachable. Check command exit status and returned data: stop on any non-zero result, and record every resource ID as soon as it is returned so a partial run can be cleaned up.
 
-Read the cleanup section before starting. Keep an inventory of resources actually created, including resources left by a failed step; only delete this exercise's resources. Before provisioning, confirm that you can supply the same-account [flow-log IAM role](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-iam-role.html) required by Task 8. The identity check below does not prove all these permissions are available.
+Read the cleanup section before starting. Keep an inventory of resources actually created, including resources left by a failed step; only delete this exercise's resources. Before provisioning, confirm that you can create the same-account [flow-log IAM role](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-iam-role.html) in Task 8 — a missing role is a failed logging outcome, not an optional skip. The identity check below does not prove all these permissions are available.
 
-Two NAT Gateways and two Elastic IPs are billable. Choose a spending limit and cleanup deadline before starting. Budget separately for NAT Gateway hours, processed data, transfer, public IPv4/EIP usage, and any CloudWatch Logs ingestion or storage. Check the current regional rates in [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/) and [NAT Gateway pricing](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html) before provisioning; this page supplies no default budget or universal hourly quote. Stopping your terminal does not delete billable resources.
+Two NAT Gateways and two Elastic IPs are billable for the whole lab. Task 9 adds at most one `t3.micro` (or another current-generation x86_64 type available in AZ1) for ≤20 minutes in a private subnet with no public IPv4, plus CloudWatch [vended-log](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html) ingestion for that window. Choose a spending limit and cleanup deadline that cover NAT hours, processed data, transfer, public IPv4/EIP usage (the VPC pricing page examples billed in-use and idle public IPv4 hourly), the optional probe instance, and log ingestion/storage. Check current regional rates on [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/) and [NAT Gateway pricing](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html) before provisioning; this page supplies no default budget and does not treat the Ohio NAT examples as a universal hourly quote. If you cannot accept the Task 9 instance, skip only that probe and record `probe not executed` — do not treat a skip as a traffic receipt.
 
 Set your chosen region first, for example `export AWS_REGION=us-east-1`, and keep the AWS CLI variables consistent. The function discovers two available standard zones using [`describe-availability-zones`](https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-availability-zones.html). It returns a failure instead of closing an interactive shell; do not continue after a failure message.
 
@@ -902,7 +902,7 @@ JSON
     FLOW_LOG_POLICY_ATTACHED=1
   fi
 
-  FLOW_LOG_RESPONSE=$(aws ec2 create-flow-logs --region "$AWS_REGION" --resource-type VPC --resource-ids "$VPC_ID" --traffic-type ALL --log-destination-type cloud-watch-logs --log-group-name "$FLOW_LOG_GROUP_NAME" --deliver-logs-permission-arn "$FLOW_LOG_ROLE_ARN" --output json 2>&1)
+  FLOW_LOG_RESPONSE=$(aws ec2 create-flow-logs --region "$AWS_REGION" --resource-type VPC --resource-ids "$VPC_ID" --traffic-type ALL --log-destination-type cloud-watch-logs --log-group-name "$FLOW_LOG_GROUP_NAME" --deliver-logs-permission-arn "$FLOW_LOG_ROLE_ARN" --max-aggregation-interval 60 --output json 2>&1)
   FLOW_LOG_EXIT=$?
   if (( FLOW_LOG_EXIT != 0 )); then
     FLOW_LOG_CREATED=unknown
@@ -924,16 +924,124 @@ JSON
 vpc_flowlog_setup
 ```
 
-`ACTIVE` and a successful delivery status show configuration and delivery readiness only; they are not evidence that a packet was generated or a log event was received. IAM propagation failures, `Unsuccessful` entries, pending delivery, and non-empty delivery errors remain actionable failures for this task.
+`ACTIVE` and a successful delivery status show configuration and delivery readiness only; they are not evidence that a packet was generated or a log event was received. IAM propagation failures, `Unsuccessful` entries, pending delivery, and non-empty delivery errors remain actionable failures for this task. Task 8 now requests a 60-second maximum aggregation interval so Task 9 can poll on the documented one-minute window instead of the ten-minute default.
+
+### Task 9: Traffic, security, and flow-log receipt
+
+Task 8 only proves that publication is configured. This task generates two outbound flows from one short-lived Amazon Linux 2023 instance in a **private** subnet: HTTPS (TCP/443) that the probe security group allows, and HTTP (TCP/80) that it denies. The instance has no public IPv4 address; allowed egress uses the NAT Gateway already created in Task 5. AWS documents that [security groups are stateful, that a new group starts with an allow-all outbound rule you can replace, and that Amazon DNS is not filtered by security groups](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html). [Flow-log records are aggregated (optional 1-minute maximum) and typically reach CloudWatch Logs in about five minutes on a best-effort basis](https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html).
+
+**Bounded extra budget (accept before running):** one current-generation x86_64 instance (this example uses `t3.micro`) for at most 20 minutes, plus CloudWatch vended-log ingestion for the probe window. Do not add a second NAT, extra Elastic IP, or Traffic Mirroring. If you lack authorization, quota, or budget, do **not** run `vpc_behavior_probe`; record `probe not executed` and leave the traffic-receipt checkbox unchecked. A skipped probe is not a silent logging success.
+
+The AMI is resolved through the official [AL2023 SSM public parameter](https://docs.aws.amazon.com/linux/al2023/ug/ec2.html). User-data writes probe markers to the instance console; retrieve them with `get-console-output` after the instance is running. Then poll the Task 8 log group for records that contain this instance's ENI and the `ACCEPT`/`REJECT` actions. Print only events AWS actually returns. If the 12-minute poll deadline expires with no matching events, record that timeout — do not invent a receipt.
+
+**Execution record (2026-09-09):** The environment that prepared this revision had no AWS CLI and no AWS credentials, so it did not provision billable lab resources and did not observe a flow-log receipt. Treat the commands below as a reproducible procedure, not as a completed run.
+
+```bash
+vpc_behavior_probe() {
+  command -v jq >/dev/null || { printf '%s\n' 'Install jq before Task 9; it is required to inspect filter-log-events JSON.' >&2; return 1; }
+  : "${PROBE_SG_CREATED:=0}"
+  : "${PROBE_INSTANCE_CREATED:=0}"
+  : "${PROBE_RECEIPT:=none}"
+  if [[ "${FLOW_LOG_CREATED:-0}" != 1 || -z "${FLOW_LOG_GROUP_NAME:-}" || -z "${PRIV_SUB1_ID:-}" || -z "${VPC_ID:-}" || -z "${AWS_REGION:-}" ]]; then
+    printf '%s\n' 'Task 9 needs a completed Task 8 flow log plus PRIV_SUB1_ID, VPC_ID, and AWS_REGION; no probe resources were changed.' >&2
+    return 1
+  fi
+  if [[ "$PROBE_INSTANCE_CREATED" != 0 ]]; then
+    printf 'Probe ownership state is %s; inspect and clean up before retrying.\n' "$PROBE_INSTANCE_CREATED" >&2
+    return 1
+  fi
+
+  if [[ "$PROBE_SG_CREATED" != 1 ]]; then
+    PROBE_SG_ID=$(aws ec2 create-security-group \
+      --region "$AWS_REGION" \
+      --group-name "Dojo-Probe-${VPC_ID}-SG" \
+      --description "Task9 probe: TCP/443 egress only" \
+      --vpc-id "$VPC_ID" \
+      --query 'GroupId' --output text) || { printf '%s\n' 'Could not create the probe security group; a name collision is not adopted.' >&2; return 1; }
+    PROBE_SG_CREATED=1
+    aws ec2 revoke-security-group-egress --region "$AWS_REGION" --group-id "$PROBE_SG_ID" --protocol -1 --cidr 0.0.0.0/0 || { printf '%s\n' 'Could not remove the default allow-all egress rule; retain PROBE_SG_ID.' >&2; return 1; }
+    aws ec2 authorize-security-group-egress --region "$AWS_REGION" --group-id "$PROBE_SG_ID" --protocol tcp --port 443 --cidr 0.0.0.0/0 || { printf '%s\n' 'Could not authorize TCP/443 egress; retain PROBE_SG_ID.' >&2; return 1; }
+  fi
+  aws ec2 describe-security-groups --region "$AWS_REGION" --group-ids "$PROBE_SG_ID" \
+    --query 'SecurityGroups[0].{GroupId:GroupId,Egress:IpPermissionsEgress}' --output json || { printf '%s\n' 'Could not describe the probe security group.' >&2; return 1; }
+
+  PROBE_USER_DATA=$(printf '%s\n' \
+    '#!/bin/bash' \
+    'echo PROBE_START "$(date -u +%Y-%m-%dT%H:%M:%SZ)"' \
+    'echo PROBE_HTTPS "$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 20 https://example.com || echo curl_failed:$?)"' \
+    'echo PROBE_HTTP "$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 20 http://example.com || echo curl_failed:$?)"' \
+    'echo PROBE_END "$(date -u +%Y-%m-%dT%H:%M:%SZ)"')
+
+  PROBE_INSTANCE_ID=$(aws ec2 run-instances \
+    --region "$AWS_REGION" \
+    --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
+    --instance-type t3.micro \
+    --subnet-id "$PRIV_SUB1_ID" \
+    --security-group-ids "$PROBE_SG_ID" \
+    --no-associate-public-ip-address \
+    --user-data "$PROBE_USER_DATA" \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=Dojo-Probe-${VPC_ID}}]" \
+    --query 'Instances[0].InstanceId' --output text) || { printf '%s\n' 'run-instances failed; no instance ID was recorded.' >&2; return 1; }
+  PROBE_INSTANCE_CREATED=1
+  aws ec2 wait instance-running --region "$AWS_REGION" --instance-ids "$PROBE_INSTANCE_ID" || { printf '%s\n' 'Instance did not reach running; retain PROBE_INSTANCE_ID for cleanup.' >&2; return 1; }
+  PROBE_ENI=$(aws ec2 describe-instances --region "$AWS_REGION" --instance-ids "$PROBE_INSTANCE_ID" \
+    --query 'Reservations[0].Instances[0].NetworkInterfaces[0].NetworkInterfaceId' --output text) || return 1
+  if [[ -z "$PROBE_ENI" || "$PROBE_ENI" == None ]]; then
+    printf '%s\n' 'Could not read the probe ENI; retain the instance ID for cleanup.' >&2
+    return 1
+  fi
+  printf 'Probe InstanceId=%s ENI=%s\n' "$PROBE_INSTANCE_ID" "$PROBE_ENI"
+  aws ec2 get-console-output --region "$AWS_REGION" --instance-id "$PROBE_INSTANCE_ID" --query 'Output' --output text || printf '%s\n' 'Console output was not available yet; that is not a flow-log receipt.'
+
+  PROBE_ACCEPT=0
+  PROBE_REJECT=0
+  PROBE_DEADLINE=$((SECONDS + 720))
+  while (( SECONDS < PROBE_DEADLINE )); do
+    PROBE_EVENTS=$(aws logs filter-log-events --region "$AWS_REGION" --log-group-name "$FLOW_LOG_GROUP_NAME" --filter-pattern "$PROBE_ENI" --output json) || { printf '%s\n' 'filter-log-events failed; retain probe IDs.' >&2; return 1; }
+    PROBE_COUNT=$(printf '%s' "$PROBE_EVENTS" | jq -e -r 'if (type == "object" and (.events | type) == "array") then (.events | length) else error("events must be an array") end') || { printf '%s\n' 'Unexpected filter-log-events JSON; retain probe IDs.' >&2; return 1; }
+    if (( PROBE_COUNT > 0 )); then
+      printf '%s\n' "$PROBE_EVENTS" | jq -r '.events[]?.message // empty'
+      printf '%s' "$PROBE_EVENTS" | jq -e --arg eni "$PROBE_ENI" '[.events[]?.message | select(test($eni) and test("ACCEPT"))] | length > 0' >/dev/null && PROBE_ACCEPT=1
+      printf '%s' "$PROBE_EVENTS" | jq -e --arg eni "$PROBE_ENI" '[.events[]?.message | select(test($eni) and test("REJECT"))] | length > 0' >/dev/null && PROBE_REJECT=1
+      if [[ "$PROBE_ACCEPT" == 1 && "$PROBE_REJECT" == 1 ]]; then
+        PROBE_RECEIPT=accept_and_reject
+        printf '%s\n' 'Observed flow-log messages include both ACCEPT and REJECT for this ENI.'
+        return 0
+      fi
+    fi
+    sleep 30
+  done
+  if [[ "$PROBE_ACCEPT" == 1 || "$PROBE_REJECT" == 1 ]]; then
+    PROBE_RECEIPT=partial
+    printf 'Poll deadline reached with partial receipt (ACCEPT=%s REJECT=%s). Do not invent the missing action.\n' "$PROBE_ACCEPT" "$PROBE_REJECT" >&2
+    return 1
+  fi
+  PROBE_RECEIPT=timeout
+  printf '%s\n' 'No matching flow-log events within 12 minutes (1-minute aggregation plus typical CloudWatch delivery, best-effort). Record timeout; do not invent a receipt.' >&2
+  return 1
+}
+vpc_behavior_probe
+```
 
 ### Clean Up
 
-Tear-down is where labs earn their keep: AWS bills NAT Gateways and Elastic IPs until you release them, and dependency order matters because you cannot delete a VPC that still owns subnets, gateways, or ENIs. Work backward from flow logs through NAT, security groups, route tables, subnets, the detached IGW, and finally the VPC itself.
+Tear-down is where labs earn their keep: AWS bills NAT Gateways, Elastic IPs, and any Task 9 instance until you release them, and dependency order matters because you cannot delete a VPC that still owns subnets, gateways, or ENIs. Work backward from the probe instance through flow logs, NAT, security groups, route tables, subnets, the detached IGW, and finally the VPC itself.
 
-**Important**: Delete resources in reverse order of dependency to avoid errors. NAT Gateways take 1-2 minutes to delete.
+**Important**: Delete resources in reverse order of dependency to avoid errors. NAT Gateways take 1-2 minutes to delete. Terminate the probe instance before deleting its security group or the private subnet.
 
 ```bash
 vpc_lab_cleanup() {
+# 0. Terminate only the Task 9 probe instance created by this run.
+if [[ "${PROBE_INSTANCE_CREATED:-0}" == 1 && -n "${PROBE_INSTANCE_ID:-}" ]]; then
+  if aws ec2 terminate-instances --region "$AWS_REGION" --instance-ids "$PROBE_INSTANCE_ID" \
+    && aws ec2 wait instance-terminated --region "$AWS_REGION" --instance-ids "$PROBE_INSTANCE_ID"; then
+    PROBE_INSTANCE_CREATED=0
+  else
+    printf '%s\n' 'Probe instance terminate failed; retain PROBE_INSTANCE_CREATED and stop before deleting its subnet or security group.' >&2
+    return 1
+  fi
+fi
+
 # 1. Delete only flow-log resources created by this run.
 if [[ -z "${FLOW_LOG_CONTEXT:-}" && ( "${FLOW_LOG_CREATED:-0}" != 0 || "${FLOW_LOG_GROUP_CREATED:-0}" != 0 || "${FLOW_LOG_ROLE_CREATED:-0}" != 0 || "${FLOW_LOG_POLICY_CREATED:-0}" != 0 || "${FLOW_LOG_POLICY_ATTACHED:-0}" != 0 ) ]]; then
   printf '%s\n' 'Flow-log ownership flags exist without a saved context; cleanup is stopped.' >&2
@@ -1004,8 +1112,24 @@ if [[ "${FLOW_LOG_CREATED:-0}" != 0 || "${FLOW_LOG_GROUP_CREATED:-0}" != 0 || "$
   printf '%s\n' 'Flow-log cleanup remains incomplete; inspect and retry before continuing dependent cleanup.' >&2
   return 1
 fi
+if [[ "${PROBE_INSTANCE_CREATED:-0}" == 0 && "${PROBE_SG_CREATED:-0}" == 1 && -n "${PROBE_SG_ID:-}" ]]; then
+  if aws ec2 delete-security-group --region "$AWS_REGION" --group-id "$PROBE_SG_ID"; then
+    PROBE_SG_CREATED=0
+  else
+    printf '%s\n' 'Probe security-group deletion failed; retain PROBE_SG_CREATED.' >&2
+    return 1
+  fi
+fi
+if [[ "${PROBE_INSTANCE_CREATED:-0}" != 0 || "${PROBE_SG_CREATED:-0}" != 0 ]]; then
+  printf '%s\n' 'Probe cleanup remains incomplete; inspect and retry before deleting NAT or other networking.' >&2
+  return 1
+fi
 
 # 2. Delete NAT Gateways (they take ~60s to fully delete)
+if [[ -z "${NAT1_ID:-}" || -z "${NAT2_ID:-}" || -z "${EIP1_ALLOC:-}" || -z "${EIP2_ALLOC:-}" ]]; then
+  printf '%s\n' 'NAT or EIP IDs are missing; stop and inventory remaining lab resources before continuing.' >&2
+  return 1
+fi
 aws ec2 delete-nat-gateway --nat-gateway-id $NAT1_ID
 aws ec2 delete-nat-gateway --nat-gateway-id $NAT2_ID
 echo "Waiting for NAT Gateways to delete..."
@@ -1051,7 +1175,7 @@ vpc_lab_cleanup
 
 ### Success Criteria
 
-If every checkbox below is true after cleanup, you have reproduced the core production patterns this module teaches: tiered subnets, routed internet edge, per-AZ NAT egress, chained security groups, subnet NACL policy, and flow-log configuration. A separate traffic test is still required for an observed packet and log event. Capture the VPC ID and route table IDs in your notes so you can compare them when Module 1.3 launches EC2 instances into the same address plan.
+If every checkbox below is true after cleanup, you have reproduced the core production patterns this module teaches: tiered subnets, routed internet edge, per-AZ NAT egress, chained security groups, subnet NACL policy, flow-log configuration, and a behavioral receipt. Capture the VPC ID, route table IDs, probe InstanceId/ENI, and any CloudWatch event timestamps in your notes so you can compare them when Module 1.3 launches EC2 instances into the same address plan.
 
 - [ ] I created a VPC with a `/16` CIDR block and enabled DNS hostnames
 - [ ] I carved the VPC into 4 subnets spread across 2 Availability Zones
@@ -1060,8 +1184,13 @@ If every checkbox below is true after cleanup, you have reproduced the core prod
 - [ ] I created separate private route tables per AZ, each pointing to its own NAT Gateway
 - [ ] I implemented a three-tier chained Security Group architecture (ALB -> App -> DB)
 - [ ] I created a custom NACL that blocks a specific CIDR range on the private subnets
-- [ ] I created VPC Flow Logs, recorded the actual FlowLogIds, and inspected delivery status; this does not count as a traffic receipt
-- [ ] I successfully cleaned up all resources to avoid ongoing charges
+- [ ] I created VPC Flow Logs with a recorded FlowLogIds value and inspected delivery status; that step is not a traffic receipt
+- [ ] I ran Task 9 and recorded an observed ACCEPT and REJECT flow-log message for the probe ENI, or I recorded `probe not executed` / timeout honestly
+- [ ] I successfully cleaned up all resources, including the probe instance and its security group, to avoid ongoing charges
+
+## Learner check
+
+> VPC lab success is not "objects exist." Before you create anything, you accept account, region, permissions, billable NAT/EIP/instance/log costs, and the cleanup path. Flow-log IAM is created or the task fails in the open. Traffic, security-group, and log behavior count only when you have a reproducible probe and an observed flow-log receipt — or an honest record that the authorized environment was unavailable.
 
 ---
 
@@ -1095,3 +1224,10 @@ With routing, NAT, layered firewalls, and observability in place, you have the s
 - [CloudWatch Logs service authorization](https://docs.aws.amazon.com/service-authorization/latest/reference/list_logs.html) — Defines resource scoping for the log-group and log-stream actions used here.
 - [AWS CLI create-flow-logs](https://docs.aws.amazon.com/cli/latest/reference/ec2/create-flow-logs.html) — Defines `FlowLogIds` and `Unsuccessful` response fields.
 - [AWS CLI describe-flow-logs](https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-flow-logs.html) — Defines flow-log status and delivery error fields used for setup verification.
+- [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/) — Inspected 2026-09-09: NAT hourly plus per-GB processing; partial NAT hours bill as a full hour; Ohio `$0.045` figures are regional examples; public IPv4 examples billed in-use and idle addresses hourly.
+- [AWS PrivateLink pricing](https://aws.amazon.com/privatelink/pricing/) — Inspected 2026-09-09: interface endpoints bill hourly per provisioned AZ/ENI plus tiered per-GB processing; no universal lab hourly quote.
+- [Flow log records](https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html) — Inspected 2026-09-09: default maximum aggregation interval is 10 minutes, optional 1 minute; typical CloudWatch delivery about 5 minutes, best-effort.
+- [AWS CLI create-flow-logs `--max-aggregation-interval`](https://docs.aws.amazon.com/cli/latest/reference/ec2/create-flow-logs.html) — Inspected 2026-09-09: allowed values 60 or 600 seconds; default 600.
+- [Security groups](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html) — Inspected 2026-09-09: new groups start with allow-all egress; Amazon DNS is not filtered by security groups.
+- [AL2023 on EC2 (SSM parameter)](https://docs.aws.amazon.com/linux/al2023/ug/ec2.html) — Inspected 2026-09-09: `resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64`.
+- [AWS CLI filter-log-events](https://docs.aws.amazon.com/cli/latest/reference/logs/filter-log-events.html) — Defines the Task 9 poll against the CloudWatch log group.
