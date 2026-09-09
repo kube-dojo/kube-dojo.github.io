@@ -632,7 +632,7 @@ CiliumEgressGatewayPolicy routes outbound traffic from selected pods through ded
 
 Why you need this: Many external firewalls, databases, and SaaS APIs allowlist traffic by source IP. Without an egress gateway, pod traffic exits from whatever node the pod resides on, resulting in shifting source IPs.
 
-Cilium Egress Gateway is GA since Cilium 1.14 (and current in 1.20.x); it requires BPF masquerading and kube-proxy replacement to be enabled. **Crucially, Egress Gateway is incompatible with Cluster Mesh.** 
+Cilium Egress Gateway is GA since Cilium 1.14 (and current in 1.20.x); it requires BPF masquerading and kube-proxy replacement to be enabled. **Crucially, Egress Gateway is incompatible with Cluster Mesh.**
 
 > **Stop and think**: Why is Cilium Egress Gateway incompatible with Cluster Mesh?
 > *Answer: Egress gateways rely on strict SNAT and localized routing logic that conflicts with the cross-cluster identity synchronization and datapath behavior inherent to Cluster Mesh.*
