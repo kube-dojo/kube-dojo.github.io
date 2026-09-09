@@ -686,26 +686,85 @@ Identify the failing container first, then read its logs with `-c`. Run `kubectl
 
 ## Hands-On Exercise: Application Failure Scenarios
 
-Exercise scenario: diagnose three failing Pods in `app-debug-lab` and a failed Deployment rollout in a separate fresh namespace. For each, inspect Events and relevant state before choosing a repair. Run these deliberately broken workloads in a disposable lab environment.
+Exercise scenario: diagnose three failing Pods in a fresh owned namespace and a failed Deployment rollout in a separate fresh namespace. For each, inspect Events and relevant state before choosing a repair. Run these deliberately broken workloads in a disposable lab environment.
 
 ### Setup
 
+Use one Bash session for Scenarios 1, 2 and 4. Set `APP_LAB_KUBECONFIG` to the absolute path of a dedicated disposable Kubernetes 1.35 kubeconfig, `APP_LAB_CONTEXT` to its context, and `APP_LAB_CLUSTER_UID` to the `kube-system` UID recorded by trusted fixture provisioning. Do not fetch a current UID and treat it as the expected identity. Keep the dedicated kubeconfig unchanged; identity alone does not prove disposability.
+
+The helpers use [explicit kubectl targeting](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl/) to bind the supplied fences to that fixture and a newly created namespace; they are not a sandbox for arbitrary commands or manifests. Keep the private creation receipt. Failed or interrupted creation preserves the candidate for fixture-owner reconciliation, never adoption by later lookup. Continue only after setup succeeds.
+
+Scenario 3 retains its separate `KUBEDOJO_LAB_*` inputs, namespace and cleanup. Its reference to `app-debug-lab` describes the other scenarios' former fixed name; Scenarios 1/2/4 now use the unique `app-debug-…` namespace below. Use Scenario 3's own instructions in a separate Bash session; neither cleanup handles the other's namespace.
+
 ```bash
-# Create namespace
-kubectl create ns app-debug-lab
+_app_lab_base() {
+  command kubectl --kubeconfig="$_APP_LAB_CONFIG" --context="$_APP_LAB_CONTEXT" \
+    --namespace="${_APP_LAB_NS:-default}" --request-timeout=30s "$@"
+}
+_app_lab_identity() {
+  local actual
+  actual=$(_app_lab_base get namespace kube-system -o jsonpath='{.metadata.uid}' </dev/null) || return
+  [[ -n "$_APP_LAB_CLUSTER_UID" && "$actual" == "$_APP_LAB_CLUSTER_UID" ]] || {
+    echo 'Fixture identity mismatch; stop.' >&2; return 1;
+  }
+}
+_app_lab_receipt() {
+  (umask 077; declare -p _APP_LAB_CONFIG _APP_LAB_CONTEXT _APP_LAB_CLUSTER_UID _APP_LAB_NS _APP_LAB_UID _APP_LAB_DELETE_SENT) >> "$_APP_LAB_RECEIPT"
+}
+app_lab_setup() {
+  [[ -z ${_APP_LAB_NS+x} && -z ${_APP_LAB_RECEIPT+x} ]] || {
+    echo 'Existing candidate/receipt: reconcile it before another setup.' >&2; return 1;
+  }
+  [[ -n ${APP_LAB_KUBECONFIG:-} && -n ${APP_LAB_CONTEXT:-} && -n ${APP_LAB_CLUSTER_UID:-} ]] || {
+    echo 'Supply all three independently verified fixture inputs.' >&2; return 1;
+  }
+  _APP_LAB_CONFIG=$APP_LAB_KUBECONFIG; _APP_LAB_CONTEXT=$APP_LAB_CONTEXT; _APP_LAB_CLUSTER_UID=$APP_LAB_CLUSTER_UID
+  _app_lab_identity || return
+  _APP_LAB_NS="app-debug-$(date +%s)-$RANDOM-$RANDOM"; _APP_LAB_UID=; _APP_LAB_DELETE_SENT=false
+  _APP_LAB_RECEIPT="$PWD/$_APP_LAB_NS.receipt"
+  (umask 077; set -o noclobber; : > "$_APP_LAB_RECEIPT") || return
+  _app_lab_receipt || return
+  printf 'Retain receipt: %s\n' "$_APP_LAB_RECEIPT"
+  if ! _APP_LAB_UID=$(_app_lab_base create namespace "$_APP_LAB_NS" -o jsonpath='{.metadata.uid}'); then
+    _APP_LAB_UID=; echo 'Creation uncertain: retain candidate; ask fixture owner to reconcile.' >&2; return 1
+  fi
+  [[ $_APP_LAB_UID =~ ^[0-9a-fA-F-]{36}$ ]] || {
+    _APP_LAB_UID=; echo 'Missing creation UID: preserve candidate; do not adopt or delete it.' >&2; return 1;
+  }
+  _app_lab_receipt || return
+  _APP_LAB_RECEIPT_OK=true
+}
+app_lab() {
+  local arg actual
+  [[ ${1:-} != delete ]] || { echo 'Use app_lab_cleanup for teardown.' >&2; return 1; }
+  for arg in "$@"; do
+    [[ $arg == -- ]] && break
+    case "$arg" in
+      -n*|-s*|-A*|--namespace*|--context*|--kubeconfig*|--cluster*|--user*|--server*|--all-namespaces*|--raw*|--as*|--token*|--client-*|--certificate-authority*|--insecure-skip-tls-verify*|--tls-server-name*|--request-timeout*)
+        echo 'Target override refused.' >&2; return 1;;
+    esac
+  done
+  [[ ${_APP_LAB_RECEIPT_OK:-} == true && -s ${_APP_LAB_RECEIPT:-} && -n ${_APP_LAB_NS:-} && ${_APP_LAB_UID:-} =~ ^[0-9a-fA-F-]{36}$ ]] || {
+    echo 'No valid creation receipt; stop.' >&2; return 1;
+  }
+  _app_lab_identity || return
+  actual=$(_app_lab_base get namespace "$_APP_LAB_NS" -o jsonpath='{.metadata.uid}' </dev/null) || return
+  [[ "$actual" == "$_APP_LAB_UID" ]] || { echo 'Namespace identity mismatch; stop.' >&2; return 1; }
+  _app_lab_base "$@"
+}
+app_lab_setup
 ```
 
 ### Scenario 1: CrashLoopBackOff
 
-This Pod starts a BusyBox container, prints one line, and exits with code `1`. That makes it a clean example of a process-level failure rather than an image, scheduling, or volume problem. Your goal is to prove the exit code and then replace the one-shot command with a long-running command so the Pod can stay alive.
+This Pod starts a BusyBox container, prints one line, and exits with code `1`. That makes it a clean example of a process-level failure rather than an image, scheduling, or volume problem. Your goal is to prove the exit code and then create a separate corrected Pod with a long-running command, retaining the failing Pod for comparison.
 
 ```bash
-cat <<'EOF' | kubectl apply -f -
+cat <<'EOF' | app_lab apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: crash-app
-  namespace: app-debug-lab
 spec:
   containers:
   - name: app
@@ -720,20 +779,27 @@ EOF
 <summary>Solution</summary>
 
 ```bash
-kubectl describe pod crash-app -n app-debug-lab | grep -A5 "Last State"
-kubectl get pod crash-app -n app-debug-lab -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}'
+app_lab describe pod crash-app | grep -A5 "Last State"
+app_lab get pod crash-app -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}'
 # Exit code 1 - the command explicitly exits with error
 
 # If kubelet retained logs from the prior instance, follow up with:
-kubectl logs crash-app -n app-debug-lab --previous
+app_lab logs crash-app --previous
 
-# Fix: update the command to sleep instead of exit
-kubectl get pod crash-app -n app-debug-lab -o yaml > crash.yaml
-sed -i.bak 's/exit 1/sleep 3600/g' crash.yaml && rm crash.yaml.bak
-kubectl replace --force -f crash.yaml
-
-# Verify
-kubectl get pod crash-app -n app-debug-lab
+# Create a corrected Pod; retain crash-app and its evidence.
+cat <<'EOF' | app_lab create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-app-fixed
+spec:
+  containers:
+  - name: app
+    image: busybox:1.36
+    command: ['sh', '-c', 'echo "Starting..."; sleep 3600']
+EOF
+app_lab wait --for=condition=Ready pod/crash-app-fixed --timeout=90s
+app_lab get pod crash-app crash-app-fixed
 ```
 
 </details>
@@ -743,12 +809,11 @@ kubectl get pod crash-app -n app-debug-lab
 This Pod references a ConfigMap volume named `app-settings`, but the ConfigMap does not exist yet. The container image is valid, so image pull is not the likely cause. The evidence should appear in Events as a volume setup or missing ConfigMap problem, and the fix is to create the named object in the same namespace.
 
 ```bash
-cat <<'EOF' | kubectl apply -f -
+cat <<'EOF' | app_lab apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: config-app
-  namespace: app-debug-lab
 spec:
   containers:
   - name: app
@@ -770,14 +835,15 @@ EOF
 
 ```bash
 # Diagnose
-kubectl describe pod config-app -n app-debug-lab | grep -A 5 Events
+app_lab describe pod config-app | grep -A 5 Events
 # "configmap "app-settings" not found"
 
 # Fix
-kubectl create configmap app-settings -n app-debug-lab --from-literal=key=value
+app_lab create configmap app-settings --from-literal=key=value
 
 # Verify
-kubectl get pod config-app -n app-debug-lab
+app_lab wait --for=condition=Ready pod/config-app --timeout=90s
+app_lab get pod config-app
 ```
 
 </details>
@@ -949,15 +1015,14 @@ Registry availability and error wording can differ in your environment.
 
 ### Scenario 4: Resource Constraint (OOM)
 
-This Pod intentionally asks the stress process to allocate more memory than the container limit allows. The result should be an OOMKilled termination, which is different from a generic application exit. Your goal is to prove the termination reason and then increase the limit enough for this synthetic workload to run.
+This Pod intentionally asks the stress process to allocate more memory than the container limit allows. The intended result is `OOMKilled`, which must be observed rather than inferred from the limit. The checked Kubernetes 1.35 arm64 fixture observed that termination with `polinux/stress`; this does not establish portability or verify the higher-limit Pod. Keep the failing Pod and create a distinct Pod with a higher limit for comparison, then record its actual behavior before claiming a successful repair.
 
 ```bash
-cat <<'EOF' | kubectl apply -f -
+cat <<'EOF' | app_lab apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: oom-app
-  namespace: app-debug-lab
 spec:
   containers:
   - name: app
@@ -970,41 +1035,77 @@ spec:
 EOF
 ```
 
-**Task**: Diagnose why the container keeps getting killed.
+**Task**: Determine whether the observed termination reason is `OOMKilled`. If the image cannot run on the fixture, record that limitation and stop this scenario; an image or architecture failure is not OOM evidence.
 
 <details>
 <summary>Solution</summary>
 
 ```bash
 # Diagnose
-kubectl describe pod oom-app -n app-debug-lab | grep -i oom
-kubectl get pod oom-app -n app-debug-lab -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
-# "OOMKilled"
+app_lab describe pod oom-app | grep -i oom
+app_lab get pod oom-app -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+# Require an observed OOMKilled reason; a generic exit is not proof.
 
-# The container tries to use 500MB but only has 100Mi limit
-# Fix: increase memory limit by replacing the pod
-kubectl get pod oom-app -n app-debug-lab -o yaml > oom.yaml
-sed -i.bak 's/100Mi/600Mi/g' oom.yaml && rm oom.yaml.bak
-kubectl replace --force -f oom.yaml
-
-# Verify
-kubectl get pod oom-app -n app-debug-lab
+# Create a separate comparison Pod; retain oom-app.
+cat <<'EOF' | app_lab create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oom-app-fixed
+spec:
+  containers:
+  - name: app
+    image: polinux/stress
+    command: ["stress"]
+    args: ['--vm', '1', '--vm-bytes', '500M']
+    resources:
+      limits:
+        memory: "600Mi"
+EOF
+app_lab get pod oom-app oom-app-fixed
 ```
+
+A sampled Running/Ready state does not prove the memory problem is fixed. Record actual termination reasons, restart history and corrected-workload behavior before claiming success. Keeping both Pods also requires capacity for both; do not delete the failing Pod to manufacture a passing comparison.
 
 </details>
 
 ### Success Criteria
 
 - [ ] Diagnose application failures by identifying `crash-app` exit code as `1` using previous logs and container state.
+- [ ] Create `crash-app-fixed`, verify it becomes Ready, and retain the original failed Pod for comparison.
 - [ ] Fix application failures caused by missing ConfigMaps by creating `app-settings` in the correct namespace.
 - [ ] Diagnose the new ReplicaSet's image-pull failure, roll back `image-rollout`, and verify two ready replicas in its dedicated namespace.
-- [ ] Trace resource-limit failure evidence by identifying `OOMKilled` for `oom-app` before increasing the memory limit.
+- [ ] Record `OOMKilled` for `oom-app` before creating the higher-limit `oom-app-fixed`; report an unreproduced failure instead of claiming OOM from an image or architecture error.
 
 ### Cleanup
 
+Explicit cleanup below deletes only the recorded Scenarios 1/2/4 namespace, including failed and corrected Pods. It uses a [UID-preconditioned DELETE](https://github.com/kubernetes/apimachinery/blob/v0.35.0/pkg/apis/meta/v1/types.go), bounded wait and final absence check. Failures retain the receipt for deliberate retry; never fall back to name-only deletion or remove finalizers.
+
 ```bash
-kubectl delete ns app-debug-lab
+app_lab_cleanup() {
+  local actual
+  [[ ${_APP_LAB_RECEIPT_OK:-} == true && -s ${_APP_LAB_RECEIPT:-} && -n ${_APP_LAB_NS:-} && ${_APP_LAB_UID:-} =~ ^[0-9a-fA-F-]{36}$ ]] || {
+    echo 'No valid creation receipt; cleanup refused.' >&2; return 1;
+  }
+  _app_lab_identity || return
+  actual=$(_app_lab_base get namespace "$_APP_LAB_NS" --ignore-not-found -o jsonpath='{.metadata.uid}' </dev/null) || return
+  if [[ -n "$actual" ]]; then
+    [[ "$actual" == "$_APP_LAB_UID" ]] || { echo 'Replacement namespace: stop.' >&2; return 1; }
+    printf '{"apiVersion":"v1","kind":"DeleteOptions","preconditions":{"uid":"%s"}}' "$_APP_LAB_UID" |
+      _app_lab_base delete --raw "/api/v1/namespaces/$_APP_LAB_NS" -f - || return
+    _APP_LAB_DELETE_SENT=true; _app_lab_receipt || return
+    _app_lab_base wait --for=delete "namespace/$_APP_LAB_NS" --timeout=120s || return
+  elif [[ $_APP_LAB_DELETE_SENT != true ]]; then
+    echo 'Namespace missing without confirmed deletion; reconcile receipt.' >&2; return 1
+  fi
+  actual=$(_app_lab_base get namespace "$_APP_LAB_NS" --ignore-not-found -o jsonpath='{.metadata.uid}' </dev/null) || return
+  [[ -z "$actual" ]] || { echo 'Namespace still present; retain receipt.' >&2; return 1; }
+  printf 'Confirmed namespace absent: %s. Retain receipt: %s\n' "$_APP_LAB_NS" "$_APP_LAB_RECEIPT"
+}
+app_lab_cleanup
 ```
+
+There is no automatic EXIT cleanup when an interactive command is interrupted. If the creation response, session or receipt is lost, stop for fixture-owner reconciliation; never recover ownership by looking up the candidate's current UID. Retain the private receipt on failure and retry cleanup in the same session. It stores identifiers and a kubeconfig path, not credential contents; do not blindly source a receipt.
 
 ### Practice Drills
 
