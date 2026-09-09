@@ -1000,16 +1000,77 @@ You will create broken resources, diagnose them with the five-step method, repai
 
 ### Setup
 
-Create a disposable namespace and deploy a broken workload. The manifest is runnable as written, but it contains several intentional mistakes for you to discover using evidence rather than by visually scanning first.
+Use one Bash session and an independently provisioned disposable Kubernetes 1.35 fixture. Before running setup, set `LAB_KUBECONFIG` to the absolute path of its dedicated kubeconfig, `LAB_CONTEXT` to its context, and `LAB_CLUSTER_UID` to the `kube-system` namespace UID recorded by trusted fixture provisioning. Do not fetch the current cluster's UID and treat it as the expected identity. A matching UID checks identity, not disposability; keep the dedicated kubeconfig unchanged during the exercise.
+
+The helpers use [explicit kubectl targeting](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl/). They guard the supplied fences, including piped manifests and nested lookups, not arbitrary manifests or commands. Keep the printed private receipt for reconciliation if the session is lost. Setup refuses to run again while candidate state exists, including after a failed or interrupted creation; a later lookup cannot replace a successful creation receipt.
 
 ```bash
-kubectl create ns troubleshoot-lab
-cat <<'EOF' | kubectl apply -f -
+_lab_base() {
+  command kubectl --kubeconfig="$_LAB_CONFIG" --context="$_LAB_CONTEXT" \
+    --namespace="${_LAB_NS:-default}" --request-timeout=30s "$@"
+}
+_lab_identity() {
+  local actual
+  actual=$(_lab_base get namespace kube-system -o jsonpath='{.metadata.uid}' </dev/null) || return
+  [[ -n "$_LAB_CLUSTER_UID" && "$actual" == "$_LAB_CLUSTER_UID" ]] || {
+    echo 'Fixture identity mismatch; stop.' >&2; return 1;
+  }
+}
+_lab_receipt() {
+  (umask 077; declare -p _LAB_CONFIG _LAB_CONTEXT _LAB_CLUSTER_UID _LAB_NS _LAB_UID _LAB_DELETE_SENT) >> "$_LAB_RECEIPT"
+}
+lab_setup() {
+  [[ -z ${_LAB_NS+x} && -z ${_LAB_RECEIPT+x} ]] || {
+    echo 'Existing candidate/receipt: reconcile it before another setup.' >&2; return 1;
+  }
+  [[ -n ${LAB_KUBECONFIG:-} && -n ${LAB_CONTEXT:-} && -n ${LAB_CLUSTER_UID:-} ]] || {
+    echo 'Supply all three independently verified fixture inputs.' >&2; return 1;
+  }
+  _LAB_CONFIG=$LAB_KUBECONFIG; _LAB_CONTEXT=$LAB_CONTEXT; _LAB_CLUSTER_UID=$LAB_CLUSTER_UID
+  _lab_identity || return
+  _LAB_NS="troubleshoot-$(date +%s)-$RANDOM-$RANDOM"; _LAB_UID=; _LAB_DELETE_SENT=false
+  _LAB_RECEIPT="$PWD/$_LAB_NS.receipt"
+  (umask 077; set -o noclobber; : > "$_LAB_RECEIPT") || return
+  _lab_receipt || return
+  printf 'Retain receipt: %s\n' "$_LAB_RECEIPT"
+  if ! _LAB_UID=$(_lab_base create namespace "$_LAB_NS" -o jsonpath='{.metadata.uid}'); then
+    _LAB_UID=; echo 'Creation uncertain: retain candidate; ask fixture owner to reconcile.' >&2; return 1
+  fi
+  [[ $_LAB_UID =~ ^[0-9a-fA-F-]{36}$ ]] || {
+    _LAB_UID=; echo 'Missing creation UID: preserve candidate; do not adopt or delete it.' >&2; return 1;
+  }
+  _lab_receipt || return
+  _LAB_RECEIPT_OK=true
+}
+lab() {
+  local arg actual
+  [[ ${1:-} != delete ]] || { echo 'Use lab_cleanup for teardown.' >&2; return 1; }
+  for arg in "$@"; do
+    [[ $arg == -- ]] && break
+    case "$arg" in
+      -n*|-s*|-A*|--namespace*|--context*|--kubeconfig*|--cluster*|--user*|--server*|--all-namespaces*|--raw*|--as*|--token*|--client-*|--certificate-authority*|--insecure-skip-tls-verify*|--tls-server-name*|--request-timeout*)
+        echo 'Target override refused.' >&2; return 1;;
+    esac
+  done
+  [[ ${_LAB_RECEIPT_OK:-} == true && -s ${_LAB_RECEIPT:-} && -n ${_LAB_NS:-} && ${_LAB_UID:-} =~ ^[0-9a-fA-F-]{36}$ ]] || {
+    echo 'No valid creation receipt; stop.' >&2; return 1;
+  }
+  _lab_identity || return
+  actual=$(_lab_base get namespace "$_LAB_NS" -o jsonpath='{.metadata.uid}' </dev/null) || return
+  [[ "$actual" == "$_LAB_UID" ]] || { echo 'Namespace identity mismatch; stop.' >&2; return 1; }
+  _lab_base "$@"
+}
+lab_setup
+```
+
+Continue only after setup succeeds. The fault manifest below contains intentional mistakes to discover using evidence; its namespace comes from `lab`.
+
+```bash
+cat <<'EOF' | lab apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: broken-app
-  namespace: troubleshoot-lab
 spec:
   replicas: 2
   selector:
@@ -1052,7 +1113,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: broken-app
-  namespace: troubleshoot-lab
 spec:
   selector:
     app: broken-api
@@ -1068,8 +1128,8 @@ EOF
 Start broad and do not fix anything yet. Capture which objects exist, which pods are failing, and which Events appear most recent. Write one sentence describing the first visible symptom before moving deeper.
 
 ```bash
-kubectl get deploy,rs,pods,svc,endpoints -n troubleshoot-lab -o wide
-kubectl get events -n troubleshoot-lab --sort-by='.lastTimestamp'
+lab get deploy,rs,pods,svc,endpointslices -o wide
+lab get events --sort-by='.lastTimestamp'
 ```
 
 Success criteria for this task are evidence-based. You should be able to say whether the deployment created pods, whether the pods reached `Running`, and whether the service has endpoints. If you cannot state those three things, you have not observed enough.
@@ -1084,8 +1144,8 @@ Success criteria for this task are evidence-based. You should be able to say whe
 Inspect one broken pod with `describe`. Do not jump to logs until you know whether the container started. Use the Events section to decide whether the first failing layer is scheduler, image pull, volume mount, container process, readiness, or service selection.
 
 ```bash
-POD_NAME="$(kubectl get pods -n troubleshoot-lab -l app=broken-app -o jsonpath='{.items[0].metadata.name}')"
-kubectl describe pod "$POD_NAME" -n troubleshoot-lab
+POD_NAME="$(lab get pods -l app=broken-app -o jsonpath='{.items[0].metadata.name}')"
+lab describe pod "$POD_NAME"
 ```
 
 You should discover at least two pod-startup blockers over the course of the repair. The exact order depends on what Kubernetes reports first, but the image typo and missing ConfigMap are both real issues. Fix one confirmed issue at a time and re-observe after each fix.
@@ -1100,10 +1160,10 @@ You should discover at least two pod-startup blockers over the course of the rep
 Apply the smallest repairs for the image typo and missing ConfigMap. Use commands that directly address the confirmed causes. Then watch the rollout long enough to see the next layer of failure, because fixing startup blockers may reveal readiness or service problems.
 
 ```bash
-kubectl set image deployment/broken-app -n troubleshoot-lab app=nginx:1.27
-kubectl create configmap nginx-config -n troubleshoot-lab --from-literal=default.conf='server { listen 80; location / { return 200 "ok\n"; } location /ready { return 200 "ready\n"; } }'
-kubectl rollout status deployment/broken-app -n troubleshoot-lab --timeout=90s
-kubectl get pods -n troubleshoot-lab -l app=broken-app
+lab set image deployment/broken-app app=nginx:1.27
+lab create configmap nginx-config --from-literal=default.conf='server { listen 80; location / { return 200 "ok\n"; } location /ready { return 200 "ready\n"; } }'
+lab rollout status deployment/broken-app --timeout=90s
+lab get pods -l app=broken-app
 ```
 
 If the rollout still does not complete, inspect the newest pod again. Do not assume the first repair fixed everything. Kubernetes troubleshooting often reveals one blocker at a time because later lifecycle stages cannot fail until earlier stages succeed.
@@ -1118,19 +1178,19 @@ If the rollout still does not complete, inspect the newest pod again. Do not ass
 Now test the requirement a user would care about: traffic through the service. The service object exists, but the selector is intentionally wrong. Use endpoints and labels to prove the cause before patching it.
 
 ```bash
-kubectl get svc broken-app -n troubleshoot-lab -o yaml
-kubectl get endpoints broken-app -n troubleshoot-lab
-kubectl get endpointslices -n troubleshoot-lab -l kubernetes.io/service-name=broken-app -o wide
-kubectl get pods -n troubleshoot-lab --show-labels
+lab get svc broken-app -o yaml
+lab get endpointslices -l kubernetes.io/service-name=broken-app -o wide
+lab get pods --show-labels
 ```
 
 Patch the service selector only after you can explain the mismatch. Then create a temporary client pod and test the service through its cluster DNS name and port.
 
 ```bash
-kubectl patch svc broken-app -n troubleshoot-lab --type='merge' -p '{"spec":{"selector":{"app":"broken-app"}}}'
-kubectl get endpoints broken-app -n troubleshoot-lab
-kubectl run client -n troubleshoot-lab --image=busybox:1.36 --restart=Never -- sleep 3600
-kubectl exec -n troubleshoot-lab client -- wget -qO- http://broken-app:8080/
+lab patch svc broken-app --type='merge' -p '{"spec":{"selector":{"app":"broken-app"}}}'
+lab get endpointslices -l kubernetes.io/service-name=broken-app -o wide
+lab run client --image=busybox:1.36 --restart=Never -- sleep 3600
+lab wait --for=condition=Ready pod/client --timeout=90s
+lab exec client -- wget -qO- http://broken-app:8080/
 ```
 
 The validation should return the response from nginx through the service. If it fails, inspect endpoints, targetPort, pod readiness, and the temporary client pod status before changing anything else. Remember that service reachability is a path, not a single object.
@@ -1145,12 +1205,11 @@ The validation should return the response from nginx through the service. If it 
 Create a separate crashing pod and apply the worked-example sequence without looking back at the solution. This pod starts, prints output, and exits with a nonzero code. Your goal is to capture previous logs and termination details before making a repair.
 
 ```bash
-cat <<'EOF' | kubectl apply -f -
+cat <<'EOF' | lab apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: crash-pod
-  namespace: troubleshoot-lab
 spec:
   containers:
   - name: app
@@ -1165,10 +1224,10 @@ EOF
 Use the method in order. Observe status, inspect `describe`, read previous logs, and confirm exit code. Then decide what change would make the pod stop crashing.
 
 ```bash
-kubectl get pod crash-pod -n troubleshoot-lab
-kubectl describe pod crash-pod -n troubleshoot-lab
-kubectl logs crash-pod -n troubleshoot-lab --previous
-kubectl get pod crash-pod -n troubleshoot-lab -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}{"\n"}'
+lab get pod crash-pod
+lab describe pod crash-pod
+lab logs crash-pod --previous
+lab get pod crash-pod -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}{"\n"}'
 ```
 
 You do not need to repair this standalone pod unless you want extra practice. The important outcome is explaining why `--previous` matters and why the failure is application process behavior rather than scheduling, image pull, or volume setup.
@@ -1183,12 +1242,11 @@ You do not need to repair this standalone pod unless you want extra practice. Th
 Create a pod that requests unrealistic resources. It should remain `Pending` because the scheduler cannot find a suitable node. Your job is to prove that no application logs can exist yet and that the scheduler event is the relevant evidence.
 
 ```bash
-cat <<'EOF' | kubectl apply -f -
+cat <<'EOF' | lab apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: pending-pod
-  namespace: troubleshoot-lab
 spec:
   containers:
   - name: app
@@ -1203,10 +1261,10 @@ EOF
 Inspect scheduler evidence and node capacity. Do not attempt to exec or read logs from a pod that has not started. The failure is a scheduling decision, not an application error.
 
 ```bash
-kubectl get pod pending-pod -n troubleshoot-lab
-kubectl describe pod pending-pod -n troubleshoot-lab
-kubectl get nodes
-kubectl describe node "$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')" | sed -n '/Allocatable/,/System Info/p'
+lab get pod pending-pod
+lab describe pod pending-pod
+lab get nodes
+lab describe node "$(lab get nodes -o jsonpath='{.items[0].metadata.name}')" | sed -n '/Allocatable/,/System Info/p'
 ```
 
 A good answer identifies the scheduler as the component refusing placement because no node can satisfy the resource request. The repair would be to lower requests to realistic values, add suitable capacity, or change scheduling constraints depending on the real workload requirement.
@@ -1218,12 +1276,33 @@ A good answer identifies the scheduler as the component refusing placement becau
 
 ### Cleanup
 
-Remove the practice namespace after completing the exercise. This deletes all broken resources and temporary pods created during the lab.
+Explicitly remove only the namespace recorded by successful setup. [UID preconditions](https://github.com/kubernetes/apimachinery/blob/v0.35.0/pkg/apis/meta/v1/types.go) protect the [raw DELETE request](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/) from deleting a replacement namespace. A failed request or bounded wait preserves the receipt for retry; do not fall back to name-only deletion, remove finalizers, or delete `method-demo`.
 
 ```bash
-kubectl delete ns troubleshoot-lab
-kubectl delete ns method-demo --ignore-not-found=true
+lab_cleanup() {
+  local actual
+  [[ ${_LAB_RECEIPT_OK:-} == true && -s ${_LAB_RECEIPT:-} && -n ${_LAB_NS:-} && ${_LAB_UID:-} =~ ^[0-9a-fA-F-]{36}$ ]] || {
+    echo 'No valid creation receipt; cleanup refused.' >&2; return 1;
+  }
+  _lab_identity || return
+  actual=$(_lab_base get namespace "$_LAB_NS" --ignore-not-found -o jsonpath='{.metadata.uid}' </dev/null) || return
+  if [[ -n "$actual" ]]; then
+    [[ "$actual" == "$_LAB_UID" ]] || { echo 'Replacement namespace: stop.' >&2; return 1; }
+    printf '{"apiVersion":"v1","kind":"DeleteOptions","preconditions":{"uid":"%s"}}' "$_LAB_UID" |
+      _lab_base delete --raw "/api/v1/namespaces/$_LAB_NS" -f - || return
+    _LAB_DELETE_SENT=true; _lab_receipt || return
+    _lab_base wait --for=delete "namespace/$_LAB_NS" --timeout=120s || return
+  elif [[ $_LAB_DELETE_SENT != true ]]; then
+    echo 'Namespace missing without confirmed deletion; reconcile receipt.' >&2; return 1
+  fi
+  actual=$(_lab_base get namespace "$_LAB_NS" --ignore-not-found -o jsonpath='{.metadata.uid}' </dev/null) || return
+  [[ -z "$actual" ]] || { echo 'Namespace still present; retain receipt.' >&2; return 1; }
+  printf 'Confirmed namespace absent: %s. Retain receipt: %s\n' "$_LAB_NS" "$_LAB_RECEIPT"
+}
+lab_cleanup
 ```
+
+There is no automatic EXIT cleanup: interrupting diagnosis must not silently delete the exercise. If creation loses its response, ownership is uncertain even if the candidate later exists. If the Bash session or receipt is lost, stop and ask the fixture owner to reconcile the candidate and provisioning records; do not reconstruct ownership by looking up its current UID. Retain failed-cleanup receipts and retry deliberately in the same session. The receipt contains identifiers and a kubeconfig path, not credential contents; keep it private and do not blindly source an untrusted receipt.
 
 ### Exercise Reflection
 
@@ -1240,7 +1319,7 @@ After cleanup, write a brief troubleshooting note for yourself. It should includ
 
 ## Learner check
 
-> This module writes every runnable example with the full `kubectl` command because copied shell blocks should work in non-interactive terminals, scripts, and exam environments without relying on local aliases.
+> The hands-on exercise defines `lab` to keep its supplied commands on the selected fixture and owned namespace. Run those blocks in the same Bash session after successful setup. Other examples use full `kubectl` commands; the exercise helper is not an exam prerequisite or a general-purpose command sandbox.
 
 You are evaluating an OOMKilled pod before raising its memory limit. Which command shows per-container CPU and memory usage from the metrics API, and why should you run it after reading `kubectl describe pod` rather than before?
 
