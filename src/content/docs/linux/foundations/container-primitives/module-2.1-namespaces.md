@@ -7,13 +7,13 @@ sidebar:
 lab:
   id: "linux-2.1-namespaces"
   url: "https://killercoda.com/kubedojo/scenario/linux-2.1-namespaces"
-  duration: "35-45 min"
+  duration: "35-45 min (estimate)"
   difficulty: "intermediate"
   environment: "ubuntu"
 revision_pending: false
 ---
 
-> **Linux Foundations** | Complexity: `[MEDIUM]` | Time: 35-45 min. This medium-depth lesson focuses on inspecting real namespace boundaries instead of memorizing container vocabulary.
+> **Linux Foundations** | Complexity: `[MEDIUM]` | Estimated time: 35-45 min. Allow more time for environment setup, unfamiliar commands, or repeated diagnosis. This medium-depth lesson focuses on inspecting real namespace boundaries instead of memorizing container vocabulary.
 
 ## Prerequisites
 
@@ -145,6 +145,8 @@ If the link targets differ, the two processes do not share that network namespac
 Seeing a container process from the host does not prove the container lacks a PID namespace. The host PID namespace is the parent view and can usually see descendant processes. The more important question is what the process sees from inside its own PID namespace. Compare `/proc/<host-pid>/ns/pid` with `/proc/1/ns/pid`, then enter the target PID namespace or inspect from inside the container if you need to verify the internal process view.
 
 The following small diagnostic pattern is safe on a lab machine because it only reads namespace identities. It compares the current shell with a target PID and prints the namespace types that differ. Use it as a reading exercise before copying it into your own notes.
+
+This loop and the Part 1 baseline inspect seven namespace types. They intentionally omit `time`; the separate [time-namespace inspection](#cgroup-and-time-namespaces-less-visible-still-relevant) below is optional. The baseline is not an inventory of every namespace available on your system.
 
 ```bash
 target_pid=1
