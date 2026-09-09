@@ -1128,7 +1128,7 @@ EOF
 Start broad and do not fix anything yet. Capture which objects exist, which pods are failing, and which Events appear most recent. Write one sentence describing the first visible symptom before moving deeper.
 
 ```bash
-lab get deploy,rs,pods,svc,endpoints -o wide
+lab get deploy,rs,pods,svc,endpointslices -o wide
 lab get events --sort-by='.lastTimestamp'
 ```
 
@@ -1179,7 +1179,6 @@ Now test the requirement a user would care about: traffic through the service. T
 
 ```bash
 lab get svc broken-app -o yaml
-lab get endpoints broken-app
 lab get endpointslices -l kubernetes.io/service-name=broken-app -o wide
 lab get pods --show-labels
 ```
@@ -1188,7 +1187,7 @@ Patch the service selector only after you can explain the mismatch. Then create 
 
 ```bash
 lab patch svc broken-app --type='merge' -p '{"spec":{"selector":{"app":"broken-app"}}}'
-lab get endpoints broken-app
+lab get endpointslices -l kubernetes.io/service-name=broken-app -o wide
 lab run client --image=busybox:1.36 --restart=Never -- sleep 3600
 lab wait --for=condition=Ready pod/client --timeout=90s
 lab exec client -- wget -qO- http://broken-app:8080/
