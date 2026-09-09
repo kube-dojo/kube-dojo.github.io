@@ -18,3 +18,5 @@ sidebar:
 | -- | [Cumulative Quiz](cumulative-quiz/) | -- |
 
 Module 5.1's duration is an unmeasured planning estimate for the full reading, exercise, and reflection, excluding fixture provisioning. Its hosted scenario metadata is not independent timing or execution validation.
+
+Module 5.2's 45-55 minutes is an unmeasured planning estimate for reading, guided exercises, and reflection. Fixture setup, image pulls, retries, and optional drills can extend it; the hosted scenario metadata is not an independent timing measurement.
