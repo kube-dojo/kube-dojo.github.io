@@ -1234,9 +1234,9 @@ kubectl get pod <pod> -o yaml | grep -A 15 readinessProbe
 
 ## Learner check
 
-> `image: polinux/stress` with `command: ["stress"]` and `args: ['--vm', '1', '--vm-bytes', '500M']` replaces the schema-v1 `progrium/stress` image so the OOM lab runs on Kubernetes 1.35.
+> The checked Kubernetes 1.35 arm64 fixture produced `OOMKilled` at 100Mi and completed the allocation-marker and state comparison at 600Mi. This is a bounded observation, not a portability or long-term stability claim.
 
-You applied Scenario 4 with a 100Mi memory limit and the stress container requesting 500M. What termination reason should `kubectl get pod oom-app -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'` return before you raise the limit?
+The 600Mi comparison Pod is Ready, but its allocation marker is absent. Can you claim a repair? Explain what else the verifier must observe, and why the failed 100Mi Pod remains available for comparison.
 
 ---
 
