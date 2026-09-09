@@ -7,13 +7,13 @@ sidebar:
 lab:
   id: cka-5.2-application-failures
   url: https://killercoda.com/kubedojo/scenario/cka-5.2-application-failures
-  duration: "45 min"
+  duration: "45-55 min"
   difficulty: intermediate
   environment: kubernetes
 ---
 > **Complexity**: `[MEDIUM]` - Most common troubleshooting scenarios
 >
-> **Time to Complete**: 45-55 minutes
+> **Time to Complete**: 45-55 minutes — an unmeasured planning estimate for the reading, guided exercises, and reflection. Fixture setup, image pulls, retries, and optional drills can extend it.
 >
 > **Prerequisites**: Module 5.1 (Troubleshooting Methodology), Module 2.1-2.7 (Workloads)
 
@@ -21,12 +21,14 @@ lab:
 
 ## What You'll Be Able to Do
 
-After this module, you will be able to:
+The guided exercises practice these skills:
 
-- **Diagnose** application failures by connecting Pod phase, container state, Events, logs, and exit codes to a specific root cause.
-- **Fix** application failures caused by wrong images, missing ConfigMaps, missing Secrets, incorrect probes, and resource limits.
-- **Debug** multi-container Pod failures by identifying the failing app container or init container before choosing a command.
-- **Trace** Deployment rollout failures from a stalled rollout symptom through ReplicaSet, Pod, and container evidence.
+- **Explain** a configured process exit using observed container state, exit code, and available previous logs, then compare it with a separate corrected Pod.
+- **Connect** a missing ConfigMap volume to observed Events and verify the Pod after creating the named ConfigMap.
+- **Trace** the guided bad-image Deployment rollout through ReplicaSet and Pod evidence, then verify rollback to two ready replicas.
+- **Distinguish** observed `OOMKilled` evidence from other exits and verify the comparison Pod's allocation marker and matching state samples over the bounded observation interval.
+
+Secrets, probes, init containers, and multi-container debugging are conceptual recognition topics here. Their explanations and quiz questions do not establish that you have completed practical diagnosis of those failure families. The hosted scenario link and duration metadata are not independent execution or timing measurements.
 
 ---
 
@@ -36,7 +38,7 @@ Hypothetical scenario: you are the administrator on duty during a release window
 
 Application failure troubleshooting is where Kubernetes stops feeling like a collection of object definitions and starts behaving like an operating system for distributed processes. The scheduler, kubelet, container runtime, registry, volume plugins, probes, and controller loops all leave evidence in different places. If you jump straight to editing YAML, you may fix the symptom that happened to be visible first while missing the root cause that will return on the next rollout.
 
-This module teaches a repeatable diagnostic path for the failures you will meet most often in the CKA exam and in day-to-day operations. You will learn how to move from Pod phase to Events, from Events to container state, from container state to previous logs, and from logs to the exact configuration, image, resource, or probe mistake that needs correction. The goal is not to memorize every status string; the goal is to build a habit of asking which Kubernetes component was trying to do work, what it reported, and what object you should inspect next.
+The guided crash, missing ConfigMap, rollout, and memory exercises practice a repeatable diagnostic path: inspect state, gather the relevant evidence, explain a proposed change, and verify the result. The wider examples introduce other configuration and probe failures without reproducing each one. Ask which Kubernetes component was trying to do work, what it actually reported, and what object you should inspect next.
 
 The restaurant kitchen analogy is still useful, provided we use it carefully. A Pod is like an order moving through a kitchen: the order must be accepted, ingredients must be available, prep steps must complete, the dish must stay hot, and the waiter must know when it is ready to serve. A bad image is a bad recipe, a missing ConfigMap is a missing ingredient, an OOM kill is a cook running out of counter space, and a probe mistake is a waiter asking whether the dish is ready before it has finished cooking.
 
@@ -688,6 +690,10 @@ Identify the failing container first, then read its logs with `-c`. Run `kubectl
 
 Exercise scenario: diagnose three failing Pods in a fresh owned namespace and a failed Deployment rollout in a separate fresh namespace. For each, inspect Events and relevant state before choosing a repair. Run these deliberately broken workloads in a disposable lab environment.
 
+The injected defects are disclosed in the manifests and scenario descriptions. This is guided evidence practice, not an unseen diagnosis test. Before opening an optional solution, record your hypothesis, the evidence you would seek, the change you propose, and the observation that would verify it. Compare your reasoning with the supplied solution, then record what your fixture actually reports. Example status strings and comments are expectations to check, not guaranteed screenshots or substitutes for output.
+
+The crash and OOM comparisons create separately named corrected Pods and retain the original failed Pods until explicit cleanup. They do not repair those original Pods in place. Preserve both sides of the comparison; if capacity or another prerequisite is missing, report the unmet requirement instead of deleting evidence to make room.
+
 ### Setup
 
 Use one Bash session for Scenarios 1, 2 and 4. Set `APP_LAB_KUBECONFIG` to the absolute path of a dedicated disposable Kubernetes 1.35 kubeconfig, `APP_LAB_CONTEXT` to its context, and `APP_LAB_CLUSTER_UID` to the `kube-system` UID recorded by trusted fixture provisioning. Do not fetch a current UID and treat it as the expected identity. Keep the dedicated kubeconfig unchanged; identity alone does not prove disposability.
@@ -775,6 +781,8 @@ EOF
 
 **Task**: Find why it is crashing and what exit code it has.
 
+Checkpoint: the command already discloses `exit 1`. Separate that configured cause from the termination and log evidence you observe. State why a long-running command addresses this example and what you expect from `crash-app-fixed`. Previous logs require a prior container instance; if they are not available yet, record that limit rather than claiming the expected output.
+
 <details>
 <summary>Solution</summary>
 
@@ -806,6 +814,8 @@ app_lab get pod crash-app crash-app-fixed
 
 ### Scenario 2: Missing ConfigMap
 
+Before this scenario, record whether the crash comparison became Ready and whether the original Pod's exit evidence was retained. A Ready sample for the comparison is the check supplied here, not a long-term reliability measurement.
+
 This Pod references a ConfigMap volume named `app-settings`, but the ConfigMap does not exist yet. The container image is valid, so image pull is not the likely cause. The evidence should appear in Events as a volume setup or missing ConfigMap problem, and the fix is to create the named object in the same namespace.
 
 ```bash
@@ -829,6 +839,8 @@ EOF
 ```
 
 **Task**: Find why it is stuck in ContainerCreating and fix it.
+
+Checkpoint: identify the ConfigMap name in the spec, then record the actual Pod state and any Event tying the failure to that missing object. Propose where to create it and how to verify recovery before comparing with the solution. If image pulling or another preparation step is still pending, report that observation; do not infer a missing-ConfigMap Event from the manifest alone.
 
 <details>
 <summary>Solution</summary>
@@ -1015,6 +1027,8 @@ Registry availability and error wording can differ in your environment.
 
 ### Scenario 4: Resource Constraint (OOM)
 
+Checkpoint before continuing: record whether `config-app` became Ready after the ConfigMap was created, or what prevented verification. For the separately scoped rollout exercise, retain the actual failed-image and rollback evidence from its own instructions. Neither a successful command nor a solution's expected outcome replaces those observations.
+
 This experiment retains a 500 MiB Python `bytearray`, writes to it at 4 KiB intervals, prints an allocation marker, and sleeps. [Python documents the zero-initialized allocation](https://docs.python.org/3.12/library/functions.html#func-bytearray); the writes do not create a second same-size bytes object. The failing Pod has a 100Mi memory request and limit. Require Kubernetes' observed [`OOMKilled` termination reason](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/#exceed-a-container-s-memory-limit), not exit code 137 alone, before creating the 600Mi comparison Pod.
 
 Both Pods use the [official Python image](https://github.com/docker-library/official-images/blob/master/library/python) tag `python:3.12.14-alpine3.24`. A tag or manifest is not execution evidence: record image identity and actual behavior on your fixture. The scheduler accounts for 700Mi in their combined memory requests, in addition to the other exercise workloads; check available capacity before continuing. This synthetic comparison is not a production recommendation to raise memory limits.
@@ -1047,6 +1061,8 @@ EOF
 ```
 
 **Task**: Predict the termination evidence, then inspect the actual result. If the image cannot run or the Pod cannot schedule, record that limitation; those failures are not OOM evidence. The solution refuses comparison creation without `OOMKilled` in a 120-second observation window. Existing helper request timeouts still apply to API calls; a response arriving after the observation deadline cannot pass the gate.
+
+Before opening the solution, explain why exit code 137 alone cannot meet the gate, why the higher-limit Pod needs an allocation marker, and which identity and state fields should match across the two samples. Write down the evidence that would make you stop instead of claiming the comparison passed. The supplied helper performs these checks; explaining its result is part of the exercise.
 
 <details>
 <summary>Solution</summary>
@@ -1130,13 +1146,17 @@ The verifier requires the exact allocation marker, then compares Pod UID, contai
 
 ### Success Criteria
 
-- [ ] Diagnose application failures by identifying `crash-app` exit code as `1` using previous logs and container state.
+Use these criteria to record verified results or unmet gates. The OOM comparison's matching samples roughly 15 seconds apart do not establish continuous health between samples or sustained stability. Do not count conceptual Secret, probe, init-container, or multi-container coverage as completed hands-on diagnosis.
+
+- [ ] Identify `crash-app` exit code `1` in terminated container state; inspect previous logs when available and record any missing evidence.
 - [ ] Create `crash-app-fixed`, verify it becomes Ready, and retain the original failed Pod for comparison.
 - [ ] Fix application failures caused by missing ConfigMaps by creating `app-settings` in the correct namespace.
 - [ ] Diagnose the new ReplicaSet's image-pull failure, roll back `image-rollout`, and verify two ready replicas in its dedicated namespace.
 - [ ] Observe `OOMKilled` before comparison creation; then capture `allocated=524288000` and matching running/ready identity samples with zero restarts 15 seconds apart for `oom-app-fixed`, or report the unmet gate without claiming a repair.
 
 ### Cleanup
+
+Before cleanup, write a short evidence note for each exercise: hypothesis, actual observation, supplied or proposed repair, verification result, and any missing evidence. Keep configured defects, observed failures, and successful comparisons distinct; retain failed and corrected Pod evidence until this explicit teardown.
 
 Explicit cleanup below deletes only the recorded Scenarios 1/2/4 namespace, including failed and corrected Pods. It uses a [UID-preconditioned DELETE](https://github.com/kubernetes/apimachinery/blob/v0.35.0/pkg/apis/meta/v1/types.go), bounded wait and final absence check. Failures retain the receipt for deliberate retry; never fall back to name-only deletion or remove finalizers.
 
