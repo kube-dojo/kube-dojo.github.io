@@ -4,9 +4,9 @@ slug: cloud/aws-essentials/module-1.2-vpc
 sidebar:
   order: 3
 ---
-**Complexity**: `[COMPLEX]` | **Time to Complete**: 3h | **Prerequisites**: Module 1.1, Linux Networking
+**Complexity**: `[COMPLEX]` | **Time to Complete**: 3h | **Prerequisites**: [Module 1.1](../module-1.1-iam/), [Linux Networking](/linux/foundations/everyday-use/module-0.5-networking-tools/)
 
-This module is labeled **[COMPLEX]** because VPC networking stacks several independent control planes—CIDR planning, subnet placement, route tables, NAT, security groups, NACLs, and cross-VPC connectivity—into one design surface where a single mistake can silently break production traffic. Budget about three hours if you work through the hands-on CLI exercise and pause on the prediction prompts; you should already be comfortable with Linux networking fundamentals from Module 1.1 and with IAM concepts from the prior AWS Essentials module, because you will attach policies to VPC endpoints and flow-log delivery roles later in the track.
+This module is labeled **[COMPLEX]** because VPC networking stacks several independent control planes—CIDR planning, subnet placement, route tables, NAT, security groups, NACLs, and cross-VPC connectivity—into one design surface where a single mistake can silently break production traffic. Budget about three hours if you work through the hands-on CLI exercise and pause on the prediction prompts; you should already be comfortable with [Linux networking fundamentals](/linux/foundations/everyday-use/module-0.5-networking-tools/) and with IAM concepts from [Module 1.1](../module-1.1-iam/), because you will attach policies to VPC endpoints and flow-log delivery roles later in the track.
 
 ## What You'll Be Able to Do
 
@@ -1175,6 +1175,8 @@ vpc_lab_cleanup
 
 ### Success Criteria
 
+**Theory-only pass**: Reading all sections through Task 8 (VPC Flow Logs configuration) is a complete theory-only pass. You do not need to run `vpc_behavior_probe` to finish the conceptual learning. If you skip Task 9, leave the traffic-receipt checkbox unchecked and record `probe not executed` — that is the honest outcome, not a failure.
+
 If every checkbox below is true after cleanup, you have reproduced the core production patterns this module teaches: tiered subnets, routed internet edge, per-AZ NAT egress, chained security groups, subnet NACL policy, flow-log configuration, and a behavioral receipt. Capture the VPC ID, route table IDs, probe InstanceId/ENI, and any CloudWatch event timestamps in your notes so you can compare them when Module 1.3 launches EC2 instances into the same address plan.
 
 - [ ] I created a VPC with a `/16` CIDR block and enabled DNS hostnames
@@ -1200,23 +1202,23 @@ With routing, NAT, layered firewalls, and observability in place, you have the s
 
 ## Sources
 
-- [docs.aws.amazon.com: vpc cidr blocks.html](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-cidr-blocks.html) — AWS VPC documentation explicitly defines the allowed IPv4 CIDR range and secondary CIDR association behavior.
-- [docs.aws.amazon.com: configure subnets.html](https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html) — AWS documents subnet scope as AZ-local and non-spanning.
-- [docs.aws.amazon.com: subnet sizing.html](https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html) — AWS subnet sizing documentation lists the reserved addresses and explains the base-plus-two DNS reservation.
-- [docs.aws.amazon.com: VPC Internet Gateway.html](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html) — AWS internet-gateway documentation explicitly states these characteristics.
-- [docs.aws.amazon.com: amazon vpc limits.html](https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html) — AWS VPC quotas documentation states that only one internet gateway can be attached to a VPC at a time.
-- [docs.aws.amazon.com: vpc nat gateway.html](https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpc-nat-gateway.html) — AWS NAT gateway documentation directly describes public NAT gateway placement, EIP requirements, and connection behavior.
-- [docs.aws.amazon.com: nat gateway working with.html](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-working-with.html) — AWS NAT gateway lifecycle documentation explicitly describes blackhole status for leftover routes.
-- [docs.aws.amazon.com: gateway endpoints.html](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html) — AWS gateway-endpoint documentation directly states the supported services and pricing model.
-- [docs.aws.amazon.com: privatelink access aws services.html](https://docs.aws.amazon.com/vpc/latest/privatelink/privatelink-access-aws-services.html) — AWS PrivateLink documentation describes reaching AWS services privately through interface endpoints without an internet or NAT path.
-- [docs.aws.amazon.com: infrastructure security.html](https://docs.aws.amazon.com/vpc/latest/userguide/infrastructure-security.html) — AWS VPC infrastructure-security documentation includes this comparison explicitly.
-- [docs.aws.amazon.com: security group rules.html](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html) — AWS security-group rules documentation explicitly covers security-group referencing.
-- [docs.aws.amazon.com: vpc service.html](https://docs.aws.amazon.com/general/latest/gr/vpc-service.html) — AWS quota references publish these default numeric limits.
-- [docs.aws.amazon.com: vpc peering.html](https://docs.aws.amazon.com/whitepapers/latest/aws-vpc-connectivity-options/vpc-peering.html) — The AWS VPC connectivity whitepaper covers these peering characteristics together.
-- [docs.aws.amazon.com: AmazonDNS concepts.html](https://docs.aws.amazon.com/vpc/latest/userguide/AmazonDNS-concepts.html) — AWS Amazon DNS documentation explicitly describes the base-plus-two address and the DNS attributes.
-- [docs.aws.amazon.com: resolver overview DSN queries to vpc.html](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-overview-DSN-queries-to-vpc.html) — Route 53 Resolver documentation directly defines inbound and outbound endpoint behavior for hybrid DNS.
-- [docs.aws.amazon.com: nat gateway pricing.html](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html) — AWS NAT gateway pricing documentation details the hourly charge plus the per-GB data-processing fee referenced in the cost discussion.
-- [docs.aws.amazon.com: vpc sharing.html](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-sharing.html) — AWS VPC sharing documentation explicitly describes subnet sharing within an Organization and its management benefits.
+- [VPC CIDR Blocks](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-cidr-blocks.html) — AWS VPC documentation explicitly defines the allowed IPv4 CIDR range and secondary CIDR association behavior.
+- [Configure Subnets](https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html) — AWS documents subnet scope as AZ-local and non-spanning.
+- [Subnet Sizing](https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html) — AWS subnet sizing documentation lists the reserved addresses and explains the base-plus-two DNS reservation.
+- [Internet Gateways](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html) — AWS internet-gateway documentation explicitly states these characteristics.
+- [Amazon VPC Quotas](https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html) — AWS VPC quotas documentation states that only one internet gateway can be attached to a VPC at a time.
+- [NAT Gateways](https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpc-nat-gateway.html) — AWS NAT gateway documentation directly describes public NAT gateway placement, EIP requirements, and connection behavior.
+- [Working with NAT Gateways](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-working-with.html) — AWS NAT gateway lifecycle documentation explicitly describes blackhole status for leftover routes.
+- [Gateway Endpoints](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html) — AWS gateway-endpoint documentation directly states the supported services and pricing model.
+- [Access AWS Services Through AWS PrivateLink](https://docs.aws.amazon.com/vpc/latest/privatelink/privatelink-access-aws-services.html) — AWS PrivateLink documentation describes reaching AWS services privately through interface endpoints without an internet or NAT path.
+- [Infrastructure Security in Amazon VPC](https://docs.aws.amazon.com/vpc/latest/userguide/infrastructure-security.html) — AWS VPC infrastructure-security documentation includes this comparison explicitly.
+- [Security Group Rules](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html) — AWS security-group rules documentation explicitly covers security-group referencing.
+- [Amazon VPC Endpoints and Quotas](https://docs.aws.amazon.com/general/latest/gr/vpc-service.html) — AWS quota references publish these default numeric limits.
+- [VPC Peering](https://docs.aws.amazon.com/whitepapers/latest/aws-vpc-connectivity-options/vpc-peering.html) — The AWS VPC connectivity whitepaper covers these peering characteristics together.
+- [DNS Support in Your VPC](https://docs.aws.amazon.com/vpc/latest/userguide/AmazonDNS-concepts.html) — AWS Amazon DNS documentation explicitly describes the base-plus-two address and the DNS attributes.
+- [Route 53 Resolver](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-overview-DSN-queries-to-vpc.html) — Route 53 Resolver documentation directly defines inbound and outbound endpoint behavior for hybrid DNS.
+- [NAT Gateway Pricing](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-pricing.html) — AWS NAT gateway pricing documentation details the hourly charge plus the per-GB data-processing fee referenced in the cost discussion.
+- [Share Your VPC with Other Accounts](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-sharing.html) — AWS VPC sharing documentation explicitly describes subnet sharing within an Organization and its management benefits.
 - [VPC Basics](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-subnet-basics.html) — Good canonical reference for VPC, subnet, and built-in component behavior.
 - [Regional NAT Gateways for Automatic Multi-AZ Expansion](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html) — Covers the newer regional NAT option that changes the HA guidance in this module.
 - [Logging IP Traffic Using VPC Flow Logs](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html) — Deepens the troubleshooting section with official record, destination, and limitation details.
