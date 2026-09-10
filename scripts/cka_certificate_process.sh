@@ -22,13 +22,26 @@ cka_cert_process_stat() {
   CKA_CERT_PROC_START=${fields[19]}
 }
 
+# Shared node clock in centiseconds, unlike shell-relative SECONDS.
+# /proc/uptime reports elapsed boot time including suspend (proc_uptime(5)).
+cka_cert_process_now() {
+  local uptime idle extra
+  [[ $# == 0 ]] || return 1
+  read -r uptime idle extra < /proc/uptime || return 1
+  [[ $uptime =~ ^[0-9]{1,12}\.[0-9]{2}$ && $idle =~ ^[0-9]+\.[0-9]{2}$ && -z $extra ]] || return 1
+  CKA_CERT_PROCESS_NOW=$((10#${uptime%.*} * 100 + 10#${uptime#*.}))
+}
+
+# Pass an absolute deadline in node-clock centiseconds; callers share one budget.
 # Builtins only while enumerating: do not manufacture transient scanner children.
 # Zombies have released descriptors; any live reused SID conservatively blocks.
 cka_cert_process_snapshot() {
   local path pid
-  [[ $# == 2 && $1 =~ ^[1-9][0-9]*$ && $2 =~ ^[0-9]+$ ]] || return 1
+  [[ $# == 3 && $1 =~ ^[1-9][0-9]*$ && $2 =~ ^[0-9]+$ && $3 =~ ^[0-9]{1,15}$ ]] || return 1
   CKA_CERT_PROCESS_OTHERS=0
   for path in /proc/[0-9]*/stat; do
+    cka_cert_process_now || return 1
+    (( CKA_CERT_PROCESS_NOW < 10#$3 )) || return 124
     pid=${path#/proc/}
     pid=${pid%/stat}
     cka_cert_process_stat "$pid" || return 1
@@ -37,6 +50,8 @@ cka_cert_process_snapshot() {
     [[ $CKA_CERT_PROC_PGID == "$1" ]] || return 1
     [[ $pid == "$2" ]] || CKA_CERT_PROCESS_OTHERS=$((CKA_CERT_PROCESS_OTHERS + 1))
   done
+  cka_cert_process_now || return 1
+  (( CKA_CERT_PROCESS_NOW < 10#$3 )) || return 124
 }
 
 cka_cert_process_check() {
@@ -61,22 +76,44 @@ cka_cert_process_payload() {
     def integer: type=="number" and floor==.;
     def pid: integer and .>0;
     def ticks: type=="string" and test("^[0-9]+$");
+    def leader: type=="object" and keys==["pgid","pid","sid","start_time"] and
+      (.pid | pid) and .pid==.pgid and .pid==.sid and (.start_time | ticks);
+    def command: type=="object" and keys==["child_pid","exit_code","started"] and
+      (if .started==true then (.child_pid | pid) and (.exit_code | integer and .>=0 and .<=255)
+       else (.started==null or .started==false) and .child_pid==null and .exit_code==null end);
     if length==1 then .[0] else error("Expected one record") end |
     if $kind=="cancel" then
       select(.=={schema:1,identity:$identity,operation_id:$operation,request:"cancel"})
     else
-      select(type=="object" and
-        keys==["child_exit","coordinator","identity","operation_id","schema","stage","supervisor","timeout_seconds"]) |
-      select(.schema==1 and .identity==$identity and .operation_id==$operation) |
+      select(type=="object" and keys==["cancel_ack","cause","command","coordinator",
+        "identity","launch_disposition","operation_id","schema","stage","supervisor","timeout_seconds"]) |
+      select(.schema==2 and .identity==$identity and .operation_id==$operation) |
       select(.timeout_seconds | integer and .>=1 and .<=3600) |
+      select(.cancel_ack | type=="boolean") |
+      select(.cause=="none" or .cause=="cancel" or .cause=="timeout" or .cause=="signal" or .cause=="unknown") |
       select(.coordinator | type=="object" and keys==["pid","start_time"] and
         (.pid | pid) and (.start_time | ticks)) |
-      select(if .stage=="launch_requested" then .supervisor==null and .child_exit==null else
-        (.supervisor | type=="object" and keys==["pgid","pid","sid","start_time"] and
-          (.pid | pid) and .pid==.pgid and .pid==.sid and (.start_time | ticks)) and
-        (if .stage=="supervision_complete" then (.child_exit | integer and .>=0 and .<=255) else
-          (.stage=="running" or .stage=="term_requested" or .stage=="kill_requested") and .child_exit==null end)
-      end)
+      select(.command | command) |
+      select(if .stage=="launch_requested" then
+        .supervisor==null and .launch_disposition=="not_committed" and .command.started==null and .cause=="none"
+      elif .stage=="launch_committed" then
+        .supervisor==null and .launch_disposition=="supervisor_committed" and .command.started==null and .cause=="none"
+      elif .stage=="cancelled_before_launch" then
+        (.supervisor==null or (.supervisor | leader)) and .launch_disposition=="not_started" and
+        .command.started==false and .cancel_ack==true and .cause=="cancel"
+      else
+        (.supervisor | leader) and
+        (if .stage=="supervisor_ready" then
+          .launch_disposition=="supervisor_committed" and .command.started==null and .cause=="none"
+        else .launch_disposition=="command_committed" and .command.started!=false and
+          (if .stage=="command_launch_committed" then .command.started==null and .cause=="none"
+           elif .stage=="term_requested" or .stage=="kill_requested" then .cause!="none" and .cause!="unknown"
+           elif .stage=="supervision_complete" then .command.started==true and .cause!="unknown"
+           elif .stage=="supervision_unresolved" then .cause!="none"
+           else false end)
+        end)
+      end) |
+      select(if .cancel_ack then .cause!="none" else .cause!="cancel" end)
     end
   ' <<< "$4"
 }
