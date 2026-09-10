@@ -238,3 +238,64 @@ cka_cert_supervisor_receipt_write() {
   sync -f /var/lib/cka-certificate-transaction || return 1
   cka_cert_supervisor_receipt_read "$1" "$2" "$3" "$4" >/dev/null
 }
+
+# Shared deadline helpers; source-inert. Deadline is absolute node centiseconds.
+# A late/timeout result is unknown, never proof that descendants are absent.
+cka_cert_deadline_budget() {
+  local remaining soft
+  [[ $# == 1 && $1 =~ ^[0-9]{1,15}$ ]] || return 1
+  cka_cert_process_now || return 1
+  remaining=$((10#$1 - CKA_CERT_PROCESS_NOW))
+  # Reserve 25cs TERM-to-KILL grace and 5cs return margin inside this budget.
+  (( remaining > 30 )) || return 124
+  soft=$((remaining - 30))
+  printf -v CKA_CERT_DEADLINE_SOFT '%d.%02ds' "$((soft / 100))" "$((soft % 100))"
+}
+
+# Use only for receipt/read utilities; never for authoritative decision publication.
+# Decision publishers need a separate FD8+FD9-retaining protocol.
+cka_cert_run_utility() {
+  local deadline result duration
+  [[ $# -ge 3 && $2 == -- ]] || return 1
+  deadline=$1; shift 2
+  case $1 in jq|stat|cat|sha256sum|sync|ln|unlink|mktemp|flock|cmp|openssl) ;; *) return 1 ;; esac
+  cka_cert_deadline_budget "$deadline" || return $?
+  duration=$CKA_CERT_DEADLINE_SOFT
+  if (exec 8>&-; exec timeout --foreground --kill-after=0.25s "$duration" "$@"); then
+    result=0
+  else result=$?; fi
+  cka_cert_process_now || return 1
+  (( CKA_CERT_PROCESS_NOW < 10#$deadline )) || return 124
+  return "$result"
+}
+
+# Fixed read-only function allowlist; no receipt writes or process decisions.
+# Caller must have validated the private staged artifact set before dispatch.
+cka_cert_run_read_helper() {
+  local deadline duration result
+  [[ $# -ge 2 ]] || return 1
+  deadline=$1; shift
+  case $1 in
+    cka_cert_process_check|cka_cert_process_read|cka_cert_process_payload|\
+    cka_cert_state_expected|cka_cert_state_descriptor|cka_cert_state_file|\
+    cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read) ;;
+    *) return 1 ;;
+  esac
+  cka_cert_deadline_budget "$deadline" || return $?
+  duration=$CKA_CERT_DEADLINE_SOFT
+  if (exec 8>&-; exec timeout --foreground --kill-after=0.25s "$duration" \
+    env -u BASH_ENV -u ENV bash --noprofile --norc -p -c '
+      unset CKA_CERT_CONTROL_OWNS_FD
+      source /var/lib/cka-certificate-artifacts/observe.sh || exit 1
+      source /var/lib/cka-certificate-artifacts/state.sh || exit 1
+      source /var/lib/cka-certificate-artifacts/process.sh || exit 1
+      if [[ -L /proc/$BASHPID/fd/9 ]]; then
+        CKA_CERT_STATE_OWNS_FD=1
+        cka_cert_state_descriptor || exit 1
+      fi
+      "$@"
+    ' cka-certificate-read-helper "$@"); then result=0; else result=$?; fi
+  cka_cert_process_now || return 1
+  (( CKA_CERT_PROCESS_NOW < 10#$deadline )) || return 124
+  return "$result"
+}
