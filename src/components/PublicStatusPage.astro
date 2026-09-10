@@ -1,6 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import { execFileSync } from 'node:child_process';
+import { isStatusPage, summarizeFlags } from '../scripts/public-status';
 
 type Locale = 'en' | 'uk';
 type StatusEntry = {
@@ -21,74 +22,68 @@ type RecentEntry = {
 };
 
 const { locale = 'en' } = Astro.props as { locale?: Locale };
-const recentFallbackIds = [
-  ['2026-05-01', 'ai-ml-engineering/reinforcement-learning/module-2.1-offline-rl-and-imitation-learning'],
-  ['2026-05-01', 'ai-ml-engineering/machine-learning/module-2.7-causal-inference-for-ml-practitioners'],
-  ['2026-05-01', 'ai-ml-engineering/machine-learning/module-2.6-fairness-and-bias-auditing'],
-  ['2026-05-01', 'ai-ml-engineering/machine-learning/module-2.5-conformal-prediction-and-uncertainty-quantification'],
-  ['2026-05-01', 'ai-ml-engineering/machine-learning/module-2.4-recommender-systems'],
-] as const;
 
 const text = {
   en: {
     eyebrow: 'KubeDojo status',
-    title: 'Quality pass progress',
+    title: 'Content maintenance snapshot',
     intro:
-      'KubeDojo is being steadily refreshed. This page summarizes what learners need to know: how much of the curriculum is already through the current quality pass, what recently shipped, and which lessons are being reworked next.',
-    explainerTitle: 'What rework means',
+      'These counts cover English pages in the nine curriculum areas, including modules, book chapters and reference pages, excluding section index pages. Ukrainian translations are outside this snapshot, including when you view it in Ukrainian.',
+    explainerTitle: 'What these flags tell you',
     explainer:
-      'A rework banner means a lesson is scheduled for a clearer explanation, stronger examples, or fresher practice material. The existing lesson remains available while that happens. A final-review banner means the rewrite is published but still waiting for one last independent read.',
-    complete: 'quality pass complete',
-    completeLabel: 'Complete',
-    reworkLabel: 'Being reworked',
-    reviewLabel: 'Final review',
+      'Rework and review counts report page flags recorded in this build. An unflagged page has neither flag; that does not establish that its claims, explanations or exercises have passed review. Acceptance is unknown here because this page does not read evidence tied to each revision. A page can have both flags and appear in both category counts.',
+    complete: 'English pages in this snapshot',
+    completeLabel: 'Neither flag',
+    reworkLabel: 'Rework flagged',
+    reviewLabel: 'Review flagged',
     sectionsTitle: 'Section summary',
     sectionCol: 'Section',
-    doneCol: 'Complete',
-    progressCol: 'Progress',
-    recentTitle: 'Recently shipped',
-    currentTitle: 'Currently being reworked',
-    noRecent: 'No recent module changes were available while generating this page.',
-    noCurrent: 'No lessons are currently marked for rework.',
-    fallbackNote: "Scheduling dates aren't available in this build, so lessons are listed in curriculum order.",
-    updated: 'Static snapshot generated at build time. No learner data is collected here.',
+    doneCol: 'Neither flag / total',
+    progressCol: 'Either flag / total',
+    recentTitle: 'Recent source changes',
+    currentTitle: 'Pages flagged for rework',
+    noRecent: 'No recent source changes were available while generating this page.',
+    noCurrent: 'No pages are currently marked for rework.',
+    fallbackNote: 'Flag dates are unavailable in this build; pages are listed in curriculum order.',
+    updated: 'Static snapshot generated at build time. Dates come from Git author metadata; source changes do not establish deployment or review acceptance. Recent history may be unavailable in shallow builds. No learner data is collected here.',
   },
   uk: {
     eyebrow: 'Статус KubeDojo',
-    title: 'Прогрес перевірки якості',
+    title: 'Стан оновлення матеріалів',
     intro:
-      'KubeDojo поступово оновлюється. Ця сторінка показує головне для учнів: яка частина програми вже пройшла поточну перевірку якості, що нещодавно зʼявилося, і які уроки зараз переробляються.',
-    explainerTitle: 'Що означає переробка',
+      'Підрахунок охоплює англомовні сторінки дев’яти напрямів програми: модулі, розділи книги й довідкові матеріали, крім сторінок зі змістом розділів. Українські переклади не входять до цього знімка, навіть коли ви переглядаєте його українською.',
+    explainerTitle: 'Що означають позначки',
     explainer:
-      'Банер переробки означає, що урок заплановано зробити зрозумілішим: кращі пояснення, сильніші приклади або свіжіші практичні завдання. Поточний урок залишається доступним. Банер фінальної перевірки означає, що оновлення вже опубліковане, але ще чекає останнього незалежного читання.',
-    complete: 'перевірку якості завершено',
-    completeLabel: 'Готово',
-    reworkLabel: 'Переробляється',
-    reviewLabel: 'Фінальна перевірка',
+      'Кількості відображають позначки переробки та перевірки, записані на сторінках цієї збірки. Відсутність обох позначок не підтверджує перевірку тверджень, пояснень або вправ. Результат перевірки тут невідомий: ця сторінка не використовує докази, прив’язані до конкретної редакції. Сторінка з обома позначками враховується в обох категоріях.',
+    complete: 'англомовних сторінок у цьому знімку',
+    completeLabel: 'Без позначок',
+    reworkLabel: 'Позначено для переробки',
+    reviewLabel: 'Позначено для перевірки',
     sectionsTitle: 'Підсумок за розділами',
     sectionCol: 'Розділ',
-    doneCol: 'Готово',
-    progressCol: 'Прогрес',
-    recentTitle: 'Нещодавно опубліковано',
-    currentTitle: 'Зараз переробляється',
-    noRecent: 'Під час створення цієї сторінки не було доступних нещодавніх змін модулів.',
-    noCurrent: 'Зараз жоден урок не позначений для переробки.',
-    fallbackNote: 'Дати планування недоступні в цій збірці, тому уроки показано в порядку програми.',
-    updated: 'Статичний знімок створено під час збірки. Дані учнів тут не збираються.',
+    doneCol: 'Без позначок / усього',
+    progressCol: 'Хоча б одна позначка / усього',
+    recentTitle: 'Нещодавні зміни вихідних матеріалів',
+    currentTitle: 'Сторінки, позначені для переробки',
+    noRecent: 'Під час створення цієї сторінки не було доступних нещодавніх змін вихідних матеріалів.',
+    noCurrent: 'Зараз жодну сторінку не позначено для переробки.',
+    fallbackNote: 'Дати позначок недоступні в цій збірці; сторінки показано в порядку програми.',
+    updated: 'Статичний знімок створено під час збірки. Дати взято з авторських метаданих Git; зміни вихідних матеріалів не підтверджують публікацію чи проходження перевірки. У збірках зі скороченою історією Git нещодавні зміни можуть бути недоступні. Дані учнів тут не збираються.',
   },
 }[locale];
 
 const docs = await getCollection('docs');
 const moduleDocs: StatusEntry[] = docs
-  .filter((entry) => isLearnerModule(entry.id))
+  .filter((entry) => isStatusPage(entry.filePath))
   .map((entry) => {
     const data = entry.data as typeof entry.data & { slug?: string };
+    const sourceId = entry.filePath!.replace(/^src\/content\/docs\//, '').replace(/\.[^.]+$/, '');
     return {
-      id: entry.id,
+      id: sourceId,
       title: cleanTitle(entry.data.title ?? titleFromId(entry.id)),
       href: docHref(data.slug ?? entry.id),
-      section: sectionLabel(entry.id),
-      sectionKey: sectionKey(entry.id),
+      section: sectionLabel(sourceId),
+      sectionKey: sectionKey(sourceId),
       revisionPending: entry.data.revision_pending === true,
       qaPending: entry.data.qa_pending === true,
       queuedAt: null,
@@ -101,11 +96,7 @@ for (const entry of moduleDocs) {
   entry.queuedAt = queueDates.get(entry.id) ?? null;
 }
 
-const total = moduleDocs.length;
-const reworkCount = moduleDocs.filter((entry) => entry.revisionPending).length;
-const reviewCount = moduleDocs.filter((entry) => entry.qaPending).length;
-const completeCount = Math.max(0, total - reworkCount - reviewCount);
-const completePct = total > 0 ? Math.round((completeCount / total) * 100) : 0;
+const { total, rework: reworkCount, review: reviewCount, unflagged: completeCount } = summarizeFlags(moduleDocs);
 
 const sectionMap = moduleDocs.reduce((acc, entry) => {
   const row = acc.get(entry.sectionKey) ?? {
@@ -124,7 +115,7 @@ const sections = Array.from(sectionMap.values())
   .sort((a, b) => a.label.localeCompare(b.label))
   .map((row) => ({
     ...row,
-    pct: row.total > 0 ? Math.round((row.complete / row.total) * 100) : 0,
+    flagged: row.total - row.complete,
   }));
 
 const recent = loadRecentChanges(moduleDocs).slice(0, 8);
@@ -138,25 +129,6 @@ const current = moduleDocs
   })
   .slice(0, 5);
 const hasQueueAges = current.some((entry) => entry.queuedAt);
-
-function isLearnerModule(id: string): boolean {
-  if (id.startsWith('uk/')) return false;
-  const root = id.split('/')[0] ?? '';
-  const learnerRoots = new Set([
-    'ai',
-    'ai-history',
-    'ai-ml-engineering',
-    'cloud',
-    'k8s',
-    'linux',
-    'on-premises',
-    'platform',
-    'prerequisites',
-  ]);
-  if (!learnerRoots.has(root)) return false;
-  const file = id.split('/').at(-1) ?? id;
-  return file !== 'index';
-}
 
 function docHref(slug: string): string {
   return `/${slug}/`;
@@ -236,10 +208,9 @@ function loadQueuedDates(entries: StatusEntry[]): Map<string, string> {
 
 function loadRecentChanges(entries: StatusEntry[]): RecentEntry[] {
   const byPath = new Map(entries.map((entry) => [contentPathForId(entry.id), entry]));
-  const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const seen = new Set<string>();
   const rows: RecentEntry[] = [];
-  if (isShallowGitRepo()) return recentFallback(byId);
+  if (isShallowGitRepo()) return rows;
   try {
     const stdout = execFileSync(
       'git',
@@ -270,15 +241,7 @@ function loadRecentChanges(entries: StatusEntry[]): RecentEntry[] {
   } catch {
     // Git metadata is optional in static hosting builds.
   }
-  if (rows.length > 0) return rows;
-  return recentFallback(byId);
-}
-
-function recentFallback(byId: Map<string, StatusEntry>): RecentEntry[] {
-  return recentFallbackIds.flatMap(([date, id]) => {
-    const entry = byId.get(id);
-    return entry ? [{ date, title: entry.title, href: entry.href }] : [];
-  });
+  return rows;
 }
 
 function isShallowGitRepo(): boolean {
@@ -305,11 +268,8 @@ function isShallowGitRepo(): boolean {
 
   <div class="kd-status-overview" aria-label={text.title}>
     <div class="kd-status-main-stat">
-      <span>{completePct}%</span>
+      <span>{total}</span>
       <strong>{text.complete}</strong>
-    </div>
-    <div class="kd-status-progress" aria-label={`${completePct}% ${text.complete}`}>
-      <span style={`width: ${completePct}%`}></span>
     </div>
     <div class="kd-status-stats">
       <div>
@@ -388,9 +348,7 @@ function isShallowGitRepo(): boolean {
                   {section.complete}/{section.total}
                 </td>
                 <td>
-                  <div class="kd-status-mini" aria-label={`${section.pct}%`}>
-                    <span style={`width: ${section.pct}%`}></span>
-                  </div>
+                  {section.flagged}/{section.total}
                 </td>
               </tr>
             ))
