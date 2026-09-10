@@ -363,7 +363,7 @@ An agent is a loop, not a single completion. The model receives tools, chooses a
 
 `create_agent` is the LangChain 1.x entry point: it binds the model, tools, and system prompt and returns a compiled graph that loops until the model emits no more tool calls. Cap runaway loops with `recursion_limit` on invoke (or `.with_config({"recursion_limit": N})`). Inspect `result["messages"]` for tool calls and `ToolMessage` observations. Temperature near zero is common for tool routing because creativity in JSON tool selection is usually a liability.
 
-Tool-calling agents differ from text-only ReAct agents: modern chat models emit native tool_call objects instead of parsing Thought/Action/Observation strings from free text. LangChain 1.x agents assume structured `tool_calls`; mismatch manifests as ignored tools or infinite retries. Recover from tool failures with `handle_tool_error` on the tool or middleware that implements `wrap_tool_call`—do not expect a `handle_parsing_errors=` knob on the harness.
+Tool-calling agents differ from text-only ReAct agents: modern chat models emit native tool_call objects instead of parsing Thought/Action/Observation strings from free text. LangChain 1.x agents assume structured `tool_calls`; mismatch manifests as ignored tools or infinite retries. Recover from tool failures with `wrap_tool_call` middleware (or try/except inside the tool)—`@tool` no longer accepts `handle_tool_error=`, and `create_agent` has no `handle_parsing_errors=` knob.
 
 When durable threads, human approval, or custom cyclic graphs enter the picture, add a `checkpointer` to `create_agent` or compose LangChain tools and retrievers into an explicit LangGraph. The ReAct loop taught here is still the conceptual foundation.
 
@@ -464,7 +464,7 @@ Back-pressure matters when consumers process streams slower than models emit tok
 
 ## Production Patterns
 
-Production patterns start with failure as the default case. Tools time out, APIs rate-limit, and models emit invalid JSON. Use handle_tool_error, try/except inside tools, and graceful degradation paths that return actionable error strings the model can read on the next turn. Crashes should be reserved for programmer errors, not for expected external dependency failures.
+Production patterns start with failure as the default case. Tools time out, APIs rate-limit, and models emit invalid JSON. Use `wrap_tool_call` middleware, try/except inside tools, and graceful degradation paths that return actionable error strings the model can read on the next turn. Crashes should be reserved for programmer errors, not for expected external dependency failures.
 
 Security for tool-calling systems applies the principle of least privilege at the tool boundary, not in the prompt. Parameterize SQL, whitelist shell prefixes, require confirmation flags for destructive operations, and validate inputs with Pydantic before any side effect. Diagnose vulnerabilities by threat-modeling each tool as if the model were adversarial—because prompt injection can make it behave that way.
 
@@ -475,34 +475,39 @@ Hypothetical scenario: A market-data agent without caching answers every follow-
 When debugging agents, stream events and inspect `result["messages"]` to see tool inputs and `ToolMessage` outputs in order. Dump compiled tool schemas to verify docstrings became descriptions. Compare synchronous versus parallel tool execution when latency matters: independent reads should run concurrently when your runtime and provider support parallel tool calls.
 
 ```python
+from langchain.agents import create_agent
+from langchain.agents.middleware import wrap_tool_call
+from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool, ToolException
 
-@tool(handle_tool_error=True)
+@tool
 def risky_operation(param: str) -> str:
-    """A tool that might fail.
-
-    The handle_tool_error=True means failures are caught
-    and returned as messages instead of crashing.
-    """
+    """A tool that might fail at runtime after schema validation."""
     if not param:
         raise ToolException("Parameter cannot be empty!")
     return f"Success with {param}"
 
-def handle_tool_error(error: ToolException) -> str:
-    """Convert tool errors into helpful messages."""
-    return f"""Tool Error: {str(error)}
+@wrap_tool_call
+def handle_tool_errors(request, handler):
+    """Return runtime tool failures as ToolMessages the model can read."""
+    try:
+        return handler(request)
+    except Exception as e:
+        return ToolMessage(
+            content=(
+                f"Tool error: {e}. Check required parameters and input format, "
+                "then try a simpler query."
+            ),
+            tool_call_id=request.tool_call["id"],
+        )
 
-Suggestions:
-- Check if all required parameters are provided
-- Verify the input format is correct
-- Try a simpler query first"""
-
-@tool(handle_tool_error=handle_tool_error)
-def another_risky_tool(x: int) -> str:
-    """Tool with custom error handling."""
-    if x < 0:
-        raise ToolException("Negative numbers not allowed")
-    return str(x * 2)
+# Pass middleware= to create_agent (reuse model/tools from the agent-loop example).
+agent = create_agent(
+    model=llm,
+    tools=[risky_operation],
+    system_prompt="You are a concise developer assistant.",
+    middleware=[handle_tool_errors],
+)
 ```
 
 ```python
@@ -590,7 +595,7 @@ Prompt injection via tool results is an integration security topic. Wrap untrust
 
 Production LangChain systems fail at integration boundaries more often than at model quality. The patterns below span multiple sections and deserve explicit treatment because they do not fit neatly into a single Runnable or tool.
 
-**Error propagation in composed graphs.** When a RunnableParallel branch raises an exception, the entire parallel invoke fails unless you wrap optional branches in RunnableLambda try/except blocks or use newer `exceptions="return"` merge semantics where your langchain-core version supports them. Mark branches as critical vs. best-effort in design docs so on-call engineers know whether partial dictionaries are acceptable. Chain-level `with_fallbacks` on the outer runnable catches model timeouts but not arbitrary Python exceptions inside custom tools—those need `handle_tool_error` or explicit catches at the tool boundary.
+**Error propagation in composed graphs.** When a RunnableParallel branch raises an exception, the entire parallel invoke fails unless you wrap optional branches in RunnableLambda try/except blocks or use newer `exceptions="return"` merge semantics where your langchain-core version supports them. Mark branches as critical vs. best-effort in design docs so on-call engineers know whether partial dictionaries are acceptable. Chain-level `with_fallbacks` on the outer runnable catches model timeouts but not arbitrary Python exceptions inside custom tools—those need `wrap_tool_call` middleware or explicit catches at the tool boundary.
 
 **Retry policy belongs per tool category.** Chat models retry rate-limited API calls automatically when configured; Python tools do not. Use libraries like `tenacity` inside idempotent read tools, never inside payment or email-sending tools without idempotency keys. Document retry safety in each tool description so orchestrators and future maintainers inherit the contract. `create_agent` `recursion_limit` is not a retry mechanism—it caps graph steps, not transient HTTP failures.
 
@@ -707,7 +712,7 @@ Closing the loop: compose runnables, design tool contracts, integrate memory and
 | Mistake | Why it hurts | Fix |
 |---|---|---|
 | Overpowered tools | Models may invoke destructive commands when scopes are too broad. | Apply least privilege; parameterize queries and restrict filesystem or SQL access. |
-| Missing error context | Generic failures force the model to guess the next step. | Return actionable error strings; use `handle_tool_error` and try/except inside tools. |
+| Missing error context | Generic failures force the model to guess the next step. | Return actionable error strings; use `wrap_tool_call` and try/except inside tools. |
 | Tool overload | Dozens of overlapping tools confuse routing. | Consolidate related actions into meta-tools or route to focused subsets first. |
 | Ignoring memory growth | Storing full tool payloads in history blows context limits. | Trim or summarize tool results before persisting memory; cap turn count. |
 | Synchronous fan-out | Sequential independent reads inflate latency. | Use async tools and parallel tool calls when the provider supports them. |
@@ -763,7 +768,7 @@ Build a small offline agent lab using `langchain_core` fakes—no API keys requi
 - [ ] **Design** a `@tool` with a Pydantic schema that rejects empty location strings and returns simulated weather JSON.
 - [ ] **Integrate** Conversation-style memory by loading the last two turns into a ChatPromptTemplate MessagesPlaceholder before invoking a fake chat model.
 - [ ] **Debug** the run with a custom BaseCallbackHandler that prints chain start and LLM end events.
-- [ ] **Apply** `handle_tool_error=True` on a tool that raises ToolException when input is invalid.
+- [ ] **Apply** `wrap_tool_call` (or try/except inside the tool) so invalid input becomes an error string instead of crashing.
 
 ```python
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -782,7 +787,7 @@ def get_weather(location: str) -> str:
     '''Return simulated weather for a city.'''
     return f'{{"city": "{location}", "temp_c": 21, "conditions": "clear"}}'
 
-@tool(handle_tool_error=True)
+@tool
 def strict_echo(text: str) -> str:
     '''Echo text or fail clearly.'''
     if not text.strip():
@@ -818,7 +823,10 @@ composed = (
 
 print(composed.invoke({"text": "compose integrate debug apply", "history": history, "question": "Summarize our chat"}))
 print(get_weather.invoke({"location": "Oslo"}))
-print(strict_echo.invoke({"text": ""}))
+try:
+    print(strict_echo.invoke({"text": ""}))
+except ToolException as e:
+    print(f"Tool error: {e}")
 ```
 
 
