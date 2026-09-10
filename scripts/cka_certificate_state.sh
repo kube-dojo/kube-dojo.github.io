@@ -36,7 +36,7 @@ cka_cert_state_expected() {
     select(.image_id | type=="string" and test("^sha256:[a-f0-9]{64}$")) |
     select(.system_namespace_uid | type=="string" and
       test("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")) |
-    select(.artifact_hashes | type=="object" and keys==["observe.sh","state.sh"] and
+    select(.artifact_hashes | type=="object" and keys==["observe.sh","process.sh","state.sh"] and
       all(.[]; hex))
   ' <<< "$1"
 }
@@ -45,7 +45,7 @@ cka_cert_state_artifacts() {
   local name actual expected
   [[ $# == 1 ]] || return 1
   cka_cert_state_directory /var/lib/cka-certificate-artifacts || return 1
-  for name in state.sh observe.sh; do
+  for name in state.sh observe.sh process.sh; do
     cka_cert_state_file "/var/lib/cka-certificate-artifacts/$name" || return 1
     actual=$(sha256sum -- "/var/lib/cka-certificate-artifacts/$name") || return 1
     expected=$(jq -er --arg name "$name" '.artifact_hashes[$name]' <<< "$1") || return 1
