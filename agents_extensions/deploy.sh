@@ -99,6 +99,25 @@ deploy_skills() {
                 fi
                 changed=$((changed + 1))
             fi
+            # Companion files (reference.md, dual-repo.md, …) stay next to SKILL.md
+            # so relative links in the skill body resolve after deploy.
+            local extra extra_base target_extra
+            for extra in "$skill_dir"*; do
+                [[ -f "$extra" ]] || continue
+                extra_base=$(basename "$extra")
+                [[ "$extra_base" == "SKILL.md" ]] && continue
+                target_extra="$target_skill_dir/$extra_base"
+                if [[ ! -f "$target_extra" ]] || ! cmp -s "$extra" "$target_extra"; then
+                    if [[ "$CHECK" == "true" ]]; then
+                        log "   ✗ DRIFT skills/$skill_name/$extra_base"
+                    else
+                        mkdir -p "$target_skill_dir"
+                        cp "$extra" "$target_extra"
+                        log "   📄 skills/$skill_name/$extra_base"
+                    fi
+                    changed=$((changed + 1))
+                fi
+            done
         fi
     done
     echo "$changed"

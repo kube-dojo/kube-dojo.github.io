@@ -14,6 +14,7 @@ agents_extensions/
 │   └── skills/                    # Used by ALL agents (also at dispatch time)
 │       ├── curriculum-writer/
 │       ├── cross-family-reviewer/
+│       ├── drive-epic/                 # epic-driver playbook (site + labs)
 │       ├── module-quality-reviewer/
 │       ├── session-handoff-writer/
 │       ├── k8s-cert-expert/

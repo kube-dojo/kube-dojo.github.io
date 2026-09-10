@@ -60,6 +60,15 @@ rm -f "$TMP/.claude/hooks/standalone.sh"
 # 7. missing deployed copy → exit 1
 rm -f "$TMP/.claude/skills/demo/SKILL.md"
 run_check && bad "missing deployed should exit 1" || ok "missing deployed → exit 1"
+printf 'hello\n' > "$TMP/.claude/skills/demo/SKILL.md"
+
+# 8. companion markdown next to SKILL.md is copied and drift-checked
+printf 'ref\n' > "$TMP/agents_extensions/claude/skills/demo/dual-repo.md"
+redeploy
+[ -f "$TMP/.claude/skills/demo/dual-repo.md" ] && ok "companion file deployed" || bad "companion file not copied"
+printf 'drift\n' >> "$TMP/.claude/skills/demo/dual-repo.md"
+run_check && bad "companion drift should exit 1" || ok "companion drift → exit 1"
+redeploy; run_check && ok "deploy re-syncs companion → exit 0" || bad "deploy did not re-sync companion"
 
 if [ "$fail" -ne 0 ]; then echo "[deploy-check-test] FAIL"; exit 1; fi
 echo "[deploy-check-test] PASS"

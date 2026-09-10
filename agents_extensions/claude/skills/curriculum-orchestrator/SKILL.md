@@ -156,6 +156,7 @@ Context discipline in the meantime:
 | Sub-skill | When |
 |---|---|
 | [[cold-start]] | Start of every fresh session |
+| [[drive-epic]] | Driving one GitHub epic end-to-end (site + kubedojo-labs) |
 | [[dispatch-router]] | Picking an agent for a task |
 | [[cross-family-reviewer]] | Running R1/R2 reviews on PRs |
 | [[curriculum-writer]] | Author dispatch protocol |
