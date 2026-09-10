@@ -632,7 +632,7 @@ CiliumEgressGatewayPolicy routes outbound traffic from selected pods through ded
 
 Why you need this: Many external firewalls, databases, and SaaS APIs allowlist traffic by source IP. Without an egress gateway, pod traffic exits from whatever node the pod resides on, resulting in shifting source IPs.
 
-Cilium Egress Gateway is GA since Cilium 1.14 (and current in 1.19.x); it requires BPF masquerading and kube-proxy replacement to be enabled. **Crucially, Egress Gateway is incompatible with Cluster Mesh.** 
+Cilium Egress Gateway is GA since Cilium 1.14 (and current in 1.20.x); it requires BPF masquerading and kube-proxy replacement to be enabled. **Crucially, Egress Gateway is incompatible with Cluster Mesh.**
 
 > **Stop and think**: Why is Cilium Egress Gateway incompatible with Cluster Mesh?
 > *Answer: Egress gateways rely on strict SNAT and localized routing logic that conflicts with the cross-cluster identity synchronization and datapath behavior inherent to Cluster Mesh.*
@@ -702,7 +702,7 @@ spec:
 
 ## Part 7: CLI, Observability, and Troubleshooting
 
-Hubble is Cilium's integrated network observability platform, providing real-time service maps and L3-L7 flow visibility. Hubble provides a Relay component that aggregates flow data from all nodes for cluster-wide observability. Note that while Hubble Relay is stable, the Hubble UI is technically in Beta status as of Cilium 1.19.x stable.
+Hubble is Cilium's integrated network observability platform, providing real-time service maps and L3-L7 flow visibility. Hubble provides a Relay component that aggregates flow data from all nodes for cluster-wide observability. As of Cilium 1.20.1 stable docs (checked 2026-09), the Hubble UI guide no longer marks the UI as beta—`beta.rst` is only a generic include stub, not a Hubble UI maturity label—so treat Relay and the UI as the documented observability path on current stable.
 
 Good Cilium troubleshooting is a disciplined narrowing process. Start by asking whether the packet entered the Cilium-managed datapath, whether it matched the expected source and destination identities, whether it was forwarded, redirected, translated, or dropped, and whether the drop was L3/L4 or L7. Hubble is valuable because it turns those hidden datapath decisions into timestamped flow records. The CLI and agent commands are valuable because they let you compare those records against endpoint state, identity state, service maps, connection tracking, and current configuration.
 
@@ -898,8 +898,8 @@ Which approach would you choose here and why? A regulated internal service needs
 ## Did You Know?
 
 - **Cilium graduated from the CNCF on October 11, 2023**, after being accepted as an Incubating project on October 13, 2021. The CCA certification exam rigorously tests 8 domains, with Architecture (20%), Network Policy (18%), and Service Mesh (16%) making up the vast majority of the weight.
-- **Cilium's current latest stable release is version 1.19.3 as of May 6, 2026.** Active stable branches also include the supported v1.18 and v1.17 lines, while the v1.20 pre-release line is where upcoming Kubernetes Cluster Network Policy (BANP/ANP) support is being developed.
-- **Cilium passes all Gateway API version 1.4.1 Core conformance tests** across the `GATEWAY-HTTP`, `GATEWAY-TLS`, and `GATEWAY-GRPC` profiles. However, its GAMMA (Gateway API for Mesh) support remains partial, as it does not yet support consumer HTTPRoutes.
+- **Cilium's current latest stable release is version 1.20.1 as of August 18, 2026.** Active stable branches also include the supported v1.19 and v1.18 lines, while the v1.21 pre-release line continues development. Kubernetes Cluster Network Policy (`ClusterNetworkPolicy` / KCNP) support is available on the stable 1.20 line.
+- **Cilium passes all Gateway API version 1.6.1 Core conformance tests** across the `GATEWAY-HTTP`, `GATEWAY-TLS`, and `GATEWAY-GRPC` profiles. However, its GAMMA (Gateway API for Mesh) support remains partial, as it does not yet support consumer HTTPRoutes.
 - **Cilium's kube-proxy replacement requires a Linux kernel of at least 4.19.57, 5.1.16, or 5.2.0**, though kernel 5.3+ is strongly recommended. For maximum performance, XDP acceleration for kube-proxy replacement has been available since Cilium version 1.8, requiring a native XDP-supported NIC driver to bypass the kernel network stack entirely.
 
 ---

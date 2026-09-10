@@ -66,15 +66,15 @@ HARBOR REQUEST AND CONTROL PLANES
 
 When a push succeeds but a project webhook never fires, you might have a registry path problem or a core configuration problem, and the logs live in different places. When replication stalls, the job service queue and target registry credentials are the first suspects. When scans never appear, verify Trivy connectivity and project auto-scan settings before you assume the image lacks packages. Operations teams that document "which component owns which symptom" recover faster than teams that treat Harbor as a black box labeled "registry."
 
-Production Harbor on Kubernetes typically deploys via the [official Helm chart](https://helm.goharbor.io/) documented in [Deploying Harbor with High Availability via Helm](https://goharbor.io/docs/2.11.0/install-config/harbor-ha-helm/). High availability means more than multiple portal pods. Durable production posture usually externalizes PostgreSQL and Redis, uses shared object storage for registry blobs, and fronts the installation with a load balancer or ingress controller that preserves large upload bodies. The install documentation also covers HTTPS configuration, internal TLS between components, and lifecycle reconfiguration. Treat those documents as the source of truth for version-specific settings rather than copying values from a blog post tied to an older release.
+Production Harbor on Kubernetes typically deploys via the [official Helm chart](https://helm.goharbor.io/) documented in [Deploying Harbor with High Availability via Helm](https://goharbor.io/docs/2.15.0/install-config/harbor-ha-helm/). High availability means more than multiple portal pods. Durable production posture usually externalizes PostgreSQL and Redis, uses shared object storage for registry blobs, and fronts the installation with a load balancer or ingress controller that preserves large upload bodies. The install documentation also covers HTTPS configuration, internal TLS between components, and lifecycle reconfiguration. Treat those documents as the source of truth for version-specific settings rather than copying values from a blog post tied to an older release.
 
-> **Landscape snapshot — as of 2026-06. This changes fast; verify against vendor docs before relying on specifics.**
+> **Landscape snapshot — as of 2026-09. This changes fast; verify against vendor docs before relying on specifics.**
 
 | Fact | Current snapshot |
 |------|------------------|
-| Harbor docs version used here | 2.11.x |
+| Harbor docs version used here | 2.15.x |
 | CNCF status | Graduated — confirmed on the [CNCF Harbor project page](https://www.cncf.io/projects/harbor/) |
-| Default bundled scanner | Trivy — see [Harbor vulnerability scanning administration](https://goharbor.io/docs/2.11.0/administration/vulnerability-scanning/) |
+| Default bundled scanner | Trivy — see [Harbor vulnerability scanning administration](https://goharbor.io/docs/2.15.0/administration/vulnerability-scanning/) |
 | Signing options in Harbor | Cosign and Notation workflows are supported; verify current UI and version notes in Harbor release documentation |
 | Minimal OCI peer called out in this sub-track | [Zot](../module-13.2-zot/) |
 | P2P distribution peer module | [Dragonfly](../module-13.3-dragonfly/) for fan-out in front of a registry |
@@ -94,17 +94,17 @@ Production Harbor on Kubernetes typically deploys via the [official Helm chart](
 
 Harbor organizes content into projects. A project is more than a name prefix in an image reference. It is the boundary where you set public versus private visibility, member roles, robot accounts, vulnerability thresholds, tag immutability, retention policies, webhooks, and quotas. The image reference `harbor.example.com/team-backend/api-server:v2` encodes registry host, project name, repository name, and tag. Many policy decisions are made at the project layer before anyone debates individual tags.
 
-Harbor assigns project-scoped roles such as Guest, Developer, Maintainer, and Project Admin. Guests pull; Developers push; Maintainers manage tags and members; Project Admins configure project policies. System-level administrators configure authentication sources and global defaults. Harbor supports local database users, LDAP, and OIDC according to [Configure Authentication](https://goharbor.io/docs/2.11.0/administration/configure-authentication/). The durable design pattern is to map your organization's identity provider groups to Harbor roles rather than maintaining a parallel user database that drifts every quarter.
+Harbor assigns project-scoped roles such as Guest, Developer, Maintainer, and Project Admin. Guests pull; Developers push; Maintainers manage tags and members; Project Admins configure project policies. System-level administrators configure authentication sources and global defaults. Harbor supports local database users, LDAP, and OIDC according to [Configure Authentication](https://goharbor.io/docs/2.15.0/administration/configure-authentication/). The durable design pattern is to map your organization's identity provider groups to Harbor roles rather than maintaining a parallel user database that drifts every quarter.
 
-Robot accounts exist because human credentials do not belong in CI pipelines. A robot account receives a token scoped to explicit projects and actions such as push, pull, or artifact read. When a pipeline only needs to push `team-backend/api-server`, grant only that repository path. When a deployment controller only needs pull access to `production/**`, grant read without delete. Robot account compromise is still serious, but narrow scope limits blast radius and makes audit logs easier to interpret. Harbor documents robot creation under [Create Robot Accounts](https://goharbor.io/docs/2.11.0/working-with-projects/project-configuration/create-robot-accounts/).
+Robot accounts exist because human credentials do not belong in CI pipelines. A robot account receives a token scoped to explicit projects and actions such as push, pull, or artifact read. When a pipeline only needs to push `team-backend/api-server`, grant only that repository path. When a deployment controller only needs pull access to `production/**`, grant read without delete. Robot account compromise is still serious, but narrow scope limits blast radius and makes audit logs easier to interpret. Harbor documents robot creation under [Create Robot Accounts](https://goharbor.io/docs/2.15.0/working-with-projects/project-configuration/create-robot-accounts/).
 
-Public projects can be useful for shared base images, but "public inside Harbor" still means inside your organization unless you deliberately expose the registry to the internet. Private production projects should default to auto-scan on push, severity thresholds aligned with your risk appetite, and immutability on release tags so a compromised pipeline cannot overwrite an existing `v1.4.0` manifest. [Tag immutability rules](https://goharbor.io/docs/2.11.0/working-with-projects/working-with-images/create-tag-immutability-rules/) protect against accidental or malicious overwrites by rejecting pushes that collide with protected tag patterns.
+Public projects can be useful for shared base images, but "public inside Harbor" still means inside your organization unless you deliberately expose the registry to the internet. Private production projects should default to auto-scan on push, severity thresholds aligned with your risk appetite, and immutability on release tags so a compromised pipeline cannot overwrite an existing `v1.4.0` manifest. [Tag immutability rules](https://goharbor.io/docs/2.15.0/working-with-projects/working-with-images/create-tag-immutability-rules/) protect against accidental or malicious overwrites by rejecting pushes that collide with protected tag patterns.
 
 Multi-team registries fail socially before they fail technically. If every team shares one project because "it is easier," you lose accountability. If every team gets a separate project but nobody owns retention, storage costs climb silently until finance notices. A workable model assigns each team or product line a project, uses robot accounts per pipeline, maps OIDC groups to roles, and documents which project is authoritative for production promotion. Harbor supplies the controls; your organization supplies the naming and ownership conventions.
 
 ## 4. Shift Vulnerability Discovery Left with Registry Scanning
 
-Running containers without knowing their CVE exposure is a gamble you only notice during an incident. Registry scanning moves discovery earlier: when an image lands in the registry, not after it is already running on hundreds of nodes. Harbor integrates pluggable scanners and ships Trivy as the default option documented in [Vulnerability Scanning](https://goharbor.io/docs/2.11.0/administration/vulnerability-scanning/). Trivy inspects OS packages and language dependencies, compares them against vulnerability data sources, and returns severity summaries Harbor can display and enforce.
+Running containers without knowing their CVE exposure is a gamble you only notice during an incident. Registry scanning moves discovery earlier: when an image lands in the registry, not after it is already running on hundreds of nodes. Harbor integrates pluggable scanners and ships Trivy as the default option documented in [Vulnerability Scanning](https://goharbor.io/docs/2.15.0/administration/vulnerability-scanning/). Trivy inspects OS packages and language dependencies, compares them against vulnerability data sources, and returns severity summaries Harbor can display and enforce.
 
 Project configuration allows automatic scan on push and optional prevention of pulls when severity exceeds a threshold. The combination is powerful. Auto-scan ensures new content receives a report without a human clicking "scan" in the UI. Pull prevention ensures Kubernetes (or any client) cannot retrieve an image that violates your policy, which turns the registry into an enforcement gate. Be deliberate about thresholds. Blocking on every Medium CVE during early development can stall iteration; allowing Critical CVEs in a `production` project defeats the purpose. Align thresholds with environment: permissive in `sandbox`, strict in `production`.
 
@@ -124,23 +124,23 @@ Trust is only as strong as the references you enforce. If deployments still allo
 
 ## 6. Distribute Images with Replication, Proxy Cache, and P2P Preconditions
 
-Clusters in multiple regions, factory floors, or disaster recovery sites need images without every node reaching a single distant registry. Harbor addresses distribution with replication rules and proxy projects. [Configuring Replication](https://goharbor.io/docs/2.11.0/administration/configuring-replication/) supports push-based replication from a primary Harbor to a secondary Harbor or compatible registry, and pull-based synchronization from upstream registries into Harbor. Push replication suits active disaster recovery where you want artifacts copied after CI promotes them. Pull replication suits mirroring selected upstream content on a schedule.
+Clusters in multiple regions, factory floors, or disaster recovery sites need images without every node reaching a single distant registry. Harbor addresses distribution with replication rules and proxy projects. [Configuring Replication](https://goharbor.io/docs/2.15.0/administration/configuring-replication/) supports push-based replication from a primary Harbor to a secondary Harbor or compatible registry, and pull-based synchronization from upstream registries into Harbor. Push replication suits active disaster recovery where you want artifacts copied after CI promotes them. Pull replication suits mirroring selected upstream content on a schedule.
 
 Proxy cache mode lets Harbor act as a pull-through registry for an upstream such as Docker Hub or a vendor registry. The first pull fetches content upstream; subsequent pulls from any client in your environment hit local storage. This reduces upstream rate limiting risk and improves latency. It does not magically make offline sites resilient unless the content they need was pulled before the outage. Critical images still require pre-warming or scheduled replication for true offline readiness.
 
-Retention interacts with distribution. [Create Tag Retention Rules](https://goharbor.io/docs/2.11.0/working-with-projects/working-with-images/create-tag-retention-rules/) identify which tags remain eligible for keep; artifacts that do not match any retention rule become candidates for deletion during retention runs. Retention is not the same as garbage collection. Deleting a tag removes a name reference; [Garbage Collection](https://goharbor.io/docs/2.11.0/administration/garbage-collection/) reclaims unreferenced blobs from storage. Operators need both: retention to cap tag sprawl, garbage collection to reclaim disk after deletes and retention sweeps. Schedule GC during maintenance windows on large installations because registry performance can degrade while blobs are reclaimed.
+Retention interacts with distribution. [Create Tag Retention Rules](https://goharbor.io/docs/2.15.0/working-with-projects/working-with-images/create-tag-retention-rules/) identify which tags remain eligible for keep; artifacts that do not match any retention rule become candidates for deletion during retention runs. Retention is not the same as garbage collection. Deleting a tag removes a name reference; [Garbage Collection](https://goharbor.io/docs/2.15.0/administration/garbage-collection/) reclaims unreferenced blobs from storage. Operators need both: retention to cap tag sprawl, garbage collection to reclaim disk after deletes and retention sweeps. Schedule GC during maintenance windows on large installations because registry performance can degrade while blobs are reclaimed.
 
-For massive fan-out inside a single site—thousands of nodes pulling the same multi-gigabyte image during a rollout—registry bandwidth can still bottleneck. [Module 13.3: Dragonfly](../module-13.3-dragonfly/) covers peer-to-peer distribution in front of a registry. Harbor even documents [P2P preheat](https://goharbor.io/docs/2.11.0/administration/p2p-preheat/) integration to seed P2P networks. The design pattern is complementary: Harbor remains authoritative storage; Dragonfly reduces repeated full pulls across the LAN.
+For massive fan-out inside a single site—thousands of nodes pulling the same multi-gigabyte image during a rollout—registry bandwidth can still bottleneck. [Module 13.3: Dragonfly](../module-13.3-dragonfly/) covers peer-to-peer distribution in front of a registry. Harbor even documents [P2P preheat](https://goharbor.io/docs/2.15.0/administration/p2p-preheat/) integration to seed P2P networks. The design pattern is complementary: Harbor remains authoritative storage; Dragonfly reduces repeated full pulls across the LAN.
 
 ## 7. Deploy and Operate Harbor for Production-Like Environments
 
-Development teams often start Harbor with Docker Compose using the offline installer described in [Harbor Installation and Configuration](https://goharbor.io/docs/2.11.0/install-config/). That path is valuable for learning, but production teams typically move to Kubernetes and Helm for rolling upgrades and replicated components. The Helm chart exposes values for ingress, external database, external Redis, storage classes, resource limits, and metrics integration. Before you install, read [installation prerequisites](https://goharbor.io/docs/2.11.0/install-config/installation-prereqs/) and plan TLS trust: cluster nodes and CI runners must trust Harbor's certificate chain or pulls fail with TLS errors that look like application bugs.
+Development teams often start Harbor with Docker Compose using the offline installer described in [Harbor Installation and Configuration](https://goharbor.io/docs/2.15.0/install-config/). That path is valuable for learning, but production teams typically move to Kubernetes and Helm for rolling upgrades and replicated components. The Helm chart exposes values for ingress, external database, external Redis, storage classes, resource limits, and metrics integration. Before you install, read [installation prerequisites](https://goharbor.io/docs/2.15.0/install-config/installation-prereqs/) and plan TLS trust: cluster nodes and CI runners must trust Harbor's certificate chain or pulls fail with TLS errors that look like application bugs.
 
 Storage planning prevents painful migrations later. Local PVCs are simple for labs; S3-compatible object storage scales better for large blob volumes and HA registry backends. PostgreSQL holds users, projects, policies, and job metadata—lose it without backups and you rebuild governance from scratch even if blobs survive. Redis loss is less catastrophic but disrupts queued jobs until restored. Document backup and restore drills that include both database dumps and blob store consistency checks.
 
-Upgrades require reading [Upgrading Harbor](https://goharbor.io/docs/2.11.0/administration/upgrade/) release notes for the target version. Harbor maintains a migration path for the database schema between minor versions, but skipping multiple major versions without intermediate steps is a common source of failed upgrades. Staging environments that mirror production auth integrations and scanner adapters catch breaking changes before they touch the registry your entire company pulls from.
+Upgrades require reading [Upgrading Harbor](https://goharbor.io/docs/2.15.0/administration/upgrade/) release notes for the target version. Harbor maintains a migration path for the database schema between minor versions, but skipping multiple major versions without intermediate steps is a common source of failed upgrades. Staging environments that mirror production auth integrations and scanner adapters catch breaking changes before they touch the registry your entire company pulls from.
 
-Monitoring turns component architecture into actionable signals. Harbor exposes Prometheus metrics from core, registry, and jobservice endpoints documented under [Metrics](https://goharbor.io/docs/2.11.0/administration/metrics/). Track push and pull rates, storage usage, scan queue depth, replication failures, and GC duration. Alert on sustained replication errors and on disk usage trends that predict retention misconfiguration. A registry outage is a fleet-wide outage because no new Pods start without images.
+Monitoring turns component architecture into actionable signals. Harbor exposes Prometheus metrics from core, registry, and jobservice endpoints documented under [Metrics](https://goharbor.io/docs/2.15.0/administration/metrics/). Track push and pull rates, storage usage, scan queue depth, replication failures, and GC duration. Alert on sustained replication errors and on disk usage trends that predict retention misconfiguration. A registry outage is a fleet-wide outage because no new Pods start without images.
 
 ## 8. Walk Through a Worked Harbor Pipeline End to End
 
@@ -172,7 +172,7 @@ Start from the client error string. `unauthorized` usually means expired robot t
 
 On the server, check `/api/v2.0/health` and component health endpoints before diving into pod logs. If health is degraded, identify whether database connectivity, Redis, registry storage, or Trivy is failing. Core logs show authentication and authorization decisions. Registry logs show blob mount and manifest serve paths. Job service logs show replication, retention, and GC task failures. Trivy adapter logs show scanner timeouts on large images.
 
-For performance complaints, distinguish latency from throughput. Small images with many tags hurt metadata queries; huge images hurt push and scan duration. Replication lag shows up as DR site missing recent digests even though primary pushes succeed. Proxy cache misses show up as repeated upstream pulls in registry logs. Metrics from [Harbor metrics](https://goharbor.io/docs/2.11.0/administration/metrics/) help you correlate user reports with queue depth and storage trends.
+For performance complaints, distinguish latency from throughput. Small images with many tags hurt metadata queries; huge images hurt push and scan duration. Replication lag shows up as DR site missing recent digests even though primary pushes succeed. Proxy cache misses show up as repeated upstream pulls in registry logs. Metrics from [Harbor metrics](https://goharbor.io/docs/2.15.0/administration/metrics/) help you correlate user reports with queue depth and storage trends.
 
 Restore drills deserve the same seriousness as etcd restores. Practice recovering PostgreSQL metadata and blob storage together, then verify that a known digest can be pulled and that robot accounts still authenticate. Teams that backup blobs but not the database recover files they cannot map to projects and policies. Teams that backup the database but not blobs see manifests referencing missing layers. Harbor is a system; partial recovery is a subtle failure mode.
 
@@ -260,9 +260,9 @@ When you review an architecture diagram that shows Kubernetes at the center and 
 ## Did You Know?
 
 - **Harbor reached CNCF Graduated status in June 2020 (graduation announced 2020-06-23).** The [CNCF Harbor project page](https://www.cncf.io/projects/harbor/) lists Harbor among graduated projects, which indicates a mature governance and adoption trajectory within the foundation—not a guarantee that every feature you need is enabled in your installation without configuration.
-- **Trivy replaced Clair as Harbor's default scanner path.** Harbor's administration documentation for [vulnerability scanning](https://goharbor.io/docs/2.11.0/administration/vulnerability-scanning/) describes pluggable scanners with Trivy as the common default, which matters when you size scanner workers and plan offline database updates.
-- **Tag deletion and blob deletion are different events.** Removing a tag does not immediately free storage; [garbage collection](https://goharbor.io/docs/2.11.0/administration/garbage-collection/) reclaims unreferenced layers after retention and delete operations have run.
-- **Harbor supports P2P preheat integrations.** The [P2P preheat](https://goharbor.io/docs/2.11.0/administration/p2p-preheat/) administration page documents how Harbor can seed Dragonfly or similar networks—useful when LAN fan-out, not registry storage, is the bottleneck.
+- **Trivy replaced Clair as Harbor's default scanner path.** Harbor's administration documentation for [vulnerability scanning](https://goharbor.io/docs/2.15.0/administration/vulnerability-scanning/) describes pluggable scanners with Trivy as the common default, which matters when you size scanner workers and plan offline database updates.
+- **Tag deletion and blob deletion are different events.** Removing a tag does not immediately free storage; [garbage collection](https://goharbor.io/docs/2.15.0/administration/garbage-collection/) reclaims unreferenced layers after retention and delete operations have run.
+- **Harbor supports P2P preheat integrations.** The [P2P preheat](https://goharbor.io/docs/2.15.0/administration/p2p-preheat/) administration page documents how Harbor can seed Dragonfly or similar networks—useful when LAN fan-out, not registry storage, is the bottleneck.
 
 ## Common Mistakes
 
@@ -270,8 +270,8 @@ When you review an architecture diagram that shows Kubernetes at the center and 
 |---------|---------|----------|
 | HTTP registry in production | Credentials and layers traverse the network unprotected | Terminate TLS with trusted certificates on ingress or Harbor proxy |
 | Default admin password left unchanged | Trivial compromise of global configuration | Change admin password during install; prefer SSO for humans |
-| No project quotas | One team fills shared storage | Apply [project quotas](https://goharbor.io/docs/2.11.0/administration/configure-project-quotas/) per team |
-| Skipping immutability on release tags | Compromised CI can overwrite a known release name | Apply [tag immutability](https://goharbor.io/docs/2.11.0/working-with-projects/working-with-images/create-tag-immutability-rules/) on `v*` patterns |
+| No project quotas | One team fills shared storage | Apply [project quotas](https://goharbor.io/docs/2.15.0/administration/configure-project-quotas/) per team |
+| Skipping immutability on release tags | Compromised CI can overwrite a known release name | Apply [tag immutability](https://goharbor.io/docs/2.15.0/working-with-projects/working-with-images/create-tag-immutability-rules/) on `v*` patterns |
 | Replication configured but never tested | Failover day discovers firewall or credential drift | Run scheduled test pulls from the secondary registry |
 | Blocking pulls without developer-visible scans | Teams circumvent policy with emergency exceptions | Expose scan results in CI logs and tie thresholds to documented SLAs |
 | Running GC on huge registries at peak hours | Pull latency spikes during blob sweeps | Schedule GC in maintenance windows and monitor `harbor_gc_completion_time_seconds` |
@@ -288,7 +288,7 @@ The deployment still references a public upstream registry or an image path that
 <details>
 <summary>2. CI pushes successfully to `team-backend/api-server:build-442` but the pipeline fails when querying scan results. The image appears in the UI without CVE data. What Harbor project settings and components should you verify first?</summary>
 
-Confirm the target project has **Automatically scan images on push** enabled in [project configuration](https://goharbor.io/docs/2.11.0/working-with-projects/project-configuration/), verify the Trivy adapter is healthy and can reach vulnerability databases, and inspect job service logs for queued scan failures. Push success only proves registry storage; scanning is asynchronous and can fail independently when scanner pods are undersized or offline.
+Confirm the target project has **Automatically scan images on push** enabled in [project configuration](https://goharbor.io/docs/2.15.0/working-with-projects/project-configuration/), verify the Trivy adapter is healthy and can reach vulnerability databases, and inspect job service logs for queued scan failures. Push success only proves registry storage; scanning is asynchronous and can fail independently when scanner pods are undersized or offline.
 </details>
 
 <details>
@@ -306,7 +306,7 @@ Replication success does not automatically repoint clusters. DR kubeconfigs and 
 <details>
 <summary>5. Storage growth remains high after you deleted hundreds of old feature-branch tags. Retention rules are active. Why?</summary>
 
-Tag deletion and retention free references, not necessarily disk space. Unreferenced blobs remain until [garbage collection](https://goharbor.io/docs/2.11.0/administration/garbage-collection/) runs successfully. Schedule GC, monitor duration metrics, and confirm retention jobs actually executed for the intended repositories.
+Tag deletion and retention free references, not necessarily disk space. Unreferenced blobs remain until [garbage collection](https://goharbor.io/docs/2.15.0/administration/garbage-collection/) runs successfully. Schedule GC, monitor duration metrics, and confirm retention jobs actually executed for the intended repositories.
 </details>
 
 <details>
@@ -329,7 +329,7 @@ Admission policy is missing, misconfigured, or not enrolled on the namespace. Ha
 
 ## Hands-On Exercise: Deploy Harbor and Secure a Pipeline
 
-Deploy Harbor on a local Kubernetes cluster with Helm, create a secured project, push and scan an image, and verify policy-oriented configuration. The commands below follow Harbor 2.11 documentation patterns; adjust hostnames and passwords for your lab.
+Deploy Harbor on a local Kubernetes cluster with Helm, create a secured project, push and scan an image, and verify policy-oriented configuration. The commands below follow Harbor 2.15 documentation patterns; adjust hostnames and passwords for your lab.
 
 ### Step 1: Create a kind cluster and install Harbor
 
@@ -403,23 +403,23 @@ rm -f harbor-values.yaml
 
 ## Sources
 
-- [Harbor 2.11 Documentation](https://goharbor.io/docs/2.11.0/) — Versioned entry point for installation, administration, and project workflows used throughout this module.
-- [Harbor Installation and Configuration](https://goharbor.io/docs/2.11.0/install-config/) — Prerequisites, installer flow, HTTPS, and Helm-oriented deployment pointers.
-- [Deploying Harbor with High Availability via Helm](https://goharbor.io/docs/2.11.0/install-config/harbor-ha-helm/) — HA topology expectations when running Harbor on Kubernetes.
-- [Configure Authentication](https://goharbor.io/docs/2.11.0/administration/configure-authentication/) — Database, LDAP, and OIDC authentication modes for enterprise identity integration.
-- [Vulnerability Scanning](https://goharbor.io/docs/2.11.0/administration/vulnerability-scanning/) — Scanner adapters and Trivy integration defaults.
-- [Configuring Replication](https://goharbor.io/docs/2.11.0/administration/configuring-replication/) — Push and pull replication between Harbor and compatible registries.
-- [Configure Proxy Cache](https://goharbor.io/docs/2.11.0/administration/configure-proxy-cache/) — Pull-through caching behavior for upstream registries.
-- [Create Tag Retention Rules](https://goharbor.io/docs/2.11.0/working-with-projects/working-with-images/create-tag-retention-rules/) — How retention selects artifacts to keep and discard.
-- [Garbage Collection](https://goharbor.io/docs/2.11.0/administration/garbage-collection/) — Reclaiming unreferenced blobs after tag deletion and retention.
-- [Create Robot Accounts](https://goharbor.io/docs/2.11.0/working-with-projects/project-configuration/create-robot-accounts/) — Scoped automation credentials for CI/CD pipelines.
+- [Harbor 2.15 Documentation](https://goharbor.io/docs/2.15.0/) — Versioned entry point for installation, administration, and project workflows used throughout this module.
+- [Harbor Installation and Configuration](https://goharbor.io/docs/2.15.0/install-config/) — Prerequisites, installer flow, HTTPS, and Helm-oriented deployment pointers.
+- [Deploying Harbor with High Availability via Helm](https://goharbor.io/docs/2.15.0/install-config/harbor-ha-helm/) — HA topology expectations when running Harbor on Kubernetes.
+- [Configure Authentication](https://goharbor.io/docs/2.15.0/administration/configure-authentication/) — Database, LDAP, and OIDC authentication modes for enterprise identity integration.
+- [Vulnerability Scanning](https://goharbor.io/docs/2.15.0/administration/vulnerability-scanning/) — Scanner adapters and Trivy integration defaults.
+- [Configuring Replication](https://goharbor.io/docs/2.15.0/administration/configuring-replication/) — Push and pull replication between Harbor and compatible registries.
+- [Configure Proxy Cache](https://goharbor.io/docs/2.15.0/administration/configure-proxy-cache/) — Pull-through caching behavior for upstream registries.
+- [Create Tag Retention Rules](https://goharbor.io/docs/2.15.0/working-with-projects/working-with-images/create-tag-retention-rules/) — How retention selects artifacts to keep and discard.
+- [Garbage Collection](https://goharbor.io/docs/2.15.0/administration/garbage-collection/) — Reclaiming unreferenced blobs after tag deletion and retention.
+- [Create Robot Accounts](https://goharbor.io/docs/2.15.0/working-with-projects/project-configuration/create-robot-accounts/) — Scoped automation credentials for CI/CD pipelines.
 - [Harbor GitHub Repository](https://github.com/goharbor/harbor) — Upstream source, releases, and issue tracking for the Harbor project.
 - [CNCF Harbor Project Page](https://www.cncf.io/projects/harbor/) — CNCF maturity status and project metadata.
 - [OCI Distribution Specification](https://github.com/opencontainers/distribution-spec/blob/main/spec.md) — Registry HTTP API that Harbor implements for push and pull.
 - [OCI Image Specification](https://github.com/opencontainers/image-spec/blob/main/spec.md) — Manifest, layer, and digest model underlying container images.
 - [Cosign Signing Overview](https://docs.sigstore.dev/cosign/signing/overview/) — Signing images and storing signatures in OCI registries.
 - [Notation Documentation](https://notaryproject.dev/docs/) — Notary Project signing and verification concepts supported by Harbor workflows.
-- [Trivy Documentation](https://aquasecurity.github.io/trivy/) — Default scanner engine Harbor commonly uses for CVE detection.
+- [Trivy Documentation](https://trivy.dev/) — Default scanner engine Harbor commonly uses for CVE detection.
 - [Module 13.2: Zot](../module-13.2-zot/) — Minimal OCI-native registry peer covered in this sub-track for contrast.
 
 ## Next Module
