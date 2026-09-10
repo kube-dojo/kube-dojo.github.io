@@ -1,6 +1,7 @@
 # Internal Linux Bash process identity and private record custody primitives.
 # Sourcing defines functions only. No launch, signalling or recovery admission.
 # Callers explicitly source the state and observation helpers.
+# Receipt publication additionally requires GNU ln and unlink.
 
 # Parse after the LAST closing comm delimiter; spaces/parentheses in comm are valid.
 # A vanished or malformed /proc entry is uncertainty, not proof of absence.
@@ -172,4 +173,68 @@ cka_cert_process_self() {
   cka_cert_process_stat "$1" || return 1
   [[ $CKA_CERT_PROC_PGID == "$1" && $CKA_CERT_PROC_SID == "$1" &&
      $CKA_CERT_PROC_START == "$2" ]]
+}
+
+# Expected identities must come from the later live supervisor/runner handshake.
+cka_cert_supervisor_receipt_payload() {
+  local expected
+  [[ $# == 5 && $2 =~ ^[a-f0-9]{32}$ ]] || return 1
+  expected=$(cka_cert_state_expected "$1") || return 1
+  jq -ces --argjson identity "$expected" --arg operation "$2" \
+    --argjson supervisor "$3" --argjson runner "$4" '
+    def integer: type=="number" and floor==.;
+    def pid: integer and .>0;
+    def ticks: type=="string" and test("^[0-9]+$");
+    def runner: type=="object" and keys==["pid","start_time"] and
+      (.pid | pid) and (.start_time | ticks);
+    def leader: type=="object" and keys==["pgid","pid","sid","start_time"] and
+      (.pid | pid) and .pid==.pgid and .pid==.sid and (.start_time | ticks);
+    if length==1 then .[0] else error("Expected one command receipt") end |
+    select(($supervisor | leader) and ($runner | runner)) |
+    select(type=="object" and keys==["child_pid","exit_code","identity","operation_id","runner","schema","supervisor"]) |
+    select(.schema==1 and .identity==$identity and .operation_id==$operation and
+      .supervisor==$supervisor and .runner==$runner and (.child_pid | pid)) |
+    select(.exit_code | integer and .>=0 and .<=255)
+  ' <<< "$5"
+}
+
+cka_cert_supervisor_receipt_read() {
+  local payload
+  [[ $# == 4 ]] || return 1
+  cka_cert_process_check "$1" "$2" || return 1
+  cka_cert_state_file /var/lib/cka-certificate-transaction/command.json || return 1
+  payload=$(cat /var/lib/cka-certificate-transaction/command.json) || return 1
+  cka_cert_supervisor_receipt_payload "$1" "$2" "$3" "$4" "$payload"
+}
+
+# Invoke directly in the admitted runner, not in a timeout-created Bash child.
+# This proves writer identity/custody only; the runner must supply real wait evidence.
+cka_cert_supervisor_receipt_write() {
+  local payload temporary runner_pid runner_start supervisor_pid supervisor_start
+  [[ $# == 5 ]] || return 1
+  payload=$(cka_cert_supervisor_receipt_payload "$1" "$2" "$3" "$4" "$5") || return 1
+  cka_cert_process_check "$1" "$2" && cka_cert_state_locked || return 1
+  runner_pid=$(jq -er .pid <<< "$4") || return 1
+  runner_start=$(jq -er .start_time <<< "$4") || return 1
+  supervisor_pid=$(jq -er .pid <<< "$3") || return 1
+  supervisor_start=$(jq -er .start_time <<< "$3") || return 1
+  [[ $BASHPID == "$runner_pid" ]] || return 1
+  cka_cert_process_stat "$supervisor_pid" || return 1
+  [[ $CKA_CERT_PROC_START == "$supervisor_start" && $CKA_CERT_PROC_PGID == "$supervisor_pid" &&
+     $CKA_CERT_PROC_SID == "$supervisor_pid" ]] || return 1
+  cka_cert_process_stat "$BASHPID" || return 1
+  [[ $CKA_CERT_PROC_START == "$runner_start" && $CKA_CERT_PROC_PPID == "$supervisor_pid" &&
+     $CKA_CERT_PROC_PGID == "$supervisor_pid" && $CKA_CERT_PROC_SID == "$supervisor_pid" ]] || return 1
+  [[ ! -e /var/lib/cka-certificate-transaction/command.json &&
+     ! -L /var/lib/cka-certificate-transaction/command.json ]] || return 1
+  temporary=$(mktemp /var/lib/cka-certificate-transaction/command.XXXXXXXX) || return 1
+  cka_cert_state_file "$temporary" || return 1
+  printf '%s\n' "$payload" > "$temporary" || return 1
+  sync -f "$temporary" || return 1
+  # Exclusive link creation also refuses a destination appearing after the check.
+  ln -T -- "$temporary" /var/lib/cka-certificate-transaction/command.json || return 1
+  # A crash before this unlink leaves two links and therefore a refused receipt.
+  unlink -- "$temporary" || return 1
+  sync -f /var/lib/cka-certificate-transaction || return 1
+  cka_cert_supervisor_receipt_read "$1" "$2" "$3" "$4" >/dev/null
 }
