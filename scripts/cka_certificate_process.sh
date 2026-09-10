@@ -218,7 +218,11 @@ cka_cert_capture() {
   unset CKA_CERT_CAPTURED
   [[ $# -ge 3 ]] || return 1
   deadline=$1; mode=$2; shift 2
-  case "$mode:$1" in read:cka_cert_supervisor_receipt_payload|utility:jq|utility:mktemp) ;; *) return 1 ;; esac
+  case "$mode:$1" in
+    read:cka_cert_supervisor_receipt_payload|read:cka_cert_decision_observation|\
+    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|utility:jq|utility:mktemp) ;;
+    *) return 1 ;;
+  esac
   cka_cert_deadline_budget "$deadline" || return $?
   cka_cert_run_read_helper "$deadline" cka_cert_capture_directory || return $?
   path=/var/lib/cka-certificate-transaction/capture.$BASHPID.$RANDOM.$RANDOM
@@ -319,6 +323,7 @@ cka_cert_run_read_helper() {
   deadline=$1; shift
   case $1 in
     cka_cert_process_check|cka_cert_process_read|cka_cert_process_payload|cka_cert_capture_directory|\
+    cka_cert_decision_observation|cka_cert_decision_proposal|cka_cert_decision_classify|\
     cka_cert_state_expected|cka_cert_state_descriptor|cka_cert_state_file|\
     cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read) ;;
     *) return 1 ;;
@@ -422,4 +427,45 @@ cka_cert_control_child_drop() {
      $CKA_CERT_CONTROL_OWNER != "$BASHPID" ]] || return 1
   exec 8>&- || return 1
   unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED
+}
+
+# Pure record helpers only. Run through bounded read/capture dispatch in live callers.
+# Explicit presence prevents a stored JSON null from masquerading as file absence.
+cka_cert_decision_observation() {
+  local observation record
+  [[ $# == 3 && $2 =~ ^[a-f0-9]{32}$ ]] || return 1
+  cka_cert_state_expected "$1" >/dev/null || return 1
+  observation=$(jq -ces 'select(length==1) | .[0] | select(type=="object" and
+    ((.presence=="absent" and keys==["presence"]) or
+     (.presence=="present" and keys==["presence","record"])))' <<< "$3") || return 1
+  if [[ $(jq -r .presence <<< "$observation") == present ]]; then
+    record=$(cka_cert_process_payload "$1" "$2" process "$(jq -c .record <<< "$observation")") || return 1
+    jq -cnS --argjson record "$record" '{presence:"present",record:$record}'
+  else printf '%s\n' '{"presence":"absent"}'; fi
+}
+
+# Shape, expected predecessor and stable operation metadata are not transition permission.
+cka_cert_decision_proposal() {
+  local expected next
+  [[ $# == 4 ]] || return 1
+  expected=$(cka_cert_decision_observation "$1" "$2" "$3") || return 1
+  next=$(cka_cert_process_payload "$1" "$2" process "$4") || return 1
+  jq -cnSe --argjson expected "$expected" --argjson next "$next" '
+    select($expected.presence=="absent" or
+      ($expected.record!=$next and $expected.record.coordinator==$next.coordinator and
+       $expected.record.timeout_seconds==$next.timeout_seconds)) |
+    {schema:1,identity:$next.identity,operation_id:$next.operation_id,expected:$expected,next:$next}'
+}
+
+# Classifies a supplied observation only: no file access, durability claim or retry.
+cka_cert_decision_classify() {
+  local proposal observed
+  [[ $# == 5 ]] || return 1
+  proposal=$(cka_cert_decision_proposal "$1" "$2" "$3" "$4") || return 1
+  observed=$(cka_cert_decision_observation "$1" "$2" "$5") || return 1
+  jq -nr --argjson proposal "$proposal" --argjson observed "$observed" '
+    if $observed=={presence:"present",record:$proposal.next} then "successor"
+    elif $observed==$proposal.expected then "predecessor"
+    elif $observed.presence=="absent" then "missing"
+    else "conflict" end'
 }
