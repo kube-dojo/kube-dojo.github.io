@@ -7,27 +7,83 @@ from pathlib import Path
 
 
 class TestCertificateStateSource(unittest.TestCase):
+    def test_process_clock_with_injected_read(self):
+        library = Path(__file__).resolve().parents[1] / "cka_certificate_process.sh"
+        # Redirect only the proc clock input so the injected read works on macOS too.
+        code = library.read_text().replace("< /proc/uptime", "< /dev/null")
+        cases = [("00.08 0.00", "8"), ("08.09 100.01", "809"),
+                 ("999999999999.99 0.00", "99999999999999")]
+        cases += [(sample, "refused") for sample in (
+            "", "read-failure", "1 0.00", "-1.00 0.00", "1.1 0.00", "1.001 0.00",
+            "1.00 0.0", "1.00 -0.01", "1.00 0.00 extra", "1000000000000.00 0.00")]
+        for sample, expected in cases:
+            with self.subTest(sample=sample):
+                result = subprocess.run(["bash", "-c", code + r'''
+sample=$1
+read() { [[ $sample != read-failure ]] && builtin read "$@" <<< "$sample"; }
+if cka_cert_process_now; then printf '%s' "$CKA_CERT_PROCESS_NOW"; else printf refused; fi
+''', "--", sample], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, expected)
+
+    def test_process_snapshot_refuses_expired_or_failed_clock_before_stat(self):
+        library = Path(__file__).resolve().parents[1] / "cka_certificate_process.sh"
+        for fault, expected in (("expired", "124"), ("failed", "1")):
+            with self.subTest(fault=fault):
+                result = subprocess.run(["bash", "-c", r'''
+source "$1"; fault=$2
+cka_cert_process_now() { [[ $fault != failed ]] || return 1; CKA_CERT_PROCESS_NOW=200; }
+cka_cert_process_stat() { printf unexpected-stat; return 1; }
+if cka_cert_process_snapshot 999 0 200; then printf 0; else printf '%s' "$?"; fi
+''', "--", str(library), fault], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, expected)
+
     def test_process_payload_rejects_malformed_and_foreign_records(self):
         library = Path(__file__).resolve().parents[1] / "cka_certificate_process.sh"
         operation = "a" * 32
         coordinator = {"pid": 20, "start_time": "123"}
         supervisor = {"pid": 21, "pgid": 21, "sid": 21, "start_time": "124"}
-        launch = {"schema": 1, "identity": {}, "operation_id": operation,
-                  "coordinator": coordinator, "supervisor": None, "child_exit": None,
-                  "stage": "launch_requested", "timeout_seconds": 60}
-        running = dict(launch, supervisor=supervisor, stage="running")
-        done = dict(running, stage="supervision_complete", child_exit=0)
+        unknown = {"started": None, "child_pid": None, "exit_code": None}
+        exited = {"started": True, "child_pid": 22, "exit_code": 0}
+        launch = {"schema": 2, "identity": {}, "operation_id": operation,
+                  "coordinator": coordinator, "supervisor": None, "command": unknown,
+                  "stage": "launch_requested", "timeout_seconds": 60,
+                  "launch_disposition": "not_committed", "cancel_ack": False, "cause": "none"}
+        committed = dict(launch, stage="launch_committed", launch_disposition="supervisor_committed")
+        ready = dict(committed, supervisor=supervisor, stage="supervisor_ready")
+        running = dict(ready, stage="command_launch_committed", launch_disposition="command_committed")
+        stopped = dict(launch, stage="cancelled_before_launch", launch_disposition="not_started",
+                       cancel_ack=True, cause="cancel", command=dict(unknown, started=False))
+        term = dict(running, stage="term_requested", cause="timeout")
+        done = dict(running, stage="supervision_complete", command=exited)
         cancel = {"schema": 1, "identity": {}, "operation_id": operation, "request": "cancel"}
-        cases = [(v, "process", True) for v in [launch, running, done]]
+        valid = [launch, committed, ready, running, stopped, dict(stopped, supervisor=supervisor),
+                 term, dict(term, stage="kill_requested"), done,
+                 dict(done, cancel_ack=True, cause="cancel", command=dict(exited, exit_code=42)),
+                 dict(running, stage="supervision_unresolved", cause="unknown")]
+        valid += [dict(launch, timeout_seconds=n) for n in (1, 3600)]
+        valid += [dict(done, command=dict(exited, exit_code=255)), dict(term, cause="signal")]
+        cases = [(v, "process", True) for v in valid]
         cases += [(cancel, "cancel", True), (dict(cancel, extra=True), "cancel", False)]
-        invalid = [dict(launch, supervisor=supervisor), dict(running, supervisor=None),
-                   dict(running, child_exit=0), dict(done, child_exit=None),
-                   dict(done, child_exit=256), dict(done, child_exit=0.5),
+        invalid = [dict(launch, schema=1), dict(launch, supervisor=supervisor),
+                   dict(committed, supervisor=supervisor), dict(ready, supervisor=None),
+                   dict(running, command=exited), dict(done, command=unknown),
+                   dict(stopped, command=exited), dict(stopped, cancel_ack=False),
+                   dict(term, cause="none"), dict(launch, cause="cancel"), dict(launch, cancel_ack=True),
+                   dict(running, launch_disposition="supervisor_committed"),
                    dict(running, supervisor=dict(supervisor, pgid=22)),
                    dict(running, coordinator=dict(coordinator, start_time=123)),
                    dict(running, operation_id="b" * 32), dict(running, identity={"foreign": 1}),
-                   dict(running, timeout_seconds=0), dict(running, timeout_seconds=3601),
-                   dict(running, stage="invented"), dict(running, extra=True), [], None]
+                   dict(running, stage="invented"), dict(running, cause="invented"),
+                   dict(running, cancel_ack=1), dict(running, extra=True), [], None]
+        invalid += [dict(launch, timeout_seconds=n) for n in (0, 3601, 1.5, "60", True)]
+        invalid += [dict(done, command=dict(exited, exit_code=n)) for n in (-1, 256, 0.5, None, True)]
+        invalid += [dict(done, command=dict(exited, child_pid=n)) for n in (0, -1, "22", True)]
+        invalid += [dict(launch, **{key: None}) for key in ("command", "coordinator", "launch_disposition")]
+        invalid += [dict(v, cause="unknown") for v in (ready, running, term, dict(term, stage="kill_requested"), done)]
+        invalid += [dict(v, command=dict(unknown, started=False)) for v in
+                    (term, done, dict(running, stage="supervision_unresolved", cause="unknown"))]
         cases += [(v, "process", False) for v in invalid]
         for value, kind, accepted in cases:
             with self.subTest(value=value, kind=kind):
