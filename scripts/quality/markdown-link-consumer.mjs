@@ -10,9 +10,18 @@ export function extractLinks(content) {
   const links = [];
   const lines = content.split('\n');
   const linkRegex = /\[(?:[^\]\\]|\\.)*\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
+  let inFencedBlock = false;
   for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().startsWith('```')) {
+      inFencedBlock = !inFencedBlock;
+      continue;
+    }
+    if (inFencedBlock) continue;
+    
+    let processedLine = line.replace(/`[^`]*`/g, '');
     let match;
-    while ((match = linkRegex.exec(lines[i])) !== null) {
+    while ((match = linkRegex.exec(processedLine)) !== null) {
       links.push({ href: match[1], line: i + 1 });
     }
   }
@@ -35,6 +44,7 @@ export function consumeMarkdownLinks(manifest, docsRoot) {
   walk(docsRoot);
   
   const report = [];
+  const memo = new Map();
   
   for (const file of files) {
     const relativeToDocs = path.relative(docsRoot, file).split(path.sep).join('/');
@@ -54,22 +64,30 @@ export function consumeMarkdownLinks(manifest, docsRoot) {
         disposition = 'fragment-only';
         target = new URL(href, primary.url).href;
       } else {
-        try {
-          const resolved = resolveRoute(href, primary.url, routeSet.origin, routeSet.targetPaths);
-          target = resolved.url;
-          if (resolved.kind === 'external-http' || resolved.kind === 'mailto') {
-            disposition = 'external';
-          } else if (resolved.routeExists) {
-            disposition = fallbackPaths.has(resolved.path) ? 'present-fallback' : 'present';
-          } else {
-            disposition = 'missing';
+        const memoKey = `${href}::${primary.url}`;
+        if (memo.has(memoKey)) {
+          const res = memo.get(memoKey);
+          target = res.target;
+          disposition = res.disposition;
+        } else {
+          try {
+            const resolved = resolveRoute(href, primary.url, routeSet.origin, routeSet.targetPaths);
+            target = resolved.url;
+            if (resolved.kind === 'external-http' || resolved.kind === 'mailto') {
+              disposition = 'external';
+            } else if (resolved.routeExists) {
+              disposition = fallbackPaths.has(resolved.path) ? 'present-fallback' : 'present';
+            } else {
+              disposition = 'missing';
+            }
+          } catch (error) {
+            if (error instanceof UnsupportedRoute) {
+              disposition = 'unsupported';
+            } else {
+              throw error;
+            }
           }
-        } catch (error) {
-          if (error instanceof UnsupportedRoute) {
-            disposition = 'unsupported';
-          } else {
-            throw error;
-          }
+          memo.set(memoKey, { target, disposition });
         }
       }
       
