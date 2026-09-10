@@ -330,7 +330,7 @@ testpaths = ["tests"]
 | Робочий процес PDM | `pyproject.toml`, керований через `pdm add` і групи залежностей | `pdm.lock` записує розв’язане середовище | Найкраще, коли команда вже стандартизується на керуванні проєктами PDM |
 | Робочий процес `pip-tools` | `requirements.in`, `pyproject.toml` або подібні вхідні файли | скомпільований `requirements.txt` від `pip-compile` | Найкраще, коли розгортання або політика платформи очікує зафіксовані файли вимог |
 
-Таблиця — не рейтинг. Це попередження проти змішаної власності. uv документує залежності проєкту в `pyproject.toml` і синхронізацію проєкту через власний робочий процес. PDM документує керування залежностями через метадані проєкту й групи. pip-tools документує `pip-compile` як команду, що компілює зафіксований вивід вимог із входів вищого рівня. Кожен підхід може бути дисциплінованим, коли команда дотримується його послідовно. Кожен стає плутаним, коли згенеровані файли редагує інший робочий процес вручну. ([uv: Managing Dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/), [PDM: Manage Dependencies](https://pdm-project.org/latest/usage/dependency/), [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/cli/pip-compile/))
+Таблиця — не рейтинг. Це попередження проти змішаної власності. uv документує залежності проєкту в `pyproject.toml` і синхронізацію проєкту через власний робочий процес. PDM документує керування залежностями через метадані проєкту й групи. pip-tools документує `pip-compile` як команду, що компілює зафіксований вивід вимог із входів вищого рівня. Кожен підхід може бути дисциплінованим, коли команда дотримується його послідовно. Кожен стає плутаним, коли згенеровані файли редагує інший робочий процес вручну. ([uv: Managing Dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/), [PDM: Manage Dependencies](https://pdm-project.org/latest/usage/dependency/), [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/reference/pip-compile/))
 
 ```bash
 # uv-owned project
@@ -1071,5 +1071,5 @@ find src data outputs notebooks tests -maxdepth 3 -type f | sort
 - [Python venv](https://docs.python.org/3/library/venv.html) — Документує ізольовані віртуальні середовища Python і те, як встановлені пакети обмежені ними.
 - [uv: Managing Dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/) — Документує керування залежностями проєкту uv через метадані проєкту й синхронізацію.
 - [PDM: Manage Dependencies](https://pdm-project.org/latest/usage/dependency/) — Документує керування залежностями PDM і групи залежностей.
-- [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/cli/pip-compile/) — Документує компіляцію зафіксованих вимог із вхідних файлів залежностей.
+- [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/reference/pip-compile/) — Документує компіляцію зафіксованих вимог із вхідних файлів залежностей.
 - [Git: gitignore](https://git-scm.com/docs/gitignore) — Документує навмисно невідстежувані файли й поведінку шаблонів ігнорування для згенерованих шляхів.
