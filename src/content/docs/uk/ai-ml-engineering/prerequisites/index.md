@@ -25,10 +25,10 @@ en_file: "src/content/docs/ai-ml-engineering/prerequisites/index.md"
 
 | # | Модуль |
 |---|--------|
-| 1.1 | [Передумови та налаштування середовища](/ai-ml-engineering/prerequisites/module-1.1-prerequisites-environment-setup/) |
-| 1.2 | [Основи домашньої ШІ-станції](/ai-ml-engineering/prerequisites/module-1.2-home-ai-workstation-fundamentals/) |
-| 1.3 | [Відтворювані середовища Python, CUDA та ROCm](/ai-ml-engineering/prerequisites/module-1.3-reproducible-python-cuda-rocm-environments/) |
-| 1.4 | [Ноутбуки, скрипти та макети проєктів](/ai-ml-engineering/prerequisites/module-1.4-notebooks-scripts-project-layouts/) |
+| 1.1 | [Передумови та налаштування середовища](./module-1.1-prerequisites-environment-setup/) |
+| 1.2 | [Основи домашньої ШІ-станції](./module-1.2-home-ai-workstation-fundamentals/) |
+| 1.3 | [Відтворювані середовища Python, CUDA та ROCm](./module-1.3-reproducible-python-cuda-rocm-environments/) |
+| 1.4 | [Ноутбуки, скрипти та макети проєктів](./module-1.4-notebooks-scripts-project-layouts/) |
 
 ## Рекомендований порядок
 
