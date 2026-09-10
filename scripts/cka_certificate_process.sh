@@ -1,0 +1,138 @@
+# Internal Linux Bash process identity and private record custody primitives.
+# Sourcing defines functions only. No launch, signalling or recovery admission.
+# Callers explicitly source the state and observation helpers.
+
+# Parse after the LAST closing comm delimiter; spaces/parentheses in comm are valid.
+# A vanished or malformed /proc entry is uncertainty, not proof of absence.
+cka_cert_process_stat() {
+  local line tail
+  local -a fields
+  [[ $# == 1 && $1 =~ ^[1-9][0-9]*$ ]] || return 1
+  IFS= read -r line < "/proc/$1/stat" || return 1
+  [[ $line == "$1 ("* && $line == *") "* ]] || return 1
+  tail=${line##*) }
+  read -r -a fields <<< "$tail" || return 1
+  [[ ${#fields[@]} -ge 50 && ${fields[0]} =~ ^[RSDZTtXxKWPI]$ &&
+     ${fields[1]} =~ ^[0-9]+$ && ${fields[2]} =~ ^[0-9]+$ &&
+     ${fields[3]} =~ ^[0-9]+$ && ${fields[19]} =~ ^[0-9]+$ ]] || return 1
+  CKA_CERT_PROC_STATE=${fields[0]}
+  CKA_CERT_PROC_PPID=${fields[1]}
+  CKA_CERT_PROC_PGID=${fields[2]}
+  CKA_CERT_PROC_SID=${fields[3]}
+  CKA_CERT_PROC_START=${fields[19]}
+}
+
+# Builtins only while enumerating: do not manufacture transient scanner children.
+# Zombies have released descriptors; any live reused SID conservatively blocks.
+cka_cert_process_snapshot() {
+  local path pid
+  [[ $# == 2 && $1 =~ ^[1-9][0-9]*$ && $2 =~ ^[0-9]+$ ]] || return 1
+  CKA_CERT_PROCESS_OTHERS=0
+  for path in /proc/[0-9]*/stat; do
+    pid=${path#/proc/}
+    pid=${pid%/stat}
+    cka_cert_process_stat "$pid" || return 1
+    [[ $CKA_CERT_PROC_SID == "$1" ]] || continue
+    [[ $CKA_CERT_PROC_STATE != Z && $CKA_CERT_PROC_STATE != X && $CKA_CERT_PROC_STATE != x ]] || continue
+    [[ $CKA_CERT_PROC_PGID == "$1" ]] || return 1
+    [[ $pid == "$2" ]] || CKA_CERT_PROCESS_OTHERS=$((CKA_CERT_PROCESS_OTHERS + 1))
+  done
+}
+
+cka_cert_process_check() {
+  local expected state
+  [[ $# == 2 && $2 =~ ^[a-f0-9]{32}$ ]] || return 1
+  declare -F cka_cert_state_expected cka_cert_state_read cka_cert_state_artifacts \
+    cka_cert_state_environment cka_cert_state_locked cka_cert_state_file >/dev/null || return 1
+  cka_cert_state_environment || return 1
+  expected=$(cka_cert_state_expected "$1") || return 1
+  cka_cert_state_artifacts "$expected" || return 1
+  state=$(cka_cert_state_read "$expected") || return 1
+  jq -e '.revision==2 and .recovery=={direction:"forward",stage:"backup_verified"}' \
+    <<< "$state" >/dev/null || return 1
+}
+
+# Validate both record kinds before either reading or creating a temporary file.
+cka_cert_process_payload() {
+  local expected
+  [[ $# == 4 && $2 =~ ^[a-f0-9]{32}$ && ( $3 == process || $3 == cancel ) ]] || return 1
+  expected=$(cka_cert_state_expected "$1") || return 1
+  jq -ces --argjson identity "$expected" --arg operation "$2" --arg kind "$3" '
+    def integer: type=="number" and floor==.;
+    def pid: integer and .>0;
+    def ticks: type=="string" and test("^[0-9]+$");
+    if length==1 then .[0] else error("Expected one record") end |
+    if $kind=="cancel" then
+      select(.=={schema:1,identity:$identity,operation_id:$operation,request:"cancel"})
+    else
+      select(type=="object" and
+        keys==["child_exit","coordinator","identity","operation_id","schema","stage","supervisor","timeout_seconds"]) |
+      select(.schema==1 and .identity==$identity and .operation_id==$operation) |
+      select(.timeout_seconds | integer and .>=1 and .<=3600) |
+      select(.coordinator | type=="object" and keys==["pid","start_time"] and
+        (.pid | pid) and (.start_time | ticks)) |
+      select(if .stage=="launch_requested" then .supervisor==null and .child_exit==null else
+        (.supervisor | type=="object" and keys==["pgid","pid","sid","start_time"] and
+          (.pid | pid) and .pid==.pgid and .pid==.sid and (.start_time | ticks)) and
+        (if .stage=="supervision_complete" then (.child_exit | integer and .>=0 and .<=255) else
+          (.stage=="running" or .stage=="term_requested" or .stage=="kill_requested") and .child_exit==null end)
+      end)
+    end
+  ' <<< "$4"
+}
+
+cka_cert_process_read() {
+  local payload
+  [[ $# == 2 ]] || return 1
+  cka_cert_state_environment || return 1
+  cka_cert_state_directory /var/lib/cka-certificate-transaction || return 1
+  cka_cert_state_file /var/lib/cka-certificate-transaction/process.json || return 1
+  payload=$(cat /var/lib/cka-certificate-transaction/process.json) || return 1
+  cka_cert_process_payload "$1" "$2" process "$payload"
+}
+
+# Callers own sequencing. Process writes require FD9; cancel writes need no lock.
+# Existing records must be private, valid and bound to this same operation.
+cka_cert_process_write() {
+  local temporary target payload existing
+  [[ $# == 4 && ( $3 == process || $3 == cancel ) ]] || return 1
+  cka_cert_process_check "$1" "$2" || return 1
+  [[ $3 != process ]] || cka_cert_state_locked || return 1
+  payload=$(cka_cert_process_payload "$1" "$2" "$3" "$4") || return 1
+  target="/var/lib/cka-certificate-transaction/$3.json"
+  if [[ -e $target || -L $target ]]; then
+    cka_cert_state_file "$target" || return 1
+    existing=$(cat -- "$target") || return 1
+    cka_cert_process_payload "$1" "$2" "$3" "$existing" >/dev/null || return 1
+  fi
+  temporary=$(mktemp /var/lib/cka-certificate-transaction/process-write.XXXXXXXX) || return 1
+  cka_cert_state_file "$temporary" || return 1
+  printf '%s\n' "$payload" > "$temporary" || return 1
+  sync -f "$temporary" || return 1
+  mv -T -- "$temporary" "$target" || return 1
+  sync -f /var/lib/cka-certificate-transaction || return 1
+}
+
+cka_cert_process_cancel_read() {
+  local payload
+  [[ $# == 2 && $2 =~ ^[a-f0-9]{32}$ ]] || return 1
+  cka_cert_state_expected "$1" >/dev/null || return 1
+  cka_cert_state_environment || return 1
+  cka_cert_state_directory /var/lib/cka-certificate-transaction || return 1
+  CKA_CERT_PROCESS_CANCEL=0
+  if [[ ! -e /var/lib/cka-certificate-transaction/cancel.json &&
+        ! -L /var/lib/cka-certificate-transaction/cancel.json ]]; then
+    return 0
+  fi
+  cka_cert_state_file /var/lib/cka-certificate-transaction/cancel.json || return 1
+  payload=$(cat /var/lib/cka-certificate-transaction/cancel.json) || return 1
+  cka_cert_process_payload "$1" "$2" cancel "$payload" >/dev/null || return 1
+  CKA_CERT_PROCESS_CANCEL=1
+}
+
+cka_cert_process_self() {
+  [[ $# == 2 && $BASHPID == "$1" ]] || return 1
+  cka_cert_process_stat "$1" || return 1
+  [[ $CKA_CERT_PROC_PGID == "$1" && $CKA_CERT_PROC_SID == "$1" &&
+     $CKA_CERT_PROC_START == "$2" ]]
+}
