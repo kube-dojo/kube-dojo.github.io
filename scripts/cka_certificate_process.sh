@@ -220,7 +220,7 @@ cka_cert_capture() {
   deadline=$1; mode=$2; shift 2
   case "$mode:$1" in
     read:cka_cert_supervisor_receipt_payload|read:cka_cert_decision_observation|\
-    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|utility:jq|utility:mktemp) ;;
+    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|utility:jq|utility:mktemp|utility:stat) ;;
     *) return 1 ;;
   esac
   cka_cert_deadline_budget "$deadline" || return $?
@@ -361,7 +361,8 @@ cka_cert_control_init() {
      ! -L /var/lib/cka-certificate-transaction/process.json &&
      ! -e /var/lib/cka-certificate-transaction/control.lock &&
      ! -L /var/lib/cka-certificate-transaction/control.lock ]] || return 1
-  temporary=$(cka_cert_run_utility "$deadline" -- mktemp /var/lib/cka-certificate-transaction/control.XXXXXXXX) || return $?
+  cka_cert_capture "$deadline" utility mktemp /var/lib/cka-certificate-transaction/control.XXXXXXXX || return $?
+  temporary=$CKA_CERT_CAPTURED
   cka_cert_run_read_helper "$deadline" cka_cert_state_file "$temporary" || return $?
   cka_cert_run_utility "$deadline" -- sync -f "$temporary" || return $?
   cka_cert_run_utility "$deadline" -- ln -T -- "$temporary" /var/lib/cka-certificate-transaction/control.lock || return $?
@@ -372,18 +373,22 @@ cka_cert_control_init() {
 
 cka_cert_control_descriptor() {
   local descriptor inode path
-  [[ $# == 1 && ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" && -L /proc/$BASHPID/fd/8 ]] || return 1
+  [[ $# == 1 && -z ${CKA_CERT_CONTROL_DELEGATED:-} &&
+     ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" && -L /proc/$BASHPID/fd/8 ]] || return 1
   path=/proc/$BASHPID/fd/8
   cka_cert_run_read_helper "$1" cka_cert_state_file /var/lib/cka-certificate-transaction/control.lock || return $?
-  descriptor=$(cka_cert_run_utility "$1" -- stat -Lc '%d:%i:%u:%a:%h' -- "$path") || return $?
-  inode=$(cka_cert_run_utility "$1" -- stat -c '%d:%i:%u:%a:%h' -- /var/lib/cka-certificate-transaction/control.lock) || return $?
+  cka_cert_capture "$1" utility stat -Lc '%d:%i:%u:%a:%h' -- "$path" || return $?
+  descriptor=$CKA_CERT_CAPTURED
+  cka_cert_capture "$1" utility stat -c '%d:%i:%u:%a:%h' -- /var/lib/cka-certificate-transaction/control.lock || return $?
+  inode=$CKA_CERT_CAPTURED
   [[ $descriptor == "$inode" && $inode == *:0:600:1 ]]
 }
 
 # The only acquisition wrapper retaining FD8; never accepts arbitrary commands.
 cka_cert_control_acquire() {
   local deadline duration result
-  [[ $# == 1 && ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" && -L /proc/$BASHPID/fd/8 ]] || return 1
+  [[ $# == 1 && -z ${CKA_CERT_CONTROL_DELEGATED:-} &&
+     ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" && -L /proc/$BASHPID/fd/8 ]] || return 1
   deadline=$1
   cka_cert_deadline_budget "$deadline" || return $?
   duration=$CKA_CERT_DEADLINE_SOFT
@@ -396,7 +401,7 @@ cka_cert_control_acquire() {
 cka_cert_control_close() {
   [[ $# == 0 && ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" ]] || return 1
   exec 8>&- || return 1
-  unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED
+  unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED CKA_CERT_CONTROL_DELEGATED
 }
 
 cka_cert_control_open() {
@@ -426,7 +431,7 @@ cka_cert_control_child_drop() {
   [[ $# == 0 && ${CKA_CERT_CONTROL_OWNER:-} =~ ^[1-9][0-9]*$ &&
      $CKA_CERT_CONTROL_OWNER != "$BASHPID" ]] || return 1
   exec 8>&- || return 1
-  unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED
+  unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED CKA_CERT_CONTROL_DELEGATED
 }
 
 # Pure record helpers only. Run through bounded read/capture dispatch in live callers.
@@ -468,4 +473,154 @@ cka_cert_decision_classify() {
     elif $observed==$proposal.expected then "predecessor"
     elif $observed.presence=="absent" then "missing"
     else "conflict" end'
+}
+
+# Complete decision publication protocol; no lifecycle or certificate activation.
+# Called only inside the dedicated, deadline-bounded executor retaining FD8 and FD9.
+cka_cert_decision_actual() {
+  local record path=/var/lib/cka-certificate-transaction/process.json
+  [[ $# == 2 ]] || return 1
+  if [[ ! -e $path && ! -L $path ]]; then
+    cka_cert_decision_observation "$1" "$2" '{"presence":"absent"}'
+  else
+    cka_cert_state_file "$path" || return 1
+    record=$(cka_cert_process_payload "$1" "$2" process "$(cat -- "$path")") || return 1
+    jq -cnS --argjson record "$record" '{presence:"present",record:$record}'
+  fi
+}
+
+# This predicate never adopts ordinary CONTROL_OWNER. The fixed bootstrap is
+# owner -> timeout -> clean Bash executor; every mutating descendant retains 8/9.
+cka_cert_decision_executor() {
+  local mode request owner owner_start parent parent_start identity operation
+  local expected next proposal control state observed classification temporary
+  local root=/var/lib/cka-certificate-transaction
+  [[ $# == 2 && ( $1 == publish || $1 == reconcile ) &&
+     -z ${CKA_CERT_CONTROL_OWNER:-} && -z ${CKA_CERT_CONTROL_DELEGATED:-} ]] || return 1
+  mode=$1; request=$2
+  jq -es 'length==1 and (.[0] | type=="object" and keys==["control","owner","proposal","state"] and
+    (.owner|type=="object" and keys==["pid","start_time"] and
+      (.pid|type=="number" and floor==. and .>0) and
+      (.start_time|type=="string" and test("^[0-9]+$"))) and
+    (.control|type=="string" and test("^[0-9]+:[0-9]+$")) and
+    (.state|type=="string" and test("^[0-9]+:[0-9]+$")))' <<< "$request" >/dev/null || return 1
+  owner=$(jq -er .owner.pid <<< "$request") || return 1
+  owner_start=$(jq -er .owner.start_time <<< "$request") || return 1
+  [[ $owner != "$BASHPID" ]] || return 1
+  cka_cert_process_stat "$BASHPID" || return 1; parent=$CKA_CERT_PROC_PPID
+  cka_cert_process_stat "$parent" || return 1; parent_start=$CKA_CERT_PROC_START
+  [[ $CKA_CERT_PROC_PPID == "$owner" ]] || return 1
+  cka_cert_process_stat "$owner" || return 1
+  [[ $CKA_CERT_PROC_START == "$owner_start" ]] || return 1
+  proposal=$(jq -ce .proposal <<< "$request") || return 1
+  identity=$(jq -ce .identity <<< "$proposal") || return 1
+  operation=$(jq -er .operation_id <<< "$proposal") || return 1
+  expected=$(jq -ce .expected <<< "$proposal") || return 1
+  next=$(jq -ce .next <<< "$proposal") || return 1
+  proposal=$(cka_cert_decision_proposal "$identity" "$operation" "$expected" "$next") || return 1
+  jq -e --argjson proposal "$proposal" '.proposal==$proposal' <<< "$request" >/dev/null || return 1
+  cka_cert_process_check "$identity" "$operation" && cka_cert_state_locked || return 1
+  cka_cert_state_file "$root/control.lock" || return 1
+  control=$(stat -Lc '%d:%i' -- "/proc/$BASHPID/fd/8") || return 1
+  state=$(stat -Lc '%d:%i' -- "/proc/$BASHPID/fd/9") || return 1
+  [[ $control == "$(stat -c '%d:%i' -- "$root/control.lock")" ]] || return 1
+  jq -e --arg control "$control" --arg state "$state" \
+    '.control==$control and .state==$state' <<< "$request" >/dev/null || return 1
+  flock -n 8 || return 1
+  cka_cert_process_stat "$parent" || return 1
+  [[ $CKA_CERT_PROC_START == "$parent_start" && $CKA_CERT_PROC_PPID == "$owner" ]] || return 1
+  observed=$(cka_cert_decision_actual "$identity" "$operation") || return 1
+  classification=$(cka_cert_decision_classify "$identity" "$operation" "$expected" "$next" "$observed") || return 1
+  if [[ $mode == publish ]]; then
+    [[ $classification == predecessor ]] || return 1
+    temporary=$(mktemp "$root/decision.XXXXXXXX") || return 1
+    cka_cert_state_file "$temporary" || return 1
+    printf '%s\n' "$next" > "$temporary" && sync -f "$temporary" || return 1
+    # All checks/publication remain under the original exclusive description.
+    observed=$(cka_cert_decision_actual "$identity" "$operation") || return 1
+    [[ $(cka_cert_decision_classify "$identity" "$operation" "$expected" "$next" "$observed") == predecessor ]] || return 1
+    if [[ $(jq -r .presence <<< "$expected") == absent ]]; then
+      ln -T -- "$temporary" "$root/process.json" && unlink -- "$temporary" || return 1
+    else mv -T -- "$temporary" "$root/process.json" || return 1; fi
+    sync -f "$root" || return 1
+    printf 'reconciliation_required\n'
+  else
+    if [[ $classification == successor ]]; then
+      sync -f "$root/process.json" && sync -f "$root" || return 1
+      observed=$(cka_cert_decision_actual "$identity" "$operation") || return 1
+      [[ $(cka_cert_decision_classify "$identity" "$operation" "$expected" "$next" "$observed") == successor ]] || return 1
+    fi
+    printf '%s\n' "$classification"
+  fi
+}
+
+# Internal owner dispatch. No callbacks, pipe captures or descriptor-dropping wrappers.
+cka_cert_decision_dispatch() {
+  local mode deadline proposal control state request output duration result snapshot owner_start
+  unset CKA_CERT_DECISION_RESULT
+  [[ $# == 6 && ( $1 == publish || $1 == reconcile ) &&
+     ${CKA_CERT_STATE_OWNS_FD:-0} == 1 ]] || return 1
+  mode=$1; deadline=$2
+  [[ $mode != reconcile || ${CKA_CERT_DECISION_FRESH_OWNER:-} == "$BASHPID" ]] || return 1
+  cka_cert_control_locked "$deadline" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_state_descriptor || return $?
+  cka_cert_run_utility "$deadline" -- flock -n 9 || return $?
+  cka_cert_capture "$deadline" read cka_cert_decision_proposal "$3" "$4" "$5" "$6" || return $?
+  proposal=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility stat -Lc '%d:%i' -- "/proc/$BASHPID/fd/8" || return $?
+  control=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility stat -Lc '%d:%i' -- "/proc/$BASHPID/fd/9" || return $?
+  state=$CKA_CERT_CAPTURED
+  cka_cert_process_stat "$BASHPID" || return 1; owner_start=$CKA_CERT_PROC_START
+  cka_cert_capture "$deadline" utility jq -cn --argjson pid "$BASHPID" --arg ticks "$owner_start" \
+    --arg control "$control" --arg state "$state" --argjson proposal "$proposal" \
+    '{owner:{pid:$pid,start_time:$ticks},control:$control,state:$state,proposal:$proposal}' || return $?
+  request=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility mktemp /var/lib/cka-certificate-transaction/decision-output.XXXXXXXX || return $?
+  output=$CKA_CERT_CAPTURED
+  cka_cert_run_read_helper "$deadline" cka_cert_state_file "$output" || return $?
+  cka_cert_deadline_budget "$deadline" || return $?
+  duration=$CKA_CERT_DEADLINE_SOFT
+  CKA_CERT_CONTROL_DELEGATED=$BASHPID
+  if timeout --foreground --kill-after=0.25s "$duration" \
+    env -u BASH_ENV -u ENV bash --noprofile --norc -p -c '
+      unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED CKA_CERT_CONTROL_DELEGATED
+      source /var/lib/cka-certificate-artifacts/observe.sh || exit 1
+      source /var/lib/cka-certificate-artifacts/state.sh || exit 1
+      source /var/lib/cka-certificate-artifacts/process.sh || exit 1
+      CKA_CERT_STATE_OWNS_FD=1
+      cka_cert_decision_executor "$@"
+    ' cka-certificate-decision "$mode" "$request" > "$output" 2>&1; then result=0; else result=$?; fi
+  cka_cert_control_close || return 1
+  cka_cert_process_now || return 1
+  (( CKA_CERT_PROCESS_NOW < 10#$deadline )) || return 124
+  (( result == 0 )) || return "$result"
+  cka_cert_run_read_helper "$deadline" cka_cert_state_file "$output" || return $?
+  if LC_ALL=C IFS= read -r -d '' -n 65537 snapshot < "$output"; then return 1; else [[ $? == 1 ]] || return 1; fi
+  case "$mode:$snapshot" in
+    publish:$'reconciliation_required\n'|reconcile:$'successor\n'|reconcile:$'predecessor\n'|\
+    reconcile:$'missing\n'|reconcile:$'conflict\n') ;;
+    *) return 1 ;;
+  esac
+  cka_cert_deadline_budget "$deadline" || return $?
+  CKA_CERT_DECISION_RESULT=${snapshot%$'\n'}
+}
+
+cka_cert_decision_publish() {
+  unset CKA_CERT_DECISION_RESULT
+  [[ $# == 5 ]] || return 1
+  cka_cert_decision_dispatch publish "$@"
+}
+
+# Fresh FD8 only; this is not fresh FD9 recovery admission. No stale replay.
+cka_cert_decision_reconcile() {
+  local result CKA_CERT_DECISION_FRESH_OWNER
+  unset CKA_CERT_DECISION_RESULT
+  [[ $# == 5 && ${CKA_CERT_STATE_OWNS_FD:-0} == 1 &&
+     -z ${CKA_CERT_CONTROL_OWNER:-} && ! -L /proc/$BASHPID/fd/8 ]] || return 1
+  cka_cert_control_open "$1" || return $?
+  CKA_CERT_DECISION_FRESH_OWNER=$BASHPID
+  if cka_cert_decision_dispatch reconcile "$@"; then result=0; else result=$?; fi
+  if [[ ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" ]]; then cka_cert_control_close || return 1; fi
+  return "$result"
 }
