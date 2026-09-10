@@ -10,7 +10,7 @@ sidebar:
 
 - **Compose** multi-step LCEL pipelines from prompts, models, parsers, and routers using Runnable composition patterns you can test without live API keys.
 - **Design** distinct tool schemas with Pydantic validation that guide models toward accurate tool selection, safe execution, and minimal token overhead.
-- **Integrate** memory policies, retrieval tools, and agent executors into cohesive workflows that ground answers in verified external data instead of model weights.
+- **Integrate** memory policies, retrieval tools, and `create_agent` loops into cohesive workflows that ground answers in verified external data instead of model weights.
 - **Debug** agent execution loops using streaming events, callback handlers, verbose traces, and intermediate-step inspection when routing fails in production.
 - **Apply** production patterns including least-privilege tools, structured error handling, caching layers, recursion limits, and cost-aware payload shaping.
 
@@ -23,7 +23,7 @@ Hypothetical scenario: A financial analysis agent works in staging but generates
 
 This module teaches the durable spine of LangChain orchestration: how to compose pipelines with LCEL, how to expose safe tools, how to ground agents with retrieval and memory, how to observe execution with callbacks and streaming, and how to harden deployments for security and cost. You already saw fundamentals in the sibling module [LangChain Fundamentals](/ai-ml-engineering/frameworks-agents/module-1.1-langchain-fundamentals/); here we go deeper into the patterns production teams reuse even when import paths change quarterly. When agent state and routing grow beyond a linear chain, the next step is [LangGraph for Agents](/ai-ml-engineering/frameworks-agents/module-1.3-langgraph-for-agents/).
 
-> **LangChain landscape snapshot — as of 2026-06.** LangChain reorganizes APIs frequently; verify against current docs before relying on import paths or class names. Package layout at authoring time: `langchain-core` (Runnable/LCEL primitives), provider packages (`langchain-openai`, etc.), `langchain-community` (integrations), higher-level `langchain` (agents/chains). Agent executors increasingly delegate to LangGraph for durable state.
+> **LangChain landscape snapshot — as of 2026-09.** LangChain reorganizes APIs frequently; verify against current docs before relying on import paths or class names. Package layout at authoring time (`langchain` 1.4.x): `langchain-core` (Runnable/LCEL primitives—still the composition spine), provider packages (`langchain-openai`, etc.), `langchain-community` (integrations), higher-level `langchain` (agents via `create_agent`). Legacy `AgentExecutor` / `create_tool_calling_agent` live in maintenance `langchain-classic`. `create_agent` compiles a LangGraph; pass a `checkpointer` (or drop the graph into a larger StateGraph) when you need durable threads, human approval, or custom cyclic workflows.
 
 
 ## LCEL and Runnables
@@ -359,24 +359,25 @@ Re-ranking retrieved chunks before they enter the tool result often improves ans
 
 ## Agents and the Agent Loop
 
-An agent is a loop, not a single completion. The model receives tools, chooses an action, observes the tool result, and repeats until it produces a final answer or hits a guardrail. The ReAct pattern—reasoning interleaved with acting—formalizes this loop and remains the mental model even when frameworks rename their executor classes.
+An agent is a loop, not a single completion. The model receives tools, chooses an action, observes the tool result, and repeats until it produces a final answer or hits a guardrail. The ReAct pattern—reasoning interleaved with acting—formalizes this loop and remains the mental model even when frameworks rename their harness classes.
 
-AgentExecutor binds the model, tools, and prompt template with scratchpad space for intermediate steps. Key knobs include max_iterations to prevent runaway loops, handle_parsing_errors to recover from malformed tool JSON, and return_intermediate_steps for debugging. Temperature near zero is common for tool routing because creativity in JSON tool selection is usually a liability.
+`create_agent` is the LangChain 1.x entry point: it binds the model, tools, and system prompt and returns a compiled graph that loops until the model emits no more tool calls. Cap runaway loops with `recursion_limit` on invoke (or `.with_config({"recursion_limit": N})`). Inspect `result["messages"]` for tool calls and `ToolMessage` observations. Temperature near zero is common for tool routing because creativity in JSON tool selection is usually a liability.
 
-Tool-calling agents differ from text-only ReAct agents: modern chat models emit native tool_call objects instead of parsing Thought/Action/Observation strings from free text. LangChain normalizes both styles, but you should match the agent factory to what your model supports. Mismatch manifests as parsing errors, silent ignored tools, or infinite retries.
+Tool-calling agents differ from text-only ReAct agents: modern chat models emit native tool_call objects instead of parsing Thought/Action/Observation strings from free text. LangChain 1.x agents assume structured `tool_calls`; mismatch manifests as ignored tools or infinite retries. Recover from tool failures with `handle_tool_error` on the tool or middleware that implements `wrap_tool_call`—do not expect a `handle_parsing_errors=` knob on the harness.
 
-When durable multi-step state, human approval, or checkpointing enters the picture, teams increasingly move orchestration to LangGraph while keeping LangChain tools and retrievers. The executor pattern taught here remains the conceptual foundation even if your deployment graph lives in LangGraph nodes.
+When durable threads, human approval, or custom cyclic graphs enter the picture, add a `checkpointer` to `create_agent` or compose LangChain tools and retrievers into an explicit LangGraph. The ReAct loop taught here is still the conceptual foundation.
+
+**Legacy note.** `AgentExecutor` and `create_tool_calling_agent` are not on the `langchain.agents` mainline in 1.x (`ImportError` if you copy old tutorials). They live in maintenance `langchain-classic` (`from langchain_classic.agents import AgentExecutor, create_tool_calling_agent`). Keep the ReAct mental model; do not start new work on the classic executor.
 
 ```python
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain.agents import create_agent
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
 
 tools = [run_shell_command, read_file, search_code]
 
 # In production swap GenericFakeChatModel for your provider LLM
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
-
+# (or pass a model string such as "openai:gpt-5.5" to create_agent).
 llm = GenericFakeChatModel(messages=iter([
     AIMessage(content="", tool_calls=[{
         "name": "search_code",
@@ -386,41 +387,30 @@ llm = GenericFakeChatModel(messages=iter([
     AIMessage(content="Found files importing requests in the src directory."),
 ]))
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are a helpful developer assistant with access to tools.
+agent = create_agent(
+    model=llm,
+    tools=tools,
+    system_prompt="""You are a helpful developer assistant with access to tools.
 
 When using tools:
 - Think step by step about what information you need
 - Use the most appropriate tool for each task
 - If a tool returns an error, try to understand and fix the issue
-- Summarize your findings clearly for the user
-
-Available tools: {tool_names}"""),
-    ("human", "{input}"),
-    MessagesPlaceholder(variable_name="agent_scratchpad"),
-])
-
-agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    max_iterations=10,
-    handle_parsing_errors=True,
+- Summarize your findings clearly for the user""",
 )
 
-result = agent_executor.invoke({
-    "input": "Find all Python files that import requests",
-    "tool_names": ", ".join(t.name for t in tools),
-})
-print(result["output"])
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": "Find all Python files that import requests"}]},
+    config={"recursion_limit": 10},
+)
+print(result["messages"][-1].content)
 ```
 
 Scratchpad pollution happens when tools return verbose payloads that accumulate in agent history. Truncate or summarize tool outputs at the boundary before the next model turn. Your future self debugging a routing failure will thank you for concise intermediate observations.
 
 Human-in-the-loop approvals belong outside the model's direct tool access. Expose a pending_action field in application state and require an authenticated API call to confirm destructive operations. Prompts asking the model to be careful are not a substitute for authorization checks.
 
-**Agent loop retries and limits.** `max_iterations` on AgentExecutor stops infinite loops but does not retry failed tools—add retry logic inside idempotent tools or wrap the executor with application-level re-invocation. `handle_parsing_errors=True` masks malformed tool JSON by feeding the error back to the model; log raw model messages before parsing so you can distinguish prompt issues from provider schema drift. LangChain 0.3 documentation increasingly steers new projects toward LangGraph for cyclic graphs; AgentExecutor remains valid for linear tool loops but checkpointing and human approval require graph-level state.
+**Agent loop retries and limits.** `recursion_limit` on `create_agent` invoke stops infinite loops but does not retry failed tools—add retry logic inside idempotent tools or wrap tool calls with `wrap_tool_call` middleware. Log raw model messages before the next turn so you can distinguish prompt issues from provider schema drift. `create_agent` already compiles a graph; add a `checkpointer` or an explicit LangGraph when you need durable state, human approval, or custom cycles.
 
 ## Streaming and Callbacks
 
@@ -430,7 +420,7 @@ Callbacks are the observability hook surface. BaseCallbackHandler implementation
 
 Combine streaming with callbacks carefully: streaming handlers may fire hundreds of times per request, so aggregate before writing to expensive sinks. For agents, log the structured tool call and summarized result, not every token of the scratchpad, unless you are actively diagnosing a single failure.
 
-The handler below demonstrates debug-friendly logging using only langchain_core. Pair it with `chain.stream()` or `agent_executor.stream()` to watch events arrive incrementally during development.
+The handler below demonstrates debug-friendly logging using only langchain_core. Pair it with `chain.stream()` or `agent.stream({"messages": [...]})` to watch events arrive incrementally during development.
 
 ```python
 from langchain_core.callbacks import BaseCallbackHandler
@@ -466,7 +456,7 @@ Structured logging beats println debugging at scale. Serialize callback events a
 
 Back-pressure matters when consumers process streams slower than models emit tokens. Use async iterators and bounded queues in your API layer so slow clients do not force the model side to buffer unbounded text.
 
-**Streaming and observability pitfalls.** `stream()` on agent executors emits heterogeneous event types—distinguish `on_chat_model_stream` token chunks from `on_tool_start` status in your UI so users know the agent is waiting on external systems. Callback handlers attached via config propagate to child runnables; forgetting to pass `config={"callbacks": [...]}` on nested `.invoke()` calls creates blind spots in traces. High-cardinality tags (per-user IDs in callback metadata) can explode tracing backend costs—aggregate at session level in production.
+**Streaming and observability pitfalls.** `stream()` on `create_agent` graphs emits heterogeneous event types—distinguish `on_chat_model_stream` token chunks from `on_tool_start` status in your UI so users know the agent is waiting on external systems. Callback handlers attached via config propagate to child runnables; forgetting to pass `config={"callbacks": [...]}` on nested `.invoke()` calls creates blind spots in traces. High-cardinality tags (per-user IDs in callback metadata) can explode tracing backend costs—aggregate at session level in production.
 
 ## Production Patterns
 
@@ -478,7 +468,7 @@ Cost control is part of architecture: cache idempotent reads, cap tool result si
 
 Hypothetical scenario: A market-data agent without caching answers every follow-up with fresh API calls, inflating bills during a single curious user session. Hypothetical scenario: A legal-research agent follows related-case links recursively until it hits provider limits. Fixes—TTL caches, call budgets, truncated tool payloads—are boring engineering that keeps agent demos from becoming production incidents.
 
-When debugging agents, enable verbose executor logs and inspect intermediate_steps to see tool inputs and outputs in order. Dump compiled tool schemas to verify docstrings became descriptions. Compare synchronous versus parallel tool execution when latency matters: independent reads should run concurrently when your runtime and provider support parallel tool calls.
+When debugging agents, stream events and inspect `result["messages"]` to see tool inputs and `ToolMessage` outputs in order. Dump compiled tool schemas to verify docstrings became descriptions. Compare synchronous versus parallel tool execution when latency matters: independent reads should run concurrently when your runtime and provider support parallel tool calls.
 
 ```python
 from langchain_core.tools import tool, ToolException
@@ -561,21 +551,25 @@ async def get_news_async(topic: str) -> str:
 ```
 
 ```python
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    return_intermediate_steps=True,
+from langchain.agents import create_agent
+from langchain_core.messages import AIMessage, ToolMessage
+
+# Reuse the fake model + tools from the agent-loop example above.
+agent = create_agent(model=llm, tools=tools, system_prompt="You are a concise developer assistant.")
+
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": "test query"}]},
+    config={"recursion_limit": 10},
 )
 
-result = agent_executor.invoke({"input": "test query"})
-
-for step in result["intermediate_steps"]:
-    action, output = step
-    print(f"Tool: {action.tool}")
-    print(f"Input: {action.tool_input}")
-    print(f"Output: {output}")
-    print("---")
+for msg in result["messages"]:
+    if isinstance(msg, AIMessage) and msg.tool_calls:
+        for call in msg.tool_calls:
+            print(f"Tool: {call['name']}")
+            print(f"Input: {call['args']}")
+    if isinstance(msg, ToolMessage):
+        print(f"Output: {msg.content}")
+        print("---")
 
 for tool in tools:
     print(f"Name: {tool.name}")
@@ -594,7 +588,7 @@ Production LangChain systems fail at integration boundaries more often than at m
 
 **Error propagation in composed graphs.** When a RunnableParallel branch raises an exception, the entire parallel invoke fails unless you wrap optional branches in RunnableLambda try/except blocks or use newer `exceptions="return"` merge semantics where your langchain-core version supports them. Mark branches as critical vs. best-effort in design docs so on-call engineers know whether partial dictionaries are acceptable. Chain-level `with_fallbacks` on the outer runnable catches model timeouts but not arbitrary Python exceptions inside custom tools—those need `handle_tool_error` or explicit catches at the tool boundary.
 
-**Retry policy belongs per tool category.** Chat models retry rate-limited API calls automatically when configured; Python tools do not. Use libraries like `tenacity` inside idempotent read tools, never inside payment or email-sending tools without idempotency keys. Document retry safety in each tool description so orchestrators and future maintainers inherit the contract. AgentExecutor `max_iterations` is not a retry mechanism—it caps loop count, not transient HTTP failures.
+**Retry policy belongs per tool category.** Chat models retry rate-limited API calls automatically when configured; Python tools do not. Use libraries like `tenacity` inside idempotent read tools, never inside payment or email-sending tools without idempotency keys. Document retry safety in each tool description so orchestrators and future maintainers inherit the contract. `create_agent` `recursion_limit` is not a retry mechanism—it caps graph steps, not transient HTTP failures.
 
 **Observability without cardinality explosions.** Pass consistent `config={"tags": ["billing-agent"], "metadata": {"route": "v2"}}` on every invoke, batch, and stream call so distributed traces remain readable. Deep graphs with many RunnableLambda steps can emit hundreds of callback events per request; aggregate token counts at chain boundaries and sample full verbose traces behind feature flags. LangSmith and OpenTelemetry exporters hook the same BaseCallbackHandler interface—choose one primary sink to avoid duplicate billing on high-volume streams.
 
@@ -602,7 +596,7 @@ Production LangChain systems fail at integration boundaries more often than at m
 
 **StructuredTool and Pydantic v2.** LangChain 0.2+ expects Pydantic v2 models for `args_schema`; use `field_validator` with `@classmethod`, not v1 `@validator`, and introspect schemas with `model_json_schema()` instead of `.schema()`. Validation runs before any side effect—keep validators fast and free of network I/O. Optional fields need explicit `Field(default=...)` or `Optional` typing; models sometimes omit keys entirely, and missing vs. null behaves differently across providers.
 
-**Cost guards that survive prompt changes.** Track tokens per successful task (answer delivered, ticket resolved), not per attempt—agents that retry failed tools inflate per-attempt metrics without reflecting user value. Session-level tool-call budgets complement per-executor `max_iterations` when users open multiple tabs or replay conversations. Alert on category spikes (market-data tools, browser automation) separately from aggregate LLM spend so finance and engineering see the same regression at different granularities.
+**Cost guards that survive prompt changes.** Track tokens per successful task (answer delivered, ticket resolved), not per attempt—agents that retry failed tools inflate per-attempt metrics without reflecting user value. Session-level tool-call budgets complement per-invoke `recursion_limit` when users open multiple tabs or replay conversations. Alert on category spikes (market-data tools, browser automation) separately from aggregate LLM spend so finance and engineering see the same regression at different granularities.
 
 ### Operational notes
 
@@ -622,7 +616,7 @@ Memory summarization should preserve open questions explicitly. If the user aske
 
 Tool routing classifiers can be small models or embedding similarity over description vectors. Either approach beats dumping every schema into one prompt when catalogs exceed a dozen entries. Measure routing precision in staging before enabling automatic subset selection in production.
 
-Streaming partial JSON from models is fragile compared with native tool-call messages. Prefer provider tool-call APIs when available; fall back to text parsers only for legacy models. LangChain's tool-calling agents assume structured tool_call objects when using create_tool_calling_agent.
+Streaming partial JSON from models is fragile compared with native tool-call messages. Prefer provider tool-call APIs when available; fall back to text parsers only for legacy models. LangChain's `create_agent` harness assumes structured `tool_call` objects.
 
 Production deployments should version tool schemas alongside API deployments. Breaking parameter renames without versioning confuse models mid-conversation. Expose schema version identifiers in tool descriptions during migration windows.
 
@@ -630,7 +624,7 @@ Graceful degradation returns partial answers when non-critical tools fail. If ne
 
 Integrate retrieval confidence scores into tool results when your vector store provides them. Low-confidence hits should trigger clarification questions instead of authoritative statements. Confidence metadata is cheap to append and saves reputation on edge-case queries.
 
-Debug sessions should capture intermediate_steps only for opted-in users or internal staff. Full scratchpads may contain sensitive tool output. Gate verbose traces behind feature flags and retention policies aligned with privacy review.
+Debug sessions should capture full `result["messages"]` transcripts only for opted-in users or internal staff. Full tool payloads may contain sensitive output. Gate verbose traces behind feature flags and retention policies aligned with privacy review.
 
 Apply circuit breakers on tools that call legacy mainframes or batch systems. One slow tool should not block the entire agent thread pool. Return timeout messages the model can quote while your status page explains the outage.
 
@@ -644,7 +638,7 @@ Streaming UX should distinguish model tokens from tool status messages. Show too
 
 Apply budget alerts on token usage per tool category. Finance teams notice category spikes faster than aggregate LLM bills alone. Tag callbacks with tool names to feed those dashboards automatically.
 
-Integrate LangGraph when AgentExecutor loops need checkpointing after human approval. LangChain tools and retrievers still plug into LangGraph nodes. This module's executor mental model maps directly to graph nodes and conditional edges.
+Integrate explicit LangGraph (or pass a `checkpointer` to `create_agent`) when the default agent loop needs checkpointing after human approval. LangChain tools and retrievers still plug into LangGraph nodes. This module's ReAct loop maps directly to graph nodes and conditional edges.
 
 Compose retriever and formatter steps as separate runnables so you can unit test formatting without vector infrastructure. Mock retriever outputs as lists of Document objects with metadata. When formatting changes, tests fail fast instead of silently altering agent answers in production.
 
@@ -652,7 +646,7 @@ Design idempotent tools whenever possible so retries after timeouts do not doubl
 
 Debug malformed tool JSON by logging the raw model message before parsing. Often the fix is a clearer parameter description or a smaller tool set rather than a new prompt essay. Keep a corpus of failed parses from staging to regression-test parser upgrades.
 
-Apply request-level budgets that cap total tool calls across an entire user session. Per-executor max_iterations is necessary but not sufficient when users open multiple tabs. Session stores should track cumulative tool usage and refuse new calls when budgets exhaust.
+Apply request-level budgets that cap total tool calls across an entire user session. Per-invoke `recursion_limit` is necessary but not sufficient when users open multiple tabs. Session stores should track cumulative tool usage and refuse new calls when budgets exhaust.
 
 Integrate feature flags to disable risky tools instantly without redeploying model weights. Operations teams need a kill switch when a vendor API behaves unexpectedly during an incident. Tool registries loaded at startup make flag-gated subsets straightforward to implement.
 
@@ -686,7 +680,7 @@ Apply structured audit logs whenever tools mutate customer records. Include acto
 
 RunnableLambda steps are the escape hatch when you need plain Python between model calls. Keep lambdas small and pure; push heavy IO into tools with explicit schemas instead of hidden side effects. Named functions improve stack traces when callbacks report errors mid-chain.
 
-Cross-linking fundamentals and LangGraph modules helps teams choose the right orchestration layer. Stay on LCEL and AgentExecutor until you need checkpoints; graduate to LangGraph when cycles and approvals dominate. Mixing both in one product is normal—shared tools and retrievers reduce duplication.
+Cross-linking fundamentals and LangGraph modules helps teams choose the right orchestration layer. Stay on LCEL and `create_agent` until you need custom cycles, durable checkpoints, or human-approval nodes; graduate to an explicit LangGraph when those dominate. Mixing both in one product is normal—shared tools and retrievers reduce duplication.
 
 Token accounting should attribute tool definition overhead separately from conversation history. Large tool catalogs inflate every request even when the model picks one tool. Measure definition tokens when debating meta-tool consolidation versus flat schemas.
 
@@ -701,7 +695,7 @@ Closing the loop: compose runnables, design tool contracts, integrate memory and
 - [OpenAI introduced function calling in June 2023](https://openai.com/index/function-calling-and-other-api-updates/), shifting many applications from pure text generation toward agentic workflows that call external APIs.
 - [Anthropic's tool-use announcement](https://www.anthropic.com/news/tool-use-ga) describes how external tools improve accuracy on tasks models cannot complete from weights alone.
 - Tool selection accuracy often degrades as overlapping tools accumulate; large catalogs typically need routing layers or hierarchical meta-tools rather than flat schema dumps.
-- [ReAct (Reason + Act)](https://arxiv.org/abs/2210.03629) formalized interleaved reasoning and tool use—the same loop LangChain agent executors implement with modern native tool-call messages.
+- [ReAct (Reason + Act)](https://arxiv.org/abs/2210.03629) formalized interleaved reasoning and tool use—the same loop LangChain `create_agent` implements with modern native tool-call messages.
 
 
 ## Common Mistakes
@@ -729,7 +723,7 @@ Closing the loop: compose runnables, design tool contracts, integrate memory and
 2. **Your agent selects the wrong tool among fifteen similar database utilities. What design change improves schema clarity?**
    <details>
    <summary>Design distinct tool descriptions and hierarchical meta-tools instead of flat duplicates</summary>
-   Rewrite descriptions so each tool states when to use it and when not to. Consolidate related SQL helpers into one meta-tool with an action parameter, or route to a focused subset before invoking the main agent executor.
+   Rewrite descriptions so each tool states when to use it and when not to. Consolidate related SQL helpers into one meta-tool with an action parameter, or route to a focused subset before invoking the main `create_agent` loop.
    </details>
 
 3. **How should you integrate memory with agents so tool results do not exhaust the context window?**
@@ -740,8 +734,8 @@ Closing the loop: compose runnables, design tool contracts, integrate memory and
 
 4. **Operators cannot see why an agent stalled during a long tool call. Which debug hooks help?**
    <details>
-   <summary>Debug with streaming events, callbacks, and return_intermediate_steps on the executor</summary>
-   Attach a BaseCallbackHandler that logs tool start/end timestamps, enable verbose mode, and inspect intermediate_steps after the run. Stream partial events to the UI so latency is visible while tools execute.
+   <summary>Debug with streaming events, callbacks, and result["messages"] on the agent</summary>
+   Attach a BaseCallbackHandler that logs tool start/end timestamps, stream the graph, and inspect `result["messages"]` for tool calls and ToolMessage outputs after the run. Stream partial events to the UI so latency is visible while tools execute.
    </details>
 
 5. **A retrieval tool returns entire PDFs and answers become slow and expensive. What production pattern fixes this?**
@@ -753,7 +747,7 @@ Closing the loop: compose runnables, design tool contracts, integrate memory and
 6. **Users trigger repeated market-data fetches with follow-up questions. Which apply-layer control limits cost?**
    <details>
    <summary>Apply TTL caching, recursion limits, and call budgets at the tool boundary</summary>
-   Cache idempotent reads with time-bucket keys, enforce max_iterations on the executor, and track per-session tool call counts. Surface degraded answers when limits are reached instead of silent retry storms.
+   Cache idempotent reads with time-bucket keys, enforce `recursion_limit` on the agent invoke, and track per-session tool call counts. Surface degraded answers when limits are reached instead of silent retry storms.
    </details>
 
 
@@ -826,14 +820,15 @@ print(strict_echo.invoke({"text": ""}))
 
 ## Next Module
 
-Continue to [Module 1.3: LangGraph for Agents](/ai-ml-engineering/frameworks-agents/module-1.3-langgraph-for-agents/) to model durable agent state, cyclic workflows, and human-in-the-loop checkpoints beyond linear AgentExecutor loops.
+Continue to [Module 1.3: LangGraph for Agents](/ai-ml-engineering/frameworks-agents/module-1.3-langgraph-for-agents/) to model durable agent state, cyclic workflows, and human-in-the-loop checkpoints beyond the default `create_agent` loop.
 
 
 ## Sources
 
 - [LangChain LCEL concepts](https://python.langchain.com/docs/concepts/lcel/) — Official overview of Runnable composition, piping, and streaming semantics in LangChain Expression Language.
 - [LangChain tools concepts](https://python.langchain.com/docs/concepts/tools/) — How tools expose schemas to models and integrate with agents and chains.
-- [LangChain agents concepts](https://python.langchain.com/docs/concepts/agents/) — Agent loop architecture, executors, and relationship to LangGraph for durable workflows.
+- [LangChain agents (1.x)](https://docs.langchain.com/oss/python/langchain/agents) — Official `create_agent` harness: model, tools, `system_prompt`, middleware, and `{"messages": [...]}` invoke.
+- [Migrate to LangChain v1](https://docs.langchain.com/oss/python/migrate/langchain-v1) — `create_agent` vs older factories; legacy runtime and chains in `langchain-classic`.
 - [LangChain memory concepts](https://python.langchain.com/docs/concepts/memory/) — Memory types, buffer policies, and how history feeds prompts across turns.
 - [LangChain streaming concepts](https://python.langchain.com/docs/concepts/streaming/) — Streaming modes for tokens and events through Runnable pipelines.
 - [LangChain callbacks concepts](https://python.langchain.com/docs/concepts/callbacks/) — Callback handler lifecycle hooks for tracing and custom logging.
