@@ -22,15 +22,19 @@ class TestCommandReceipt(unittest.TestCase):
                      json.dumps(expected.get("supervisor", self.supervisor)),
                      json.dumps(expected.get("runner", self.runner)),
                      value if raw else json.dumps(value)]
+        arguments = (["10000"] if method == "write" else []) + arguments[:count]
         result = subprocess.run(["bash", "-c", r'''
 source "$1"; method=$2; shift 2
+CKA_CERT_STATE_OWNS_FD=1
+cka_cert_run_read_helper() { [[ $1 == 10000 ]] || return 97; shift; "$@"; }
+cka_cert_capture() { [[ $1 == 10000 && $2 == read ]] || return 97; shift 2; CKA_CERT_CAPTURED=$("$@"); }
 cka_cert_state_expected() { printf '%s\n' "$1"; }
 cka_cert_process_check() { printf REACHED_CUSTODY >&2; return 1; }
 mktemp() { printf REACHED_MKTEMP >&2; return 1; }
 if "cka_cert_supervisor_receipt_$method" "$@" >/dev/null; then
   printf accepted
 else printf refused; fi
-''', "--", str(library), method, *arguments[:count]], capture_output=True, text=True, check=False)
+''', "--", str(library), method, *arguments], capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "accepted" if accepted else "refused")
         self.assertNotIn("REACHED_MKTEMP", result.stderr)
