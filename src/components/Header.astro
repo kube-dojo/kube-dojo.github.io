@@ -44,7 +44,7 @@ const nav = isUk
     ];
 ---
 
-<div class="kd-header-shell">
+<div class:list={['kd-header-shell', { 'kd-header-standalone': standalone }]}>
   <div class="kd-topbar">
     <a class="kd-logo" href={`${p}/` || '/'}><span class="kd-logo-icon">K</span><span>KubeDojo</span></a>
     <nav class="kd-nav" aria-label="Primary">
@@ -116,8 +116,11 @@ const nav = isUk
       root.querySelectorAll('.kd-mobile-nav a').forEach((anchor) => {
         anchor.addEventListener('click', closeMenu);
       });
+      const navCollapseQuery = root.classList.contains('kd-header-standalone')
+        ? '(max-width: 80rem)'
+        : '(max-width: 50rem)';
       window.addEventListener('resize', () => {
-        if (window.innerWidth > 800) closeMenu();
+        if (!window.matchMedia(navCollapseQuery).matches) closeMenu();
       });
     } else {
       closeMenu();
@@ -146,6 +149,14 @@ const nav = isUk
   .kd-right { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
   .kd-search { min-width: 10rem; }
   .kd-search :global(button) { border-radius: 0.5rem !important; height: 2rem !important; font-size: 0.8125rem !important; }
+  /* #2266: standalone home header intrinsic width was ~1268px (search clipped).
+     Keep Starlight pages on the 50rem collapse; home collapses earlier and lets
+     the search button size to its label so "Search" stays fully visible. */
+  .kd-header-standalone .kd-topbar { max-width: 100%; min-width: 0; }
+  .kd-header-standalone .kd-right { flex-shrink: 0; }
+  .kd-header-standalone .kd-search { min-width: 0; }
+  .kd-header-standalone .kd-search :global(button) { max-width: none; width: auto; white-space: nowrap; }
+  .kd-header-standalone .kd-search :global(kbd) { display: none; }
   .kd-theme :global(select), .kd-lang :global(select) { font-size: 0.75rem; }
   .kd-social :global(a) { color: #9CA3AF; } .kd-social :global(a:hover) { color: #0F172A; }
   :global([data-theme='dark']) .kd-social :global(a:hover) { color: white; }
@@ -168,5 +179,15 @@ const nav = isUk
     .kd-search { min-width: 0; }
     .kd-search :global(button) { max-width: none; width: auto; }
     .kd-menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  }
+
+  /* #2266: mid-desktop home viewports (e.g. 1027px) still show the 9-item nav. */
+  @media (max-width: 80rem) {
+    .kd-header-standalone .kd-topbar { padding: 0 1rem; }
+    .kd-header-standalone .kd-nav,
+    .kd-header-standalone .kd-social,
+    .kd-header-standalone .kd-lang,
+    .kd-header-standalone .kd-lang-link { display: none; }
+    .kd-header-standalone .kd-menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
   }
 </style>
