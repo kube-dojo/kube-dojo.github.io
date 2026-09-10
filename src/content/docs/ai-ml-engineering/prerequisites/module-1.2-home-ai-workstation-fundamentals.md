@@ -26,7 +26,7 @@ By the end of this module, you will be able to:
 
 ## Why This Module Matters
 
-Maya had a capable laptop, a new interest in local AI coding assistants, and a bookmarked shopping cart full of expensive hardware. She believed the purchase would make her learning serious. Then her first month of work turned out to be mostly Python environments, API calls, notebooks, Git workflows, and reading model documentation. The large GPU she almost bought would have sat idle while her real friction came from a crowded system disk and not enough memory for browser-heavy notebooks.
+*(Maya is a hypothetical illustrative learner, not a documented incident.)* Maya had a capable laptop, a new interest in local AI coding assistants, and a bookmarked shopping cart full of expensive hardware. She believed the purchase would make her learning serious. Then her first month of work turned out to be mostly Python environments, API calls, notebooks, Git workflows, and reading model documentation. The large GPU she almost bought would have sat idle while her real friction came from a crowded system disk and not enough memory for browser-heavy notebooks.
 
 That story repeats constantly in AI engineering. People buy for status, benchmark charts, or social media screenshots before they understand their own workload. The result is not just wasted money. It is also wasted attention, because a learner who is fighting heat, noise, driver issues, bad storage layout, and unstable package installs is not learning model behavior, data flow, evaluation, or deployment discipline.
 
@@ -312,7 +312,7 @@ The worst diagnosis is "the machine is bad." That phrase hides the constraint. R
 
 ### 7. Worked Example: Designing A Workstation Plan For A Specific Learner
 
-Jordan is a software developer who wants to spend the next 6 months learning AI engineering at home. Their budget is limited, they already own a recent laptop with moderate RAM, and they are tempted by a single-GPU desktop build. Their planned work is API-first application development for the first month, local embeddings and RAG experiments by month three, and one small LoRA-style fine-tuning experiment near the end of the period.
+*(Jordan is a hypothetical illustrative learner, not a documented incident.)* Jordan is a software developer who wants to spend the next 6 months learning AI engineering at home. Their budget is limited, they already own a recent laptop with moderate RAM, and they are tempted by a single-GPU desktop build. Their planned work is API-first application development for the first month, local embeddings and RAG experiments by month three, and one small LoRA-style fine-tuning experiment near the end of the period.
 
 The first step is to identify what the current laptop can already teach. API-first development, Python packaging, Git workflows, notebooks, prompt evaluation, and basic service design do not require a local GPU. Jordan should not buy a desktop before discovering whether they can maintain clean environments, run notebooks reliably, and structure projects well. Those skills transfer directly to the future desktop.
 

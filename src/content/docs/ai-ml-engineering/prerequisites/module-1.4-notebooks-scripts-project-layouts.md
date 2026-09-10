@@ -27,7 +27,7 @@ This module is not about making notebooks look professional. It is about learnin
 
 ## Why This Module Matters
 
-Maya joined a small AI team two weeks before a customer demo. The model already looked promising, the notebook had attractive charts, and everyone believed the hard part was over. Then she tried to rerun the project from a fresh clone.
+*(Maya is a hypothetical illustrative learner, not a documented incident.)* Maya joined a small AI team two weeks before a customer demo. The model already looked promising, the notebook had attractive charts, and everyone believed the hard part was over. Then she tried to rerun the project from a fresh clone.
 
 The first run failed because the notebook expected a local file that was never committed. The second run completed but produced different metrics because one preprocessing cell had been executed days earlier with a slightly different rule. The third run generated a chart, but nobody could tell whether it came from the current model, last week's model, or a manually edited CSV file.
 
@@ -328,7 +328,7 @@ Dependency hygiene is an operational decision before it is a tooling decision. A
 | PDM workflow | `pyproject.toml` managed with `pdm add` and dependency groups | `pdm.lock` records the resolved environment | Best when the team already standardizes on PDM project management |
 | `pip-tools` workflow | `requirements.in`, `pyproject.toml`, or similar input files | compiled `requirements.txt` from `pip-compile` | Best when deployment or platform policy expects pinned requirements files |
 
-The table is not a ranking. It is a warning against mixing ownership. uv documents project dependencies in `pyproject.toml` and project synchronization through its own workflow. PDM documents dependency management through project metadata and groups. pip-tools documents `pip-compile` as the command that compiles pinned requirement output from higher-level dependency inputs. Each approach can be disciplined when the team follows it consistently. Each approach becomes confusing when its generated files are hand-edited by a different workflow. ([uv: Managing Dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/), [PDM: Manage Dependencies](https://pdm-project.org/latest/usage/dependency/), [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/cli/pip-compile/))
+The table is not a ranking. It is a warning against mixing ownership. uv documents project dependencies in `pyproject.toml` and project synchronization through its own workflow. PDM documents dependency management through project metadata and groups. pip-tools documents `pip-compile` as the command that compiles pinned requirement output from higher-level dependency inputs. Each approach can be disciplined when the team follows it consistently. Each approach becomes confusing when its generated files are hand-edited by a different workflow. ([uv: Managing Dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/), [PDM: Manage Dependencies](https://pdm-project.org/latest/usage/dependency/), [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/reference/pip-compile/))
 
 ```bash
 # uv-owned project
@@ -435,7 +435,7 @@ The training script is source and should be reviewed directly. The generated PNG
 
 ## Worked Example: From Messy Notebook to Structured Project
 
-Now we will transform a small messy notebook into a maintainable project. The goal is not to create a perfect architecture. The goal is to show the decisions, in order, so you can apply the same reasoning to larger AI projects.
+*(Hypothetical teaching example, not a recorded run or a production incident.)* Now we will transform a small messy notebook into a maintainable project. The goal is not to create a perfect architecture. The goal is to show the decisions, in order, so you can apply the same reasoning to larger AI projects.
 
 Assume the notebook started as a quick text-classification experiment. It loads examples, cleans text, creates simple features, calculates a fake score for demonstration, and writes predictions. The whole experiment works only because the author remembers the cell order.
 
@@ -1069,5 +1069,5 @@ Optional later-phase deep-dives (after you complete Phases 1–4):
 - [Python venv](https://docs.python.org/3/library/venv.html) — Documents isolated Python virtual environments and how installed packages are scoped to them.
 - [uv: Managing Dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/) — Documents uv project dependency management through project metadata and synchronization.
 - [PDM: Manage Dependencies](https://pdm-project.org/latest/usage/dependency/) — Documents PDM dependency management and dependency groups.
-- [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/cli/pip-compile/) — Documents compiling pinned requirements from dependency input files.
+- [pip-tools: pip-compile](https://pip-tools.readthedocs.io/en/stable/reference/pip-compile/) — Documents compiling pinned requirements from dependency input files.
 - [Git: gitignore](https://git-scm.com/docs/gitignore) — Documents intentionally untracked files and ignore-pattern behavior for generated paths.

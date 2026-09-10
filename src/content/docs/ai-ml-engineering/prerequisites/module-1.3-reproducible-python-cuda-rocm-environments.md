@@ -19,7 +19,7 @@ sidebar:
 
 ## Why This Module Matters
 
-Mira joins a small applied AI team on Monday and receives a model repository, a short README, and a message that says, "It should run after installing the requirements." By Tuesday afternoon, one teammate can train on an NVIDIA GPU, another silently falls back to CPU, and Mira's notebook imports a different package version than the command-line script. Nobody has changed the model code, but every person is seeing a different system.
+*(Mira is a hypothetical illustrative learner, not a documented incident.)* Mira joins a small applied AI team on Monday and receives a model repository, a short README, and a message that says, "It should run after installing the requirements." By Tuesday afternoon, one teammate can train on an NVIDIA GPU, another silently falls back to CPU, and Mira's notebook imports a different package version than the command-line script. Nobody has changed the model code, but every person is seeing a different system.
 
 That failure is not a Python trivia problem. It is a systems problem disguised as setup friction. AI projects combine interpreted code, compiled native extensions, hardware drivers, compute runtimes, and framework wheels that were built against specific assumptions. When those assumptions drift, the learner often blames the line of model code they can see, even though the failure was created several layers below it.
 
