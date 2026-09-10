@@ -376,9 +376,13 @@ from langchain_core.messages import AIMessage
 
 tools = [run_shell_command, read_file, search_code]
 
-# In production swap GenericFakeChatModel for your provider LLM
-# (or pass a model string such as "openai:gpt-5.5" to create_agent).
-llm = GenericFakeChatModel(messages=iter([
+# create_agent calls model.bind_tools(); GenericFakeChatModel leaves that abstract.
+class BindableFakeChatModel(GenericFakeChatModel):
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+# In production swap for your provider LLM (or a model string such as "openai:gpt-5.5").
+llm = BindableFakeChatModel(messages=iter([
     AIMessage(content="", tool_calls=[{
         "name": "search_code",
         "args": {"pattern": "import requests", "directory": "."},
@@ -592,7 +596,7 @@ Production LangChain systems fail at integration boundaries more often than at m
 
 **Observability without cardinality explosions.** Pass consistent `config={"tags": ["billing-agent"], "metadata": {"route": "v2"}}` on every invoke, batch, and stream call so distributed traces remain readable. Deep graphs with many RunnableLambda steps can emit hundreds of callback events per request; aggregate token counts at chain boundaries and sample full verbose traces behind feature flags. LangSmith and OpenTelemetry exporters hook the same BaseCallbackHandler interface—choose one primary sink to avoid duplicate billing on high-volume streams.
 
-**Testing fakes across multi-turn flows.** GenericFakeChatModel queues one AIMessage per `invoke`; agent tests that expect three tool rounds need three queued messages or a factory that rebuilds `iter([...])` before each test case. Tool-calling fakes must include well-formed `tool_calls` dicts with `name`, `args`, and `id` keys—malformed shapes produce parsing errors indistinguishable from production provider drift in verbose logs.
+**Testing fakes across multi-turn flows.** GenericFakeChatModel queues one AIMessage per `invoke`; agent tests that expect three tool rounds need three queued messages or a factory that rebuilds `iter([...])` before each test case. `create_agent` also calls `bind_tools`—subclass the fake and return `self` (as in the agent-loop example) or the model node raises `NotImplementedError`. Tool-calling fakes must include well-formed `tool_calls` dicts with `name`, `args`, and `id` keys—malformed shapes produce parsing errors indistinguishable from production provider drift in verbose logs.
 
 **StructuredTool and Pydantic v2.** LangChain 0.2+ expects Pydantic v2 models for `args_schema`; use `field_validator` with `@classmethod`, not v1 `@validator`, and introspect schemas with `model_json_schema()` instead of `.schema()`. Validation runs before any side effect—keep validators fast and free of network I/O. Optional fields need explicit `Field(default=...)` or `Optional` typing; models sometimes omit keys entirely, and missing vs. null behaves differently across providers.
 
