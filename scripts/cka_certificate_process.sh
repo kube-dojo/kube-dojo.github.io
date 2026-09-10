@@ -285,7 +285,7 @@ cka_cert_run_read_helper() {
   duration=$CKA_CERT_DEADLINE_SOFT
   if (exec 8>&-; exec timeout --foreground --kill-after=0.25s "$duration" \
     env -u BASH_ENV -u ENV bash --noprofile --norc -p -c '
-      unset CKA_CERT_CONTROL_OWNS_FD
+      unset CKA_CERT_CONTROL_OWNS_FD CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED
       source /var/lib/cka-certificate-artifacts/observe.sh || exit 1
       source /var/lib/cka-certificate-artifacts/state.sh || exit 1
       source /var/lib/cka-certificate-artifacts/process.sh || exit 1
@@ -298,4 +298,86 @@ cka_cert_run_read_helper() {
   cka_cert_process_now || return 1
   (( CKA_CERT_PROCESS_NOW < 10#$deadline )) || return 124
   return "$result"
+}
+
+# Permanent control-inode custody. FD8 is reserved; callers must not replace it manually.
+# Callers validate the private transaction directory; participating actors never replace the inode.
+# Initialize once before process.json or any child work; failure requires reconciliation.
+cka_cert_control_init() {
+  local deadline temporary
+  [[ $# == 3 && ${CKA_CERT_STATE_OWNS_FD:-0} == 1 ]] || return 1
+  deadline=$1
+  cka_cert_run_read_helper "$deadline" cka_cert_process_check "$2" "$3" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_state_descriptor || return $?
+  cka_cert_run_utility "$deadline" -- flock -n 9 || return $?
+  [[ ! -e /var/lib/cka-certificate-transaction/process.json &&
+     ! -L /var/lib/cka-certificate-transaction/process.json &&
+     ! -e /var/lib/cka-certificate-transaction/control.lock &&
+     ! -L /var/lib/cka-certificate-transaction/control.lock ]] || return 1
+  temporary=$(cka_cert_run_utility "$deadline" -- mktemp /var/lib/cka-certificate-transaction/control.XXXXXXXX) || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_state_file "$temporary" || return $?
+  cka_cert_run_utility "$deadline" -- sync -f "$temporary" || return $?
+  cka_cert_run_utility "$deadline" -- ln -T -- "$temporary" /var/lib/cka-certificate-transaction/control.lock || return $?
+  cka_cert_run_utility "$deadline" -- unlink -- "$temporary" || return $?
+  cka_cert_run_utility "$deadline" -- sync -f /var/lib/cka-certificate-transaction || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_state_file /var/lib/cka-certificate-transaction/control.lock
+}
+
+cka_cert_control_descriptor() {
+  local descriptor inode path
+  [[ $# == 1 && ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" && -L /proc/$BASHPID/fd/8 ]] || return 1
+  path=/proc/$BASHPID/fd/8
+  cka_cert_run_read_helper "$1" cka_cert_state_file /var/lib/cka-certificate-transaction/control.lock || return $?
+  descriptor=$(cka_cert_run_utility "$1" -- stat -Lc '%d:%i:%u:%a:%h' -- "$path") || return $?
+  inode=$(cka_cert_run_utility "$1" -- stat -c '%d:%i:%u:%a:%h' -- /var/lib/cka-certificate-transaction/control.lock) || return $?
+  [[ $descriptor == "$inode" && $inode == *:0:600:1 ]]
+}
+
+# The only acquisition wrapper retaining FD8; never accepts arbitrary commands.
+cka_cert_control_acquire() {
+  local deadline duration result
+  [[ $# == 1 && ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" && -L /proc/$BASHPID/fd/8 ]] || return 1
+  deadline=$1
+  cka_cert_deadline_budget "$deadline" || return $?
+  duration=$CKA_CERT_DEADLINE_SOFT
+  if timeout --foreground --kill-after=0.25s "$duration" flock -n 8; then result=0; else result=$?; fi
+  cka_cert_process_now || return 1
+  (( CKA_CERT_PROCESS_NOW < 10#$deadline )) || return 124
+  return "$result"
+}
+
+cka_cert_control_close() {
+  [[ $# == 0 && ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" ]] || return 1
+  exec 8>&- || return 1
+  unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED
+}
+
+cka_cert_control_open() {
+  [[ $# == 1 && -z ${CKA_CERT_CONTROL_OWNER:-} && ! -L /proc/$BASHPID/fd/8 ]] || return 1
+  cka_cert_run_read_helper "$1" cka_cert_state_file /var/lib/cka-certificate-transaction/control.lock || return $?
+  cka_cert_deadline_budget "$1" || return $?
+  # Read-only open cannot recreate a vanished inode; native Linux flock permits it.
+  exec 8< /var/lib/cka-certificate-transaction/control.lock || return 1
+  CKA_CERT_CONTROL_OWNER=$BASHPID
+  CKA_CERT_CONTROL_LOCKED=0
+  if cka_cert_control_descriptor "$1" && cka_cert_control_acquire "$1" && cka_cert_control_descriptor "$1"; then
+    CKA_CERT_CONTROL_LOCKED=1
+  else
+    local result=$?
+    cka_cert_control_close || return 1
+    return "$result"
+  fi
+}
+
+cka_cert_control_locked() {
+  [[ $# == 1 && ${CKA_CERT_CONTROL_LOCKED:-0} == 1 ]] || return 1
+  cka_cert_control_descriptor "$1"
+}
+
+# Child bootstrap only, before doing any other work or acquiring a fresh lock.
+cka_cert_control_child_drop() {
+  [[ $# == 0 && ${CKA_CERT_CONTROL_OWNER:-} =~ ^[1-9][0-9]*$ &&
+     $CKA_CERT_CONTROL_OWNER != "$BASHPID" ]] || return 1
+  exec 8>&- || return 1
+  unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED
 }
