@@ -79,21 +79,24 @@ not a second lab platform. Do not create a replacement for Killercoda.
 | Interactive hosted smoke | Operator/platform session that ran the steps | Page publication |
 | Curriculum alignment | Module outcomes ↔ scenario steps + reset + env | URL string match alone |
 
-## Content-upgrade wiring (#2272 / G04)
+## Discover cross-repo children from the live epic
 
-When driving epic
-[#2272](https://github.com/kube-dojo/kube-dojo.github.io/issues/2272):
+Do not memorize issue numbers. From the epic body + `gh issue list` on
+**both** remotes, record:
 
-- Main **#2276** owns reproducible lab validation **and** Killercoda
-  coordination.
-- Labs **#2** owns the scenario portfolio and exact-path execution packets.
-- Labs **#1** owns automated scenario testing / CI (including a privileged
-  Kubernetes/namespace lane if still missing).
-- English-first scheduling does not close labs `#2` early.
+- which main-repo child owns lab *receipts* / `lab.url` / pipeline
+- which labs-repo issue owns the scenario portfolio
+- which labs-repo issue owns CI / harness lanes
+- any worktree, line-budget, or English-first constraint
 
-Priority-1 lab work is unsafe or unverified behavior, not "write more
-scenarios." Missing exact ids are packets under labs `#2`; they need
-semantic + deployed evidence, not a manifest tally.
+Quote those numbers into the cycle inventory. If the epic and a labs
+issue disagree, the GitHub issue/PR state on each repo is factual SSOT;
+the epic is the priority queue.
+
+Example (content-upgrade #2272 at writing — re-read before relying):
+G04 `#2276` ↔ labs portfolio `#2` ↔ labs CI `#1`. English-first
+scheduling does not close the labs portfolio early. Priority-1 lab work
+is unsafe or unverified behavior, not "write more scenarios."
 
 Do **not** provision billable cloud (AWS VPC NAT, public IPv4, …) without
 present-tense operator GO. Record `probe not executed` honestly.
@@ -101,6 +104,6 @@ present-tense operator GO. Record `probe not executed` honestly.
 ## Hygiene
 
 Reap merged labs worktrees in the labs repo the same way as curriculum
-worktrees. Stale `feat/linux-2.*` trees after merge are disk defects.
-Keep issue comments on **both** #2276 and labs #2 when a packet lands so
+worktrees. Stale scenario feature trees after merge are disk defects.
+Comment the live main-repo *and* labs-repo owners when a packet lands so
 neither board looks idle.

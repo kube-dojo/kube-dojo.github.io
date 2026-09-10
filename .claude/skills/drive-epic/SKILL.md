@@ -95,9 +95,10 @@ free *compatible* lane. Idle free lane + ready item = utilization failure.
 Never manufacture busywork. Disk wins: `df -h` + `git worktree list` before
 fan-out; reap first.
 
-Epic #2272 cap: **at most four active curriculum worktrees** and one local
-generated `dist/` (remove after validation). Labs worktrees live in
+Honor the **active epic's** stated worktree/disk cap (quote it from the
+issue body — do not remember a number). Labs worktrees live in
 `kubedojo-labs/.worktrees/` and count separately — still reap merged ones.
+Remove local `dist/` after validation.
 
 ### 3. Route by activity × live capacity
 
@@ -302,24 +303,25 @@ Copied from the live epic body when driving #2272 — do not weaken it:
 
 English-first scheduling (when the epic says so) does **not** waive
 Ukrainian obligations. Do not introduce UK regressions in shared
-code/routes. Translation volume still uses the UK roster in
-[[dispatch-router]] (deepseek author, RAG calque gates, 2-family review).
+code/routes. Translation volume uses the UK roster in [[dispatch-router]]
+(author + RAG calque gates + required reviewer families — live data).
 
 ---
 
 ## Per-seat delta
 
-Same playbook; only these adjustments. §2c binds every seat.
+Same playbook. Live **model ids and task-class defaults** are
+[[dispatch-router]] + CodexBar — do not freeze them here. §2c binds every seat.
 
-| Seat | Delta |
+| Seat | Constraint that is not a roster pin |
 | --- | --- |
-| **Cursor (this IDE / `auto`)** | Volume workhorse and strong fixer. If **you** are the Cursor driver, do not dispatch `--agent cursor`. Attest `resolved_model` when identity matters for CF. Anti-passive: a CLEAN PR with CF APPROVE is merged the same turn. |
-| **Claude / Fable / Sonnet** | Cheapest Claude *review* is inline. Headless for author lanes or an independent context on the 1–2 hardest reviews. Heavy headless bursts hit the **5-hour window** first. |
-| **Codex / GPT** | Quality-critical author and code review. Weekly cap — skip when CodexBar shows deficit and cooler seats exist. Review always danger + worktree. |
-| **AGY (Google)** | `--agent agy`. Write on Pro-high after re-prove; Flash is search/review only, never code/lab CF. Check **both** Gemini pools (5h and weekly). |
-| **DeepSeek** | Dirt-cheap author/reviewer; ground-check numbers/schemas. Local only. |
-| **Grok** | grok-build = native CLI, code only, feed complete diffs. grok-4.* content = hermes `xai-oauth`. Driver-only if seated: no multi-file heroics. |
-| **GLM / OpenCode** | Local coherence-audit finder. Never CI. |
+| **Cursor** | If **you** are the Cursor driver, do not `dispatch_smart --agent cursor`. Attest `resolved_model` when CF identity matters. A CLEAN PR with CF APPROVE is merged the same turn. |
+| **Claude** | Cheapest Claude *review* is inline. Headless for author lanes or an independent context on the hardest 1–2 reviews. Session (5h) window beats weekly. |
+| **Codex / GPT** | Skip the lane when CodexBar shows deficit and a cooler eligible seat exists. Review always danger + worktree. |
+| **AGY (Google)** | `--agent agy` (gemini-cli retired). Check **both** Gemini pools. Never Flash-class for code/lab CF. Re-prove write on the live write-tier before load-bearing. |
+| **DeepSeek** | Local only (China-host). Ground-check numbers/schemas. |
+| **Grok** | Native grok CLI = code, complete diffs, no file tools. Content-class Grok is a different harness — resolve in dispatch-router. Driver-only if seated: no multi-file heroics. |
+| **GLM / OpenCode** | Local only. Never CI. |
 
 ---
 
