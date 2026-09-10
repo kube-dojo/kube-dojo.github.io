@@ -8,7 +8,11 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.quality.source_acceptance import SCHEMA, SCHEMA_VERSION, evaluate_source_acceptance
+from scripts.quality.source_acceptance import (
+    SCHEMA,
+    SCHEMA_VERSION,
+    evaluate_source_acceptance,
+)
 
 PAGE, SEED, SNAP = "sha256:" + "a" * 64, "sha256:" + "b" * 64, "sha256:" + "c" * 64
 
