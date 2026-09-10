@@ -207,18 +207,60 @@ cka_cert_supervisor_receipt_read() {
   cka_cert_supervisor_receipt_payload "$1" "$2" "$3" "$4" "$payload"
 }
 
+cka_cert_capture_directory() {
+  [[ $# == 0 ]] && cka_cert_state_environment && cka_cert_state_directory /var/lib/cka-certificate-transaction
+}
+
+# Direct invocation only: never put this capture helper inside command substitution.
+# Fixed single-line text results; uncertain files remain private reconciliation artifacts.
+cka_cert_capture() {
+  local deadline mode path snapshot
+  unset CKA_CERT_CAPTURED
+  [[ $# -ge 3 ]] || return 1
+  deadline=$1; mode=$2; shift 2
+  case "$mode:$1" in read:cka_cert_supervisor_receipt_payload|utility:jq|utility:mktemp) ;; *) return 1 ;; esac
+  cka_cert_deadline_budget "$deadline" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_capture_directory || return $?
+  path=/var/lib/cka-certificate-transaction/capture.$BASHPID.$RANDOM.$RANDOM
+  [[ ! -e $path && ! -L $path ]] || return 1
+  if (umask 077; set -C; exec 8>&-; {
+    case $mode in
+      read) cka_cert_run_read_helper "$deadline" "$@" ;;
+      utility) cka_cert_run_utility "$deadline" -- "$@" ;;
+    esac
+  } > "$path" 2>&1); then :; else return $?; fi
+  cka_cert_run_read_helper "$deadline" cka_cert_state_file "$path" || return $?
+  # These allowlisted results are single-line text; cap the direct builtin read.
+  if LC_ALL=C IFS= read -r -d '' -n 65537 snapshot < "$path"; then return 1; else [[ $? == 1 ]] || return 1; fi
+  [[ ${#snapshot} -le 65536 && $snapshot == *$'\n' ]] || return 1
+  snapshot=${snapshot%$'\n'}
+  [[ -n $snapshot && $snapshot != *$'\n'* ]] || return 1
+  cka_cert_deadline_budget "$deadline" || return $?
+  CKA_CERT_CAPTURED=$snapshot
+}
+
 # Invoke directly in the admitted runner, not in a timeout-created Bash child.
 # This proves writer identity/custody only; the runner must supply real wait evidence.
+# Deadline is mandatory and first; late receipts are preserved without acknowledgement.
 cka_cert_supervisor_receipt_write() {
-  local payload temporary runner_pid runner_start supervisor_pid supervisor_start
-  [[ $# == 5 ]] || return 1
-  payload=$(cka_cert_supervisor_receipt_payload "$1" "$2" "$3" "$4" "$5") || return 1
-  cka_cert_process_check "$1" "$2" && cka_cert_state_locked || return 1
-  runner_pid=$(jq -er .pid <<< "$4") || return 1
-  runner_start=$(jq -er .start_time <<< "$4") || return 1
-  supervisor_pid=$(jq -er .pid <<< "$3") || return 1
-  supervisor_start=$(jq -er .start_time <<< "$3") || return 1
+  local deadline payload temporary runner_pid runner_start supervisor_pid supervisor_start
+  [[ $# == 6 && ${CKA_CERT_STATE_OWNS_FD:-0} == 1 ]] || return 1
+  deadline=$1
+  cka_cert_capture "$deadline" read cka_cert_supervisor_receipt_payload "$2" "$3" "$4" "$5" "$6" || return $?
+  payload=$CKA_CERT_CAPTURED
+  cka_cert_run_read_helper "$deadline" cka_cert_process_check "$2" "$3" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_state_descriptor || return $?
+  cka_cert_run_utility "$deadline" -- flock -n 9 || return $?
+  cka_cert_capture "$deadline" utility jq -er .pid <<< "$5" || return $?
+  runner_pid=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -er .start_time <<< "$5" || return $?
+  runner_start=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -er .pid <<< "$4" || return $?
+  supervisor_pid=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -er .start_time <<< "$4" || return $?
+  supervisor_start=$CKA_CERT_CAPTURED
   [[ $BASHPID == "$runner_pid" ]] || return 1
+  cka_cert_deadline_budget "$deadline" || return $?
   cka_cert_process_stat "$supervisor_pid" || return 1
   [[ $CKA_CERT_PROC_START == "$supervisor_start" && $CKA_CERT_PROC_PGID == "$supervisor_pid" &&
      $CKA_CERT_PROC_SID == "$supervisor_pid" ]] || return 1
@@ -227,16 +269,16 @@ cka_cert_supervisor_receipt_write() {
      $CKA_CERT_PROC_PGID == "$supervisor_pid" && $CKA_CERT_PROC_SID == "$supervisor_pid" ]] || return 1
   [[ ! -e /var/lib/cka-certificate-transaction/command.json &&
      ! -L /var/lib/cka-certificate-transaction/command.json ]] || return 1
-  temporary=$(mktemp /var/lib/cka-certificate-transaction/command.XXXXXXXX) || return 1
-  cka_cert_state_file "$temporary" || return 1
+  cka_cert_capture "$deadline" utility mktemp /var/lib/cka-certificate-transaction/command.XXXXXXXX || return $?
+  temporary=$CKA_CERT_CAPTURED
+  cka_cert_run_read_helper "$deadline" cka_cert_state_file "$temporary" || return $?
+  cka_cert_deadline_budget "$deadline" || return $?
   printf '%s\n' "$payload" > "$temporary" || return 1
-  sync -f "$temporary" || return 1
-  # Exclusive link creation also refuses a destination appearing after the check.
-  ln -T -- "$temporary" /var/lib/cka-certificate-transaction/command.json || return 1
-  # A crash before this unlink leaves two links and therefore a refused receipt.
-  unlink -- "$temporary" || return 1
-  sync -f /var/lib/cka-certificate-transaction || return 1
-  cka_cert_supervisor_receipt_read "$1" "$2" "$3" "$4" >/dev/null
+  cka_cert_run_utility "$deadline" -- sync -f "$temporary" || return $?
+  cka_cert_run_utility "$deadline" -- ln -T -- "$temporary" /var/lib/cka-certificate-transaction/command.json || return $?
+  cka_cert_run_utility "$deadline" -- unlink -- "$temporary" || return $?
+  cka_cert_run_utility "$deadline" -- sync -f /var/lib/cka-certificate-transaction || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_supervisor_receipt_read "$2" "$3" "$4" "$5" >/dev/null
 }
 
 # Shared deadline helpers; source-inert. Deadline is absolute node centiseconds.
@@ -276,7 +318,7 @@ cka_cert_run_read_helper() {
   [[ $# -ge 2 ]] || return 1
   deadline=$1; shift
   case $1 in
-    cka_cert_process_check|cka_cert_process_read|cka_cert_process_payload|\
+    cka_cert_process_check|cka_cert_process_read|cka_cert_process_payload|cka_cert_capture_directory|\
     cka_cert_state_expected|cka_cert_state_descriptor|cka_cert_state_file|\
     cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read) ;;
     *) return 1 ;;
