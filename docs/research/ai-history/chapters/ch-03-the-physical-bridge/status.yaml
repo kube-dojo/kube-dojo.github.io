@@ -18,8 +18,9 @@ notes: |
      14 Green claims for the axiomatic structure (postulates, theorems by
      perfect induction, hindrance definition, make/break-contact-as-negation,
      explicit Boole identification, Figure 5 → Figure 6 simplification with
-     element-count drop from 13 to 5, Section V Selective Circuit 20 → 15
-     → 14 reduction).
+     contact-occurrence drop from 13 to 6 (printed pp.14-16; 15a vs 17b;
+     not a physical-relay count — claim-ledger-2339.md), Section V Selective
+     Circuit 20 → 15 → 14 reduction).
 
    - Shannon 1938 Trans. AIEE paper (Wiley 1993 reissue mirror at
      harrymoreno.com): 5 Green claims for the publication metadata, the
@@ -41,9 +42,9 @@ notes: |
      claims for the 1931 Bush analyzer architecture (six disc integrators,
      drawing boards), the disc integrator as "the heart of the analyzer,"
      the March 1936 Rockefeller $85,000 grant, the automatic-control
-     problem framed as "in fact, a software problem," and the post-1942
+     problem framed as "in fact, a software problem," and      the 1941–42 wartime
      scale of the Rockefeller Differential Analyzer (~2000 vacuum tubes,
-     several thousand relays).
+     several thousand relays; do not call this post-war).
 
   Verifying total: 26 Green / 3 Yellow / 0 Red claims in the scene-level
   claim table. The 3 Yellow claims are: (1) Howard Gardner's "possibly the
@@ -98,3 +99,7 @@ review_coverage:
     overall: true
   backfill_pending: false
   last_audited: 2026-05-01
+# 2026-09-11 #2339 research packet: contract 13→5 rows corrected to 13→6.
+# Green/status metadata above is not fresh chapter acceptance.
+claim_ledger: claim-ledger-2339.md
+claim_ledger_date: 2026-09-11

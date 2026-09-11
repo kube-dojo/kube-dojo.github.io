@@ -60,7 +60,7 @@ Surfaced from `brief.md` *Conflict Notes* and the Yellow/Red entries in `sources
 - **Question:** Where does the "Shannon proved a 5-relay circuit could be minimized to 3" folk claim come from? It appears in the legacy chapter prose at `src/content/docs/ai-history/ch-03-the-physical-bridge.md`, but it does not match the primary source.
 - **Why it matters:** Tracking the folk claim's origin would help the chapter explain (briefly) why it's wrong without making the explanation read as a takedown of any specific source.
 - **Evidence needed:** Search of popular Shannon biographies and anniversary articles — *IEEE Spectrum* 2016 centennial coverage, *Wired* and *New Yorker* profiles of Shannon, Soni & Goodman 2017.
-- **Status:** Yellow. Non-blocking. The chapter can simply present the correct numbers (13 → 5) without forensically tracing the folk version.
+- **Status:** Yellow. Non-blocking. Present the correct numbers (13 → 6 contact occurrences; not a physical-relay count). See `claim-ledger-2339.md` row 1.
 
 ### Q9. The "tertiary parallel discovery" thread
 
