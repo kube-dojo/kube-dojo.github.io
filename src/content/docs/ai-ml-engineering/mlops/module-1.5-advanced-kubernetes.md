@@ -6,7 +6,7 @@ sidebar:
 ---
 > **AI/ML Engineering Track** | Complexity: `[MEDIUM]` | Time: 6-8 hours
 >
-> **Prerequisites**: [Module 1.4: Kubernetes for ML](./module-1.4-kubernetes-for-ml/) — Deployments, Services, GPU requests, probes, and autoscaling fundamentals.
+> **Prerequisites**: [Module 1.4: Kubernetes for ML](../module-1.4-kubernetes-for-ml/) — Deployments, Services, GPU requests, probes, and autoscaling fundamentals.
 
 ---
 
@@ -32,7 +32,7 @@ By the end of this module, you will:
 
 ## Why This Module Matters
 
-In [Module 1.4: Kubernetes for ML](./module-1.4-kubernetes-for-ml/), you learned how Deployments, Services, Jobs, GPU extended resources, taints, tolerations, and autoscaling controllers fit ML workloads. Those primitives are necessary but not sufficient for most production ML systems. A training pipeline is not a single Job—it is a directed graph of steps with artifact lineage. Serving a model is not a Deployment with a Flask wrapper—it is batching, versioning, traffic splitting, and cold-start behavior tuned for inference latency rather than CPU utilization.
+In [Module 1.4: Kubernetes for ML](../module-1.4-kubernetes-for-ml/), you learned how Deployments, Services, Jobs, GPU extended resources, taints, tolerations, and autoscaling controllers fit ML workloads. Those primitives are necessary but not sufficient for most production ML systems. A training pipeline is not a single Job—it is a directed graph of steps with artifact lineage. Serving a model is not a Deployment with a Flask wrapper—it is batching, versioning, traffic splitting, and cold-start behavior tuned for inference latency rather than CPU utilization.
 
 Advanced Kubernetes for ML therefore spans two layers. The **infrastructure layer** still depends on correct scheduling: GPU node pools with taints, queue-aware batch schedulers such as Kueue, cluster autoscalers that add accelerator nodes when jobs queue, and the NVIDIA GPU Operator that advertises `nvidia.com/gpu` consistently across nodes. The **platform layer** adds ML-native abstractions—Kubeflow Pipelines for workflow DAGs, KServe for InferenceService resources, Ray for distributed Python execution, and Triton for GPU-efficient batch inference. You need both layers to reason about incidents like the hypothetical scenario above: Kubernetes may report success while the platform layer exposes model-load failures, missing artifacts, or misconfigured serving routes.
 
@@ -57,7 +57,7 @@ Work on ML technical debt helped popularize the idea that production ML systems 
 
 > **Pause and predict**: Before reading further, think about what Kubernetes provides out of the box. What specific concerns of an ML workload—training, serving, experimentation—do you think Kubernetes cannot address natively?
 
-In [Module 1.4](./module-1.4-kubernetes-for-ml/), you learned Kubernetes fundamentals—Pods, Deployments, Services, and the resource model that makes container orchestration possible. But if you have tried to run actual ML workloads on Kubernetes, you have probably discovered an uncomfortable truth: the primitives alone do not express ML workflows cleanly.
+In [Module 1.4](../module-1.4-kubernetes-for-ml/), you learned Kubernetes fundamentals—Pods, Deployments, Services, and the resource model that makes container orchestration possible. But if you have tried to run actual ML workloads on Kubernetes, you have probably discovered an uncomfortable truth: the primitives alone do not express ML workflows cleanly.
 
 Consider what a typical ML workflow needs:
 

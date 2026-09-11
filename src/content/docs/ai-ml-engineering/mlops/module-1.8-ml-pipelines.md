@@ -6,7 +6,7 @@ sidebar:
 ---
 > **AI/ML Engineering Track** | Complexity: `[COMPLEX]` | Time: 6-8
 
-**Prerequisites**: [Module 1.7: Data Pipelines](./module-1.7-data-pipelines/) (data versioning, feature stores, and validation)
+**Prerequisites**: [Module 1.7: Data Pipelines](../module-1.7-data-pipelines/) (data versioning, feature stores, and validation)
 
 A notebook trains a model once. Production retrains it on a schedule, validates every artifact, caches expensive steps, branches on metric thresholds, and leaves an audit trail that another engineer can replay six months later. That gap between a one-off experiment and a repeatable system is what ML pipeline frameworks exist to close. Pipeline tools such as Kubeflow Pipelines, TensorFlow Extended (TFX), ZenML, and Metaflow express machine learning work as a directed acyclic graph of components, pass typed artifacts between steps, compile the graph to a runtime, and apply caching so you do not pay twice for unchanged preprocessing.
 

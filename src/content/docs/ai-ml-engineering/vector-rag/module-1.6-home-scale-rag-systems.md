@@ -1050,7 +1050,7 @@ If you extend the prototype with embeddings or a generator, use the optional-ste
 ## Next Module
 
 - [Local Inference Stack for Learners](../ai-infrastructure/module-1.4-local-inference-stack-for-learners/)
-- [Advanced RAG Patterns](./module-1.3-advanced-rag-patterns/)
+- [Advanced RAG Patterns](../module-1.3-advanced-rag-patterns/)
 - [Notebooks to Production for ML/LLMs](../mlops/module-1.11-notebooks-to-production-for-ml-llms/)
 
 ## Sources

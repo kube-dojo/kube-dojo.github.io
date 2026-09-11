@@ -6,7 +6,7 @@ sidebar:
 ---
 
 > **AI/ML Engineering Track** | Complexity: `[COMPLEX]` | Time: 5-6 hours  
-> **Prerequisites**: [Module 1.9: Model Serving](./module-1.9-model-serving/)
+> **Prerequisites**: [Module 1.9: Model Serving](../module-1.9-model-serving/)
 
 In March 2020, consumer behavior changed faster than most production machine learning systems could adapt. Commute-hour shopping patterns vanished. Fraud models trained on travel-season signals began flagging legitimate home purchases. Inventory systems that predicted condiment demand from years of steady retail rhythms suddenly faced bulk-order spikes they had never seen in training data. [MIT Technology Review documented these failures across retail, fraud detection, and supply-chain forecasting](https://www.technologyreview.com/2020/05/11/1001563/covid-pandemic-broken-ai-machine-learning-amazon-retail-fraud-humans-in-the-loop/) as a defining lesson of the pandemic era: models do not crash when the world changes — they keep serving predictions with the same confident HTTP 200 responses they always did.
 
@@ -561,7 +561,7 @@ Fairness monitoring belongs in the same dashboard as accuracy because aggregate 
 
 ## 5. Alerting, Governance, and the Feedback Loop
 
-A monitoring system without effective alerting is merely a data graveyard. Implementing robust instrumentation requires exporting metrics into specialized time-series databases like Prometheus, defining alert rules that encode business tolerances, and connecting those alerts to runbooks that tell humans exactly what to investigate. The feedback loop closes when confirmed drift or performance degradation triggers retraining, shadow evaluation, or rollback — wiring you practiced in [Module 1.8: ML Pipelines](./module-1.8-ml-pipelines/).
+A monitoring system without effective alerting is merely a data graveyard. Implementing robust instrumentation requires exporting metrics into specialized time-series databases like Prometheus, defining alert rules that encode business tolerances, and connecting those alerts to runbooks that tell humans exactly what to investigate. The feedback loop closes when confirmed drift or performance degradation triggers retraining, shadow evaluation, or rollback — wiring you practiced in [Module 1.8: ML Pipelines](../module-1.8-ml-pipelines/).
 
 Governance ties monitoring to accountability. Model cards document intended use, limitations, and which metrics you monitor. Audit logs record training events, deployments, threshold changes, and alert acknowledgments. Regulated industries and the [EU AI Act framework](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai) increasingly expect demonstrable monitoring — not just that a model was accurate at launch, but that you detected and responded to degradation afterward. [NIST's AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework) provides a durable structure for mapping monitoring controls to organizational risk tolerance without tying the curriculum to a specific vendor compliance product.
 
@@ -1968,7 +1968,7 @@ kubectl get pods -n mlops-prod -l app=drift-monitor
 
 ## Next Module
 
-Now that you have constructed mathematically rigorous observability around your models, revisit [Module 1.8: ML Pipelines](./module-1.8-ml-pipelines) to wire monitoring signals back into retraining, validation, and controlled promotion workflows. The monitoring layer you built here supplies the triggers — drift scores, performance drops, fairness disparities — that tell the pipeline when to retrain, shadow-test a challenger, or roll back to the previous champion. Without monitoring, pipelines run on schedule whether the model needs updating or not; with monitoring, retraining becomes evidence-driven rather than calendar-driven.
+Now that you have constructed mathematically rigorous observability around your models, revisit [Module 1.8: ML Pipelines](../module-1.8-ml-pipelines) to wire monitoring signals back into retraining, validation, and controlled promotion workflows. The monitoring layer you built here supplies the triggers — drift scores, performance drops, fairness disparities — that tell the pipeline when to retrain, shadow-test a challenger, or roll back to the previous champion. Without monitoring, pipelines run on schedule whether the model needs updating or not; with monitoring, retraining becomes evidence-driven rather than calendar-driven.
 
 ## Sources
 

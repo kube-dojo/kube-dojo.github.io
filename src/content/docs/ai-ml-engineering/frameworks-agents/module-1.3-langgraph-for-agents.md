@@ -8,7 +8,7 @@ sidebar:
 >
 > **Time to Complete**: 80-100 minutes
 >
-> **Prerequisites**: [LangChain Fundamentals](./module-1.1-langchain-fundamentals/) and [LangChain Advanced](./module-1.2-langchain-advanced/), plus ReAct basics from [Reasoning and Logic Prompts](/ai/ai-engineering-foundations/module-1.2-reasoning-and-logic-prompts/).
+> **Prerequisites**: [LangChain Fundamentals](../module-1.1-langchain-fundamentals/) and [LangChain Advanced](../module-1.2-langchain-advanced/), plus ReAct basics from [Reasoning and Logic Prompts](/ai/ai-engineering-foundations/module-1.2-reasoning-and-logic-prompts/).
 
 ---
 
@@ -1362,4 +1362,4 @@ print("Final State:", output)
 
 ## Next Module
 
-[Module 1.4 - LlamaIndex](./module-1.4-llamaindex/) - Add a purpose-built data framework for RAG and knowledge-intensive agents: ingestion, indexing, and query engines on top of the LangChain/LangGraph foundations you just built.
+[Module 1.4 - LlamaIndex](../module-1.4-llamaindex/) - Add a purpose-built data framework for RAG and knowledge-intensive agents: ingestion, indexing, and query engines on top of the LangChain/LangGraph foundations you just built.
