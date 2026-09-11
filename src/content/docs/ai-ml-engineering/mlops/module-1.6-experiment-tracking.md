@@ -864,7 +864,7 @@ print(f"Production model predictions: {test_prediction}")
 
 You now understand experiment tracking and model registry -- the foundation of reproducible ML. Every model you train from this point forward should be logged, tagged, and registered, so that six months from now, you (or your colleagues) can reproduce it, explain it, and improve upon it without archaeological excavation.
 
-[Module 1.7: Data Versioning and Feature Stores](./module-1.7-data-versioning-feature-stores) -- where you will learn how to apply the same systematic tracking discipline to the data side of the ML pipeline: versioning datasets with DVC, managing features with Feast, and ensuring that the data your models were trained on is as reproducible as the models themselves.
+[Module 1.7: Data Versioning and Feature Stores](../module-1.7-data-versioning-feature-stores) -- where you will learn how to apply the same systematic tracking discipline to the data side of the ML pipeline: versioning datasets with DVC, managing features with Feast, and ensuring that the data your models were trained on is as reproducible as the models themselves.
 
 ## Sources
 

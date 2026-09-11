@@ -6,7 +6,7 @@ sidebar:
 ---
 > **AI/ML Engineering Track** | Complexity: `[COMPLEX]` | Time: 5-6 hours
 
-**Prerequisites**: Complete [Module 1.8: ML Pipelines](./module-1.8-ml-pipelines/) first so you understand artifact promotion, orchestration, and how training outputs become versioned deployables.
+**Prerequisites**: Complete [Module 1.8: ML Pipelines](../module-1.8-ml-pipelines/) first so you understand artifact promotion, orchestration, and how training outputs become versioned deployables.
 
 ## What You'll Be Able to Do
 

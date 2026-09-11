@@ -1382,7 +1382,7 @@ python bounded_memory.py
 
 After mastering these LangChain fundamentals, the next module turns to giving your models controlled access to external systems, so you can integrate APIs and databases without opening new injection, oversharing, or data-exposure risks along the way.
 
-[**Module 1.2: LangChain Advanced**](./module-1.2-langchain-advanced) -> Learn how to grant your LLMs read/write access to external databases safely.
+[**Module 1.2: LangChain Advanced**](../module-1.2-langchain-advanced) -> Learn how to grant your LLMs read/write access to external databases safely.
 
 _Last updated: 2026-04-26_  
 _Module 1.1 of KubeDojo AI/ML Engineering Track_

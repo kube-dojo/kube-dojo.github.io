@@ -9,7 +9,7 @@ sidebar:
 >
 > **Time to Complete**: 90-120 minutes
 >
-> **Prerequisites**: [Module 1.1: MLOps Foundations](./module-1.1-ml-devops-foundations/), [Module 1.2: Docker for ML](./module-1.2-docker-for-ml/), [Module 1.3: CI/CD for ML](./module-1.3-cicd-for-ml/), basic YAML, container images, and command-line Kubernetes practice.
+> **Prerequisites**: [Module 1.1: MLOps Foundations](../module-1.1-ml-devops-foundations/), [Module 1.2: Docker for ML](../module-1.2-docker-for-ml/), [Module 1.3: CI/CD for ML](../module-1.3-cicd-for-ml/), basic YAML, container images, and command-line Kubernetes practice.
 
 ---
 

@@ -29,7 +29,7 @@ Reliable RAG teams treat evaluation as a continuous discipline, not as a one-tim
 
 The analogy is an instrumented aircraft cockpit. A pilot does not "feel" altitude, fuel, heading, and engine temperature by confidence alone; the cockpit exposes measurements that make diagnosis possible before a bad decision compounds. A RAG system needs the same cockpit. Retrieval recall tells you whether the right evidence entered the candidate set. Ranking metrics tell you whether it was near the top. Faithfulness checks tell you whether the answer stayed inside the evidence. Latency and cost metrics tell you whether the quality gain can survive production traffic.
 
-This module deliberately does not re-teach the retrieval architecture patterns themselves. For the retrieval patterns themselves, see [Module 1.3: Advanced RAG Patterns](./module-1.3-advanced-rag-patterns/). Here, the question is different: once you have a RAG system, how do you know whether it works, how do you diagnose why it fails, and how do you improve it without losing control of correctness, cost, and latency?
+This module deliberately does not re-teach the retrieval architecture patterns themselves. For the retrieval patterns themselves, see [Module 1.3: Advanced RAG Patterns](../module-1.3-advanced-rag-patterns/). Here, the question is different: once you have a RAG system, how do you know whether it works, how do you diagnose why it fails, and how do you improve it without losing control of correctness, cost, and latency?
 
 ## Evaluation Starts with a Test Collection
 
@@ -758,7 +758,7 @@ kind delete cluster --name rag-eval-cluster
 
 ## Next Module
 
-[Module 1.5: Long-Context LLMs and Prompt Caching](./module-1.5-long-context-prompt-caching/) continues the sub-track by comparing retrieval against long-context strategies, explaining lost-in-the-middle behavior in more depth, and showing how prompt caching changes cost and latency tradeoffs.
+[Module 1.5: Long-Context LLMs and Prompt Caching](../module-1.5-long-context-prompt-caching/) continues the sub-track by comparing retrieval against long-context strategies, explaining lost-in-the-middle behavior in more depth, and showing how prompt caching changes cost and latency tradeoffs.
 
 ## Sources
 

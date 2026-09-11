@@ -815,8 +815,8 @@ The final `grep` command should not show production code importing from notebook
 
 ## Next Module
 
-- [Small-Team Private AI Platform](./module-1.12-small-team-private-ai-platform/)
-- [ML Monitoring](./module-1.10-ml-monitoring/)
+- [Small-Team Private AI Platform](../module-1.12-small-team-private-ai-platform/)
+- [ML Monitoring](../module-1.10-ml-monitoring/)
 - [Local Inference Stack for Learners](../ai-infrastructure/module-1.4-local-inference-stack-for-learners/)
 
 ## Sources

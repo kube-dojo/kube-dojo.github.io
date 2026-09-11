@@ -988,7 +988,7 @@ After completing the exercise, review your design as if you were approving it fo
 ## Next Module
 
 - [Home AI Operations and Cost Model](../ai-infrastructure/module-1.5-home-ai-operations-cost-model/)
-- [ML Monitoring](./module-1.10-ml-monitoring/)
+- [ML Monitoring](../module-1.10-ml-monitoring/)
 - [Private MLOps Platform](../../on-premises/ai-ml-infrastructure/module-9.4-private-mlops-platform/)
 
 ## Sources
