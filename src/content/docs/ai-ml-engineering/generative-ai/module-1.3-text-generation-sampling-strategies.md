@@ -965,7 +965,7 @@ cat sampling-profile-notes.txt
 
 ## Next Module
 
-Next module: [Embeddings & Semantic Search](./module-1.4-embeddings-semantic-search/)
+Next module: [Embeddings & Semantic Search](../module-1.4-embeddings-semantic-search/)
 
 Sampling parameters control how a model turns probabilities into generated text, but embeddings solve a different problem: how systems represent meaning so similar content can be found, compared, clustered, and retrieved. In the next module, you will learn how text becomes vectors, why semantic similarity powers retrieval-augmented generation, and how embedding quality affects the context that a generator receives before sampling ever begins.
 

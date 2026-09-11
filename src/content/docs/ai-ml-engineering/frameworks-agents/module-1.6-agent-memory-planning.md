@@ -1201,7 +1201,7 @@ Write a short note beside your lab files that answers these questions in your ow
 
 ## Next Module
 
-Move on to **[Module 1.7: Multi-Agent Systems](./module-1.7-multi-agent-systems)** to deepen coordination patterns, observability tracing, RBAC-compliant tool execution, and human-in-the-loop approval design.
+Move on to **[Module 1.7: Multi-Agent Systems](../module-1.7-multi-agent-systems)** to deepen coordination patterns, observability tracing, RBAC-compliant tool execution, and human-in-the-loop approval design.
 
 ## Sources
 

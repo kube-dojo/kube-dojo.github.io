@@ -789,7 +789,7 @@ Success criteria for this step:
 
 ## Next Module
 
-Next: [Tokenization & Text Processing](./module-1.2-tokenization-text-processing/)
+Next: [Tokenization & Text Processing](../module-1.2-tokenization-text-processing/)
 
 The next module moves from the LLM system picture to the first concrete boundary between human text and model input. You will measure tokens, compare tokenizer families, and design context budgets before requests reach inference.
 

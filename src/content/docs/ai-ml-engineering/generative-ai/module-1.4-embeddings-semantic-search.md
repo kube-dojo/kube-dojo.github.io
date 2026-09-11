@@ -830,7 +830,7 @@ Document the baseline metric, the change you made, the new metric, and two failu
 
 ## Next Module
 
-Next module: [Vector Space Visualization](./module-1.5-vector-space-visualization/)
+Next module: [Vector Space Visualization](../module-1.5-vector-space-visualization/)
 
 Embeddings give you searchable vectors, but high-dimensional spaces are hard to inspect directly. The next module teaches projection and visualization techniques so you can debug clusters, spot outliers, and communicate retrieval behavior to teammates who do not live inside cosine-similarity tables.
 

@@ -959,7 +959,7 @@ print("All capstone exercise checks passed.")
 
 ## Next Module
 
-Continue to **[Module 1.8: Self-Supervised Learning](./module-1.8-self-supervised-learning/)** — where you will learn to train without labels, pretraining representations on unlabeled data before fine-tuning on scarce annotations. The end-to-end supervised workflow you mastered here is the foundation; self-supervised learning extends it to data regimes where labels are the bottleneck.
+Continue to **[Module 1.8: Self-Supervised Learning](../module-1.8-self-supervised-learning/)** — where you will learn to train without labels, pretraining representations on unlabeled data before fine-tuning on scarce annotations. The end-to-end supervised workflow you mastered here is the foundation; self-supervised learning extends it to data regimes where labels are the bottleneck.
 
 ---
 
