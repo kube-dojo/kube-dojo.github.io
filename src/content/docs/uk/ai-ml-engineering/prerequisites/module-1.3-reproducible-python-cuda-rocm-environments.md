@@ -9,7 +9,7 @@ en_file: "src/content/docs/ai-ml-engineering/prerequisites/module-1.3-reproducib
 ---
 > **Трек «Інженерія ШІ/МН»** | Складність: `[MEDIUM]` | Час: 2-3 години
 >
-> **Передумови**: [Модуль 1.1: Передумови та налаштування середовища](./module-1.1-prerequisites-environment-setup/), [Модуль 1.2: Основи домашньої ШІ-станції](./module-1.2-home-ai-workstation-fundamentals/), базова навігація в командному рядку та впевненість у редагуванні невеликих текстових файлів.
+> **Передумови**: [Модуль 1.1: Передумови та налаштування середовища](../module-1.1-prerequisites-environment-setup/), [Модуль 1.2: Основи домашньої ШІ-станції](../module-1.2-home-ai-workstation-fundamentals/), базова навігація в командному рядку та впевненість у редагуванні невеликих текстових файлів.
 
 ## Результати навчання
 
@@ -726,9 +726,9 @@ python3.12 -m venv .venv
 
 ## Наступний модуль
 
-- [Ноутбуки, скрипти та макети проєктів](./module-1.4-notebooks-scripts-project-layouts/)
+- [Ноутбуки, скрипти та макети проєктів](../module-1.4-notebooks-scripts-project-layouts/)
 - [Основи PyTorch](../deep-learning/module-1.2-pytorch-fundamentals/)
-- [Основи домашньої ШІ-станції](./module-1.2-home-ai-workstation-fundamentals/)
+- [Основи домашньої ШІ-станції](../module-1.2-home-ai-workstation-fundamentals/)
 
 ## Джерела
 
