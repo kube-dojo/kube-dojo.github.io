@@ -49,6 +49,7 @@ handoff_agent_from_argv() {
 handoff_identity_for_agent() {
   case "${1:-}" in
     infra-orchestrator) printf '%s' 'claude-infra' ;;
+    epic-driver) printf '%s' 'claude-epic' ;;
     # curriculum-orchestrator / curriculum-writer / unset → default lane.
     *) ;;
   esac

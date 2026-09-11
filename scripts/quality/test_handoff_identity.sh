@@ -37,6 +37,7 @@ assert_eq "empty argv"                  ""                   "$(handoff_agent_fr
 
 # --- handoff_identity_for_agent ---
 assert_eq "slot: infra-orchestrator"    "claude-infra"       "$(handoff_identity_for_agent infra-orchestrator)"
+assert_eq "slot: epic-driver"           "claude-epic"        "$(handoff_identity_for_agent epic-driver)"
 assert_eq "slot: curriculum (default)"  ""                   "$(handoff_identity_for_agent curriculum-orchestrator)"
 assert_eq "slot: unknown (default)"     ""                   "$(handoff_identity_for_agent something-else)"
 assert_eq "slot: empty (default)"       ""                   "$(handoff_identity_for_agent '')"

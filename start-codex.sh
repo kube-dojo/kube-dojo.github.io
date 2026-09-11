@@ -26,11 +26,12 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --help-wrapper)
             cat <<'EOF'
-Usage: ./start-codex.sh [--main|--worktree] [codex args...]
+Usage: ./start-codex.sh [--main|--worktree] [--epic N] [codex args...]
 
 KubeDojo Codex launcher:
   - runs Codex in the primary main checkout by default
   - use --worktree to run in .worktrees/codex-interactive instead
+  - --epic N  bind drive-epic (SESSION_EPIC + KUBEDOJO_ISSUE); CodexBar + fleet
   - always adds --dangerously-bypass-approvals-and-sandbox
   - enables Codex multi-agent support by default
   - set CODEX_ENABLE_MULTI_AGENT=0 to disable multi-agent support
@@ -46,12 +47,32 @@ EOF
             CODEX_TARGET="worktree"
             shift
             ;;
+        --epic)
+            if [ "$#" -lt 2 ]; then
+                echo "Error: --epic requires a positive integer" >&2
+                exit 2
+            fi
+            CODEX_EPIC="$2"
+            shift 2
+            ;;
+        --epic=*)
+            CODEX_EPIC="${1#--epic=}"
+            shift
+            ;;
         *)
             CODEX_ARGS+=("$1")
             shift
             ;;
     esac
 done
+
+if [ -n "${CODEX_EPIC:-}" ]; then
+    # shellcheck source=scripts/lib/epic_driver_bind.sh
+    source "$SCRIPT_DIR/scripts/lib/epic_driver_bind.sh"
+    epic_export_env "$CODEX_EPIC" || exit $?
+    echo "Epic driver → SESSION_EPIC=$SESSION_EPIC (drive-epic + CodexBar + fleet)"
+    CODEX_ARGS+=("$(epic_driver_prompt "$CODEX_EPIC")")
+fi
 
 case "$CODEX_TARGET" in
     main|worktree)

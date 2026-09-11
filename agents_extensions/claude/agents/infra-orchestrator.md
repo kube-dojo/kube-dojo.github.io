@@ -27,7 +27,8 @@ work to the default lane and vice versa.
 - `.claude/hooks/**` and their source in `agents_extensions/claude/hooks/**`
   (deployed via `agents_extensions/deploy.sh`).
 - `agents_extensions/**` — skills, agents, commands, statusline, `deploy.sh`.
-- Launchers: `start-claude.sh`, `start-codex.sh`, `start-docs.sh`.
+- Launchers: `start-claude.sh` (`--epic N` → epic-driver), `start-codex.sh`
+  (`--epic N`), `start-cursor-driver.sh` (`--epic N`), `start-docs.sh`.
 - CI: `.github/workflows/**`, `.github/actions/**`, `dependabot.yml`, `zizmor.yml`.
 - Agent-runtime plumbing, handoff identity, the briefing/orientation system.
 

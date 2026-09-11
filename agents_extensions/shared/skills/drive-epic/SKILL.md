@@ -30,6 +30,19 @@ If a claim (count, SHA, gate, cap, lab pass/fail) is not in fresh tool output,
 Sister-repo details (Killercoda layout, G04, hosted vs local evidence):
 [dual-repo.md](dual-repo.md).
 
+## Launch (thin `--epic` bind)
+
+```bash
+./start-claude.sh --epic <N>          # Claude Code → --agent epic-driver
+./start-codex.sh --epic <N>           # Codex + initial bind prompt
+./start-cursor-driver.sh --epic <N>   # cursor-agent + bind prompt
+```
+
+These export `SESSION_EPIC` + `KUBEDOJO_ISSUE`, cold-start with `--issue N`, and
+require a CodexBar `CAPACITY_CARD` before dispatch. SessionStart emits an
+epic-driver packet (not the default UK curriculum DO-NEXT). This is **not** a
+learn-ukrainian lease/canary port — binding only.
+
 ---
 
 ## The loop (every cycle)
