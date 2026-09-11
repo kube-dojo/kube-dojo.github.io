@@ -337,4 +337,4 @@ A strong answer names the loop driver, tool boundary, approval owner, and stop c
 
 ## Next Module
 
-Continue to [Designing AI Workflows](./module-1.3-designing-ai-workflows/) to turn the delegation ladder into complete AI-native workflow designs.
+Continue to [Designing AI Workflows](../module-1.3-designing-ai-workflows/) to turn the delegation ladder into complete AI-native workflow designs.

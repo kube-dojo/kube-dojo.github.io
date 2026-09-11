@@ -903,4 +903,4 @@ EOF
 
 ## Наступний модуль
 
-Перейдіть до [Запуск відкритих моделей на Linux-машинах](./module-1.5-running-open-models-on-linux-boxes/).
+Перейдіть до [Запуск відкритих моделей на Linux-машинах](../module-1.5-running-open-models-on-linux-boxes/).

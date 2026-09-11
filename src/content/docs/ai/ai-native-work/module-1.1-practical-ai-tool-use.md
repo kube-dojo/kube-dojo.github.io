@@ -409,4 +409,4 @@ The exercise is complete when the checklist below shows a balanced decision log,
 
 ## Next Module
 
-Continue to [AI Agents and Assistants](./module-1.2-ai-agents-and-assistants/) to separate chat, assistants, copilots, and agents by autonomy and review boundaries.
+Continue to [AI Agents and Assistants](../module-1.2-ai-agents-and-assistants/) to separate chat, assistants, copilots, and agents by autonomy and review boundaries.

@@ -328,7 +328,7 @@ From here, continue to:
 
 - [AI/ML Engineering: Generative AI](../../ai-ml-engineering/generative-ai/)
 - [AI/ML Engineering: AI Infrastructure](../../ai-ml-engineering/ai-infrastructure/)
-- or revisit [Choosing Between Ollama, MLX, Transformers, and vLLM](./module-1.6-choosing-between-ollama-mlx-transformers-vllm/)
+- or revisit [Choosing Between Ollama, MLX, Transformers, and vLLM](../module-1.6-choosing-between-ollama-mlx-transformers-vllm/)
 
 ## Sources
 
