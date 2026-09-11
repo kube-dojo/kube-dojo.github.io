@@ -875,4 +875,4 @@ A strong submission first separates the job into capabilities instead of treatin
 
 ## Next Module
 
-Continue to [Prompting Basics](./module-1.3-prompting-basics/).
+Continue to [Prompting Basics](../module-1.3-prompting-basics/).

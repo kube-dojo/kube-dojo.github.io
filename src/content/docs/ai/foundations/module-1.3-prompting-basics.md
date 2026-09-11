@@ -476,4 +476,4 @@ A useful refinement after the first answer might be: "Revise the Next checks sec
 
 ## Next Module
 
-Continue to [How to Verify AI Output](./module-1.4-how-to-verify-ai-output/).
+Continue to [How to Verify AI Output](../module-1.4-how-to-verify-ai-output/).
