@@ -1032,4 +1032,4 @@ If multi-GPU experiments show NCCL errors, confirm `/dev/shm` is mounted, inspec
 
 ## Next Module
 
-Next: [Module 9.4: Private MLOps Platform](./module-9.4-private-mlops-platform/) introduces model registry, approval, rollout, and lifecycle practices for private AI platforms.
+Next: [Module 9.4: Private MLOps Platform](../module-9.4-private-mlops-platform/) introduces model registry, approval, rollout, and lifecycle practices for private AI platforms.

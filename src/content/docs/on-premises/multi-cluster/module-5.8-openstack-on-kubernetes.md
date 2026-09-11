@@ -1468,7 +1468,7 @@ You used OpenStack CLI and Horizon as a tenant would. You used `kubectl` and Hel
 
 ## Next Module
 
-Continue to [Module 5.9: VMware Tanzu](./module-5.9-vmware-tanzu/) for a vendor-integrated Kubernetes platform contrasted with the OpenStack-centered private-cloud patterns you studied here.
+Continue to [Module 5.9: VMware Tanzu](../module-5.9-vmware-tanzu/) for a vendor-integrated Kubernetes platform contrasted with the OpenStack-centered private-cloud patterns you studied here.
 
 ---
 

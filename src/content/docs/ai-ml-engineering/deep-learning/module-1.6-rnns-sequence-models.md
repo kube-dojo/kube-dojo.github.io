@@ -739,4 +739,4 @@ The expected outcome is not a fixed accuracy number, because random initializati
 
 ## Next Module
 
-**[Module 1.7: Capstone — Train a Real Net End-to-End](./module-1.7-capstone-train-a-real-net/)**
+**[Module 1.7: Capstone — Train a Real Net End-to-End](../module-1.7-capstone-train-a-real-net/)**

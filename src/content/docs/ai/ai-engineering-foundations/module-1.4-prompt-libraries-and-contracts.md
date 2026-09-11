@@ -28,7 +28,7 @@ The first three modules in this prompt layer teach the craft of the instruction 
 Module 1.1 defines what a prompt is supposed to express, Module 1.2 sharpens reasoning and logic patterns, and Module 1.3 frames safety and evaluation as repeatable evidence rather than vibe checks.
 This module turns those skills into an operating system for prompt work.
 
-Use [Prompt Fundamentals](../#planned-modules) for the interface baseline, [Reasoning and Logic Prompts](./module-1.2-reasoning-and-logic-prompts/) for reasoning patterns, and [Prompt Safety and Evaluation](./module-1.3-prompt-safety-and-evaluation/) for the eval-suite framing this module extends.
+Use [Prompt Fundamentals](../#planned-modules) for the interface baseline, [Reasoning and Logic Prompts](../module-1.2-reasoning-and-logic-prompts/) for reasoning patterns, and [Prompt Safety and Evaluation](../module-1.3-prompt-safety-and-evaluation/) for the eval-suite framing this module extends.
 
 An individual can keep a useful prompt in a note, a playground, or a Python string for a while.
 That stops working when the prompt has users, a product manager, a security reviewer, a model migration, and a customer integration depending on a stable output shape.
@@ -344,7 +344,7 @@ If a reviewer must run the whole service to understand the prompt, the asset bou
 
 Contract tests for prompts answer a narrower question than broad model evaluation.
 They ask whether a given prompt version still satisfies the behavior that callers and safety reviewers depend on.
-[Prompt Safety and Evaluation](./module-1.3-prompt-safety-and-evaluation/) covers the wider evaluation mindset; this section focuses on the operational contract test suite that gates prompt-library releases.
+[Prompt Safety and Evaluation](../module-1.3-prompt-safety-and-evaluation/) covers the wider evaluation mindset; this section focuses on the operational contract test suite that gates prompt-library releases.
 
 A golden set is the smallest practical starting point.
 It contains representative inputs, expected output characteristics, edge cases, adversarial cases, and known incidents.

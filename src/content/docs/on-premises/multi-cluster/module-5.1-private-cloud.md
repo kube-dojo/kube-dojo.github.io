@@ -418,7 +418,7 @@ A single-node control plane proves bootstrap automation, not production HA. DevS
 
 ## Next Module
 
-Continue to [Module 5.2: Multi-Cluster Control Planes](./module-5.2-multi-cluster-control-planes/) to compare vCluster, Kamaji, and dedicated control plane strategies once your private cloud foundation can supply reliable VMs, networks, and disks.
+Continue to [Module 5.2: Multi-Cluster Control Planes](../module-5.2-multi-cluster-control-planes/) to compare vCluster, Kamaji, and dedicated control plane strategies once your private cloud foundation can supply reliable VMs, networks, and disks.
 
 ## Learner Check
 

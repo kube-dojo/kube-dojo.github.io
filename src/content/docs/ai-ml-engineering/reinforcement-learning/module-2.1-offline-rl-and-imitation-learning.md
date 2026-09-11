@@ -7,7 +7,7 @@ sidebar:
 ---
 
 > Track: AI/ML Engineering | Complexity: `[ADVANCED]` | Time: 100-120 minutes
-> Prerequisites: [Module 1.1: RL Practitioner Foundations](./module-1.1-rl-practitioner-foundations/), [Module 2.7: Causal Inference for ML Practitioners](../../machine-learning/module-2.7-causal-inference-for-ml-practitioners/), and comfort with supervised validation, sequential data, and Python experiment logs.
+> Prerequisites: [Module 1.1: RL Practitioner Foundations](../module-1.1-rl-practitioner-foundations/), [Module 2.7: Causal Inference for ML Practitioners](../../machine-learning/module-2.7-causal-inference-for-ml-practitioners/), and comfort with supervised validation, sequential data, and Python experiment logs.
 
 The most tempting reinforcement-learning demo is also the least available production workflow. Let an agent explore.
 Watch rewards improve. Deploy the best checkpoint.
@@ -62,7 +62,7 @@ can say: "This dataset cannot support that policy claim."
 ## Section 1: What offline RL is, and why it's different from online RL
 
 Online RL learns by interacting. The agent chooses actions, observes rewards, updates its policy, and uses the
-improved policy to collect more data. That loop is the engine behind the algorithms in [Module 1.1: RL Practitioner Foundations](./module-1.1-rl-practitioner-foundations/).
+improved policy to collect more data. That loop is the engine behind the algorithms in [Module 1.1: RL Practitioner Foundations](../module-1.1-rl-practitioner-foundations/).
 
 Offline RL breaks the loop. The agent receives a fixed dataset of transitions: state, action, reward, next state, and
 terminal flag. Training may run for many gradient steps, but the evidence does not expand. No new action is tried. No

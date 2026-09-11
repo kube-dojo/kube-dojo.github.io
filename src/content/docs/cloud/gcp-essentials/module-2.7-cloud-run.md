@@ -676,7 +676,7 @@ rm -rf /tmp/cloud-run-lab
 
 ## Next Module
 
-Next: [Module 2.8: Cloud Functions](./module-2.8-cloud-functions/) explores event-driven functions and when they are a better fit than containerized services.
+Next: [Module 2.8: Cloud Functions](../module-2.8-cloud-functions/) explores event-driven functions and when they are a better fit than containerized services.
 
 ## Sources
 
