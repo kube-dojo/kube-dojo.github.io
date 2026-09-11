@@ -549,4 +549,4 @@ Success criteria:
 
 ## Next Module
 
-Continue with [CGOA Practice Questions Set 1](./module-1.4-practice-questions-set-1/) to turn these patterns into exam-style reasoning under time pressure.
+Continue with [CGOA Practice Questions Set 1](../module-1.4-practice-questions-set-1/) to turn these patterns into exam-style reasoning under time pressure.

@@ -604,4 +604,4 @@ A strong final explanation says GitOps uses Git as the reviewed desired-state so
 
 ## Next Module
 
-Continue with [CGOA Practice Questions Set 2](./module-1.5-practice-questions-set-2/), where you will apply the same GitOps reasoning to a second set of scenario-driven questions.
+Continue with [CGOA Practice Questions Set 2](../module-1.5-practice-questions-set-2/), where you will apply the same GitOps reasoning to a second set of scenario-driven questions.

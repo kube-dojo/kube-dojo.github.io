@@ -413,4 +413,4 @@ Start by writing the object, desired state, and proof command for each practice 
 
 ## Next Module
 
-Continue to [LFCS Essential Commands Practice](./module-1.2-essential-commands-practice/) to turn this strategy into repeated file, text, permissions, and shell-navigation drills.
+Continue to [LFCS Essential Commands Practice](../module-1.2-essential-commands-practice/) to turn this strategy into repeated file, text, permissions, and shell-navigation drills.

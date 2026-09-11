@@ -442,7 +442,7 @@ logs, metrics, and SLO alerts. The next move is to inspect the SLI numerator and
 
 ## Next Module
 
-Continue with [CNPA Practice Questions Set 1](./module-1.4-practice-questions-set-1/).
+Continue with [CNPA Practice Questions Set 1](../module-1.4-practice-questions-set-1/).
 
 ## Sources
 

@@ -686,4 +686,4 @@ After the service starts, check the exact success condition the task names. If t
 
 ## Next Module
 
-Next: [LFCS Full Mock Exam](./module-1.5-full-mock-exam/) brings these skills together in a timed end-to-end practice run where identity, storage, service, and verification habits must work as one coherent operating routine.
+Next: [LFCS Full Mock Exam](../module-1.5-full-mock-exam/) brings these skills together in a timed end-to-end practice run where identity, storage, service, and verification habits must work as one coherent operating routine.

@@ -515,4 +515,4 @@ The next study action should be traceable to evidence. If your error log shows t
 
 ## Next Module
 
-Continue with [CNPA Core Platform Fundamentals Review](./module-1.2-core-platform-fundamentals-review/), where you will apply this strategy to the platform engineering concepts that anchor the rest of the CNPA blueprint.
+Continue with [CNPA Core Platform Fundamentals Review](../module-1.2-core-platform-fundamentals-review/), where you will apply this strategy to the platform engineering concepts that anchor the rest of the CNPA blueprint.

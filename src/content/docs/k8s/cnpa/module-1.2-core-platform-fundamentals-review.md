@@ -799,4 +799,4 @@ When you answer CNPA questions, use the framework as a filtering tool. Reject an
 
 ## Next Module
 
-Continue with [CNPA Delivery, APIs, and Observability Review](./module-1.3-delivery-apis-and-observability-review/).
+Continue with [CNPA Delivery, APIs, and Observability Review](../module-1.3-delivery-apis-and-observability-review/).
