@@ -806,4 +806,4 @@ kubectl apply --dry-run=client -f orders-api.yaml
 
 ## Наступний модуль
 
-Продовжте з [Огляд CNPA: доставка, API та спостережуваність](./module-1.3-delivery-apis-and-observability-review/).
+Продовжте з [Огляд CNPA: доставка, API та спостережуваність](../module-1.3-delivery-apis-and-observability-review/).

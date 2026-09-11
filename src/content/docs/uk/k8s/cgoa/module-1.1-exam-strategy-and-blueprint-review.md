@@ -562,4 +562,4 @@ EOF
 
 ## Наступний модуль
 
-Продовжуйте з [Огляд принципів GitOps для CGOA](./module-1.2-gitops-principles-review/).
+Продовжуйте з [Огляд принципів GitOps для CGOA](../module-1.2-gitops-principles-review/).

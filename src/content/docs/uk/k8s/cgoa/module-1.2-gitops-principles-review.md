@@ -558,7 +558,7 @@ grep -n "GitOps agent" analysis.md
 
 ## Наступний модуль
 
-Продовжте з [Огляд патернів та інструментів CGOA](./module-1.3-patterns-and-tooling-review/).
+Продовжте з [Огляд патернів та інструментів CGOA](../module-1.3-patterns-and-tooling-review/).
 
 
 
