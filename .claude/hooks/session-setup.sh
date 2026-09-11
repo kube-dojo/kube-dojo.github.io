@@ -107,15 +107,26 @@ fi
 # briefing) but EXTRACT only a compact summary — never inline the whole dump.
 # Outer timeout so a slow/down API can't hang session start; on failure the
 # extractor falls back to a "run cold-start yourself" directive.
+# When SESSION_EPIC / KUBEDOJO_ISSUE is set (./start-*.sh --epic N), pass the
+# issue into cold-start so the epic bind is visible in the dump.
 COLDSTART_BIN="$PROJECT_DIR/scripts/cold-start.sh"
 COLDSTART_OUT=""
+EPIC_NUM="${SESSION_EPIC:-${KUBEDOJO_ISSUE:-}}"
+if [ -n "$EPIC_NUM" ]; then
+  export KUBEDOJO_ISSUE="$EPIC_NUM"
+  export SESSION_EPIC="$EPIC_NUM"
+fi
 if [ -f "$COLDSTART_BIN" ]; then
+  COLDSTART_ARGS=()
+  if [ -n "$EPIC_NUM" ]; then
+    COLDSTART_ARGS=(--issue "$EPIC_NUM")
+  fi
   if command -v timeout >/dev/null 2>&1; then
-    COLDSTART_OUT=$(timeout 30 bash "$COLDSTART_BIN" 2>/dev/null || true)
+    COLDSTART_OUT=$(timeout 30 bash "$COLDSTART_BIN" "${COLDSTART_ARGS[@]}" 2>/dev/null || true)
   elif command -v gtimeout >/dev/null 2>&1; then
-    COLDSTART_OUT=$(gtimeout 30 bash "$COLDSTART_BIN" 2>/dev/null || true)
+    COLDSTART_OUT=$(gtimeout 30 bash "$COLDSTART_BIN" "${COLDSTART_ARGS[@]}" 2>/dev/null || true)
   else
-    COLDSTART_OUT=$(bash "$COLDSTART_BIN" 2>/dev/null || true)
+    COLDSTART_OUT=$(bash "$COLDSTART_BIN" "${COLDSTART_ARGS[@]}" 2>/dev/null || true)
   fi
 fi
 
@@ -180,15 +191,43 @@ if [ -z "$ORIENT_BODY" ]; then
   ORIENT_BODY="(cold-start produced no briefing — RUN IT YOURSELF NOW as your first action: bash scripts/cold-start.sh, then act on its DO-NEXT focus item.)"
 fi
 
-# ============================================================================
+# =============================================================================
 # LANE SELECTION — SESSION_HANDOFF_AGENT (exported by start-claude.sh from the
 # selected --agent; see scripts/lib/handoff_identity.sh) routes the orientation
 # identity + handoff slot. cold-start ran ABOVE for BOTH lanes, so the infra
 # lane still orients via the API even on its FIRST session (no handoff file
-# yet). The DEFAULT (curriculum) lane keeps its exact original CONTEXT, byte for
-# byte. Additive only — #2113 (learn-ukrainian parity).
-# ============================================================================
-if [ "${SESSION_HANDOFF_AGENT:-}" = "claude-infra" ]; then
+# yet). SESSION_EPIC / KUBEDOJO_ISSUE (./start-*.sh --epic N) selects the
+# epic-driver packet and OVERRIDES the default curriculum UK DO-NEXT.
+# The DEFAULT (curriculum) lane keeps its exact original CONTEXT when no epic
+# is bound. Additive — #2113 (learn-ukrainian parity) + thin --epic bind.
+# =============================================================================
+if [ -n "${EPIC_NUM:-}" ]; then
+  EPIC_HANDOFF="$PROJECT_DIR/.agent/claude-epic-thread-handoff.md"
+  if [ -f "$EPIC_HANDOFF" ]; then
+    EPIC_LEAD="PREVIOUS-SESSION EPIC HANDOFF — read this FIRST if it matches epic #${EPIC_NUM}:
+  Read: $EPIC_HANDOFF
+(gitignored local thread state; never committed. Write the next handoff to this same path at session end.)"
+  else
+    EPIC_LEAD="No epic-lane handoff yet (.agent/claude-epic-thread-handoff.md absent). Orient via cold-start + drive-epic."
+  fi
+  CONTEXT="EPIC-DRIVER SESSION — auto-oriented by the SessionStart hook. You ARE driving GitHub epic #${EPIC_NUM} (SESSION_EPIC=${EPIC_NUM}). You are NOT the default curriculum UK-volume queue and NOT the infra lane unless this epic is infra.
+
+Load-bearing discipline (do NOT violate):
+  - Read and follow the drive-epic skill before acting (agents_extensions/shared/skills/drive-epic/SKILL.md).
+  - Before any dispatch wave: CodexBar capacity (\`codexbar usage --provider both --no-color\` + cursor/antigravity as needed) → CAPACITY_CARD. Never habit-route Codex on pace deficit.
+  - Drive via the fleet (\`dispatch_smart\` in worktrees). Do not solo-implement volume. Exact-head CF as a PR comment (not gh approve). Merge only when CI is green on the reviewed SHA.
+  - Branch in .worktrees/ — NEVER branch/switch in the primary dir; never push direct to main.
+  - Inventory BOTH remotes: kube-dojo/kube-dojo.github.io AND kube-dojo/kubedojo-labs.
+
+$EPIC_LEAD
+
+Live state from the API (situational — the curriculum DO-NEXT below is NOT your task list when it conflicts with epic #${EPIC_NUM}):
+$ORIENT_BODY
+
+AUTO-ORIENT — before responding to the user's first message: state that you are driving epic #${EPIC_NUM}, run CodexBar → CAPACITY_CARD if a wave is next, then proceed on that epic unless the user redirects you. Cold-start has ALREADY run with --issue ${EPIC_NUM}.
+
+SESSION SETUP CHECK:"
+elif [ "${SESSION_HANDOFF_AGENT:-}" = "claude-infra" ]; then
   INFRA_HANDOFF="$PROJECT_DIR/.agent/claude-infra-thread-handoff.md"
   if [ -f "$INFRA_HANDOFF" ]; then
     INFRA_LEAD="PREVIOUS-SESSION INFRA HANDOFF — read this FIRST, as your first action:

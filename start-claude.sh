@@ -148,22 +148,42 @@ unset ANTHROPIC_BASE_URL OPENAI_BASE_URL COPILOT_PROVIDER_BASE_URL
 echo "headroom routing DISABLED -- launching Claude DIRECT (no proxy)"
 # --- end headroom routing ---
 
+# Thin --epic N bind (scripts/lib/epic_driver_bind.sh): export SESSION_EPIC +
+# KUBEDOJO_ISSUE, strip the flag so Claude never sees an unknown option, default
+# --agent epic-driver. SessionStart honors SESSION_EPIC and skips the UK queue.
+_claude_forward=("$@")
+_selected_epic=""
+if [ -f "$PROJECT_DIR/scripts/lib/epic_driver_bind.sh" ]; then
+    # shellcheck source=scripts/lib/epic_driver_bind.sh
+    source "$PROJECT_DIR/scripts/lib/epic_driver_bind.sh"
+    _selected_epic="$(epic_number_from_argv "$@")"
+    if [ -n "$_selected_epic" ]; then
+        epic_export_env "$_selected_epic" || exit $?
+        _claude_forward=()
+        while IFS= read -r _line; do
+            [ -n "$_line" ] || continue
+            _claude_forward+=("$_line")
+        done < <(epic_strip_from_argv "$@")
+        echo "Epic driver → SESSION_EPIC=$_selected_epic (drive-epic + CodexBar + fleet)"
+    fi
+fi
+
 # Derive the cold-start handoff identity from the selected `--agent`, so ONE
 # launcher serves multiple lanes: the SessionStart hook keys its orientation +
 # handoff slot off SESSION_HANDOFF_AGENT. The default curriculum lane derives
 # nothing → the hook keeps its existing single-lane behavior byte-for-byte.
-# `--agent infra-orchestrator` → SESSION_HANDOFF_AGENT=claude-infra. An explicit
-# SESSION_HANDOFF_AGENT already in the environment wins. Mapping + argv parsing
-# live in scripts/lib/handoff_identity.sh (mirrors learn-ukrainian, #2113).
-# Derive the selected `--agent` from argv ONCE (last-wins, stops at `--`) — used
-# both for the cold-start handoff identity and for the default-lane agent
-# injection below. Sourcing is unconditional (it only defines functions); the
-# handoff-identity export still only happens when SESSION_HANDOFF_AGENT is unset.
+# `--agent infra-orchestrator` → SESSION_HANDOFF_AGENT=claude-infra.
+# `--epic N` / `--agent epic-driver` → SESSION_HANDOFF_AGENT=claude-epic.
+# An explicit SESSION_HANDOFF_AGENT already in the environment wins. Mapping +
+# argv parsing live in scripts/lib/handoff_identity.sh (mirrors learn-ukrainian, #2113).
 _selected_agent=""
 if [ -f "$PROJECT_DIR/scripts/lib/handoff_identity.sh" ]; then
     # shellcheck source=scripts/lib/handoff_identity.sh
     source "$PROJECT_DIR/scripts/lib/handoff_identity.sh"
-    _selected_agent="$(handoff_agent_from_argv "$@")"
+    _selected_agent="$(handoff_agent_from_argv "${_claude_forward[@]}")"
+    if [ -z "$_selected_agent" ] && [ -n "${_selected_epic:-}" ]; then
+        _selected_agent="epic-driver"
+    fi
     if [ -z "${SESSION_HANDOFF_AGENT:-}" ]; then
         _handoff_slot="$(handoff_identity_for_agent "$_selected_agent")"
         if [ -n "$_handoff_slot" ]; then
@@ -179,14 +199,20 @@ fi
 # starts driving WITHOUT the user typing a first message. The default
 # (curriculum) lane carries no explicit `--agent`, so default it to
 # `curriculum-orchestrator` here — making `./start-claude.sh` symmetric with
-# `--agent infra-orchestrator`. Any explicit `--agent` (incl. infra) is left
-# untouched. Opt out (bare, idle claude) with KUBEDOJO_NO_DEFAULT_AGENT=1.
+# `--agent infra-orchestrator`. `--epic N` defaults to `epic-driver` when no
+# explicit `--agent` is present. Opt out with KUBEDOJO_NO_DEFAULT_AGENT=1.
 CLAUDE_ARGS=(--chrome --permission-mode bypassPermissions)
-if [ -z "$_selected_agent" ] && [ -z "${SESSION_HANDOFF_AGENT:-}" ] && [ -z "${KUBEDOJO_NO_DEFAULT_AGENT:-}" ]; then
+_has_explicit_agent=0
+if [ -n "$(handoff_agent_from_argv "${_claude_forward[@]}")" ]; then
+    _has_explicit_agent=1
+fi
+if [ -n "${_selected_epic:-}" ] && [ "$_has_explicit_agent" = "0" ] && [ -z "${KUBEDOJO_NO_DEFAULT_AGENT:-}" ]; then
+    CLAUDE_ARGS+=(--agent epic-driver)
+    echo "Epic lane → --agent epic-driver (drive-epic; CodexBar before dispatch; fleet only)"
+elif [ -z "$_selected_agent" ] && [ -z "${SESSION_HANDOFF_AGENT:-}" ] && [ -z "${KUBEDOJO_NO_DEFAULT_AGENT:-}" ]; then
     CLAUDE_ARGS+=(--agent curriculum-orchestrator)
     echo "Default lane → --agent curriculum-orchestrator (auto-orients + drives the queue; no typing needed)"
 fi
-unset _selected_agent
 
 echo "Launching Claude Code (native build from PATH: $(command -v claude))..."
-exec claude "${CLAUDE_ARGS[@]}" "$@"
+exec claude "${CLAUDE_ARGS[@]}" "${_claude_forward[@]}"
