@@ -1326,7 +1326,7 @@ docker rm ml-api-debug
 
 ## Next Module
 
-Continue to [Module 1.3: CI/CD for ML](./module-1.3-cicd-for-ml/) to wire the container images you built here into automated pipelines—image builds on every merge, data and model validation gates, and deployment workflows that treat the Docker contract as a first-class release artifact rather than a manual local step.
+Continue to [Module 1.3: CI/CD for ML](../module-1.3-cicd-for-ml/) to wire the container images you built here into automated pipelines—image builds on every merge, data and model validation gates, and deployment workflows that treat the Docker contract as a first-class release artifact rather than a manual local step.
 
 ## Learner check
 

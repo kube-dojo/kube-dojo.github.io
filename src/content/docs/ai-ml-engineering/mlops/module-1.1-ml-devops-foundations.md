@@ -1356,4 +1356,4 @@ Success criteria:
 
 ## Next Module
 
-Up next: [Module 1.2: Docker for ML](./module-1.2-docker-for-ml/), where you package ML dependencies into repeatable container images so local, CI, and Kubernetes execution environments stay aligned.
+Up next: [Module 1.2: Docker for ML](../module-1.2-docker-for-ml/), where you package ML dependencies into repeatable container images so local, CI, and Kubernetes execution environments stay aligned.

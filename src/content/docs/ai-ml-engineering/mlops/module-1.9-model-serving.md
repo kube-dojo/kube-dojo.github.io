@@ -1522,7 +1522,7 @@ kubectl apply -f ingress-canary.yaml
 
 ## Next Module
 
-Continue to [Module 1.10: ML Monitoring](./module-1.10-ml-monitoring/) to instrument the serving paths you built here—latency histograms, error budgets, drift detection, and alert design that keep models trustworthy after deployment. Monitoring closes the loop opened in this module: serving exposes versioned predictions under SLOs, and observability tells you when to roll back, retrain, or fix the platform before users notice.
+Continue to [Module 1.10: ML Monitoring](../module-1.10-ml-monitoring/) to instrument the serving paths you built here—latency histograms, error budgets, drift detection, and alert design that keep models trustworthy after deployment. Monitoring closes the loop opened in this module: serving exposes versioned predictions under SLOs, and observability tells you when to roll back, retrain, or fix the platform before users notice.
 
 ## Sources
 

@@ -1091,7 +1091,7 @@ The `kubectl exec` approach connects directly to the Ray head pod without requir
 
 ## Next Module
 
-Continue to [Module 1.6: Experiment Tracking](./module-1.6-experiment-tracking/) to learn MLflow and Weights & Biases—the tooling that records run history, model lineage, and reproducibility metadata so you never lose track of which artifact reached production.
+Continue to [Module 1.6: Experiment Tracking](../module-1.6-experiment-tracking/) to learn MLflow and Weights & Biases—the tooling that records run history, model lineage, and reproducibility metadata so you never lose track of which artifact reached production.
 
 ---
 

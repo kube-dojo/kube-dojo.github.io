@@ -1066,7 +1066,7 @@ Start with DVC plus explicit pipeline stages in `dvc.yaml`. Wire Great Expectati
 
 ## Next Module
 
-Continue to [Module 1.8: ML Pipelines](./module-1.8-ml-pipelines/) for workflow orchestration patterns that wire validated, versioned data into training, evaluation, and deployment DAGs.
+Continue to [Module 1.8: ML Pipelines](../module-1.8-ml-pipelines/) for workflow orchestration patterns that wire validated, versioned data into training, evaluation, and deployment DAGs.
 
 ---
 
