@@ -56,7 +56,10 @@ test('rejects unsupported schema/config/source metadata and leaves redirects out
   rejects(manifest([route()], { redirects: [{ source: '/old/', target: '/new/', status: 302.5 }] }), /3xx integer/);
   rejects(manifest([route()], { redirects: [{ source: '/old/', target: '/new/', status: Number.NaN }] }), /3xx integer/);
   rejects(manifest([route()], { redirects: [{ source: '/old/', target: '/new/', status: 200 }] }), /3xx integer/);
+  rejects(manifest([route()], { redirects: [{ source: '/old/', target: '../new/', status: 301 }] }), /serialized pathname/);
+  rejects(manifest([route()], { redirects: [{ source: '/old/[...slug]/', target: '/docs/guide/one/', status: 301 }] }), /unsupported/);
+  rejects(manifest([route()], { redirects: [{ source: '/old/', target: '/docs/guide/one/', status: 301 }, { source: '/old/', target: '/docs/other/', status: 302 }] }), /duplicate/);
   const result = buildDocumentRouteSet(manifest([route()], { redirects: [{ source: '/old/', target: '/docs/guide/one/', status: 301 }] }));
   assert.equal(result.targetPaths.has('/old/'), false);
-  assert.equal('redirects' in result, false);
+  assert.deepEqual(result.redirects, [{ source: '/old/', target: '/docs/guide/one/', status: 301 }]);
 });

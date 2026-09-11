@@ -32,12 +32,12 @@ function safeSource(value) {
   return source;
 }
 
-function serializedPath(value, origin) {
-  const pathname = text(value, 'route.pathname');
-  if (!pathname.startsWith('/') || pathname.startsWith('//') || pathname.includes('?') || pathname.includes('#')) fail('route.pathname must be a root-relative serialized pathname');
+function serializedPath(value, origin, label = 'route.pathname') {
+  const pathname = text(value, label);
+  if (!pathname.startsWith('/') || pathname.startsWith('//') || pathname.includes('?') || pathname.includes('#')) fail(`${label} must be a root-relative serialized pathname`);
   let url;
-  try { url = new URL(pathname, origin); } catch { fail('route.pathname must be a URL pathname'); }
-  if (url.origin !== origin || url.pathname !== pathname || url.search || url.hash) fail('route.pathname must be a serialized pathname');
+  try { url = new URL(pathname, origin); } catch { fail(`${label} must be a URL pathname`); }
+  if (url.origin !== origin || url.pathname !== pathname || url.search || url.hash) fail(`${label} must be a serialized pathname`);
   return pathname;
 }
 
@@ -56,13 +56,18 @@ function record(value, { origin, base }) {
   return { id: text(value.id, 'route.id'), url: urlText, pathname, source: safeSource(value.source), sourceSha256: hash, isFallback: value.isFallback, locale: optionalText(value.locale, 'route.locale'), lang: optionalText(value.lang, 'route.lang') };
 }
 
-function validateRedirects(value) {
+function redirectRecords(value, origin) {
   if (!Array.isArray(value)) fail('manifest.redirects must be an array');
-  value.forEach((redirect) => {
+  const seen = new Set();
+  return value.map((redirect) => {
     object(redirect, 'redirect');
     if (redirect.status !== null && (!Number.isInteger(redirect.status) || redirect.status < 300 || redirect.status > 399)) fail('redirect.status must be a 3xx integer or null');
-    text(redirect.source, 'redirect.source');
-    text(redirect.target, 'redirect.target');
+    const source = serializedPath(redirect.source, origin, 'redirect.source');
+    const target = serializedPath(redirect.target, origin, 'redirect.target');
+    if (/[\[\]*]/.test(source) || /[\[\]*]/.test(target)) fail('redirect patterns are unsupported');
+    if (seen.has(source)) fail(`duplicate redirect.source: ${source}`);
+    seen.add(source);
+    return { source, target, status: redirect.status };
   });
 }
 
@@ -71,7 +76,7 @@ export function buildDocumentRouteSet(manifest) {
   object(manifest, 'manifest');
   if (manifest.schemaVersion !== 1 || manifest.scope !== 'starlight-document-routes') fail('unsupported manifest schema or scope');
   const config = originFor(object(manifest.config, 'manifest.config'));
-  validateRedirects(manifest.redirects);
+  const redirects = redirectRecords(manifest.redirects, config.origin);
   if (!Array.isArray(manifest.routes)) fail('manifest.routes must be an array');
   const routes = manifest.routes.map((route) => record(route, config));
   const targetPaths = new Set();
@@ -90,5 +95,5 @@ export function buildDocumentRouteSet(manifest) {
     if (primary.length !== 1) fail(`source requires exactly one primary route: ${source}`);
     primaryBySource.set(source, primary[0]);
   }
-  return { origin: config.origin, config: manifest.config, routes, targetPaths, primaryBySource, fallbacks: routes.filter((route) => route.isFallback) };
+  return { origin: config.origin, config: manifest.config, routes, targetPaths, primaryBySource, fallbacks: routes.filter((route) => route.isFallback), redirects };
 }
