@@ -1,43 +1,27 @@
 ---
 name: cold-start
-description: KubeDojo agent session orientation. Use at the start of every fresh session or when picking up a GitHub issue. Triggers on "cold start", "orient", "session start", "issue-driven".
+description: Orient issue-driven or pipeline work using KubeDojo's live briefing and handoff pointers.
 ---
 
-# Cold-start Skill
+# Cold start
 
-Deterministic orientation for KubeDojo coding agents: **issue in → API orient → minimal file reads → work**.
+Use this workflow when taking a GitHub issue or coordinating pipeline work.
+Self-contained code or documentation edits can start with repository status
+and the relevant files, without starting services.
 
-Full ritual: [`scripts/prompts/cold-start.md`](../../../scripts/prompts/cold-start.md)
+Read the issue verbatim, then run `KUBEDOJO_ISSUE=N bash scripts/cold-start.sh`
+from the repository root (omit the variable if there is no issue). See
+`scripts/prompts/cold-start.md` for the command sequence and output sections.
+Paths here are relative to the repository root.
 
-## When to Use
+Use the briefing to resolve the assigned task; an unrelated queue suggestion
+is not a new assignment. Read the full handoff only for a relevant context gap.
+Before claiming pipeline work, check `GET /api/pipeline/leases`. Post a claim
+only when authorized. Make changes in a worktree, preserving primary `main`.
 
-- First call on a fresh agent session
-- Picking up a GitHub issue (#N)
-- After a long break when briefing may be stale
+If the API is unavailable, the script exits 0 with a STATUS excerpt and handoff
+path. Continue with sufficient local evidence, or report the specific missing
+state; exit 0 is not a service health check.
 
-## Steps
-
-1. **Read parent task verbatim** — `gh issue view N --repo kube-dojo/kube-dojo.github.io`
-2. **Run cold-start** — `KUBEDOJO_ISSUE=N bash scripts/cold-start.sh`
-3. **Claim if assigned** — `gh issue comment N --body "Claiming — worktree .worktrees/<name>"`
-4. **Worktree only** — never commit on primary `main`
-5. **Handoff on demand** — read the latest `.agent/session-state/*` brief (pre-s196 history: `docs/session-state/*`) only when orient/briefing leave a narrative gap
-
-## Script output sections
-
-Parse the labeled blocks from stdout:
-
-- `kubedojo:orient` — **start here** for "what to do now" (primary + up to 3 alternatives)
-- `kubedojo:briefing` — full compact snapshot (`actions`, `top_modules`, blockers)
-- `kubedojo:session` — latest handoff path (do not read the handoff file unless needed)
-- `kubedojo:pending-decisions` — blocking Decision Cards in `docs/decisions/pending/`
-
-Optional: `bash scripts/cold-start.sh --manifest` for route discovery via `/api/state/manifest`.
-
-## API-down
-
-Script exits **0** with `kubedojo:fallback` (STATUS excerpt) + `kubedojo:handoff-path`. Continue with local files; do not treat API failure as a hard stop.
-
-## Do NOT cold-start when
-
-The dispatch brief explicitly forbids shell scripts (e.g. headless content rewrites in worktrees where `services-up` is unnecessary).
+Honor a dispatch's tool and output constraints. A supplied content packet that
+prohibits shell commands does not need a separate orchestration session.
