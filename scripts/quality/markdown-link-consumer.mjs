@@ -71,7 +71,7 @@ export function consumeMarkdownLinks(manifest, docsRoot) {
           disposition = res.disposition;
         } else {
           try {
-            const resolved = resolveRoute(href, primary.url, routeSet.origin, routeSet.targetPaths);
+            const resolved = resolveRoute(href, primary.url, routeSet.origin, routeSet.targetPaths, routeSet.redirects);
             target = resolved.url;
             if (resolved.kind === 'external-http' || resolved.kind === 'mailto') {
               disposition = 'external';

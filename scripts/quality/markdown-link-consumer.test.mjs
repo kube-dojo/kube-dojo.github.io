@@ -17,7 +17,10 @@ test('consumeMarkdownLinks handles various fixtures', (t) => {
       trailingSlash: 'always',
       buildFormat: 'directory'
     },
-    redirects: [],
+    redirects: [
+      { source: '/legacy-module-b/', target: '/dir1/module-b/', status: 301 },
+      { source: '/gone-alias/', target: '/no-such-page/', status: 302 }
+    ],
     routes: [
       {
         id: 'dir1/module-a.md',
@@ -79,6 +82,8 @@ test('consumeMarkdownLinks handles various fixtures', (t) => {
 [index](../../)
 [explicit slug](/dir1/module-b/)
 [root-relative](/dir1/module-b/)
+[redirect source](/legacy-module-b/)
+[dead redirect](/gone-alias/)
 [fragment](#section)
 [unsupported form](ftp://invalid)
 \`\`\`
@@ -125,6 +130,14 @@ test('consumeMarkdownLinks handles various fixtures', (t) => {
   const rootRelative = findReport('root-relative');
   assert.equal(rootRelative.disposition, 'present');
   assert.equal(rootRelative.target, 'https://site.test/dir1/module-b/');
+
+  const redirectSource = findReport('/legacy-module-b/');
+  assert.equal(redirectSource.disposition, 'present');
+  assert.equal(redirectSource.target, 'https://site.test/dir1/module-b/');
+
+  const deadRedirect = findReport('/gone-alias/');
+  assert.equal(deadRedirect.disposition, 'missing');
+  assert.equal(deadRedirect.target, 'https://site.test/no-such-page/');
 
   const fragment = findReport('fragment');
   assert.equal(fragment.disposition, 'fragment-only');

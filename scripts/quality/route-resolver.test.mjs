@@ -97,3 +97,25 @@ test('explicit inputs and manifest paths must be canonical', () => {
   assert.throws(() => resolveRoute('/x/', '/x/', `${ORIGIN}/base/`, ['/x/']), { name: 'TypeError', message: /HTTP\(S\) origin/ });
   assert.throws(() => resolveRoute('/x/', '/x/', ORIGIN, '/x/'), { name: 'TypeError', message: /non-string iterable/ });
 });
+
+test('redirect source resolves to the final canonical pathname', () => {
+  const redirects = [{ source: '/old/', target: '/mid/' }, { source: '/mid/', target: '/final/' }];
+  const chained = resolveRoute('/old/?q=1#part', '/source/', ORIGIN, ['/final/'], redirects);
+  assert.deepEqual(chained, { url: 'https://site.test/final/?q=1#part', kind: 'internal', path: '/final/', routeExists: true });
+  const relative = resolveRoute('../old/', '/section/page/', ORIGIN, ['/new/'], [{ source: '/section/old/', target: '/new/' }]);
+  assert.equal(relative.path, '/new/');
+  assert.equal(relative.routeExists, true);
+  const missing = resolveRoute('/old/', '/source/', ORIGIN, ['/elsewhere/'], [{ source: '/old/', target: '/gone/' }]);
+  assert.equal(missing.path, '/gone/');
+  assert.equal(missing.routeExists, false);
+});
+
+test('redirect chains fail closed and do not invent filename-derived URLs', () => {
+  assert.equal(resolveRoute('/docs/old-name/', '/source/', ORIGIN, ['/docs/new-name/']).path, '/docs/old-name/');
+  assert.equal(resolveRoute('/docs/old-name/', '/source/', ORIGIN, ['/docs/new-name/']).routeExists, false);
+  assert.equal(resolveRoute('/old', '/source/', ORIGIN, ['/new/'], [{ source: '/old/', target: '/new/' }]).path, '/old');
+  assert.throws(() => resolveRoute('/a/', '/source/', ORIGIN, ['/a/'], [{ source: '/a/', target: '/b/' }, { source: '/b/', target: '/a/' }]), UnsupportedRoute);
+  assert.throws(() => resolveRoute('/a/', '/source/', ORIGIN, ['/b/'], [{ source: '/a/', target: '../b/' }]), UnsupportedRoute);
+  assert.throws(() => resolveRoute('/a/', '/source/', ORIGIN, ['/b/'], [{ source: '/old/[...slug]/', target: '/b/' }]), UnsupportedRoute);
+  assert.throws(() => resolveRoute('/a/', '/source/', ORIGIN, ['/b/'], [{ source: '/a/', target: '/b/' }, { source: '/a/', target: '/c/' }]), UnsupportedRoute);
+});
