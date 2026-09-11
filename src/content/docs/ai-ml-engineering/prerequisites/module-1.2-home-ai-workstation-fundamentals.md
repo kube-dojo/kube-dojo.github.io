@@ -607,8 +607,8 @@ Write one final paragraph using this format: "For the next stage, I will choose 
 
 ## Next Module
 
-- [Reproducible Python, CUDA, and ROCm Environments](./module-1.3-reproducible-python-cuda-rocm-environments/)
-- [Notebooks, Scripts, and Project Layouts](./module-1.4-notebooks-scripts-project-layouts/)
+- [Reproducible Python, CUDA, and ROCm Environments](../module-1.3-reproducible-python-cuda-rocm-environments/)
+- [Notebooks, Scripts, and Project Layouts](../module-1.4-notebooks-scripts-project-layouts/)
 
 ## Sources
 

@@ -609,8 +609,8 @@ Next action:
 
 ## Наступний модуль
 
-- [Відтворювані середовища Python, CUDA та ROCm](./module-1.3-reproducible-python-cuda-rocm-environments/)
-- [Ноутбуки, скрипти та макети проєктів](./module-1.4-notebooks-scripts-project-layouts/)
+- [Відтворювані середовища Python, CUDA та ROCm](../module-1.3-reproducible-python-cuda-rocm-environments/)
+- [Ноутбуки, скрипти та макети проєктів](../module-1.4-notebooks-scripts-project-layouts/)
 
 ## Джерела
 
