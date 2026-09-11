@@ -13,8 +13,8 @@ sidebar:
 ## Prerequisites
 
 Before starting this module, make sure you can navigate a shell, edit text files safely, and recognize basic process, service, and networking terminology from the prerequisite lessons:
-- **Required**: [LFCS Exam Strategy and Workflow](./module-1.1-exam-strategy-and-workflow/)
-- **Required**: [LFCS Essential Commands Practice](./module-1.2-essential-commands-practice/)
+- **Required**: [LFCS Exam Strategy and Workflow](../module-1.1-exam-strategy-and-workflow/)
+- **Required**: [LFCS Essential Commands Practice](../module-1.2-essential-commands-practice/)
 - **Helpful**: [Module 1.2: Processes & systemd](/linux/foundations/system-essentials/module-1.2-processes-systemd/)
 - **Helpful**: [Module 3.1: TCP/IP Essentials](/linux/foundations/networking/module-3.1-tcp-ip-essentials/)
 - **Helpful**: [Module 3.2: DNS on Linux](/linux/foundations/networking/module-3.2-dns-linux/)

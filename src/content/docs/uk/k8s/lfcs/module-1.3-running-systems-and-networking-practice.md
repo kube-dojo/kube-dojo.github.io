@@ -21,8 +21,8 @@ calque_review:
 ## Передумови
 
 Перш ніж починати цей модуль, переконайтеся, що ви вмієте орієнтуватися в оболонці, безпечно редагувати текстові файли та розпізнаєте базову термінологію процесів, служб і мереж із попередніх уроків:
-- **Обов'язково**: [LFCS: Стратегія та робочий процес іспиту](./module-1.1-exam-strategy-and-workflow/)
-- **Обов'язково**: [LFCS: Практика основних команд](./module-1.2-essential-commands-practice/)
+- **Обов'язково**: [LFCS: Стратегія та робочий процес іспиту](../module-1.1-exam-strategy-and-workflow/)
+- **Обов'язково**: [LFCS: Практика основних команд](../module-1.2-essential-commands-practice/)
 - **Корисно**: [Модуль 1.2: Процеси та systemd](/linux/foundations/system-essentials/module-1.2-processes-systemd/)
 - **Корисно**: [Модуль 3.1: Основи TCP/IP](/linux/foundations/networking/module-3.1-tcp-ip-essentials/)
 - **Корисно**: [Модуль 3.2: DNS у Linux](/linux/foundations/networking/module-3.2-dns-linux/)
@@ -559,4 +559,4 @@ ssh -v user@server
 
 ## Наступний модуль
 
-Продовжуйте до [LFCS: Практика сховища, служб і користувачів](./module-1.4-storage-services-and-users-practice/).
+Продовжуйте до [LFCS: Практика сховища, служб і користувачів](../module-1.4-storage-services-and-users-practice/).

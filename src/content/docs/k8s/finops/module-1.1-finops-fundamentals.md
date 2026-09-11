@@ -167,7 +167,7 @@ In practice, namespace is usually the first allocation boundary because it is vi
 
 `kubectl top` is still useful to spot current load, but it cannot answer “how much did Service X cost last week?” because it reports usage at a point in time without applying price models, shared-cost rules, or historical aggregation windows. Use allocation reports for that.
 
-The next module, [Module 1.2: FinOps in Practice](./module-1.2-finops-practice/), addresses this gap by comparing OpenCost and Kubecost approaches in deeper scenarios.
+The next module, [Module 1.2: FinOps in Practice](../module-1.2-finops-practice/), addresses this gap by comparing OpenCost and Kubecost approaches in deeper scenarios.
 
 ## Requests, Limits, and Waste
 
@@ -452,4 +452,4 @@ You should also be able to sketch a basic collaboration model for your own organ
 
 ## Next Module
 
-Continue to [Module 1.2: FinOps in Practice](./module-1.2-finops-practice/) to apply these fundamentals to allocation strategy, budgets, rate optimization, workload optimization, and deeper Kubernetes cost-management workflows.
+Continue to [Module 1.2: FinOps in Practice](../module-1.2-finops-practice/) to apply these fundamentals to allocation strategy, budgets, rate optimization, workload optimization, and deeper Kubernetes cost-management workflows.

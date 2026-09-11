@@ -12,13 +12,13 @@ sidebar:
 
 ## Prerequisites
 
-Before starting this module, complete [LFCS Exam Strategy and Workflow](./module-1.1-exam-strategy-and-workflow/) so your command workflow is already intentional under time pressure.
+Before starting this module, complete [LFCS Exam Strategy and Workflow](../module-1.1-exam-strategy-and-workflow/) so your command workflow is already intentional under time pressure.
 
-Before starting this module, complete [LFCS Essential Commands Practice](./module-1.2-essential-commands-practice/) so file search, text processing, archives, links, and redirection are not new during the mock.
+Before starting this module, complete [LFCS Essential Commands Practice](../module-1.2-essential-commands-practice/) so file search, text processing, archives, links, and redirection are not new during the mock.
 
-Before starting this module, complete [LFCS Running Systems and Networking Practice](./module-1.3-running-systems-and-networking-practice/) so you can inspect systemd services, logs, interfaces, routes, DNS, and listening sockets.
+Before starting this module, complete [LFCS Running Systems and Networking Practice](../module-1.3-running-systems-and-networking-practice/) so you can inspect systemd services, logs, interfaces, routes, DNS, and listening sockets.
 
-Before starting this module, complete [LFCS Storage, Services, and Users Practice](./module-1.4-storage-services-and-users-practice/) so mounts, permissions, users, groups, and scheduled jobs feel familiar enough to combine.
+Before starting this module, complete [LFCS Storage, Services, and Users Practice](../module-1.4-storage-services-and-users-practice/) so mounts, permissions, users, groups, and scheduled jobs feel familiar enough to combine.
 
 You should also have a disposable Linux VM, cloud instance, or lab machine where you are allowed to create users, change services, edit mounts, and make mistakes without risking production work.
 

@@ -452,4 +452,4 @@ By the end of the lab, your notes should prove that you can explain the contract
 
 ## Next Module
 
-Continue with [CNPE Observability, Security, and Operations Lab](./module-1.4-observability-security-and-operations-lab/), where the platform contract is judged by its signals, policies, and incident response behavior.
+Continue with [CNPE Observability, Security, and Operations Lab](../module-1.4-observability-security-and-operations-lab/), where the platform contract is judged by its signals, policies, and incident response behavior.

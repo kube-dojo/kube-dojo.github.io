@@ -13,9 +13,9 @@ sidebar:
 ## Prerequisites
 
 Before starting this module, make sure the earlier LFCS practice modules feel comfortable enough that you can navigate files, inspect processes, and troubleshoot networking without stopping this storage and identity workflow.
-- **Required**: [LFCS Exam Strategy and Workflow](./module-1.1-exam-strategy-and-workflow/)
-- **Required**: [LFCS Essential Commands Practice](./module-1.2-essential-commands-practice/)
-- **Required**: [LFCS Running Systems and Networking Practice](./module-1.3-running-systems-and-networking-practice/)
+- **Required**: [LFCS Exam Strategy and Workflow](../module-1.1-exam-strategy-and-workflow/)
+- **Required**: [LFCS Essential Commands Practice](../module-1.2-essential-commands-practice/)
+- **Required**: [LFCS Running Systems and Networking Practice](../module-1.3-running-systems-and-networking-practice/)
 - **Helpful**: [Module 1.4: Users & Permissions](/linux/foundations/system-essentials/module-1.4-users-permissions/)
 - **Helpful**: [Module 8.1: Storage Management](/linux/operations/module-8.1-storage-management/)
 

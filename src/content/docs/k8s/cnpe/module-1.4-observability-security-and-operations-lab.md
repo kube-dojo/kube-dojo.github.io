@@ -448,4 +448,4 @@ kubectl describe deploy/<name> -n <namespace>
 
 ## Next Module
 
-Continue with [CNPE Full Mock Exam](./module-1.5-full-mock-exam/), where GitOps, platform APIs, observability, and security are combined into a timed run.
+Continue with [CNPE Full Mock Exam](../module-1.5-full-mock-exam/), where GitOps, platform APIs, observability, and security are combined into a timed run.

@@ -993,7 +993,7 @@ kubectl get events -n "$WORKLOAD_NAMESPACE" --sort-by=.lastTimestamp | tail -n 2
 
 ## Наступний модуль
 
-Продовжте з [CNPE: Лабораторна робота з API платформи та самообслуговування](./module-1.3-platform-apis-and-self-service-lab/), де керований цикл стає орієнтованим на користувача контрактом платформи.
+Продовжте з [CNPE: Лабораторна робота з API платформи та самообслуговування](../module-1.3-platform-apis-and-self-service-lab/), де керований цикл стає орієнтованим на користувача контрактом платформи.
 
 
 

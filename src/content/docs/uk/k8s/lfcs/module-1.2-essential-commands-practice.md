@@ -18,7 +18,7 @@ calque_review:
 
 ## Передумови
 
-- **Обов'язково**: [Стратегія та робочий процес іспиту LFCS](./module-1.1-exam-strategy-and-workflow/) для моделі розподілу часу
+- **Обов'язково**: [Стратегія та робочий процес іспиту LFCS](../module-1.1-exam-strategy-and-workflow/) для моделі розподілу часу
 - **Обов'язково**: [Модуль 1.3: Ієрархія файлової системи](/linux/foundations/system-essentials/module-1.3-filesystem-hierarchy/) для шляхів, посилань та структури файлів
 - **Корисно**: [Модуль 7.2: Обробка тексту](/linux/operations/shell-scripting/module-7.2-text-processing/) для конвеєрів, фільтрів та пошуку
 
