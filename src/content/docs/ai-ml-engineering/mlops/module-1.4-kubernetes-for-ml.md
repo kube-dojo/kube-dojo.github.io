@@ -575,7 +575,7 @@ k delete namespace ml-k8s-lab
 
 ## Next Module
 
-Next, continue to [Module 1.5: Advanced Kubernetes](./module-1.5-advanced-kubernetes/) to connect these workload primitives to deeper cluster operations, production policies, and advanced deployment patterns.
+Next, continue to [Module 1.5: Advanced Kubernetes](../module-1.5-advanced-kubernetes/) to connect these workload primitives to deeper cluster operations, production policies, and advanced deployment patterns.
 
 ## Sources
 

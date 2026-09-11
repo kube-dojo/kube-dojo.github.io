@@ -1390,7 +1390,7 @@ kubectl rollout status deployment/ml-inference-server --timeout=10s || true
 
 You now have the release-discipline foundation for ML systems: code gates, data gates, model gates, Continuous Training triggers, portable pipeline execution, and cost controls based on measured evidence. The next module moves from validation into runtime orchestration, where a model artifact becomes a Kubernetes workload with rollout, scaling, health, and rollback behavior.
 
-Next: [Kubernetes Fundamentals for ML](./module-1.4-kubernetes-for-ml/) - learn how to package validated models and deploy them resiliently using production-grade orchestration.
+Next: [Kubernetes Fundamentals for ML](../module-1.4-kubernetes-for-ml/) - learn how to package validated models and deploy them resiliently using production-grade orchestration.
 
 ## Sources
 

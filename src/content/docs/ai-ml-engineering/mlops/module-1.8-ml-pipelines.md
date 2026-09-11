@@ -2039,7 +2039,7 @@ Confirm the Dagster exercise succeeded before finishing the module:
 
 ## Next Module
 
-Continue to [Module 1.9: Model Serving](./module-1.9-model-serving/) for deployment patterns—FastAPI and gRPC inference endpoints, canary rollouts, and Kubernetes-native serving controls that consume the artifacts your pipelines produce.
+Continue to [Module 1.9: Model Serving](../module-1.9-model-serving/) for deployment patterns—FastAPI and gRPC inference endpoints, canary rollouts, and Kubernetes-native serving controls that consume the artifacts your pipelines produce.
 
 ## Sources
 
