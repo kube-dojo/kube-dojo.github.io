@@ -527,4 +527,4 @@ Both delete commands should return a deletion message if the namespaces exist. I
 
 ## Next Module
 
-Continue with [CNPA Practice Questions Set 2](./module-1.5-practice-questions-set-2/) to practice comparison traps across reconciliation, platform ownership, delivery APIs, and developer experience metrics.
+Continue with [CNPA Practice Questions Set 2](../module-1.5-practice-questions-set-2/) to practice comparison traps across reconciliation, platform ownership, delivery APIs, and developer experience metrics.

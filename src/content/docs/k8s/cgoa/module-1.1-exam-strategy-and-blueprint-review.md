@@ -553,4 +553,4 @@ EOF
 
 ## Next Module
 
-Continue with [CGOA GitOps Principles Review](./module-1.2-gitops-principles-review/).
+Continue with [CGOA GitOps Principles Review](../module-1.2-gitops-principles-review/).

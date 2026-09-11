@@ -551,4 +551,4 @@ The log should show at least two commits, the manifest should show the debug ima
 
 ## Next Module
 
-Continue with [CGOA Patterns and Tooling Review](./module-1.3-patterns-and-tooling-review/).
+Continue with [CGOA Patterns and Tooling Review](../module-1.3-patterns-and-tooling-review/).

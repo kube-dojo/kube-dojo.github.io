@@ -551,4 +551,4 @@ Success criteria should prove both repair and cleanup, so do not mark the exerci
 
 ## Next Module
 
-Continue to [LFCS Storage, Services & Users Practice](./module-1.4-storage-services-and-users-practice/).
+Continue to [LFCS Storage, Services & Users Practice](../module-1.4-storage-services-and-users-practice/).
