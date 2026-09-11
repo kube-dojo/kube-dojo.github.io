@@ -10,7 +10,7 @@ revision_pending: false
 
 ## Prerequisites
 
-- **Required**: [LFCS Exam Strategy and Workflow](./module-1.1-exam-strategy-and-workflow/) for the pacing model
+- **Required**: [LFCS Exam Strategy and Workflow](../module-1.1-exam-strategy-and-workflow/) for the pacing model
 - **Required**: [Module 1.3: Filesystem Hierarchy](/linux/foundations/system-essentials/module-1.3-filesystem-hierarchy/) for paths, links, and file layout
 - **Helpful**: [Module 7.2: Text Processing](/linux/operations/shell-scripting/module-7.2-text-processing/) for pipes, filters, and search
 

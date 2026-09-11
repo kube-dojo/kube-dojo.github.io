@@ -986,4 +986,4 @@ kubectl get events -n "$WORKLOAD_NAMESPACE" --sort-by=.lastTimestamp | tail -n 2
 
 ## Next Module
 
-Continue with [CNPE Platform APIs and Self-Service Lab](./module-1.3-platform-apis-and-self-service-lab/), where the control loop becomes a user-facing platform contract.
+Continue with [CNPE Platform APIs and Self-Service Lab](../module-1.3-platform-apis-and-self-service-lab/), where the control loop becomes a user-facing platform contract.

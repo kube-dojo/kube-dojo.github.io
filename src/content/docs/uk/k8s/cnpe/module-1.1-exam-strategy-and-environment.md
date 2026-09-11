@@ -524,7 +524,7 @@ Proof: test pod admitted and policy report records audit result.
 
 ## Наступний модуль
 
-Продовжте з [Лабораторією GitOps і доставки CNPE](./module-1.2-gitops-and-delivery-lab/), де абстрактний робочий процес стає хронометрованим практичним сценарієм доставки.
+Продовжте з [Лабораторією GitOps і доставки CNPE](../module-1.2-gitops-and-delivery-lab/), де абстрактний робочий процес стає хронометрованим практичним сценарієм доставки.
 
 
 

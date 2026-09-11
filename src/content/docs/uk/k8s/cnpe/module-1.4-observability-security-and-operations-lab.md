@@ -456,7 +456,7 @@ kubectl describe deploy/<name> -n <namespace>
 
 ## Наступний модуль
 
-Продовжуйте з [CNPE Full Mock Exam](./module-1.5-full-mock-exam/), де GitOps, платформні API, спостережуваність і безпека поєднуються в один пробіг з обмеженням часу.
+Продовжуйте з [CNPE Full Mock Exam](../module-1.5-full-mock-exam/), де GitOps, платформні API, спостережуваність і безпека поєднуються в один пробіг з обмеженням часу.
 
 
 

@@ -516,4 +516,4 @@ Proof: test pod admitted and policy report records audit result.
 
 ## Next Module
 
-Continue with [CNPE GitOps and Delivery Lab](./module-1.2-gitops-and-delivery-lab/), where the abstract workflow becomes a timed, hands-on delivery scenario.
+Continue with [CNPE GitOps and Delivery Lab](../module-1.2-gitops-and-delivery-lab/), where the abstract workflow becomes a timed, hands-on delivery scenario.
