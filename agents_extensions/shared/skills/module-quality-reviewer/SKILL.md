@@ -1,34 +1,29 @@
 ---
 name: module-quality-reviewer
-description: Review KubeDojo modules against the 8-dimension (D1-D8) pedagogical rubric. For ANY agent acting as reviewer (codex, composer-2.5, agy, claude). Use when reviewing, scoring, or checking modules. Triggers on "review module", "check quality", "score module".
-last_calibrated: 2026-05-24
+description: Evaluate KubeDojo curriculum modules against the eight-dimension pedagogical rubric and return evidence-backed scores and required fixes. Use for module quality reviews, not general code review.
 ---
 
 # Module Quality Reviewer Skill
 
-Review KubeDojo modules against the quality rubric at `docs/quality-rubric.md`. **Agent-agnostic** — applies whether you are codex gpt-5.5, composer-2.5, agy (gemini or Claude models), or claude headless.
-
-## Who reviews what (cross-family routing, Decision Card C, 2026-05-24)
-
-```
-Author                                  →  Cross-family reviewer
-codex / deepseek / claude /
-agy / anyone else                       →  composer-2.5 (cursor-agent CLI or cursor IDE)
-composer-2.5                            →  codex (gpt-5.5, danger mode, worktree)
-orchestrator inline edits               →  composer-2.5
-```
-
-Every PR must be reviewed by a different model family than the author per [`docs/review-protocol.md`](../../../docs/review-protocol.md). "Tests passing" is not a substitute ([[feedback_review_policy]]). **The Decision Card C table above + [`STATUS.md`](../../../STATUS.md) "Active policies" supersede the stale concrete pairings in `docs/review-protocol.md`** until that doc is refreshed.
+Review KubeDojo modules against repository-root `docs/quality-rubric.md`. The accountable lead owns reviewer routing and publication under current repository policy.
 
 ## How to Review
 
-1. **Read the module fully** — line-by-line, not skim ([[code-editing-safety §3]]).
-2. **Run the verifier first**: `.venv/bin/python scripts/quality/verify_module.py <path>`. Density gates failing (median_wpp < 28, mean_wpp < 30, short-para > 20%) = immediate NEEDS_CHANGES, no rubric needed yet.
+1. **Read the module fully** — line-by-line, not skim.
+2. **Run the verifier first**: `.venv/bin/python scripts/quality/verify_module.py <path>`. Density gates failing (median_wpp < 28, mean_wpp < 30, short-para > 20%) = immediate NEEDS WORK; report the failing gates and leave rubric scores unassessed rather than inventing them.
 3. **Score against ALL 8 rubric dimensions** (1-5 each).
 4. **Be STRICT** — a 4 means genuinely good, a 5 is exceptional.
-5. **Flag specific issues with line numbers** — vague critique is reviewer-malpractice.
-6. **Verify all external facts**. Burden of proof on keeping: if a citation `supports` the claim → keep; partial/no/fetch-fail/ambiguous → flag for removal ([[feedback_citation_verify_or_remove]]).
-7. **Test runnability** — actually run `bash`/`kubectl`/`yaml` snippets in a sandbox. Composer-2.5 verifier-pass ≠ runnability ([[feedback_composer_2_5_viable_for_t0_content]]).
+5. **Flag specific issues with line numbers**.
+6. **Verify all external facts**. Burden of proof on keeping: if a citation `supports` the claim → keep; partial/no/fetch-fail/ambiguous → flag for removal.
+7. **Test runnability** — actually run `bash`/`kubectl`/`yaml` snippets in a sandbox. A verifier pass does not establish runnability.
+
+Before reporting a finding, verify the path and quote the actual reviewed file
+at the cited line. Check the full file before claiming content is missing from
+a diff. Verify schema, rule identifiers, version semantics, and shell behavior
+against the relevant official documentation or executable check. State when an
+example could not be run; never report an inferred result as observed. Apply
+these checks to every reviewer regardless of model family, and challenge both
+unsupported praise and unsupported criticism.
 
 ## Rubric Dimensions (1-5 each)
 
@@ -57,7 +52,7 @@ Every PR must be reviewed by a different model family than the author per [`docs
 
 Do not penalize a module solely for omitting a story or analogy. When used, verify the incident's source, the hypothetical scenario's explicit label, and the analogy's mapping and limits. A labeled simulation illustrates a concept; it is not evidence that an incident occurred or a learner improved. Engagement scores are editorial judgments, not measured learner outcomes.
 
-> **Reviewer bar ≥ author template.** [[curriculum-writer]]'s minimal template lists 2-3 Did You Know? / 4 quiz questions; this reviewer checklist is the stricter shipping bar. Author for the reviewer bar, not the template floor.
+The author skill and this checklist share the shipping bar; illustrative templates do not lower it.
 
 ## Passing Criteria
 
@@ -115,38 +110,14 @@ Per the repository-root `docs/quality-rubric.md` (D1-D8), a module passes only w
 - Diagrams with separate legends instead of inline labels
 - "Refer to official documentation for details"
 - Sections that could be rearranged in any order without losing coherence
-- Unverified external citations (a hard-flag, not a soft-flag — see [[feedback_citation_verify_or_remove]])
+- Unverified external citations (a hard-flag, not a soft-flag )
 - Unsourced incidents presented as facts or anonymous “authentic” details treated as evidence
-- Personal-life framing (interview/job/role narrative — [[feedback_no_personal_framing]])
-- Listicle dumps without teaching arc ([[feedback_teaching_not_listicles]])
-
-## Common reviewer hallucinations to watch for in YOURSELF
-
-| You are | Watch out for |
-|---|---|
-| codex (gpt-5.5) | Fabricating GitHub Actions / Dependabot schema claims ([[feedback_deepseek_hallucinates_on_gh_schemas]] applies here too). Verify CLI/YAML schema before flagging. |
-| composer-2.5 | Hallucinated file paths in findings (e.g. claimed PR #1487 path that did not exist). Always quote the exact line from the diff. Verifier-pass ≠ runnability — run the bash. |
-| deepseek-v4-pro | Same as codex on schema facts; also rule attribution slippage (SC2236 vs SC2230, semver exact, expansion order). |
-| gemini-flash-class (via agy) | DO NOT use as a code/lab reviewer ([[feedback_never_flash_for_code_review]]). Calibrated 0/2 bugs caught on PR #1229. Use agy `--model gemini-3.1-pro-high` instead (gemini-cli retired). |
-| agy (Claude tier) | 0 hallucinations on code review historically — strong default. Surfaces 100% Claude quota independently of Anthropic chat cap ([[feedback_agy_claude_route_during_throttle]]). |
-| claude headless | Yes-man drift on close reads ([[feedback_no_yes_man]]); be deliberate about flagging weaknesses, not just strengths. |
-
-## Reviewer dispatch protocol (orchestrator perspective)
-
-| Pair | Dispatch |
-|---|---|
-| Review claude-authored | `.venv/bin/python scripts/dispatch_smart.py review --agent cursor --model composer-2.5` (headless cursor-agent CLI; review-class default mode is read-only). OR open in cursor IDE with composer-2.5 selected. |
-| Review composer-2.5-authored | `.venv/bin/python scripts/dispatch_smart.py review --agent codex --mode danger --worktree <pr-slug>` ([[feedback_codex_review_danger_mode]]) |
-| Review codex-authored | Same as claude-authored (composer-2.5 cross-family) OR `dispatch_smart review --agent agy --model gemini-3.1-pro-high` if cursor unavailable. **During Anthropic throttle window, claude headless is OFF rotation** (Decision Card C, `docs/decisions/2026-05-24-reviewer-routing-composer-2-5.md:11`) — prefer codex / agy (Claude tier). Post-throttle, `dispatch_smart review --agent claude` is a documented Gemini-503 fallback ([[feedback_headless_claude_gemini_fallback]]). |
-| Review agy-authored | `.venv/bin/python scripts/dispatch_smart.py review --agent codex` (different family). |
-
-After R1, if NEEDS_CHANGES, dispatch the original author for a fix-pass, then re-run review (R2). On APPROVE/APPROVE_WITH_NITS, merge (orchestrator-driven; cursor does NOT self-merge per session-51 directive).
+- Interview, job, or personal-role narratives unrelated to the module's learning task
+- Listicle dumps without teaching arc
 
 ## References
 
-- [[curriculum-writer]] — what the author was contracted to deliver.
-- [[cross-family-reviewer]] — sibling skill for the cross-family routing protocol.
-- [[dispatch-router]] — agent picking decisions.
-- [`docs/quality-rubric.md`](../../../docs/quality-rubric.md) — full rubric definition.
-- [`docs/pedagogical-framework.md`](../../../docs/pedagogical-framework.md) — research backing the rubric.
-- [`docs/review-protocol.md`](../../../docs/review-protocol.md) — cross-family review contract.
+- [curriculum-writer](../curriculum-writer/SKILL.md) — the author's content contract.
+- Read `docs/quality-rubric.md` from the repository root for scoring definitions.
+- Read `docs/pedagogical-framework.md` from the repository root for research backing the rubric.
+- Read `docs/review-protocol.md` from the repository root for the review contract, subject to current repository policy.

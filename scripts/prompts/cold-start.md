@@ -1,10 +1,14 @@
-# Cold-start ritual — issue-driven agent sessions
+# Cold start — issue-driven and pipeline sessions
 
 Copy-paste sequence for a fresh KubeDojo coding session. Single shell entry point:
 `scripts/cold-start.sh` (also documented in `AGENTS.md`, `CLAUDE.md`, and
 `.claude/skills/cold-start/SKILL.md`).
 
-## Ritual
+Use this workflow for issue-driven work or tasks that need pipeline state.
+For self-contained code or documentation edits, start with repository status
+and the relevant files; no service startup or full handoff is needed.
+
+## Session prompt
 
 ```
 1. Read GitHub issue #N verbatim (parent task).
@@ -15,11 +19,12 @@ Copy-paste sequence for a fresh KubeDojo coding session. Single shell entry poin
    # Optional route discovery:
    bash scripts/cold-start.sh --manifest
 
-3. If claiming the issue:
+3. Check GET /api/pipeline/leases before claiming pipeline work.
+   If issue claiming is authorized:
    gh issue comment N --body "Claiming — worktree .worktrees/<short-name>"
 
 4. Create worktree on main (never work on primary main):
-   git worktree add .worktrees/<short-name> -b <branch> main
+   git worktree add .worktrees/<short-name> -b codex/<short-name> main
 
 5. Work in the worktree only. Do not merge — cross-family review via
    scripts/dispatch.py or scripts/ab; organizer merges.
@@ -27,6 +32,13 @@ Copy-paste sequence for a fresh KubeDojo coding session. Single shell entry poin
 6. Read the full handoff file ONLY if briefing/orient leaves a narrative gap.
    Path comes from --- kubedojo:session --- (API) or --- kubedojo:handoff-path --- (fallback).
 ```
+
+Complete the assigned acceptance criteria in the worktree, run the applicable
+checks from AGENTS.md, and fix failures introduced by the change. Continue
+through authorized validation and delivery rather than stopping at the first
+implementation. For bridge assignments, return the verified PR and its design
+choice; for local edits, return changed paths and verification. Report a precise
+blocker when completion is impossible. Preserve the organizer's merge boundary.
 
 ## What the script emits
 
@@ -59,7 +71,8 @@ After cold-start, use the local API (see `scripts/agent_onboarding.md`):
 - Fix module: `GET /api/module/{key}/state`
 - Re-review: `GET /api/reviews?module={key}`
 
-## Skip cold-start
+## Bounded dispatches
 
-Content dispatches that must not invoke skills or shell scripts should say so
-explicitly in the brief (see session-50 dispatch preamble pattern).
+Honor the supplied tool and output contract. A content-only dispatch can supply
+its module state and source packet directly and prohibit shell/service startup.
+Do not expand such a packet into a separate orchestration session.
