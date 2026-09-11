@@ -7,7 +7,7 @@ sidebar:
 ---
 > **AI/ML Engineering Track** | Complexity: `[MEDIUM]` | Time: 2-3 hours
 >
-> **Prerequisites**: [Module 1.1: Prerequisites & Environment Setup](./module-1.1-prerequisites-environment-setup/), [Module 1.2: Home AI Workstation Fundamentals](./module-1.2-home-ai-workstation-fundamentals/), basic command-line navigation, and comfort editing small text files.
+> **Prerequisites**: [Module 1.1: Prerequisites & Environment Setup](../module-1.1-prerequisites-environment-setup/), [Module 1.2: Home AI Workstation Fundamentals](../module-1.2-home-ai-workstation-fundamentals/), basic command-line navigation, and comfort editing small text files.
 
 ## Learning Outcomes
 
@@ -724,9 +724,9 @@ Success criteria:
 
 ## Next Module
 
-- [Notebooks, Scripts, and Project Layouts](./module-1.4-notebooks-scripts-project-layouts/)
+- [Notebooks, Scripts, and Project Layouts](../module-1.4-notebooks-scripts-project-layouts/)
 - [PyTorch Fundamentals](../deep-learning/module-1.2-pytorch-fundamentals/)
-- [Home AI Workstation Fundamentals](./module-1.2-home-ai-workstation-fundamentals/)
+- [Home AI Workstation Fundamentals](../module-1.2-home-ai-workstation-fundamentals/)
 
 ## Sources
 
