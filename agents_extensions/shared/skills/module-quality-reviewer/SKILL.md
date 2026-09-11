@@ -17,6 +17,14 @@ Review KubeDojo modules against repository-root `docs/quality-rubric.md`. The ac
 6. **Verify all external facts**. Burden of proof on keeping: if a citation `supports` the claim → keep; partial/no/fetch-fail/ambiguous → flag for removal.
 7. **Test runnability** — actually run `bash`/`kubectl`/`yaml` snippets in a sandbox. A verifier pass does not establish runnability.
 
+Before reporting a finding, verify the path and quote the actual reviewed file
+at the cited line. Check the full file before claiming content is missing from
+a diff. Verify schema, rule identifiers, version semantics, and shell behavior
+against the relevant official documentation or executable check. State when an
+example could not be run; never report an inferred result as observed. Apply
+these checks to every reviewer regardless of model family, and challenge both
+unsupported praise and unsupported criticism.
+
 ## Rubric Dimensions (1-5 each)
 
 | Dimension | What to Check |

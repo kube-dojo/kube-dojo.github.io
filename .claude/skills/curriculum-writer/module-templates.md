@@ -56,7 +56,14 @@ Current tools (will evolve over time):
 
 ## Module Template (Certification Track)
 
-```markdown
+````markdown
+---
+title: "Module X.Y: [Topic Name]"
+sidebar:
+  order: 1 # Replace with the module's navigation order.
+slug: "module-X.Y-topic-name" # Set the published path; preserve filename dots.
+---
+
 # Module X.Y: [Topic Name]
 
 > **Complexity**: `[QUICK]` | `[MEDIUM]` | `[COMPLEX]`
@@ -89,6 +96,8 @@ Current tools (will evolve over time):
 
 [Content with diagrams/examples]
 
+> **Predict:** [Ask the learner to predict an outcome before revealing the explanation.]
+
 > **Did You Know?**
 >
 > [Interesting fact]
@@ -99,6 +108,8 @@ Current tools (will evolve over time):
 
 [Hands-on content]
 
+> **Try it:** [Give a short task here in the body, with a way to check the result.]
+
 > **Optional documented case or labeled scenario**
 >
 > [Use a cited real incident, or label `Hypothetical scenario:`/`Simulation:` and state what is simulated.]
@@ -107,13 +118,16 @@ Current tools (will evolve over time):
 
 ## Did You Know?
 
-- **[Fact 1]**: [Detail]
-- **[Fact 2]**: [Detail]
-- **[Fact 3]**: [Detail]
+- **[Fact 1]**: [Verified detail with real numbers and supporting source]
+- **[Fact 2]**: [Verified detail with real numbers and supporting source]
+- **[Fact 3]**: [Verified detail with real numbers and supporting source]
+- **[Fact 4]**: [Verified detail with real numbers and supporting source]
 
 ---
 
 ## Common Mistakes
+
+[Complete this table with 6–8 distinct mistakes and concrete fixes.]
 
 | Mistake | Problem | Solution |
 |---------|---------|----------|
@@ -152,10 +166,18 @@ Current tools (will evolve over time):
 
 ---
 
+## Sources
+
+[Replace all three placeholders with verified primary/vendor documentation citations; inline citations elsewhere do not replace this section.]
+
+- [Primary/vendor source 1 title](PRIMARY_VENDOR_URL_1)
+- [Primary/vendor source 2 title](PRIMARY_VENDOR_URL_2)
+- [Primary/vendor source 3 title](PRIMARY_VENDOR_URL_3)
+
 ## Next Module
 
 [Link to next module]
-```
+````
 
 ---
 
@@ -163,7 +185,14 @@ Current tools (will evolve over time):
 
 Platform modules include additional sections:
 
-```markdown
+````markdown
+---
+title: "Module X.Y: [Topic Name]"
+sidebar:
+  order: 1 # Replace with the module's navigation order.
+slug: "module-X.Y-topic-name" # Set the published path; preserve filename dots.
+---
+
 # Module X.Y: [Topic Name]
 
 > **Complexity**: `[QUICK]` | `[MEDIUM]` | `[COMPLEX]`
@@ -198,9 +227,13 @@ Platform modules include additional sections:
 
 [Theory explanation with diagrams]
 
+> **Predict:** [Ask the learner to predict a tradeoff or outcome, then explain why.]
+
 ### [Concept 2]
 
 [More theory]
+
+> **Try it:** [Ask the learner to apply the concept here, with a way to check the result.]
 
 ---
 
@@ -238,12 +271,16 @@ What to avoid:
 
 ## Did You Know?
 
-- **[Fact 1]**: [Detail]
-- **[Fact 2]**: [Detail]
+- **[Fact 1]**: [Verified detail with real numbers and supporting source]
+- **[Fact 2]**: [Verified detail with real numbers and supporting source]
+- **[Fact 3]**: [Verified detail with real numbers and supporting source]
+- **[Fact 4]**: [Verified detail with real numbers and supporting source]
 
 ---
 
 ## Common Mistakes
+
+[Complete this table with 6–8 distinct mistakes and concrete fixes.]
 
 | Mistake | Problem | Solution |
 |---------|---------|----------|
@@ -273,9 +310,17 @@ Books, talks, and papers for deeper understanding:
 
 ---
 
+## Sources
+
+[Replace all three placeholders with verified primary/vendor documentation citations; inline citations elsewhere do not replace this section.]
+
+- [Primary/vendor source 1 title](PRIMARY_VENDOR_URL_1)
+- [Primary/vendor source 2 title](PRIMARY_VENDOR_URL_2)
+- [Primary/vendor source 3 title](PRIMARY_VENDOR_URL_3)
+
 ## Next Module
 
 [Link to next module]
-```
+````
 
 ---

@@ -150,7 +150,7 @@ summary, verification, and diff size. Do not include generated artifacts.
 Before merging or closing an issue, obtain an adversarial review from a
 *different model family* and post it as a PR/issue comment when posting is
 authorized. Codex reviewing Codex is not that review, and passing tests do not
-replace it. Route the required Gemini review before merge; keep the lead
+replace it. Route the required cross-family review before merge; keep the lead
 accountable. Resolve material findings before proceeding. Use a comment rather
 than `gh pr review --approve` when author and reviewer share a GitHub identity.
 
