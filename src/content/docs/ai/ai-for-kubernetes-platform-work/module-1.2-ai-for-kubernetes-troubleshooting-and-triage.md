@@ -501,4 +501,4 @@ A good note might say that new Pods are Pending, scheduler events report insuffi
 
 ## Next Module
 
-Continue to [AI for Platform and SRE Workflows](./module-1.3-ai-for-platform-and-sre-workflows/) to turn triage habits into repeatable platform workflows.
+Continue to [AI for Platform and SRE Workflows](../module-1.3-ai-for-platform-and-sre-workflows/) to turn triage habits into repeatable platform workflows.

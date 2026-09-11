@@ -1460,4 +1460,4 @@ After cleanup, `kubectl api-resources | grep backuppolicies` should no longer sh
 
 ## Next Module
 
-[Module 1.3: Building Controllers with client-go](./module-1.3-controllers-client-go/) - Write a complete Kubernetes controller from scratch using the API design patterns you practiced in Modules 1.1 and 1.2.
+[Module 1.3: Building Controllers with client-go](../module-1.3-controllers-client-go/) - Write a complete Kubernetes controller from scratch using the API design patterns you practiced in Modules 1.1 and 1.2.

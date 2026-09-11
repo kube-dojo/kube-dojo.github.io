@@ -824,4 +824,4 @@ A strong solution starts with a small overview dashboard that links to the servi
 
 ## Next Module
 
-Continue to [Module 1.4: Loki](./module-1.4-loki/) to build the log aggregation layer that makes Grafana investigations richer than metrics alone.
+Continue to [Module 1.4: Loki](../module-1.4-loki/) to build the log aggregation layer that makes Grafana investigations richer than metrics alone.

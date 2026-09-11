@@ -515,4 +515,4 @@ The exercise is complete when the final packet proves that AI stayed in a suppor
 
 ## Next Module
 
-Continue to [Trust Boundaries for Infrastructure AI Use](./module-1.4-trust-boundaries-for-infrastructure-ai-use/), where you will turn this workflow boundary into a concrete trust model for infrastructure-facing AI tools.
+Continue to [Trust Boundaries for Infrastructure AI Use](../module-1.4-trust-boundaries-for-infrastructure-ai-use/), where you will turn this workflow boundary into a concrete trust model for infrastructure-facing AI tools.

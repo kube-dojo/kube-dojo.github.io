@@ -1027,7 +1027,7 @@ Success criteria:
 
 ## Next Module
 
-- [Multi-GPU and Home-Lab Fine-Tuning](./module-1.11-multi-gpu-home-lab-fine-tuning/)
+- [Multi-GPU and Home-Lab Fine-Tuning](../module-1.11-multi-gpu-home-lab-fine-tuning/)
 
 ## Sources
 

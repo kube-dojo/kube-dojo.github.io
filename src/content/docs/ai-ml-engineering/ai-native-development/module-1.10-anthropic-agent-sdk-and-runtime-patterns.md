@@ -12,7 +12,7 @@ sidebar:
 
 **Prerequisites**: Claude Code & CLI Deep Dive, CLI AI Coding Agents, Building with AI Coding Assistants, and Model Context Protocol for Agents
 
-> **Go deeper:** For the vendor-neutral tool landscape introduced in this sub-track, revisit [AI Coding Tools Landscape](./module-1.1-ai-coding-tools-landscape/). For retrieval boundaries, dynamic context orchestration, and production harness operation around agent runtimes, see [Retrieval, Tools, and Memory Boundaries](/ai/ai-engineering-foundations/module-2.3-retrieval-tools-and-memory-boundaries/), [Dynamic Context Orchestration](/ai/ai-engineering-foundations/module-2.4-dynamic-context-orchestration/), and [Operating the Harness](/ai/ai-engineering-foundations/module-3.3-operating-the-harness/).
+> **Go deeper:** For the vendor-neutral tool landscape introduced in this sub-track, revisit [AI Coding Tools Landscape](../module-1.1-ai-coding-tools-landscape/). For retrieval boundaries, dynamic context orchestration, and production harness operation around agent runtimes, see [Retrieval, Tools, and Memory Boundaries](/ai/ai-engineering-foundations/module-2.3-retrieval-tools-and-memory-boundaries/), [Dynamic Context Orchestration](/ai/ai-engineering-foundations/module-2.4-dynamic-context-orchestration/), and [Operating the Harness](/ai/ai-engineering-foundations/module-3.3-operating-the-harness/).
 
 ---
 
@@ -65,7 +65,7 @@ The Claude Agent SDK is Anthropic's library form of the agent harness behind Cla
 
 That packaging is valuable precisely because it makes the runtime visible. A hand-rolled loop can absolutely be correct, but it often spreads policy across prompt text, helper functions, API wrappers, and ad hoc logs. Once the loop becomes hard to inspect, it becomes hard to answer the operational questions that matter: which tool was called, why was it allowed, what evidence came back, which state was preserved, and what stopped the run from continuing forever.
 
-The neutral comparison from [Module 1.1](./module-1.1-ai-coding-tools-landscape/) still applies here. Claude Agent SDK is the concrete worked example, not the universal answer. A Cursor rule, a Codex harness, a LangGraph node, a CrewAI worker, or a custom service can all express similar runtime concepts. The implementation details differ, but the boundary questions do not.
+The neutral comparison from [Module 1.1](../module-1.1-ai-coding-tools-landscape/) still applies here. Claude Agent SDK is the concrete worked example, not the universal answer. A Cursor rule, a Codex harness, a LangGraph node, a CrewAI worker, or a custom service can all express similar runtime concepts. The implementation details differ, but the boundary questions do not.
 
 A useful mental model is that the SDK is not the intelligence layer alone. It is a runtime layer around the intelligence. The model still reasons, but the runtime decides what kind of world the model is allowed to touch, how that world is represented, and what evidence is required before work can be called complete.
 
