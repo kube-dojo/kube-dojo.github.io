@@ -485,4 +485,4 @@ output_format:
 
 ## Наступний модуль
 
-Перейдіть до [Як верифікувати вивід ШІ](./module-1.4-how-to-verify-ai-output/).
+Перейдіть до [Як верифікувати вивід ШІ](../module-1.4-how-to-verify-ai-output/).

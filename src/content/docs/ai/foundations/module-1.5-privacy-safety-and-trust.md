@@ -338,4 +338,4 @@ The public documentation summary should usually be low trust if it uses public s
 
 ## Next Module
 
-Continue to [Using AI for Learning, Writing, Research, and Coding](./module-1.6-using-ai-for-learning-writing-research-and-coding/) to practice choosing the right AI workflow for study, writing, research, and coding tasks.
+Continue to [Using AI for Learning, Writing, Research, and Coding](../module-1.6-using-ai-for-learning-writing-research-and-coding/) to practice choosing the right AI workflow for study, writing, research, and coding tasks.

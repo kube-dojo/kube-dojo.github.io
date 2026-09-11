@@ -506,4 +506,4 @@ Use this success checklist to confirm that the exercise practiced proportional v
 
 ## Next Module
 
-Continue to [Privacy, Safety, and Trust](./module-1.5-privacy-safety-and-trust/) to learn how verification connects to data handling, safety boundaries, and responsible AI use.
+Continue to [Privacy, Safety, and Trust](../module-1.5-privacy-safety-and-trust/) to learn how verification connects to data handling, safety boundaries, and responsible AI use.

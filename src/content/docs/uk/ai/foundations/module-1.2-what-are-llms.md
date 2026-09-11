@@ -901,4 +901,4 @@ flowchart LR
 
 ## Наступний модуль
 
-Перейдіть до [Основи промптування](./module-1.3-prompting-basics/).
+Перейдіть до [Основи промптування](../module-1.3-prompting-basics/).
