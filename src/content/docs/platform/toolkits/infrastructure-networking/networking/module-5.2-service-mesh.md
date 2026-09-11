@@ -232,9 +232,9 @@ East-west HTTPRoute attachment to Services is the hallmark GAMMA pattern; ingres
 
 ---
 
-## Landscape snapshot — as of 2026-06. This changes fast; verify against vendor docs before relying on specifics.
+## Landscape snapshot — as of 2026-09. This changes fast; verify against vendor docs before relying on specifics.
 
-Istio latest supported release line in June 2026 includes **1.30.1** (with active 1.29.x and 1.28.x patch streams). Ambient mode reached GA in **Istio 1.24** (late 2024) with stable ztunnel, waypoint proxies, and policy APIs; 2026 releases added ambient multi-cluster features and Gateway API inference extensions per Istio release notes. Linkerd publishes **stable 2.19** open-source docs (Buoyant Enterprise for Linkerd tracks enterprise-2.19.x with semantic versioning) plus faster-moving **edge** builds such as edge-26.6.x for early features. Cilium service mesh continues on the stable documentation track tied to Cilium **1.16+** feature releases—confirm your CNI chart version before enabling mesh APIs.
+Istio latest supported release line in September 2026 is **1.31.0** (with the 1.30.x patch stream at **1.30.4**; 1.28 reached EOL 2026-07-01 and 1.29 support ends 2026-10-12). Ambient mode reached GA in **Istio 1.24** (late 2024) with stable ztunnel, waypoint proxies, and policy APIs; 2026 releases added ambient multi-cluster features and Gateway API inference extensions per Istio release notes. Linkerd publishes **stable 2.20** open-source docs (Buoyant Enterprise for Linkerd tracks enterprise-2.20.x with semantic versioning) plus faster-moving **edge** builds such as edge-26.9.1 for early features. Cilium service mesh continues on the current Cilium stable / docs default track (the 1.20.x line)—confirm your CNI chart version before enabling mesh APIs.
 
 ### Service Mesh Rosetta
 
@@ -539,8 +539,8 @@ VirtualService defines routing logic—matches, weights, faults, retries, and ti
 Deploy Istio on a learning cluster, enable strict mutual TLS for the default namespace, shift reviews traffic with a canary VirtualService, and confirm edges in Kiali or equivalent tooling.
 
 ```bash
-curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.30.1 sh -
-cd istio-1.30.1
+curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.31.0 sh -
+cd istio-1.31.0
 export PATH=$PWD/bin:$PATH
 istioctl install --set profile=demo -y
 kubectl label namespace default istio-injection=enabled --overwrite
@@ -607,8 +607,8 @@ When you finish, remove Bookinfo and the demo control plane with `kubectl delete
 - [Istio Documentation](https://istio.io/latest/docs/)
 - [Istio Ambient Mode Overview](https://istio.io/latest/docs/ops/ambient/)
 - [Announcing Istio 1.24 — Ambient GA](https://istio.io/latest/news/releases/1.24.x/announcing-1.24/)
-- [Announcing Istio 1.30.1](https://istio.io/latest/news/releases/1.30.x/announcing-1.30.1/)
-- [Linkerd Overview](https://linkerd.io/2.19/overview/)
+- [Announcing Istio 1.31.0](https://istio.io/latest/news/releases/1.31.x/announcing-1.31/)
+- [Linkerd Overview](https://linkerd.io/2.20/overview/)
 - [Linkerd Releases](https://github.com/linkerd/linkerd2/releases)
 - [Cilium Service Mesh](https://docs.cilium.io/en/stable/network/servicemesh/)
 - [CNCF Istio Project](https://www.cncf.io/projects/istio/)
