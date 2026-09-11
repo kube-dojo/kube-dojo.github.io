@@ -895,4 +895,4 @@ EOF
 
 ## Next Module
 
-Continue to [Running Open Models on Linux Boxes](./module-1.5-running-open-models-on-linux-boxes/).
+Continue to [Running Open Models on Linux Boxes](../module-1.5-running-open-models-on-linux-boxes/).

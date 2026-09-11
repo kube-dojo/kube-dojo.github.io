@@ -338,4 +338,4 @@ Success criteria:
 
 ## Next Module
 
-Continue to [MLX on Apple Silicon](./module-1.4-mlx-on-apple-silicon/) to see how unified memory and Apple-focused runtimes change local inference decisions.
+Continue to [MLX on Apple Silicon](../module-1.4-mlx-on-apple-silicon/) to see how unified memory and Apple-focused runtimes change local inference decisions.

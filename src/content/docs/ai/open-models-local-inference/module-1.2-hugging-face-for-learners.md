@@ -347,4 +347,4 @@ Success criteria:
 
 ## Next Module
 
-Continue to [Quantization and Model Formats](./module-1.3-quantization-and-model-formats/) to learn how file formats, precision, and runtime constraints shape local inference choices.
+Continue to [Quantization and Model Formats](../module-1.3-quantization-and-model-formats/) to learn how file formats, precision, and runtime constraints shape local inference choices.

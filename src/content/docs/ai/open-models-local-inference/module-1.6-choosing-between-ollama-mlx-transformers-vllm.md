@@ -449,4 +449,4 @@ The Windows engineers should use Ollama for local development because it gives t
 
 ## Next Module
 
-Continue to [Gemma 4 and the Open Model Landscape](./module-1.7-gemma-4-and-the-open-model-landscape/) to compare modern open model families after you have a runtime-selection framework.
+Continue to [Gemma 4 and the Open Model Landscape](../module-1.7-gemma-4-and-the-open-model-landscape/) to compare modern open model families after you have a runtime-selection framework.

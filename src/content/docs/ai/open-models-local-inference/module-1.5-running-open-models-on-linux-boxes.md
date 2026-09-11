@@ -428,4 +428,4 @@ The strongest answers are often conservative. A box can be excellent for learnin
 
 ## Next Module
 
-Continue to [Choosing Between Ollama, MLX, Transformers, and vLLM](./module-1.6-choosing-between-ollama-mlx-transformers-vllm/) to turn your host profile into a runtime selection.
+Continue to [Choosing Between Ollama, MLX, Transformers, and vLLM](../module-1.6-choosing-between-ollama-mlx-transformers-vllm/) to turn your host profile into a runtime selection.

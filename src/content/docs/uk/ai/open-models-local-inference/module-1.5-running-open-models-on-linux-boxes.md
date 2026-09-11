@@ -433,4 +433,4 @@ CPU-орієнтований слухач може обрати локальне
 
 ## Наступний модуль
 
-Продовжуйте до [Вибір між Ollama, MLX, Transformers та vLLM](./module-1.6-choosing-between-ollama-mlx-transformers-vllm/), щоб перетворити профіль вашого хосту на вибір середовища виконання.
+Продовжуйте до [Вибір між Ollama, MLX, Transformers та vLLM](../module-1.6-choosing-between-ollama-mlx-transformers-vllm/), щоб перетворити профіль вашого хосту на вибір середовища виконання.

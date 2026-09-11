@@ -302,4 +302,4 @@ Your recommendation should be specific enough for another engineer to reproduce 
 
 ## Next Module
 
-Continue to [Hugging Face for Learners](./module-1.2-hugging-face-for-learners/) to practice navigating the hub interface, repository files, and account workflows in more detail.
+Continue to [Hugging Face for Learners](../module-1.2-hugging-face-for-learners/) to practice navigating the hub interface, repository files, and account workflows in more detail.

@@ -488,4 +488,4 @@ Use the following success criteria to decide whether your workflow is ready for 
 
 ## Next Module
 
-Continue to [Human-in-the-Loop Habits](./module-1.4-human-in-the-loop-habits/) to practice the review habits that keep AI-assisted work accountable after a workflow is designed.
+Continue to [Human-in-the-Loop Habits](../module-1.4-human-in-the-loop-habits/) to practice the review habits that keep AI-assisted work accountable after a workflow is designed.
