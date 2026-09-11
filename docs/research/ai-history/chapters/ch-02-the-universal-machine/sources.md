@@ -6,6 +6,8 @@
 - **Yellow**: claim has one strong source, page anchor pending verification, or unresolved attribution nuance.
 - **Red**: claim should not be drafted yet.
 
+[Claim-level correction ledger (2026-09-11)](claim-corrections-2026-09-11.md) rechecks the Gödel/ω-consistency qualification, physical-machine scope, and modern-epilogue bounds for #2329. Green labels below remain pointers to verify, not acceptance of that packet.
+
 ## Primary Sources
 
 | Source | Use | Verification |

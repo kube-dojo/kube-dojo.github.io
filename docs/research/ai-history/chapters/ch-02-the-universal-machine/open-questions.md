@@ -52,7 +52,7 @@ Surfaced from `brief.md` *Conflict Notes* and the Yellow/Red entries in `sources
 - **Question:** Is the chapter's claim that "no general-purpose programmable digital computer existed in 1936" defensible without footnoting Konrad Zuse's Z1 (under construction in Berlin from 1936) or the Bell Labs Model K (Stibitz, 1937)?
 - **Why it matters:** The chapter's "infrastructure was zero" framing is dramatic but requires care. Zuse's Z1 was programmable (via punched tape) and in development through 1936; the Z3 (1941) is widely credited as the first programmable digital computer. Stibitz's Model K (1937) is later than Turing 1936 but close.
 - **Evidence needed:** A short footnote citing Zuse and Stibitz, with dates that put them squarely *after* Turing's May 1936 manuscript receipt. Standard secondary sources have these.
-- **Status:** Yellow. Non-blocking — the chapter can footnote-handle this honestly without reopening the structural framing.
+- **Status:** Yellow, narrowed 2026-09-11. [claim-corrections-2026-09-11.md](claim-corrections-2026-09-11.md) P1 scopes “no physical U” separately from Z1 (built 1936–38; punched-tape mechanical; no attested U implementation). Stibitz Model K and any 1936 device meeting U remain unchecked. Do not restore an unqualified “no physical machine.”
 
 ### Q9. The "stored program" architecture lineage
 - **Question:** How explicit should the chapter be about the distance between Turing's §6 universal computing machine and the post-1945 stored-program machines (EDVAC, Manchester Baby, EDSAC)?
