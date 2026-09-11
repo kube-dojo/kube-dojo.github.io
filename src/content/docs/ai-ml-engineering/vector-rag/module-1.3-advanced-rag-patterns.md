@@ -677,7 +677,7 @@ Extend the lab by logging intermediate rankings to stdout: print the BM25 orderi
 
 ## Next Module
 
-Continue to [Module 1.4: RAG Evaluation & Optimization](./module-1.4-rag-evaluation-optimization) to measure retrieval quality, tune chunking and fusion weights with labeled data, and build repeatable evaluation loops for the pipelines you assembled here.
+Continue to [Module 1.4: RAG Evaluation & Optimization](../module-1.4-rag-evaluation-optimization) to measure retrieval quality, tune chunking and fusion weights with labeled data, and build repeatable evaluation loops for the pipelines you assembled here.
 
 ## Sources
 

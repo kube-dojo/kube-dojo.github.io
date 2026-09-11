@@ -683,4 +683,4 @@ If you complete the exercise well, you should have more than working code. You s
 
 ## Next Module
 
-Continue to [Module 1.10: Anthropic Agent SDK and Runtime Patterns](./module-1.10-anthropic-agent-sdk-and-runtime-patterns/).
+Continue to [Module 1.10: Anthropic Agent SDK and Runtime Patterns](../module-1.10-anthropic-agent-sdk-and-runtime-patterns/).

@@ -1293,7 +1293,7 @@ Success criteria:
 
 ## Next Module
 
-**Next Module**: [Module 1.2: Vision AI and Multimodal LLMs](./module-1.2-vision-ai)
+**Next Module**: [Module 1.2: Vision AI and Multimodal LLMs](../module-1.2-vision-ai)
 
 Now that your AI can hear and speak, the next module adds visual perception. You will compare vision models, image embeddings, multimodal prompts, and real-time video pipelines so your agents can reason across more than one sensory channel.
 
