@@ -69,7 +69,8 @@ title: "\u0413\u043b\u043e\u0441\u0430\u0440\u0456\u0439 KubeDojo / KubeDojo Glo
 | metrics | метрики |
 | alerting | оповіщення |
 | incident | інцидент |
-| SLO | SLO (угода про рівень обслуговування) |
+| SLO | SLO (ціль рівня обслуговування, вимірюється через SLI) |
+| SLA | SLA (угода про рівень обслуговування з наслідками за порушення) |
 | error budget | бюджет помилок |
 | GitOps | GitOps |
 | CI/CD | CI/CD |

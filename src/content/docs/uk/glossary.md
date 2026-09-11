@@ -69,7 +69,8 @@ title: "Глосарій KubeDojo / KubeDojo Glossary"
 | metrics | метрики |
 | alerting | оповіщення |
 | incident | інцидент |
-| SLO | SLO (угода про рівень обслуговування) |
+| SLO | SLO (ціль рівня обслуговування, вимірюється через SLI) |
+| SLA | SLA (угода про рівень обслуговування з наслідками за порушення) |
 | error budget | бюджет помилок |
 | GitOps | GitOps |
 | CI/CD | CI/CD |
