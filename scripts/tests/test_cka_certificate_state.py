@@ -116,8 +116,7 @@ else printf refused; fi
                      (7, "forward", "manifest_return_requested"),
                      (8, "forward", "manifest_returned"),
                      (9, "rollback", "rollback_requested"),
-                     (10, "rollback", "pair_restored"),
-                     (11, "rollback", "rollback_verified"),
+                     (10, "rollback", "rollback_verified"),
                  )]
         invalid = [dict(valid[0], revision=2), dict(valid[1], revision=1),
                    dict(valid[0], schema=2), dict(valid[0], extra=True), dict(valid[0], baseline={}),

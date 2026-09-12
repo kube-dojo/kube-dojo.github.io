@@ -22,12 +22,21 @@ cka_cert_state_backup_verify(){ return 0; }
 jq(){ if [[ ${!#} == /var/lib/cka-certificate-transaction/state.json ]]; then command jq "${@:1:$#-1}" "$S"; else command jq "$@"; fi; }
 mv(){ if [[ $1 == -T && $2 == -- ]]; then d=$4; [[ $d == /var/lib/cka-certificate-transaction/state.json ]]&&d=$S; command mv -- "$3" "$d"; else command mv "$@"; fi; }
 sync(){ return 0; }; mktemp(){ command mktemp "$t/state.XXXXXXXX"; }
+cka_cert_obs_running_ids(){ [[ $# == 2 ]]||return 1; printf '[]\n'; }
+cka_cert_renew_cert_fingerprint(){ printf '%s\n' "$(printf a%.0s {1..64})"; }
 case $m in
 begin) cka_cert_rollback_begin id||exit 1
   jq -e '.recovery.direction=="rollback" and .recovery.stage=="rollback_requested"' <"$S" >/dev/null||exit 2
   cka_cert_rollback_phase id rollback_requested consumer_stop_requested||exit 3
   jq -e '.recovery.stage=="consumer_stop_requested"' <"$S" >/dev/null||exit 4 ;;
 refuse) if cka_cert_rollback_begin id; then exit 1; fi ;;
+resume)
+  cka_cert_obs_running_ids(){ [[ $# == 2 ]]||return 1; printf '[]\n'; }
+  cka_cert_renew_cert_fingerprint(){ printf '%s\n' "$(printf a%.0s {1..64})"; }
+  cka_cert_state_file(){ return 0; }
+  cmp(){ return 0; }  # live already matches backup — resume completes without copy
+  cka_cert_rollback_restore_pair id /bin/crictl unix:///run/x.sock||exit 1
+  jq -e '.recovery.stage=="pair_restored"' <"$S" >/dev/null||exit 2 ;;
 *) exit 9 ;;
 esac
 '''
@@ -55,3 +64,7 @@ class TestCertificateRollback(unittest.TestCase):
 
     def test_begin_refuses_wrong_stage(self):
         self.assertEqual(self.run_mode("refuse", 2, "forward", "backup_verified").returncode, 0)
+
+    def test_restore_pair_resumes_pair_restore_requested(self):
+        result = self.run_mode("resume", 12, "rollback", "pair_restore_requested")
+        self.assertEqual(result.returncode, 0, result.stderr)
