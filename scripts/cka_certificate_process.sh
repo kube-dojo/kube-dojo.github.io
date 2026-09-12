@@ -807,3 +807,91 @@ cka_cert_runner_entry() {
   if "$@"; then result=0; else result=$?; fi
   return "$result"
 }
+
+# Dedicated runner bootstrap, invoked only by the supervisor launch function.
+cka_cert_runner_body() {
+  local deadline identity operation supervisor argv binding runner child child_start result evidence payload actual_argv
+  [[ $# -ge 6 && ${BASH_VERSINFO[0]} == 5 && ${BASH_VERSINFO[1]} == 2 ]] || return 1
+  deadline=$1; identity=$2; operation=$3; supervisor=$4; argv=$5; shift 5
+  local -a command=("$@")
+  set +o posix; set +m
+  CKA_CERT_WAIT_GENERATION=0
+  trap 'CKA_CERT_WAIT_GENERATION=$((CKA_CERT_WAIT_GENERATION + 1))' HUP INT QUIT TERM
+  cka_cert_capture "$deadline" utility jq -cn --args '$ARGS.positional' -- "${command[@]}" || return $?
+  actual_argv=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -ce --argjson actual "$actual_argv" \
+    'select(.==$actual)' <<< "$argv" || return $?
+  cka_cert_process_stat "$BASHPID" || return 1
+  cka_cert_capture "$deadline" utility jq -cn --argjson pid "$BASHPID" --arg start "$CKA_CERT_PROC_START" \
+    --argjson supervisor "$supervisor" --argjson argv "$argv" \
+    '{supervisor:$supervisor,runner:{pid:$pid,start_time:$start},argv:$argv}' || return $?
+  binding=$CKA_CERT_CAPTURED
+  cka_cert_runner_record "$deadline" "$identity" "$operation" "$binding" ready null || return $?
+  cka_cert_runner_write "$deadline" "$identity" "$operation" "$binding" ready "$CKA_CERT_CAPTURED" || return $?
+  while [[ ! -e /var/lib/cka-certificate-transaction/runner-admission.json &&
+           ! -L /var/lib/cka-certificate-transaction/runner-admission.json ]]; do
+    (( CKA_CERT_WAIT_GENERATION == 0 )) || return 1
+    cka_cert_run_read_helper "$deadline" cka_cert_runner_live "$binding" null || return $?
+  done
+  until cka_cert_control_open "$deadline"; do
+    (( CKA_CERT_WAIT_GENERATION == 0 )) || return 1
+    cka_cert_deadline_budget "$deadline" || return $?
+    cka_cert_run_read_helper "$deadline" cka_cert_runner_live "$binding" null || return $?
+  done
+  # Visibility is not durability. Reconcile immutable admission under fresh FD8.
+  if ! cka_cert_run_read_helper "$deadline" cka_cert_runner_read "$identity" "$operation" "$binding" admission >/dev/null ||
+     ! cka_cert_run_utility "$deadline" -- sync -f /var/lib/cka-certificate-transaction/runner-admission.json ||
+     ! cka_cert_run_utility "$deadline" -- sync -f /var/lib/cka-certificate-transaction ||
+     ! cka_cert_run_read_helper "$deadline" cka_cert_runner_read "$identity" "$operation" "$binding" admission >/dev/null; then
+    cka_cert_control_close; return 1
+  fi
+  if ! cka_cert_run_read_helper "$deadline" cka_cert_runner_permission "$identity" "$operation" "$binding" command_launch_committed ||
+     (( CKA_CERT_WAIT_GENERATION != 0 )); then cka_cert_control_close; return 1; fi
+  (
+    exec 8>&-
+    unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED CKA_CERT_CONTROL_DELEGATED
+    trap - HUP INT QUIT TERM
+    cka_cert_process_stat "$BASHPID" || exit 1
+    child_start=$CKA_CERT_PROC_START
+    cka_cert_capture "$deadline" utility jq -cn --argjson pid "$BASHPID" --arg start "$child_start" \
+      '{pid:$pid,start_time:$start}' || exit 1
+    child=$CKA_CERT_CAPTURED
+    cka_cert_runner_record "$deadline" "$identity" "$operation" "$binding" birth "$child" || exit 1
+    cka_cert_runner_write "$deadline" "$identity" "$operation" "$binding" birth "$CKA_CERT_CAPTURED" || exit 1
+    exec env -u BASH_ENV -u ENV bash --noprofile --norc -p -c '
+      source /var/lib/cka-certificate-artifacts/observe.sh || exit 1
+      source /var/lib/cka-certificate-artifacts/state.sh || exit 1
+      source /var/lib/cka-certificate-artifacts/process.sh || exit 1
+      CKA_CERT_STATE_OWNS_FD=1
+      cka_cert_runner_entry "$@"
+    ' cka-certificate-command "$deadline" "$identity" "$operation" "$binding" "${command[@]}"
+  ) &
+  child=$!
+  cka_cert_control_close || return 1
+  cka_cert_runner_wait_candidate "$child" || return 1
+  result=$CKA_CERT_WAIT_EXIT
+  cka_cert_capture "$deadline" read cka_cert_runner_evidence "$identity" "$operation" "$binding" || return $?
+  evidence=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -er .pid <<< "$evidence" || return $?
+  [[ $CKA_CERT_CAPTURED == "$child" ]] || return 1
+  cka_cert_capture "$deadline" utility jq -ce .runner <<< "$binding" || return $?
+  runner=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -cn --argjson identity "$identity" --arg operation "$operation" \
+    --argjson supervisor "$supervisor" --argjson runner "$runner" --argjson child "$child" --argjson result "$result" \
+    '{schema:1,identity:$identity,operation_id:$operation,supervisor:$supervisor,runner:$runner,child_pid:$child,exit_code:$result}' || return $?
+  payload=$CKA_CERT_CAPTURED
+  cka_cert_supervisor_receipt_write "$deadline" "$identity" "$operation" "$supervisor" "$runner" "$payload" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_runner_receipt_read "$identity" "$operation" "$binding" >/dev/null
+}
+
+# Pre-runner read-only check, before a runner identity can exist.
+cka_cert_runner_before() {
+  local observed
+  [[ $# == 4 ]] || return 1
+  cka_cert_process_check "$1" "$2" || return 1
+  observed=$(cka_cert_process_read "$1" "$2") || return 1
+  jq -e --argjson before "$4" --argjson supervisor "$3" \
+    '.==$before and .supervisor==$supervisor and .stage=="supervisor_ready" and
+      .cancel_ack==false and .cause=="none"' <<< "$observed" >/dev/null || return 1
+  cka_cert_process_cancel_read "$1" "$2" && [[ $CKA_CERT_PROCESS_CANCEL == 0 ]]
+}
