@@ -219,8 +219,9 @@ cka_cert_capture() {
   [[ $# -ge 3 ]] || return 1
   deadline=$1; mode=$2; shift 2
   case "$mode:$1" in
-    read:cka_cert_supervisor_receipt_payload|read:cka_cert_decision_observation|\
-    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|read:cka_cert_runner_payload|read:cka_cert_runner_read|utility:jq|utility:mktemp|utility:stat) ;;
+    read:cka_cert_runner_payload|read:cka_cert_runner_read|read:cka_cert_runner_evidence|\
+    read:cka_cert_runner_receipt_read|read:cka_cert_supervisor_receipt_payload|read:cka_cert_decision_observation|\
+    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|utility:jq|utility:mktemp|utility:stat) ;;
     *) return 1 ;;
   esac
   cka_cert_deadline_budget "$deadline" || return $?
@@ -324,8 +325,10 @@ cka_cert_run_read_helper() {
   case $1 in
     cka_cert_process_check|cka_cert_process_read|cka_cert_process_payload|cka_cert_capture_directory|\
     cka_cert_decision_observation|cka_cert_decision_proposal|cka_cert_decision_classify|\
+    cka_cert_runner_payload|cka_cert_runner_live|cka_cert_runner_read|cka_cert_runner_permission|\
+    cka_cert_runner_evidence|cka_cert_runner_receipt_read|cka_cert_runner_before|\
     cka_cert_state_expected|cka_cert_state_descriptor|cka_cert_state_file|\
-    cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read|cka_cert_runner_payload|cka_cert_runner_live|cka_cert_runner_read) ;;
+    cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read) ;;
     *) return 1 ;;
   esac
   cka_cert_deadline_budget "$deadline" || return $?
@@ -687,4 +690,78 @@ cka_cert_runner_read() {
   cka_cert_state_file "$path" || return 1
   payload=$(cat -- "$path") || return 1
   cka_cert_runner_payload "$1" "$2" "$3" "$4" "$payload"
+}
+
+# Evidence records are exclusive, never an alternate lifecycle authority.
+# Direct invocation only; all utility children drop FD8 while this actor retains it.
+cka_cert_runner_write() {
+  local deadline identity operation binding kind payload target temporary actor child
+  [[ $# == 6 && ${CKA_CERT_STATE_OWNS_FD:-0} == 1 ]] || return 1
+  deadline=$1; identity=$2; operation=$3; binding=$4; kind=$5
+  cka_cert_capture "$deadline" read cka_cert_runner_payload "$identity" "$operation" "$binding" "$kind" "$6" || return $?
+  payload=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -cr .child <<< "$payload" || return $?
+  child=$CKA_CERT_CAPTURED
+  case $kind in ready) actor=.runner.pid ;; admission) actor=.supervisor.pid ;; *) actor=.child.pid ;; esac
+  cka_cert_capture "$deadline" utility jq -er "$actor" <<< "$payload" || return $?
+  [[ $BASHPID == "$CKA_CERT_CAPTURED" ]] || return 1
+  cka_cert_run_read_helper "$deadline" cka_cert_runner_live "$binding" "$child" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_process_check "$identity" "$operation" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_state_descriptor || return $?
+  cka_cert_run_utility "$deadline" -- flock -n 9 || return $?
+  target=/var/lib/cka-certificate-transaction/runner-$kind.json
+  [[ ! -e $target && ! -L $target ]] || return 1
+  cka_cert_capture "$deadline" utility mktemp /var/lib/cka-certificate-transaction/runner.XXXXXXXX || return $?
+  temporary=$CKA_CERT_CAPTURED
+  cka_cert_run_read_helper "$deadline" cka_cert_state_file "$temporary" || return $?
+  cka_cert_deadline_budget "$deadline" || return $?
+  printf '%s\n' "$payload" > "$temporary" || return 1
+  cka_cert_run_utility "$deadline" -- sync -f "$temporary" || return $?
+  cka_cert_run_utility "$deadline" -- ln -T -- "$temporary" "$target" || return $?
+  cka_cert_run_utility "$deadline" -- unlink -- "$temporary" || return $?
+  cka_cert_run_utility "$deadline" -- sync -f /var/lib/cka-certificate-transaction || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_runner_read "$identity" "$operation" "$binding" "$kind" >/dev/null
+}
+
+# The caller retains freshly acquired FD8. A cancelled or changed state refuses launch.
+cka_cert_runner_permission() {
+  local record
+  [[ $# == 4 && ( $4 == supervisor_ready || $4 == command_launch_committed ) ]] || return 1
+  cka_cert_runner_live "$3" null || return 1
+  record=$(cka_cert_process_read "$1" "$2") || return 1
+  jq -e --argjson binding "$3" --arg stage "$4" \
+    '.stage==$stage and .supervisor==$binding.supervisor and .cancel_ack==false and .cause=="none"' \
+    <<< "$record" >/dev/null || return 1
+  cka_cert_process_cancel_read "$1" "$2" && [[ $CKA_CERT_PROCESS_CANCEL == 0 ]]
+}
+
+# Constructor uses the invocation's original binding, never adopts recorded argv.
+cka_cert_runner_record() {
+  [[ $# == 6 ]] || return 1
+  cka_cert_capture "$1" utility jq -cn --argjson identity "$2" --arg operation "$3" \
+    --argjson binding "$4" --arg kind "$5" --argjson child "$6" \
+    '$binding+{schema:1,identity:$identity,operation_id:$operation,kind:$kind,child:$child}'
+}
+
+# Retrospective validation uses preserved live evidence, not /proc after reaping.
+cka_cert_runner_evidence() {
+  local birth entry
+  [[ $# == 3 ]] || return 1
+  birth=$(cka_cert_runner_read "$1" "$2" "$3" birth) || return 1
+  entry=$(cka_cert_runner_read "$1" "$2" "$3" entry) || return 1
+  jq -ce --argjson birth "$birth" 'select(.==($birth|.kind="entry")) | .child' <<< "$entry"
+}
+
+# Only this composite reader supplies accepted command evidence to supervision.
+# Expected binding (including argv) comes from the original admitted invocation.
+cka_cert_runner_receipt_read() {
+  local child receipt supervisor runner
+  [[ $# == 3 ]] || return 1
+  cka_cert_runner_read "$1" "$2" "$3" ready >/dev/null || return 1
+  cka_cert_runner_read "$1" "$2" "$3" admission >/dev/null || return 1
+  child=$(cka_cert_runner_evidence "$1" "$2" "$3") || return 1
+  supervisor=$(jq -ce .supervisor <<< "$3") || return 1
+  runner=$(jq -ce .runner <<< "$3") || return 1
+  receipt=$(cka_cert_supervisor_receipt_read "$1" "$2" "$supervisor" "$runner") || return 1
+  jq -ce --argjson child "$child" 'select(.child_pid==$child.pid)' <<< "$receipt"
 }
