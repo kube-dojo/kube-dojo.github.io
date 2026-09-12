@@ -99,7 +99,11 @@ cka_cert_state_read() {
     else
       keys==["baseline","identity","recovery","revision","schema"] and
       ((.revision==1 and .recovery=={direction:"forward",stage:"backup_requested"}) or
-       (.revision==2 and .recovery=={direction:"forward",stage:"backup_verified"})) and
+       (.revision==2 and .recovery=={direction:"forward",stage:"backup_verified"}) or
+       (.revision>=3 and .recovery.direction=="forward" and
+         (.recovery.stage | IN("consumer_stop_requested","consumer_stopped",
+           "renew_requested","renew_verified","manifest_return_requested",
+           "manifest_returned")))) and
       (.baseline | type=="object" and keys==["fingerprint","hashes","metadata","public_key"] and
         (.fingerprint | hash) and (.public_key | hash) and
         (.hashes | files and all(.[]; hash)) and
