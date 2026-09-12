@@ -41,12 +41,13 @@ cka_cert_renew_stop_consumer() {
 }
 
 # Poll CRI until no kube-apiserver container is running (max attempts).
+# Args: attempts, CRI_BIN, unix://CRI_ENDPOINT
 cka_cert_renew_wait_stopped() {
   local attempts ids
-  [[ $# == 1 && $1 =~ ^[1-9][0-9]*$ ]] || return 1
+  [[ $# == 3 && $1 =~ ^[1-9][0-9]*$ ]] || return 1
   attempts=$1
   while (( attempts > 0 )); do
-    ids=$(cka_cert_obs_running_ids) || return 1
+    ids=$(cka_cert_obs_running_ids "$2" "$3") || return 1
     [[ $ids == '[]' ]] && return 0
     attempts=$((attempts - 1))
     sleep 1
@@ -54,20 +55,35 @@ cka_cert_renew_wait_stopped() {
   return 124
 }
 
-# Renew only apiserver; require consumer stopped; require fingerprint change + pair match.
+# Live cert+key identity only (no manifest). Prints lowercase 64-hex fingerprint.
+# Pair match is proven by successful cka_cert_obs_pair; private key never printed.
+cka_cert_renew_cert_fingerprint() {
+  local fingerprint
+  [[ $# == 0 ]] || return 1
+  declare -F cka_cert_obs_fingerprint cka_cert_obs_pair >/dev/null || return 1
+  [[ -f /etc/kubernetes/pki/apiserver.crt && ! -L /etc/kubernetes/pki/apiserver.crt ]] || return 1
+  [[ -f /etc/kubernetes/pki/apiserver.key && ! -L /etc/kubernetes/pki/apiserver.key ]] || return 1
+  fingerprint=$(cka_cert_obs_fingerprint /etc/kubernetes/pki/apiserver.crt) || return 1
+  fingerprint=${fingerprint#*=}
+  fingerprint=${fingerprint//:/}
+  fingerprint=${fingerprint,,}
+  cka_cert_obs_pair /etc/kubernetes/pki/apiserver.crt /etc/kubernetes/pki/apiserver.key >/dev/null || return 1
+  [[ $fingerprint =~ ^[a-f0-9]{64}$ ]] || return 1
+  printf '%s\n' "$fingerprint"
+}
+
+# Renew only apiserver; require consumer stopped; fingerprint must change + pair match.
+# Args: identity, CRI_BIN, unix://CRI_ENDPOINT
 cka_cert_renew_apiserver() {
   local before after ids
-  [[ $# == 1 ]] || return 1
-  ids=$(cka_cert_obs_running_ids) || return 1
+  [[ $# == 3 ]] || return 1
+  ids=$(cka_cert_obs_running_ids "$2" "$3") || return 1
   [[ $ids == '[]' ]] || return 1
-  before=$(cka_cert_state_backup_evidence live) || return 1
+  before=$(cka_cert_renew_cert_fingerprint) || return 1
   cka_cert_renew_phase "$1" consumer_stopped renew_requested || return 1
   kubeadm certs renew apiserver || return 1
-  after=$(cka_cert_state_backup_evidence live) || return 1
-  jq -e --argjson before "$before" --argjson after "$after" '
-    $after.fingerprint != $before.fingerprint and
-    $after.public_key != $before.public_key
-  ' <<< '{}' >/dev/null || return 1
+  after=$(cka_cert_renew_cert_fingerprint) || return 1
+  [[ $after != "$before" ]] || return 1
   cka_cert_renew_phase "$1" renew_requested renew_verified || return 1
 }
 

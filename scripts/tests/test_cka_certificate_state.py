@@ -106,9 +106,19 @@ else printf refused; fi
                     "metadata": {name: {"uid": 0, "gid": 0, "mode": "600"} for name in names}}
         valid = [{"schema": 1, "identity": {}, "revision": revision,
                   "recovery": {"direction": "forward", "stage": stage}, "baseline": baseline}
-                 for revision, stage in ((1, "backup_requested"), (2, "backup_verified"))]
+                 for revision, stage in (
+                     (1, "backup_requested"),
+                     (2, "backup_verified"),
+                     (3, "consumer_stop_requested"),
+                     (4, "consumer_stopped"),
+                     (5, "renew_requested"),
+                     (6, "renew_verified"),
+                     (7, "manifest_return_requested"),
+                     (8, "manifest_returned"),
+                 )]
         invalid = [dict(valid[0], revision=2), dict(valid[1], revision=1),
-                   dict(valid[0], schema=2), dict(valid[0], extra=True), dict(valid[0], baseline={})]
+                   dict(valid[0], schema=2), dict(valid[0], extra=True), dict(valid[0], baseline={}),
+                   dict(valid[2], recovery={"direction": "forward", "stage": "not_a_stage"})]
         for field, bad in (("fingerprint", "invalid"), ("public_key", None), ("hashes", {})):
             invalid.append(dict(valid[0], baseline=dict(baseline, **{field: bad})))
         for field, bad in (("uid", 1), ("gid", -1), ("gid", 0.5), ("mode", "644")):
