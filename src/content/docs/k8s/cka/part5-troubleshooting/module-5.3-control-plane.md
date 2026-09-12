@@ -258,6 +258,8 @@ Before opening the explanation, write a decision note:
 
 [Kubernetes 1.35 certificate management](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#manual-certificate-renewal) distinguishes kubeadm-managed and externally managed certificates. Identify the manager before proposing a renewal. A consuming control-plane Pod must reload renewed files; deleting its API mirror Pod is not the static Pod restart mechanism. A separate execution contract must preserve original credentials and manifests, identify the one certificate and consumer, and handle interruptions before any renewal or reload is attempted. This exercise does not supply or execute those mutations.
 
+Owned disposable-fixture work for that contract (issue [#2478](https://github.com/kube-dojo/kube-dojo.github.io/issues/2478)) validated **apiserver serving-certificate only**: private backup custody, stop consumer → renew → return unchanged manifest, rollback to baseline fingerprint, and labelled interrupt → continue to verified rollback. Accept recovery claims only when public evidence shows a new (or restored) fingerprint, a returned kube-apiserver consumer, trusted served TLS, and an authenticated existing marker read/write — not because a renew command exited zero.
+
 </details>
 
 ### Manifest evidence before a proposed change
