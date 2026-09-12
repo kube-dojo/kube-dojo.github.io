@@ -1,6 +1,5 @@
 """cka_etcd_fixture: composition + refuse restore claims without live kind."""
 import importlib.util
-import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -21,22 +20,21 @@ class TestEtcdFixture(unittest.TestCase):
         self.assertIn("etcd", self.mod.ETCD_PKI)
 
     def test_etcd_inspect_records_no_restore(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            # Avoid real Fixture ctor (needs 0700 owned dir + tools).
-            fake = mock.Mock()
-            fake.state = {"node": {"id": "abc"}, "etcd": {}}
-            fake.verify = mock.Mock()
-            fake.inspect = mock.Mock()
-            fake.run = mock.Mock(
-                side_effect=[
-                    "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok",
-                    "etcdctl version: 3.5.16",
-                ]
-            )
-            fake.save = mock.Mock()
-            wrapper = self.mod.EtcdFixture.__new__(self.mod.EtcdFixture)
-            wrapper.inner = fake
-            result = wrapper.etcd_inspect()
-            self.assertFalse(result["restore_executed"])
-            self.assertEqual(result["endpoint"], self.mod.ETCD_ENDPOINT)
-            self.assertIn("3.5", result["etcdctl_version_line"])
+        # Avoid real Fixture ctor (needs 0700 owned dir + tools).
+        fake = mock.Mock()
+        fake.state = {"node": {"id": "abc"}, "etcd": {}}
+        fake.verify = mock.Mock()
+        fake.inspect = mock.Mock()
+        fake.run = mock.Mock(
+            side_effect=[
+                "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok",
+                "etcdctl version: 3.5.16",
+            ]
+        )
+        fake.save = mock.Mock()
+        wrapper = self.mod.EtcdFixture.__new__(self.mod.EtcdFixture)
+        wrapper.inner = fake
+        result = wrapper.etcd_inspect()
+        self.assertFalse(result["restore_executed"])
+        self.assertEqual(result["endpoint"], self.mod.ETCD_ENDPOINT)
+        self.assertIn("3.5", result["etcdctl_version_line"])
