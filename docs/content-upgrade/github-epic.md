@@ -103,6 +103,7 @@ The closed original book epic #394 is historical context; this is the follow-on 
 - [ ] #2298 — [Content upgrade F03] Repair AWS VPC lab preflight, flow-log prerequisites and behavioral verification
 - [ ] #2299 — [Content upgrade F04] Add verified public source references to History Chapter 1
 - [ ] #2300 — [Content upgrade X05] Upgrade all shared reference pages and landing-page editorial content
+- [ ] #2542 — [Content upgrade X06] Standing Kubernetes release onboarding (exam-pin + latest-stable)
 - [ ] #1911 — existing complete Ukrainian translation epic (retained ownership)
 - [ ] #2086 — existing translation review gate
 - [ ] #2110 — existing Ukrainian terminology normalization
