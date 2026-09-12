@@ -948,7 +948,10 @@ cka_cert_runner_launch_actual() {
   if ! cka_cert_run_read_helper "$deadline" cka_cert_runner_permission "$identity" "$operation" "$binding" supervisor_ready; then
     cka_cert_control_close; return 1
   fi
-  [[ ${CKA_CERT_SUPERVISOR_TERM:-1} == 0 ]] || return 1
+  if [[ ${CKA_CERT_SUPERVISOR_TERM:-1} != 0 ]]; then
+    cka_cert_control_close || return 1
+    return 1
+  fi
   cka_cert_decision_publish "$deadline" "$identity" "$operation" "$expected" "$next" || return $?
   cka_cert_decision_reconcile "$deadline" "$identity" "$operation" "$expected" "$next" || return $?
   [[ $CKA_CERT_DECISION_RESULT == successor ]] || return 1
