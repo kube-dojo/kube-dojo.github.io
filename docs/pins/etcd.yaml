@@ -1,0 +1,29 @@
+# KubeDojo etcd recovery pins (#2479 under epic #2272).
+# Agents: do not publish learner snapshot/restore recipes until E2–E3 evidence exists.
+# Bump only with verified tool/image compatibility on an owned disposable fixture.
+
+kubernetes:
+  exam_pin_minor: "1.35"
+  kind_node_image: "kindest/node:v1.35.0"
+  # Digest pin used by scripts/cka_certificate_fixture.py (reuse for etcd fixture until split).
+  kind_node_digest: "sha256:4613778f3cfcd10e615029370f5786704559103cf27bef934597ba562b269661"
+  verified_date: "2026-09-13"
+
+etcd:
+  # kubeadm kind 1.35 ships etcd in-tree; confirm exact binary at fixture inspect time.
+  expected_major_minor: "3.5"
+  endpoint: "https://127.0.0.1:2379"
+  # Paths on the control-plane node (kubeadm layout).
+  data_dir: "/var/lib/etcd"
+  pki_dir: "/etc/kubernetes/pki/etcd"
+  verified_note: "Exact etcd version string must be captured from the owned node before restore work."
+
+tools:
+  etcdctl: "must speak TLS to the local endpoint with etcd CA/cert/key"
+  etcdutl: "offline restore into a clean target directory (never in-place over live data)"
+  ownership: "fixture cluster name cert-fixture-* style private run dirs; no shared/live clusters"
+
+forbidden_until_evidence:
+  - "learner-facing snapshot/restore command recipes in module-5.3"
+  - "endpoint health alone as proof of Kubernetes state restore"
+  - "mutating shared or persistent fixtures"
