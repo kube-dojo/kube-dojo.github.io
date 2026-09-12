@@ -220,7 +220,7 @@ cka_cert_capture() {
   deadline=$1; mode=$2; shift 2
   case "$mode:$1" in
     read:cka_cert_supervisor_receipt_payload|read:cka_cert_decision_observation|\
-    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|utility:jq|utility:mktemp|utility:stat) ;;
+    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|read:cka_cert_runner_payload|utility:jq|utility:mktemp|utility:stat) ;;
     *) return 1 ;;
   esac
   cka_cert_deadline_budget "$deadline" || return $?
@@ -325,7 +325,7 @@ cka_cert_run_read_helper() {
     cka_cert_process_check|cka_cert_process_read|cka_cert_process_payload|cka_cert_capture_directory|\
     cka_cert_decision_observation|cka_cert_decision_proposal|cka_cert_decision_classify|\
     cka_cert_state_expected|cka_cert_state_descriptor|cka_cert_state_file|\
-    cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read) ;;
+    cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read|cka_cert_runner_payload) ;;
     *) return 1 ;;
   esac
   cka_cert_deadline_budget "$deadline" || return $?
@@ -623,4 +623,33 @@ cka_cert_decision_reconcile() {
   if cka_cert_decision_dispatch reconcile "$@"; then result=0; else result=$?; fi
   if [[ ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" ]]; then cka_cert_control_close || return 1; fi
   return "$result"
+}
+
+# Pure runner-record schema validation (Slice A / #2478). No live custody.
+# Rejects argv with embedded NUL; ready/admission require child==null;
+# birth/entry require a person-shaped child distinct from runner/supervisor.
+cka_cert_runner_payload() {
+  local identity
+  [[ $# == 5 && $2 =~ ^[a-f0-9]{32}$ ]] || return 1
+  identity=$(cka_cert_state_expected "$1") || return 1
+  jq -ces --argjson identity "$identity" --arg operation "$2" \
+    --argjson binding "$3" --arg kind "$4" '
+    def pid: type=="number" and floor==. and .>0;
+    def person: type=="object" and keys==["pid","start_time"] and
+      (.pid|pid) and (.start_time|type=="string" and test("^[0-9]+$"));
+    def leader: type=="object" and keys==["pgid","pid","sid","start_time"] and
+      ({pid,start_time}|person) and .pid==.pgid and .pid==.sid;
+    select(length==1) | .[0] |
+    select($binding|type=="object" and keys==["argv","runner","supervisor"] and
+      (.runner|person) and (.supervisor|leader) and .runner.pid!=.supervisor.pid and
+      (.argv|type=="array" and length>0 and length<=32 and (.[0]|length>0) and
+        all(.[]; type=="string" and (explode|index(0)==null)))) |
+    select(type=="object" and keys==["argv","child","identity","kind","operation_id",
+      "runner","schema","supervisor"]) |
+    select(.schema==1 and .identity==$identity and .operation_id==$operation and
+      .kind==$kind and .argv==$binding.argv and .runner==$binding.runner and .supervisor==$binding.supervisor) |
+    select(if $kind=="ready" or $kind=="admission" then .child==null
+      elif $kind=="birth" or $kind=="entry" then (.child|person) and
+        .child.pid!=.runner.pid and .child.pid!=.supervisor.pid else false end)
+  ' <<< "$5"
 }
