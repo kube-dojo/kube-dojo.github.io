@@ -103,7 +103,11 @@ cka_cert_state_read() {
        (.revision>=3 and .recovery.direction=="forward" and
          (.recovery.stage | IN("consumer_stop_requested","consumer_stopped",
            "renew_requested","renew_verified","manifest_return_requested",
-           "manifest_returned")))) and
+           "manifest_returned"))) or
+       (.revision>=3 and .recovery.direction=="rollback" and
+         (.recovery.stage | IN("rollback_requested","consumer_stop_requested",
+           "consumer_stopped","pair_restore_requested","pair_restored",
+           "manifest_return_requested","manifest_returned","rollback_verified")))) and
       (.baseline | type=="object" and keys==["fingerprint","hashes","metadata","public_key"] and
         (.fingerprint | hash) and (.public_key | hash) and
         (.hashes | files and all(.[]; hash)) and
