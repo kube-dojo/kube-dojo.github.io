@@ -4,6 +4,8 @@ sidebar:
   order: 1
   label: "Certifications"
 ---
+> **Release Radar:** Onboard Kubernetes **1.35 / 1.36 / 1.37** (and future minors) without mixing them into exam lessons — start at [Release Radar](/k8s/releases/) and the [exam version policy](/k8s/releases/exam-version-policy/).
+
 **The Kubestronaut Path** — All 5 certifications required for [Kubestronaut](https://www.cncf.io/training/kubestronaut/) status, CNCF's recognition for passing KCNA, KCSA, CKAD, CKA, and CKS.
 
 ---

@@ -342,6 +342,11 @@ export default defineConfig({
           items: [
             { label: 'Certifications Hub', link: '/k8s/' },
             {
+              label: 'Release Radar',
+              collapsed: true,
+              items: [{ autogenerate: { directory: 'k8s/releases', collapsed: true } }],
+            },
+            {
               label: 'Core Kubernetes',
               collapsed: true,
               items: [
