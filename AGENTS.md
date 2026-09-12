@@ -166,7 +166,7 @@ and final `git status --short --branch` for worktree and primary checkout.
 
 Published content lives in `src/content/docs/`; Ukrainian content mirrors it in
 `src/content/docs/uk/`. Navigation uses Starlight configuration and frontmatter,
-including `title:` and `sidebar.order:`. Kubernetes content targets 1.35 unless
+including `title:` and `sidebar.order:`. Kubernetes **exam-pinned** content targets 1.35 unless
 the task establishes a newer target. Pipeline v2 is the default; v1 remains for
 compatibility.
 

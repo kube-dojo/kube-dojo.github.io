@@ -1,0 +1,20 @@
+# KubeDojo Kubernetes version pins (X06 / #2542).
+# Agents: bump exam_pin only after verifying LF/CNCF exam environment.
+# Bump latest_stable_track when upstream adds a new supported minor.
+
+exam_pin:
+  kubernetes_minor: "1.35"
+  applies_to: ["cka", "ckad", "cks", "kcna", "kcsa"]
+  verified_date: "2026-09-12"
+  verified_note: "Curriculum remains exam-pinned at 1.35 until LF/CNCF exam docs show otherwise."
+
+latest_stable_track:
+  policy: "tracks upstream supported minor branches (typically three)"
+  supported_minors: ["1.37", "1.36", "1.35"]
+  as_of: "2026-09-12"
+  source: "https://kubernetes.io/releases/"
+
+kind_node_images:
+  "1.35": "kindest/node:v1.35.0"
+  "1.36": "kindest/node:v1.36.1"
+  "1.37": "kindest/node:v1.37.0"

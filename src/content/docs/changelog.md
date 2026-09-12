@@ -6,6 +6,10 @@ sidebar:
   label: "What's New"
 ---
 
+## September 2026
+
+- **Kubernetes Release Radar (1.35 / 1.36 / 1.37).** New [Release Radar](/k8s/releases/) under Certifications: dual-track [exam version policy](/k8s/releases/exam-version-policy/) (exam pin stays **1.35** until LF moves), per-minor pages for [1.37 Garhwal](/k8s/releases/v1.37/), [1.36 Haru](/k8s/releases/v1.36/), and [1.35 Timbernetes](/k8s/releases/v1.35/), plus a [kind practice matrix](/k8s/releases/practice-kind-matrix/). Machine pins in `docs/pins/kubernetes.yaml`; agent playbook in `docs/release-maintenance/`. Workstream #2542 (X06).
+
 ## June 2026
 
 - **AI/ML Engineering — the track is complete and currency-reviewed end to end.** The [AI/ML Engineering track](/ai-ml-engineering/) is now a full ~120-module curriculum across its phases, and every module has passed an independent cross-family quality review for technical accuracy and currency — model names, framework versions, and CNCF project maturity verified against upstream sources and quarantined into dated snapshots so the fast-moving specifics stay refreshable without rewriting the lessons. This cycle rounded out the track beyond the from-scratch deep-learning and machine-learning arcs noted below: [generative AI](/ai-ml-engineering/generative-ai/), [vector search & RAG](/ai-ml-engineering/vector-rag/), [agent frameworks](/ai-ml-engineering/frameworks-agents/), [advanced generative AI](/ai-ml-engineering/advanced-genai/), [multimodal AI](/ai-ml-engineering/multimodal-ai/), [AI infrastructure on Kubernetes](/ai-ml-engineering/ai-infrastructure/), and [reinforcement learning](/ai-ml-engineering/reinforcement-learning/). Issues #2020, #2031.
