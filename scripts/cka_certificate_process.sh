@@ -220,7 +220,7 @@ cka_cert_capture() {
   deadline=$1; mode=$2; shift 2
   case "$mode:$1" in
     read:cka_cert_supervisor_receipt_payload|read:cka_cert_decision_observation|\
-    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|read:cka_cert_runner_payload|utility:jq|utility:mktemp|utility:stat) ;;
+    read:cka_cert_decision_proposal|read:cka_cert_decision_classify|read:cka_cert_runner_payload|read:cka_cert_runner_read|utility:jq|utility:mktemp|utility:stat) ;;
     *) return 1 ;;
   esac
   cka_cert_deadline_budget "$deadline" || return $?
@@ -325,7 +325,7 @@ cka_cert_run_read_helper() {
     cka_cert_process_check|cka_cert_process_read|cka_cert_process_payload|cka_cert_capture_directory|\
     cka_cert_decision_observation|cka_cert_decision_proposal|cka_cert_decision_classify|\
     cka_cert_state_expected|cka_cert_state_descriptor|cka_cert_state_file|\
-    cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read|cka_cert_runner_payload) ;;
+    cka_cert_supervisor_receipt_payload|cka_cert_supervisor_receipt_read|cka_cert_runner_payload|cka_cert_runner_live|cka_cert_runner_read) ;;
     *) return 1 ;;
   esac
   cka_cert_deadline_budget "$deadline" || return $?
@@ -652,4 +652,39 @@ cka_cert_runner_payload() {
       elif $kind=="birth" or $kind=="entry" then (.child|person) and
         .child.pid!=.runner.pid and .child.pid!=.supervisor.pid else false end)
   ' <<< "$5"
+}
+
+# Read-only identity evidence. The actual writer separately checks its BASHPID.
+cka_cert_runner_live() {
+  local binding supervisor runner child expected_start
+  [[ $# == 2 ]] || return 1
+  binding=$1; child=$2
+  supervisor=$(jq -er .supervisor.pid <<< "$binding") || return 1
+  runner=$(jq -er .runner.pid <<< "$binding") || return 1
+  expected_start=$(jq -er .supervisor.start_time <<< "$binding") || return 1
+  cka_cert_process_stat "$supervisor" || return 1
+  [[ $CKA_CERT_PROC_START == "$expected_start" && $CKA_CERT_PROC_SID == "$supervisor" &&
+     $CKA_CERT_PROC_PGID == "$supervisor" && $CKA_CERT_PROC_STATE != [ZXx] ]] || return 1
+  expected_start=$(jq -er .runner.start_time <<< "$binding") || return 1
+  cka_cert_process_stat "$runner" || return 1
+  [[ $CKA_CERT_PROC_START == "$expected_start" && $CKA_CERT_PROC_PPID == "$supervisor" &&
+     $CKA_CERT_PROC_SID == "$supervisor" && $CKA_CERT_PROC_PGID == "$supervisor" &&
+     $CKA_CERT_PROC_STATE != [ZXx] ]] || return 1
+  if [[ $child != null ]]; then
+    expected_start=$(jq -er .start_time <<< "$child") || return 1
+    cka_cert_process_stat "$(jq -er .pid <<< "$child")" || return 1
+    [[ $CKA_CERT_PROC_START == "$expected_start" && $CKA_CERT_PROC_PPID == "$runner" &&
+       $CKA_CERT_PROC_SID == "$supervisor" && $CKA_CERT_PROC_PGID == "$supervisor" &&
+       $CKA_CERT_PROC_STATE != [ZXx] ]] || return 1
+  fi
+}
+
+cka_cert_runner_read() {
+  local path payload
+  [[ $# == 4 && ( $4 == ready || $4 == admission || $4 == birth || $4 == entry ) ]] || return 1
+  cka_cert_process_check "$1" "$2" || return 1
+  path=/var/lib/cka-certificate-transaction/runner-$4.json
+  cka_cert_state_file "$path" || return 1
+  payload=$(cat -- "$path") || return 1
+  cka_cert_runner_payload "$1" "$2" "$3" "$4" "$payload"
 }
