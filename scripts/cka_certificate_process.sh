@@ -628,6 +628,27 @@ cka_cert_decision_reconcile() {
   return "$result"
 }
 
+cka_cert_runner_wait_candidate() {
+  local child generation result completed
+  unset CKA_CERT_WAIT_EXIT
+  [[ $# == 1 && $1 =~ ^[1-9][0-9]*$ &&
+     ${CKA_CERT_WAIT_GENERATION:-} =~ ^[0-9]+$ ]] || return 1
+  child=$1
+  [[ ! -o posix && ! -o monitor ]] || return 1
+  while :; do
+    generation=$CKA_CERT_WAIT_GENERATION
+    unset completed
+    if wait -p completed "$child"; then result=0; else result=$?; fi
+    # Conservatively repeat even if the signal followed a real completion.
+    # Non-POSIX explicit wait retains the cached status for this same PID.
+    (( generation == CKA_CERT_WAIT_GENERATION )) || continue
+    [[ ${completed:-} == "$child" ]] || return 1
+    CKA_CERT_WAIT_EXIT=$result
+    return 0
+  done
+}
+
+
 # Pure runner-record schema validation (Slice A / #2478). No live custody.
 # Rejects argv with embedded NUL; ready/admission require child==null;
 # birth/entry require a person-shaped child distinct from runner/supervisor.
@@ -764,4 +785,25 @@ cka_cert_runner_receipt_read() {
   runner=$(jq -ce .runner <<< "$3") || return 1
   receipt=$(cka_cert_supervisor_receipt_read "$1" "$2" "$supervisor" "$runner") || return 1
   jq -ce --argjson child "$child" 'select(.child_pid==$child.pid)' <<< "$receipt"
+}
+
+# Fixed clean-Bash entrypoint; reaching this function occurs AFTER its exec.
+# Entry proves this wrapper began, never that the reviewed nested argv executed.
+cka_cert_runner_entry() {
+  local deadline identity operation binding birth child argv result
+  [[ $# -ge 5 && ${BASH_VERSINFO[0]} == 5 && ${BASH_VERSINFO[1]} == 2 ]] || return 1
+  deadline=$1; identity=$2; operation=$3; binding=$4; shift 4
+  cka_cert_capture "$deadline" utility jq -cn --args '$ARGS.positional' -- "$@" || return $?
+  argv=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -ce --argjson argv "$argv" \
+    'select(.argv==$argv)' <<< "$binding" || return $?
+  cka_cert_capture "$deadline" read cka_cert_runner_read "$identity" "$operation" "$binding" birth || return $?
+  birth=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -ce .child <<< "$birth" || return $?
+  child=$CKA_CERT_CAPTURED
+  cka_cert_runner_record "$deadline" "$identity" "$operation" "$binding" entry "$child" || return $?
+  cka_cert_runner_write "$deadline" "$identity" "$operation" "$binding" entry "$CKA_CERT_CAPTURED" || return $?
+  cka_cert_deadline_budget "$deadline" || return $?
+  if "$@"; then result=0; else result=$?; fi
+  return "$result"
 }
