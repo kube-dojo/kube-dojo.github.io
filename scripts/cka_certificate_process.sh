@@ -895,3 +895,80 @@ cka_cert_runner_before() {
       .cancel_ack==false and .cause=="none"' <<< "$observed" >/dev/null || return 1
   cka_cert_process_cancel_read "$1" "$2" && [[ $CKA_CERT_PROCESS_CANCEL == 0 ]]
 }
+
+# Direct live session-leader API. Success acknowledges admission only, not entry.
+# Caller retains FD9, owns group supervision, and must reconcile all failures.
+cka_cert_runner_launch_actual() {
+  local deadline identity operation supervisor before argv next expected runner start binding name result
+  unset CKA_CERT_RUNNER_PID CKA_CERT_RUNNER_BINDING
+  [[ $# -ge 6 && ${CKA_CERT_STATE_OWNS_FD:-0} == 1 && ${CKA_CERT_SUPERVISOR_TERM:-1} == 0 ]] || return 1
+  deadline=$1; identity=$2; operation=$3; supervisor=$4; before=$5; shift 5
+  cka_cert_control_locked "$deadline" || return $?
+  cka_cert_run_read_helper "$deadline" cka_cert_runner_before "$identity" "$operation" "$supervisor" "$before" || return $?
+  cka_cert_capture "$deadline" utility jq -er .pid <<< "$supervisor" || return $?
+  [[ $CKA_CERT_CAPTURED == "$BASHPID" ]] || return 1
+  cka_cert_capture "$deadline" utility jq -er .start_time <<< "$supervisor" || return $?
+  cka_cert_process_self "$BASHPID" "$CKA_CERT_CAPTURED" || return 1
+  cka_cert_capture "$deadline" utility jq -cn --args '$ARGS.positional' -- "$@" || return $?
+  argv=$CKA_CERT_CAPTURED
+  for name in runner-ready runner-admission runner-birth runner-entry command; do
+    [[ ! -e /var/lib/cka-certificate-transaction/$name.json &&
+       ! -L /var/lib/cka-certificate-transaction/$name.json ]] || return 1
+  done
+  [[ ${CKA_CERT_SUPERVISOR_TERM:-1} == 0 ]] || return 1
+  (
+    exec 8>&-
+    unset CKA_CERT_CONTROL_OWNER CKA_CERT_CONTROL_LOCKED CKA_CERT_CONTROL_DELEGATED
+    cka_cert_runner_body "$deadline" "$identity" "$operation" "$supervisor" "$argv" "$@"
+  ) &
+  runner=$!
+  CKA_CERT_RUNNER_PID=$runner
+  cka_cert_control_close || return 1
+  # Independent parent observation; never obtain runner identity from readiness.
+  cka_cert_process_stat "$runner" || return 1
+  [[ $CKA_CERT_PROC_PPID == "$BASHPID" && $CKA_CERT_PROC_SID == "$BASHPID" &&
+     $CKA_CERT_PROC_PGID == "$BASHPID" && $CKA_CERT_PROC_STATE != [ZXx] ]] || return 1
+  start=$CKA_CERT_PROC_START
+  cka_cert_capture "$deadline" utility jq -cn --argjson supervisor "$supervisor" --argjson pid "$runner" \
+    --arg start "$start" --argjson argv "$argv" \
+    '{supervisor:$supervisor,runner:{pid:$pid,start_time:$start},argv:$argv}' || return $?
+  binding=$CKA_CERT_CAPTURED
+  CKA_CERT_RUNNER_BINDING=$binding
+  # ln/unlink publication briefly has two links; existence alone is not readiness.
+  until cka_cert_run_read_helper "$deadline" cka_cert_runner_read "$identity" "$operation" "$binding" ready >/dev/null; do
+    cka_cert_run_read_helper "$deadline" cka_cert_runner_live "$binding" null || return $?
+  done
+  cka_cert_capture "$deadline" utility jq -cn --argjson record "$before" \
+    '{presence:"present",record:$record}' || return $?
+  expected=$CKA_CERT_CAPTURED
+  cka_cert_capture "$deadline" utility jq -c \
+    '.stage="command_launch_committed" | .launch_disposition="command_committed"' <<< "$before" || return $?
+  next=$CKA_CERT_CAPTURED
+  cka_cert_control_open "$deadline" || return $?
+  if ! cka_cert_run_read_helper "$deadline" cka_cert_runner_permission "$identity" "$operation" "$binding" supervisor_ready; then
+    cka_cert_control_close; return 1
+  fi
+  [[ ${CKA_CERT_SUPERVISOR_TERM:-1} == 0 ]] || return 1
+  cka_cert_decision_publish "$deadline" "$identity" "$operation" "$expected" "$next" || return $?
+  cka_cert_decision_reconcile "$deadline" "$identity" "$operation" "$expected" "$next" || return $?
+  [[ $CKA_CERT_DECISION_RESULT == successor ]] || return 1
+  cka_cert_control_open "$deadline" || return $?
+  if cka_cert_run_read_helper "$deadline" cka_cert_runner_permission "$identity" "$operation" "$binding" command_launch_committed &&
+     cka_cert_runner_record "$deadline" "$identity" "$operation" "$binding" admission null &&
+     [[ ${CKA_CERT_SUPERVISOR_TERM:-1} == 0 ]] &&
+     cka_cert_runner_write "$deadline" "$identity" "$operation" "$binding" admission "$CKA_CERT_CAPTURED"; then
+    result=0
+  else result=$?; fi
+  cka_cert_control_close || return 1
+  return "$result"
+}
+
+# Always relinquish this actor's control custody, including pre-fork refusals.
+cka_cert_runner_launch() {
+  local result
+  if cka_cert_runner_launch_actual "$@"; then result=0; else result=$?; fi
+  if [[ ${CKA_CERT_CONTROL_OWNER:-} == "$BASHPID" ]]; then
+    cka_cert_control_close || return 1
+  fi
+  return "$result"
+}
