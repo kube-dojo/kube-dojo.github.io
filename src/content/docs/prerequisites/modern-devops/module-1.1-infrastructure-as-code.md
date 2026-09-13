@@ -8,7 +8,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]` - Foundational concept.
 >
-> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Basic command line skills, Git basics, and enough YAML familiarity to read indentation.
 
