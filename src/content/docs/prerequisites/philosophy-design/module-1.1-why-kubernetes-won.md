@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[QUICK]` - Conceptual foundation with a practical evaluation exercise
 >
-> **Time to Complete**: 45-55 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: [Cloud Native 101](/prerequisites/cloud-native-101/) and [Kubernetes Basics](/prerequisites/kubernetes-basics/) — you should already understand containers, orchestration at a high level, and hands-on `kubectl` workflows before examining why Kubernetes won and how its design shapes operations.
 

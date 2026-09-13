@@ -12,9 +12,11 @@ Equally important is knowing what to avoid. We will clearly outline the technolo
 
 ## Modules
 
-| # | Module | Description |
-|---|--------|-------------|
-| 1.1 | [Module 1.1: Why Kubernetes Won](module-1.1-why-kubernetes-won/) | How Kubernetes became the industry standard |
-| 1.2 | [Module 1.2: Declarative vs Imperative - The Philosophy](module-1.2-declarative-vs-imperative/) | The philosophy that makes Kubernetes work |
-| 1.3 | [Module 1.3: What We Don't Cover (and Why)](module-1.3-what-we-dont-cover/) | Scope decisions and why we made them |
-| 1.4 | [Module 1.4: Dead Ends - Technologies We Skip](module-1.4-dead-ends/) | Technologies we skip and why |
+| # | Module | Time | Description |
+|---|--------|------|-------------|
+| 1.1 | [Module 1.1: Why Kubernetes Won](module-1.1-why-kubernetes-won/) | 80–110 min | How Kubernetes became the industry standard |
+| 1.2 | [Module 1.2: Declarative vs Imperative - The Philosophy](module-1.2-declarative-vs-imperative/) | 80–110 min | The philosophy that makes Kubernetes work |
+| 1.3 | [Module 1.3: What We Don't Cover (and Why)](module-1.3-what-we-dont-cover/) | 80–110 min | Scope decisions and why we made them |
+| 1.4 | [Module 1.4: Dead Ends - Technologies We Skip](module-1.4-dead-ends/) | 80–110 min | Technologies we skip and why |
+
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **320–440 minutes (about 5 hours 20 minutes–7 hours 20 minutes)**; individual setup, reading, and practice time will vary.
