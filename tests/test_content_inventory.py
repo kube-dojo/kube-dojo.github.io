@@ -156,14 +156,15 @@ def test_inventory_source_acceptance_fail_closed(tmp_path: Path) -> None:
     from tests.test_source_acceptance import _valid
 
     docs = tmp_path / "docs"
-    page = docs / "k8s/cka/module-1.1-foo.md"
+    rel = "k8s/cka/module-1.1-foo.md"
+    page = docs / rel
     _write(page)
     evidence = tmp_path / "evidence.json"
-    evidence.write_text(json.dumps({"pages": [_receipt(docs, "k8s/cka/module-1.1-foo.md")]}), encoding="utf-8")
-    missing = _pages(inventory.build_inventory(docs, evidence))["k8s/cka/module-1.1-foo.md"]
-    assert missing["evidence"]["receipt_status"] == "current"
-    assert missing["evidence"]["independent_statuses"]["technical_source"] == "unknown"
-    assert missing["evidence"]["source_acceptance"]["accepted"] is False
+    evidence.write_text(json.dumps({"pages": [_receipt(docs, rel)]}), encoding="utf-8")
+    missing = _pages(inventory.build_inventory(docs, evidence))[rel]["evidence"]
+    assert missing["receipt_status"] == "current"
+    assert missing["independent_statuses"]["technical_source"] == "unknown"
+    assert missing["source_acceptance"]["accepted"] is False
 
     seed = b'{"claims":[{"claim_id":"C001"}]}'
     seeds = tmp_path / "seeds"
@@ -171,17 +172,15 @@ def test_inventory_source_acceptance_fail_closed(tmp_path: Path) -> None:
     (seeds / "k8s-cka-module-1.1-foo.json").write_bytes(seed)
     stale = _valid(page_digest=_digest(page.read_bytes()), seed_digest=_digest(seed))
     stale["page_digest"] = "sha256:" + "d" * 64
-    rel = "k8s/cka/module-1.1-foo.md"
     evidence.write_text(json.dumps({"pages": [_receipt(docs, rel, source_acceptance=stale)]}), encoding="utf-8")
-    stale_rec = _pages(inventory.build_inventory(docs, evidence, seeds_dir=seeds))[rel]
-    assert stale_rec["evidence"]["source_acceptance"]["accepted"] is False
-    assert stale_rec["evidence"]["independent_statuses"]["technical_source"] == "unknown"
-
+    stale_rec = _pages(inventory.build_inventory(docs, evidence, seeds_dir=seeds))[rel]["evidence"]
+    assert stale_rec["source_acceptance"]["accepted"] is False
+    assert stale_rec["independent_statuses"]["technical_source"] == "unknown"
     ok_receipt = _valid(page_digest=_digest(page.read_bytes()), seed_digest=_digest(seed))
     evidence.write_text(json.dumps({"pages": [_receipt(docs, rel, source_acceptance=ok_receipt)]}), encoding="utf-8")
-    ok = _pages(inventory.build_inventory(docs, evidence, seeds_dir=seeds))[rel]
-    assert ok["evidence"]["source_acceptance"]["accepted"] is True
-    assert ok["evidence"]["independent_statuses"]["technical_source"] == "pass"
+    ok = _pages(inventory.build_inventory(docs, evidence, seeds_dir=seeds))[rel]["evidence"]
+    assert ok["source_acceptance"]["accepted"] is True
+    assert ok["independent_statuses"]["technical_source"] == "pass"
 
 
 def test_missing_docs_root_is_an_explicit_cli_error(tmp_path: Path, capsys) -> None:

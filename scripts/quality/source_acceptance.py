@@ -1,8 +1,9 @@
-"""Revision-bound source-acceptance receipt (#2310).
+"""Revision-bound source-acceptance receipt (#2310 packet 1).
 
 Only a complete applicable positive receipt can accept. Frontmatter,
 injection, and inventory pass strings are not inputs. Fixture-valid
-receipts prove validator behavior, not real source support.
+receipts prove validator behavior, not real source support. Read-only:
+no status store, no promotion/backfill.
 """
 
 from __future__ import annotations
@@ -13,10 +14,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-try:
-    from .content_inventory import _normalise_digest
-except ImportError:  # script / standalone test load
-    from content_inventory import _normalise_digest
+from .content_inventory import _normalise_digest
 
 SCHEMA = "kubedojo.source_acceptance.v1"
 SCHEMA_VERSION = 1
@@ -47,7 +45,6 @@ def load_seed_bytes(seeds_dir: Path | None, page_rel: str) -> bytes | None:
 def bind_source_acceptance(
     receipt: Any, *, page_bytes: bytes, seed_bytes: bytes | None,
 ) -> dict[str, Any]:
-    """Evaluate *receipt* against live page/seed bytes. Missing seed fails closed."""
     page_digest = _digest(page_bytes)
     if seed_bytes is None:
         return evaluate_source_acceptance(
@@ -57,29 +54,28 @@ def bind_source_acceptance(
         payload = json.loads(seed_bytes.decode("utf-8"))
     except (UnicodeError, json.JSONDecodeError):
         return _reject("seed_malformed")
-    claims = payload.get("claims") if isinstance(payload, dict) else None
+    claims = payload.get("claims") if isinstance(payload, dict) else []
     ids = [
-        cid.strip()
-        for claim in claims or []
-        if isinstance(claim, dict)
-        for cid in [claim.get("claim_id")]
-        if isinstance(cid, str) and cid.strip()
+        str(c.get("claim_id")).strip()
+        for c in claims
+        if isinstance(c, dict) and str(c.get("claim_id") or "").strip()
     ]
     return evaluate_source_acceptance(
         receipt, page_digest=page_digest, seed_digest=_digest(seed_bytes), seed_claim_ids=ids,
     )
 
 
-def apply_source_acceptance(evidence: dict[str, Any], result: dict[str, Any]) -> None:
-    """Record the derived result; a pass string cannot survive a failed bind."""
-    evidence["source_acceptance"] = result
-    statuses = evidence.get("independent_statuses")
-    if (
-        isinstance(statuses, dict)
-        and result.get("accepted") is not True
-        and statuses.get("technical_source") == "pass"
-    ):
-        statuses["technical_source"] = "unknown"
+def bind_page(repo_root: Path, page_rel: str, page_bytes: bytes) -> dict[str, Any]:
+    from .content_inventory import _load_receipts
+    ledger = repo_root / EVIDENCE_LEDGER
+    receipts, _, invalid = _load_receipts(ledger if ledger.is_file() else None)
+    entry = None if invalid else receipts.get(page_rel)
+    seeds = repo_root / SEEDS_DIR
+    return bind_source_acceptance(
+        nested_source_receipt(entry),
+        page_bytes=page_bytes,
+        seed_bytes=load_seed_bytes(seeds if seeds.is_dir() else None, page_rel),
+    )
 
 
 def _reject(reason: str) -> dict[str, Any]:

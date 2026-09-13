@@ -13,7 +13,6 @@ from scripts.quality.source_acceptance import (
     SCHEMA,
     SCHEMA_VERSION,
     _digest,
-    apply_source_acceptance,
     bind_source_acceptance,
     evaluate_source_acceptance,
 )
@@ -92,6 +91,34 @@ def test_bind_missing_stale_malformed_cannot_accept() -> None:
     assert "receipt_missing" in bind_source_acceptance(None, page_bytes=page, seed_bytes=seed)["reasons"]
     assert "page_digest_stale" in bind_source_acceptance(bound, page_bytes=b"other", seed_bytes=seed)["reasons"]
     assert "seed_malformed" in bind_source_acceptance(bound, page_bytes=page, seed_bytes=b"{")["reasons"]
-    evidence = {"independent_statuses": {"technical_source": "pass"}}
-    apply_source_acceptance(evidence, {"accepted": False, "reasons": ["receipt_missing"]})
-    assert evidence["independent_statuses"]["technical_source"] == "unknown"
+
+
+def test_readiness_source_accepted_fail_closed(tmp_path: Path) -> None:
+    from tests.test_local_api import _init_repo, _seed_module, local_api
+
+    _init_repo(tmp_path)
+    _seed_module(tmp_path, "k8s/cka/module-1.1-alpha",
+                 frontmatter={"revision_pending": False, "citations_verified": True})
+    page = tmp_path / "src/content/docs/k8s/cka/module-1.1-alpha.md"
+    seed = b'{"claims":[{"claim_id":"C001"}]}'
+    (tmp_path / "docs/citation-seeds").mkdir(parents=True)
+    (tmp_path / "docs/citation-seeds/k8s-cka-module-1.1-alpha.json").write_bytes(seed)
+    ready = local_api.build_tracks_readiness(tmp_path)
+    assert ready["totals"]["cleared"] == 1 and ready["totals"]["source_accepted"] == 0
+    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    base = {"path": "k8s/cka/module-1.1-alpha.md", "page_digest": "0" * 64,
+            "disposition": "retain", "reviewer_refs": ["r"], "evidence_refs": ["e"],
+            "independent_statuses": {"technical_source": "pass"}}
+    ledger.write_text(json.dumps({"pages": [base]}), encoding="utf-8")
+    assert local_api.build_tracks_readiness(tmp_path)["totals"]["source_accepted"] == 0
+    stale = _valid(page_digest=_digest(page.read_bytes()), seed_digest=_digest(seed))
+    stale["page_digest"] = "sha256:" + "d" * 64
+    ledger.write_text(json.dumps({"pages": [{**base, "source_acceptance": stale}]}), encoding="utf-8")
+    assert local_api.build_tracks_readiness(tmp_path)["totals"]["source_accepted"] == 0
+    ok = _valid(page_digest=_digest(page.read_bytes()), seed_digest=_digest(seed))
+    ledger.write_text(json.dumps({"pages": [{**base, "source_acceptance": ok}]}), encoding="utf-8")
+    assert local_api.build_tracks_readiness(tmp_path)["totals"]["source_accepted"] == 1
+    first = local_api._v_docs_frontmatter(tmp_path)
+    ledger.write_text(json.dumps({"pages": [base]}), encoding="utf-8")
+    assert first != local_api._v_docs_frontmatter(tmp_path)

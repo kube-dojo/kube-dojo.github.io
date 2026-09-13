@@ -167,13 +167,6 @@ def _load_receipts(path: Path | None) -> tuple[dict[str, Any], list[str], bool]:
     return receipts, errors, False
 
 
-def _infer_seeds_dir(docs_root: Path) -> Path | None:
-    root = docs_root.resolve()
-    if root.parts[-3:] == ("src", "content", "docs"):
-        return root.parents[2] / "docs" / "citation-seeds"
-    return None
-
-
 def _bind_source_acceptance():
     try:
         from . import source_acceptance as sa
@@ -181,12 +174,10 @@ def _bind_source_acceptance():
         import importlib
         import sys
         import types
-
-        quality_dir = Path(__file__).resolve().parent
         pkg = sys.modules.setdefault("quality", types.ModuleType("quality"))
-        pkg.__path__ = [str(quality_dir)]
+        pkg.__path__ = [str(Path(__file__).resolve().parent)]
         sa = importlib.import_module("quality.source_acceptance")
-    return sa.apply_source_acceptance, sa.bind_source_acceptance, sa.load_seed_bytes, sa.nested_source_receipt
+    return sa.bind_source_acceptance, sa.load_seed_bytes, sa.nested_source_receipt
 
 
 def build_inventory(
@@ -216,8 +207,11 @@ def build_inventory(
     )
     rel_paths = {path.relative_to(docs_root).as_posix() for path in source_paths}
     receipts, receipt_errors, invalid_input = _load_receipts(evidence_path)
-    apply_sa, bind_sa, load_seed, nested_receipt = _bind_source_acceptance()
-    seed_root = seeds_dir if seeds_dir is not None else _infer_seeds_dir(docs_root)
+    bind_sa, load_seed, nested_receipt = _bind_source_acceptance()
+    seed_root = seeds_dir
+    root = docs_root.resolve()
+    if seed_root is None and root.parts[-3:] == ("src", "content", "docs"):
+        seed_root = root.parents[2] / "docs" / "citation-seeds"
     pages: list[dict[str, Any]] = []
 
     for path in source_paths:
@@ -258,14 +252,15 @@ def build_inventory(
             if error:
                 receipt_errors.append(f"{rel.as_posix()}: {error}")
         entry = None if invalid_input else receipts.get(rel.as_posix())
-        apply_sa(
-            page["evidence"],
-            bind_sa(
-                nested_receipt(entry),
-                page_bytes=raw,
-                seed_bytes=load_seed(seed_root, rel.as_posix()),
-            ),
+        result = bind_sa(
+            nested_receipt(entry),
+            page_bytes=raw,
+            seed_bytes=load_seed(seed_root, rel.as_posix()),
         )
+        page["evidence"]["source_acceptance"] = result
+        statuses = page["evidence"]["independent_statuses"]
+        if result.get("accepted") is not True and statuses.get("technical_source") == "pass":
+            statuses["technical_source"] = "unknown"
         pages.append(page)
 
     receipt_paths = set(receipts)
