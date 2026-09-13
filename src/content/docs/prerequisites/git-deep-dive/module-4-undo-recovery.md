@@ -7,7 +7,7 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 3 of Git Deep Dive
 
