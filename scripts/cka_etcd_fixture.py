@@ -1,4 +1,4 @@
-"""Owned disposable etcd fixture helpers; lifecycle reuses certificate Fixture. No restore."""
+"""Owned disposable etcd fixture helpers; lifecycle reuses certificate Fixture."""
 from __future__ import annotations
 
 import argparse
@@ -9,6 +9,7 @@ import re
 import shlex
 import signal
 import subprocess
+import time
 import uuid
 from pathlib import Path
 
@@ -23,6 +24,8 @@ Fixture = _mod.Fixture
 ETCD_ENDPOINT = "https://127.0.0.1:2379"
 ETCD_PKI = "/etc/kubernetes/pki/etcd"
 ETCD_DATA = "/var/lib/etcd"
+ETCD_MANIFEST = "/etc/kubernetes/manifests/etcd.yaml"
+RESTORE_TXN = "/var/lib/etcd-fixture-transaction"
 MARKER_NAME = "snapshot-marker"
 SNAPSHOT_FILE = "etcd-snapshot.db"
 
@@ -200,12 +203,194 @@ class EtcdFixture:
         self.post_snapshot_mutate()
         return self.inner.state
 
+    def _node_sh(self, script):
+        return self.inner.run("docker", "exec", self._node_id(), "sh", "-c", script)
+
+    def _restore_rec(self):
+        etcd = self._ensure_etcd()
+        return etcd.setdefault("restore", {"direction": "restore", "stage": None})
+
+    def _require_restore_inputs(self):
+        marker = self.inner.state.get("etcd_marker")
+        baseline = self.inner.state.get("etcd_baseline")
+        snapshot = self.inner.state.get("snapshot")
+        etcd = self._ensure_etcd()
+        if not marker or not baseline or not snapshot:
+            raise RuntimeError("snapshot, etcd_marker, and etcd_baseline required before restore")
+        if etcd.get("restore_executed"):
+            raise RuntimeError("Restore already executed")
+        if not Path(snapshot["path"]).is_file():
+            raise RuntimeError("Snapshot file missing")
+        return marker, snapshot
+
+    def _advance_restore(self, expected, nxt):
+        rec = self._restore_rec()
+        stage = rec.get("stage")
+        if stage is None and expected == "restore_requested":
+            rec["stage"] = expected
+            self.inner.save()
+            stage = expected
+        if stage != expected:
+            raise RuntimeError(f"Restore stage {stage!r} != expected {expected!r}")
+        rec["stage"] = nxt
+        self.inner.state["etcd"]["restore_executed"] = False
+        self.inner.save()
+
+    def _etcd_restore_params(self):
+        rec = self._restore_rec()
+        if rec.get("restore_params"):
+            return rec["restore_params"]
+        staged = f"{RESTORE_TXN}/etcd.yaml.staged"
+        grep = (
+            "grep -oE '--(name|initial-cluster|initial-advertise-peer-urls|initial-cluster-token)="
+            "[^ \"'\"']+' $M"
+        )
+        script = f"M={ETCD_MANIFEST}; [ -f $M ] || M={staged}; {grep}"
+        params = {}
+        for line in self._node_sh(script).splitlines():
+            key, _, value = line[2:].partition("=")
+            params[key] = value
+        if not params.get("name"):
+            raise RuntimeError("Could not parse etcd restore params from manifest")
+        rec["restore_params"] = params
+        self.inner.save()
+        return params
+
+    def restore_begin(self):
+        marker, _snapshot = self._require_restore_inputs()
+        rec = self._restore_rec()
+        if rec.get("stage") is None:
+            rec["stage"] = "restore_requested"
+            rec["expected_marker_value"] = marker["value"]
+            self.inner.state["etcd"]["restore_executed"] = False
+            self.inner.save()
+        return self.inner.state
+
+    def _stop_etcd_pod(self):
+        rec = self._restore_rec()
+        staged = f"{RESTORE_TXN}/etcd.yaml.staged"
+        stage = rec.get("stage")
+        if stage == "restore_requested":
+            self._advance_restore("restore_requested", "etcd_stop_requested")
+        elif stage != "etcd_stop_requested":
+            return
+        self._etcd_restore_params()
+        self._node_sh(f"mkdir -p {RESTORE_TXN}")
+        if "stopped" not in self._node_sh(
+            f"! test -f {ETCD_MANIFEST} && test -f {staged} && echo stopped"
+        ):
+            self._node_sh(
+                f"if [ -f {ETCD_MANIFEST} ] && [ ! -f {staged} ]; then "
+                f"cp -a {ETCD_MANIFEST} {staged} && rm -f {ETCD_MANIFEST}; fi"
+            )
+            for _ in range(30):
+                try:
+                    self._etcdctl("endpoint", "health")
+                except RuntimeError:
+                    break
+                time.sleep(1)
+            else:
+                raise RuntimeError("etcd did not stop")
+        self._advance_restore("etcd_stop_requested", "etcd_stopped")
+
+    def _offline_restore(self, snapshot):
+        rec = self._restore_rec()
+        stage = rec.get("stage")
+        if stage == "etcd_stopped":
+            self._advance_restore("etcd_stopped", "offline_restore_requested")
+        elif stage != "offline_restore_requested":
+            return
+        moved = rec.setdefault("live_data_moved", f"/var/lib/etcd-pre-{uuid.uuid4().hex[:8]}")
+        restore_dir = rec.setdefault("restore_data_dir", f"/var/lib/etcd-restored-{uuid.uuid4().hex[:8]}")
+        self.inner.save()
+        if "ready" not in self._node_sh(
+            f"test -d {ETCD_DATA} && test -d {moved} && echo ready"
+        ):
+            self._node_sh(f"test ! -d {restore_dir}")
+            self._node_sh(
+                f"if [ -d {ETCD_DATA} ]; then mv {ETCD_DATA} {moved}; fi; mkdir -p {restore_dir}"
+            )
+            node_snap = f"/tmp/etcd-restore-{uuid.uuid4().hex}.db"
+            self.inner.run("docker", "cp", snapshot["path"], f"{self._node_id()}:{node_snap}")
+            params = self._etcd_restore_params()
+            flags = " ".join(f"--{k}={shlex.quote(params[k])}" for k in sorted(params))
+            self._node_sh(f"etcdutl snapshot restore {node_snap} --data-dir={restore_dir} {flags}")
+            self._node_sh(f"rm -rf {ETCD_DATA} && mv {restore_dir} {ETCD_DATA}")
+        self._advance_restore("offline_restore_requested", "offline_restored")
+
+    def _return_etcd_pod(self):
+        rec = self._restore_rec()
+        staged = f"{RESTORE_TXN}/etcd.yaml.staged"
+        stage = rec.get("stage")
+        if stage == "offline_restored":
+            self._advance_restore("offline_restored", "etcd_return_requested")
+        elif stage != "etcd_return_requested":
+            return
+        if "ok" not in self._node_sh(
+            f"test -f {ETCD_MANIFEST} && test -f {staged} && cmp -s {ETCD_MANIFEST} {staged} && echo ok"
+        ):
+            self._node_sh(f"test -f {staged} && cp -a {staged} {ETCD_MANIFEST}")
+        for _ in range(60):
+            try:
+                if self.inner.api("get", "--raw=/readyz") == "ok":
+                    break
+            except RuntimeError:
+                pass
+            time.sleep(2)
+        else:
+            raise RuntimeError("API not ready after restore")
+        self._advance_restore("etcd_return_requested", "etcd_returned")
+
+    def _verify_restored_marker(self):
+        marker, _snapshot = self._require_restore_inputs()
+        rec = self._restore_rec()
+        observed = self._marker_cm(marker["namespace"], marker["name"])
+        if observed["data"]["value"] != marker["value"]:
+            raise RuntimeError("Restored marker value does not match snapshot-era marker")
+        rec["observed_marker_uid"] = observed["metadata"]["uid"]
+        rec["marker_uid_may_differ"] = observed["metadata"]["uid"] != marker["uid"]
+        self._advance_restore("etcd_returned", "restore_verified")
+        self.inner.state["etcd"]["restore_executed"] = True
+        self.inner.save()
+
+    def restore_continue(self):
+        self.inner.verify()
+        rec = self._restore_rec()
+        stage = rec.get("stage")
+        if stage is None:
+            self.restore_begin()
+            stage = rec.get("stage")
+        if stage in ("restore_requested", "etcd_stop_requested"):
+            self._stop_etcd_pod()
+        elif stage in ("etcd_stopped", "offline_restore_requested"):
+            self._offline_restore(self.inner.state["snapshot"])
+        elif stage in ("offline_restored", "etcd_return_requested"):
+            self._return_etcd_pod()
+        elif stage == "etcd_returned":
+            self._verify_restored_marker()
+        elif stage != "restore_verified":
+            raise RuntimeError(f"Unknown restore stage {stage!r}")
+        return self.inner.state
+
+    def restore_execute(self):
+        while self._restore_rec().get("stage") != "restore_verified":
+            self.restore_continue()
+        return self.inner.state
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "action",
-        choices=("create", "inspect", "etcd-inspect", "snapshot-observe", "delete"),
+        choices=(
+            "create",
+            "inspect",
+            "etcd-inspect",
+            "snapshot-observe",
+            "restore",
+            "restore-continue",
+            "delete",
+        ),
     )
     parser.add_argument("run_dir")
     args = parser.parse_args()
@@ -224,6 +409,10 @@ def main():
             print(json.dumps(fixture.etcd_inspect(), indent=2))
         elif args.action == "snapshot-observe":
             print(json.dumps(fixture.snapshot_observe(), indent=2, default=str))
+        elif args.action == "restore":
+            print(json.dumps(fixture.restore_execute(), indent=2, default=str))
+        elif args.action == "restore-continue":
+            print(json.dumps(fixture.restore_continue(), indent=2, default=str))
         elif args.action == "create":
             fixture.create()
         elif args.action == "inspect":
