@@ -44,7 +44,7 @@ All of the following must **agree on the same minor**, cited in the PR with a ve
 3. [CKAD product page](https://training.linuxfoundation.org/certification/certified-kubernetes-application-developer-ckad/)
 4. [CKS product page](https://training.linuxfoundation.org/certification/certified-kubernetes-security-specialist/)
 
-Write the verbatim product-page sentence into `exam_pin.verified_note`. If FAQ and product pages disagree, **do not bump** — report the contradiction on #2542.
+Write a **verbatim** LF FAQ or CKA product-page sentence into `exam_pin.verified_note` (plus source and date). Required for any `exam_pin` field edit, including re-verify-without-bump — a paraphrase alone is not enough. If FAQ and product pages disagree, **do not bump** — report the contradiction on #2542.
 
 Re-verified **2026-09-13**: CKA, CKAD, and CKS still state **Kubernetes v1.35**.
 
@@ -66,14 +66,25 @@ Re-verified **2026-09-13**: CKA, CKAD, and CKS still state **Kubernetes v1.35**.
 - `docs/pins/kubernetes.yaml` — `latest_stable_track` and `kind_node_images` only
 - `src/content/docs/changelog.md` — one What’s New bullet
 - `src/content/docs/k8s/index.md` — hub version list only if the supported set changed
-- this playbook / the bundle template, if the process itself changed
+
+**Process / playbook packet** (standing trigger and discovery hooks; may ship alone or with Track B) — allow:
+
+- `docs/release-maintenance/kubernetes-minor-release-playbook.md`
+- `docs/release-maintenance/kubernetes-release-bundle-template.md`
+- `.claude/rules/kubernetes-release-tracks.md`
+- `.claude/rules/new-content-checklist.md` — dual-track item only
+- `AGENTS.md` / `CLAUDE.md` — dual-track pointers only (not the exam-pin minor number)
+- `scripts/prompts/cold-start.md`
+- `scripts/agent_onboarding.md`
+- `scripts/prompts/module-writer.md` / `.claude/rules/module-quality.md` — playbook pointer only (not the exam-pin minor number)
+- `docs/pins/kubernetes.yaml` — `exam_pin.verified_date` / `verified_note` on re-verify-without-bump (`kubernetes_minor` unchanged)
 
 **Deny unless this is the rare Track A exam-pin bump PR:**
 
 - `src/content/docs/k8s/cka/**`, `ckad/**`, `cks/**`, `kcna/**`, `kcsa/**`
 - `src/content/docs/uk/**`
 - exam fixtures (`scripts/cka_certificate_fixture.py` and siblings)
-- version lines in `AGENTS.md`, `.claude/rules/module-quality.md`, `scripts/prompts/module-writer.md`
+- exam-pin **version-number** lines in `AGENTS.md`, `.claude/rules/module-quality.md`, `scripts/prompts/module-writer.md`
 
 **Never:**
 
@@ -126,7 +137,7 @@ When a minor leaves upstream support, add an “Archive” note on the Release R
 
 Only when the LF sources in **Verify exam pin** all show a new environment version:
 
-1. Update `exam_pin` in `docs/pins/kubernetes.yaml` (`kubernetes_minor`, `verified_date`, `verified_note` with the quoted sentence).
+1. Update `exam_pin` in `docs/pins/kubernetes.yaml` (`kubernetes_minor`, `verified_date`, `verified_note` with a verbatim LF FAQ or CKA sentence plus source and date).
 2. Update `AGENTS.md`, `.claude/rules/module-quality.md`, `scripts/prompts/module-writer.md` to the new pin.
 3. Grep `1.3N` / `v1-3N.docs` / `kindest/node:v1.3N` / fixture scripts — **surgical** patches only, driven by Release Radar migration notes.
 4. Separate PR from Track B authorship. Still `Refs #2542` (and #2280 if a cert-track upgrade issue is open). Never close #2542 from the bump PR alone.

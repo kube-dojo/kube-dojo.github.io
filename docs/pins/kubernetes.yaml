@@ -6,7 +6,7 @@ exam_pin:
   kubernetes_minor: "1.35"
   applies_to: ["cka", "ckad", "cks", "kcna", "kcsa"]
   verified_date: "2026-09-13"
-  verified_note: "LF FAQ + CKA/CKAD/CKS product pages still state Kubernetes v1.35 (re-checked 2026-09-13). Do not bump until those pages move."
+  verified_note: "\"The CKA exam environment is currently running Kubernetes v1.35\" (LF FAQ, 2026-09-13). CKA/CKAD/CKS product pages agree. Do not bump until that sentence changes."
 
 latest_stable_track:
   policy: "tracks upstream supported minor branches (typically three)"
