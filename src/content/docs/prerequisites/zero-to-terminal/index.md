@@ -75,7 +75,7 @@ Use the kitchen table as an optional orientation aid for the terms listed above.
 | 0.10 | [What is the Cloud?](module-0.10-what-is-the-cloud/) | 80–100 min | Cloud computing, AWS/Azure/GCP, where K8s fits |
 | 0.11 | [Your First Server -- Putting It All Together](module-0.11-your-first-server/) | 90–120 min | Capstone: deploy a real website using everything you've learned |
 
-These are planning estimates copied from the eleven module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **380–425 minutes (6 hours 20 minutes–7 hours 5 minutes)**; individual setup, reading, and practice time will vary.
+These are planning estimates copied from the eleven module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **940–1220 minutes (about 15 hours 40 minutes–20 hours 20 minutes)**; individual setup, reading, and practice time will vary.
 
 ---
 
@@ -117,7 +117,7 @@ If you are unsure where to go, start with Cloud Native 101 and keep the Linux pa
 
 ## Time Investment
 
-The module-header planning range is **6 hours 20 minutes–7 hours 5 minutes**. It is an unmeasured estimate, not a completion promise; setup, reading, and practice can take longer.
+The module-header planning range is **about 15 hours 40 minutes–20 hours 20 minutes**. It is an unmeasured estimate, not a completion promise; setup, reading, and practice can take longer.
 
 ---
 
