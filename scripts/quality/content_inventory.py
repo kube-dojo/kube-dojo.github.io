@@ -167,7 +167,25 @@ def _load_receipts(path: Path | None) -> tuple[dict[str, Any], list[str], bool]:
     return receipts, errors, False
 
 
-def build_inventory(docs_root: Path, evidence_path: Path | None = None) -> dict[str, Any]:
+def _bind_source_acceptance():
+    try:
+        from . import source_acceptance as sa
+    except ImportError:
+        import importlib
+        import sys
+        import types
+        pkg = sys.modules.setdefault("quality", types.ModuleType("quality"))
+        pkg.__path__ = [str(Path(__file__).resolve().parent)]
+        sa = importlib.import_module("quality.source_acceptance")
+    return sa.bind_source_acceptance, sa.load_seed_bytes, sa.nested_source_receipt
+
+
+def build_inventory(
+    docs_root: Path,
+    evidence_path: Path | None = None,
+    *,
+    seeds_dir: Path | None = None,
+) -> dict[str, Any]:
     """Return inventory JSON data without writing files or changing runtime state."""
     docs_root = docs_root.resolve()
     if not docs_root.is_dir():
@@ -189,6 +207,11 @@ def build_inventory(docs_root: Path, evidence_path: Path | None = None) -> dict[
     )
     rel_paths = {path.relative_to(docs_root).as_posix() for path in source_paths}
     receipts, receipt_errors, invalid_input = _load_receipts(evidence_path)
+    bind_sa, load_seed, nested_receipt = _bind_source_acceptance()
+    seed_root = seeds_dir
+    root = docs_root.resolve()
+    if seed_root is None and root.parts[-3:] == ("src", "content", "docs"):
+        seed_root = root.parents[2] / "docs" / "citation-seeds"
     pages: list[dict[str, Any]] = []
 
     for path in source_paths:
@@ -228,6 +251,16 @@ def build_inventory(docs_root: Path, evidence_path: Path | None = None) -> dict[
             page["evidence"] = evidence
             if error:
                 receipt_errors.append(f"{rel.as_posix()}: {error}")
+        entry = None if invalid_input else receipts.get(rel.as_posix())
+        result = bind_sa(
+            nested_receipt(entry),
+            page_bytes=raw,
+            seed_bytes=load_seed(seed_root, rel.as_posix()),
+        )
+        page["evidence"]["source_acceptance"] = result
+        statuses = page["evidence"]["independent_statuses"]
+        if result.get("accepted") is not True and statuses.get("technical_source") == "pass":
+            statuses["technical_source"] = "unknown"
         pages.append(page)
 
     receipt_paths = set(receipts)

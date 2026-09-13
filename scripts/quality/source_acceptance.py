@@ -8,8 +8,10 @@ no status store, no promotion/backfill.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from .content_inventory import _normalise_digest
@@ -18,6 +20,62 @@ SCHEMA = "kubedojo.source_acceptance.v1"
 SCHEMA_VERSION = 1
 FAILING_VERDICTS = frozenset({"UNSUPPORTED", "CONTRADICTED", "UNREADABLE"})
 UNKNOWN_FAMILIES = frozenset({"", "unknown"})
+EVIDENCE_LEDGER = Path("docs/content-upgrade/evidence.json")
+SEEDS_DIR = Path("docs/citation-seeds")
+
+
+def _digest(data: bytes) -> str:
+    return f"sha256:{hashlib.sha256(data).hexdigest()}"
+
+
+def nested_source_receipt(entry: Any) -> Any:
+    return entry.get("source_acceptance") if isinstance(entry, dict) else None
+
+
+def load_seed_bytes(seeds_dir: Path | None, page_rel: str) -> bytes | None:
+    if seeds_dir is None:
+        return None
+    key = Path(page_rel).with_suffix("").as_posix().replace("/", "-")
+    try:
+        return (seeds_dir / f"{key}.json").read_bytes()
+    except OSError:
+        return None
+
+
+def bind_source_acceptance(
+    receipt: Any, *, page_bytes: bytes, seed_bytes: bytes | None,
+) -> dict[str, Any]:
+    page_digest = _digest(page_bytes)
+    if seed_bytes is None:
+        return evaluate_source_acceptance(
+            receipt, page_digest=page_digest, seed_digest="", seed_claim_ids=(),
+        )
+    try:
+        payload = json.loads(seed_bytes.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError):
+        return _reject("seed_malformed")
+    claims = payload.get("claims") if isinstance(payload, dict) else []
+    ids = [
+        str(c.get("claim_id")).strip()
+        for c in claims
+        if isinstance(c, dict) and str(c.get("claim_id") or "").strip()
+    ]
+    return evaluate_source_acceptance(
+        receipt, page_digest=page_digest, seed_digest=_digest(seed_bytes), seed_claim_ids=ids,
+    )
+
+
+def bind_page(repo_root: Path, page_rel: str, page_bytes: bytes) -> dict[str, Any]:
+    from .content_inventory import _load_receipts
+    ledger = repo_root / EVIDENCE_LEDGER
+    receipts, _, invalid = _load_receipts(ledger if ledger.is_file() else None)
+    entry = None if invalid else receipts.get(page_rel)
+    seeds = repo_root / SEEDS_DIR
+    return bind_source_acceptance(
+        nested_source_receipt(entry),
+        page_bytes=page_bytes,
+        seed_bytes=load_seed_bytes(seeds if seeds.is_dir() else None, page_rel),
+    )
 
 
 def _reject(reason: str) -> dict[str, Any]:

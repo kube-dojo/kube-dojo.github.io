@@ -4014,6 +4014,9 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
       - ``cleared`` — frontmatter says ``revision_pending`` is not true and ``citations_verified`` is true
       - ``not_yet_enqueued`` — every other state
 
+    Totals ``source_accepted`` is independent of ``cleared`` and counts only
+    complete applicable receipts bound to the live page and seed.
+
     Readiness % = ``cleared / total``. Tracks come out in the canonical
     ``TRACK_ORDER``; within a track, sections are alphabetical so the
     grid layout is stable across calls.
@@ -4023,6 +4026,11 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
     from status import TRACK_ORDER, _extract_frontmatter, _iter_en_modules, _track_for_key
 
     read_errors = 0
+    try:
+        from quality.source_acceptance import bind_page
+    except ImportError:
+        bind_page = None
+    source_accepted = 0
 
     # track_slug -> section_slug -> counts
     grid: dict[str, dict[str, dict[str, int]]] = {}
@@ -4034,7 +4042,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         rel = path.relative_to(docs_root).as_posix()
         module_key = rel[:-3] if rel.endswith(".md") else rel
         try:
-            path.read_text(encoding="utf-8")
+            page_bytes = path.read_bytes()
         except OSError:
             read_errors += 1
             continue
@@ -4063,6 +4071,8 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         )
         s["total"] += 1
         s[bucket] += 1
+        if bind_page is not None and bind_page(repo_root, rel, page_bytes).get("accepted") is True:
+            source_accepted += 1
 
     track_labels = dict(TRACK_ORDER)
     canonical_order = [slug for slug, _ in TRACK_ORDER]
@@ -4125,6 +4135,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         grand["in_flight"] += track_in_flight
         grand["dead_letter"] += track_dead
         grand["not_yet_enqueued"] += track_notenq
+    grand["source_accepted"] = source_accepted
 
     grand["readiness_pct"] = (
         round(100.0 * grand["cleared"] / grand["total"], 1) if grand["total"] else 0.0
@@ -9790,6 +9801,17 @@ def _v_docs_frontmatter(repo_root: Path) -> tuple:
         try:
             rel = path.relative_to(repo_root).as_posix()
             stat = path.stat()
+        except OSError:
+            continue
+        sig.update(rel.encode("utf-8"))
+        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode("utf-8"))
+    extras = [repo_root / "docs/content-upgrade/evidence.json"]
+    seeds = repo_root / "docs/citation-seeds"
+    extras.extend(sorted(seeds.glob("*.json")) if seeds.is_dir() else [])
+    for extra in extras:
+        try:
+            rel = extra.relative_to(repo_root).as_posix()
+            stat = extra.stat()
         except OSError:
             continue
         sig.update(rel.encode("utf-8"))
