@@ -125,6 +125,8 @@ class TestEtcdFixture(unittest.TestCase):
                 return "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok"
             if tool == "docker" and args[0] == "exec" and shell.startswith("etcdctl"):
                 return "" if "snapshot save" in shell else "present"
+            if tool == "docker" and args[0] == "exec" and shell.startswith("mkdir -p"):
+                return ""
             if tool == "docker" and args[0] == "cp":
                 Path(args[2]).write_bytes(b"snap")
                 return ""

@@ -214,7 +214,9 @@ class EtcdFixture:
         snap_path = self.inner.directory / SNAPSHOT_FILE
         if self.inner.state.get("snapshot") or snap_path.exists():
             raise RuntimeError("Refusing to overwrite existing snapshot")
-        node_snap = "/tmp/etcd-snapshot-" + uuid.uuid4().hex + ".db"
+        self._node_sh(f"mkdir -p {RESTORE_TXN}")
+        # kind node /tmp is not visible to docker cp; stage under /var/lib.
+        node_snap = f"{RESTORE_TXN}/etcd-snapshot-{uuid.uuid4().hex}.db"
         self._etcdctl("snapshot", "save", node_snap)
         status = json.loads(
             self.inner.run(
@@ -391,8 +393,8 @@ class EtcdFixture:
         if "restored" not in self._node_sh(
             f"if [ -d {restore_dir}/member ]; then echo restored; fi"
         ):
-            self._node_sh(f"rm -rf {restore_dir}; mkdir -p {restore_dir}")
-            node_snap = f"/tmp/etcd-restore-{uuid.uuid4().hex}.db"
+            self._node_sh(f"rm -rf {restore_dir}; mkdir -p {restore_dir} {RESTORE_TXN}")
+            node_snap = f"{RESTORE_TXN}/etcd-restore-{uuid.uuid4().hex}.db"
             self.inner.run("docker", "cp", snapshot["path"], f"{self._node_id()}:{node_snap}")
             params = self._etcd_restore_params()
             flags = " ".join(f"--{k}={shlex.quote(params[k])}" for k in sorted(params))
