@@ -88,7 +88,7 @@ TASK: Write a complete KubeDojo educational module.
 - YAML: 2-space indentation, valid syntax
 - Code blocks must specify the language (```bash, ```yaml, ```go, etc.)
 - Do NOT rely on shell aliases in runnable Bash examples. Do not define a short alias for `kubectl`, and do not use the `k` shorthand for get/describe/apply-style commands inside fenced ```bash / ```sh / ```shell / ```zsh blocks. Aliases do not expand in non-interactive shells, so use the full `kubectl` binary name in copy-paste examples. Prose like "many engineers use a short kubectl alias interactively" is fine.
-- Kubernetes version: 1.35+ for exam-pinned cert modules; use Release Radar (`/k8s/releases/`) for 1.36/1.37+ deltas
+- Kubernetes version: 1.35+ for exam-pinned cert modules; use Release Radar (`/k8s/releases/`) for 1.36/1.37+ deltas. Standing trigger for a new minor: `docs/release-maintenance/kubernetes-minor-release-playbook.md`. Do not rewrite cert tracks on upstream GA.
 
 **PEDAGOGICAL REQUIREMENTS** (from `docs/pedagogical-framework.md`):
 - Every module must operate at Bloom's Taxonomy Level 3 (Apply) or above

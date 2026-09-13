@@ -55,7 +55,7 @@ paths:
 - Code blocks specify language (```bash, ```yaml, ```go)
 - YAML: 2-space indentation
 - kubectl alias: use `k` after explaining it once
-- K8s version: 1.35+ for exam-pinned cert content; Release Radar covers supported upstream minors (see `docs/pins/kubernetes.yaml`)
+- K8s version: 1.35+ for exam-pinned cert content; Release Radar covers supported upstream minors (see `docs/pins/kubernetes.yaml` and `docs/release-maintenance/kubernetes-minor-release-playbook.md`)
 - Do NOT repeat the number 47 (known LLM pattern)
 - Do NOT use emojis
 - Do NOT write "list of facts" modules — if sections are just bullets, it's a reference doc, not a lesson

@@ -5,8 +5,8 @@
 exam_pin:
   kubernetes_minor: "1.35"
   applies_to: ["cka", "ckad", "cks", "kcna", "kcsa"]
-  verified_date: "2026-09-12"
-  verified_note: "Curriculum remains exam-pinned at 1.35 until LF/CNCF exam docs show otherwise."
+  verified_date: "2026-09-13"
+  verified_note: "LF FAQ + CKA/CKAD/CKS product pages still state Kubernetes v1.35 (re-checked 2026-09-13). Do not bump until those pages move."
 
 latest_stable_track:
   policy: "tracks upstream supported minor branches (typically three)"

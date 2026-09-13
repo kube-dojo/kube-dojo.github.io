@@ -91,6 +91,8 @@ npx astro preview          # preview built site
 | `docs/pedagogical-framework.md` | Educational research & guidelines |
 | `docs/quality-rubric.md` | 1-5 rubric for module/lab quality |
 | `scripts/prompts/module-writer.md` | Standard prompt for module creation |
+| `docs/pins/kubernetes.yaml` | Exam pin vs latest-stable minors + kind node images |
+| `docs/release-maintenance/kubernetes-minor-release-playbook.md` | Standing trigger for each new Kubernetes minor |
 | `scripts/dispatch.py` / `scripts/dispatch_smart.py` | CLI dispatchers |
 | `astro.config.mjs` | Starlight config (sidebar, i18n, theme) |
 

@@ -20,6 +20,9 @@ bash scripts/cold-start.sh --manifest
 Emits labeled sections: `workspace`, `pending-decisions`, `briefing`, `orient`, `session`.
 On API failure: `STATUS.md` excerpt + handoff path, exit 0. Copy-paste ritual:
 [`scripts/prompts/cold-start.md`](prompts/cold-start.md).
+If the issue is a Kubernetes minor or exam-pin question, read
+[`docs/release-maintenance/kubernetes-minor-release-playbook.md`](../docs/release-maintenance/kubernetes-minor-release-playbook.md)
+before editing (exam pin ≠ latest-stable Release Radar).
 
 Individual endpoints (when you need one call without the full ritual):
 

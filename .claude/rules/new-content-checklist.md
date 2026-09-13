@@ -13,3 +13,4 @@ EVERY TIME new modules are added, do ALL of these BEFORE committing:
 5. **Build** — `npm run build` — verify no errors
 6. **Health check** — `python scripts/check_site_health.py` — 0 errors
 7. **changelog.md** — add entry for significant additions
+8. **K8s dual-track** — cert modules stay on `docs/pins/kubernetes.yaml` → `exam_pin`. New upstream minors go under `src/content/docs/k8s/releases/` per `docs/release-maintenance/kubernetes-minor-release-playbook.md`. Do not rewrite CKA/CKAD/CKS because kubernetes.io GA'd a minor.
