@@ -8,6 +8,7 @@ sidebar:
 
 ## September 2026
 
+- **Exam-pin verification sources.** The [exam version policy](/k8s/releases/exam-version-policy/) now names the official LF FAQ and CKA/CKAD/CKS product pages to re-check before any exam-pin bump, and the agent playbook is the standing trigger for each new upstream minor. Re-verified 2026-09-13: exam environment still **v1.35**. Workstream #2542.
 - **Kubernetes Release Radar (1.35 / 1.36 / 1.37).** New [Release Radar](/k8s/releases/) under Certifications: dual-track [exam version policy](/k8s/releases/exam-version-policy/) (exam pin stays **1.35** until LF moves), per-minor pages for [1.37 Garhwal](/k8s/releases/v1.37/), [1.36 Haru](/k8s/releases/v1.36/), and [1.35 Timbernetes](/k8s/releases/v1.35/), plus a [kind practice matrix](/k8s/releases/practice-kind-matrix/). Machine pins in `docs/pins/kubernetes.yaml`; agent playbook in `docs/release-maintenance/`. Workstream #2542 (X06).
 
 ## June 2026

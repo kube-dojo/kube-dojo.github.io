@@ -166,9 +166,12 @@ and final `git status --short --branch` for worktree and primary checkout.
 
 Published content lives in `src/content/docs/`; Ukrainian content mirrors it in
 `src/content/docs/uk/`. Navigation uses Starlight configuration and frontmatter,
-including `title:` and `sidebar.order:`. Kubernetes **exam-pinned** content targets 1.35 unless
-the task establishes a newer target. Pipeline v2 is the default; v1 remains for
-compatibility.
+including `title:` and `sidebar.order:`. Kubernetes **exam-pinned** content targets the
+minor in `docs/pins/kubernetes.yaml` → `exam_pin` (currently 1.35) unless a web-verified
+LF/CNCF exam-environment change establishes a newer target. Latest-stable Release Radar
+(`src/content/docs/k8s/releases/`) is a **separate** track — every new upstream minor
+starts at `docs/release-maintenance/kubernetes-minor-release-playbook.md`. Pipeline v2
+is the default; v1 remains for compatibility.
 
 Teach the reasons behind concepts and use worked examples. For mathematics,
 explain the purpose and use concrete demonstrations before formalism. Preserve

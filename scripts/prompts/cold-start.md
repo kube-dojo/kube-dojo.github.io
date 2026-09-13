@@ -13,6 +13,9 @@ and the relevant files; no service startup or full handoff is needed.
 ```
 1. Read GitHub issue #N verbatim (parent task).
    gh issue view N --repo kube-dojo/kube-dojo.github.io
+   If the issue is a Kubernetes minor, exam-version bump, or “update certs to latest K8s”:
+   read docs/release-maintenance/kubernetes-minor-release-playbook.md before editing.
+   Dual-track: exam_pin ≠ latest_stable_track. Refs #2542 only (never Resolves).
 
 2. Orient (services-up + workspace + API):
    KUBEDOJO_ISSUE=N bash scripts/cold-start.sh

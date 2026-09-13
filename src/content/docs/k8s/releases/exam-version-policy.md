@@ -14,7 +14,7 @@ KubeDojo runs **two tracks** on purpose. Mixing them is how learners fail exams 
 |-------|-------|
 | Current pin | **Kubernetes 1.35** |
 | Applies to | CKA, CKAD, CKS, and associate tracks that declare the same target |
-| Verified | 2026-09-12 (re-check LF/CNCF exam docs before any bump) |
+| Verified | 2026-09-13 (LF FAQ + CKA/CKAD/CKS product pages still say v1.35) |
 | Source of truth | `docs/pins/kubernetes.yaml` → `exam_pin` |
 
 **Rules**
@@ -22,6 +22,20 @@ KubeDojo runs **two tracks** on purpose. Mixing them is how learners fail exams 
 - Cert modules teach the **exam environment** version, not “whatever is newest on kubernetes.io”.
 - Upstream GA of 1.36 or 1.37 does **not** by itself authorize a cert-corpus rewrite.
 - Bump the pin only after web-verified evidence that the Linux Foundation / CNCF exam (or published curriculum PDF) moved.
+- The LF note that exam environments “align with the most recent K8s minor version within approximately 4 to 8 weeks” is a **forecast**. It is not proof that today’s exam already moved.
+
+### How to verify the exam pin
+
+Agents and editors must re-check these official pages on the same day before changing `exam_pin` (all must agree):
+
+| Source | What to read |
+|--------|----------------|
+| [LF FAQ — exam environment](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks) | “What application version is running in the Exam Environment?” |
+| [CKA](https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/) | “The exam is based on Kubernetes v…” |
+| [CKAD](https://training.linuxfoundation.org/certification/certified-kubernetes-application-developer-ckad/) | same sentence |
+| [CKS](https://training.linuxfoundation.org/certification/certified-kubernetes-security-specialist/) | same sentence |
+
+Re-verified **2026-09-13**: CKA, CKAD, and CKS still state **Kubernetes v1.35**. Record the date and a verbatim quote in `docs/pins/kubernetes.yaml` when the pin moves.
 
 Look for the inline target callouts already used in cert part-0 modules (for example CKA exam strategy). Prefer linking here rather than inventing a second story per lesson.
 
