@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[MEDIUM]` - Core workload management.
 >
-> **Time to Complete**: 40-45 minutes.
+> **Time to Complete**: 90–130 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.3: Pods. This module assumes a Kubernetes 1.35 or newer cluster and a working shell. All runnable examples use the full `kubectl` command so they can be copied into scripts as well as interactive terminals.
 

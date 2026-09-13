@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 60-75 minutes
+> **Time to Complete**: 60–90 minutes (long-form read)
 >
 > **Prerequisites**: Modules 1.1-1.7, including basic Kubernetes resources, pods, services, deployments, labels, and the `kubectl` workflow
 >

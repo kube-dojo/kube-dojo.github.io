@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[MEDIUM]` - Essential networking concept for every application that runs behind a controller
 >
-> **Time to Complete**: 35-40 minutes of reading and lab work, with extra practice time if you intentionally break selectors
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 4 (Deployments), especially labels, replicas, rollout behavior, and why pods are replaceable
 

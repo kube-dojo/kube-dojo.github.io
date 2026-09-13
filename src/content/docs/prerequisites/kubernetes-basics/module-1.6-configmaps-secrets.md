@@ -7,7 +7,7 @@ sidebar:
 ---
 > **Complexity**: `[MEDIUM]` - Essential configuration management
 >
-> **Time to Complete**: 35-40 minutes
+> **Time to Complete**: 60–90 minutes (long-form read)
 >
 > **Prerequisites**: Module 1.3 (Pods)
 

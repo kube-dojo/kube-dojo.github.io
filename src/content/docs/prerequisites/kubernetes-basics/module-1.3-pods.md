@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 60-75 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.2 (kubectl Basics)
 

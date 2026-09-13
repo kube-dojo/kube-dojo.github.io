@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 45-60 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Docker installed, Cloud Native 101 completed
 
