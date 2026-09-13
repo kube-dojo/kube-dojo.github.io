@@ -7,7 +7,7 @@ sidebar:
 ---
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 50-60 minutes
+> **Time to Complete**: 50–80 minutes (long-form read)
 >
 > **Prerequisites**: [Module 1.4: Deployments](/prerequisites/kubernetes-basics/module-1.4-deployments/), [Module 1.5: Services](/prerequisites/kubernetes-basics/module-1.5-services/)
 

@@ -14,7 +14,7 @@ lab:
 ---
 > **Complexity**: `[MEDIUM]` - Essential commands to master.
 >
-> **Time to Complete**: 60-75 minutes.
+> **Time to Complete**: 100–140 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.1 (a working kind or minikube cluster), basic familiarity with the Linux shell, and a `kubectl` binary on your `$PATH` [matching your Kubernetes 1.35+ cluster within one minor version](https://kubernetes.io/releases/version-skew-policy/).
 
