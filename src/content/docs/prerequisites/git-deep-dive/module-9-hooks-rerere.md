@@ -9,7 +9,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 100–140 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Previous module in Git Deep Dive
 >
