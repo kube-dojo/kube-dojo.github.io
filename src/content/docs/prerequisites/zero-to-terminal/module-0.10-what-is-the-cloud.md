@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[QUICK]` - Concepts that click into place
 >
-> **Time to Complete**: 35 minutes
+> **Time to Complete**: 80–100 minutes (long-form beginner read)
 >
 > **Prerequisites**: [Module 0.8 - Servers and SSH](/prerequisites/zero-to-terminal/module-0.8-servers-and-ssh/)
 
