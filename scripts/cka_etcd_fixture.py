@@ -28,6 +28,8 @@ ETCD_MANIFEST = "/etc/kubernetes/manifests/etcd.yaml"
 RESTORE_TXN = "/var/lib/etcd-fixture-transaction"
 MARKER_NAME = "snapshot-marker"
 SNAPSHOT_FILE = "etcd-snapshot.db"
+NODE_ETCDCTL = "/usr/local/bin/etcdctl"
+NODE_ETCDUTL = "/usr/local/bin/etcdutl"
 
 
 class EtcdFixture:
@@ -46,6 +48,59 @@ class EtcdFixture:
         if not self.inner.state.get("etcd"):
             self.etcd_inspect()
         return self.inner.state["etcd"]
+
+    def _discover_etcd_image(self):
+        raw = self.inner.run(
+            "docker",
+            "exec",
+            self._node_id(),
+            "crictl",
+            "ps",
+            "--name",
+            "etcd",
+            "-o",
+            "json",
+        )
+        containers = json.loads(raw).get("containers") or []
+        if not containers:
+            raise RuntimeError("No running etcd container on owned node")
+        image = containers[0].get("image", {}).get("userSpecifiedImage") or ""
+        if not image.startswith("registry.k8s.io/etcd:"):
+            raise RuntimeError(f"Unexpected etcd image ref: {image!r}")
+        return image
+
+    def _ensure_etcd_tools(self):
+        node_id = self._node_id()
+        present = self.inner.run(
+            "docker",
+            "exec",
+            node_id,
+            "sh",
+            "-c",
+            f"if [ -x {NODE_ETCDCTL} ] && [ -x {NODE_ETCDUTL} ]; then echo present; fi",
+        )
+        if "present" in present:
+            return {"source": "preinstalled"}
+        image = self._discover_etcd_image()
+        staging = self.inner.directory / "etcd-tools"
+        staging.mkdir(mode=0o700, exist_ok=True)
+        cid = self.inner.run("docker", "create", "--entrypoint", "/bin/true", image)
+        try:
+            self.inner.run("docker", "cp", f"{cid}:{NODE_ETCDCTL}", str(staging / "etcdctl"))
+            self.inner.run("docker", "cp", f"{cid}:{NODE_ETCDUTL}", str(staging / "etcdutl"))
+        finally:
+            self.inner.run("docker", "rm", "-f", cid)
+        self.inner.run("docker", "cp", str(staging / "etcdctl"), f"{node_id}:{NODE_ETCDCTL}")
+        self.inner.run("docker", "cp", str(staging / "etcdutl"), f"{node_id}:{NODE_ETCDUTL}")
+        self.inner.run(
+            "docker",
+            "exec",
+            node_id,
+            "sh",
+            "-c",
+            f"chmod 0755 {NODE_ETCDCTL} {NODE_ETCDUTL}",
+        )
+        return {"source": "etcd_image", "image": image}
 
     def _etcdctl(self, *args):
         pki = ETCD_PKI
@@ -75,6 +130,7 @@ class EtcdFixture:
     def etcd_inspect(self):
         self.inner.verify()
         self.inner.inspect()
+        tools = self._ensure_etcd_tools()
         node_id = self._node_id()
         inventory = self.inner.run(
             "docker",
@@ -108,6 +164,7 @@ class EtcdFixture:
             "pki_dir": ETCD_PKI,
             "tool_inventory": inventory,
             "etcdctl_version_line": version,
+            "tools_provision": tools,
             "restore_executed": False,
         }
         self.inner.save()
