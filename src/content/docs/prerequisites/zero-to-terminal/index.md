@@ -63,17 +63,17 @@ Use the kitchen table as an optional orientation aid for the terms listed above.
 
 | Module | Title | Time | What You'll Learn |
 |--------|-------|------|-------------------|
-| 0.1 | [What is a Computer?](module-0.1-what-is-a-computer/) | 35 min | CPU, RAM, disk, OS -- the kitchen hardware |
-| 0.2 | [What is a Terminal?](module-0.2-what-is-a-terminal/) | 25–35 min | Opening and understanding the terminal |
-| 0.3 | [First Terminal Commands](module-0.3-first-commands/) | 25 min | Navigate, create, move, and delete files |
-| 0.4 | [Files and Directories](module-0.4-files-and-directories/) | 25–30 min | Paths, file types, organizing your filesystem |
-| 0.5 | [Editing Files](module-0.5-editing-files/) | 35 min | Edit files with nano, write your first script |
-| 0.6 | [Git Basics — Track Your Work](module-0.6-git-basics/) | 60 min | Track your work with Git -- init, add, commit, log |
-| 0.7 | [What is Networking?](module-0.7-what-is-networking/) | 35–45 min | IPs, ports, DNS -- how computers talk to each other |
-| 0.8 | [Servers and SSH](module-0.8-servers-and-ssh/) | 25 min | What servers are, how to connect remotely |
-| 0.9 | [Software and Packages](module-0.9-software-and-packages/) | 25–30 min | Installing and managing software from the terminal |
-| 0.10 | [What is the Cloud?](module-0.10-what-is-the-cloud/) | 35 min | Cloud computing, AWS/Azure/GCP, where K8s fits |
-| 0.11 | [Your First Server -- Putting It All Together](module-0.11-your-first-server/) | 55–70 min | Capstone: deploy a real website using everything you've learned |
+| 0.1 | [What is a Computer?](module-0.1-what-is-a-computer/) | 90–120 min | CPU, RAM, disk, OS -- the kitchen hardware |
+| 0.2 | [What is a Terminal?](module-0.2-what-is-a-terminal/) | 90–120 min | Opening and understanding the terminal |
+| 0.3 | [First Terminal Commands](module-0.3-first-commands/) | 80–100 min | Navigate, create, move, and delete files |
+| 0.4 | [Files and Directories](module-0.4-files-and-directories/) | 90–120 min | Paths, file types, organizing your filesystem |
+| 0.5 | [Editing Files](module-0.5-editing-files/) | 80–100 min | Edit files with nano, write your first script |
+| 0.6 | [Git Basics — Track Your Work](module-0.6-git-basics/) | 90–120 min | Track your work with Git -- init, add, commit, log |
+| 0.7 | [What is Networking?](module-0.7-what-is-networking/) | 90–120 min | IPs, ports, DNS -- how computers talk to each other |
+| 0.8 | [Servers and SSH](module-0.8-servers-and-ssh/) | 80–100 min | What servers are, how to connect remotely |
+| 0.9 | [Software and Packages](module-0.9-software-and-packages/) | 80–100 min | Installing and managing software from the terminal |
+| 0.10 | [What is the Cloud?](module-0.10-what-is-the-cloud/) | 80–100 min | Cloud computing, AWS/Azure/GCP, where K8s fits |
+| 0.11 | [Your First Server -- Putting It All Together](module-0.11-your-first-server/) | 90–120 min | Capstone: deploy a real website using everything you've learned |
 
 These are planning estimates copied from the eleven module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **380–425 minutes (6 hours 20 minutes–7 hours 5 minutes)**; individual setup, reading, and practice time will vary.
 
