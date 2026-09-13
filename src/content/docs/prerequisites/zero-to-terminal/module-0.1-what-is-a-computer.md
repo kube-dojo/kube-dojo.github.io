@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[QUICK]` - No technical experience needed
 >
-> **Time to Complete**: 35 minutes
+> **Time to Complete**: 90–120 minutes (long-form beginner read + inventory practice)
 >
 > **Prerequisites**: None. Seriously, none. If you can read this, you're ready.
 

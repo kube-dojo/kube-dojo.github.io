@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[QUICK]` - Absolute beginner
 >
-> **Time to Complete**: 25-30 minutes
+> **Time to Complete**: 90–120 minutes (long-form beginner read + practice)
 >
 > **Prerequisites**: [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/) — You should be able to open a terminal and type commands.
 

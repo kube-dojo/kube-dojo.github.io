@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[QUICK]` - Follow along and type what you see
 >
-> **Time to Complete**: 25 minutes
+> **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >
 > **Prerequisites**: [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/) — You should be able to open a terminal and type commands.
 
