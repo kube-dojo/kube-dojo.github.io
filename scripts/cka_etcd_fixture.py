@@ -245,11 +245,15 @@ class EtcdFixture:
         )
         params = {}
         for line in manifest_text.splitlines():
-            stripped = line.strip().lstrip("- ").strip()
-            for key in keys:
-                prefix = f"--{key}="
-                if stripped.startswith(prefix):
-                    params[key] = stripped[len(prefix) :].strip().strip("\"'")
+            match = re.search(
+                r"--(name|initial-cluster|initial-advertise-peer-urls|initial-cluster-token)=(\S+)",
+                line,
+            )
+            if not match:
+                continue
+            key, value = match.group(1), match.group(2).strip("\"'")
+            if key in keys:
+                params[key] = value
         return params
 
     def _etcd_restore_params(self):
