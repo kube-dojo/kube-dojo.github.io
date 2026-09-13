@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[QUICK]` - Absolute beginner
 >
-> **Time to Complete**: 35-45 minutes
+> **Time to Complete**: 90–120 minutes (long-form beginner read)
 >
 > **Prerequisites**: [Module 0.4: Files and Directories](../module-0.4-files-and-directories/) - You should be comfortable running commands and navigating directories.
 

@@ -8,7 +8,7 @@ sidebar:
 
 > **Complexity**: `[QUICK]`
 >
-> **Time to Complete**: 60 minutes
+> **Time to Complete**: 90–120 minutes (long-form beginner read + git drills)
 >
 > **Prerequisites**: Module 0.5 (Editing Files)
 

@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[QUICK]` - Concepts and a hands-on connection
 >
-> **Time to Complete**: 25 minutes
+> **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >
 > **Prerequisites**: [Module 0.5 - Editing Files](../module-0.5-editing-files/)
 
