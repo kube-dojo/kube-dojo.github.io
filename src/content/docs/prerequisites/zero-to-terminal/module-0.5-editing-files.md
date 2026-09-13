@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[QUICK]` - Type what you see, save, verify, and run a tiny script
 >
-> **Time to Complete**: 35 minutes
+> **Time to Complete**: 80–100 minutes (read + editor drills)
 >
 > **Prerequisites**: [Module 0.3 - First Terminal Commands](../module-0.3-first-commands/)
 

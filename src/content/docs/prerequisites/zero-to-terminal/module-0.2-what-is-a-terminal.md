@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[QUICK]` - Absolute beginner
 >
-> **Time to Complete**: 25-35 minutes
+> **Time to Complete**: 90–120 minutes (long-form beginner read + hands-on prompts)
 >
 > **Prerequisites**: None. Seriously, none. If you can read this sentence, you're ready.
 
