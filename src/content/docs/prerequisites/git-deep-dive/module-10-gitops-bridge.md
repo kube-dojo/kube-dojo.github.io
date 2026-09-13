@@ -9,7 +9,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]`.
 >
-> **Time to Complete**: 60 minutes.
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Modules 1-9 of the Git Deep Dive, basic Kubernetes manifests, pull requests, semantic versioning, and enough command-line comfort to inspect YAML safely.
 
