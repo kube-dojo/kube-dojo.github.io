@@ -13,7 +13,7 @@ lab:
 ---
 > **Complexity**: `[QUICK]` - Absolute beginner
 >
-> **Time to Complete**: 25-30 minutes
+> **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >
 > **Prerequisites**: [Module 0.7: What is Networking?](/prerequisites/zero-to-terminal/module-0.7-what-is-networking/) - You should be comfortable with the terminal, files, and basic networking concepts.
 
