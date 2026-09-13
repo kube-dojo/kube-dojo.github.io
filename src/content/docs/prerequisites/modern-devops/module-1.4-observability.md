@@ -9,7 +9,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]` - Critical operational skill
 >
-> **Time to Complete**: 90-120 minutes
+> **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Basic understanding of distributed systems, Kubernetes deployments, and API architectures.
 

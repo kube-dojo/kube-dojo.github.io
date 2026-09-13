@@ -8,7 +8,7 @@ sidebar:
 
 > **Complexity:** `[MEDIUM]`
 >
-> **Time to Complete:** 60-75 minutes
+> **Time to Complete**: 80–120 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites:** [Module 1.1: Infrastructure as Code](/prerequisites/modern-devops/module-1.1-infrastructure-as-code/), [Module 1.2: GitOps](/prerequisites/modern-devops/module-1.2-gitops/), basic Git knowledge
 
