@@ -171,11 +171,18 @@ class TestEtcdFixture(unittest.TestCase):
     def test_restore_interrupt_leaves_restore_executed_false(self):
         tmp_path = Path(tempfile.mkdtemp())
         state = self._restore_state(tmp_path, stage="restore_requested")
+        manifest = (
+            "    - --name=etcd\n"
+            "    - --initial-cluster=etcd=https://127.0.0.1:2380\n"
+            "    - --initial-advertise-peer-urls=https://127.0.0.1:2380\n"
+            "    - --initial-cluster-token=tok\n"
+        )
 
         def run(tool, *args):
-            if tool == "docker" and args[0] == "exec" and "grep -oE" in args[-1]:
-                return "--name=etcd\n--initial-cluster=etcd=https://127.0.0.1:2380"
             if tool == "docker" and args[0] == "exec" and args[2] == "sh":
+                shell = args[-1]
+                if "cat " in shell:
+                    return manifest
                 raise InterruptedError("Signal 2")
             raise AssertionError(args)
 
@@ -185,3 +192,76 @@ class TestEtcdFixture(unittest.TestCase):
         with self.assertRaises(InterruptedError):
             wrapper.restore_continue()
         self.assertFalse(fake.state["etcd"]["restore_executed"])
+
+    def test_parse_etcd_restore_params_from_manifest(self):
+        wrapper, _fake = self._wrapper([])
+        params = wrapper._parse_etcd_restore_params(
+            "    - --name=etcd\n"
+            "    - --initial-cluster=etcd=https://127.0.0.1:2380\n"
+            "    - --initial-advertise-peer-urls=https://127.0.0.1:2380\n"
+            "    - --initial-cluster-token=tok\n"
+        )
+        self.assertEqual(params["name"], "etcd")
+        self.assertIn("2380", params["initial-cluster"])
+
+    def test_offline_restore_resumes_when_restore_dir_exists(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="offline_restore_requested")
+        state["etcd"]["restore"].update(
+            {
+                "live_data_moved": "/var/lib/etcd-pre-abc",
+                "restore_data_dir": "/var/lib/etcd-restored-abc",
+                "restore_params": {
+                    "name": "etcd",
+                    "initial-cluster": "etcd=https://127.0.0.1:2380",
+                    "initial-advertise-peer-urls": "https://127.0.0.1:2380",
+                    "initial-cluster-token": "tok",
+                },
+                "offline_substage": "live_data_aside",
+            }
+        )
+        seen = {"cp": 0, "restore": 0, "activate": 0}
+
+        def run(tool, *args):
+            if tool == "docker" and args[0] == "cp":
+                seen["cp"] += 1
+                return ""
+            if tool == "docker" and args[0] == "exec" and args[2] == "sh":
+                shell = args[-1]
+                if "test -d /var/lib/etcd && test -d /var/lib/etcd-pre-abc" in shell:
+                    return ""
+                if "test -d /var/lib/etcd-pre-abc && echo aside" in shell:
+                    return "aside"
+                if "test -d /var/lib/etcd-restored-abc/member" in shell:
+                    return ""
+                if "etcdutl snapshot restore" in shell:
+                    seen["restore"] += 1
+                    return ""
+                if "mv /var/lib/etcd-restored-abc /var/lib/etcd" in shell:
+                    seen["activate"] += 1
+                    return ""
+                if "rm -rf /var/lib/etcd-restored-abc" in shell or "mkdir -p" in shell:
+                    return ""
+                raise AssertionError(shell)
+            raise AssertionError(args)
+
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        fake.run = mock.Mock(side_effect=run)
+        wrapper.restore_continue()
+        self.assertEqual(fake.state["etcd"]["restore"]["stage"], "offline_restored")
+        self.assertEqual(seen["cp"], 1)
+        self.assertEqual(seen["restore"], 1)
+        self.assertEqual(seen["activate"], 1)
+        self.assertFalse(fake.state["etcd"]["restore_executed"])
+
+    def test_restore_verified_repairs_missing_executed_flag(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="restore_verified", restore_executed=False)
+        cm = {"metadata": {"uid": "uid-new"}, "data": {"value": "marker-original"}}
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        wrapper._marker_cm = mock.Mock(return_value=cm)
+        wrapper.restore_continue()
+        self.assertTrue(fake.state["etcd"]["restore_executed"])
+        self.assertEqual(fake.state["etcd"]["restore"]["stage"], "restore_verified")
