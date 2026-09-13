@@ -9,7 +9,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 90 minutes
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 6 of Git Deep Dive, comfort with branches, and basic Kubernetes manifest editing. This module uses Kubernetes 1.35+ examples and copy-paste commands that use the full `kubectl` binary name when Kubernetes validation is shown.
 

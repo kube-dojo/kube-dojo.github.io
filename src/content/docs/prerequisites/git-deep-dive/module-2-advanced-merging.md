@@ -11,7 +11,7 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 75 minutes
+> **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1, Git Internals. This module assumes you can read a commit graph, create branches, and commit small changes, but it does not assume you have already handled a production-grade Kubernetes merge conflict under pressure.
 

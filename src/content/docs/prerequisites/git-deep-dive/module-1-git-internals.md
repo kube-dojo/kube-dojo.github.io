@@ -8,7 +8,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 90 minutes
+> **Time to Complete**: 100–140 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Zero to Terminal Module 0.6 (Git Basics: init, add, commit, push, pull)
 >
