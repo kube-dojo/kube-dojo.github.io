@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[MEDIUM]` - Capstone project
 >
-> **Time to Complete**: 55-70 minutes
+> **Time to Complete**: 90–120 minutes (long-form beginner read + server drills)
 >
 > **Prerequisites**: [Module 0.1](../module-0.1-what-is-a-computer/) through [Module 0.10](/prerequisites/zero-to-terminal/module-0.10-what-is-the-cloud/) -- all of them
 
