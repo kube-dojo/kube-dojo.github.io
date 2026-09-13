@@ -7,7 +7,7 @@ sidebar:
 ---
 > **Complexity**: `[QUICK]` - Architectural concepts
 >
-> **Time to Complete**: 40-55 minutes
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.3 (What Is Kubernetes?)
 >

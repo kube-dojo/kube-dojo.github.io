@@ -7,7 +7,7 @@ sidebar:
 ---
 > **Complexity**: `[QUICK]` - Orientation, not deep dives
 >
-> **Time to Complete**: 40-55 minutes
+> **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.3 (What Is Kubernetes?)
 >

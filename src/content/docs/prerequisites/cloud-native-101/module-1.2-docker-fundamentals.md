@@ -7,7 +7,7 @@ sidebar:
 ---
 > **Complexity**: `[MEDIUM]` - Hands-on practice required
 >
-> **Time to Complete**: 50-60 minutes
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.1: What Are Containers?
 >

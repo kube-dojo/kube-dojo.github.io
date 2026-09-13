@@ -7,7 +7,7 @@ sidebar:
 ---
 > **Complexity**: `[QUICK]` - Foundational concepts.
 >
-> **Time to Complete**: 30-35 minutes.
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: none beyond a terminal for the optional Docker lab and curiosity about why deployment environments drift.
 
