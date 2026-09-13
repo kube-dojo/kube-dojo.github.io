@@ -8,7 +8,7 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 60-75 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Modules 1.1-1.4 (IaC, GitOps, CI/CD, Observability)
 

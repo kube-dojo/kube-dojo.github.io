@@ -8,7 +8,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 60-75 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: [Module 1.1: Infrastructure as Code](/prerequisites/modern-devops/module-1.1-infrastructure-as-code/), Git basics, Kubernetes fundamentals
 

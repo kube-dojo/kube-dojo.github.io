@@ -8,7 +8,7 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`.
 >
-> **Time to Complete**: 75 minutes.
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Modern DevOps modules 1.1-1.5, basic Kubernetes manifests, CI/CD concepts, and command-line comfort.
 
