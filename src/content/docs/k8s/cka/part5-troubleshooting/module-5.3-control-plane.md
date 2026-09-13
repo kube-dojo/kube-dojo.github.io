@@ -572,6 +572,8 @@ Restore creates a new logical etcd cluster. A safe execution plan must name the 
 
 A successful endpoint health response does not prove the intended Kubernetes contents were recovered. Require the expected marker state and subsequent API/controller behavior in a separate owned restore experiment. This module's scheduler fixture proves neither snapshot integrity nor certificate/etcd recovery.
 
+Owned disposable-fixture work for that contract (issue [#2479](https://github.com/kube-dojo/kube-dojo.github.io/issues/2479)) validated **offline etcd snapshot restore only**: authenticated baseline with a marker key in etcd, snapshot hash retained across a post-snapshot live mutation, stop static etcd → offline restore into a clean data directory → return the manifest, and labelled interrupt → continue to verified restore. Accept recovery claims only when the snapshot-era marker value is readable again through the API after return — not because `endpoint health` succeeded or a restore command exited zero.
+
 </details>
 
 The diagrams below explain static Pod lifecycle mechanics, not an approved restore sequence. Changes in the watched directory affect running components; a separate recovery contract must protect those changes and their reversal.
