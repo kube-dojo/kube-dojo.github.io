@@ -292,7 +292,7 @@ class EtcdFixture:
         self._etcd_restore_params()
         self._node_sh(f"mkdir -p {RESTORE_TXN}")
         if "stopped" not in self._node_sh(
-            f"! test -f {ETCD_MANIFEST} && test -f {staged} && echo stopped"
+            f"if [ ! -f {ETCD_MANIFEST} ] && [ -f {staged} ]; then echo stopped; fi"
         ):
             self._node_sh(
                 f"if [ -f {ETCD_MANIFEST} ] && [ ! -f {staged} ]; then "
@@ -318,17 +318,21 @@ class EtcdFixture:
         moved = rec.setdefault("live_data_moved", f"/var/lib/etcd-pre-{uuid.uuid4().hex[:8]}")
         restore_dir = rec.setdefault("restore_data_dir", f"/var/lib/etcd-restored-{uuid.uuid4().hex[:8]}")
         self.inner.save()
-        if "ready" in self._node_sh(f"test -d {ETCD_DATA} && test -d {moved} && echo ready"):
+        if "ready" in self._node_sh(
+            f"if [ -d {ETCD_DATA} ] && [ -d {moved} ]; then echo ready; fi"
+        ):
             self._advance_restore("offline_restore_requested", "offline_restored")
             return
-        if "aside" not in self._node_sh(f"test -d {moved} && echo aside"):
+        if "aside" not in self._node_sh(f"if [ -d {moved} ]; then echo aside; fi"):
             self._node_sh(
                 f"if [ -d {restore_dir} ]; then rm -rf {restore_dir}; fi; "
                 f"if [ -d {ETCD_DATA} ]; then mv {ETCD_DATA} {moved}; fi"
             )
             rec["offline_substage"] = "live_data_aside"
             self.inner.save()
-        if "restored" not in self._node_sh(f"test -d {restore_dir}/member && echo restored"):
+        if "restored" not in self._node_sh(
+            f"if [ -d {restore_dir}/member ]; then echo restored; fi"
+        ):
             self._node_sh(f"rm -rf {restore_dir}; mkdir -p {restore_dir}")
             node_snap = f"/tmp/etcd-restore-{uuid.uuid4().hex}.db"
             self.inner.run("docker", "cp", snapshot["path"], f"{self._node_id()}:{node_snap}")
@@ -354,7 +358,8 @@ class EtcdFixture:
         elif stage != "etcd_return_requested":
             return
         if "ok" not in self._node_sh(
-            f"test -f {ETCD_MANIFEST} && test -f {staged} && cmp -s {ETCD_MANIFEST} {staged} && echo ok"
+            f"if [ -f {ETCD_MANIFEST} ] && [ -f {staged} ] && cmp -s {ETCD_MANIFEST} {staged}; "
+            f"then echo ok; fi"
         ):
             self._node_sh(f"test -f {staged} && cp -a {staged} {ETCD_MANIFEST}")
         for _ in range(60):

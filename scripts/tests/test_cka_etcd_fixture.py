@@ -228,11 +228,11 @@ class TestEtcdFixture(unittest.TestCase):
                 return ""
             if tool == "docker" and args[0] == "exec" and args[2] == "sh":
                 shell = args[-1]
-                if "test -d /var/lib/etcd && test -d /var/lib/etcd-pre-abc" in shell:
+                if "echo ready" in shell:
                     return ""
-                if "test -d /var/lib/etcd-pre-abc && echo aside" in shell:
+                if "echo aside" in shell:
                     return "aside"
-                if "test -d /var/lib/etcd-restored-abc/member" in shell:
+                if "echo restored" in shell:
                     return ""
                 if "etcdutl snapshot restore" in shell:
                     seen["restore"] += 1
@@ -265,3 +265,33 @@ class TestEtcdFixture(unittest.TestCase):
         wrapper.restore_continue()
         self.assertTrue(fake.state["etcd"]["restore_executed"])
         self.assertEqual(fake.state["etcd"]["restore"]["stage"], "restore_verified")
+
+    def test_stop_probe_does_not_raise_when_manifest_still_present(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="restore_requested")
+        manifest = "    - --name=etcd\n"
+        calls = []
+
+        def run(tool, *args):
+            if tool != "docker" or args[0] != "exec" or args[2] != "sh":
+                raise AssertionError(args)
+            shell = args[-1]
+            calls.append(shell)
+            if "cat " in shell:
+                return manifest
+            if "echo stopped" in shell:
+                return ""
+            if "cp -a" in shell and "rm -f" in shell:
+                raise InterruptedError("Signal 2")
+            if "mkdir -p" in shell:
+                return ""
+            raise AssertionError(shell)
+
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        fake.run = mock.Mock(side_effect=run)
+        with self.assertRaises(InterruptedError):
+            wrapper.restore_continue()
+        self.assertFalse(fake.state["etcd"]["restore_executed"])
+        self.assertTrue(any("echo stopped" in c for c in calls))
+        self.assertTrue(any("if [ ! -f" in c for c in calls))
