@@ -10,13 +10,16 @@ kubernetes:
   verified_date: "2026-09-13"
 
 etcd:
-  # kubeadm kind 1.35 ships etcd in-tree; confirm exact binary at fixture inspect time.
-  expected_major_minor: "3.5"
+  # kindest/node v1.35.0 ships registry.k8s.io/etcd:3.6.6-0 (verified live 2026-09-13).
+  expected_major_minor: "3.6"
+  image_ref: "registry.k8s.io/etcd:3.6.6-0"
   endpoint: "https://127.0.0.1:2379"
   # Paths on the control-plane node (kubeadm layout).
   data_dir: "/var/lib/etcd"
   pki_dir: "/etc/kubernetes/pki/etcd"
-  verified_note: "Exact etcd version string must be captured from the owned node before restore work."
+  verified_note: >-
+    kind node image does not ship etcdctl/etcdutl on PATH; fixture copies them from the
+    running etcd image into /usr/local/bin on the owned node during etcd-inspect.
 
 tools:
   etcdctl: "must speak TLS to the local endpoint with etcd CA/cert/key"

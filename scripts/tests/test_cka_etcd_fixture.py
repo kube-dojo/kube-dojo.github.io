@@ -36,32 +36,73 @@ class TestEtcdFixture(unittest.TestCase):
     def test_etcd_inspect_records_no_restore(self):
         wrapper, fake = self._wrapper(
             [
+                "present",
                 "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok",
-                "etcdctl version: 3.5.16",
+                "etcdctl version: 3.6.6",
             ]
         )
         result = wrapper.etcd_inspect()
         self.assertFalse(result["restore_executed"])
         self.assertEqual(result["endpoint"], self.mod.ETCD_ENDPOINT)
-        self.assertIn("3.5", result["etcdctl_version_line"])
+        self.assertIn("3.6", result["etcdctl_version_line"])
+        self.assertEqual(result["tools_provision"]["source"], "preinstalled")
         fake.save.assert_called()
 
     def test_etcd_inspect_rejects_missing_tools(self):
-        wrapper, fake = self._wrapper(["paths_ok"])
+        wrapper, _fake = self._wrapper(["present", "paths_ok"])
         with self.assertRaisesRegex(RuntimeError, "etcdctl/etcdutl missing"):
             wrapper.etcd_inspect()
-        fake.save.assert_not_called()
 
     def test_etcd_inspect_rejects_empty_version(self):
-        wrapper, fake = self._wrapper(
+        wrapper, _fake = self._wrapper(
             [
+                "present",
                 "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok",
                 "",
             ]
         )
         with self.assertRaisesRegex(RuntimeError, "version line missing"):
             wrapper.etcd_inspect()
-        fake.save.assert_not_called()
+
+    def test_ensure_etcd_tools_copies_from_image(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        calls = []
+
+        def run(tool, *args):
+            calls.append((tool, args))
+            if tool == "docker" and args[0] == "exec" and "echo present" in args[-1]:
+                return ""
+            if tool == "docker" and args[0] == "exec" and args[2] == "crictl":
+                return json.dumps(
+                    {
+                        "containers": [
+                            {
+                                "image": {
+                                    "userSpecifiedImage": "registry.k8s.io/etcd:3.6.6-0"
+                                }
+                            }
+                        ]
+                    }
+                )
+            if tool == "docker" and args[0] == "create":
+                return "cid-etcd"
+            if tool == "docker" and args[0] == "cp":
+                src, dst = args[1], args[2]
+                if src.startswith("cid-etcd:"):
+                    Path(dst).write_bytes(b"bin")
+                return ""
+            if tool == "docker" and args[0] == "rm":
+                return ""
+            if tool == "docker" and args[0] == "exec" and "chmod" in args[-1]:
+                return ""
+            raise AssertionError(args)
+
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.run = mock.Mock(side_effect=run)
+        info = wrapper._ensure_etcd_tools()
+        self.assertEqual(info["source"], "etcd_image")
+        self.assertEqual(info["image"], "registry.k8s.io/etcd:3.6.6-0")
+        self.assertTrue((tmp_path / "etcd-tools" / "etcdctl").exists())
 
     def test_snapshot_observe_success(self):
         tmp_path = Path(tempfile.mkdtemp())
@@ -77,7 +118,9 @@ class TestEtcdFixture(unittest.TestCase):
                     raise RuntimeError("unauth")
                 return json.dumps([{"Status": {"header": {"revision": 40}}}])
             if tool == "docker" and args[0] == "exec" and "etcdctl version" in shell:
-                return "etcdctl version: 3.5.16"
+                return "etcdctl version: 3.6.6"
+            if tool == "docker" and args[0] == "exec" and "echo present" in shell:
+                return "present"
             if tool == "docker" and args[0] == "exec" and "command -v" in shell:
                 return "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok"
             if tool == "docker" and args[0] == "exec" and shell.startswith("etcdctl"):
@@ -112,7 +155,7 @@ class TestEtcdFixture(unittest.TestCase):
             wrapper.snapshot_save()
 
     def test_snapshot_observe_refuses_missing_tools(self):
-        wrapper, fake = self._wrapper(["paths_ok"])
+        wrapper, fake = self._wrapper(["present", "paths_ok"])
         fake.state = {"node": {"id": "abc"}}
         with self.assertRaisesRegex(RuntimeError, "etcdctl/etcdutl missing"):
             wrapper.snapshot_observe()
