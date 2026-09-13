@@ -7,7 +7,7 @@ sidebar:
 ---
 > **Complexity**: `[QUICK]` - High-level overview
 >
-> **Time to Complete**: 30-35 minutes
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.1 (Containers), Module 1.2 (Docker). This lesson assumes you can explain why teams package applications as containers and can recognize a basic Docker image or container command, but it does not assume previous Kubernetes experience.
 
