@@ -1,23 +1,85 @@
-"""Revision-bound source-acceptance receipt (#2310 packet 1).
+"""Revision-bound source-acceptance receipt (#2310).
 
 Only a complete applicable positive receipt can accept. Frontmatter,
 injection, and inventory pass strings are not inputs. Fixture-valid
-receipts prove validator behavior, not real source support. Read-only:
-no status store, no promotion/backfill.
+receipts prove validator behavior, not real source support.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
-from .content_inventory import _normalise_digest
+try:
+    from .content_inventory import _normalise_digest
+except ImportError:  # script / standalone test load
+    from content_inventory import _normalise_digest
 
 SCHEMA = "kubedojo.source_acceptance.v1"
 SCHEMA_VERSION = 1
 FAILING_VERDICTS = frozenset({"UNSUPPORTED", "CONTRADICTED", "UNREADABLE"})
 UNKNOWN_FAMILIES = frozenset({"", "unknown"})
+EVIDENCE_LEDGER = Path("docs/content-upgrade/evidence.json")
+SEEDS_DIR = Path("docs/citation-seeds")
+
+
+def _digest(data: bytes) -> str:
+    return f"sha256:{hashlib.sha256(data).hexdigest()}"
+
+
+def nested_source_receipt(entry: Any) -> Any:
+    return entry.get("source_acceptance") if isinstance(entry, dict) else None
+
+
+def load_seed_bytes(seeds_dir: Path | None, page_rel: str) -> bytes | None:
+    if seeds_dir is None:
+        return None
+    key = Path(page_rel).with_suffix("").as_posix().replace("/", "-")
+    try:
+        return (seeds_dir / f"{key}.json").read_bytes()
+    except OSError:
+        return None
+
+
+def bind_source_acceptance(
+    receipt: Any, *, page_bytes: bytes, seed_bytes: bytes | None,
+) -> dict[str, Any]:
+    """Evaluate *receipt* against live page/seed bytes. Missing seed fails closed."""
+    page_digest = _digest(page_bytes)
+    if seed_bytes is None:
+        return evaluate_source_acceptance(
+            receipt, page_digest=page_digest, seed_digest="", seed_claim_ids=(),
+        )
+    try:
+        payload = json.loads(seed_bytes.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError):
+        return _reject("seed_malformed")
+    claims = payload.get("claims") if isinstance(payload, dict) else None
+    ids = [
+        cid.strip()
+        for claim in claims or []
+        if isinstance(claim, dict)
+        for cid in [claim.get("claim_id")]
+        if isinstance(cid, str) and cid.strip()
+    ]
+    return evaluate_source_acceptance(
+        receipt, page_digest=page_digest, seed_digest=_digest(seed_bytes), seed_claim_ids=ids,
+    )
+
+
+def apply_source_acceptance(evidence: dict[str, Any], result: dict[str, Any]) -> None:
+    """Record the derived result; a pass string cannot survive a failed bind."""
+    evidence["source_acceptance"] = result
+    statuses = evidence.get("independent_statuses")
+    if (
+        isinstance(statuses, dict)
+        and result.get("accepted") is not True
+        and statuses.get("technical_source") == "pass"
+    ):
+        statuses["technical_source"] = "unknown"
 
 
 def _reject(reason: str) -> dict[str, Any]:

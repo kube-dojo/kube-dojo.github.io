@@ -4007,12 +4007,55 @@ def build_quality_board(repo_root: Path) -> dict[str, Any]:
     }
 
 
+def _load_source_acceptance_bind():
+    """Fail closed if the receipt evaluator cannot be imported."""
+    try:
+        from quality.content_inventory import _load_receipts
+        from quality.source_acceptance import (
+            EVIDENCE_LEDGER,
+            SEEDS_DIR,
+            bind_source_acceptance,
+            load_seed_bytes,
+            nested_source_receipt,
+        )
+    except ImportError:
+        return None
+    return {
+        "load_receipts": _load_receipts,
+        "ledger": EVIDENCE_LEDGER,
+        "seeds": SEEDS_DIR,
+        "bind": bind_source_acceptance,
+        "load_seed": load_seed_bytes,
+        "nested": nested_source_receipt,
+    }
+
+
+def _source_accepted_for_page(
+    bind: dict[str, Any] | None,
+    receipts: dict[str, Any],
+    seeds_dir: Path | None,
+    page_rel: str,
+    page_bytes: bytes,
+) -> bool:
+    if bind is None:
+        return False
+    result = bind["bind"](
+        bind["nested"](receipts.get(page_rel)),
+        page_bytes=page_bytes,
+        seed_bytes=bind["load_seed"](seeds_dir, page_rel),
+    )
+    return result.get("accepted") is True
+
+
 def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
     """Per-track, per-section readiness grid for the operator dashboard.
 
     Buckets every English module on disk into one of:
       - ``cleared`` — frontmatter says ``revision_pending`` is not true and ``citations_verified`` is true
       - ``not_yet_enqueued`` — every other state
+
+    ``source_accepted`` is independent of ``cleared`` and increments only
+    for a complete applicable receipt bound to the live page and seed.
 
     Readiness % = ``cleared / total``. Tracks come out in the canonical
     ``TRACK_ORDER``; within a track, sections are alphabetical so the
@@ -4023,6 +4066,16 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
     from status import TRACK_ORDER, _extract_frontmatter, _iter_en_modules, _track_for_key
 
     read_errors = 0
+    bind = _load_source_acceptance_bind()
+    receipts: dict[str, Any] = {}
+    seeds_dir: Path | None = None
+    if bind is not None:
+        ledger = repo_root / bind["ledger"]
+        receipts, _, invalid = bind["load_receipts"](ledger if ledger.is_file() else None)
+        if invalid:
+            receipts = {}
+        candidate = repo_root / bind["seeds"]
+        seeds_dir = candidate if candidate.is_dir() else None
 
     # track_slug -> section_slug -> counts
     grid: dict[str, dict[str, dict[str, int]]] = {}
@@ -4034,7 +4087,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         rel = path.relative_to(docs_root).as_posix()
         module_key = rel[:-3] if rel.endswith(".md") else rel
         try:
-            path.read_text(encoding="utf-8")
+            page_bytes = path.read_bytes()
         except OSError:
             read_errors += 1
             continue
@@ -4056,6 +4109,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
             {
                 "total": 0,
                 "cleared": 0,
+                "source_accepted": 0,
                 "in_flight": 0,
                 "dead_letter": 0,
                 "not_yet_enqueued": 0,
@@ -4063,6 +4117,8 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         )
         s["total"] += 1
         s[bucket] += 1
+        if _source_accepted_for_page(bind, receipts, seeds_dir, rel, page_bytes):
+            s["source_accepted"] += 1
 
     track_labels = dict(TRACK_ORDER)
     canonical_order = [slug for slug, _ in TRACK_ORDER]
@@ -4076,6 +4132,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
     grand: dict[str, Any] = {
         "total": 0,
         "cleared": 0,
+        "source_accepted": 0,
         "in_flight": 0,
         "dead_letter": 0,
         "not_yet_enqueued": 0,
@@ -4087,6 +4144,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         sections: list[dict[str, Any]] = []
         track_total = 0
         track_cleared = 0
+        track_source_accepted = 0
         track_in_flight = 0
         track_dead = 0
         track_notenq = 0
@@ -4094,11 +4152,13 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
             counts = sections_map[section_slug]
             total = counts["total"]
             cleared = counts["cleared"]
+            source_accepted = counts["source_accepted"]
             readiness_pct = round(100.0 * cleared / total, 1) if total else 0.0
             sections.append({
                 "slug": section_slug,
                 "total": total,
                 "cleared": cleared,
+                "source_accepted": source_accepted,
                 "in_flight": counts["in_flight"],
                 "dead_letter": counts["dead_letter"],
                 "not_yet_enqueued": counts["not_yet_enqueued"],
@@ -4106,6 +4166,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
             })
             track_total += total
             track_cleared += cleared
+            track_source_accepted += source_accepted
             track_in_flight += counts["in_flight"]
             track_dead += counts["dead_letter"]
             track_notenq += counts["not_yet_enqueued"]
@@ -4114,6 +4175,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
             "label": track_labels.get(slug, slug.replace("-", " ").title()),
             "total": track_total,
             "cleared": track_cleared,
+            "source_accepted": track_source_accepted,
             "in_flight": track_in_flight,
             "dead_letter": track_dead,
             "not_yet_enqueued": track_notenq,
@@ -4122,6 +4184,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         })
         grand["total"] += track_total
         grand["cleared"] += track_cleared
+        grand["source_accepted"] += track_source_accepted
         grand["in_flight"] += track_in_flight
         grand["dead_letter"] += track_dead
         grand["not_yet_enqueued"] += track_notenq
@@ -8966,7 +9029,7 @@ def build_api_schema() -> dict[str, Any]:
             {"path": "/api/delivery/status", "desc": "Build freshness and site-health status"},
             {
                 "path": "/api/tracks/readiness",
-                "desc": "Per-track, per-section production-readiness grid (cleared/in_flight/dead_letter/not_yet_enqueued)",
+                "desc": "Per-track, per-section production-readiness grid (cleared/source_accepted/in_flight/dead_letter/not_yet_enqueued)",
             },
             {
                 "path": "/api/runtime/services",
@@ -9790,6 +9853,18 @@ def _v_docs_frontmatter(repo_root: Path) -> tuple:
         try:
             rel = path.relative_to(repo_root).as_posix()
             stat = path.stat()
+        except OSError:
+            continue
+        sig.update(rel.encode("utf-8"))
+        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode("utf-8"))
+    extras = [repo_root / "docs" / "content-upgrade" / "evidence.json"]
+    seeds = repo_root / "docs" / "citation-seeds"
+    if seeds.is_dir():
+        extras.extend(sorted(seeds.glob("*.json")))
+    for extra in extras:
+        try:
+            rel = extra.relative_to(repo_root).as_posix()
+            stat = extra.stat()
         except OSError:
             continue
         sig.update(rel.encode("utf-8"))

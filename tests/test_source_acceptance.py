@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.quality.source_acceptance import (
     SCHEMA,
     SCHEMA_VERSION,
+    _digest,
+    apply_source_acceptance,
+    bind_source_acceptance,
     evaluate_source_acceptance,
 )
 
@@ -78,3 +82,16 @@ def test_fail_closed_adversarial_receipts(receipt: object, kwargs: dict[str, obj
     result = _eval(receipt, **kwargs)
     assert result["accepted"] is False
     assert needle in result["reasons"]
+
+
+def test_bind_missing_stale_malformed_cannot_accept() -> None:
+    page = b"page-bytes"
+    seed = json.dumps({"claims": [{"claim_id": "C001"}]}).encode()
+    bound = _valid(page_digest=_digest(page), seed_digest=_digest(seed))
+    assert bind_source_acceptance(bound, page_bytes=page, seed_bytes=seed)["accepted"]
+    assert "receipt_missing" in bind_source_acceptance(None, page_bytes=page, seed_bytes=seed)["reasons"]
+    assert "page_digest_stale" in bind_source_acceptance(bound, page_bytes=b"other", seed_bytes=seed)["reasons"]
+    assert "seed_malformed" in bind_source_acceptance(bound, page_bytes=page, seed_bytes=b"{")["reasons"]
+    evidence = {"independent_statuses": {"technical_source": "pass"}}
+    apply_source_acceptance(evidence, {"accepted": False, "reasons": ["receipt_missing"]})
+    assert evidence["independent_statuses"]["technical_source"] == "unknown"
