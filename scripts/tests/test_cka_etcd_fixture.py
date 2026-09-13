@@ -116,3 +116,182 @@ class TestEtcdFixture(unittest.TestCase):
         fake.state = {"node": {"id": "abc"}}
         with self.assertRaisesRegex(RuntimeError, "etcdctl/etcdutl missing"):
             wrapper.snapshot_observe()
+
+    def _restore_state(self, tmp_path, stage=None, restore_executed=False):
+        snap_path = tmp_path / self.mod.SNAPSHOT_FILE
+        snap_path.write_bytes(b"snap")
+        state = {
+            "node": {"id": "node-abc"},
+            "etcd": {
+                "restore_executed": restore_executed,
+                "restore": {"direction": "restore", "stage": stage},
+            },
+            "etcd_marker": {
+                "namespace": "ns-marker",
+                "name": self.mod.MARKER_NAME,
+                "uid": "uid-original",
+                "value": "marker-original",
+            },
+            "etcd_baseline": {"revision": 1, "marker_etcd_key": "/registry/x", "authenticated": True},
+            "snapshot": {"path": str(snap_path), "sha256": "deadbeef"},
+            "post_snapshot_mutation": {"value": "mutated", "uid": "uid-original"},
+        }
+        return state
+
+    def test_restore_happy_path_sets_restore_executed(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="etcd_returned")
+        cm = json.dumps({"metadata": {"uid": "uid-new"}, "data": {"value": "marker-original"}})
+
+        def run(tool, *args):
+            if tool == "docker" and args[0] == "exec" and args[2] == "sh":
+                return "ok"
+            raise AssertionError(args)
+
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        fake.run = mock.Mock(side_effect=run)
+        wrapper._marker_cm = mock.Mock(return_value=json.loads(cm))
+        wrapper.restore_continue()
+        self.assertTrue(fake.state["etcd"]["restore_executed"])
+        self.assertEqual(fake.state["etcd"]["restore"]["stage"], "restore_verified")
+        self.assertTrue(fake.state["etcd"]["restore"]["marker_uid_may_differ"])
+
+    def test_restore_refuses_without_snapshot(self):
+        wrapper, fake = self._wrapper([])
+        fake.state = {
+            "node": {"id": "abc"},
+            "etcd": {"restore_executed": False},
+            "etcd_marker": {"namespace": "n", "name": "m", "uid": "u", "value": "v"},
+            "etcd_baseline": {"revision": 1},
+        }
+        with self.assertRaisesRegex(RuntimeError, "snapshot, etcd_marker, and etcd_baseline"):
+            wrapper.restore_begin()
+
+    def test_restore_interrupt_leaves_restore_executed_false(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="restore_requested")
+        manifest = (
+            "    - --name=etcd\n"
+            "    - --initial-cluster=etcd=https://127.0.0.1:2380\n"
+            "    - --initial-advertise-peer-urls=https://127.0.0.1:2380\n"
+            "    - --initial-cluster-token=tok\n"
+        )
+
+        def run(tool, *args):
+            if tool == "docker" and args[0] == "exec" and args[2] == "sh":
+                shell = args[-1]
+                if "cat " in shell:
+                    return manifest
+                raise InterruptedError("Signal 2")
+            raise AssertionError(args)
+
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        fake.run = mock.Mock(side_effect=run)
+        with self.assertRaises(InterruptedError):
+            wrapper.restore_continue()
+        self.assertFalse(fake.state["etcd"]["restore_executed"])
+
+    def test_parse_etcd_restore_params_from_manifest(self):
+        wrapper, _fake = self._wrapper([])
+        params = wrapper._parse_etcd_restore_params(
+            "    - --name=etcd\n"
+            "    - --initial-cluster=etcd=https://127.0.0.1:2380\n"
+            "    - --initial-advertise-peer-urls=https://127.0.0.1:2380\n"
+            "    - --initial-cluster-token=tok\n"
+        )
+        self.assertEqual(params["name"], "etcd")
+        self.assertIn("2380", params["initial-cluster"])
+
+    def test_offline_restore_resumes_when_restore_dir_exists(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="offline_restore_requested")
+        state["etcd"]["restore"].update(
+            {
+                "live_data_moved": "/var/lib/etcd-pre-abc",
+                "restore_data_dir": "/var/lib/etcd-restored-abc",
+                "restore_params": {
+                    "name": "etcd",
+                    "initial-cluster": "etcd=https://127.0.0.1:2380",
+                    "initial-advertise-peer-urls": "https://127.0.0.1:2380",
+                    "initial-cluster-token": "tok",
+                },
+                "offline_substage": "live_data_aside",
+            }
+        )
+        seen = {"cp": 0, "restore": 0, "activate": 0}
+
+        def run(tool, *args):
+            if tool == "docker" and args[0] == "cp":
+                seen["cp"] += 1
+                return ""
+            if tool == "docker" and args[0] == "exec" and args[2] == "sh":
+                shell = args[-1]
+                if "echo ready" in shell:
+                    return ""
+                if "echo aside" in shell:
+                    return "aside"
+                if "echo restored" in shell:
+                    return ""
+                if "etcdutl snapshot restore" in shell:
+                    seen["restore"] += 1
+                    return ""
+                if "mv /var/lib/etcd-restored-abc /var/lib/etcd" in shell:
+                    seen["activate"] += 1
+                    return ""
+                if "rm -rf /var/lib/etcd-restored-abc" in shell or "mkdir -p" in shell:
+                    return ""
+                raise AssertionError(shell)
+            raise AssertionError(args)
+
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        fake.run = mock.Mock(side_effect=run)
+        wrapper.restore_continue()
+        self.assertEqual(fake.state["etcd"]["restore"]["stage"], "offline_restored")
+        self.assertEqual(seen["cp"], 1)
+        self.assertEqual(seen["restore"], 1)
+        self.assertEqual(seen["activate"], 1)
+        self.assertFalse(fake.state["etcd"]["restore_executed"])
+
+    def test_restore_verified_repairs_missing_executed_flag(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="restore_verified", restore_executed=False)
+        cm = {"metadata": {"uid": "uid-new"}, "data": {"value": "marker-original"}}
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        wrapper._marker_cm = mock.Mock(return_value=cm)
+        wrapper.restore_continue()
+        self.assertTrue(fake.state["etcd"]["restore_executed"])
+        self.assertEqual(fake.state["etcd"]["restore"]["stage"], "restore_verified")
+
+    def test_stop_probe_does_not_raise_when_manifest_still_present(self):
+        tmp_path = Path(tempfile.mkdtemp())
+        state = self._restore_state(tmp_path, stage="restore_requested")
+        manifest = "    - --name=etcd\n"
+        calls = []
+
+        def run(tool, *args):
+            if tool != "docker" or args[0] != "exec" or args[2] != "sh":
+                raise AssertionError(args)
+            shell = args[-1]
+            calls.append(shell)
+            if "cat " in shell:
+                return manifest
+            if "echo stopped" in shell:
+                return ""
+            if "cp -a" in shell and "rm -f" in shell:
+                raise InterruptedError("Signal 2")
+            if "mkdir -p" in shell:
+                return ""
+            raise AssertionError(shell)
+
+        wrapper, fake = self._wrapper([], directory=tmp_path)
+        fake.state = state
+        fake.run = mock.Mock(side_effect=run)
+        with self.assertRaises(InterruptedError):
+            wrapper.restore_continue()
+        self.assertFalse(fake.state["etcd"]["restore_executed"])
+        self.assertTrue(any("echo stopped" in c for c in calls))
+        self.assertTrue(any("if [ ! -f" in c for c in calls))
