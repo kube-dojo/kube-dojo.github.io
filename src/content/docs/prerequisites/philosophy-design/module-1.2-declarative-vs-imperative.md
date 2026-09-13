@@ -8,7 +8,7 @@ sidebar:
 
 > **Complexity**: `[QUICK]` - Conceptual understanding with production consequences
 >
-> **Time to Complete**: 25-30 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.1 (Why Kubernetes Won)
 >

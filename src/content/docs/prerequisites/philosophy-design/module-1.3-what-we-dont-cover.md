@@ -7,7 +7,7 @@ revision_pending: false
 ---
 > **Complexity**: `[QUICK]` - Setting expectations
 >
-> **Time to Complete**: 35-45 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.1, Module 1.2
 

@@ -8,7 +8,7 @@ sidebar:
 
 > **Complexity**: `[QUICK]` - Understanding what not to learn.
 >
-> **Time to Complete**: 25-30 minutes.
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.1, Module 1.2, Module 1.3.
 
