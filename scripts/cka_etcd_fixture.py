@@ -197,7 +197,8 @@ class EtcdFixture:
         status = json.loads(self._etcdctl("endpoint", "status", "-w", "json"))[0]["Status"]
         revision = status["header"]["revision"]
         etcd_key = f"/registry/configmaps/{marker['namespace']}/{marker['name']}"
-        if not self._etcdctl("get", etcd_key):
+        # Prefer keys-only: raw ConfigMap values are protobuf and break text=True capture.
+        if not self._etcdctl("get", etcd_key, "--keys-only"):
             raise RuntimeError("Marker key missing in etcd")
         baseline = {"revision": revision, "marker_etcd_key": etcd_key, "authenticated": True}
         self.inner.state["etcd_baseline"] = baseline
