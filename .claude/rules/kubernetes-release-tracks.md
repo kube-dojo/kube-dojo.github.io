@@ -18,8 +18,9 @@ KubeDojo runs **two** Kubernetes version tracks. Mixing them is a defect.
 | **Exam pin** | `docs/pins/kubernetes.yaml` → `exam_pin` | CKA / CKAD / CKS / KCNA / KCSA |
 | **Latest-stable** | same file → `latest_stable_track` | `src/content/docs/k8s/releases/` only |
 
-Standing workflow: `docs/release-maintenance/kubernetes-minor-release-playbook.md`.  
-Learner policy: `/k8s/releases/exam-version-policy/`. Workstream: **#2542** (`Refs` only, never Resolves).
+- Standing workflow: `docs/release-maintenance/kubernetes-minor-release-playbook.md`
+- Learner policy: `/k8s/releases/exam-version-policy/`
+- Workstream: **#2542** (`Refs` only, never Resolves)
 
 ## Must
 
