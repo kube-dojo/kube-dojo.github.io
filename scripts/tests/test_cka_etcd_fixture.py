@@ -19,22 +19,44 @@ class TestEtcdFixture(unittest.TestCase):
         self.assertTrue(self.mod.ETCD_DATA.startswith("/var/lib/"))
         self.assertIn("etcd", self.mod.ETCD_PKI)
 
-    def test_etcd_inspect_records_no_restore(self):
-        # Avoid real Fixture ctor (needs 0700 owned dir + tools).
+    def _wrapper(self, runs):
         fake = mock.Mock()
         fake.state = {"node": {"id": "abc"}, "etcd": {}}
         fake.verify = mock.Mock()
         fake.inspect = mock.Mock()
-        fake.run = mock.Mock(
-            side_effect=[
+        fake.run = mock.Mock(side_effect=runs)
+        fake.save = mock.Mock()
+        wrapper = self.mod.EtcdFixture.__new__(self.mod.EtcdFixture)
+        wrapper.inner = fake
+        return wrapper, fake
+
+    def test_etcd_inspect_records_no_restore(self):
+        # Avoid real Fixture ctor (needs 0700 owned dir + tools).
+        wrapper, fake = self._wrapper(
+            [
                 "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok",
                 "etcdctl version: 3.5.16",
             ]
         )
-        fake.save = mock.Mock()
-        wrapper = self.mod.EtcdFixture.__new__(self.mod.EtcdFixture)
-        wrapper.inner = fake
         result = wrapper.etcd_inspect()
         self.assertFalse(result["restore_executed"])
         self.assertEqual(result["endpoint"], self.mod.ETCD_ENDPOINT)
         self.assertIn("3.5", result["etcdctl_version_line"])
+        fake.save.assert_called_once()
+
+    def test_etcd_inspect_rejects_missing_tools(self):
+        wrapper, fake = self._wrapper(["paths_ok"])
+        with self.assertRaisesRegex(RuntimeError, "etcdctl/etcdutl missing"):
+            wrapper.etcd_inspect()
+        fake.save.assert_not_called()
+
+    def test_etcd_inspect_rejects_empty_version(self):
+        wrapper, fake = self._wrapper(
+            [
+                "/usr/local/bin/etcdctl\n/usr/local/bin/etcdutl\npaths_ok",
+                "",
+            ]
+        )
+        with self.assertRaisesRegex(RuntimeError, "version line missing"):
+            wrapper.etcd_inspect()
+        fake.save.assert_not_called()

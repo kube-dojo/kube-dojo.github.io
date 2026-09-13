@@ -44,19 +44,23 @@ class EtcdFixture:
             "command -v etcdctl; command -v etcdutl; "
             f"test -d {ETCD_DATA} && test -d {ETCD_PKI} && echo paths_ok",
         )
+        if "etcdctl" not in inventory or "etcdutl" not in inventory:
+            raise RuntimeError("etcdctl/etcdutl missing on owned node")
+        if "paths_ok" not in inventory:
+            raise RuntimeError("etcd data/pki paths missing on owned node")
         version = self.inner.run(
             "docker",
             "exec",
             node_id,
             "sh",
             "-c",
-            "etcdctl version 2>/dev/null | head -1 || true",
-        )
-        if version and not re.search(r"etcdctl\s+version:\s*3\.", version):
-            # Fall back to recording raw output; refuse empty inventry.
-            pass
-        if "paths_ok" not in inventory:
-            raise RuntimeError("etcd data/pki paths missing on owned node")
+            "etcdctl version 2>/dev/null | head -1",
+        ).strip()
+        if not version or not re.search(r"etcdctl\s+version:\s*3\.", version):
+            raise RuntimeError(
+                "etcdctl version line missing or not etcd 3.x: "
+                f"{version!r}"
+            )
         self.inner.state["etcd"] = {
             "endpoint": ETCD_ENDPOINT,
             "data_dir": ETCD_DATA,
