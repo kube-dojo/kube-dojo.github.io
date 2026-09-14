@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 3.3: Network Namespaces & veth"
 slug: linux/foundations/networking/module-3.3-network-namespaces

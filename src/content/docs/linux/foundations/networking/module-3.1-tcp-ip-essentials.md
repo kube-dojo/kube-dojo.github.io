@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 3.1: TCP/IP Essentials"
 slug: linux/foundations/networking/module-3.1-tcp-ip-essentials
@@ -233,7 +234,7 @@ QUIC adds another operational split because connection identity can survive addr
 
 ## Conntrack, NAT, and Service Rewrites
 
-Connection tracking records flows so stateful filtering and NAT can handle replies consistently. Linux netfilter documentation describes the hook-based packet path, and the kernel documents conntrack sysctls such as maximum entries and protocol timeout controls. Kubernetes Services rely on this machinery in Linux kube-proxy modes: iptables mode redirects Service virtual IP traffic to endpoints using destination NAT, and nftables mode uses the nftables API of the same netfilter subsystem. ([Linux netfilter documentation](https://docs.kernel.org/networking/netfilter.html), [Linux nf_conntrack sysctl](https://docs.kernel.org/networking/nf_conntrack-sysctl.html), [Kubernetes Virtual IPs and Service Proxies](https://v1-35.docs.kubernetes.io/docs/reference/networking/virtual-ips/))
+Connection tracking records flows so stateful filtering and NAT can handle replies consistently. The netfilter project documentation describes the hook-based packet path, and the kernel documents conntrack sysctls such as maximum entries and protocol timeout controls. Kubernetes Services rely on this machinery in Linux kube-proxy modes: iptables mode redirects Service virtual IP traffic to endpoints using destination NAT, and nftables mode uses the nftables API of the same netfilter subsystem. ([netfilter project documentation](https://netfilter.org/documentation/), [Linux nf_conntrack sysctl](https://docs.kernel.org/networking/nf_conntrack-sysctl.html), [Kubernetes Virtual IPs and Service Proxies](https://v1-35.docs.kubernetes.io/docs/reference/networking/virtual-ips/))
 
 ```mermaid
 flowchart TD
@@ -514,7 +515,7 @@ Next, continue to [Module 3.2: DNS in Linux](../module-3.2-dns-linux/) to go dee
 - [Linux nsswitch.conf manual](https://man7.org/linux/man-pages/man5/nsswitch.conf.5.html)
 - [Linux resolv.conf manual](https://man7.org/linux/man-pages/man5/resolv.conf.5.html)
 - [Linux ss manual](https://man7.org/linux/man-pages/man8/ss.8.html)
-- [Linux kernel netfilter documentation](https://docs.kernel.org/networking/netfilter.html)
+- [netfilter project documentation](https://netfilter.org/documentation/)
 - [Linux kernel conntrack sysctl documentation](https://docs.kernel.org/networking/nf_conntrack-sysctl.html)
 - [Linux kernel IP sysctl documentation](https://docs.kernel.org/networking/ip-sysctl.html)
 - [Linux kernel VXLAN documentation](https://docs.kernel.org/networking/vxlan.html)
