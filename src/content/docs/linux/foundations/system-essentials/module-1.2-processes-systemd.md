@@ -12,7 +12,11 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Foundations** | Complexity: `[MEDIUM]` | Time: 30-35 min with a hands-on process, signal, boot, and systemd service lab.
+> **Complexity**: `[MEDIUM]`
+>
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+>
+> **Prerequisites**: See [Prerequisites](#prerequisites) below
 
 ## Prerequisites
 
