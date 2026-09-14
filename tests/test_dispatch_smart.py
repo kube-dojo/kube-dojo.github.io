@@ -85,6 +85,7 @@ def test_hermes_provider_deepseek_routes_first_party(monkeypatch) -> None:
     monkeypatch.delenv("KUBEDOJO_HERMES_PROVIDER", raising=False)
     assert _hermes_provider_for_model("deepseek-v4-pro") == "deepseek"
     assert _hermes_provider_for_model("deepseek-v4-flash") == "deepseek"
+    assert _hermes_provider_for_model("deepseek-flash") == "deepseek"
 
 
 def test_hermes_provider_unknown_model_raises(monkeypatch) -> None:

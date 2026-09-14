@@ -164,7 +164,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.5-flash-high",
             "claude": "claude-haiku-4-5-20251001",
             "codex": "gpt-5.4-mini",
-            "deepseek": "deepseek-v4-flash",
+            "deepseek": "deepseek-flash",  # V4.1 Flash (canonical API id)
             "grok": "grok-build",
             "cursor": "composer-2.5-fast",
             "hermes": "qwen-3.6-flash",
@@ -182,7 +182,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.1-pro-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.3-codex-spark",
-            "deepseek": "deepseek-v4-pro",
+            "deepseek": "deepseek-flash",  # V4.1 Flash
             "grok": "grok-build",
             "cursor": "composer-2.5",
             "hermes": "grok-4.6",
@@ -200,7 +200,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.1-pro-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
-            "deepseek": "deepseek-v4-pro",
+            "deepseek": "deepseek-flash",  # V4.1 Flash
             "grok": "grok-build",
             "cursor": "composer-2.5",
             "hermes": "grok-4.6",
@@ -218,7 +218,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.1-pro-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
-            "deepseek": "deepseek-v4-pro",
+            "deepseek": "deepseek-flash",  # V4.1 Flash
             "grok": "grok-build",
             "cursor": "auto",
             "hermes": "grok-4.6",
@@ -236,7 +236,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.1-pro-high",
             "claude": "claude-opus-4-8",
             "codex": "gpt-5.5",
-            "deepseek": "deepseek-v4-pro",
+            "deepseek": "deepseek-flash",  # V4.1 Flash
             "grok": "grok-build",
             "cursor": "composer-2.5",
             "hermes": "grok-4.6",

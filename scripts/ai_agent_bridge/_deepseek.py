@@ -23,7 +23,7 @@ _AGENT_TITLE = "DeepSeek"
 _DEFAULT_BRIDGE_TIMEOUT_SECONDS = 900
 _NO_TIMEOUT_BRIDGE_TIMEOUT_SECONDS = 24 * 60 * 60
 _DEFAULT_MODEL = str(
-    get_agent_entry(_AGENT_NAME)["default_model"] or "deepseek-v4-pro"
+    get_agent_entry(_AGENT_NAME)["default_model"] or "deepseek-flash"
 )
 _TIMEOUT_ENV = "DEEPSEEK_BRIDGE_TIMEOUT"
 

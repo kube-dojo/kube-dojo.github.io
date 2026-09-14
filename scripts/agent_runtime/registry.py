@@ -81,7 +81,8 @@ AGENTS: dict[str, AgentEntry] = {
     },
     "deepseek": {
         "adapter": "scripts.agent_runtime.adapters.deepseek:DeepSeekAdapter",
-        "default_model": os.environ.get("AB_DEEPSEEK_MODEL", "deepseek-v4-pro"),
+        # Canonical API id for DeepSeek-V4.1-Flash (legacy deepseek-v4-* aliases still route).
+        "default_model": os.environ.get("AB_DEEPSEEK_MODEL", "deepseek-flash"),
         "cost_tier": "low",
         "capabilities": frozenset({
             "code_review",
