@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 1.2: Processes & systemd"
 slug: linux/foundations/system-essentials/module-1.2-processes-systemd
