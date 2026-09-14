@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 2.4: Union Filesystems"
 slug: linux/foundations/container-primitives/module-2.4-union-filesystems
