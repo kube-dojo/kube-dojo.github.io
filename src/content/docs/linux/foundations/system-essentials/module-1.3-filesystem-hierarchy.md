@@ -1,6 +1,7 @@
 ---
 title: "Module 1.3: Filesystem Hierarchy"
 slug: linux/foundations/system-essentials/module-1.3-filesystem-hierarchy
+citations_verified: true
 revision_pending: false
 sidebar:
   order: 4

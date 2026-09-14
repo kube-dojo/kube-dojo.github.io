@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 1.4: Users & Permissions"
 slug: linux/foundations/system-essentials/module-1.4-users-permissions
