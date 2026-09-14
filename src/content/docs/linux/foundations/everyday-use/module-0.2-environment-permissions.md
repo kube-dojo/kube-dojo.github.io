@@ -12,7 +12,13 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Everyday Use** | Complexity: `[QUICK]` | Time: 45 min | This practical lesson focuses on diagnosing the identity, lookup, inheritance, and permission failures that make everyday Linux work feel unpredictable.
+> **Complexity**: `[QUICK]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> **Prerequisites**: See [Prerequisites](#prerequisites) below
+>
+> This practical lesson focuses on diagnosing the identity, lookup, inheritance, and permission failures that make everyday Linux work feel unpredictable.
 
 ## Prerequisites
 
