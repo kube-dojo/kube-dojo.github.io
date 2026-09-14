@@ -12,7 +12,11 @@ lab:
   environment: ubuntu
 ---
 
-> **Operations - LFCS** | Complexity: `[COMPLEX]` | Time: 35 min. This module treats storage as a production responsibility, so every command is connected to verification, reboot safety, and failure diagnosis.
+> **Operations - LFCS** | Complexity: `[COMPLEX]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> This module treats storage as a production responsibility, so every command is connected to verification, reboot safety, and failure diagnosis.
 
 ## Prerequisites
 

@@ -12,7 +12,11 @@ lab:
   environment: ubuntu
 ---
 
-> **Operations — LFCS** | Complexity: `[COMPLEX]` | Time: 45-55 min. This lesson treats scheduling and backups as one reliability practice, because a backup that is not scheduled will be forgotten and a scheduled job that cannot be restored is only noise.
+> **Operations — LFCS** | Complexity: `[COMPLEX]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> This lesson treats scheduling and backups as one reliability practice, because a backup that is not scheduled will be forgotten and a scheduled job that cannot be restored is only noise.
 
 ## Prerequisites
 

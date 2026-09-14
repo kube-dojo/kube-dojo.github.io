@@ -12,7 +12,11 @@ lab:
   environment: ubuntu
 ---
 
-> **Operations - LFCS** | Complexity: `[COMPLEX]` | Time: 45-55 min for administrators who already know basic TCP/IP and now need durable host-level operations.
+> **Operations - LFCS** | Complexity: `[COMPLEX]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> Designed for administrators who already know basic TCP/IP and now need durable host-level operations.
 
 ## Prerequisites
 

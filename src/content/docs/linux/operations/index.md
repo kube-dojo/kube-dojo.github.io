@@ -25,7 +25,10 @@ After [Security and Hardening](/linux/security/hardening/), follow the modules i
 
 | Module | Description | Time |
 |--------|-------------|------|
-| [Module 8.1: Storage Management](module-8.1-storage-management/) | Disk partitioning, filesystems, and LVM | 35 min |
-| [Module 8.2: Network Administration](module-8.2-network-administration/) | Network configuration and management | 45-55 min |
-| [Module 8.3: Package Management & User Administration](module-8.3-package-user-management/) | Package managers and user/group management | 40-50 min |
-| [Module 8.4: Task Scheduling and Backup Strategies](module-8.4-scheduling-backups/) | Cron, systemd timers, and backup approaches | 45-55 min |
+| [Module 8.1: Storage Management](module-8.1-storage-management/) | Disk partitioning, filesystems, and LVM | 80–110 min |
+| [Module 8.2: Network Administration](module-8.2-network-administration/) | Network configuration and management | 80–110 min |
+| [Module 8.3: Package Management & User Administration](module-8.3-package-user-management/) | Package managers and user/group management | 80–110 min |
+| [Module 8.4: Task Scheduling and Backup Strategies](module-8.4-scheduling-backups/) | Cron, systemd timers, and backup approaches | 80–110 min |
+
+
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **320–440 minutes (about 5 hours 20 minutes–7 hours 20 minutes)**; individual setup, reading, and practice time will vary.
