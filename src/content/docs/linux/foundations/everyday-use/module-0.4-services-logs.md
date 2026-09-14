@@ -14,7 +14,7 @@ lab:
 
 > **Complexity**: `[QUICK]` - Operator practice for Linux services, unit files, and log evidence
 >
-> **Time to Complete**: 45-50 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: [Module 0.3: Process & Resource Survival Guide](../module-0.3-processes-resources/), a Linux VM or lab host with `sudo`, and comfort reading command output under time pressure
 

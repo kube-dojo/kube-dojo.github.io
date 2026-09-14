@@ -11,7 +11,11 @@ lab:
   difficulty: "intermediate"
   environment: "ubuntu"
 ---
-> **Everyday Use** | Complexity: `[QUICK]` | Time: 45 min
+> **Complexity**: `[QUICK]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> **Prerequisites**: See [Prerequisites](#prerequisites) below
 
 ## Prerequisites
 

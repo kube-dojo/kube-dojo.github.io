@@ -12,7 +12,13 @@ lab:
   environment: "ubuntu"
 ---
 
-**Complexity:** `[QUICK]`. **Time to Complete:** 45 minutes. **Prerequisites:** Zero to Terminal (Module 0.8). This module assumes you can open a shell, move through directories, and run basic commands, then shows how those small skills become repeatable investigation workflows.
+> **Complexity**: `[QUICK]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> **Prerequisites**: Zero to Terminal (Module 0.8)
+>
+> This module assumes you can open a shell, move through directories, and run basic commands, then shows how those small skills become repeatable investigation workflows.
 
 ## Learning Outcomes
 

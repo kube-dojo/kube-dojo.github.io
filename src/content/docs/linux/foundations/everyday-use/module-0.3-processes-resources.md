@@ -12,7 +12,13 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Everyday Use** | Complexity: `[QUICK]` | Time: 40 min. This quick module is still written as a full operational lesson because process and resource triage becomes useful only when the commands fit into a repeatable diagnostic sequence.
+> **Complexity**: `[QUICK]`
+>
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+>
+> **Prerequisites**: See [Prerequisites](#prerequisites) below
+>
+> This quick module is still written as a full operational lesson because process and resource triage becomes useful only when the commands fit into a repeatable diagnostic sequence.
 
 ## Prerequisites
 
