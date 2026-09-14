@@ -12,7 +12,9 @@ lab:
   environment: ubuntu
 ---
 
-> **Linux Troubleshooting** | Complexity: `[MEDIUM]` | Time: 25-30 min for a focused learner, with extra practice time encouraged if you are new to production log formats.
+> **Linux Troubleshooting** | Complexity: `[MEDIUM]`
+> 
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 
