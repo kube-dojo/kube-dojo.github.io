@@ -4014,8 +4014,10 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
       - ``cleared`` — frontmatter says ``revision_pending`` is not true and ``citations_verified`` is true
       - ``not_yet_enqueued`` — every other state
 
-    Totals ``source_accepted`` is independent of ``cleared`` and counts only
-    complete applicable receipts bound to the live page and seed.
+    Totals, track, and section ``source_accepted`` are independent of
+    ``cleared`` and count only complete applicable receipts bound to the
+    live page and seed. Missing, stale, or malformed receipts do not
+    increment; legacy ``citations_verified`` / ``cleared`` cannot bypass.
 
     Readiness % = ``cleared / total``. Tracks come out in the canonical
     ``TRACK_ORDER``; within a track, sections are alphabetical so the
@@ -4030,7 +4032,6 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         from quality.source_acceptance import bind_page
     except ImportError:
         bind_page = None
-    source_accepted = 0
 
     # track_slug -> section_slug -> counts
     grid: dict[str, dict[str, dict[str, int]]] = {}
@@ -4067,12 +4068,13 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
                 "in_flight": 0,
                 "dead_letter": 0,
                 "not_yet_enqueued": 0,
+                "source_accepted": 0,
             },
         )
         s["total"] += 1
         s[bucket] += 1
         if bind_page is not None and bind_page(repo_root, rel, page_bytes).get("accepted") is True:
-            source_accepted += 1
+            s["source_accepted"] += 1
 
     track_labels = dict(TRACK_ORDER)
     canonical_order = [slug for slug, _ in TRACK_ORDER]
@@ -4089,6 +4091,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         "in_flight": 0,
         "dead_letter": 0,
         "not_yet_enqueued": 0,
+        "source_accepted": 0,
     }
     for slug in track_order:
         sections_map = grid.get(slug)
@@ -4100,10 +4103,12 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         track_in_flight = 0
         track_dead = 0
         track_notenq = 0
+        track_accepted = 0
         for section_slug in sorted(sections_map.keys()):
             counts = sections_map[section_slug]
             total = counts["total"]
             cleared = counts["cleared"]
+            accepted = counts["source_accepted"]
             readiness_pct = round(100.0 * cleared / total, 1) if total else 0.0
             sections.append({
                 "slug": section_slug,
@@ -4112,6 +4117,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
                 "in_flight": counts["in_flight"],
                 "dead_letter": counts["dead_letter"],
                 "not_yet_enqueued": counts["not_yet_enqueued"],
+                "source_accepted": accepted,
                 "readiness_pct": readiness_pct,
             })
             track_total += total
@@ -4119,6 +4125,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
             track_in_flight += counts["in_flight"]
             track_dead += counts["dead_letter"]
             track_notenq += counts["not_yet_enqueued"]
+            track_accepted += accepted
         out_tracks.append({
             "slug": slug,
             "label": track_labels.get(slug, slug.replace("-", " ").title()),
@@ -4127,6 +4134,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
             "in_flight": track_in_flight,
             "dead_letter": track_dead,
             "not_yet_enqueued": track_notenq,
+            "source_accepted": track_accepted,
             "readiness_pct": round(100.0 * track_cleared / track_total, 1) if track_total else 0.0,
             "sections": sections,
         })
@@ -4135,7 +4143,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         grand["in_flight"] += track_in_flight
         grand["dead_letter"] += track_dead
         grand["not_yet_enqueued"] += track_notenq
-    grand["source_accepted"] = source_accepted
+        grand["source_accepted"] += track_accepted
 
     grand["readiness_pct"] = (
         round(100.0 * grand["cleared"] / grand["total"], 1) if grand["total"] else 0.0
@@ -8977,7 +8985,7 @@ def build_api_schema() -> dict[str, Any]:
             {"path": "/api/delivery/status", "desc": "Build freshness and site-health status"},
             {
                 "path": "/api/tracks/readiness",
-                "desc": "Per-track, per-section production-readiness grid (cleared/in_flight/dead_letter/not_yet_enqueued)",
+                "desc": "Per-track, per-section production-readiness grid (cleared/in_flight/dead_letter/not_yet_enqueued/source_accepted)",
             },
             {
                 "path": "/api/runtime/services",

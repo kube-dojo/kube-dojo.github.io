@@ -3024,6 +3024,7 @@ def test_tracks_readiness_empty_repo(tmp_path: Path) -> None:
     result = local_api.build_tracks_readiness(tmp_path)
     assert result["tracks"] == []
     assert result["totals"]["total"] == 0
+    assert result["totals"]["source_accepted"] == 0
     assert result["totals"]["readiness_pct"] == 0.0
 
 
@@ -3074,9 +3075,12 @@ def test_tracks_readiness_frontmatter_aggregate_counts(tmp_path: Path) -> None:
     cka = next(s for s in k8s["sections"] if s["slug"] == "cka")
     assert k8s["total"] == 3
     assert k8s["cleared"] == 1
+    assert k8s["source_accepted"] == 0
     assert k8s["not_yet_enqueued"] == 2
     assert cka["total"] == 3
+    assert cka["source_accepted"] == 0
     assert cka["readiness_pct"] == 33.3
+    assert result["totals"]["source_accepted"] == 0
 
 
 def test_v_docs_frontmatter_changes_on_module_edit(tmp_path: Path) -> None:
