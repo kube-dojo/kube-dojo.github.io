@@ -5,16 +5,16 @@
 exam_pin:
   kubernetes_minor: "1.35"
   applies_to: ["cka", "ckad", "cks", "kcna", "kcsa"]
-  verified_date: "2026-09-13"
-  verified_note: "\"The CKA exam environment is currently running Kubernetes v1.35\" (LF FAQ, 2026-09-13). CKA/CKAD/CKS product pages agree. Do not bump until that sentence changes."
+  verified_date: "2026-09-14"
+  verified_note: "\"The CKA exam environment is currently running Kubernetes v1.35\" (LF FAQ, 2026-09-14). CKA/CKAD/CKS product pages agree. Do not bump until that sentence changes."
 
 latest_stable_track:
   policy: "tracks upstream supported minor branches (typically three)"
   supported_minors: ["1.37", "1.36", "1.35"]
-  as_of: "2026-09-12"
+  as_of: "2026-09-14"
   source: "https://kubernetes.io/releases/"
 
 kind_node_images:
-  "1.35": "kindest/node:v1.35.0"
-  "1.36": "kindest/node:v1.36.1"
+  "1.35": "kindest/node:v1.35.8"
+  "1.36": "kindest/node:v1.36.4"
   "1.37": "kindest/node:v1.37.0"

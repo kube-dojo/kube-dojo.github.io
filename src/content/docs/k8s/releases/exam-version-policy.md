@@ -14,7 +14,7 @@ KubeDojo runs **two tracks** on purpose. Mixing them is how learners fail exams 
 |-------|-------|
 | Current pin | **Kubernetes 1.35** |
 | Applies to | CKA, CKAD, CKS, and associate tracks that declare the same target |
-| Verified | 2026-09-13 (LF FAQ + CKA/CKAD/CKS product pages still say v1.35) |
+| Verified | 2026-09-14 (LF FAQ + CKA/CKAD/CKS product pages still say v1.35) |
 | Source of truth | `docs/pins/kubernetes.yaml` → `exam_pin` |
 
 **Rules**
@@ -35,7 +35,7 @@ Agents and editors must re-check these official pages on the same day before cha
 | [CKAD](https://training.linuxfoundation.org/certification/certified-kubernetes-application-developer-ckad/) | same sentence |
 | [CKS](https://training.linuxfoundation.org/certification/certified-kubernetes-security-specialist/) | same sentence |
 
-Re-verified **2026-09-13**: CKA, CKAD, and CKS still state **Kubernetes v1.35**. Record the date and a verbatim quote in `docs/pins/kubernetes.yaml` when the pin moves.
+Re-verified **2026-09-14**: CKA, CKAD, and CKS still state **Kubernetes v1.35**. Record the date and a verbatim quote in `docs/pins/kubernetes.yaml` when the pin moves.
 
 Look for the inline target callouts already used in cert part-0 modules (for example CKA exam strategy). Prefer linking here rather than inventing a second story per lesson.
 
