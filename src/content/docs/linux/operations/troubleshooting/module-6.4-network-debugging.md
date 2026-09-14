@@ -14,7 +14,7 @@ lab:
 ---
 
 > **Linux Troubleshooting** | Complexity: `[COMPLEX]`
-> 
+>
 > **Time to Complete**: 50–80 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
