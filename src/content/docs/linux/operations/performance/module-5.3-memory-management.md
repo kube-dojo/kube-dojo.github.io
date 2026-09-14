@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 5.3: Memory Management"
 slug: linux/operations/performance/module-5.3-memory-management
@@ -387,7 +388,7 @@ Quality of Service class is Kubernetes' way of saying which pods made explicit r
 ```bash
 # OOM score adjustment by QoS:
 # Guaranteed: -997
-# Burstable: 2 to 999 (scaled by request/limit)
+# Burstable: 2 to 999 (scaled by memory request vs node capacity)
 # BestEffort: 1000
 
 # BestEffort pods die first under memory pressure
