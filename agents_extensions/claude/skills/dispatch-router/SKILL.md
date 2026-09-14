@@ -10,6 +10,20 @@ Pick the right agent + model + tier for a task before firing a dispatch. This sk
 
 **Always cross-check memory keys** below before relying on an agent — caps and prices rotate weekly.
 
+## EN epic 5-lane balance (epic #2272 / paid seats — 2026-09-14)
+
+Rotate **authors** and **cross-family CF** across these five seats so none idle while another burns:
+
+| Seat | Dispatch | Default model | Prefer for | Never |
+|---|---|---|---|---|
+| **agy** | `--agent agy` | `gemini-3.1-pro-high` | EN content drafts | habit-only author lane |
+| **codex** | `--agent codex` | task-class default | quality-critical author + CF | habit-route on weekly deficit |
+| **kimi** | `--agent kimi` | `kimi-code/k3-256k` | EN drafts/edits (ACP tools) | UK translation; bare `kimi -p` |
+| **claude** | `--agent claude` | sonnet/opus per class | author + strong CF | pile-on during Anthropic throttle |
+| **grok-4.6** | `--agent hermes --model grok-4.6` | `grok-4.6` | EN content CF/draft | confuse with `--agent grok` (grok-build code only) |
+
+**Rotation rule (wave of N packets):** author seats cycle `kimi → agy → claude → hermes/grok-4.6 → codex` (skip a seat only on live CodexBar throttle / auth fail). CF seat ≠ author family. Driver on Cursor → never `--agent cursor`. Prefer `kimi-code/k3-256k` over `kimi-code/k3` (1M) unless context demands it. Kimi headless writes go through ACP (`KimiAdapter` / `kimi_acp_oneshot.py`), not `-p`.
+
 ## Activity × lane matrix (2026-06-04) — route by ACTIVITY, not just review
 
 Pick the row for the activity, then the **primary doer**; for any write/author row, send the output to a **cross-family reviewer** (a DIFFERENT model family than the doer). All lanes below are flat-rate/cheap.
