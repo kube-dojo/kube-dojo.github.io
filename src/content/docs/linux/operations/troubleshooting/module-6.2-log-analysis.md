@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 6.2: Log Analysis"
 slug: linux/operations/troubleshooting/module-6.2-log-analysis
@@ -35,7 +36,7 @@ After this module, you will be able to make evidence-based troubleshooting decis
 
 ## Why This Module Matters
 
-In 2017, British Airways suffered a major IT outage that disrupted flights across London airports and forced thousands of passengers into cancellations, delays, and manual recovery work [source]. The operational pain was not only financial: teams had to reconstruct which services failed first, which alarms were symptoms, and which restart actions made recovery better or worse. During incidents like that, logs become the closest thing an engineering team has to a flight recorder, and the team that can read them calmly has a decisive advantage over the team that only reacts to the loudest error message.
+In 2017, British Airways suffered a major IT outage that disrupted flights across London airports and forced thousands of passengers into cancellations, delays, and manual recovery work ([FlightGlobal, 31 May 2017](https://www.flightglobal.com/interruption-of-power-supply-took-out-it-systems-ba/124220.article)). The operational pain was not only financial: teams had to reconstruct which services failed first, which alarms were symptoms, and which restart actions made recovery better or worse. During incidents like that, logs become the closest thing an engineering team has to a flight recorder, and the team that can read them calmly has a decisive advantage over the team that only reacts to the loudest error message.
 
 Modern Linux systems generate logs from many layers at once. The kernel records device, memory, and networking events; `systemd-journald` indexes service messages; traditional files under `/var/log` hold syslog, authentication, package, web server, and database history; container runtimes collect stdout and stderr; Kubernetes exposes a simplified view through `kubectl logs`, and later examples define `alias k=kubectl` before using the shorter `k logs` form. A single outage might leave useful clues in all of those places, and the important evidence is often not the first scary line you find but the sequence of smaller events that led to it.
 
@@ -101,7 +102,7 @@ Time synchronization quietly underpins this whole workflow. If two hosts disagre
 
 Pause and predict: if you need to correlate a database error with a web server error, what is the most reliable piece of information to use across both log sources? The answer is not the severity label or the exact wording of the message, because those are application-specific. The answer is a timestamp, ideally with a known timezone and enough precision to compare events that happened within seconds of one another.
 
-A realistic war story looks like this: an API team sees elevated 502 responses from NGINX and immediately restarts the application deployment. The restart lowers the error rate for a few minutes, but the issue returns because the real cause was a kernel-level conntrack table exhaustion on the node. The NGINX access log proved user impact, the application log showed retries, `journalctl -k` showed dropped connections, and the kubelet log showed pods being recreated on the same unhealthy node. No single log source told the whole truth.
+**Hypothetical scenario:** An API team sees elevated 502 responses from NGINX and immediately restarts the application deployment. The restart lowers the error rate for a few minutes, but the issue returns because the real cause was a kernel-level conntrack table exhaustion on the node. The NGINX access log proved user impact, the application log showed retries, `journalctl -k` showed dropped connections, and the kubelet log showed pods being recreated on the same unhealthy node. No single log source told the whole truth.
 
 That story also shows why logs need interpretation rather than blind trust. The first 502 line was true, but it was not sufficient. The application retries were true, but they were symptoms of network state rather than a bug in retry code. The kubelet messages were true, but they described recovery attempts, not the original trigger. Log analysis is the craft of preserving all of those truths while refusing to promote the first one you found into the root cause.
 
