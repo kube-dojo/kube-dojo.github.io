@@ -18,7 +18,7 @@ Linux networking is the foundation for everything in Kubernetes—pod-to-pod com
 | 3.3 | [Module 3.3: Network Namespaces & veth](module-3.3-network-namespaces/) | veth pairs, bridges, pod networking | 140–170 min |
 | 3.4 | [Module 3.4: iptables & netfilter](module-3.4-iptables-netfilter/) | Packet filtering, NAT, kube-proxy internals | 80–110 min |
 
-> **Total Time Estimate**: 380–490 minutes. *Note: Times are planning estimates for long-form reading and hands-on exercises; actual completion time may vary.*
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **380–500 minutes (about 6 hours 20 minutes–8 hours 20 minutes)**; individual setup, reading, and practice time will vary.
 
 ## Why This Section Matters
 
