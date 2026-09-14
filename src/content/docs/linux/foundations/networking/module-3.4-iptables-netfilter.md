@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 3.4: iptables & netfilter"
 slug: linux/foundations/networking/module-3.4-iptables-netfilter

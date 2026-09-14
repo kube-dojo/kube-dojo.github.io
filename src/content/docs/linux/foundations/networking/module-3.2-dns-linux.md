@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 3.2: DNS in Linux"
 slug: linux/foundations/networking/module-3.2-dns-linux
