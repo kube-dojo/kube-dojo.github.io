@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 revision_pending: false
 title: "Module 2.3: Capabilities & Linux Security Modules"
 slug: linux/foundations/container-primitives/module-2.3-capabilities-lsms
@@ -467,7 +468,7 @@ The same framework applies during incident response, but the priority changes fr
 ## Did You Know?
 
 - **Linux currently defines more than 40 named capabilities** in modern kernels, and the list has grown over time as kernel developers split overloaded powers into smaller pieces such as `CAP_BPF` and `CAP_CHECKPOINT_RESTORE`.
-- **Docker's default seccomp profile has historically blocked around four dozen high-risk syscalls** while allowing the common calls needed by ordinary Linux applications, which is why many containers run safely without custom seccomp files.
+- **Docker's default seccomp profile has historically blocked dozens of high-risk syscalls** while allowing the common calls needed by ordinary Linux applications, which is why many containers run safely without custom seccomp files.
 - **The `ping` command moved away from setuid-root designs on many distributions** by using `CAP_NET_RAW`, which narrows the privilege needed to send ICMP packets instead of granting every root privilege.
 - **Kubernetes has supported seccomp as a stable pod security feature since v1.19**, and Kubernetes 1.35 still treats `RuntimeDefault` as the practical baseline for reducing kernel attack surface in normal workloads.
 
