@@ -12,7 +12,11 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Foundations** | Complexity: `[MEDIUM]` | Time: 35-40 min. This is the operator-grade packet model that later modules use for DNS, namespaces, veth pairs, iptables, and Kubernetes Service debugging.
+> **Linux Foundations** | Complexity: `[MEDIUM]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> This is the operator-grade packet model that later modules use for DNS, namespaces, veth pairs, iptables, and Kubernetes Service debugging.
 
 ## Prerequisites
 

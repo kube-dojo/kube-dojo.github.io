@@ -12,7 +12,9 @@ lab:
   environment: "ubuntu"
 ---
 
-Complexity: `[COMPLEX]` | Time: 65-75 min | Track: Linux Foundations networking. This module assumes you already know TCP/IP packet structure, DNS resolution, and Linux network namespaces well enough to recognize when a packet is local, forwarded, or leaving through a host interface.
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+
+Complexity: `[COMPLEX]` | Track: Linux Foundations networking. This module assumes you already know TCP/IP packet structure, DNS resolution, and Linux network namespaces well enough to recognize when a packet is local, forwarded, or leaving through a host interface.
 
 ## Prerequisites
 
