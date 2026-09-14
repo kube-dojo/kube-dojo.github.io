@@ -16,13 +16,13 @@ These 5 modules bridge the gap between "I can use a terminal" and "I understand 
 
 | # | Module | Time | What You'll Learn |
 |---|--------|------|-------------------|
-| 0.1 | [The CLI Power User (Search & Streams)](module-0.1-cli-power-user/) | 80–110 min | Wildcards, pipes, redirects, find, grep |
+| 0.1 | [The CLI Power User (Search & Streams)](module-0.1-cli-power-user/) | 70–100 min | Wildcards, pipes, redirects, find, grep |
 | 0.2 | [Environment & Permissions (Who You Are & Where You Are)](module-0.2-environment-permissions/) | 80–110 min | $PATH, .bashrc, chmod, chown, sudo |
 | 0.3 | [Process & Resource Survival Guide](module-0.3-processes-resources/) | 90–120 min | ps, top, kill, background jobs, disk usage |
 | 0.4 | [Services & Logs Demystified](module-0.4-services-logs/) | 80–110 min | systemctl, journalctl, daemons |
-| 0.5 | [Everyday Networking Tools](module-0.5-networking-tools/) | 80–110 min | ping, curl, ss, dig, traceroute |
+| 0.5 | [Everyday Networking Tools](module-0.5-networking-tools/) | 70–100 min | ping, curl, ss, dig, traceroute |
 
-These are planning estimates copied from the five module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **410–560 minutes (about 6 hours 50 minutes–9 hours 20 minutes)**; individual setup, reading, and practice time will vary.
+These are planning estimates copied from the five module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **390–540 minutes (about 6 hours 30 minutes–9 hours)**; individual setup, reading, and practice time will vary.
 
 ---
 
