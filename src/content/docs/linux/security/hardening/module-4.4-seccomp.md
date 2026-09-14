@@ -12,7 +12,9 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Security** | Complexity: `[MEDIUM]` | Time-to-Complete: 80–110 minutes
+> **Linux Security** | Complexity: `[MEDIUM]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 
