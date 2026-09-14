@@ -1,5 +1,6 @@
 ---
 revision_pending: false
+citations_verified: true
 title: "Module 8.2: Network Administration"
 slug: linux/operations/module-8.2-network-administration
 sidebar:
@@ -570,9 +571,6 @@ PasswordAuthentication no
 # Disable root login
 PermitRootLogin no
 
-# Use only SSH protocol 2
-Protocol 2
-
 # Limit to specific users or groups
 AllowUsers admin deploy
 # Or: AllowGroups sshusers
@@ -761,7 +759,7 @@ For security-sensitive exposure, prefer named services and scoped sources before
 
 - **firewalld became the default firewall manager in Red Hat Enterprise Linux 7 in 2014**, and modern releases can use nftables as the backend while keeping the `firewall-cmd` workflow administrators recognize.
 - **The Linux bonding driver has supported active-backup mode for decades**, and that simple failover mode remains popular because it does not require switch-side link aggregation.
-- **Chrony was selected as the default NTP implementation in Red Hat Enterprise Linux 8 and Ubuntu 22.04 installations**, largely because it synchronizes quickly and behaves well on virtualized systems.
+- **Chrony became the default NTP implementation in Red Hat Enterprise Linux 8 and is the recommended full-featured NTP daemon on Ubuntu**, largely because it synchronizes quickly and behaves well on virtualized systems; Ubuntu defaults to the lighter `systemd-timesyncd` client unless chrony is installed.
 - **802.1Q VLAN tags add 4 bytes to an Ethernet frame**, which is why administrators must pay attention to MTU behavior when tagged traffic, tunnels, and storage networks combine.
 
 ## Common Mistakes
@@ -985,7 +983,7 @@ sudo nmcli connection delete static-eth0
 - [nftables wiki: Main page](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page)
 - [chrony project documentation](https://chrony-project.org/documentation.html)
 - [OpenSSH manual: sshd_config](https://man.openbsd.org/sshd_config)
-- [fail2ban documentation](https://www.fail2ban.org/wiki/index.php/Main_Page)
+- [fail2ban wiki and documentation](https://github.com/fail2ban/fail2ban/wiki)
 - [systemd timedatectl manual](https://www.freedesktop.org/software/systemd/man/latest/timedatectl.html)
 - [systemd resolvectl manual](https://www.freedesktop.org/software/systemd/man/latest/resolvectl.html)
 
