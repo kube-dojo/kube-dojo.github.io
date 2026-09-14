@@ -1,7 +1,7 @@
 ---
 title: "Module 7.4: DevOps Automation"
 slug: linux/operations/shell-scripting/module-7.4-devops-automation
-revision_pending: false
+citations_verified: true
 sidebar:
   order: 5
 lab:

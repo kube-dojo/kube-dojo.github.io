@@ -1,5 +1,5 @@
 ---
-revision_pending: false
+citations_verified: true
 title: "Module 7.2: Text Processing"
 slug: linux/operations/shell-scripting/module-7.2-text-processing
 sidebar:

@@ -1,5 +1,5 @@
 ---
-revision_pending: false
+citations_verified: true
 title: "Module 7.3: Practical Scripts"
 slug: linux/operations/shell-scripting/module-7.3-practical-scripts
 sidebar:
