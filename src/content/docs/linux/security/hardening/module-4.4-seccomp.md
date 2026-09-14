@@ -1,7 +1,7 @@
 ---
-revision_pending: false
 title: "Module 4.4: seccomp Profiles"
 slug: linux/security/hardening/module-4.4-seccomp
+citations_verified: true
 sidebar:
   order: 5
 lab:

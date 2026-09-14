@@ -1,7 +1,7 @@
 ---
-revision_pending: false
 title: "Module 4.3: SELinux Contexts"
 slug: linux/security/hardening/module-4.3-selinux
+citations_verified: true
 sidebar:
   order: 4
 lab:
