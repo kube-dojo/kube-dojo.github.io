@@ -2,6 +2,7 @@
 title: "Module 8.1: Storage Management"
 slug: linux/operations/module-8.1-storage-management
 revision_pending: false
+citations_verified: true
 sidebar:
   order: 1
 lab:

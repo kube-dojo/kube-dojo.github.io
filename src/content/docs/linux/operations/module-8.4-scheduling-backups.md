@@ -2,6 +2,7 @@
 title: "Module 8.4: Task Scheduling and Backup Strategies"
 slug: linux/operations/module-8.4-scheduling-backups
 revision_pending: false
+citations_verified: true
 sidebar:
   order: 4
 lab:

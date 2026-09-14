@@ -2,6 +2,7 @@
 title: "Module 8.3: Package Management & User Administration"
 slug: linux/operations/module-8.3-package-user-management
 revision_pending: false
+citations_verified: true
 sidebar:
   order: 3
 lab:
@@ -431,7 +432,7 @@ Hash prefixes are useful during audits because they reveal whether the system is
 | `$1$` | MD5 | Weak - do not use |
 | `$5$` | SHA-256 | Acceptable |
 | `$6$` | SHA-512 | Current default on most distros |
-| `$y$` | yescrypt | Modern default on Debian 12+, Fedora 38+ |
+| `$y$` | yescrypt | Modern default on Debian 11+, Fedora 35+, Ubuntu 22.04+ |
 | `!` or `*` | (none) | Account is locked / no password login |
 
 Groups provide a scalable way to grant access without editing every file or sudo rule for every person. A primary group is recorded in `/etc/passwd`, while supplementary memberships live in `/etc/group`. The trap is that group membership changes often require a new login session before processes see the updated group list, so successful administration includes both changing the file and verifying the user's effective identity.
