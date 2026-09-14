@@ -14,7 +14,7 @@ lab:
 
 > **Complexity**: `[MEDIUM]` - Operator-grade Linux identity and access control
 >
-> **Time to Complete**: 50-55 minutes
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: [Module 1.3: Filesystem Hierarchy](../module-1.3-filesystem-hierarchy/), shell navigation, basic `ls -l`, and enough Kubernetes context to read a Pod `securityContext`
 

@@ -12,9 +12,11 @@ lab:
   environment: "ubuntu"
 ---
 
-**Complexity**: `[MEDIUM]`<br>
-**Time to complete**: 45 minutes<br>
-**Prerequisites**: [Module 1.1: Kernel & Architecture](../module-1.1-kernel-architecture/) and [Module 1.2: Processes & systemd](../module-1.2-processes-systemd/)
+> **Complexity**: `[MEDIUM]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+>
+> **Prerequisites**: [Module 1.1: Kernel & Architecture](../module-1.1-kernel-architecture/) and [Module 1.2: Processes & systemd](../module-1.2-processes-systemd/)
 
 ## Learning Outcomes
 
