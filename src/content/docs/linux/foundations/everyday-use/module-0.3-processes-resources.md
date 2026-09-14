@@ -1,6 +1,7 @@
 ---
 title: "Module 0.3: Process & Resource Survival Guide"
 slug: linux/foundations/everyday-use/module-0.3-processes-resources
+citations_verified: true
 revision_pending: false
 sidebar:
   order: 4

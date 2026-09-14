@@ -1,6 +1,7 @@
 ---
 title: "Module 0.2: Environment & Permissions (Who You Are & Where You Are)"
 slug: linux/foundations/everyday-use/module-0.2-environment-permissions
+citations_verified: true
 revision_pending: false
 sidebar:
   order: 3

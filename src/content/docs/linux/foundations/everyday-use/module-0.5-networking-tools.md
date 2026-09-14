@@ -1,6 +1,7 @@
 ---
 title: "Module 0.5: Everyday Networking Tools"
 slug: linux/foundations/everyday-use/module-0.5-networking-tools
+citations_verified: true
 revision_pending: false
 sidebar:
   order: 6
