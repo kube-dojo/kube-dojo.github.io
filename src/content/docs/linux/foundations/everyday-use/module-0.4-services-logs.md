@@ -1,6 +1,7 @@
 ---
 title: "Module 0.4: Services & Logs Demystified"
 slug: linux/foundations/everyday-use/module-0.4-services-logs
+citations_verified: true
 revision_pending: false
 sidebar:
   order: 5
@@ -166,7 +167,7 @@ Restart policy is an operating contract. `Restart=no` means systemd will not aut
 | Restart policy | Use when | Avoid when | First triage command |
 |---|---|---|---|
 | `no` | A one-shot task should leave success or failure visible | A long-running daemon must self-heal after crashes | `systemctl status <unit>` |
-| `on-failure` | Availability matters and failed exits are safe to retry | Repeated failure can corrupt state or flood dependencies | `journalctl -u <unit> -p warning..alert` (in syslog numbering, lower means more severe: `alert=1`, `warning=4`) |
+| `on-failure` | Availability matters and failed exits are safe to retry | Repeated failure can corrupt state or flood dependencies | `journalctl -u <unit> -p warning` (warning and more severe; syslog `warning=4`, `err=3`, `alert=1`, `emerg=0`) |
 | `on-abnormal` | You only want signal, timeout, or watchdog-style recovery | Normal nonzero exits should also recover | `systemctl show -p NRestarts <unit>` |
 | `on-abort` | A signal abort should be treated as crash recovery | Exit-code failures also need restart | `coredumpctl list <unit>` |
 | `on-watchdog` | The daemon participates in watchdog health checks | The daemon cannot send watchdog notifications | `journalctl -u <unit> | grep -i watchdog` |
@@ -199,7 +200,7 @@ systemctl list-failed
 
 ```bash
 journalctl -u nginx.service --since "2026-05-21 08:00" --until "2026-05-21 09:00"
-journalctl -u nginx.service -b -p warning..alert
+journalctl -u nginx.service -b -p warning
 journalctl -u nginx.service --since=-1h --until=now -o json | jq -r '.PRIORITY, .MESSAGE'
 journalctl _PID=1234 --since=-10m
 systemctl show -p MainPID -p ExecMainStatus -p NRestarts nginx.service
@@ -270,7 +271,7 @@ sudo journalctl --vacuum-size=2G
 
 Do not treat vacuum commands as harmless cleanup during an investigation. They delete old journal data according to the requested boundary, which may be correct for disk pressure but wrong for evidence preservation. First export the relevant range with `journalctl -u <unit> --since ... --until ... -o json` or `journalctl --output=export` if another system needs native journal import. Then vacuum only the data you can afford to remove. ([journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html), [journald.conf](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html))
 
-Priorities are filters, not conclusions. A high-priority message may be noisy during a known maintenance action, and an `info` message may contain the only command-line clue before a crash. Start broad enough to understand the sequence, then narrow with `-p warning..alert`, `_SYSTEMD_UNIT=`, `_PID=`, `_BOOT_ID=`, and time boundaries. The journal-fields manual is your map when a text search starts missing evidence. ([Journal Fields](https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+Priorities are filters, not conclusions. A high-priority message may be noisy during a known maintenance action, and an `info` message may contain the only command-line clue before a crash. Start broad enough to understand the sequence, then narrow with `-p warning`, `_SYSTEMD_UNIT=`, `_PID=`, `_BOOT_ID=`, and time boundaries. The journal-fields manual is your map when a text search starts missing evidence. ([Journal Fields](https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
 
 ## Forwarding and Durable Storage
 
@@ -430,7 +431,7 @@ Reload uses the unit's reload action when it exists, commonly asking the daemon 
 <details>
 <summary>`journalctl -u api.service --since=-1h` shows thousands of entries. Which filters help narrow the evidence without losing the unit boundary?</summary>
 
-Keep `-u api.service`, add a precise `--since` and `--until` window, filter by priority with `-p warning..alert`, limit to the current or previous boot with `-b` or `-b -1`, and switch to `-o json` when fields such as `_PID`, `SYSLOG_IDENTIFIER`, or `_BOOT_ID` matter. Avoid a plain text grep until you know which field you are trying to match.
+Keep `-u api.service`, add a precise `--since` and `--until` window, filter by priority with `-p warning` (warning and more severe), limit to the current or previous boot with `-b` or `-b -1`, and switch to `-o json` when fields such as `_PID`, `SYSLOG_IDENTIFIER`, or `_BOOT_ID` matter. Avoid a plain text grep until you know which field you are trying to match.
 </details>
 
 <details>

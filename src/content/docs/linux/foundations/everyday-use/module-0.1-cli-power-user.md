@@ -1,6 +1,7 @@
 ---
 title: "Module 0.1: The CLI Power User (Search & Streams)"
 slug: linux/foundations/everyday-use/module-0.1-cli-power-user
+citations_verified: true
 revision_pending: false
 sidebar:
   order: 2
