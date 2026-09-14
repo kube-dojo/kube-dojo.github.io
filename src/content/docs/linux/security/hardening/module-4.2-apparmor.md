@@ -1,7 +1,7 @@
 ---
 title: "Module 4.2: AppArmor Profiles"
 slug: linux/security/hardening/module-4.2-apparmor
-revision_pending: false
+citations_verified: true
 sidebar:
   order: 3
 lab:

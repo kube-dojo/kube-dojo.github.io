@@ -1,7 +1,7 @@
 ---
-revision_pending: false
 title: "Module 4.1: Kernel Hardening & sysctl"
 slug: linux/security/hardening/module-4.1-kernel-hardening
+citations_verified: true
 sidebar:
   order: 2
 lab:
