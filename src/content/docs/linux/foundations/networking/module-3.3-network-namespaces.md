@@ -14,7 +14,7 @@ lab:
 
 > **Complexity**: `[MEDIUM]` — Container networking as inspectable Linux objects for Kubernetes node incidents
 >
-> **Time to Complete**: 40-50 minutes
+> **Time to Complete**: 140–170 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: [Module 2.1: Linux Namespaces](/linux/foundations/container-primitives/module-2.1-namespaces/), [Module 3.1: TCP/IP Essentials](../module-3.1-tcp-ip-essentials/), and [Module 3.2: DNS in Linux](../module-3.2-dns-linux/); comfort reading `ip addr`, `ip route`, and `ss` on a host before applying the same tools inside isolated stacks
 

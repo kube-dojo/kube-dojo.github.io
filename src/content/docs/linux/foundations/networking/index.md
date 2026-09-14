@@ -13,10 +13,12 @@ Linux networking is the foundation for everything in Kubernetes—pod-to-pod com
 
 | # | Module | Description | Time |
 |---|--------|-------------|------|
-| 3.1 | [Module 3.1: TCP/IP Essentials](module-3.1-tcp-ip-essentials/) | OSI model, TCP vs UDP, subnetting, routing | 30-35 min |
-| 3.2 | [Module 3.2: DNS in Linux](module-3.2-dns-linux/) | resolv.conf, dig, DNS debugging | 25-30 min |
-| 3.3 | [Module 3.3: Network Namespaces & veth](module-3.3-network-namespaces/) | veth pairs, bridges, pod networking | 30-35 min |
-| 3.4 | [Module 3.4: iptables & netfilter](module-3.4-iptables-netfilter/) | Packet filtering, NAT, kube-proxy internals | 35-40 min |
+| 3.1 | [Module 3.1: TCP/IP Essentials](module-3.1-tcp-ip-essentials/) | OSI model, TCP vs UDP, subnetting, routing | 80–110 min |
+| 3.2 | [Module 3.2: DNS in Linux](module-3.2-dns-linux/) | resolv.conf, dig, DNS debugging | 80–110 min |
+| 3.3 | [Module 3.3: Network Namespaces & veth](module-3.3-network-namespaces/) | veth pairs, bridges, pod networking | 140–170 min |
+| 3.4 | [Module 3.4: iptables & netfilter](module-3.4-iptables-netfilter/) | Packet filtering, NAT, kube-proxy internals | 80–110 min |
+
+> **Total Time Estimate**: 380–490 minutes. *Note: Times are planning estimates for long-form reading and hands-on exercises; actual completion time may vary.*
 
 ## Why This Section Matters
 
