@@ -7,7 +7,7 @@ sidebar:
 
 **Track upstream Kubernetes minors without confusing them with your exam pin.**
 
-Upstream currently supports three minors at a time — today that is **1.37, 1.36, and 1.35** ([Kubernetes Releases](https://kubernetes.io/releases/), verified 2026-09-12). KubeDojo teaches those deltas here. Certification lessons (CKA/CKAD/CKS) stay on the **exam pin** until the Linux Foundation / CNCF exam environment moves — see [Exam version policy](/k8s/releases/exam-version-policy/).
+Upstream currently supports three minors at a time — today that is **1.37, 1.36, and 1.35** ([Kubernetes Releases](https://kubernetes.io/releases/), verified 2026-09-14). KubeDojo teaches those deltas here. Certification lessons (CKA/CKAD/CKS) stay on the **exam pin** until the Linux Foundation / CNCF exam environment moves — see [Exam version policy](/k8s/releases/exam-version-policy/).
 
 ## Start here
 

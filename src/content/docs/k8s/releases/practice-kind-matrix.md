@@ -14,15 +14,15 @@ Pinned in `docs/pins/kubernetes.yaml` (adjust patch tags when you verify newer k
 
 | Minor | kind node image | Notes |
 |-------|-----------------|-------|
-| 1.35 | `kindest/node:v1.35.0` | Matches current **exam pin** fixtures |
-| 1.36 | `kindest/node:v1.36.1` | Middle supported minor |
+| 1.35 | `kindest/node:v1.35.8` | Matches current **exam pin** fixtures |
+| 1.36 | `kindest/node:v1.36.4` | Middle supported minor |
 | 1.37 | `kindest/node:v1.37.0` | Newest supported minor (Garhwal) |
 
 Create separate clusters per minor (do not skew control plane vs workers beyond the [version skew policy](https://kubernetes.io/releases/version-skew-policy/)):
 
 ```bash
-kind create cluster --name kd-135 --image kindest/node:v1.35.0
-kind create cluster --name kd-136 --image kindest/node:v1.36.1
+kind create cluster --name kd-135 --image kindest/node:v1.35.8
+kind create cluster --name kd-136 --image kindest/node:v1.36.4
 kind create cluster --name kd-137 --image kindest/node:v1.37.0
 ```
 
