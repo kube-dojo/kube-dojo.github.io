@@ -12,7 +12,9 @@ lab:
   environment: ubuntu
 ---
 
-> **Shell Scripting** | Complexity: `[MEDIUM]` | Time: 30-35 min | Kubernetes: 1.35+
+> **Shell Scripting** | Complexity: `[MEDIUM]` | Kubernetes: 1.35+
+>
+> **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 

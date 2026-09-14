@@ -13,10 +13,12 @@ Shell scripting transforms repetitive manual tasks into reliable automation. Thi
 
 | # | Module | Description | Time |
 |---|--------|-------------|------|
-| 7.1 | [Module 7.1: Bash Fundamentals](module-7.1-bash-fundamentals/) | Variables, conditionals, loops, functions | 30-35 min |
-| 7.2 | [Module 7.2: Text Processing](module-7.2-text-processing/) | grep, sed, awk, jq for data manipulation | 30-35 min |
-| 7.3 | [Module 7.3: Practical Scripts](module-7.3-practical-scripts/) | Common patterns, error handling, logging | 25-30 min |
-| 7.4 | [Module 7.4: DevOps Automation](module-7.4-devops-automation/) | kubectl scripts, CI/CD helpers, operational tools | 30-35 min |
+| 7.1 | [Module 7.1: Bash Fundamentals](module-7.1-bash-fundamentals/) | Variables, conditionals, loops, functions | 90–120 min |
+| 7.2 | [Module 7.2: Text Processing](module-7.2-text-processing/) | grep, sed, awk, jq for data manipulation | 70–100 min |
+| 7.3 | [Module 7.3: Practical Scripts](module-7.3-practical-scripts/) | Common patterns, error handling, logging | 90–120 min |
+| 7.4 | [Module 7.4: DevOps Automation](module-7.4-devops-automation/) | kubectl scripts, CI/CD helpers, operational tools | 70–100 min |
+
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **320–440 minutes (about 5 hours 20 minutes–7 hours 20 minutes)**; individual setup, reading, and practice time will vary.
 
 ## Why This Section Matters
 

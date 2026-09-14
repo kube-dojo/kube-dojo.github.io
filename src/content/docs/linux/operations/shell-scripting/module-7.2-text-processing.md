@@ -12,7 +12,9 @@ lab:
   environment: ubuntu
 ---
 
-> **Shell Scripting** | Complexity: `[MEDIUM]` | Time: 30-35 min. This module focuses on dependable inspection, transformation, and reporting workflows that avoid silent operational drift.
+> **Shell Scripting** | Complexity: `[MEDIUM]` | This module focuses on dependable inspection, transformation, and reporting workflows that avoid silent operational drift.
+>
+> **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 
 Before this module, the learner should be comfortable with Bash syntax, process basics, and simple command chaining. The goal is no longer one-liner memorization; it is operational precision. In real incidents, operators read uncertain data under uncertainty, so the reliability of text-processing commands is part of reliability engineering itself. You should be able to choose the parser with the right cost model, prove your transformations are safe, and produce evidence that can be replayed by another engineer during handoff.
 

@@ -12,7 +12,9 @@ lab:
   environment: ubuntu
 ---
 
-> **Shell Scripting** | Complexity: `[MEDIUM]` | Time: 25-30 min. This module treats scripts as operational tools that need clear contracts, repeatable behavior, and evidence when something fails.
+> **Shell Scripting** | Complexity: `[MEDIUM]` | This module treats scripts as operational tools that need clear contracts, repeatable behavior, and evidence when something fails.
+>
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 
