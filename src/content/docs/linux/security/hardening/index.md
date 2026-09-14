@@ -13,10 +13,12 @@ Security isn't just firewalls—it's defense in depth. This section covers the L
 
 | # | Module | Description | Time |
 |---|--------|-------------|------|
-| 4.1 | [Kernel Hardening & sysctl](module-4.1-kernel-hardening/) | Network stack, memory protection, kernel parameters | 25-30 min |
-| 4.2 | [AppArmor Profiles](module-4.2-apparmor/) | Mandatory access control, profile modes, K8s integration | 30-35 min |
-| 4.3 | [SELinux Contexts](module-4.3-selinux/) | Policies, contexts, enforcing mode, troubleshooting | 35-40 min |
-| 4.4 | [seccomp Profiles](module-4.4-seccomp/) | System call filtering, custom profiles | 25-30 min |
+| 4.1 | [Kernel Hardening & sysctl](module-4.1-kernel-hardening/) | Network stack, memory protection, kernel parameters | 70–100 min |
+| 4.2 | [AppArmor Profiles](module-4.2-apparmor/) | Mandatory access control, profile modes, K8s integration | 80–110 min |
+| 4.3 | [SELinux Contexts](module-4.3-selinux/) | Policies, contexts, enforcing mode, troubleshooting | 80–110 min |
+| 4.4 | [seccomp Profiles](module-4.4-seccomp/) | System call filtering, custom profiles | 80–110 min |
+
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **310–430 minutes (about 5–7 hours)**; individual setup, reading, and practice time will vary.
 
 ## Why This Section Matters
 
