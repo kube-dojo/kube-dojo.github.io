@@ -12,7 +12,7 @@ lab:
   environment: "centos"
 ---
 
-> **Linux Security** | Complexity: `[COMPLEX]` | Time: 35-40 min. This is an advanced hardening module focused on practical diagnosis, durable repair, and container-aware SELinux operations.
+> **Linux Security** | Complexity: `[COMPLEX]` | Time-to-Complete: 80–110 minutes. This is an advanced hardening module focused on practical diagnosis, durable repair, and container-aware SELinux operations.
 
 ## Prerequisites
 

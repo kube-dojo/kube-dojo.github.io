@@ -12,7 +12,7 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Security** | Complexity: `[MEDIUM]` | Time: 30-35 min | Focus: kernel-enforced process confinement for hosts, containers, and Kubernetes workloads.
+> **Linux Security** | Complexity: `[MEDIUM]` | Time-to-Complete: 80–110 minutes | Focus: kernel-enforced process confinement for hosts, containers, and Kubernetes workloads.
 
 ## Prerequisites
 

@@ -12,7 +12,7 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Security** | Complexity: `[MEDIUM]` | Time: 25-30 min, focused on practical kernel controls for production Linux and Kubernetes nodes.
+> **Linux Security** | Complexity: `[MEDIUM]` | Time-to-Complete: 70–100 minutes, focused on practical kernel controls for production Linux and Kubernetes nodes.
 
 ## Prerequisites
 
