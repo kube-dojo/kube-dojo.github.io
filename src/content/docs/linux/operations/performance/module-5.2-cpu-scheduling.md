@@ -1,4 +1,5 @@
 ---
+citations_verified: true
 title: "Module 5.2: CPU & Scheduling"
 slug: linux/operations/performance/module-5.2-cpu-scheduling
 revision_pending: false
@@ -183,7 +184,7 @@ cgroups v2 exposes controls that directly bound what each workload can do. `cpu.
 
 For Kubernetes, mapping is direct in operations practice. Requests set expected baseline and scheduler placement behavior, while limits impose hard ceilings on burst behavior and sustained progress.
 
-When a pod throttles, `nr_throttled` and `throttled_time` often explain latency spikes while host graphs are misleadingly calm. The critical command pattern is to read `cpu.max` and `cpu.stat` from inside the pod and then compare with `kubectl top` and external scheduling traces.
+When a pod throttles, `nr_throttled` and `throttled_usec` often explain latency spikes while host graphs are misleadingly calm. The critical command pattern is to read `cpu.max` and `cpu.stat` from inside the pod and then compare with `kubectl top` and external scheduling traces.
 
 ```bash
 # Typical pod cgroup paths map from namespace file
@@ -435,7 +436,7 @@ Use this triage table as a shared runbook artifact.
 | Class | Primary signal | One control action | Expected measurable outcome |
 |---|---|---|---|
 | Fairness-pressure | High runnable queue with unstable selection order | Reduce worker concurrency or tune `nice` conservatively | Lower run-queue contention and lower wait-tail variance |
-| Quota-pressure | Rising `nr_throttled`, `throttled_time`, and `pressure` | Adjust `cpu.max` and validate sibling impact | Throttle slope flattens while p99 stabilizes |
+| Quota-pressure | Rising `nr_throttled`, `throttled_usec`, and `pressure` | Adjust `cpu.max` and validate sibling impact | Throttle slope flattens while p99 stabilizes |
 | Topology-pressure | Asymmetric core/IRQ distribution | Move workload to explicit cpusets and align interrupts | Fewer migrations and steadier per-core execution shape |
 | Concurrency-pressure | High voluntary/nonvoluntary switch counts | Cut in-process parallelism and retest with same traffic shape | Lower switch churn and improved completion consistency |
 
@@ -506,7 +507,7 @@ Do not let this remain documentation-only. If two recurring incidents map to the
 
 This question checks whether you can prove quota pressure before touching workload governance during an incident response sequence where latency and queue behavior stay tied to measured limits rather than assumptions.
 
-**Correct answer:** Read `cpu.max`, `cpu.stat` fields `nr_throttled` and `throttled_time`, then correlate those counters with scheduling symptoms and latency windows before changing limits.
+**Correct answer:** Read `cpu.max`, `cpu.stat` fields `nr_throttled` and `throttled_usec`, then correlate those counters with scheduling symptoms and latency windows before changing limits.
 
 **Reasoning:** These counters directly show budget exhaustion and run-time delays at the cgroup level, and their trend should be matched with workload timing before any limit adjustment is treated as a production-safe fix.
 </details>
