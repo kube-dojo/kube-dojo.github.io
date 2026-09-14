@@ -13,10 +13,12 @@ Performance analysis is more than running `top`. This section teaches systematic
 
 | # | Module | Description | Time |
 |---|--------|-------------|------|
-| 5.1 | [USE Method](module-5.1-use-method/) | Systematic performance analysis: Utilization, Saturation, Errors | 25-30 min |
-| 5.2 | [CPU & Scheduling](module-5.2-cpu-scheduling/) | CPU utilization, load average, CFS scheduler, priorities | 40-55 min |
-| 5.3 | [Memory Management](module-5.3-memory-management/) | Virtual memory, caching, swap, OOM killer | 30-35 min |
-| 5.4 | [I/O Performance](module-5.4-io-performance/) | Disk I/O, filesystems, block devices, storage tuning | 25-30 min |
+| 5.1 | [USE Method](module-5.1-use-method/) | Systematic performance analysis: Utilization, Saturation, Errors | 80–110 min |
+| 5.2 | [CPU & Scheduling](module-5.2-cpu-scheduling/) | CPU utilization, load average, CFS scheduler, priorities | 70–100 min |
+| 5.3 | [Memory Management](module-5.3-memory-management/) | Virtual memory, caching, swap, OOM killer | 70–100 min |
+| 5.4 | [I/O Performance](module-5.4-io-performance/) | Disk I/O, filesystems, block devices, storage tuning | 70–100 min |
+
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **290–410 minutes (about 4 hours 50 minutes–6 hours 50 minutes)**; individual setup, reading, and practice time will vary.
 
 ## Why This Section Matters
 

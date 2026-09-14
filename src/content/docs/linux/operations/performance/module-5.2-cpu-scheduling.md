@@ -11,7 +11,9 @@ lab:
   difficulty: advanced
   environment: ubuntu
 ---
-> **Linux Performance** | Complexity: `[MEDIUM]` | Time: 40-55 min. The module is built for operations teams who must resolve CPU incidents with evidence, not guesswork.
+> **Linux Performance** | Complexity: `[MEDIUM]`
+>
+> **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 

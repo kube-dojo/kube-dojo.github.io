@@ -12,7 +12,9 @@ lab:
   environment: ubuntu
 ---
 
-> **Linux Performance** | Complexity: `[MEDIUM]` | Time: 25-30 min. This module treats performance triage as an operational discipline: you will learn how to inspect resources in a repeatable order, explain the evidence clearly, and know when Linux is not the bottleneck.
+> **Linux Performance** | Complexity: `[MEDIUM]`
+>
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 
