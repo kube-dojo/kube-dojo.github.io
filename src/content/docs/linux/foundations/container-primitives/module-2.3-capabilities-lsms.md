@@ -14,7 +14,7 @@ lab:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 >
 > Focus: least-privilege process control for container workloads on shared Linux kernels.
 

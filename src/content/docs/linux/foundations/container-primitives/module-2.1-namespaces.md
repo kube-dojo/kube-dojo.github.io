@@ -15,7 +15,7 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 130–160 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 120–150 minutes (long-form read + hands-on exercise)
 >
 > This medium-depth lesson focuses on inspecting real namespace boundaries instead of memorizing container vocabulary.
 

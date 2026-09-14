@@ -19,12 +19,12 @@ After this section, you'll understand that a "container" is just a process with:
 
 | # | Module | Description | Time |
 |---|--------|-------------|------|
-| 2.1 | [Module 2.1: Linux Namespaces](module-2.1-namespaces/) | PID, network, mount, UTS, user isolation | 130–160 min |
-| 2.2 | [Module 2.2: Control Groups (cgroups)](module-2.2-cgroups/) | CPU/memory limits, v1 vs v2, systemd integration | 100–130 min |
-| 2.3 | [Module 2.3: Capabilities & Linux Security Modules](module-2.3-capabilities-lsms/) | CAP_*, AppArmor, SELinux, seccomp overview | 90–120 min |
-| 2.4 | [Module 2.4: Union Filesystems](module-2.4-union-filesystems/) | OverlayFS, layers, storage drivers | 90–120 min |
+| 2.1 | [Module 2.1: Linux Namespaces](module-2.1-namespaces/) | PID, network, mount, UTS, user isolation | 120–150 min |
+| 2.2 | [Module 2.2: Control Groups (cgroups)](module-2.2-cgroups/) | CPU/memory limits, v1 vs v2, systemd integration | 80–110 min |
+| 2.3 | [Module 2.3: Capabilities & Linux Security Modules](module-2.3-capabilities-lsms/) | CAP_*, AppArmor, SELinux, seccomp overview | 70–100 min |
+| 2.4 | [Module 2.4: Union Filesystems](module-2.4-union-filesystems/) | OverlayFS, layers, storage drivers | 70–100 min |
 
-These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **410–530 minutes (about 6 hours 50 minutes–8 hours 50 minutes)**; individual setup, reading, and practice time will vary.
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **340–460 minutes (about 5 hours 40 minutes–7 hours 40 minutes)**; individual setup, reading, and practice time will vary.
 
 ## Why This Section Matters
 

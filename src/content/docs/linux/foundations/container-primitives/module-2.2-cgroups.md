@@ -14,7 +14,7 @@ lab:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > This medium-depth lesson assumes you can already read basic Linux commands and Kubernetes pod output, and it focuses on turning cgroup files into practical operational decisions.
 
