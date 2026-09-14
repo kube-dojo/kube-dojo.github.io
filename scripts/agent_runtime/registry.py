@@ -43,7 +43,7 @@ class AgentEntry(TypedDict):
 AGENTS: dict[str, AgentEntry] = {
     "agy": {
         "adapter": "scripts.agent_runtime.adapters.agy:AgyAdapter",
-        "default_model": os.environ.get("KUBEDOJO_AGY_MODEL", "gemini-3.5-flash-high"),
+        "default_model": os.environ.get("KUBEDOJO_AGY_MODEL", "gemini-3.8-flash-high"),
         "cost_tier": "low",
         "capabilities": frozenset({
             "content_writing",

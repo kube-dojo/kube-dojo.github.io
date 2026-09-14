@@ -152,21 +152,19 @@ class TaskClassConfig:
     codex_search: bool = False  # opt-in per class
 
 
-# Note on the "agy" model entries below: Antigravity 1.x added a per-session
-# `--model` flag (`agy models` lists the choices), so per-class selection now
-# works. The slugs below normalize to agy's display strings in AgyAdapter
-# (`gemini-3.1-pro-high` -> "Gemini 3.1 Pro (High)"). Cheap scans use Flash;
-# the writer/judgment classes use Gemini 3.1 Pro (High). Override per call with
-# `--model`. An unrecognized slug falls back to the adapter default.
+# Model slugs below are LIVE defaults as of 2026-09-14. Re-probe before trusting
+# memory: ``agy models``, ``agent --list-models``, ``hermes status``, kimi
+# ``default_model`` in ~/.kimi-code/config.toml. Override per call with `--model`.
+# Unrecognized agy slug falls back to the adapter default.
 TASK_CLASSES: dict[str, TaskClassConfig] = {
     "search": TaskClassConfig(
         models={
-            "agy": "gemini-3.5-flash-high",
+            "agy": "gemini-3.8-flash-high",
             "claude": "claude-haiku-4-5-20251001",
             "codex": "gpt-5.4-mini",
             "deepseek": "deepseek-flash",  # V4.1 Flash (canonical API id)
             "grok": "grok-build",
-            "cursor": "composer-2.5-fast",
+            "cursor": "auto",
             "hermes": "qwen-3.6-flash",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.6-flash",
@@ -179,12 +177,12 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     ),
     "edit": TaskClassConfig(
         models={
-            "agy": "gemini-3.1-pro-high",
+            "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.3-codex-spark",
             "deepseek": "deepseek-flash",  # V4.1 Flash
             "grok": "grok-build",
-            "cursor": "composer-2.5",
+            "cursor": "auto",
             "hermes": "grok-4.6",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
@@ -197,12 +195,12 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     ),
     "draft": TaskClassConfig(
         models={
-            "agy": "gemini-3.1-pro-high",
+            "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
             "deepseek": "deepseek-flash",  # V4.1 Flash
             "grok": "grok-build",
-            "cursor": "composer-2.5",
+            "cursor": "auto",
             "hermes": "grok-4.6",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
@@ -215,7 +213,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     ),
     "review": TaskClassConfig(
         models={
-            "agy": "gemini-3.1-pro-high",
+            "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
             "deepseek": "deepseek-flash",  # V4.1 Flash
@@ -233,12 +231,12 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     ),
     "architect": TaskClassConfig(
         models={
-            "agy": "gemini-3.1-pro-high",
+            "agy": "gemini-3.8-flash-high",
             "claude": "claude-opus-4-8",
             "codex": "gpt-5.5",
             "deepseek": "deepseek-flash",  # V4.1 Flash
             "grok": "grok-build",
-            "cursor": "composer-2.5",
+            "cursor": "auto",
             "hermes": "grok-4.6",
             "kimi": "kimi-code/k3",
             "opencode": "openrouter/anthropic/claude-sonnet-4.5",

@@ -1,34 +1,49 @@
 ---
 name: dispatch-router
-description: Pick the right KubeDojo agent for a task across ALL activities — write / code / review / research / mechanical, not just review. Activity × lane matrix → agent → model → dispatch command. Roster as of 2026-07-07 (cursor, codex, opus/claude-headless, agy[model-selectable, the Google lane — gemini-cli RETIRED], deepseek, grok via grok-CLI/hermes). Use before any dispatch. Triggers on "which agent", "dispatch", "route to", "who should do this".
-last_calibrated: 2026-07-07
+description: Pick the right KubeDojo agent for a task across ALL activities — write / code / review / research / mechanical, not just review. Activity × lane matrix → agent → model → dispatch command. LIVE roster probed 2026-09-14 (agy gemini-3.8-flash-high, cursor auto, hermes grok-4.6, deepseek-flash, kimi-code/k3-256k). Use before any dispatch. Triggers on "which agent", "dispatch", "route to", "who should do this".
+last_calibrated: 2026-09-14
 ---
 
 # Dispatch Router Skill
 
-Pick the right agent + model + tier for a task before firing a dispatch. This skill is the orchestrator's pre-flight checklist. It encodes [[reference_provider_routing_economics]] and the rotation of caps as of `last_calibrated`.
+Pick the right agent + model + tier for a task before firing a dispatch. This skill is the orchestrator's pre-flight checklist. Caps and **model ids rotate** — never trust memory or dated rows below without a live probe.
 
-**Always cross-check memory keys** below before relying on an agent — caps and prices rotate weekly.
+## LIVE model discovery (do this; do not ask the operator to recite)
+
+Probe CLIs before a wave or when anything looks stale. Canonical defaults also live in `scripts/dispatch_smart.py` → `TASK_CLASSES` and `scripts/agent_runtime/registry.py`.
+
+| Lane | Probe | Current default (2026-09-14) |
+|---|---|---|
+| **agy** (Google) | `agy models` | `gemini-3.8-flash-high` (operator `~/.gemini/antigravity-cli/settings.json`) — `gemini-3.1-pro-high` still listed for override |
+| **cursor** | `agent --list-models` | `auto` (default; not composer-*) |
+| **hermes / grok content** | `hermes status` / `~/.hermes/config.yaml` | `grok-4.6` via `xai-oauth` (4.7 when it appears in hermes — re-probe) |
+| **deepseek** | first-party hermes provider | `deepseek-flash` (DeepSeek V4.1 Flash API id) |
+| **kimi** | `~/.kimi-code/config.toml` `default_model` | `kimi-code/k3-256k` (ACP oneshot; not bare `kimi -p`) |
+| **claude** | task-class / `AB_CLAUDE_MODEL` | sonnet/opus per class (`claude-sonnet-4-6` / `claude-opus-4-8`) |
+| **codex** | `AB_CODEX_MODEL` / task class | class defaults (`gpt-5.5` draft/review; spark/mini cheaper) |
+
+If a probe disagrees with this table or `TASK_CLASSES`, **trust the probe** and update the code — do not invent slugs.
 
 ## EN epic 5-lane balance (epic #2272 / paid seats — 2026-09-14)
 
-Rotate **authors** and **cross-family CF** across these five seats so none idle while another burns:
+Rotate **authors** and **cross-family CF** across these seats so none idle while another burns:
 
 | Seat | Dispatch | Default model | Prefer for | Never |
 |---|---|---|---|---|
-| **agy** | `--agent agy` | `gemini-3.1-pro-high` | EN content drafts | habit-only author lane |
+| **agy** | `--agent agy` | `gemini-3.8-flash-high` | EN content drafts / CF | habit-only author lane; stale `gemini-3.5-*` |
 | **codex** | `--agent codex` | task-class default | quality-critical author + CF | habit-route on weekly deficit |
 | **kimi** | `--agent kimi` | `kimi-code/k3-256k` | EN drafts/edits (ACP tools) | UK translation; bare `kimi -p` |
 | **claude** | `--agent claude` | sonnet/opus per class | author + strong CF | pile-on during Anthropic throttle |
-| **grok-4.6** | `--agent hermes --model grok-4.6` | `grok-4.6` | EN content CF/draft | confuse with `--agent grok` (grok-build code only) |
+| **grok-4.6** | `--agent hermes --model grok-4.6` | `grok-4.6` | EN content CF/draft | confuse with `--agent grok` (grok-build code only); dated `grok-4.20-*` |
+| **deepseek** | `--agent deepseek` | `deepseek-flash` | cheap CF / volume | China-host from CI; inventing `deepseek-v4-*` as default |
 
-**Rotation rule (wave of N packets):** author seats cycle `kimi → agy → claude → hermes/grok-4.6 → codex` (skip a seat only on live CodexBar throttle / auth fail). CF seat ≠ author family. Driver on Cursor → never `--agent cursor`. Prefer `kimi-code/k3-256k` over `kimi-code/k3` (1M) unless context demands it. Kimi headless writes go through ACP (`KimiAdapter` / `kimi_acp_oneshot.py`), not `-p`.
+**Cursor seat:** when dispatching *to* cursor (not when Cursor is the epic driver), use `--model auto`. Driver-on-Cursor → never `--agent cursor`.
 
-## Activity × lane matrix (2026-06-04) — route by ACTIVITY, not just review
+**Rotation rule (wave of N packets):** author seats cycle `kimi → agy → claude → hermes/grok-4.6 → codex` (skip only on live CodexBar throttle / auth fail). CF seat ≠ author family. Prefer `kimi-code/k3-256k` over `kimi-code/k3` (1M) unless context demands it. Kimi headless writes go through ACP (`KimiAdapter` / `kimi_acp_oneshot.py`), not `-p`.
 
-Pick the row for the activity, then the **primary doer**; for any write/author row, send the output to a **cross-family reviewer** (a DIFFERENT model family than the doer). All lanes below are flat-rate/cheap.
+## Activity × lane matrix — route by ACTIVITY (families stable; MODEL IDS in older rows may be stale)
 
-> **The Claude/opus seat is a normal dispatch lane again — `claude -p` is FREELY USABLE (billing change CANCELLED; user reaffirmed s188 2026-07-01).** `dispatch_smart --agent claude --model claude-opus-4-8` (or `claude-sonnet-5`) works as **author** and **reviewer** on the normal subscription path — no separate capped pool, no raw-Anthropic-API adapter. **The cheapest DEFAULT for a Claude *review* is still the orchestrator working INLINE** (read → web-verify → verdict), ideally EARLY while context is light — an inline verdict costs no extra dispatch and no reload, and it caught the verifier-blind P1s. Reach for **headless `--agent claude`** when an independent Claude context is worth the reload (the hardest 1–2 reviews of a heavy-context wave) or for **author lanes** (opus-4.8 / sonnet-5 as a T0 or translation author). Avoid the Agent-tool *subagent* form for reviews — its ~2–3M project reload is ~50–150× the tokens of an inline verdict. Every other family dispatches normally. See [[feedback_claude_billing_reroute]].
+Pick the row for the activity, then the **primary doer**; for any write/author row, send the output to a **cross-family reviewer** (a DIFFERENT model family than the doer). **When a row below names an old model (`grok-4.20-*`, `gemini-3.5-*`, `composer-2.5`, `deepseek-v4-pro`), substitute the LIVE default from the discovery table / `TASK_CLASSES`.**
 
 | Activity | Primary doer | Cross-family reviewer(s) | Off-load / candidates |
 |---|---|---|---|

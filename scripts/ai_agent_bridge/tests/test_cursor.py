@@ -78,6 +78,17 @@ def test_build_command_end_of_options_before_monitor_state_prompt() -> None:
     assert command[-1] == prompt
 
 
+def test_cursor_default_model_is_auto(monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib
+
+    monkeypatch.delenv("AB_CURSOR_MODEL", raising=False)
+    import ai_agent_bridge._cursor as _cursor
+
+    importlib.reload(_cursor)
+
+    assert _cursor._DEFAULT_MODEL == "auto"
+
+
 def test_cursor_default_model_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     import importlib
 
