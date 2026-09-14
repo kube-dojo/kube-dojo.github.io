@@ -104,7 +104,11 @@ def test_readiness_source_accepted_fail_closed(tmp_path: Path) -> None:
     (tmp_path / "docs/citation-seeds").mkdir(parents=True)
     (tmp_path / "docs/citation-seeds/k8s-cka-module-1.1-alpha.json").write_bytes(seed)
     ready = local_api.build_tracks_readiness(tmp_path)
+    k8s = next(t for t in ready["tracks"] if t["slug"] == "k8s")
+    cka = next(s for s in k8s["sections"] if s["slug"] == "cka")
     assert ready["totals"]["cleared"] == 1 and ready["totals"]["source_accepted"] == 0
+    assert k8s["cleared"] == 1 and k8s["source_accepted"] == 0
+    assert cka["cleared"] == 1 and cka["source_accepted"] == 0
     ledger = tmp_path / "docs/content-upgrade/evidence.json"
     ledger.parent.mkdir(parents=True, exist_ok=True)
     base = {"path": "k8s/cka/module-1.1-alpha.md", "page_digest": "0" * 64,
@@ -118,7 +122,40 @@ def test_readiness_source_accepted_fail_closed(tmp_path: Path) -> None:
     assert local_api.build_tracks_readiness(tmp_path)["totals"]["source_accepted"] == 0
     ok = _valid(page_digest=_digest(page.read_bytes()), seed_digest=_digest(seed))
     ledger.write_text(json.dumps({"pages": [{**base, "source_acceptance": ok}]}), encoding="utf-8")
-    assert local_api.build_tracks_readiness(tmp_path)["totals"]["source_accepted"] == 1
+    ready = local_api.build_tracks_readiness(tmp_path)
+    k8s = next(t for t in ready["tracks"] if t["slug"] == "k8s")
+    cka = next(s for s in k8s["sections"] if s["slug"] == "cka")
+    assert ready["totals"]["source_accepted"] == 1
+    assert k8s["source_accepted"] == 1 and cka["source_accepted"] == 1
     first = local_api._v_docs_frontmatter(tmp_path)
     ledger.write_text(json.dumps({"pages": [base]}), encoding="utf-8")
     assert first != local_api._v_docs_frontmatter(tmp_path)
+
+
+def test_readiness_source_accepted_section_track_isolation(tmp_path: Path) -> None:
+    from tests.test_local_api import _init_repo, _seed_module, local_api
+
+    _init_repo(tmp_path)
+    _seed_module(tmp_path, "k8s/cka/module-1.1-alpha",
+                 frontmatter={"revision_pending": False, "citations_verified": True})
+    _seed_module(tmp_path, "k8s/ckad/module-2.1-beta",
+                 frontmatter={"revision_pending": False, "citations_verified": True})
+    page = tmp_path / "src/content/docs/k8s/cka/module-1.1-alpha.md"
+    seed = b'{"claims":[{"claim_id":"C001"}]}'
+    (tmp_path / "docs/citation-seeds").mkdir(parents=True)
+    (tmp_path / "docs/citation-seeds/k8s-cka-module-1.1-alpha.json").write_bytes(seed)
+    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    base = {"path": "k8s/cka/module-1.1-alpha.md", "page_digest": "0" * 64,
+            "disposition": "retain", "reviewer_refs": ["r"], "evidence_refs": ["e"],
+            "independent_statuses": {"technical_source": "pass"}}
+    ok = _valid(page_digest=_digest(page.read_bytes()), seed_digest=_digest(seed))
+    ledger.write_text(json.dumps({"pages": [{**base, "source_acceptance": ok}]}), encoding="utf-8")
+    ready = local_api.build_tracks_readiness(tmp_path)
+    k8s = next(t for t in ready["tracks"] if t["slug"] == "k8s")
+    cka = next(s for s in k8s["sections"] if s["slug"] == "cka")
+    ckad = next(s for s in k8s["sections"] if s["slug"] == "ckad")
+    assert ready["totals"]["cleared"] == 2 and ready["totals"]["source_accepted"] == 1
+    assert k8s["cleared"] == 2 and k8s["source_accepted"] == 1
+    assert cka["cleared"] == 1 and cka["source_accepted"] == 1
+    assert ckad["cleared"] == 1 and ckad["source_accepted"] == 0
