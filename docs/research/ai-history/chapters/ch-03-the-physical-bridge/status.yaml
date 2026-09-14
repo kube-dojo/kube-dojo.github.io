@@ -100,6 +100,10 @@ review_coverage:
   backfill_pending: false
   last_audited: 2026-05-01
 # 2026-09-11 #2339 research packet: contract 13→5 rows corrected to 13→6.
+# 2026-09-14 residual: Yamada 2004 abstract + 2010 review retrieved; 2003 [21]
+# and European full papers still unopened. See yamada-piesch-residual-2026-09-14.md.
 # Green/status metadata above is not fresh chapter acceptance.
 claim_ledger: claim-ledger-2339.md
 claim_ledger_date: 2026-09-11
+claim_ledger_residual: yamada-piesch-residual-2026-09-14.md
+claim_ledger_residual_date: 2026-09-14

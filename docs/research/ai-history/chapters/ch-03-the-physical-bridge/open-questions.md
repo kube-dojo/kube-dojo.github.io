@@ -66,8 +66,8 @@ Surfaced from `brief.md` *Conflict Notes* and the Yellow/Red entries in `sources
 
 - **Question:** Were there any other 1930s researchers besides Shannon, Nakashima, Piesch, and Plechl-Duschek who approached relay-network algebra independently?
 - **Why it matters:** Useful context for how widespread the insight was. TICSP-40 mentions [21] Yamada's claim that Akira Nakashima published the first paper on switching theory in the world; the question is whether that's strictly true or whether other 1930s candidates exist.
-- **Evidence needed:** TICSP-40 references [3] Goto 1949, [16] Sasao 1999 Appendix A; Yamada 2004 *IEEJ Trans. FM*; broader histories of computing (Williams 1985, Aspray 1990, Ceruzzi 1998).
-- **Status:** Yellow. Non-blocking. The chapter's three-name parallel-discovery framing (Shannon, Nakashima, Piesch / Plechl-Duschek) is the standard one.
+- **Evidence needed:** TICSP-40 references [3] Goto 1949, [16] Sasao 1999 Appendix A; Yamada 2003 *C* 123(1):1 (still unopened — TICSP `[21]`); broader histories of computing (Williams 1985, Aspray 1990, Ceruzzi 1998).
+- **Status:** Yellow. Non-blocking. 2026-09-14 residual retrieved Yamada 2004 English abstract and Yamada 2010; neither is a checked English “first paper in the World” quotation. See `yamada-piesch-residual-2026-09-14.md`. The chapter's three-name parallel-discovery framing (Shannon, Nakashima, Piesch / Plechl-Duschek) is the standard one.
 
 ## Notes on resolution sequence
 
@@ -80,7 +80,7 @@ The order of attempted resolution:
 5. **Tractable:** Soni & Goodman 2017 *A Mind at Play* — physical or e-book access. Would resolve Q3, Q5, Q6, partially Q8.
 6. **Tractable:** Gardner 1985 *The Mind's New Science* — physical or e-book access. Would resolve Q2.
 7. **Tractable:** Mindell 2002 *Between Human and Machine* — physical or e-book access. Would tighten Scene 1 with additional Bush-MIT-DA institutional anchors.
-8. **Tractable:** Yamada 2004 *IEEJ Trans. FM* (open access on J-STAGE). Would partially resolve Q9.
+8. **Partial (2026-09-14):** Yamada 2004 English abstract + Yamada 2010 *IEICE Fundamentals Review* retrieved. Yamada 2003 *C* 123(1):1 (TICSP `[21]`) still unopened. See `yamada-piesch-residual-2026-09-14.md`.
 9. **Archive-blocked:** MIT Institute Archives — Bush, Caldwell, Shannon files. Would resolve Q3, Q5, Q6.
 10. **Archive-blocked:** Vannevar Bush Papers, Library of Congress. Would resolve Q1, Q3, Q5.
 11. **Archive-blocked:** Rockefeller Foundation archival records (RF1.1/224/2/23). Would resolve Q4.
