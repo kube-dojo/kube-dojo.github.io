@@ -13,7 +13,9 @@ lab:
   environment: ubuntu
 ---
 
-> **Linux Troubleshooting** | Complexity: `[COMPLEX]` | Time: 30-35 min
+> **Linux Troubleshooting** | Complexity: `[COMPLEX]`
+> 
+> **Time to Complete**: 50–80 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 

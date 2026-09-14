@@ -11,12 +11,14 @@ Troubleshooting isn't guesswork—it's methodology. This section teaches systema
 
 ## Modules
 
+These are planning estimates copied from the four module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **290–410 minutes (about 4 hours 50 minutes–6 hours 50 minutes)**; your actual time may vary.
+
 | # | Module | Description | Time |
 |---|--------|-------------|------|
-| 6.1 | [Systematic Troubleshooting](module-6.1-systematic-troubleshooting/) | Methodologies: hypothesis-driven, divide & conquer, timeline | 25-30 min |
-| 6.2 | [Log Analysis](module-6.2-log-analysis/) | journald, syslog, log patterns, correlation | 25-30 min |
-| 6.3 | [Process Debugging](module-6.3-process-debugging/) | strace, ltrace, /proc, debugging hung processes | 30-35 min |
-| 6.4 | [Network Debugging](module-6.4-network-debugging/) | tcpdump, ss, connectivity issues, DNS problems | 30-35 min |
+| 6.1 | [Systematic Troubleshooting](module-6.1-systematic-troubleshooting/) | Methodologies: hypothesis-driven, divide & conquer, timeline | 70-100 min |
+| 6.2 | [Log Analysis](module-6.2-log-analysis/) | journald, syslog, log patterns, correlation | 90-120 min |
+| 6.3 | [Process Debugging](module-6.3-process-debugging/) | strace, ltrace, /proc, debugging hung processes | 80-110 min |
+| 6.4 | [Network Debugging](module-6.4-network-debugging/) | tcpdump, ss, connectivity issues, DNS problems | 50-80 min |
 
 ## Why This Section Matters
 

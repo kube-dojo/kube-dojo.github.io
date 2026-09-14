@@ -15,7 +15,7 @@ lab:
 
 > **Complexity**: `[COMPLEX]`.
 >
-> **Time to Complete**: 30-35 minutes.
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.2 Processes & Systemd, Module 6.2 Log Analysis, basic shell pipelines, file descriptors, signals, and system calls.
 
