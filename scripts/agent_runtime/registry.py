@@ -126,6 +126,20 @@ AGENTS: dict[str, AgentEntry] = {
         "cli_available": True,
         "resume_policy": "never",
     },
+    "kimi": {
+        "adapter": "scripts.agent_runtime.adapters.kimi:KimiAdapter",
+        # Prefer k3-256k for normal EN work; use kimi-code/k3 (1M) only when needed.
+        "default_model": os.environ.get("KUBEDOJO_KIMI_MODEL", "kimi-code/k3-256k"),
+        "cost_tier": "medium",
+        "capabilities": frozenset({
+            "content_writing",
+            "content_review",
+            "code_writing",
+            "adversarial_review",
+        }),
+        "cli_available": True,
+        "resume_policy": "never",
+    },
 }
 
 

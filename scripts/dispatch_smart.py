@@ -137,6 +137,7 @@ SUPPORTED_AGENTS = (
     # lane (agy has its own `--model` display names, e.g. gemini-3.1-pro-high).
     "grok",
     "hermes",
+    "kimi",  # ACP oneshot (kimi -p is text-only; prefer kimi-code/k3-256k)
     "opencode",
     "qwen",
 )
@@ -167,6 +168,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "grok": "grok-build",
             "cursor": "composer-2.5-fast",
             "hermes": "qwen-3.6-flash",
+            "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.6-flash",
             "qwen": "qwen/qwen3.6-flash",
         },
@@ -183,7 +185,8 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "deepseek": "deepseek-v4-pro",
             "grok": "grok-build",
             "cursor": "composer-2.5",
-            "hermes": "grok-4.3",
+            "hermes": "grok-4.6",
+            "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
             "qwen": "qwen/qwen3.6-plus",
         },
@@ -200,7 +203,8 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "deepseek": "deepseek-v4-pro",
             "grok": "grok-build",
             "cursor": "composer-2.5",
-            "hermes": "grok-4.3",
+            "hermes": "grok-4.6",
+            "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
             "qwen": "qwen/qwen3.6-plus",
         },
@@ -217,7 +221,8 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "deepseek": "deepseek-v4-pro",
             "grok": "grok-build",
             "cursor": "auto",
-            "hermes": "claude-sonnet-4-6",
+            "hermes": "grok-4.6",
+            "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
             "qwen": "qwen/qwen3.6-plus",
         },
@@ -234,7 +239,8 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "deepseek": "deepseek-v4-pro",
             "grok": "grok-build",
             "cursor": "composer-2.5",
-            "hermes": "claude-opus-4-6",
+            "hermes": "grok-4.6",
+            "kimi": "kimi-code/k3",
             "opencode": "openrouter/anthropic/claude-sonnet-4.5",
             "qwen": "qwen/qwen3.6-plus",
         },
@@ -858,7 +864,7 @@ def fire(
                 RateLimitedError,
             )
 
-            max_retries = 3 if agent == "agy" else 1
+            max_retries = 3 if agent in {"agy", "kimi"} else 1
             base_delay = 10
             
             for attempt in range(max_retries):
