@@ -12,7 +12,9 @@ lab:
   environment: ubuntu
 ---
 
-> **Shell Scripting** | Complexity: `[MEDIUM]` | Time: 30-35 min | Focus: startup files, expansion order, quoting, control flow, functions, redirections, strict mode, ShellCheck CI, and kubectl automation patterns.
+> **Shell Scripting** | Complexity: `[MEDIUM]` | Focus: startup files, expansion order, quoting, control flow, functions, redirections, strict mode, ShellCheck CI, and kubectl automation patterns.
+>
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 
 ## Prerequisites
 
