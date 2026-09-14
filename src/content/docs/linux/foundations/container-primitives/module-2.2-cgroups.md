@@ -12,7 +12,11 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Foundations** | Complexity: `[MEDIUM]` | Time: 30-35 min. This medium-depth lesson assumes you can already read basic Linux commands and Kubernetes pod output, and it focuses on turning cgroup files into practical operational decisions.
+> **Complexity**: `[MEDIUM]`
+>
+> **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
+>
+> This medium-depth lesson assumes you can already read basic Linux commands and Kubernetes pod output, and it focuses on turning cgroup files into practical operational decisions.
 
 ## Prerequisites
 
