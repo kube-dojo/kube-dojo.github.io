@@ -14,7 +14,7 @@ lab:
 
 > **Complexity**: `[QUICK]`
 >
-> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Zero to Terminal (Module 0.8)
 >
