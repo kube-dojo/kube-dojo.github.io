@@ -13,7 +13,11 @@ lab:
 revision_pending: false
 ---
 
-> **Linux Foundations** | Complexity: `[MEDIUM]` | Estimated time: 35-45 min. Allow more time for environment setup, unfamiliar commands, or repeated diagnosis. This medium-depth lesson focuses on inspecting real namespace boundaries instead of memorizing container vocabulary.
+> **Complexity**: `[MEDIUM]`
+>
+> **Time to Complete**: 130–160 minutes (long-form read + hands-on exercise)
+>
+> This medium-depth lesson focuses on inspecting real namespace boundaries instead of memorizing container vocabulary.
 
 ## Prerequisites
 

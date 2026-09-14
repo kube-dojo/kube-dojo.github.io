@@ -12,7 +12,11 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Foundations** | Complexity: `[MEDIUM]` | Time: 35-45 min | Focus: least-privilege process control for container workloads on shared Linux kernels.
+> **Complexity**: `[MEDIUM]`
+>
+> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+>
+> Focus: least-privilege process control for container workloads on shared Linux kernels.
 
 ## Prerequisites
 
