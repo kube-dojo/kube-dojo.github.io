@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   markStarted,
   markCompleted,
@@ -9,6 +11,7 @@ import {
   importProgress,
   resetProgress,
 } from '../src/components/LabProgress';
+import { labTrackMap } from '../src/components/labTrackMap';
 
 // Mock localStorage for happy-dom
 const store: Record<string, string> = {};
@@ -151,5 +154,36 @@ describe('LabProgress', () => {
       resetProgress();
       expect(getProgress()).toEqual({});
     });
+  });
+});
+
+describe('labTrackMap kubernetes-basics inventory', () => {
+  const section = 'prerequisites/kubernetes-basics';
+  const dir = join(process.cwd(), 'src/content/docs', section);
+  const moduleFiles = readdirSync(dir).filter(
+    (name) => name.startsWith('module-') && name.endsWith('.md'),
+  );
+
+  function frontmatterPrereqK8sIds(filename: string): string[] {
+    const text = readFileSync(join(dir, filename), 'utf8');
+    const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!fm) return [];
+    return [...fm[1].matchAll(/^\s*id:\s*"([^"]+)"/gm)]
+      .map((match) => match[1])
+      .filter((id) => id.startsWith('prereq-k8s-'));
+  }
+
+  it('counts Killercoda labs, not curriculum modules', () => {
+    const labIds = moduleFiles.flatMap(frontmatterPrereqK8sIds).sort();
+    expect(moduleFiles).toHaveLength(8);
+    expect(labIds).toEqual([
+      'prereq-k8s-1.1-first-cluster',
+      'prereq-k8s-1.2-kubectl',
+      'prereq-k8s-1.3-pods',
+      'prereq-k8s-1.4-deployments',
+      'prereq-k8s-1.5-services',
+    ]);
+    expect(labTrackMap[section].prefix).toBe('prereq-k8s-');
+    expect(labTrackMap[section].total).toBe(labIds.length);
   });
 });
