@@ -7,13 +7,13 @@ sidebar:
 lab:
   id: "prereq-k8s-1.4-deployments"
   url: "https://killercoda.com/kubedojo/scenario/prereq-k8s-1.4-deployments"
-  duration: "30 min"
+  duration: "30 min subset"
   difficulty: "beginner"
   environment: "kubernetes"
 ---
 > **Complexity**: `[MEDIUM]` - Core workload management.
 >
-> **Time to Complete**: 90–130 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 90–130 minutes (long-form read + on-page exercise). The Killercoda banner is a shorter beginner subset: the hosted scenario declares about 30 minutes for create, scale, update, and rollback — not this full module.
 >
 > **Prerequisites**: Module 1.3: Pods. This module assumes a Kubernetes 1.35 or newer cluster and a working shell. All runnable examples use the full `kubectl` command so they can be copied into scripts as well as interactive terminals.
 
@@ -455,6 +455,15 @@ The Deployment must be able to identify the Pods created from its own template, 
 ## Hands-On Exercise
 
 **Controlled exercise — use a context you have independently confirmed is a dedicated disposable lab.** Set `KUBEDOJO_LAB_CONTEXT` before Step 0. The guard verifies only that the selected context matches that value and that the namespace name is unused; it cannot prove cluster ownership or disposability. After setup, the selected context supplies the namespace for the simple commands in Steps 1–4. Run those steps in order; the cleanup block is safe to run after an interruption.
+
+**Killercoda bridge:** the [prereq-k8s-1.4-deployments](https://killercoda.com/kubedojo/scenario/prereq-k8s-1.4-deployments) scenario starts a disposable kubeadm cluster and does not export `KUBEDOJO_LAB_CONTEXT`. The scenario walkthrough (`webapp` / `nginx:1.25`) does not need that variable. If you paste Steps 0–4 into that same terminal, read the current context and export it first. The guard refuses the literal name `default`.
+
+```bash
+kubectl config current-context
+export KUBEDOJO_LAB_CONTEXT="$(kubectl config current-context)"
+```
+
+If that prints `default`, stop and use a differently named context. Leave `KUBEDOJO_LAB_NAMESPACE` unset to use `kubedojo-deploy-lab`. Do not reuse the scenario's `webapp` objects for this exercise; it creates its own `web` Deployment in that namespace.
 
 The `kubectl config set-context` command changes only the stored default namespace for the named dedicated context. It does not switch your current context or reset it later. Keep using this same context throughout the exercise, and do not run these commands against another context.
 
