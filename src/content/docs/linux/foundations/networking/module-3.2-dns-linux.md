@@ -19,18 +19,26 @@ lab:
 
 ## Prerequisites
 
-Before starting this module, you should have completed [Module 3.1: TCP/IP Essentials](../module-3.1-tcp-ip-essentials/) and be comfortable reading command-line output, editing configuration files safely, and distinguishing an IP connectivity problem from an application error. A helpful background is basic networking vocabulary: hostname, IP address, port, UDP, TCP, and service discovery.
+Required (Linux host skills only):
 
-For Kubernetes examples, this module assumes a Kubernetes 1.35+ cluster and the common `kubectl` shortcut. Define it once with `alias k=kubectl`, then use commands such as `k get pods` and `k logs` during troubleshooting. The alias keeps examples compact, but the operational habit is more important: always test DNS from the same environment where the failing process runs.
+- [Module 3.1: TCP/IP Essentials](../module-3.1-tcp-ip-essentials/), plus comfort reading command-line output, editing configuration files safely, and distinguishing an IP connectivity problem from an application error. Basic networking vocabulary helps: hostname, IP address, port, UDP, TCP, and service discovery.
+
+Helpful but not required:
+
+- Kubernetes Basics (pod, Service, and ClusterIP vocabulary). The module explains cluster DNS concepts as it goes; the host-only path below works without them.
+
+A running Kubernetes cluster is **not** required for most of this module. Tasks 1–3 and Task 5 in the Hands-On Exercise run on any Linux host. Task 4 tests cluster DNS from a pod and needs `kubectl` access — the exercise offers three forks (Killercoda lab, a local `kind` cluster, or read-only skip) for learners who do not have one.
+
+When you do take the cluster path, this module assumes a Kubernetes 1.35+ cluster and the common `kubectl` shortcut. Define it once with `alias k=kubectl`, then use commands such as `k get pods` and `k logs` during troubleshooting. The alias keeps examples compact, but the operational habit is more important: always test DNS from the same environment where the failing process runs.
 
 ## Learning Outcomes
 
 After completing this module, you will be able to:
 
 - **Diagnose** Linux DNS resolution failures by comparing `/etc/hosts`, `/etc/nsswitch.conf`, `/etc/resolv.conf`, resolver caches, and direct DNS query results.
-- **Debug** Kubernetes DNS failures by inspecting pod resolver configuration, CoreDNS health, service records, and the query path used by applications.
-- **Evaluate** the performance and correctness impact of `ndots`, search domains, fully qualified names, TTLs, and DNS caching in Linux and Kubernetes environments.
-- **Implement** a repeatable DNS investigation workflow that separates local overrides, resolver behavior, CoreDNS behavior, upstream DNS behavior, and stale-cache symptoms.
+- **Debug** Kubernetes DNS failures by inspecting pod resolver configuration, CoreDNS health, service records, and the query path used by applications (cluster path — see the Hands-On fork; host-only learners can complete this module without it).
+- **Evaluate** the performance and correctness impact of `ndots`, search domains, fully qualified names, TTLs, and DNS caching in Linux and, with the cluster fork, Kubernetes environments.
+- **Implement** a repeatable DNS investigation workflow that separates local overrides, resolver behavior, upstream DNS behavior, and stale-cache symptoms — plus CoreDNS behavior when you take the cluster path.
 
 ## Why This Module Matters
 
@@ -216,6 +224,8 @@ dig -x 8.8.8.8
 
 Use `dig` when you need to know what a DNS server says and how it says it. The status code, flags, answer section, authority section, query time, and responding server all matter. `NOERROR` with zero answers means something different from `NXDOMAIN`, and a response from an unexpected resolver points toward local configuration, DHCP, VPN, or pod DNS policy. Do not reduce `dig` output to "it works" or "it fails"; read the metadata.
 
+Illustrative output on a typical host (your resolver, TTL, and timestamp will differ):
+
 ```bash
 dig example.com
 
@@ -292,6 +302,8 @@ Which approach would you choose here and why: a user reports that `curl https://
 ## Kubernetes DNS and CoreDNS
 
 Kubernetes turns DNS from a host convenience into the primary service discovery mechanism. Pods are ephemeral, Service ClusterIPs are stable within the cluster, and application configuration usually points to names instead of raw pod addresses. CoreDNS is the default DNS server for modern Kubernetes clusters, and kubelet writes each pod's resolver configuration so that short names can resolve through the cluster's service naming scheme.
+
+> **Cluster path:** The commands in this section assume `kubectl` access to a running cluster (the Killercoda lab, a local `kind` cluster, or an existing one). Host-only readers can treat them as worked examples and return when a cluster is available.
 
 ```mermaid
 graph TD
@@ -608,7 +620,13 @@ The test was not run from the failing environment, so it may not use the same re
 
 ## Hands-On Exercise
 
-In this exercise, you will build a small DNS investigation worksheet from real commands. Use a disposable Linux host, VM, or lab environment, and use a Kubernetes 1.35+ cluster only for the Kubernetes-specific tasks. Do not change production resolver settings while practicing; the goal is to observe, compare, and explain the resolver path before making changes.
+In this exercise, you will build a small DNS investigation worksheet from real commands. Use a disposable Linux host, VM, or lab environment, and use a Kubernetes 1.35+ cluster only for the Kubernetes-specific task. Do not change production resolver settings while practicing; the goal is to observe, compare, and explain the resolver path before making changes.
+
+Tasks 1, 2, 3, and 5 need only a Linux host. Task 4 tests Kubernetes DNS from a pod, so pick one fork before starting it:
+
+- **Use the Killercoda lab** linked in this module's header (`linux-3.2-dns`), which provides a ready environment.
+- **Or spin up a local cluster first**, for example with [`kind`](https://kind.sigs.k8s.io/) on your own machine, then run the task there.
+- **Or skip the cluster task.** Read Task 4 as a worked example and treat the cluster-dependent Success Criteria as follow-up; the host-only criteria are fully achievable without a cluster.
 
 ### Task 1: Compare direct DNS with system resolver behavior
 
@@ -648,6 +666,8 @@ If `systemd-resolved` is active, `resolvectl status` usually gives better operat
 
 ### Task 4: Test Kubernetes DNS from a pod
 
+> **Cluster fork:** This task needs `kubectl` access to a running cluster (Killercoda lab, `kind`, or an existing cluster). Without one, skip it or read it as a worked example — see the forks above.
+
 - [ ] Define `alias k=kubectl` in your shell if you have not already.
 - [ ] Start a temporary BusyBox pod and resolve `kubernetes` and `kubernetes.default.svc.cluster.local`.
 - [ ] Read the pod's `/etc/resolv.conf` and compare the nameserver to the `kube-dns` Service ClusterIP.
@@ -674,7 +694,7 @@ A good note might say: "From pod `web` in namespace `staging`, `getent hosts db-
 
 - [ ] You can explain the difference between `dig` and `getent hosts` using evidence from your own host.
 - [ ] You can identify the active nameserver, search domains, and `ndots` setting for a Linux host or pod.
-- [ ] You can test Kubernetes DNS from inside a pod and compare the pod nameserver with the `kube-dns` Service.
+- [ ] You can test Kubernetes DNS from inside a pod and compare the pod nameserver with the `kube-dns` Service (cluster fork — Task 4; optional for host-only learners).
 - [ ] You can describe a stale-cache scenario without blaming authoritative DNS prematurely.
 - [ ] You can write a DNS incident note that names the resolver layer still under investigation.
 
