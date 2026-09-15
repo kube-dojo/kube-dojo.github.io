@@ -34,8 +34,8 @@ Cloud-managed Kubernetes hides those integration points behind provider load bal
 
 ## Did You Know
 
-- Istio **1.30.x** supports Kubernetes **1.32–1.36** per the official supported-releases matrix.
-- Linkerd **2.19** ships a Rust micro-proxy (not Envoy) and documents automatic mTLS between meshed pods once the control plane and identity anchors are installed.
+- Istio **1.31.x** supports Kubernetes **1.32–1.36** per the official supported-releases matrix.
+- Linkerd **2.20** ships a Rust micro-proxy (not Envoy) and documents automatic mTLS between meshed pods once the control plane and identity anchors are installed.
 - Cilium can deliver mesh features—including L7 policy and mutual TLS—by attaching eBPF programs at the CNI layer instead of injecting a proxy per pod.
 - A Kubernetes `LoadBalancer` Service on bare metal remains `<pending>` until a controller such as MetalLB assigns and advertises a routable VIP.
 
@@ -136,9 +136,9 @@ spec:
 
 Pair scoping with **PeerAuthentication** policies staged from `PERMISSIVE` to `STRICT` during migrations. Jumping directly to `STRICT` on bare metal without verifying every client pod is injected causes opaque TLS failures that look like application bugs. Use progressive namespaces: mesh `staging` completely, observe metrics, then promote policies to `production` racks.
 
-Istio’s **1.30** line rides Envoy **v1.38** per the supported Envoy table—when kernel tuning and Envoy filter complexity interact (Wasm plugins, large route configs), profile p99 latency on representative hardware identical to production NICs, not only on kind clusters with bridged Docker networks.
+Istio’s **1.31** line rides Envoy **v1.39** per the supported Envoy table—when kernel tuning and Envoy filter complexity interact (Wasm plugins, large route configs), profile p99 latency on representative hardware identical to production NICs, not only on kind clusters with bridged Docker networks.
 
-For Kubernetes **1.35** labs and production, align on a supported Istio line—**1.30.x** explicitly lists **1.35** as supported. Pin Helm charts and sample manifests to that minor release (for example `release-1.30` sample URLs), not floating `master` branches.
+For Kubernetes **1.35** labs and production, align on a supported Istio line—**1.31.x** explicitly lists **1.35** as supported. Pin Helm charts and sample manifests to that minor release (for example `release-1.31` sample URLs), not floating `master` branches.
 
 ### Ambient Istio (ztunnel + waypoint)
 
@@ -172,7 +172,7 @@ Linkerd’s data plane is the **linkerd-proxy** (Rust), not Envoy. Installation 
 
 **Multi-cluster** Linkerd uses **service mirroring**: the `linkerd-multicluster` extension links clusters and mirrors exported services so DNS names like `service.namespace.svc.cluster.remote` resolve to mirrored Services locally. Gateway pods (also exposed via MetalLB or NodePort on bare metal) carry cross-cluster traffic. Mirror semantics are **pull-oriented**—the importing cluster watches exported services; plan firewall rules for API server reachability and gateway paths between sites.
 
-Linkerd **2.19** documentation is the current stable doc set for features such as automatic mTLS and multicluster tasks. Before upgrading production clusters to Kubernetes **1.35**, validate the Linkerd release notes for your chosen version—upstream support matrices move independently from Istio’s.
+Linkerd **2.20** documentation is the current stable doc set for features such as automatic mTLS and multicluster tasks. Before upgrading production clusters to Kubernetes **1.35**, validate the Linkerd release notes for your chosen version—upstream support matrices move independently from Istio’s. Linkerd **2.20** lists Kubernetes **1.31–1.35**.
 
 Resource planning for Linkerd on physical nodes is simpler than large Envoy fleets but not zero: budget proxy CPU for TLS on high-QPS services and ensure `linkerd-destination` and `linkerd-identity` components are HA across control-plane nodes. For observability, `linkerd viz` adds another control-plane consumer—size Prometheus retention on bare-metal disks explicitly; tracing every request without sampling can fill NVMe arrays during load tests.
 
@@ -303,10 +303,10 @@ Run a **decision workshop** before procurement: capture peak pod density per rac
 
 ## Platform Comparison—Istio, Linkerd, Cilium, and Consul on Bare Metal
 
-| Dimension | Istio (sidecar / ambient) | Linkerd 2.19 | Cilium Service Mesh | Consul Connect |
+| Dimension | Istio (sidecar / ambient) | Linkerd 2.20 | Cilium Service Mesh | Consul Connect |
 | :--- | :--- | :--- | :--- | :--- |
 | Proxy technology | Envoy (per pod or waypoint) | linkerd2-proxy (Rust) | Envoy where needed + eBPF | Envoy sidecars |
-| K8s 1.35 alignment | Supported on Istio 1.30.x matrix | Validate release notes for 2.19 | Follow Cilium LTS matrix | Follow Consul K8s chart matrix |
+| K8s 1.35 alignment | Supported on Istio 1.31.x matrix | Supported on Linkerd 2.20 matrix (1.31–1.35) | Follow Cilium LTS matrix | Follow Consul K8s chart matrix |
 | Ingress on bare metal | Gateway / Gateway API + MetalLB | Multicluster/gateway Services + MetalLB | Cilium Gateway + BGP/LB | Consul ingress gateway + MetalLB |
 | Multi-cluster | Multi-primary / remote secrets patterns | Service mirroring extension | Cluster Mesh (Module 3.5) | WAN federation + intentions |
 | Ops complexity | Highest flexibility | Lowest baseline | Tied to CNI lifecycle | Tied to Consul estate |
@@ -488,8 +488,8 @@ You must patch worker kernel packages during business hours with minimal mesh di
 
 Complete all three exercises. Use Kubernetes **1.35** client tooling against clusters pinned to the same minor version. Commands assume `kind`, `kubectl`, `helm`, and `istioctl`/`linkerd` CLIs are installed on your workstation.
 
-- [ ] Exercise 1: Deploy Istio **1.30** ingress on kind with MetalLB and verify north-south routing through the gateway VIP.
-- [ ] Exercise 2: Install Linkerd **2.19** on a separate kind cluster and confirm identity/mTLS between two meshed pods.
+- [ ] Exercise 1: Deploy Istio **1.31** ingress on kind with MetalLB and verify north-south routing through the gateway VIP.
+- [ ] Exercise 2: Install Linkerd **2.20** on a separate kind cluster and confirm identity/mTLS between two meshed pods.
 - [ ] Exercise 3: Apply mesh-oriented `sysctl` settings and observe `nf_conntrack` utilization under controlled connection load.
 
 ### Exercise 1: Istio Sidecar Ingress with MetalLB on kind
@@ -537,16 +537,16 @@ EOF
 ```bash
 helm repo add istio https://istio-release.storage.googleapis.com/charts
 helm repo update
-helm install istio-base istio/base -n istio-system --create-namespace --version 1.30.0 --wait
-helm install istiod istio/istiod -n istio-system --version 1.30.0 --wait
+helm install istio-base istio/base -n istio-system --create-namespace --version 1.31.0 --wait
+helm install istiod istio/istiod -n istio-system --version 1.31.0 --wait
 helm install istio-ingress istio/gateway -n istio-ingress --create-namespace \
-  --version 1.30.0 \
+  --version 1.31.0 \
   --set service.externalTrafficPolicy=Local \
   --wait
 
 kubectl create namespace demo
 kubectl label namespace demo istio-injection=enabled
-kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.30/samples/httpbin/httpbin.yaml -n demo
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.31/samples/httpbin/httpbin.yaml -n demo
 kubectl wait -n demo --for=condition=Ready pod -l app=httpbin --timeout=180s
 kubectl get pods -n demo
 
@@ -594,15 +594,15 @@ curl -sS -o /dev/null -w "HTTP %{http_code}\n" "http://${INGRESS_IP}/status/200"
 
 Expected: httpbin pods show `2/2` containers (app + sidecar). The curl command returns HTTP `200` via the MetalLB-assigned ingress VIP.
 
-### Exercise 2: Linkerd 2.19 Identity on a Dedicated kind Cluster
+### Exercise 2: Linkerd 2.20 Identity on a Dedicated kind Cluster
 
-Linkerd **2.19** maps to the **edge** channel (`edge-25.10.7`); OSS stable install artifacts are deprecated—use `LINKERD2_VERSION` when bootstrapping the CLI.
+Linkerd **2.20** maps to the **edge** channel (`edge-26.9.1`); OSS stable install artifacts are deprecated—use `LINKERD2_VERSION` when bootstrapping the CLI.
 
 ```bash
 kind create cluster --name mesh-linkerd --image kindest/node:v1.35.0
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
-curl -sL https://run.linkerd.io/install | LINKERD2_VERSION=edge-25.10.7 sh
+curl -sL https://run.linkerd.io/install | LINKERD2_VERSION=edge-26.9.1 sh
 export PATH=$PATH:$HOME/.linkerd2/bin
 linkerd check --pre
 linkerd install --crds | kubectl apply -f -
@@ -656,7 +656,7 @@ kubectl uncordon "$NODE"
 
 ### Exercise 1 troubleshooting notes
 
-If `curl` to the ingress VIP hangs from your laptop but works inside the cluster, your workstation may lack routes to the kind Docker subnet—add a host route or run curl from a pod on the cluster network. If Envoy returns `404`, verify the `Gateway` selector `istio: ingress` matches labels on the gateway deployment installed by the `istio/gateway` Helm release `istio-ingress` (chart **1.30.0** trims the release prefix and labels pods `istio: ingress`). If MetalLB never assigns an IP, confirm the `IPAddressPool` range sits inside the docker `kind` network CIDR discovered earlier.
+If `curl` to the ingress VIP hangs from your laptop but works inside the cluster, your workstation may lack routes to the kind Docker subnet—add a host route or run curl from a pod on the cluster network. If Envoy returns `404`, verify the `Gateway` selector `istio: ingress` matches labels on the gateway deployment installed by the `istio/gateway` Helm release `istio-ingress` (chart **1.31.0** trims the release prefix and labels pods `istio: ingress`). If MetalLB never assigns an IP, confirm the `IPAddressPool` range sits inside the docker `kind` network CIDR discovered earlier.
 
 ### Exercise 2 troubleshooting notes
 
@@ -688,10 +688,10 @@ Next, continue to [Module 6.1: Physical Security & Air-Gapped Environments](../s
 - https://istio.io/latest/docs/ops/ambient/architecture/
 - https://istio.io/latest/docs/ops/ambient/getting-started/
 - https://istio.io/latest/docs/reference/config/networking/sidecar/
-- https://linkerd.io/2.19/overview/
-- https://linkerd.io/2.19/features/automatic-mtls/
-- https://linkerd.io/2.19/tasks/multicluster/
-- https://linkerd.io/2.19/tasks/install-helm/
+- https://linkerd.io/2.20/overview/
+- https://linkerd.io/2.20/features/automatic-mtls/
+- https://linkerd.io/2.20/tasks/multicluster/
+- https://linkerd.io/2.20/tasks/install-helm/
 - https://docs.cilium.io/en/stable/network/servicemesh/
 - https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/
 - https://developer.hashicorp.com/consul/docs/connect

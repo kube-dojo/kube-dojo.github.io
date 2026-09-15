@@ -7,9 +7,9 @@ sidebar:
 ---
 > **Toolkit Track** | Complexity: `[COMPLEX]` | Time: 60-75 minutes
 
-> **Landscape snapshot — as of 2026-06.** This changes fast; verify against [docs.cilium.io](https://docs.cilium.io/) and the CNCF project page before relying on specifics. Cilium is a CNCF Graduated project (accepted at Incubating on 2021-10-13, Graduated on 2023-10-11) and was the first graduated project in the cloud-native networking category.
+> **Landscape snapshot — as of 2026-09-15.** This changes fast; verify against [docs.cilium.io](https://docs.cilium.io/) and the CNCF project page before relying on specifics. Cilium is a CNCF Graduated project (accepted at Incubating on 2021-10-13, Graduated on 2023-10-11) and was the first graduated project in the cloud-native networking category.
 >
-> The current stable line is 1.19.x (for example 1.19.2), with 1.20 in development; the community maintains the most recent three minor releases. kube-proxy replacement is enabled with the Helm value `kubeProxyReplacement=true`; the Gateway API data plane additionally needs the L7 proxy enabled and the Gateway API v1.5.1 CRDs pre-installed. A reference stack verified together in mid-2026 is Kubernetes 1.35, Cilium 1.19.2, and Hubble 1.18.6.
+> The current stable line is 1.20.x (for example 1.20.1); the community maintains the most recent three minor releases. kube-proxy replacement is enabled with the Helm value `kubeProxyReplacement=true`; the Gateway API data plane additionally needs the L7 proxy enabled and the Gateway API v1.5.1 CRDs pre-installed. A reference stack as of 2026-09-15 is Kubernetes 1.35, Cilium 1.20.1, Hubble Relay 1.20.1 (ships with Cilium), and Hubble CLI v1.19.4 (Hubble `stable.txt`).
 
 **Prerequisites**:
 - Kubernetes networking basics (Services, Pods)
