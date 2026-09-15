@@ -19,14 +19,22 @@ Complexity: `[COMPLEX]` | Track: Linux Foundations networking. This module assum
 
 ## Prerequisites
 
-Before starting this module, complete [Module 3.1: TCP/IP Essentials](../module-3.1-tcp-ip-essentials/) and [Module 3.3: Network Namespaces](../module-3.3-network-namespaces/). Basic firewall vocabulary is helpful, but the lesson builds the packet path from first principles so you can reason about Kubernetes nodes instead of memorizing command fragments.
+Required (Linux host skills only):
+
+- [Module 3.1: TCP/IP Essentials](../module-3.1-tcp-ip-essentials/) and [Module 3.3: Network Namespaces](../module-3.3-network-namespaces/), plus enough shell comfort to run `iptables`/`iptables-save` on a disposable Linux host and read table, chain, and counter output. Basic firewall vocabulary is helpful, but the lesson builds the packet path from first principles so you can reason about host netfilter instead of memorizing command fragments.
+
+Helpful but not required:
+
+- Kubernetes Basics (pod, Service, ClusterIP, and kube-proxy vocabulary). The module explains generated Service chains as it goes; the host-only path below works without them.
+
+A running Kubernetes cluster is **not** required for most of this module. Parts 1–3 and Part 5 in the Hands-On Exercise run on any Linux host. Part 4 inspects kube-proxy Service and ClusterIP rules and needs `kubectl` access — the exercise offers three forks (Killercoda lab, a local `kind` cluster, or read-only skip) for learners who do not have one.
 
 ## Learning Outcomes
 
 - **Diagnose** netfilter packet paths by mapping a symptom to the correct table, chain, hook point, counter, and rule order.
 - **Implement** iptables filtering, NAT, masquerade, and port-forwarding rules without breaking established traffic or remote access.
-- **Trace** how Kubernetes Services, NodePorts, and network policy implementations translate service intent into iptables chains on Kubernetes 1.35+ nodes.
-- **Evaluate** when iptables, nftables, IPVS, or eBPF is the right data-plane choice for a cluster size, troubleshooting need, and operational risk.
+- **Trace** how Kubernetes Services, NodePorts, and network policy implementations translate service intent into iptables chains on Kubernetes 1.35+ nodes (cluster path — see the Hands-On fork; host-only learners can complete this module without it).
+- **Evaluate** when iptables, nftables, IPVS, or eBPF is the right data-plane choice for host troubleshooting and, with the cluster fork, cluster size and kube-proxy operational risk.
 
 ## Why This Module Matters
 
@@ -234,14 +242,16 @@ A safe change plan therefore has four parts. First, capture the existing rules w
 
 Kubernetes gives you a Service object, but the node still needs a data-plane implementation that turns a virtual IP and port into a real endpoint. In iptables mode, kube-proxy watches Services and EndpointSlices, then writes netfilter rules that match the Service IP and select one backend endpoint. This is why a broken Service can look like a Linux firewall problem: at the node level, it often is one, even though the policy was generated from Kubernetes API objects rather than typed by an administrator.
 
-For Kubernetes commands in this module, define the common alias once and use `k` afterward. The alias is only a shell convenience, but it keeps examples close to real operator workflows while still making it clear that the underlying tool is kubectl.
+> **Cluster path:** The `kubectl` commands in this section assume access to a running cluster (the Killercoda lab, a local `kind` cluster, or an existing one). Host-only readers can treat them as worked examples and return when a cluster is available. The iptables inspection commands still apply on any Linux host.
+
+When you do take the cluster path, define the common alias once and use `k` afterward. The alias is only a shell convenience, but it keeps examples close to real operator workflows while still making it clear that the underlying tool is kubectl.
 
 ```bash
 alias k=kubectl
 k version --client
 ```
 
-kube-proxy's generated chain names are intentionally mechanical. A Service match jumps from a broad service-dispatch chain into a per-Service chain, then into per-endpoint chains that perform destination NAT. With two endpoints, the first endpoint might receive a probabilistic rule and the second becomes the fallback. With more endpoints, kube-proxy adjusts probabilities so the final distribution is roughly even despite sequential rule evaluation.
+kube-proxy's generated chain names are intentionally mechanical. A Service match jumps from a broad service-dispatch chain into a per-Service chain, then into per-endpoint chains that perform destination NAT. With two endpoints, the first endpoint might receive a probabilistic rule and the second becomes the fallback. With more endpoints, kube-proxy adjusts probabilities so the final distribution is roughly even despite sequential rule evaluation. The ClusterIP, endpoint addresses, and chain suffixes in the following diagrams are illustrative teaching values; a live cluster will differ.
 
 ```mermaid
 flowchart TD
@@ -394,6 +404,8 @@ Advanced features needed: eBPF (Cilium)
 
 The Kubernetes version matters because recommendations change. For Kubernetes 1.35+, operators should be aware that nftables is the preferred direction for kube-proxy scalability and that IPVS mode is deprecated in favor of newer backends. This does not mean every iptables cluster must be rebuilt tomorrow. It means new designs should justify staying on iptables, and existing designs should have a migration plan if service count, node churn, or sync latency becomes painful.
 
+> **Cluster path:** The two commands below need `kubectl` on a running cluster. Host-only readers can skip them and still use the comparison above as the decision model.
+
 ```bash
 # Check kube-proxy mode
 kubectl get configmap kube-proxy -n kube-system -o yaml | grep mode
@@ -525,20 +537,24 @@ Narrow the match before enabling TRACE, capture one controlled reproduction, and
 
 ## Hands-On Exercise
 
-This lab turns the mental model into muscle memory. You will inspect existing rules, create a custom diagnostic chain, test NAT syntax, examine Kubernetes-generated rules when a cluster is available, and finish by interpreting counters. Run these commands only on a disposable lab host or training environment, because firewall changes affect live packet handling immediately and can interrupt remote access.
+This lab turns the mental model into muscle memory. You will inspect existing rules, create a custom diagnostic chain, test NAT syntax, examine Kubernetes-generated rules when you take the cluster fork, and finish by interpreting counters. Run these commands only on a disposable lab host or training environment, because firewall changes affect live packet handling immediately and can interrupt remote access.
 
 The lab is intentionally progressive. The first part teaches observation, the second part creates a reversible custom chain, the third part changes NAT only for local output, the fourth part connects Kubernetes intent to generated rules, and the fifth part asks you to interpret counters rather than merely collect them. Treat each part as a miniature incident: write down what you expect before running the command, generate one packet, and then decide whether the observed counter movement supports your prediction.
 
+Parts 1, 2, 3, and 5 need only a Linux host. Part 4 inspects Kubernetes Service and ClusterIP iptables, so pick one fork before starting it:
+
+- **Use the Killercoda lab** linked in this module's header (`linux-3.4-iptables`), which provides a ready environment.
+- **Or spin up a local cluster first**, for example with [`kind`](https://kind.sigs.k8s.io/) on your own machine, then run the part there.
+- **Or skip the cluster part.** Read Part 4 as a worked example and treat the cluster-dependent Success Criteria as follow-up; the host-only criteria are fully achievable without a cluster.
+
 ### Setup and Safety
 
-Save the current rules before changing anything, and keep a second terminal or console available if possible. If you are using a Kubernetes lab, define the `k` alias before the Kubernetes section and verify that your context points to the intended cluster. The exercise uses read-only inspection first, then temporary rules that are cleaned up in the same section.
+Save the current rules before changing anything, and keep a second terminal or console available if possible. The exercise uses read-only inspection first, then temporary rules that are cleaned up in the same section. If you take the cluster fork in Part 4, define the `k` alias there and verify that your context points to the intended cluster.
 
 If any command behaves differently from the notes, do not force the environment to match the lesson by deleting unrelated rules. Your host may use nft-backed iptables, a host firewall manager, a different CNI plugin, or an eBPF dataplane that leaves fewer visible iptables rules. The correct learning move is to explain the difference, identify the owner of the visible policy, and keep your edits inside the temporary chain created for the exercise.
 
 ```bash
 sudo iptables-save > /tmp/iptables-backup.txt
-alias k=kubectl
-k config current-context
 ```
 
 ### Part 1: Basic iptables
@@ -617,9 +633,14 @@ The redirect rule affects locally generated traffic in OUTPUT, which is differen
 
 </details>
 
-### Part 4: Kubernetes iptables (if available)
+### Part 4: Kubernetes iptables
+
+> **Cluster fork:** This part needs `kubectl` access to a running cluster (Killercoda lab, `kind`, or an existing cluster). Without one, skip it or read it as a worked example — see the forks above.
 
 ```bash
+alias k=kubectl
+k config current-context
+
 # 1. Count Kubernetes rules
 sudo iptables-save | grep -c KUBE
 
@@ -670,7 +691,7 @@ The busiest rule is not automatically the broken rule; it is the rule most traff
 - [ ] Viewed and interpreted filter and nat table output without changing policy.
 - [ ] Created, tested, and removed a custom diagnostic chain cleanly.
 - [ ] Implemented and removed a NAT redirect while explaining why OUTPUT was the right chain.
-- [ ] Traced Kubernetes Service rules or explained why the lab cluster uses a different dataplane.
+- [ ] Traced Kubernetes Service rules or explained why the lab cluster uses a different dataplane (cluster fork — Part 4; optional for host-only learners).
 - [ ] Diagnosed at least one rule by comparing counters before and after a controlled packet test.
 
 ## Next Module
