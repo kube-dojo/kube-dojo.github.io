@@ -21,11 +21,17 @@ lab:
 
 ## Prerequisites
 
-Before starting this module:
+Required (Linux host skills only):
 
-- **Required**: Basic comfort with Linux shells and process troubleshooting.
-- **Helpful**: [Module 1.1: Kernel & Architecture](/linux/foundations/system-essentials/module-1.1-kernel-architecture/)
+- Basic comfort with Linux shells and process troubleshooting — enough to run `ip`, `ss`, and `dig` on a host and read their output.
+
+Helpful but not required:
+
+- [Module 1.1: Kernel & Architecture](/linux/foundations/system-essentials/module-1.1-kernel-architecture/)
+- Kubernetes Basics (pod, Service, and ClusterIP vocabulary). The module explains these as it goes; the host-only path below works without them.
 - **Next bridge**: [Module 3.3: Network Namespaces & veth](../module-3.3-network-namespaces/) uses the same addressing, routing, neighbor, and MTU model inside isolated network stacks.
+
+A running Kubernetes cluster is **not** required for most of this module. Tasks 0–2 and Task 5 in the Hands-On Exercise run on any Linux host. Tasks 3–4 include `kubectl` and cluster-DNS work, so they need a cluster — the exercise offers three forks (Killercoda lab, a local `kind` cluster, or read-only skip) for learners who do not have one.
 
 Kubernetes examples use full `kubectl` commands rather than shell aliases so transcripts remain portable. The lesson is Linux-first, but the goal is Kubernetes 1.35+ operations: pod IPs, Service virtual IPs, CNI routes, ingress sockets, egress NAT, and DNS all collapse to kernel packet decisions during troubleshooting.
 
@@ -33,10 +39,10 @@ Kubernetes examples use full `kubectl` commands rather than shell aliases so tra
 
 After completing this module, you will be able to reason about TCP/IP as an operated Linux system rather than as a vocabulary list.
 
-1. **Analyze** a failing Kubernetes or host connection by separating link, neighbor, route, transport, conntrack, DNS, and application evidence.
+1. **Analyze** a failing host connection by separating link, neighbor, route, transport, conntrack, DNS, and application evidence — and, with the cluster fork in the Hands-On Exercise, a failing Kubernetes connection the same way.
 2. **Calculate** IPv4 and IPv6 prefix boundaries, then decide whether a pod, node, Service, gateway, or VIP is local, routed, or virtual.
 3. **Trace** TCP connection state from `SYN-SENT` through `TIME-WAIT` and use `ss -tan` output to distinguish refusal, timeout, backlog, close, and keepalive symptoms.
-4. **Diagnose** Service and ingress failures by connecting Linux conntrack, DNAT, netfilter hooks, sockets, and kube-proxy proxy modes.
+4. **Diagnose** Service and ingress failures by connecting Linux conntrack, DNAT, netfilter hooks, sockets, and kube-proxy proxy modes (cluster path — see the Hands-On fork; host-only learners can complete this module without it).
 5. **Design** a triage sequence for MTU, DNS, ARP/NDP, routing, and transport incidents without falling back to legacy net-tools.
 
 ## Why This Module Matters
@@ -50,6 +56,30 @@ Treat every network failure as a claim about one layer of evidence. `ping` may p
 The useful habit is to turn a vague outage report into a sequence of falsifiable claims. "The Service is down" is not yet a network diagnosis. "A pod can resolve the Service name, the ClusterIP DNATs to endpoint `10.244.2.37`, the node route sends that endpoint through `vxlan.calico`, and TCP reaches `SYN-SENT` but never receives `SYN-ACK`" is a diagnosis shape. It names a destination, an address family, a dataplane decision, and a missing packet. That level of specificity lets another operator reproduce the failure without trusting your interpretation.
 
 Cloud networking makes this discipline more important because control-plane health and packet forwarding can disagree. A managed load balancer can be healthy while its backend security group blocks return traffic. A CNI can report Ready while the host route table points a remote pod CIDR at a stale tunnel device. A DNS record can be correct while the resolver expands search domains into extra queries and hits a conntrack or CoreDNS limit. The Linux model is the common language across those systems.
+
+## First Look: One Host, One Route
+
+Before the layer model and the Kubernetes machinery, try the core operator move on any Linux machine you already have — no cluster needed. Ask the kernel how it would reach a public address:
+
+```bash
+ip -br addr
+ip route get 1.1.1.1
+ip neigh show
+```
+
+Illustrative output on a typical workstation (your addresses will differ):
+
+```text
+$ ip -br addr
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eth0             UP             192.168.10.25/24 fe80::5054:ff:fe12:3456/64
+$ ip route get 1.1.1.1
+1.1.1.1 via 192.168.10.1 dev eth0 src 192.168.10.25 uid 1000
+$ ip neigh show
+192.168.10.1 dev eth0 lladdr 52:54:00:12:34:56 REACHABLE
+```
+
+Three kernel decisions are already visible. The address list says which source addresses exist. The route lookup selects the egress device (`eth0`), the next-hop gateway (`192.168.10.1`), and the source address in one atomic answer. The neighbor table holds the link-layer MAC for that gateway, which is what actually carries the frame. Every troubleshooting pattern in this module — and every Kubernetes pod, Service, and ingress path later — is this same sequence with more devices and address domains in between. Keep these three commands in mind; the rest of the module explains what each decision can get wrong.
 
 ## Layers as Kernel Decisions
 
@@ -422,6 +452,12 @@ Inspect conntrack and kube-proxy rules. Long-lived Service flows may keep transl
 
 Use a disposable Linux VM, lab node, or Kubernetes worker where you have permission to inspect networking state. Capture outputs in a scratch note and label each one with the layer it proves. On minimal images, `tracepath` and `mtr` may require `sudo apt install iputils-tracepath mtr`.
 
+Tasks 0, 1, 2, and 5 need only a Linux host. Tasks 3 and 4 touch Kubernetes objects and cluster DNS, so pick one fork before starting them:
+
+- **Use the Killercoda lab** linked in this module's header (`linux-3.1-tcp-ip`), which provides a ready environment.
+- **Or spin up a local cluster first**, for example with [`kind`](https://kind.sigs.k8s.io/) on your own machine, then run the tasks there.
+- **Or skip the cluster tasks.** Read Tasks 3–4 as worked examples and treat cluster-dependent Success Criteria as follow-up; the host-only criteria are fully achievable without a cluster.
+
 ### Task 0: Prefix boundaries (IPv4 and IPv6)
 
 For `10.244.9.200/24`, write the network address, broadcast address, and usable host range. For `fd00:abcd:1234::/48`, identify the `/48` prefix boundary (the first 48 bits of the address). Use `ipcalc` or manual bit math; compare with `ip route get` only after you have your answers.
@@ -449,6 +485,8 @@ Record whether you saw refusal, timeout, or immediate local error. Tie each resu
 
 ### Task 3: Inspect Kubernetes Addresses
 
+> **Cluster fork:** This task needs `kubectl` access to a running cluster (Killercoda lab, `kind`, or an existing cluster). Without one, skip it or read it as a worked example — see the forks above.
+
 ```bash
 kubectl get pods -A -o wide
 kubectl get svc -A -o wide
@@ -467,7 +505,7 @@ dig +search kubernetes.default
 sudo tcpdump -ni any port 53 -c 10
 ```
 
-Identify the nameserver, search behavior, query name, and transport protocol. If your node uses systemd-resolved, compare `/etc/resolv.conf` with `resolvectl status`.
+Identify the nameserver, search behavior, query name, and transport protocol. If your node uses systemd-resolved, compare `/etc/resolv.conf` with `resolvectl status`. Without a cluster, replace the cluster names with a public one (for example `dig example.com A` and `dig +search example`) and observe the same resolver mechanics.
 
 ### Task 5: Check MTU Evidence
 
@@ -481,10 +519,10 @@ Find the egress interface MTU and any PMTU clue from `tracepath`. If you are on 
 
 ### Success Criteria
 
-- [ ] Analyze a failing Kubernetes or host connection by separating link, neighbor, route, transport, conntrack, DNS, and application evidence.
+- [ ] Analyze a failing host connection by separating link, neighbor, route, transport, conntrack, DNS, and application evidence (extend to a Kubernetes connection when using the cluster fork).
 - [ ] Calculate IPv4 and IPv6 prefix boundaries, then decide whether a pod, node, Service, gateway, or VIP is local, routed, or virtual.
 - [ ] Trace TCP connection state from `SYN-SENT` through `TIME-WAIT` and use `ss -tan` output to distinguish refusal, timeout, backlog, close, and keepalive symptoms.
-- [ ] Diagnose Service and ingress failures by connecting Linux conntrack, DNAT, netfilter hooks, sockets, and kube-proxy proxy modes.
+- [ ] Diagnose Service and ingress failures by connecting Linux conntrack, DNAT, netfilter hooks, sockets, and kube-proxy proxy modes (cluster fork — Tasks 3–4; optional for host-only learners).
 - [ ] Design a triage sequence for MTU, DNS, ARP/NDP, routing, and transport incidents without falling back to legacy net-tools.
 - [ ] Choose modern `ip`, `ss`, `tcpdump`, `dig`, `mtr`, `nc`, and `conntrack` tools instead of legacy net-tools.
 
