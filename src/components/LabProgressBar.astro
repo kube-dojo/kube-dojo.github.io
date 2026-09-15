@@ -1,22 +1,37 @@
 ---
 /**
- * LabProgressBar — Shows track-level progress on index pages.
+ * LabProgressBar — Killercoda lab completion on index pages (not module count).
  *
  * Usage: <LabProgressBar prefix="cka-" total={41} />
  */
 interface Props {
   prefix: string;
   total: number;
+  label?: string;
+  hint?: string;
+  completedLabel?: string;
 }
 
-const { prefix, total } = Astro.props;
+const {
+  prefix,
+  total,
+  label = 'Killercoda lab progress',
+  hint = 'Interactive labs, not module completion',
+  completedLabel = 'completed',
+} = Astro.props;
 ---
 
-<div class="lab-progress-bar" data-prefix={prefix} data-total={total}>
+<div
+  class="lab-progress-bar"
+  data-prefix={prefix}
+  data-total={total}
+  data-completed-label={completedLabel}
+>
   <div class="lab-progress-header">
-    <span class="lab-progress-label">Lab Progress</span>
-    <span class="lab-progress-count" data-progress-count>0/{total} completed</span>
+    <span class="lab-progress-label">{label}</span>
+    <span class="lab-progress-count" data-progress-count>0/{total} {completedLabel}</span>
   </div>
+  <p class="lab-progress-hint">{hint}</p>
   <div class="lab-progress-track">
     <div class="lab-progress-fill" data-progress-fill style="width: 0%"></div>
   </div>
@@ -33,7 +48,13 @@ const { prefix, total } = Astro.props;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.125rem;
+  }
+  .lab-progress-hint {
+    font-size: 0.6875rem;
+    color: #6B7280;
+    margin: 0 0 0.375rem;
+    line-height: 1.35;
   }
   .lab-progress-label {
     font-size: 0.75rem;
@@ -66,6 +87,7 @@ const { prefix, total } = Astro.props;
     const el = bar as HTMLElement;
     const prefix = el.dataset.prefix!;
     const total = parseInt(el.dataset.total!, 10);
+    const completedLabel = el.dataset.completedLabel || 'completed';
     const countEl = el.querySelector('[data-progress-count]') as HTMLElement;
     const fillEl = el.querySelector('[data-progress-fill]') as HTMLElement;
 
@@ -78,7 +100,7 @@ const { prefix, total } = Astro.props;
     }
 
     const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-    countEl.textContent = `${completed}/${total} completed`;
+    countEl.textContent = `${completed}/${total} ${completedLabel}`;
     fillEl.style.width = `${pct}%`;
 
     // Color based on completion
