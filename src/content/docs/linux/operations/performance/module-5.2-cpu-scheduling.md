@@ -18,7 +18,15 @@ lab:
 
 ## Prerequisites
 
-Before this module, you should already read basic Linux command output for process and system status, and you should already understand cgroup basics. The links you will use repeatedly are [module 5.1: USE method](../module-5.1-use-method/), [module 2.2: cgroups](/linux/foundations/container-primitives/module-2.2-cgroups/), and [basic process lifecycle command usage](/linux/foundations/system-essentials/module-1.2-processes-systemd/).
+Required (Linux host skills only):
+
+- Read basic Linux command output for process and system status, and understand cgroup basics. The links you will use repeatedly are [module 5.1: USE method](../module-5.1-use-method/), [module 2.2: cgroups](/linux/foundations/container-primitives/module-2.2-cgroups/), and [basic process lifecycle command usage](/linux/foundations/system-essentials/module-1.2-processes-systemd/).
+
+Helpful but not required:
+
+- Kubernetes basics (pods, CPU requests and limits, `kubectl`). The cluster path explains the cgroup-to-Kubernetes mapping as it goes; the host-only path works without it.
+
+A running Kubernetes cluster is **not** required for most of this module. Exercise 1 and Exercise 3 run on any Linux host. Exercise 2 reads pod-level cgroup v2 controls with `kubectl`, so it offers three forks (Killercoda lab, local `kind` cluster, or read-only skip) for learners who do not have a cluster.
 
 ## Learning Outcomes
 
@@ -26,7 +34,7 @@ Before this module, you should already read basic Linux command output for proce
 - **LO-2**: Describe how CFS and EEVDF differ in scheduling behavior and why latency-sensitive workloads are shaped by vruntime and virtual deadlines.
 - **LO-3**: Evaluate scheduler control options across `SCHED_OTHER`, `SCHED_FIFO`, `SCHED_RR`, `SCHED_DEADLINE`, `SCHED_BATCH`, and `SCHED_IDLE`, then select safe controls.
 - **LO-4**: Diagnose scheduler and cgroup behavior with `top`, `htop`, `pidstat`, `perf sched`, `sar -u`, `mpstat -P ALL`, `/proc/<pid>/sched`, `/proc/<pid>/status`, and `/proc/stat`.
-- **LO-5**: Apply and validate cgroups v2 CPU policy and Kubernetes requests/limits for predictable throughput and bounded latency.
+- **LO-5**: Apply and validate cgroups v2 CPU policy and Kubernetes requests/limits for predictable throughput and bounded latency (the Kubernetes half is the cluster path — see the Exercise 2 fork; host-only learners can validate cgroup v2 policy directly on a Linux host).
 
 ## Why This Module Matters
 
@@ -514,7 +522,13 @@ This question checks whether you can prove quota pressure before touching worklo
 
 ## Hands-On Exercises
 
-### Exercise 1: Plain Linux state and scheduler evidence
+Exercise 1 and Exercise 3 need only a Linux host. Exercise 2 reads pod-level cgroup v2 controls with `kubectl` on a running cluster, so pick one fork before starting it:
+
+- **Use the Killercoda lab** linked in this module's header (`linux-5.2-cpu-scheduling`), which provides a ready environment with a cluster.
+- **Or spin up a local cluster first**, for example with [`kind`](https://kind.sigs.k8s.io/) on your own machine, then run Exercise 2 there.
+- **Or skip the cluster exercise.** Read Exercise 2 as a worked example and treat its Expected Output as follow-up; the host-only exercises are fully achievable without a cluster.
+
+### Exercise 1: Plain Linux state and scheduler evidence (host-only)
 
 - [ ] Capture process state distribution and identify the dominant states.
 ```bash
@@ -537,7 +551,9 @@ cat /proc/stat | head -n 2
 
 Expected output: you should identify whether scheduler contention is per-core, per-task, or system-wide, and document which exact command sequence showed the earliest measurable difference across two back-to-back windows.
 
-### Exercise 2: Kubernetes lab with cgroup v2 `cpu.max` and throttling visibility
+### Exercise 2: Kubernetes lab with cgroup v2 `cpu.max` and throttling visibility (cluster fork)
+
+> **Cluster fork:** This exercise needs `kubectl` access to a running cluster (Killercoda lab `linux-5.2-cpu-scheduling`, a local `kind` cluster, or an existing cluster). Without one, skip it or read it as a worked example — see the forks above. Pod names, counter values, and timing below are illustrative; a live cluster will differ.
 
 - [ ] Start or use a local cluster and run a strict pod.
 ```bash
@@ -577,9 +593,9 @@ kubectl exec -n cpu-sched-lab cpu-throttle -- cat /sys/fs/cgroup/cpu.max
 kubectl exec -n cpu-sched-lab cpu-throttle -- cat /sys/fs/cgroup/cpu.stat
 ```
 
-Expected output: `cpu.max` increases, and throttled counter growth should reduce over the second sample window while request latency variance narrows under the same stress pattern.
+Expected output (cluster fork only): `cpu.max` increases, and throttled counter growth should reduce over the second sample window while request latency variance narrows under the same stress pattern.
 
-### Exercise 3: Node isolation and IRQ-awareness for jitter-sensitive workload
+### Exercise 3: Node isolation and IRQ-awareness for jitter-sensitive workload (host-only)
 
 - [ ] Capture current core spread and top tasks before pinning.
 ```bash
