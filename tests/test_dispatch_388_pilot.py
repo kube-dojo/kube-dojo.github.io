@@ -1,6 +1,7 @@
 """Tests for dispatch_388 backfill integration."""
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -11,6 +12,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.quality import dispatch_388_pilot as pilot
+from scripts.quality.source_acceptance import _digest
+from tests.test_source_acceptance import _valid
 
 
 def _mock_run(returncode: int, stdout: str = "", stderr: str = ""):
@@ -153,10 +156,6 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
 
 
 def test_recheck_module_source_acceptance_rejects_stale_pr_head(tmp_path):
-    import json
-    from scripts.quality.source_acceptance import _digest
-    from tests.test_source_acceptance import _valid
-
     module_path = "src/content/docs/k8s/cka/module-1.md"
     page = tmp_path / module_path
     page.parent.mkdir(parents=True)
