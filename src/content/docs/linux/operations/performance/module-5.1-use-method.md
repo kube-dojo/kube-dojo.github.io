@@ -21,18 +21,26 @@ lab:
 
 Before starting this module, you should be comfortable reading process lists, recognizing systemd-managed services, and understanding why containers are constrained by cgroups. The USE Method is not a replacement for those fundamentals; it gives you a disciplined way to apply them when a node, virtual machine, or Kubernetes workload is slow under pressure.
 
+Required (Linux host skills only):
+
 - **Required**: [Module 1.2: Processes & Systemd](/linux/foundations/system-essentials/module-1.2-processes-systemd/)
 - **Required**: [Module 2.2: cgroups](/linux/foundations/container-primitives/module-2.2-cgroups/)
 - **Helpful**: Basic understanding of system metrics
+
+Optional (Kubernetes cluster path):
+
+- Basic Kubernetes familiarity (nodes, pods, `kubectl`) helps with the **Kubernetes Connection** section and one optional hands-on task. That content is gated behind an explicit fork below.
+
+A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-5.1-use-method` is an Ubuntu host scenario with no cluster provided, and the full USE checklist — including every success criterion in the hands-on exercise — completes on any Linux host without `kubectl`.
 
 ## Learning Outcomes
 
 After this module, you will be able to:
 
-- **Apply** the USE Method to classify utilization, saturation, and errors for CPU, memory, disk, and network resources.
-- **Diagnose** Kubernetes node performance problems by mapping Linux metrics to MemoryPressure, DiskPressure, PIDPressure, throttling, and pod symptoms.
-- **Interpret** load average, run queue, swap activity, disk queue depth, packet drops, and CPU steal as operational evidence.
-- **Implement** a repeatable USE checklist script that automates initial triage without hiding the reasoning.
+- **Apply** the USE Method to classify utilization, saturation, and errors for CPU, memory, disk, and network resources. *(Host-only)*
+- **Diagnose** Kubernetes node performance problems by mapping Linux metrics to MemoryPressure, DiskPressure, PIDPressure, throttling, and pod symptoms. *(Cluster path: needs `kubectl` access to a running cluster, or read the Kubernetes Connection section as a worked example — see the fork there.)*
+- **Interpret** load average, run queue, swap activity, disk queue depth, packet drops, and CPU steal as operational evidence. *(Host-only)*
+- **Implement** a repeatable USE checklist script that automates initial triage without hiding the reasoning. *(Host-only)*
 
 ## Why This Module Matters
 
@@ -320,6 +328,12 @@ Before running this, what output do you expect if a web service is slow because 
 
 ## Kubernetes Connection
 
+> **Host-only vs cluster fork:** This section uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-5.1-use-method` is an Ubuntu host scenario without a cluster. Complete the USE checklist there and read this section as a worked example — nothing here is required for the host exercise.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; node names, conditions, and values below are illustrative, and a live cluster will differ.
+
 Kubernetes does not remove Linux performance problems; it adds scheduling, isolation, and resource policy on top of them. A pod can be throttled by a CPU limit while the node still has spare CPU, or a node can be under disk pressure while every individual pod looks innocent. For this module, assume Kubernetes 1.35+ behavior and use `kubectl` through the standard short alias by running `alias k=kubectl` once in your shell. After that, commands such as `k describe node` are shorter to read and match the style used in later modules.
 
 ```bash
@@ -576,17 +590,24 @@ The script must preserve the USE reasoning, not just collect commands. It should
 
 In this exercise, you will practice a full USE pass on any Linux system. Use a disposable lab VM or local sandbox, because the CPU task intentionally creates load until you clean it up. If a command is missing, install the package that provides it or note the gap in your findings. The point is not perfect tooling; the point is a repeatable evidence trail.
 
+Parts 1–5 and the checklist script need only a Linux host. One task (Kubernetes node diagnosis) additionally needs `kubectl` access to a running cluster, so pick one fork before starting it:
+
+- **Killercoda ubuntu host path:** Run everything in the linked lab `linux-5.1-use-method`, which is an Ubuntu host scenario. Complete the full USE checklist there and read the cluster task as a worked example.
+- **Local Linux host:** Any Linux VM or machine works the same way — the exercise completes fully without `kubectl`.
+- **Optional cluster path:** Use a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster to run the cluster task live.
+- **Skip-as-read:** Skip the cluster task entirely; every success criterion below is host-only.
+
 ### Setup
 
 Open two terminals if possible. Use the first terminal to create or observe load, and the second terminal to run checks. If you are in a Kubernetes lab, run `alias k=kubectl` before any cluster commands and keep node-level Linux evidence separate from pod-level metrics.
 
 ### Tasks
 
-- [ ] Apply the USE Method to classify utilization, saturation, and errors for CPU, memory, disk, and network on your system.
-- [ ] Diagnose Kubernetes node performance signals, if a cluster is available, by mapping node conditions to Linux evidence.
-- [ ] Interpret load average, run queue, swap activity, disk queue depth, packet drops, and CPU steal in a short incident note.
-- [ ] Implement a repeatable USE checklist script that automates initial triage without hiding the reasoning.
-- [ ] Compare your script output with manual commands and explain any missing evidence.
+- [ ] Apply the USE Method to classify utilization, saturation, and errors for CPU, memory, disk, and network on your system. *(Host-only)*
+- [ ] *(Cluster path — optional)* Diagnose Kubernetes node performance signals by mapping node conditions (`k describe node`) to Linux evidence. Needs `kubectl` on a running cluster; on the host-only path, read the Kubernetes Connection section as a worked example instead.
+- [ ] Interpret load average, run queue, swap activity, disk queue depth, packet drops, and CPU steal in a short incident note. *(Host-only)*
+- [ ] Implement a repeatable USE checklist script that automates initial triage without hiding the reasoning. *(Host-only)*
+- [ ] Compare your script output with manual commands and explain any missing evidence. *(Host-only)*
 
 #### Part 1: CPU Analysis
 
@@ -716,6 +737,8 @@ Your final note should name the healthiest and least healthy resource categories
 </details>
 
 ### Success Criteria
+
+All of these criteria are host-only: a learner on the Killercoda ubuntu lab or any local Linux host can complete every one without a Kubernetes cluster.
 
 - [ ] Checked CPU utilization, saturation, and errors
 - [ ] Checked memory utilization and swap activity
