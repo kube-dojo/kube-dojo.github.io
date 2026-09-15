@@ -15,6 +15,8 @@ from scripts.quality.source_acceptance import (
     _digest,
     bind_source_acceptance,
     evaluate_source_acceptance,
+    recheck_held_publication,
+    recheck_pr_head,
 )
 
 PAGE, SEED, SNAP = "sha256:" + "a" * 64, "sha256:" + "b" * 64, "sha256:" + "c" * 64
@@ -93,6 +95,48 @@ def test_bind_missing_stale_malformed_cannot_accept() -> None:
     assert "seed_malformed" in bind_source_acceptance(bound, page_bytes=page, seed_bytes=b"{")["reasons"]
 
 
+def test_pr_head_recheck_rejects_stale_page_and_seed() -> None:
+    page, changed = b"page-at-review", b"page-at-pr-head"
+    seed = json.dumps({"claims": [{"claim_id": "C001"}]}).encode()
+    new_seed = json.dumps({"claims": [{"claim_id": "C001"}], "rev": 2}).encode()
+    receipt = _valid(page_digest=_digest(page), seed_digest=_digest(seed))
+    assert recheck_pr_head(receipt, pr_head_page_bytes=page, seed_bytes=seed)["accepted"]
+    stale = recheck_pr_head(receipt, pr_head_page_bytes=changed, seed_bytes=seed)
+    assert stale["accepted"] is False and "page_digest_stale" in stale["reasons"]
+    seed_stale = recheck_pr_head(receipt, pr_head_page_bytes=page, seed_bytes=new_seed)
+    assert seed_stale["accepted"] is False and "seed_digest_stale" in seed_stale["reasons"]
+    missing = recheck_pr_head(receipt, pr_head_page_bytes=None, seed_bytes=seed)
+    assert missing["accepted"] is False and "pr_head_bytes_missing" in missing["reasons"]
+    empty = recheck_pr_head(receipt, pr_head_page_bytes=b"", seed_bytes=seed)
+    assert empty["accepted"] is False and "pr_head_bytes_missing" in empty["reasons"]
+    bypass = recheck_pr_head(
+        {"citations_verified": True, "accepted": True},
+        pr_head_page_bytes=changed, seed_bytes=seed,
+    )
+    assert bypass["accepted"] is False
+
+
+def test_held_publication_recheck_uses_pr_head_bytes(tmp_path: Path) -> None:
+    page_rel = "k8s/cka/module-1.1-alpha.md"
+    page = tmp_path / "src/content/docs" / page_rel
+    page.parent.mkdir(parents=True)
+    reviewed = b"---\ncitations_verified: true\n---\nreviewed body\n"
+    page.write_bytes(reviewed)
+    seed = b'{"claims":[{"claim_id":"C001"}]}'
+    (tmp_path / "docs/citation-seeds").mkdir(parents=True)
+    (tmp_path / "docs/citation-seeds/k8s-cka-module-1.1-alpha.json").write_bytes(seed)
+    ok = _valid(page_digest=_digest(reviewed), seed_digest=_digest(seed))
+    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(json.dumps({"pages": [{"path": page_rel, "source_acceptance": ok}]}), encoding="utf-8")
+    assert recheck_held_publication(tmp_path, page_rel, pr_head_page_bytes=reviewed)["accepted"]
+    late = recheck_held_publication(tmp_path, page_rel, pr_head_page_bytes=reviewed + b"late\n")
+    assert late["accepted"] is False and "page_digest_stale" in late["reasons"]
+    assert "pr_head_bytes_missing" in recheck_held_publication(
+        tmp_path, page_rel, pr_head_page_bytes=None,
+    )["reasons"]
+
+
 def test_readiness_source_accepted_fail_closed(tmp_path: Path) -> None:
     from tests.test_local_api import _init_repo, _seed_module, local_api
 
@@ -127,6 +171,8 @@ def test_readiness_source_accepted_fail_closed(tmp_path: Path) -> None:
     cka = next(s for s in k8s["sections"] if s["slug"] == "cka")
     assert ready["totals"]["source_accepted"] == 1
     assert k8s["source_accepted"] == 1 and cka["source_accepted"] == 1
+    page.write_bytes(page.read_bytes() + b"\nlate pr-head change\n")
+    assert local_api.build_tracks_readiness(tmp_path)["totals"]["source_accepted"] == 0
     first = local_api._v_docs_frontmatter(tmp_path)
     ledger.write_text(json.dumps({"pages": [base]}), encoding="utf-8")
     assert first != local_api._v_docs_frontmatter(tmp_path)

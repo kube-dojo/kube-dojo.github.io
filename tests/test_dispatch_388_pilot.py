@@ -147,7 +147,33 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
     events = [c.args[0]["event"] for c in mock_log.call_args_list]
     assert events.count("source_acceptance_unverified") == 2
     assert "merged" not in events
+    held = [c.args[0] for c in mock_log.call_args_list if c.args[0]["event"] == "source_acceptance_unverified"]
+    assert all(item["source_acceptance"]["accepted"] is False for item in held)
     assert capsys.readouterr().out.count("[source_acceptance_unverified]") == 2
+
+
+def test_recheck_module_source_acceptance_rejects_stale_pr_head(tmp_path):
+    import json
+    from scripts.quality.source_acceptance import _digest
+    from tests.test_source_acceptance import _valid
+
+    module_path = "src/content/docs/k8s/cka/module-1.md"
+    page = tmp_path / module_path
+    page.parent.mkdir(parents=True)
+    reviewed = b"---\ncitations_verified: true\n---\nreviewed\n"
+    page.write_bytes(reviewed)
+    seed = b'{"claims":[{"claim_id":"C001"}]}'
+    (tmp_path / "docs/citation-seeds").mkdir(parents=True)
+    (tmp_path / "docs/citation-seeds/k8s-cka-module-1.json").write_bytes(seed)
+    ok = _valid(page_digest=_digest(reviewed), seed_digest=_digest(seed))
+    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(json.dumps({"pages": [{"path": "k8s/cka/module-1.md", "source_acceptance": ok}]}))
+    assert pilot.recheck_module_source_acceptance(tmp_path, module_path)["accepted"]
+    page.write_bytes(reviewed + b"late head\n")
+    stale = pilot.recheck_module_source_acceptance(tmp_path, module_path)
+    assert stale["accepted"] is False
+    assert "page_digest_stale" in stale["reasons"]
 
 
 @pytest.mark.parametrize(

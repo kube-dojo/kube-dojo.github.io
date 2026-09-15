@@ -181,6 +181,10 @@ def test_inventory_source_acceptance_fail_closed(tmp_path: Path) -> None:
     ok = _pages(inventory.build_inventory(docs, evidence, seeds_dir=seeds))[rel]["evidence"]
     assert ok["source_acceptance"]["accepted"] is True
     assert ok["independent_statuses"]["technical_source"] == "pass"
+    page.write_bytes(page.read_bytes() + b"\nlate pr-head change\n")
+    changed = _pages(inventory.build_inventory(docs, evidence, seeds_dir=seeds))[rel]["evidence"]
+    assert changed["source_acceptance"]["accepted"] is False
+    assert "page_digest_stale" in changed["source_acceptance"]["reasons"]
 
 
 def test_missing_docs_root_is_an_explicit_cli_error(tmp_path: Path, capsys) -> None:
