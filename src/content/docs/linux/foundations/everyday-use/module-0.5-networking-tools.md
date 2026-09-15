@@ -22,15 +22,21 @@ lab:
 
 Before starting this module, you should be comfortable moving around a shell, reading command output carefully, and using `sudo` only when a command needs elevated privileges. The examples build directly on [Module 0.2: Environment & Permissions](../module-0.2-environment-permissions/) and [Module 0.4: Services & Logs Demystified](../module-0.4-services-logs/), because network symptoms often end at a process, a service unit, a log line, or a permission boundary that lives on the local host.
 
+The required foundations focus strictly on Linux host networking tools. You will need [Module 0.2: Environment & Permissions](../module-0.2-environment-permissions/), [Module 0.4: Services & Logs Demystified](../module-0.4-services-logs/), and a Linux VM or lab host with `sudo`, standard networking utilities (`ip`, `ping`, `tracepath`, `traceroute`, `curl`, `ss`, `dig`, `host`, `getent`), and firewall tools (`iptables`, `nft`, or `ufw`).
+
+Optional Kubernetes cluster familiarity helps if you take the cluster fork. Basic familiarity with pods, Services, EndpointSlices, CoreDNS, and `kubectl` helps with the **Kubernetes Touch-Points** section and optional cluster triage. That cluster material is gated behind an explicit fork below.
+
+A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-0.5-networking-tools` is an Ubuntu host scenario with no cluster provided, and the full networking tools exercise — including every hands-on task and success criterion — completes on any Linux host without `kubectl`.
+
 You do not need to be a network engineer to use these tools well. You do need a disciplined habit of asking one narrow question at a time, recording what the answer proves, and refusing to treat a single passing command as proof that every layer is healthy. KubeDojo examples assume modern Linux distributions and Kubernetes 1.35+ when cluster behavior appears, but this module stays grounded in host evidence first because a Kubernetes node is still a Linux machine with sockets, resolvers, routes, packet filters, and local services.
 
 ## Learning Outcomes
 
-- **Diagnose** reachability and latency failures with `ping`, `traceroute`, and `tracepath` before escalating to application debugging.
-- **Debug** HTTP and API behavior with `curl` verbose output, headers, redirects, TLS evidence, and mTLS client-certificate basics.
-- **Inspect** listening ports and service binding choices with `ss`, while recognizing why `netstat` is now mostly a compatibility habit.
-- **Evaluate** DNS resolver, cache, record, and TTL evidence with `getent`, `dig`, `host`, and systemd-resolved tools.
-- **Implement** a local firewall troubleshooting sequence with `ufw`, `iptables`, and `nft` that inspects state and tests targeted rules without flushing production policy.
+- **Diagnose** reachability and latency failures with `ping`, `traceroute`, and `tracepath` before escalating to application debugging. *(Host-only)*
+- **Debug** HTTP and API behavior with `curl` verbose output, headers, redirects, TLS evidence, and mTLS client-certificate basics. *(Host-only)*
+- **Inspect** listening ports and service binding choices with `ss`, while recognizing why `netstat` is now mostly a compatibility habit. *(Host-only)*
+- **Evaluate** DNS resolver, cache, record, and TTL evidence with `getent`, `dig`, `host`, and systemd-resolved tools. *(Host-only; on the optional cluster path, compare host resolvers with cluster CoreDNS behavior — see the Kubernetes Touch-Points fork.)*
+- **Implement** a local firewall troubleshooting sequence with `ufw`, `iptables`, and `nft` that inspects state and tests targeted rules without flushing production policy. *(Host-only)*
 
 ## Why This Module Matters
 
@@ -332,12 +338,18 @@ When you do change something, make the rollback as explicit as the change. A tem
 
 ## Kubernetes Touch-Points: Host Networking to Pod, Service, and DNS Failures
 
+> **Host-only vs cluster fork:** This section uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-0.5-networking-tools` is an Ubuntu host scenario without a cluster. Complete the host networking exercises there and read this section as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; pod names, namespaces, and cluster responses below are illustrative, and a live cluster will differ.
+
 Kubernetes networking adds abstractions, but host tools still answer important questions. A Pod IP is usually routed through a CNI-provided path. A Service virtual IP is usually implemented by kube-proxy through iptables, nftables, or IPVS depending on cluster configuration. DNS inside the cluster is usually served by CoreDNS, while the node may use systemd-resolved or another resolver for its own lookups. When a pod cannot reach an API, you need to know which layer produced the failure before editing manifests.
 
 Start outside the pod when the node itself looks suspicious. If the node cannot reach a registry, package mirror, external API, or internal DNS server, pods scheduled there may inherit the same path problem or a closely related policy problem. Host commands such as `ip route get`, `resolvectl status`, `dig`, `curl -v`, and firewall inspection can prevent a long detour through Deployment YAML. Once the host path is plausible, move into Kubernetes evidence with pod status, events, Services, EndpointSlices, and CoreDNS behavior.
 
 ```bash
-# Kubernetes evidence without shorthand aliases.
+# Illustrative Kubernetes evidence without shorthand aliases (cluster path only).
 kubectl get pods -A -o wide
 kubectl describe pod -n default app-pod
 kubectl get svc,endpointslices -n default
@@ -347,7 +359,7 @@ kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide
 DNS failures are a classic place where host and pod views diverge. A node may resolve `example.com` through systemd-resolved, while a pod resolves through CoreDNS. CoreDNS may forward external names to the node's resolver, to a configured upstream resolver, or to cluster-specific rules. A useful sequence is to compare `getent` or `dig` on the node, a short-lived diagnostic pod query inside the cluster, and CoreDNS logs or events only after the answers differ. Do not assume the pod and node use the same resolver just because they run on the same machine.
 
 ```bash
-# A disposable DNS probe pod using a tiny image with nslookup.
+# Illustrative disposable DNS probe pod using a tiny image with nslookup (cluster path only).
 kubectl run dns-check \
   --rm -it \
   --image=busybox:1.36 \
@@ -357,7 +369,7 @@ kubectl run dns-check \
 
 Service failures also need layered evidence. If a Service has no endpoints, the network is not the first problem; selectors, readiness, or pod labels are. If endpoints exist but a node cannot reach the Service IP, inspect kube-proxy mode and node packet-filter state. If a pod can reach the Service but external clients cannot, move outward to Ingress, load balancers, node ports, cloud security groups, and host firewalls. The same ladder applies, but each rung has a Kubernetes object paired with a Linux fact.
 
-The best Kubernetes troubleshooting notes name both sides. "CoreDNS is broken" is vague. "From pod `dns-check` in namespace `default`, `nslookup kubernetes.default` times out; from node `worker-2`, `resolvectl query kubernetes.default` is not relevant because that name is cluster-only; CoreDNS pods are running but their logs show upstream timeouts for external names" is actionable. It protects the team from mixing cluster DNS, node DNS, and public DNS into one confused bucket.
+The best Kubernetes troubleshooting notes name both sides. Illustrative example: "CoreDNS is broken" is vague. "From pod `dns-check` in namespace `default`, `nslookup kubernetes.default` times out; from node `worker-2`, `resolvectl query kubernetes.default` is not relevant because that name is cluster-only; CoreDNS pods are running but their logs show upstream timeouts for external names" is actionable. It protects the team from mixing cluster DNS, node DNS, and public DNS into one confused bucket.
 
 ## Turning Evidence into an Escalation Note
 
@@ -424,12 +436,14 @@ Not based on that evidence alone. The hop may simply refuse or rate-limit tracer
 Flushing rules can erase SSH protection, Kubernetes service routing, container networking rules, NAT behavior, and security-managed policy. Start with read-only inspection: `iptables -V`, `iptables -S`, `iptables -L -n -v --line-numbers`, and `nft list ruleset` if nftables is involved. If a change is required, use a narrow reversible rule in a lab or approved window and document the matching rollback command.
 </details>
 
-<details><summary>7. A pod cannot resolve `kubernetes.default`, but the node can resolve public names with systemd-resolved. What should you compare next?</summary>
+<details><summary>7. (Cluster path) A pod cannot resolve `kubernetes.default`, but the node can resolve public names with systemd-resolved. What should you compare next?</summary>
 
 You should compare pod DNS and cluster DNS evidence rather than treating the node's public resolver result as decisive. Check CoreDNS pods, Kubernetes Service and EndpointSlice objects for DNS, a disposable pod lookup such as `nslookup kubernetes.default`, and CoreDNS logs if the pod-side query fails. Node DNS and pod DNS can use different resolver paths.
 </details>
 
 ## Hands-On Practice
+
+All tasks below are host-only: a learner on the Killercoda `linux-0.5-networking-tools` ubuntu lab or any local Linux host with `sudo` can complete every task and verification without a Kubernetes cluster. The `kubectl` commands from the **Kubernetes Touch-Points** section form an optional cluster path for learners who already have a running cluster.
 
 These exercises are written for the Killercoda Ubuntu lab or another disposable Linux environment. Do not run firewall-changing commands on a production host, a shared bastion, or a remote machine where you lack console access. The goal is not to memorize output; it is to collect evidence in an order that would be safe during a real incident and to explain what each command proves.
 
@@ -452,9 +466,9 @@ After running the checklist, write one sentence for each tool: what did it prove
 A strong answer names the layer behind each result. `getent` proves the local application-like name path returned an address. `dig` gives DNS-specific evidence from the configured resolver. `ping` tests ICMP reachability but not the service port. `tracepath` gives path and MTU hints without proving application health. `curl -v` shows TCP, TLS, HTTP, headers, status, and body evidence for the real endpoint.
 </details>
 
-- [ ] I compared local name resolution with DNS-specific lookup for the same target.
-- [ ] I recorded whether reachability evidence came from ICMP, path probing, or the actual HTTP endpoint.
-- [ ] I can name the next layer to inspect for timeout, connection refused, TLS failure, and HTTP error responses.
+- [ ] I compared local name resolution with DNS-specific lookup for the same target. *(Host-only)*
+- [ ] I recorded whether reachability evidence came from ICMP, path probing, or the actual HTTP endpoint. *(Host-only)*
+- [ ] I can name the next layer to inspect for timeout, connection refused, TLS failure, and HTTP error responses. *(Host-only)*
 
 **Task 2: DNS deep-dive from local resolver to delegation path.** Exercise scenario: a DNS change was made recently, and different clients disagree about the address for the same name. This task compares the local system view, a chosen recursive resolver, and the public delegation chain. Use a domain you control if possible, because authoritative answers and TTLs are easiest to interpret when you know the intended record.
 
@@ -477,9 +491,9 @@ Focus on resolver identity and TTL. If your local resolver returns an old addres
 A strong answer records the answer address, record type, resolver used, and TTL for each command. It does not simply say "DNS is wrong." It separates application-like local lookup through `getent`, DNS-specific lookup through `dig`, explicit resolver lookup through `dig @8.8.8.8`, delegation evidence through `dig +trace`, and systemd-resolved routing evidence through `resolvectl status`.
 </details>
 
-- [ ] I captured the local system answer and at least one explicit resolver answer.
-- [ ] I compared A and AAAA records instead of assuming IPv4 and IPv6 behave the same.
-- [ ] I recorded TTLs and resolver addresses before clearing any cache.
+- [ ] I captured the local system answer and at least one explicit resolver answer. *(Host-only)*
+- [ ] I compared A and AAAA records instead of assuming IPv4 and IPv6 behave the same. *(Host-only)*
+- [ ] I recorded TTLs and resolver addresses before clearing any cache. *(Host-only)*
 
 **Task 3: Local firewall blocking and verification in a disposable lab.** Exercise scenario: you need to prove how a narrow host firewall rule changes one outbound connection without flushing any ruleset. The example below blocks HTTP to the current example.com address and then deletes the exact same rule. Run it only in a lab, keep another terminal open, and confirm the delete command before inserting the rule.
 
@@ -510,9 +524,10 @@ The point is not that example.com is special. The point is the pattern: inspect,
 A strong answer confirms that the OUTPUT chain changed by exactly one rule, the curl test changed while the rule was present, and the rule disappeared after the delete command. It also notes whether `iptables -V` reported an nf_tables backend, because that affects how iptables and nftables inspection relate on the host.
 </details>
 
-- [ ] I inspected firewall state before changing anything.
-- [ ] I inserted only a narrow temporary rule and verified its effect with a bounded request.
-- [ ] I removed the exact rule and confirmed the chain returned to its prior shape.
+- [ ] I inspected firewall state before changing anything. *(Host-only)*
+- [ ] I inserted only a narrow temporary rule and verified its effect with a bounded request. *(Host-only)*
+- [ ] I removed the exact rule and confirmed the chain returned to its prior shape. *(Host-only)*
+- [ ] *(Cluster path — optional)* Traced pod DNS and cluster endpoints with `kubectl run dns-check`, or read the Kubernetes Touch-Points section as a worked example without a cluster.
 
 ## Next Module
 
