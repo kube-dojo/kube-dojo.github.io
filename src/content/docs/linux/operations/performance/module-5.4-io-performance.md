@@ -21,9 +21,17 @@ lab:
 
 Before starting this module, make sure the earlier performance modules feel familiar enough that you can compare CPU, memory, and storage evidence without treating any one metric as the whole story.
 
-- **Required**: [Module 5.1: USE Method](../module-5.1-use-method/)
-- **Required**: [Module 1.3: Filesystem Hierarchy](/linux/foundations/system-essentials/module-1.3-filesystem-hierarchy/)
-- **Helpful**: [Module 5.3: Memory Management](../module-5.3-memory-management/) for page cache understanding
+Required (Linux host I/O skills only):
+
+- [Module 5.1: USE Method](../module-5.1-use-method/)
+- [Module 1.3: Filesystem Hierarchy](/linux/foundations/system-essentials/module-1.3-filesystem-hierarchy/)
+- Helpful host reading: [Module 5.3: Memory Management](../module-5.3-memory-management/) for page cache understanding
+
+Helpful but not required:
+
+- Kubernetes basics (pods, PersistentVolumeClaims, StorageClasses, `kubectl`). The cluster path maps those resources onto Linux block and cgroup behavior as it goes; the host-only path works without them.
+
+A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-5.4-io-performance` is an Ubuntu host environment, not a Kubernetes cluster — there is no separate Kubernetes Killercoda scenario for this lesson. Tasks 1–5 of the Hands-On Exercise run on any Linux host, and Task 6 stays optional if Docker is present. Commands that need `kubectl` (PVC and StorageClass inspection) offer three forks: a local [`kind`](https://kind.sigs.k8s.io/) cluster, an existing cluster, or a read-only skip.
 
 ## Learning Outcomes
 
@@ -32,7 +40,7 @@ After this module, you will be able to perform the following tasks in a lab or p
 - **Measure** disk I/O performance using `iostat`, `iotop`, and `fio` benchmarks.
 - **Diagnose** I/O bottlenecks by interpreting `await`, `%util`, and queue depth metrics together.
 - **Inspect and evaluate** I/O schedulers and cgroup I/O limits for container workloads.
-- **Evaluate** storage performance requirements for database, logging, cache, and Kubernetes PersistentVolume workloads.
+- **Evaluate** storage performance requirements for database, logging, and cache workloads; on the cluster path, extend that evaluation to Kubernetes PersistentVolume and StorageClass choices (cluster path — see the Hands-On fork; host-only learners can complete this module without a cluster).
 - **Implement** a repeatable I/O test plan that separates page cache effects from real device behavior.
 
 ## Why This Module Matters
@@ -296,7 +304,9 @@ docker stats --format "{{.Name}}: BlockIO: {{.BlockIO}}"
 
 I/O limits are useful when one workload must not starve another, but they can also hide the real capacity of the system. A team may see low host utilization and assume the storage class is oversized, while a tenant sees painful latency because the tenant is hitting a bytes-per-second throttle. The operational question is not only "How fast is the disk?" It is also "Which control group is allowed to use the disk, at what rate, and during which burst?"
 
-In Kubernetes 1.35 and later, this module uses the standard short alias `k`, introduced as `alias k=kubectl`, whenever a Kubernetes command is needed; for example, `k get pvc` inspects claims without spelling out the full client name. Kubernetes storage performance usually starts with the StorageClass and the provisioned volume type, then moves to the pod's access pattern, filesystem, node placement, and cloud provider limits. The Linux skills still apply, but the ownership chain is longer.
+> **Cluster fork:** The StorageClass, PVC, and `kubectl` material below can be read without a cluster. Commands that need `kubectl` require a running cluster — a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing one. The Killercoda lab for this module is Ubuntu and does not provide `kubectl`. Without a cluster, skip those commands or treat their output as illustrative.
+
+This section uses full `kubectl` in command references so a host-only learner is not told to alias a binary they do not have. On the cluster path you may still define `alias k=kubectl` in your own shell. Kubernetes storage performance usually starts with the StorageClass and the provisioned volume type, then moves to the pod's access pattern, filesystem, node placement, and cloud provider limits. The Linux skills still apply, but the ownership chain is longer.
 
 ```yaml
 # StorageClass with I/O parameters targeting v1.35+ best practices
@@ -344,7 +354,7 @@ spec:
 
 **Hypothetical scenario:** An operations team moved a write-heavy queue worker to a PersistentVolume backed by a general-purpose cloud disk and kept the same pod resource requests. CPU and memory graphs stayed calm, but queue lag grew after the daily reporting job started. The fix was not a CPU request change; it was separating the queue data from report exports and choosing a volume class with explicit IOPS and throughput guarantees.
 
-When you evaluate a Kubernetes storage problem, follow the path from pod to node to volume. Check whether many pods share a node-local device, whether the CSI driver provisions the expected class, whether the workload is mounted through a network filesystem, and whether the application uses many small synchronous writes. If `k get pvc` says the claim is bound, that only proves scheduling and provisioning worked; it does not prove the workload has the latency budget it needs.
+When you evaluate a Kubernetes storage problem, follow the path from pod to node to volume. Check whether many pods share a node-local device, whether the CSI driver provisions the expected class, whether the workload is mounted through a network filesystem, and whether the application uses many small synchronous writes. If `kubectl get pvc` says the claim is bound, that only proves scheduling and provisioning worked; it does not prove the workload has the latency budget it needs.
 
 Kubernetes also changes who owns the fix. A platform team may own the StorageClass, an application team may own batching or logging behavior, and an infrastructure team may own cloud volume limits. Good incident notes name all three boundaries so the action item lands with the group that can change the cause. Otherwise, the next review becomes a loop of "the pod was slow" and "the node looked healthy" without anyone connecting the policy, workload, and device.
 
@@ -538,7 +548,7 @@ The repeated test may be measuring page cache performance instead of the physica
 
 **Objective**: Use Linux tools to analyze disk I/O behavior, connect device metrics to process-level evidence, and explain which layer you would investigate next based on the results.
 
-**Environment**: Linux system with root access. If you use a Kubernetes cluster for the optional storage check, assume Kubernetes 1.35 or later and the `k` alias described earlier.
+**Environment**: Linux system with root access. Tasks 1–5 are host-only and need no cluster. Task 6 is optional and needs Docker on that same host. A Kubernetes cluster is optional and is not provided by this module's Killercoda lab; the optional PersistentVolume evaluation in the Success Criteria applies only if you already have `kubectl` access to a `kind` or other cluster running Kubernetes 1.35 or later.
 
 This lab is deliberately progressive. You first identify devices, then read live metrics, then generate controlled work, then connect the work back to a process. The goal is not to create the fastest benchmark number. The goal is to build a repeatable habit for separating throughput, latency, queueing, cache effects, and ownership.
 
@@ -710,7 +720,8 @@ docker rm -f io-test
 - [ ] Found per-process I/O consumers with `iotop` or `pidstat`.
 - [ ] Checked filesystem mount options, byte usage, and inode usage.
 - [ ] Configured the investigation notes to include scheduler and cgroup `blkio` evidence for container workloads.
-- [ ] Evaluated whether a database, logging, cache, or Kubernetes PersistentVolume workload needs IOPS, throughput, or latency guarantees.
+- [ ] Evaluated whether a database, logging, or cache workload needs IOPS, throughput, or latency guarantees.
+- [ ] (Cluster fork, optional) Extended that evaluation to a Kubernetes PersistentVolume workload and its StorageClass; host-only learners may skip this.
 
 ## Next Module
 
