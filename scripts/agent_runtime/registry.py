@@ -43,7 +43,7 @@ class AgentEntry(TypedDict):
 AGENTS: dict[str, AgentEntry] = {
     "agy": {
         "adapter": "scripts.agent_runtime.adapters.agy:AgyAdapter",
-        "default_model": os.environ.get("KUBEDOJO_AGY_MODEL", "gemini-3.5-flash-high"),
+        "default_model": os.environ.get("KUBEDOJO_AGY_MODEL", "gemini-3.8-flash-high"),
         "cost_tier": "low",
         "capabilities": frozenset({
             "content_writing",
@@ -81,7 +81,8 @@ AGENTS: dict[str, AgentEntry] = {
     },
     "deepseek": {
         "adapter": "scripts.agent_runtime.adapters.deepseek:DeepSeekAdapter",
-        "default_model": os.environ.get("AB_DEEPSEEK_MODEL", "deepseek-v4-pro"),
+        # Canonical API id for DeepSeek-V4.1-Flash (legacy deepseek-v4-* aliases still route).
+        "default_model": os.environ.get("AB_DEEPSEEK_MODEL", "deepseek-flash"),
         "cost_tier": "low",
         "capabilities": frozenset({
             "code_review",

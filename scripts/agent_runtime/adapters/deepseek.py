@@ -165,11 +165,11 @@ class DeepSeekAdapter:
     """Adapter for ``hermes -z`` with the deepseek provider."""
 
     name: str = "deepseek"
-    # deepseek-v4-pro is the canonical model identifier for hermes via
-    # the deepseek provider.
-    # User may override via env (e.g. when deepseek-v4-flash is needed for
-    # a cheap planner/architect lane).
-    default_model: str = os.environ.get("AB_DEEPSEEK_MODEL", "deepseek-v4-pro")
+    # deepseek-flash is the canonical DeepSeek-V4.1-Flash API id (first-party
+    # hermes provider=deepseek). Legacy deepseek-v4-pro / deepseek-v4-flash
+    # names still resolve upstream as temporary aliases.
+    # Override via AB_DEEPSEEK_MODEL when needed.
+    default_model: str = os.environ.get("AB_DEEPSEEK_MODEL", "deepseek-flash")
     supported_modes: frozenset[str] = frozenset({"read-only", "workspace-write", "danger"})
 
     def build_invocation(

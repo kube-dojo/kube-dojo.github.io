@@ -63,15 +63,22 @@ _PRINT_TIMEOUT_MARGIN_S = 10
 
 
 # Canonical model display strings accepted by ``agy --model`` (verbatim from
-# ``agy models``). The runtime passes a slug like ``gemini-3.1-pro-high``;
-# ``_normalize_model`` collapses both that slug and the display string to the
-# same key so either form maps here.
+# ``agy models``, refreshed 2026-09-14). The runtime passes a slug like
+# ``gemini-3.8-flash-high``; ``_normalize_model`` collapses both that slug and
+# the display string to the same key so either form maps here.
+# Re-probe with ``agy models`` when Antigravity ships new ids — do not invent.
 _AGY_MODEL_NAMES: tuple[str, ...] = (
-    "Gemini 3.5 Flash (Medium)",
-    "Gemini 3.5 Flash (High)",
-    "Gemini 3.5 Flash (Low)",
-    "Gemini 3.1 Pro (Low)",
+    "Gemini 3.8 Flash (High)",
+    "Gemini 3.8 Flash (Medium)",
+    "Gemini 3.8 Flash (Low)",
+    "Gemini 3.7 Flash (High)",
+    "Gemini 3.7 Flash (Medium)",
+    "Gemini 3.7 Flash (Low)",
+    "Gemini 3.6 Flash (High)",
+    "Gemini 3.6 Flash (Medium)",
+    "Gemini 3.6 Flash (Low)",
     "Gemini 3.1 Pro (High)",
+    "Gemini 3.1 Pro (Low)",
     "Claude Sonnet 4.6 (Thinking)",
     "Claude Opus 4.6 (Thinking)",
     "GPT-OSS 120B (Medium)",
@@ -101,7 +108,7 @@ class AgyAdapter:
 
     name: str = "agy"
     default_model: str = (
-        os.environ.get("KUBEDOJO_AGY_MODEL") or "gemini-3.5-flash-high"
+        os.environ.get("KUBEDOJO_AGY_MODEL") or "gemini-3.8-flash-high"
     )
     supported_modes: frozenset[str] = frozenset(
         {"read-only", "workspace-write", "danger"}

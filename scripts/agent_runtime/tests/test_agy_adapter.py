@@ -16,7 +16,7 @@ def _build(mode: str, *, tool_config: dict | None = None) -> list[str]:
         prompt="p",
         mode=mode,
         cwd=Path("/tmp"),
-        model="gemini-3.5-flash-high",
+        model="gemini-3.8-flash-high",
         task_id=None,
         session_id=None,
         tool_config=tool_config,
@@ -47,7 +47,7 @@ def test_build_invocation_always_includes_dangerously_skip(monkeypatch) -> None:
             "--print-timeout",
             "3590s",
             "--model",
-            "Gemini 3.5 Flash (High)",
+            "Gemini 3.8 Flash (High)",
         ], (
             f"mode={mode} must produce the same cmd because agy has no "
             f"mode-specific permission flag"
@@ -133,7 +133,7 @@ def test_build_invocation_unknown_model_falls_back_to_default(monkeypatch) -> No
         tool_config=None,
     )
 
-    assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 3.5 Flash (High)"
+    assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 3.8 Flash (High)"
 
 
 def test_build_invocation_with_session_id(monkeypatch) -> None:
@@ -145,7 +145,7 @@ def test_build_invocation_with_session_id(monkeypatch) -> None:
         prompt="p",
         mode="read-only",
         cwd=Path("/tmp"),
-        model="gemini-3.5-flash-high",
+        model="gemini-3.8-flash-high",
         task_id=None,
         session_id=session_id,
         tool_config=None,

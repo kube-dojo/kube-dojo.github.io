@@ -25,7 +25,7 @@ def test_build_invocation_read_only(monkeypatch) -> None:
     assert cmd == [
         "hermes",
         "-m",
-        "deepseek-v4-pro",
+        "deepseek-flash",
         "--provider",
         "deepseek",
         "-t",
@@ -111,7 +111,7 @@ def test_provider_default_is_first_party_deepseek(monkeypatch) -> None:
     monkeypatch.delenv("KUBEDOJO_HERMES_PROVIDER", raising=False)
     plan = _build(monkeypatch)
     assert _provider_of(plan) == "deepseek"
-    assert plan.cmd[plan.cmd.index("-m") + 1] == "deepseek-v4-pro"
+    assert plan.cmd[plan.cmd.index("-m") + 1] == "deepseek-flash"
 
 
 def test_provider_openrouter_requires_explicit_prefix(monkeypatch) -> None:
@@ -239,7 +239,7 @@ def test_deepseek_hermes_argv_puts_oneshot_last(monkeypatch) -> None:
     assert cmd[-1] == "--oneshot=hello"
     assert "-z" not in cmd
     assert cmd[0] == "hermes"
-    assert cmd[cmd.index("-m") + 1] == "deepseek-v4-pro"
+    assert cmd[cmd.index("-m") + 1] == "deepseek-flash"
     assert cmd[cmd.index("--provider") + 1] == "deepseek"
 
 
