@@ -19,11 +19,18 @@ lab:
 
 ## Prerequisites
 
-Before starting this module, you should be comfortable reading Linux command output, navigating `/proc`, and connecting resource symptoms back to workload behavior. The cgroup module matters especially here because Kubernetes memory limits are enforced by kernel memory controllers rather than by a friendly scheduler that can slow an application down.
+Required (Linux host skills only):
 
-- **Required**: [Module 5.1: USE Method](../module-5.1-use-method/)
-- **Required**: [Module 2.2: cgroups](/linux/foundations/container-primitives/module-2.2-cgroups/)
-- **Helpful**: [Module 1.3: Filesystem Hierarchy](/linux/foundations/system-essentials/module-1.3-filesystem-hierarchy/)
+- Comfortable reading Linux command output, navigating `/proc`, and connecting resource symptoms back to workload behavior. The cgroup module matters especially here because container memory limits are enforced by kernel memory controllers rather than by a friendly scheduler that can slow an application down.
+- [Module 5.1: USE Method](../module-5.1-use-method/)
+- [Module 2.2: cgroups](/linux/foundations/container-primitives/module-2.2-cgroups/)
+- Helpful host reading: [Module 1.3: Filesystem Hierarchy](/linux/foundations/system-essentials/module-1.3-filesystem-hierarchy/)
+
+Helpful but not required:
+
+- Kubernetes basics (pods, memory requests and limits, QoS classes, `kubectl`). The cluster path maps those controls onto cgroup memory accounting as it goes; the host-only path works without them.
+
+A running Kubernetes cluster is **not** required for most of this module. The Killercoda lab `linux-5.3-memory-management` is an Ubuntu host environment, not a Kubernetes cluster — do not look for a separate Kubernetes Killercoda scenario for this lesson. Parts 1–4 of the Hands-On Exercise run on any Linux host, and Part 5 stays optional if Docker is present. Commands that need `kubectl` (`describe node`, `top pod`, OOMKilled pod triage) offer three forks: a local [`kind`](https://kind.sigs.k8s.io/) cluster, an existing cluster, or a read-only skip.
 
 ## Learning Outcomes
 
@@ -31,8 +38,8 @@ After this module, you will be able to:
 
 - **Diagnose** Linux memory pressure using `free`, `vmstat`, `/proc/meminfo`, PSI, and cgroup v2 counters.
 - **Evaluate** page cache, swap, and available-memory signals to separate healthy caching from real exhaustion.
-- **Configure** Kubernetes 1.35+ memory requests, limits, QoS classes, and OOM expectations for container workloads.
-- **Predict** which process or pod is killed during global OOM, cgroup OOM, and kubelet eviction pressure.
+- **Configure** Kubernetes 1.35+ memory requests, limits, QoS classes, and OOM expectations for container workloads (cluster path — see the Hands-On fork; host-only learners can complete this module without applying these controls).
+- **Predict** which process is killed during global OOM and cgroup OOM from `oom_score`, `oom_score_adj`, and cgroup `memory.events`. On the cluster path, extend that prediction to pods, QoS classes, and kubelet eviction pressure.
 - **Implement** a repeatable memory troubleshooting workflow that distinguishes leaks, cache growth, and node pressure.
 
 ## Why This Module Matters
@@ -329,7 +336,9 @@ The better operational question is what you want pressure to look like. If you w
 
 Kubernetes memory management is Linux memory management with policy layered on top. The kubelet does not invent a new memory subsystem; it asks the container runtime to place containers in cgroups, sets resource controls, watches node conditions, and reports pod state. The kernel still accounts pages, enforces limits, and performs OOM victim selection.
 
-The convention in this course is to define `alias k=kubectl` before Kubernetes command examples, then use `k describe node`, `k top pod`, and related commands in day-to-day work. That keeps examples compact while still making clear that every Kubernetes observation eventually maps back to kernel memory accounting.
+> **Cluster fork:** YAML, QoS, and cgroup mapping in this section can be read without a cluster. Commands that need `kubectl` (`describe node`, `top pod`, and `describe pod` for `OOMKilled`) require a running cluster — a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing one. The Killercoda lab for this module is Ubuntu and does not provide `kubectl`. Without a cluster, skip those commands or treat their output as illustrative.
+
+This section uses full `kubectl` in command blocks so a host-only learner is not told to alias a binary they do not have. On the cluster path you may still define `alias k=kubectl` in your own shell. Every Kubernetes observation still maps back to kernel memory accounting.
 
 ```yaml
 resources:
@@ -420,7 +429,7 @@ Pattern: /sys/fs/cgroup/kubepods.slice/kubepods-pod<UID>.slice/memory.events
 # oom_kill 1
 ```
 
-When a pod is repeatedly `OOMKilled`, compare the application heap setting, the pod limit, and `memory.current` rather than relying only on `k top pod`. Some metrics pipelines report a useful working-set approximation, but the kernel enforces the cgroup limit based on its own accounting. During a difficult incident, direct cgroup counters settle arguments faster than dashboard labels.
+When a pod is repeatedly `OOMKilled`, compare the application heap setting, the pod limit, and `memory.current` rather than relying only on `kubectl top pod`. Some metrics pipelines report a useful working-set approximation, but the kernel enforces the cgroup limit based on its own accounting. During a difficult incident, direct cgroup counters settle arguments faster than dashboard labels.
 
 The safest sizing pattern is to leave room between the application runtime's internal memory cap and the container limit. A JVM heap equal to the pod limit is a classic failure because metaspace, thread stacks, direct buffers, native libraries, page cache, and the runtime itself all need memory too. The same principle applies to Go, Node.js, Python, and native services, even though the knobs differ.
 
@@ -440,12 +449,12 @@ cat /proc/pressure/memory
 # full = all tasks waiting for memory
 # Higher values = more pressure
 
-# Node conditions in Kubernetes
+# Node conditions in Kubernetes (cluster fork — skip without kubectl)
 kubectl describe node | grep -A 5 Conditions
-# MemoryPressure   False   # Becomes True under pressure
+# MemoryPressure   False   # Becomes True under pressure; illustrative
 ```
 
-Pressure Stall Information is valuable because it measures waiting, not allocation size. `some` means at least one task was stalled on memory, while `full` means all non-idle tasks were stalled during the measured window. If `full` rises during a user-facing incident, you have evidence that memory reclaim is stopping forward progress across the workload, not merely filling a chart.
+Pressure Stall Information is valuable because it measures waiting, not allocation size. `some` means at least one task was stalled on memory, while `full` means all non-idle tasks were stalled during the measured window. If `full` rises during a user-facing incident, you have evidence that memory reclaim is stopping forward progress across the workload, not merely filling a chart. The `kubectl describe node` line above is the cluster fork; host-only learners can stay with PSI and `/proc/meminfo`.
 
 Kubernetes reports node `MemoryPressure` when the kubelet believes allocatable memory has crossed eviction thresholds. That signal is related to kernel pressure but not identical to a cgroup OOM. A pod can be killed by its own limit without node `MemoryPressure`, and a node can evict pods under pressure before the kernel reaches a global OOM.
 
@@ -454,7 +463,7 @@ Kubernetes reports node `MemoryPressure` when the kubelet believes allocatable m
 # memory.available < 100Mi → Eviction starts
 # nodefs.available < 10% → Eviction starts
 
-# Check kubelet config
+# Check kubelet config (Kubernetes node only; skip on a plain Ubuntu host)
 cat /var/lib/kubelet/config.yaml | grep -A 10 evictionHard
 
 # BestEffort pods evicted first
@@ -509,18 +518,19 @@ cat /proc/1234/smaps | grep -E "^[a-f0-9]|Rss:"
 
 `smaps` is expensive on large processes, so use it deliberately rather than scraping it every second. It can still be the right tool when you need to distinguish heap, stacks, mapped files, anonymous mappings, and shared pages. For routine monitoring, prefer lower-cost process metrics, cgroup counters, and application runtime telemetry.
 
-Container diagnosis adds one more layer because the pod status, kubelet events, runtime metrics, and kernel cgroup files may each tell part of the story. `k top pod` is useful for a quick scan, but an `OOMKilled` event should push you toward limits, cgroup `memory.events`, and the application memory configuration. If the pod restarts too quickly, inspect the previous container logs before they disappear from your normal view.
+Container diagnosis adds one more layer because the pod status, kubelet events, runtime metrics, and kernel cgroup files may each tell part of the story. On the cluster fork, `kubectl top pod` is useful for a quick scan, but an `OOMKilled` event should push you toward limits, cgroup `memory.events`, and the application memory configuration. If the pod restarts too quickly, inspect the previous container logs before they disappear from your normal view.
 
 ```bash
-# Find container memory usage
+# Find container memory usage (Docker optional, same host)
 docker stats --no-stream
 
-# Kubernetes equivalent
+# Kubernetes equivalent (cluster fork — skip without kubectl)
 kubectl top pod
 
-# Check if container was OOM killed
-kubectl describe pod <pod> | grep -A 10 "Last State"
+# Check if a container was OOM killed (cluster fork). Substitute real names; do not paste angle brackets into the shell.
+# kubectl describe pod -n default my-pod | grep -A 10 "Last State"
 # Reason:   OOMKilled
+# Illustrative: a live cluster will differ; skip this block without kubectl.
 
 # Increase memory limit or fix the application
 ```
@@ -592,7 +602,7 @@ This is most likely a false positive caused by alerting on raw `free` memory. Li
 
 <details><summary>Question 2: A Java pod with a 512Mi limit restarts during startup, while the node has several GiB available. How do you diagnose the kill?</summary>
 
-This points to a cgroup OOM rather than global node exhaustion. Check the pod's last state with `k describe pod`, then inspect runtime heap settings and cgroup v2 counters such as `memory.current`, `memory.stat`, and `memory.events` if the node is accessible. The Java heap may be too close to the pod limit, or file cache and native overhead may be charged inside the cgroup. Adding node RAM will not fix a limit that the container itself crosses.
+This points to a cgroup OOM rather than global node exhaustion. Check the pod's last state with `kubectl describe pod` on the cluster path, then inspect runtime heap settings and cgroup v2 counters such as `memory.current`, `memory.stat`, and `memory.events` if the node is accessible. The Java heap may be too close to the pod limit, or file cache and native overhead may be charged inside the cgroup. Adding node RAM will not fix a limit that the container itself crosses.
 
 </details>
 
@@ -608,7 +618,7 @@ The system is likely thrashing because active pages are moving between RAM and s
 
 </details>
 
-<details><summary>Question 5: A pod reads large files and `k top pod` stays below the memory limit, yet the pod is OOMKilled. What metric can explain the gap?</summary>
+<details><summary>Question 5: A pod reads large files and `kubectl top pod` stays below the memory limit, yet the pod is OOMKilled. What metric can explain the gap?</summary>
 
 The missing evidence is cgroup memory accounting, especially `memory.current` and `memory.stat`. Some dashboards emphasize RSS or working set, while the kernel enforces the cgroup limit using the memory charged to that cgroup. File cache can count against the container limit, so heavy file I/O can push the total over the boundary even when application heap looks safe. Compare `anon` and `file` in `memory.stat` before changing only heap settings.
 
@@ -632,9 +642,15 @@ No, a leak requires retained memory that should have been released, not just gro
 
 **Objective**: Explore Linux memory management, caching, OOM scoring, pressure signals, and container memory boundaries using safe observations first and optional container experiments last.
 
-**Environment**: Use a Linux system with root access for cache and sysctl experiments, plus Docker if you want to complete the optional container section. In Kubernetes labs, define `alias k=kubectl` before using short `k` commands.
+Parts 1–4 need only a Linux host. The Killercoda lab `linux-5.3-memory-management` is Ubuntu, not a Kubernetes cluster. Part 5 is optional and needs Docker on that same host. `kubectl describe node`, `kubectl top pod`, and OOMKilled pod triage need a running cluster, so pick one fork before those commands:
 
-#### Part 1: Memory Metrics
+- **Stay on the host path.** Complete Parts 1–4 on Killercoda or any Linux host, and Part 5 only if Docker is available. Skip `kubectl` commands; host Success Criteria are fully achievable without a cluster.
+- **Or spin up a local cluster**, for example with [`kind`](https://kind.sigs.k8s.io/) on your own machine, then also run Part 6.
+- **Or skip the cluster commands.** Read the Kubernetes Memory section and Part 6 as a worked example. This module does not have a Kubernetes Killercoda scenario id.
+
+**Environment**: Use a Linux system with root access for cache and sysctl experiments. Docker is optional for Part 5. A Kubernetes cluster is optional and is not provided by this module's Killercoda lab; take Part 6 only if you already have `kubectl` access to `kind` or another cluster.
+
+#### Part 1: Memory Metrics (host-only)
 
 Begin by building a host-level baseline. The goal is to diagnose memory pressure using `free`, `vmstat`, and `/proc/meminfo` before touching anything, because a clean baseline protects you from mistaking healthy page cache for a leak.
 
@@ -660,7 +676,7 @@ Record `MemAvailable`, `Cached`, `AnonPages`, and the `si` and `so` columns from
 
 </details>
 
-#### Part 2: Page Cache Behavior
+#### Part 2: Page Cache Behavior (host-only)
 
 This experiment demonstrates why free memory changes after file reads. Run it only on a lab machine because dropping caches intentionally removes useful data and can make real workloads slower.
 
@@ -692,7 +708,7 @@ After the file operation, `Cached` should grow because Linux keeps file data in 
 
 </details>
 
-#### Part 3: OOM Score
+#### Part 3: OOM Score (host-only)
 
 Inspect OOM scoring to connect process policy with victim selection. Do not change production scores during this lab; reading the files is enough to understand how Kubernetes QoS later maps to kernel behavior.
 
@@ -721,7 +737,7 @@ Processes with higher scores are easier OOM victims, but score is policy plus us
 
 </details>
 
-#### Part 4: Memory Pressure
+#### Part 4: Memory Pressure (host-only)
 
 Now look for waiting rather than only allocation. PSI and `vmstat` help you determine whether memory pressure is delaying work, which is the difference between a busy memory system and an unhealthy one.
 
@@ -746,7 +762,7 @@ Low PSI and quiet swap columns usually mean memory is not delaying work, even if
 
 </details>
 
-#### Part 5: Container Memory (if Docker available)
+#### Part 5: Container Memory (optional — Docker)
 
 Finish by observing cgroup limits directly. This step helps you implement a repeatable container memory workflow by comparing runtime metrics with the files the kernel uses for enforcement.
 
@@ -773,13 +789,38 @@ docker rm -f mem-test
 
 </details>
 
+#### Part 6: Kubernetes node and pod memory (cluster fork)
+
+> **Cluster fork:** This part needs `kubectl` access to a running cluster (a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster). The Killercoda lab `linux-5.3-memory-management` is Ubuntu and does not include a cluster. Without one, skip this part or read it as a worked example — see the forks above. Node names, conditions, and `OOMKilled` details below are illustrative; a live cluster will differ.
+
+```bash
+# Node MemoryPressure vs host PSI (cluster fork only)
+kubectl describe node | grep -A 8 Conditions
+
+# Working-set scan. If metrics-server is absent, the command fails; that is evidence, not a lab bug.
+kubectl top pod -A
+
+# List pods, then describe one you already know restarted. Substitute real names; do not paste angle brackets.
+kubectl get pods -A
+# Example: kubectl describe pod -n default my-pod | grep -A 10 "Last State"
+```
+
+Compare `MemoryPressure` with host `MemAvailable` and PSI, then treat `OOMKilled` as a cgroup-limit event until `memory.current` and `memory.events` say otherwise. If no pod has been OOM-killed, record that absence and still map one running pod's request and limit to the QoS class you would expect.
+
+<details><summary>Solution guidance for Part 6</summary>
+
+`kubectl describe node` reports kubelet conditions, which are related to kernel pressure but not identical to PSI. `kubectl top pod` is a working-set scan, not the kernel's cgroup charge. An `OOMKilled` last state is a termination reason; confirm it against the pod limit and cgroup `memory.events` before raising the limit.
+
+</details>
+
 ### Success Criteria
 
 - [ ] Diagnose memory pressure by comparing `free`, `MemAvailable`, `/proc/meminfo`, `vmstat`, and PSI rather than relying on one number.
 - [ ] Evaluate page cache behavior by observing `Cached` growth and explaining why low free memory can be healthy.
-- [ ] Predict OOM victim risk by reading `oom_score`, `oom_score_adj`, and Kubernetes QoS policy.
-- [ ] Configure a Kubernetes memory plan that leaves overhead between runtime heap, request, limit, and node allocatable memory.
+- [ ] Predict OOM victim risk by reading `oom_score` and `oom_score_adj` on the host. On the cluster path, also map those scores to Kubernetes QoS policy.
+- [ ] Configure a Kubernetes memory plan that leaves overhead between runtime heap, request, limit, and node allocatable memory (cluster fork — Part 6; optional for host-only learners).
 - [ ] Implement a troubleshooting workflow that separates leaks, cache growth, cgroup limit kills, and node pressure.
+- [ ] Compare node `MemoryPressure` with host PSI and inspect an `OOMKilled` pod's last state, or explain why you skipped that work (cluster fork — Part 6; optional for host-only learners).
 
 ## Next Module
 
