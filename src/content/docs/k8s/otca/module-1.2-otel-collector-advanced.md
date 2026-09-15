@@ -475,7 +475,7 @@ metadata:
   namespace: observability
 spec:
   mode: daemonset                    # daemonset | deployment | statefulset | sidecar
-  image: otel/opentelemetry-collector-contrib:0.98.0
+  image: otel/opentelemetry-collector-contrib:0.160.0
   config:
     receivers:
       otlp:
@@ -565,19 +565,19 @@ dist:
   name: my-collector
   description: "Production collector"
   output_path: ./dist
-  otelcol_version: "0.98.0"
+  otelcol_version: "0.160.0"
 
 receivers:
-  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.98.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.98.0
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.160.0
 
 processors:
-  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.98.0
-  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.98.0
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.160.0
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.160.0
 
 exporters:
-  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.98.0
-  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.98.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.160.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.160.0
 ```
 
 ```bash
@@ -1016,7 +1016,7 @@ spec:
     spec:
       containers:
         - name: collector
-          image: otel/opentelemetry-collector-contrib:0.98.0
+          image: otel/opentelemetry-collector-contrib:0.160.0
           args: ["--config=/etc/otel/config.yaml"]
           ports:
             - containerPort: 4317
