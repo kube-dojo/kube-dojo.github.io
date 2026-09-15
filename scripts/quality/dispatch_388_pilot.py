@@ -505,6 +505,21 @@ def merge_pr(pr_num: int) -> str | None:
     return None
 
 
+def recheck_module_source_acceptance(worktree: Path, module_path: str) -> dict[str, object]:
+    """Fail-closed PR-head recheck. Does not unlock merge or backfill."""
+    rel = module_path.replace("\\", "/")
+    prefix = "src/content/docs/"
+    idx = rel.find(prefix)
+    if idx >= 0:
+        rel = rel[idx + len(prefix) :]
+    try:
+        head_bytes = (Path(worktree) / module_path).read_bytes()
+    except OSError:
+        head_bytes = None
+    from quality.source_acceptance import recheck_held_publication
+    return recheck_held_publication(Path(worktree), rel, pr_head_page_bytes=head_bytes)
+
+
 def build_reviewer_cascade(primary_reviewer: str) -> list[tuple[str, Callable]]:
     if primary_reviewer == "claude":
         return [
@@ -672,12 +687,14 @@ def main(argv: list[str] | None = None) -> int:
         if review_text:
             post_review_comment(pr_num, review_text)
         if verdict == "APPROVE":
+            sa = recheck_module_source_acceptance(Path(wt), module_path)
             log({
                 "event": "source_acceptance_unverified",
                 "pr": pr_num,
                 "module": module_path,
                 "verdict": verdict,
                 "action": "merge_held",
+                "source_acceptance": sa,
             })
             print(
                 f"[source_acceptance_unverified] holding PR #{pr_num} for {module_path}; "

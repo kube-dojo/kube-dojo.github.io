@@ -1,9 +1,10 @@
-"""Revision-bound source-acceptance receipt (#2310 packet 1).
+"""Revision-bound source-acceptance receipt (#2310).
 
 Only a complete applicable positive receipt can accept. Frontmatter,
 injection, and inventory pass strings are not inputs. Fixture-valid
 receipts prove validator behavior, not real source support. Read-only:
-no status store, no promotion/backfill.
+no status store, no promotion/backfill. Held publication must recheck
+against exact PR-head page bytes; a stale digest cannot accept.
 """
 
 from __future__ import annotations
@@ -76,6 +77,33 @@ def bind_page(repo_root: Path, page_rel: str, page_bytes: bytes) -> dict[str, An
         page_bytes=page_bytes,
         seed_bytes=load_seed_bytes(seeds if seeds.is_dir() else None, page_rel),
     )
+
+
+def recheck_pr_head(
+    receipt: Any,
+    *,
+    pr_head_page_bytes: bytes | None,
+    seed_bytes: bytes | None,
+) -> dict[str, Any]:
+    """Re-bind a receipt against live PR-head page and seed bytes.
+
+    Missing head bytes fail closed. A receipt previously bound to older
+    page or seed bytes cannot accept after those bytes change.
+    """
+    if not isinstance(pr_head_page_bytes, bytes) or not pr_head_page_bytes:
+        return _reject("pr_head_bytes_missing")
+    return bind_source_acceptance(
+        receipt, page_bytes=pr_head_page_bytes, seed_bytes=seed_bytes,
+    )
+
+
+def recheck_held_publication(
+    repo_root: Path, page_rel: str, *, pr_head_page_bytes: bytes | None,
+) -> dict[str, Any]:
+    """Held-publication seam: ledger receipt versus exact PR-head bytes."""
+    if not isinstance(pr_head_page_bytes, bytes) or not pr_head_page_bytes:
+        return _reject("pr_head_bytes_missing")
+    return bind_page(repo_root, page_rel, pr_head_page_bytes)
 
 
 def _reject(reason: str) -> dict[str, Any]:
