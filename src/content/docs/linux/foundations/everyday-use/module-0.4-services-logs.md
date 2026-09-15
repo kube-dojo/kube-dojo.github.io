@@ -17,17 +17,22 @@ lab:
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
-> **Prerequisites**: [Module 0.3: Process & Resource Survival Guide](../module-0.3-processes-resources/), a Linux VM or lab host with `sudo`, and comfort reading command output under time pressure
+> **Prerequisites**:
+>
+> - **Required**: [Module 0.3: Process & Resource Survival Guide](../module-0.3-processes-resources/), a Linux VM or lab host with `sudo`, systemd, and `journalctl`, plus comfort reading command output under time pressure.
+> - **Optional (Kubernetes cluster path)**: Basic Kubernetes familiarity (pods, nodes, `kubectl`) helps with the **Containers, Kubelet, and Node Logs** section and one optional hands-on task. That content is gated behind an explicit fork below.
+>
+> A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-0.4-services-logs` is an Ubuntu host scenario with no cluster provided, and the full systemd/journal exercise — including every host success criterion — completes on any Linux host without `kubectl`.
 
 ## What You'll Be Able to Do
 
 After completing this module, you will be able to operate Linux services as supervised workloads with auditable log trails rather than as background commands that merely happen to be running.
 
-1. **Analyze** a service's current state by connecting `systemctl status`, unit metadata, dependency relationships, cgroups, and recent journal entries.
-2. **Diagnose** service startup, crash, reload, boot-order, and logging failures with a repeatable flow that works on Ubuntu 24.04, RHEL 9, and Debian 12.
-3. **Configure** operator-safe unit behavior with `ExecStartPre`, `ExecStart`, `ExecStartPost`, service `Type=`, `Restart=`, `WantedBy=`, and drop-in overrides.
-4. **Apply** structured journal queries that filter by unit, time range, boot, priority, output format, and journal fields before escalating to syslog or external log agents.
-5. **Compare** node-level service logs, forwarded host logs, and Kubernetes container logs so you choose `journalctl`, a syslog destination, or `kubectl logs` for the evidence you need.
+1. **Analyze** a service's current state by connecting `systemctl status`, unit metadata, dependency relationships, cgroups, and recent journal entries. *(Host-only)*
+2. **Diagnose** service startup, crash, reload, boot-order, and logging failures with a repeatable flow that works on Ubuntu 24.04, RHEL 9, and Debian 12. *(Host-only)*
+3. **Configure** operator-safe unit behavior with `ExecStartPre`, `ExecStart`, `ExecStartPost`, service `Type=`, `Restart=`, `WantedBy=`, and drop-in overrides. *(Host-only)*
+4. **Apply** structured journal queries that filter by unit, time range, boot, priority, output format, and journal fields before escalating to syslog or external log agents. *(Host-only)*
+5. **Compare** node-level service logs, forwarded host logs, and Kubernetes container logs so you choose `journalctl`, a syslog destination, or `kubectl logs` for the evidence you need. *(Cluster path: needs `kubectl` access to a running cluster, or read the Containers, Kubelet, and Node Logs section as a worked example — see the fork there.)*
 
 ## Why Services and Logs Matter Together
 
@@ -235,7 +240,7 @@ A similar race appears with network readiness. `network.target` often means the 
 
 ### Worked Outage: Crash Loop With Evidence Loss Risk
 
-A crash loop is noisy, but the first move is still evidence preservation. `systemctl status api.service` may show repeated restarts and a recent exit code. `systemctl show -p NRestarts -p ExecMainStatus -p ExecMainCode api.service` gives machine-readable counters. `journalctl -u api.service --since=-15m -o short-iso` gives the sequence. If the unit uses `Restart=always`, new attempts can quickly push useful messages out of a small volatile journal. Export the relevant window before changing restart policy. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+**Hypothetical scenario:** A crash loop is noisy, but the first move is still evidence preservation. `systemctl status api.service` may show repeated restarts and a recent exit code. `systemctl show -p NRestarts -p ExecMainStatus -p ExecMainCode api.service` gives machine-readable counters. `journalctl -u api.service --since=-15m -o short-iso` gives the sequence. If the unit uses `Restart=always`, new attempts can quickly push useful messages out of a small volatile journal. Export the relevant window before changing restart policy. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
 
 The resolution path depends on the first failure, not the last line. If the first error is "address already in use," inspect sockets and competing units. If it is "permission denied," inspect the service user and file labels. If it is "configuration parse failed," validate the config offline. Once you have a likely fix, stop the loop, apply the fix, run `systemctl daemon-reload` if the unit changed, and start the unit once. Finish by checking the journal from the fix time forward. This avoids mistaking a temporary quiet period for recovery. ([systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html))
 
@@ -300,6 +305,12 @@ Modern log agents often sit at the journald boundary. Fluent Bit has a `systemd`
 When forwarding, preserve the unit boundary. A central store that keeps `unit=nginx.service`, `_HOSTNAME`, boot ID, priority, and timestamp can answer operator questions quickly. A central store that only keeps formatted message text may force responders back onto the host during the incident, which fails if the host is gone, rebooted, or under disk pressure. ([Journal Fields](https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html), [Vector journald source](https://vector.dev/docs/reference/configuration/sources/journald/), [Grafana Alloy Linux monitoring](https://grafana.com/docs/grafana-cloud/send-data/alloy/monitor/monitor-linux/))
 
 ## Containers, Kubelet, and Node Logs
+
+> **Host-only vs cluster fork:** This section uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-0.4-services-logs` is an Ubuntu host scenario without a cluster. Complete the systemd/journal exercise there and read this section as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; pod names, timestamps, and journal contents below are illustrative, and a live cluster will differ.
 
 Container logging changes the first command, not the evidence discipline. Kubernetes documentation describes containerized applications writing logs to stdout and stderr, the node logging agent or runtime making those logs available, and `kubectl logs` retrieving the current or previous container log stream. That means application container output belongs first to `kubectl logs`, while node services such as `kubelet`, `containerd`, CRI-O, CNI helpers, and host log agents often belong first to `journalctl -u <unit>`. ([Kubernetes Logging Architecture](https://v1-35.docs.kubernetes.io/docs/concepts/cluster-administration/logging/), [kubectl logs](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/))
 
@@ -448,12 +459,14 @@ It suggests the node agent may be healthy enough and the problem may be inside t
 
 ## Hands-On Practice
 
-- [ ] On Ubuntu 24.04, RHEL 9, or Debian 12, choose a harmless installed unit such as `ssh.service`, `cron.service`, or `nginx.service`, then capture `systemctl status`, `systemctl cat`, and `systemctl show -p Type -p Restart -p ExecStart`. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html))
-- [ ] Run `systemctl list-dependencies <unit>` and `systemctl list-dependencies --reverse <unit>`, then write one paragraph explaining which target or service pulls the unit into the boot graph.
-- [ ] Query `journalctl -u <unit> --since=-1h --until=now -o json` and identify the fields that would survive cleanly into a central log store.
-- [ ] Create a transient debug unit with `systemd-run --collect`, inspect its journal, and explain why it is easier to audit than a background shell job.
-- [ ] Check `journalctl --list-boots` and `journalctl --disk-usage`, then decide whether the host's journal policy is acceptable for post-reboot incident review.
-- [ ] If you have a Kubernetes node, compare `kubectl logs` for a workload with `journalctl -u kubelet` for the node agent and note which question each command answered.
+All tasks except the last one are host-only: a learner on the Killercoda `linux-0.4-services-logs` ubuntu lab or any local Linux host with `sudo` can complete them without a Kubernetes cluster. The last task follows the cluster fork from the Containers, Kubelet, and Node Logs section.
+
+- [ ] On Ubuntu 24.04, RHEL 9, or Debian 12, choose a harmless installed unit such as `ssh.service`, `cron.service`, or `nginx.service`, then capture `systemctl status`, `systemctl cat`, and `systemctl show -p Type -p Restart -p ExecStart`. *(Host-only)* ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html))
+- [ ] Run `systemctl list-dependencies <unit>` and `systemctl list-dependencies --reverse <unit>`, then write one paragraph explaining which target or service pulls the unit into the boot graph. *(Host-only)*
+- [ ] Query `journalctl -u <unit> --since=-1h --until=now -o json` and identify the fields that would survive cleanly into a central log store. *(Host-only)*
+- [ ] Create a transient debug unit with `systemd-run --collect`, inspect its journal, and explain why it is easier to audit than a background shell job. *(Host-only)*
+- [ ] Check `journalctl --list-boots` and `journalctl --disk-usage`, then decide whether the host's journal policy is acceptable for post-reboot incident review. *(Host-only)*
+- [ ] *(Cluster path — optional)* Compare `kubectl logs` for a workload with `journalctl -u kubelet` for the node agent and note which question each command answered. Needs `kubectl` on a running cluster; on the host-only path, read the Containers, Kubelet, and Node Logs section as a worked example instead.
 
 Use this safe sequence on a disposable lab host with nginx installed. It reads state, exercises reload-or-restart, creates a transient unit, and inspects the resulting logs without changing boot enablement.
 
