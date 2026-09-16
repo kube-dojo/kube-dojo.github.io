@@ -22,17 +22,26 @@ lab:
 ## Prerequisites
 
 Before starting this module, make sure you can already explain where Linux mounts filesystems, how the kernel exposes block devices, and how basic performance tools report I/O pressure.
+
+Required (Linux host skills only):
+
 - **Required**: [Module 1.3: Filesystem Hierarchy](/linux/foundations/system-essentials/module-1.3-filesystem-hierarchy/) for understanding mount points and inodes
 - **Required**: [Module 1.1: Kernel Architecture](/linux/foundations/system-essentials/module-1.1-kernel-architecture/) for understanding kernel/userspace boundary
 - **Helpful**: [Module 5.4: I/O Performance](/linux/operations/performance/module-5.4-io-performance/) for storage monitoring context
 
+Optional (Kubernetes cluster path):
+
+- Basic Kubernetes familiarity (nodes, pods, PersistentVolumes, `kubectl`) helps with the **Kubernetes 1.35+ Node Storage Strategy** section and one optional hands-on task. That content is gated behind an explicit fork below.
+
+A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-8.1-storage-management` is an Ubuntu host scenario with no cluster provided, and the full host storage lab — including every success criterion in the hands-on exercise — completes on any Linux host without `kubectl`.
+
 ## Learning Outcomes
 
 After this module, you will be able to perform the following operational tasks and explain the safety checks that make each task suitable for production systems:
-- **Configure** disk partitions, filesystems, and mount points using `fdisk`, `mkfs`, UUIDs, and `/etc/fstab`
-- **Manage** LVM physical volumes, volume groups, logical volumes, and online expansion for flexible storage allocation
-- **Diagnose** block space, inode, I/O, RAID, NFS, and mount failures using `df`, `du`, `lsblk`, `findmnt`, `mdadm`, and LVM inspection tools
-- **Design** a Kubernetes 1.35+ node storage strategy that separates ephemeral node data from persistent application data
+- **Configure** disk partitions, filesystems, and mount points using `fdisk`, `mkfs`, UUIDs, and `/etc/fstab`. *(Host-only)*
+- **Manage** LVM physical volumes, volume groups, logical volumes, and online expansion for flexible storage allocation. *(Host-only)*
+- **Diagnose** block space, inode, I/O, RAID, NFS, and mount failures using `df`, `du`, `lsblk`, `findmnt`, `mdadm`, and LVM inspection tools. *(Host-only)*
+- **Design** a Kubernetes 1.35+ node storage strategy that separates ephemeral node data from persistent application data. *(Cluster path: needs `kubectl` access to a running cluster, or read the Kubernetes 1.35+ Node Storage Strategy section as a worked example — see the fork there.)*
 
 ## Why This Module Matters
 
@@ -434,7 +443,7 @@ echo "/swapfile  none  swap  sw  0  0" | sudo tee -a /etc/fstab
 free -h
 ```
 
-Kubernetes changes the swap decision. In Kubernetes 1.35+ clusters, node memory behavior should be designed around kubelet configuration, pod requests, pod limits, eviction thresholds, and workload right-sizing rather than hidden paging. This module uses the `k` shortcut for cluster inspection after introducing it with `alias k=kubectl`; when you are correlating node pressure with Linux storage, commands such as `k describe node <node-name>` and `k get pods -A -o wide` help connect kernel symptoms to scheduled workloads.
+Kubernetes changes the swap decision. In Kubernetes 1.35+ clusters, node memory behavior should be designed around kubelet configuration, pod requests, pod limits, eviction thresholds, and workload right-sizing rather than hidden paging. Live inspection with `alias k=kubectl` and `k describe node` is optional and gated in the Kubernetes 1.35+ Node Storage Strategy section; the Ubuntu host storage lab does not need `kubectl`.
 
 ```bash
 # Show all swap spaces
@@ -714,6 +723,12 @@ A good post-incident note includes the exact symptom, the constrained layer, the
 
 ## Kubernetes 1.35+ Node Storage Strategy
 
+> **Host-only vs cluster fork:** This section uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-8.1-storage-management` is an Ubuntu host scenario without a cluster. Complete the LVM storage exercise there and read this section as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; node names, StorageClass names, and values below are illustrative, and a live cluster will differ.
+
 Kubernetes makes Linux storage more abstract, but it does not make Linux storage disappear. The kubelet, container runtime, image store, pod logs, writable layers, `emptyDir` volumes, and CSI-mounted persistent volumes all land on real filesystems with real capacity and inode limits. When a node reports disk pressure, the control plane sees a scheduling and eviction signal, but the operator still needs Linux tools to identify which path and workload caused the pressure.
 
 For Kubernetes 1.35+ operations, start with a clean division between node-local ephemeral data and application persistent data. Ephemeral data includes image layers, container writable layers, pod logs, and `emptyDir`; it can be recreated, but if it fills the node it can evict unrelated pods. Persistent application data should normally be provided through PersistentVolumes and PersistentVolumeClaims backed by a CSI driver, because the storage lifecycle should follow the workload contract rather than a particular node directory.
@@ -943,11 +958,14 @@ lsblk | grep loop
 
 ### Tasks
 
-- [ ] Create the initial LVM stack on `$LOOP1`, format it with ext4, mount it at `/mnt/exercise`, and verify the mount with `df -h` and `findmnt`.
-- [ ] Write test data to the mounted filesystem, record a checksum, extend the volume group with `$LOOP2`, grow the logical volume with `lvextend -r`, and verify the checksum still matches.
-- [ ] Configure a UUID-based `/etc/fstab` entry for `/mnt/exercise`, unmount the filesystem, run `sudo mount -a`, and confirm the persistent mount works.
-- [ ] Diagnose the stack with `pvs`, `vgs`, `lvs`, `lsblk -f`, and `df -i`, then explain which command answers each storage-layer question.
-- [ ] Clean up the mount, LVM objects, loop devices, temporary disk images, and the fstab line you added.
+All tasks except the last one are host-only: a learner on the Killercoda `linux-8.1-storage-management` ubuntu lab or any local Linux host with `sudo` can complete them without a Kubernetes cluster. The last task follows the cluster fork from the Kubernetes 1.35+ Node Storage Strategy section.
+
+- [ ] Create the initial LVM stack on `$LOOP1`, format it with ext4, mount it at `/mnt/exercise`, and verify the mount with `df -h` and `findmnt`. *(Host-only)*
+- [ ] Write test data to the mounted filesystem, record a checksum, extend the volume group with `$LOOP2`, grow the logical volume with `lvextend -r`, and verify the checksum still matches. *(Host-only)*
+- [ ] Configure a UUID-based `/etc/fstab` entry for `/mnt/exercise`, unmount the filesystem, run `sudo mount -a`, and confirm the persistent mount works. *(Host-only)*
+- [ ] Diagnose the stack with `pvs`, `vgs`, `lvs`, `lsblk -f`, and `df -i`, then explain which command answers each storage-layer question. *(Host-only)*
+- [ ] Clean up the mount, LVM objects, loop devices, temporary disk images, and the fstab line you added. *(Host-only)*
+- [ ] *(Cluster path — optional)* Inspect node storage with `alias k=kubectl`, `k get storageclass`, `k get pv,pvc -A`, and `kubectl describe node`. Needs `kubectl` on a running cluster; on the host-only path, read the Kubernetes 1.35+ Node Storage Strategy section as a worked example instead.
 
 ### Task 1: Create an LVM stack
 
