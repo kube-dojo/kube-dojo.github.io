@@ -737,7 +737,8 @@ For Kubernetes 1.35+ operations, start with a clean division between node-local 
 alias k=kubectl
 k get storageclass
 k get pv,pvc -A
-NODE_NAME=<replace-me>
+# NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+NODE_NAME=my-node  # replace with a node name from your cluster
 kubectl describe node "$NODE_NAME"
 ```
 
