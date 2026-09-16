@@ -207,6 +207,8 @@ The masquerade example is the same pattern used by many container hosts. A packe
 
 Rule management commands are deceptively powerful because they mutate live kernel state immediately. Insert, append, delete, flush, save, and restore each have a safe use case and a dangerous version. Inserting an SSH rescue rule at position one can save a session, while flushing INPUT on a remote host can remove the only rule that allowed you in. Saving to a persistent path is distribution-specific; a command that works on Debian or Ubuntu may not survive a reboot on another system unless its firewall service imports that file.
 
+> **Warning (lab only):** Run the flush demo below only on a disposable lab host or VM. `iptables -F` with no chain argument flushes every chain in the table at once, and even `iptables -F INPUT` is host-wide for inbound traffic. A flush deletes the exact rules carrying your SSH session along with any kube-proxy, Docker, or cloud firewall rules on the node, and if the chain policy is DROP you lock yourself out the moment the command lands. On any shared or production system, snapshot first with `iptables-save`, scope changes to a single chain, and agree the blast radius with another operator before mutating anything.
+
 ```bash
 # Insert at position (vs append)
 sudo iptables -I INPUT 1 -p tcp --dport 22 -j ACCEPT
@@ -217,11 +219,20 @@ sudo iptables -D INPUT -p tcp --dport 22 -j ACCEPT
 # Delete by line number
 sudo iptables -D INPUT 3
 
-# Flush all rules in chain
-sudo iptables -F INPUT
+# Chain-scoped flush demo (lab only): build a disposable chain,
+# practice the flush there, then clean up completely
+sudo iptables -N FLUSH-DEMO
+sudo iptables -A FLUSH-DEMO -p icmp -j LOG --log-prefix "flush-demo: "
+sudo iptables -A INPUT -j FLUSH-DEMO
 
-# Flush all rules
-sudo iptables -F
+# Flush ONLY the demo chain; a bare `iptables -F` would wipe every
+# chain in the table, including rules other agents installed
+sudo iptables -F FLUSH-DEMO
+
+# Cleanup/reset: unlink from INPUT, flush again, then delete the chain
+sudo iptables -D INPUT -j FLUSH-DEMO
+sudo iptables -F FLUSH-DEMO
+sudo iptables -X FLUSH-DEMO
 
 # Save rules (Debian/Ubuntu)
 sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
@@ -229,6 +240,8 @@ sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
 # Restore rules
 sudo iptables-restore < /etc/iptables/rules.v4
 ```
+
+Notice that the demo never runs a bare `iptables -F`, because that command cannot be scoped: it wipes every chain in the table in one shot, including chains installed and reconciled by kube-proxy, Docker, or your distribution firewall. Verify the cleanup before calling the exercise done. `sudo iptables -L FLUSH-DEMO` should fail with "No chain/target/match by that name", and `sudo iptables-save | grep FLUSH-DEMO` should print nothing, confirming the table is back to the state the demo found. If either check still shows the chain, repeat the unlink-flush-delete sequence until the host is clean.
 
 A good worked example is a small jump chain for ICMP logging. Instead of mixing temporary diagnostic rules into INPUT directly, create a custom chain, add the diagnostic behavior there, and link INPUT to it. When the test ends, unlink the chain, flush it, and delete it. This pattern reduces cleanup risk because you can remove the jump from the main chain without hunting individual temporary rules among production policy.
 
