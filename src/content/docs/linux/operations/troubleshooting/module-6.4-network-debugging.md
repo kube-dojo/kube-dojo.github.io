@@ -19,20 +19,24 @@ lab:
 
 ## Prerequisites
 
-Before starting this module, confirm you already understand the Linux protocol stack and basic Kubernetes networking objects.
+Before starting this module, confirm you already understand the Linux protocol stack. Kubernetes networking objects are needed only for the optional cluster path.
+
 - **Required**: [Module 3.1: TCP/IP Essentials](/linux/foundations/networking/module-3.1-tcp-ip-essentials/)
 - **Required**: [Module 6.3: Process Debugging](/linux/operations/troubleshooting/module-6.3-process-debugging/)
 - **Helpful**: [Module 5.2: CPU & Scheduling](/linux/operations/performance/module-5.2-cpu-scheduling/)
+- **Optional (Kubernetes cluster path)**: Basic familiarity with pods, Services, EndpointSlices, CoreDNS, and `kubectl`, needed only to run the live cluster examples.
+
+A running Kubernetes cluster is **not** required for this module. The linked lab `linux-6.4-network-debugging` is an Ubuntu host scenario with no cluster provided, and the host network-debugging path — `ip`, `ping`, `ss`, bounded `tcpdump`, `conntrack`/`sysctl`, and resolver-aware `dig` — completes without `kubectl`. Every section that runs `kubectl` against live cluster state opens with an explicit **Host-only vs cluster fork**; on the host-only path, read those commands as worked examples and complete the host verification checklist instead of live cluster runs.
 
 ## Learning Outcomes
 
 After completing this module, you will be able to:
 
-- **Trace** ICMP, TCP/UDP, DNS, and Kubernetes service-plane failures using a fixed layer-by-layer workflow instead of ad hoc command sprawl.
-- **Interpret** `ss`, `ip route get`, `ip neigh`, packet captures, and conntrack counters to locate the exact failure boundary between host, CNI, kube-proxy, and application sockets.
-- **Design** bounded `tcpdump` captures and offline `tshark` filters that prove whether bytes reached a listener, were dropped by policy, or never left a namespace.
-- **Compare** kube-proxy iptables versus IPVS datapaths and explain how DNAT, SNAT, and conntrack entries should align with EndpointSlices on Kubernetes 1.35+ clusters.
-- **Reproduce** MTU blackholes, conntrack table exhaustion, and CoreDNS search-path amplification in kind so postmortems reference evidence, not guesses.
+- **Trace** ICMP, TCP/UDP, DNS, and Kubernetes service-plane failures using a fixed layer-by-layer workflow instead of ad hoc command sprawl. *(Host-only through DNS; Cluster path for the service-plane step.)*
+- **Interpret** `ss`, `ip route get`, `ip neigh`, packet captures, and conntrack counters to locate the exact failure boundary between host, CNI, kube-proxy, and application sockets. *(Host-only)*
+- **Design** bounded `tcpdump` captures and offline `tshark` filters that prove whether bytes reached a listener, were dropped by policy, or never left a namespace. *(Host-only)*
+- **Compare** kube-proxy iptables versus IPVS datapaths and explain how DNAT, SNAT, and conntrack entries should align with EndpointSlices on Kubernetes 1.35+ clusters. *(Cluster path)*
+- **Reproduce** MTU blackholes, conntrack table exhaustion, and CoreDNS search-path amplification as evidence classes. *(Host-only with host `ping -M do`, `conntrack`/`sysctl`, and `dig +search`; Cluster path optional in kind.)*
 
 ## Why This Module Matters
 
@@ -49,6 +53,8 @@ Operators who debug only from application dashboards often re-learn the same les
 This module assumes you will practice the sequence until it feels boring. Boring during practice means reliable during outages. The Killercoda lab linked in the module metadata mirrors these steps; use it after the hands-on sections here if you want a guided environment with checkpoints.
 
 ## Core Section 1: Diagnose by Layer (ICMP → Transport → DNS → Service Plane)
+
+> **Host-only vs cluster fork:** The layer workflow below is host-valid through ICMP, transport (`ss`), and resolver-aware `dig`. The worked example’s `kubectl exec` commands need a running cluster and are optional. On the host-only path, run `ip route get`, `ping`, `ss`, and `dig +search` on the Linux host, then read the pod-namespace commands as a worked example.
 
 Every incident gets the same entry point. Split the symptom by protocol responsibility before mixing tools. ICMP and interface state answer “can this host emit and receive IP frames toward the next hop?” TCP and UDP socket state answer “did a listener exist and did the handshake progress?” DNS answers “did the client learn the addresses it will dial?” Only after those three planes are characterized do you inspect ClusterIP DNAT, kube-proxy mode, and conntrack translation for Kubernetes service traffic.
 
@@ -108,6 +114,8 @@ If the direct Service FQDN query succeeds but short names fail, suspect `ndots` 
 Document each command’s scope in your notes: `host`, `netns`, destination IP or name, and timestamp. During bridge calls, that single habit prevents arguing about results gathered from different namespaces.
 
 ## Core Section 2: ICMP, Routes, and Transport Sockets
+
+> **Host-only vs cluster fork:** `ip`, `ping`, `ss`, `tracepath`, and `traceroute` in this section run on any Linux host. Every `kubectl` command (pod-netns `ss`, EndpointSlices, kind host-versus-pod, UDP DNS probes) needs a running cluster and is optional. On the host-only path, complete the host socket and route checks and read the cluster commands as worked examples.
 
 ### Link and ICMP baselines
 
@@ -198,6 +206,8 @@ kubectl exec deploy/netshoot -- nc -u -w 2 10.244.2.10 53 </dev/null; echo "nc_u
 If TCP to port 443 succeeds but UDP/53 fails, suspect DNS policy or conntrack timeouts on DNS flows before replacing ingress controllers. If both TCP and UDP fail toward the same pod IP, return to routing and overlay MTU before blaming application protocols.
 
 ## Core Section 3: DNS, `ndots`, CoreDNS, and NodeLocal DNSCache
+
+> **Host-only vs cluster fork:** This section’s live commands use `kubectl` against CoreDNS and need a running cluster. On the host-only path, inspect `/etc/resolv.conf` and compare `dig +search` versus an explicit FQDN on the host; read the CoreDNS/`kubectl` blocks as worked examples. Nothing here is required for the host checklist.
 
 DNS failures masquerade as “network down” because applications report generic dial errors. Separate **reachability to the resolver** from **answer quality** (`NOERROR`, `NXDOMAIN`, timeout).
 
@@ -331,6 +341,8 @@ Init containers and sidecars share the pod network namespace. A listener on `127
 When a pod has `hostNetwork: true`, its sockets appear in the host namespace; `kubectl exec` into a non-hostNetwork debug pod will not reproduce the same `ss` output. Always match the network mode of the failing workload.
 
 ## Core Section 6: kube-proxy, NAT, and conntrack on Kubernetes 1.35+
+
+> **Host-only vs cluster fork:** The `kubectl` mode, EndpointSlice, and netcheck commands need a running cluster and are optional. On the host-only path, run the read-only `sysctl`/`conntrack`/`iptables-save`/`nft` snapshots below (they inspect this host, not kube-proxy) and read the ClusterIP matrix as a worked example.
 
 ClusterIPs are virtual destinations. kube-proxy programs Linux forwarding—iptables, nftables backends, or IPVS depending on cluster configuration. The debugging mistake is inspecting iptables chains while the cluster runs IPVS (or vice versa).
 
@@ -517,9 +529,47 @@ Refresh L2/L3 neighbor state: compare `ip neigh` and interface counters on both 
 
 ## Hands-On Exercise: Three Incident Classes in kind
 
-Use a disposable kind cluster on Ubuntu 24.04 (kind v0.24+). Export a workspace and tear down when finished. Parts A and B build **evidence bundles** that work on default single-node kind v1.35; they do not require multi-node clusters or sysctl values the kernel rejects. Never run conntrack or MTU experiments on production nodes without change control.
+The linked lab is an Ubuntu host scenario without a cluster, so the exercise has two paths that share the same evidence classes: ICMP and routing, transport sockets, conntrack pressure, and resolver search behavior.
+
+- **Host-only path (required):** Complete **Host Verification** below. Collect ICMP/route, socket, conntrack, and resolver-search evidence on this Linux host. Do not run `kubectl` or `kind`.
+- **Optional cluster path:** If you have a disposable kind cluster on Ubuntu 24.04 (kind v0.24+), continue with Parts A–C. Export a workspace and tear down when finished. Parts A and B build **evidence bundles** that work on default single-node kind v1.35; they do not require multi-node clusters or sysctl values the kernel rejects. Never run conntrack or MTU experiments on production nodes without change control.
 
 If you already run a personal kind cluster, set `KIND_CLUSTER` instead of creating `netdebug`. The commands below assume a single control-plane node named `${KIND_CLUSTER:-netdebug}-control-plane`; adjust `docker ps` filters to match your environment.
+
+### Host Verification
+
+On the host-only path, prove the four host layers without a cluster: save `ip`/`ping`, `ss`, conntrack or a documented gap, and `dig` FQDN-versus-search outputs under `/tmp/netdebug-host-$$` so another engineer can replay the same evidence.
+
+```bash
+export HOSTDIR=/tmp/netdebug-host-$$
+mkdir -p "$HOSTDIR"
+
+ip -br addr show | tee "$HOSTDIR/addr.txt"
+ip route get 8.8.8.8 | tee "$HOSTDIR/route.txt"
+ping -c 2 -W 2 127.0.0.1 | tee "$HOSTDIR/ping-lo.txt"
+ping -c 1 -M do -s 56 127.0.0.1 | tee "$HOSTDIR/ping-df.txt"
+
+ss -tuln | tee "$HOSTDIR/ss-listen.txt"
+ss -tan | head -20 | tee "$HOSTDIR/ss-tcp.txt"
+
+{ sysctl net.netfilter.nf_conntrack_max net.netfilter.nf_conntrack_count 2>/dev/null || echo "conntrack sysctls unavailable"; } | tee "$HOSTDIR/conntrack-sysctl.txt"
+{ sudo conntrack -S 2>/dev/null || echo "conntrack userspace unavailable"; } | tee "$HOSTDIR/conntrack-s.txt"
+
+tee "$HOSTDIR/resolv.conf" < /etc/resolv.conf
+dig +tries=1 +time=2 example.com | tee "$HOSTDIR/dig-fqdn.txt"
+dig +search +tries=1 +time=2 example | tee "$HOSTDIR/dig-search.txt"
+```
+
+- [ ] You recorded `ip route get` and a DF `ping` from the host namespace *(Host-only — required)*
+- [ ] You captured `ss` listen and TCP tables without `kubectl` *(Host-only — required)*
+- [ ] You recorded conntrack count-versus-max, or documented that conntrack is unavailable on this host *(Host-only — required)*
+- [ ] You compared `dig` FQDN versus `dig +search` on the host resolver *(Host-only — required)*
+
+The Part A–C checkboxes below are *(Cluster path — optional)* and are not required to finish the host-only path after Host Verification.
+
+### Optional cluster path (kind)
+
+Skip this heading and everything under it unless you have a disposable kind cluster; the host-only path is already complete after Host Verification, so live `kubectl` and `kind` commands below remain optional.
 
 ```bash
 export WORKDIR=/tmp/netdebug-lab-$$
