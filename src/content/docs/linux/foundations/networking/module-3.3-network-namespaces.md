@@ -18,6 +18,11 @@ lab:
 > **Time to Complete**: 140–170 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: [Module 2.1: Linux Namespaces](/linux/foundations/container-primitives/module-2.1-namespaces/), [Module 3.1: TCP/IP Essentials](../module-3.1-tcp-ip-essentials/), and [Module 3.2: DNS in Linux](../module-3.2-dns-linux/); comfort reading `ip addr`, `ip route`, and `ss` on a host before applying the same tools inside isolated stacks
+>
+> - **Required**: a Linux host with `sudo` — the Killercoda lab `linux-3.3-network-namespaces` is an Ubuntu host scenario with no cluster provided.
+> - **Optional (Kubernetes cluster path)**: `kubectl` access to a running cluster helps with one evidence block and one optional success criterion, both gated behind an explicit fork below.
+
+A running Kubernetes cluster is **not** required for this module. Every hands-on exercise — including all host Success Criteria — completes on the Killercoda Ubuntu host or any local Linux VM without `kubectl`.
 
 ---
 
@@ -28,7 +33,7 @@ After completing this module, you will be able to:
 - **Model** a Linux network namespace as a complete network stack with its own interfaces, routes, neighbor cache, port space, and firewall view.
 - **Build** a working veth topology that connects isolated namespaces through direct links and a Linux bridge, then verify bidirectional connectivity with kernel evidence.
 - **Trace** packets from a namespace through link state, ARP or neighbor discovery, routing, bridge forwarding, host forwarding, and optional source NAT.
-- **Diagnose** Kubernetes pod networking failures by mapping CNI plugin actions to manual `ip netns`, veth, bridge, route, and sysctl checks on a node running Kubernetes 1.35+.
+- **Diagnose** Kubernetes pod networking failures by mapping CNI plugin actions to manual `ip netns`, veth, bridge, route, and sysctl checks on a node running Kubernetes 1.35+ (cluster path — optional for host-only learners).
 - **Evaluate** cleanup and leak scenarios involving dangling veth halves, stale named namespaces, and host-versus-namespace conntrack views.
 
 ## Why This Module Matters
@@ -313,6 +318,12 @@ sequenceDiagram
 ```
 
 The sequence diagram is not a promise that every plugin uses a Linux bridge. Some plugins route directly, some use overlays, some use eBPF forwarding, and some integrate with cloud provider networking. The stable lesson is the boundary. A pod process needs a network namespace, an interface inside that namespace, an address, and a route. The host or datapath needs a corresponding endpoint and forwarding behavior. If those facts are not true, higher-level Kubernetes objects cannot make packets move.
+
+> **Host-only vs cluster fork:** The commands below inspect a live Kubernetes node and need `kubectl` plus `crictl`/`jq` on the node. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-3.3-network-namespaces` is an Ubuntu host scenario without a cluster. Complete the bridge/veth exercise there and read this block as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with node access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands as illustrative; pod names, sandbox PIDs, and namespace paths will differ on any real cluster.
 
 On a node running Kubernetes 1.35+, useful evidence commands include:
 
@@ -660,14 +671,15 @@ sudo ip netns exec kd-blue ip route get 1.1.1.1
 
 ### Success criteria
 
-- [ ] Create named network namespaces `kd-blue` and `kd-green`
-- [ ] Create a veth pair for each namespace and move the container-side end into the correct netns
-- [ ] Attach host-side veth ends to bridge `kd-br0` with gateway `10.244.50.1/24`
-- [ ] Assign `10.244.50.2/24` to `kd-blue` and `10.244.50.3/24` to `kd-green`
-- [ ] Prove bidirectional pings between namespaces through the bridge
-- [ ] Enable forwarding and add scoped MASQUERADE for `10.244.50.0/24` toward the host default interface
-- [ ] Capture ICMP inside `kd-blue` with `tcpdump` while pinging `10.244.50.3`
-- [ ] Restore sysctl and remove the NAT rule, then delete namespaces, veth, and bridge
+- [ ] Create named network namespaces `kd-blue` and `kd-green` *(Host-only)*
+- [ ] Create a veth pair for each namespace and move the container-side end into the correct netns *(Host-only)*
+- [ ] Attach host-side veth ends to bridge `kd-br0` with gateway `10.244.50.1/24` *(Host-only)*
+- [ ] Assign `10.244.50.2/24` to `kd-blue` and `10.244.50.3/24` to `kd-green` *(Host-only)*
+- [ ] Prove bidirectional pings between namespaces through the bridge *(Host-only)*
+- [ ] Enable forwarding and add scoped MASQUERADE for `10.244.50.0/24` toward the host default interface *(Host-only)*
+- [ ] Capture ICMP inside `kd-blue` with `tcpdump` while pinging `10.244.50.3` *(Host-only)*
+- [ ] Restore sysctl and remove the NAT rule, then delete namespaces, veth, and bridge *(Host-only)*
+- [ ] *(Cluster path — optional)* On a live cluster, correlate `kubectl get pod -o wide` IPs and nodes with the namespace, veth, and bridge objects from the evidence block above; host-only learners read that block as a worked example instead.
 
 ### Lab script
 
