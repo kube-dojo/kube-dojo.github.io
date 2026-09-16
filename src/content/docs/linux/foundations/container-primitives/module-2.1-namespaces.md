@@ -18,6 +18,8 @@ revision_pending: false
 > **Time to Complete**: 120–150 minutes (long-form read + hands-on exercise)
 >
 > This medium-depth lesson focuses on inspecting real namespace boundaries instead of memorizing container vocabulary.
+>
+> A running Kubernetes cluster is **not** required. The Killercoda lab `linux-2.1-namespaces` is an Ubuntu host scenario with no cluster provided. Every privileged hands-on create — `unshare`, `ip netns`, and the mount-lab tmpfs — completes on that Ubuntu lab or on a disposable Linux host where you have `sudo`. Do not run those steps on a production node or on a shared workstation you do not own. The Kubernetes YAML examples and the Docker `nsenter` worked example are optional runtime illustrations: on the host-only path, read them as worked examples instead of requiring `kubectl` or a running `web-app` container.
 
 ## Prerequisites
 
@@ -675,7 +677,7 @@ A team enables `hostNetwork: true` on an application pod because it fixes a conn
 
 ### Objective
 
-Create and inspect several namespace types, then use the observations to explain a realistic container troubleshooting workflow. This exercise is designed for a Linux lab machine where you have `sudo`. Do not run it on a production node.
+Create and inspect several namespace types, then use the observations to explain a realistic container troubleshooting workflow. Run the privileged creates on the Killercoda `linux-2.1-namespaces` Ubuntu lab or on a disposable Linux host where you have `sudo`. Do not run them on a production node, on a shared workstation you do not own, or on macOS without a Linux VM: `unshare` and `ip netns` need a Linux kernel. A Kubernetes cluster is not required for any hands-on part.
 
 ### Part 1: Build a Namespace Baseline
 
@@ -914,8 +916,37 @@ Scenario D: A minimal image has no network tools, but you need to inspect its ro
 - [ ] You inspected namespace membership through `/proc/<pid>/ns`.
 - [ ] You created PID, network, mount, UTS, and IPC namespaces in a lab.
 - [ ] You cleaned up the named network namespace after use, or confirmed the lab script's exit trap removed it.
+- [ ] You ran Cleanup/reset against only prefixed lab objects from this run and verified they are gone, or you investigated a refused cleanup without deleting unrelated resources.
 - [ ] You explained at least one interaction between two namespace types.
 - [ ] You designed a targeted debugging plan for a realistic container symptom.
+
+### Cleanup/reset
+
+Reset on the same Killercoda Ubuntu session or disposable Linux host where you created objects. The exercise uses prefixed names so teardown can stay narrow: network namespaces and directories from `/tmp/kd-netns.*`, mount-lab directories from `/tmp/kd-mnt-lab.*`, and the UTS hostname `kd-namespace-lab` only inside the unshare shell. PID, UTS, and IPC `unshare` shells should disappear when you `exit`; named network namespaces and mktemp directories can remain if a trap did not run, for example after SIGKILL. Inspect first, and do not delete anything whose name you did not print during this run.
+
+```bash
+ip netns list
+ls -d /tmp/kd-netns.* /tmp/kd-mnt-lab.* 2>/dev/null || true
+hostname
+```
+
+If `ip netns list` shows a name that matches a `kd-netns.` prefix this run printed, delete only that name. If a matching empty directory remains, remove only that directory with `rmdir`. Quote every path. `rmdir` refuses a non-empty directory, which is the intended stop: inspect the printed path instead of switching to recursive deletion.
+
+```bash
+# Replace REPLACE_ME with the exact suffix this run printed.
+ip netns delete kd-netns.REPLACE_ME
+rmdir -- /tmp/kd-netns.REPLACE_ME
+rmdir -- /tmp/kd-mnt-lab.REPLACE_ME
+```
+
+Forbidden on shared or production hosts: `ip -all netns delete`, deleting every network namespace, `rm -rf /tmp`, `umount -a`, `killall bash`, or any glob that can match objects you did not create. A missing name in `ip netns list` does not prove the namespace is gone if another process still holds it; investigate leftover `unshare` or `ip netns exec` shells and `exit` them instead of killing unrelated processes.
+
+If `hostname` still shows `kd-namespace-lab` after the UTS unshare shell exited, you changed the host UTS namespace rather than an isolated one. Restore only if you know the previous hostname; do not invent a replacement.
+
+- [ ] `ip netns list` shows no `kd-netns.` name from this run, or you investigated why the name remained.
+- [ ] No `/tmp/kd-netns.*` or `/tmp/kd-mnt-lab.*` directory from this run remains, or `rmdir` refused and you inspected that exact path.
+- [ ] Host `hostname` is not `kd-namespace-lab`.
+- [ ] You did not use broad destructive cleanup.
 
 ## Sources
 
