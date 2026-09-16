@@ -16,6 +16,11 @@ lab:
 >
 > **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 
+A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-7.2-text-processing` is an Ubuntu host scenario with no cluster provided, and host text-processing — including every host success criterion in the hands-on exercises — completes on any Linux host without `kubectl`. Live `kubectl` commands are gated behind an explicit **Host-only vs cluster fork** at each live cluster block below.
+
+- **Required**: Bash, `grep`, `sed`, `awk`, `sort`, `uniq`, `find`, `xargs`, and a Linux host or the linked lab
+- **Optional (Kubernetes cluster path)**: `kubectl` access to a running cluster, for example a local [`kind`](https://kind.sigs.k8s.io/) cluster, for the gated JSON, process-substitution, and report examples
+
 Before this module, the learner should be comfortable with Bash syntax, process basics, and simple command chaining. The goal is no longer one-liner memorization; it is operational precision. In real incidents, operators read uncertain data under uncertainty, so the reliability of text-processing commands is part of reliability engineering itself. You should be able to choose the parser with the right cost model, prove your transformations are safe, and produce evidence that can be replayed by another engineer during handoff.
 
 Most text in operations is noisy because production has many producers, each with its own schema and formatting rhythm. Logs are often multi-line over time, manifests are nested documents, and cluster metadata may be huge JSON payloads that change shape across versions. The commands in this module let you handle all three classes in a single shell toolkit by separating concerns: discovery, extraction, shaping, aggregation, and validation.
@@ -26,11 +31,11 @@ The difference between an unstable runbook and a robust troubleshooting script i
 
 After this module you can:
 
-- Design and execute incident-safe pipelines with `grep`, `sed`, `awk`, `sort`, `uniq`, `xargs`, and `find` by selecting the parser that matches data shape and performance constraints.
-- Parse, transform, and aggregate mixed structured and unstructured output with consistent semantics, explicit delimiters, and validation checks for missing values.
-- Build Bash pipelines that remain reproducible under load, especially when commands are executed in parallel or when files contain spaces and special characters.
-- Diagnose practical production incidents by identifying fragile parsing assumptions, regex blowups, portability traps, and truncation or ownership hazards.
-- Produce operational reports from Kubernetes `kubectl` JSON and YAML-aware workflows for cluster operators.
+- Design and execute incident-safe pipelines with `grep`, `sed`, `awk`, `sort`, `uniq`, `xargs`, and `find` by selecting the parser that matches data shape and performance constraints. *(Host-only)*
+- Parse, transform, and aggregate mixed structured and unstructured output with consistent semantics, explicit delimiters, and validation checks for missing values. *(Host-only)*
+- Build Bash pipelines that remain reproducible under load, especially when commands are executed in parallel or when files contain spaces and special characters. *(Host-only)*
+- Diagnose practical production incidents by identifying fragile parsing assumptions, regex blowups, portability traps, and truncation or ownership hazards. *(Host-only)*
+- Produce operational reports from Kubernetes `kubectl` JSON and YAML-aware workflows for cluster operators. *(Cluster path — optional: live `kubectl` needs a running cluster; the JSON/`jq` reasoning works from the worked examples alone.)*
 
 ## Why This Module Matters
 
@@ -267,6 +272,12 @@ tail -f /var/log/kubelet.log
 
 ## jq for JSON and yq for YAML Workloads
 
+> **Host-only vs cluster fork:** This section uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-7.2-text-processing` is an Ubuntu host scenario without a cluster. Complete the host `grep`/`awk`/`yq` exercises there and read the live `kubectl` pipelines as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; pod names, namespaces, and cluster responses below are illustrative, and a live cluster will differ.
+
 For Kubernetes and API-like payloads, `jq` should be the first parser. Unlike regex, it preserves JSON type semantics and lets you build selection, mapping, and reporting steps with explicit field paths. This avoids the fragile behavior of line-based matching against serialized objects.
 
 ```bash
@@ -316,8 +327,17 @@ find . -type f -path './.git/*' -prune -o -name '*.md' -print
 
 ```bash
 find /tmp/reports -name '*.txt' -print0 | xargs -0 -n 8 echo batch:
-xargs -a pod-names.txt -n 1 kubectl delete pod
 xargs -a pods.txt -I{} echo pod:{}
+```
+
+> **Host-only vs cluster fork:** The `kubectl` examples below need a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-7.2-text-processing` is an Ubuntu host scenario without a cluster. The `find`/`xargs` host examples above complete without a cluster — read the `kubectl` lines as illustrative argument-construction examples; nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the `kubectl` commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the `kubectl` commands as illustrative examples; pod names below are illustrative, and a live cluster will differ.
+
+```bash
+xargs -a pod-names.txt -n 1 kubectl delete pod
 ```
 
 `--null` (or `-0`) is the critical safety switch for whitespace. Without it, names and paths containing spaces break into multiple arguments and can run against wrong resources.
@@ -368,6 +388,12 @@ Performance comparisons should be operational, not only microbenchmarks. On clea
 
 ## Process Substitution and Multi-source Pipelines
 
+> **Host-only vs cluster fork:** The `kubectl` commands in this section need a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-7.2-text-processing` is an Ubuntu host scenario without a cluster. Complete host process-substitution with local files (`join`, `paste` of text files) and read the `kubectl` pipelines as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; pod names, job names, and cluster responses below are illustrative, and a live cluster will differ.
+
 Process substitution connects independent command outputs without temporary files. It is ideal for joins, parallel extraction, and side-by-side report columns.
 
 ```bash
@@ -405,6 +431,12 @@ flowchart TD
 ## Real-World Incident Patterns to Prevent
 
 A recurring incident is parsing kubectl table output without `-o json`. Table format depends on default columns, namespace width, and tool output tuning. In an SRE setting, this causes accidental joins across wrong fields and missed anomalies. Prefer JSON extraction and report-oriented formatting at the source.
+
+> **Host-only vs cluster fork:** The live `kubectl` fences in this section need a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-7.2-text-processing` is an Ubuntu host scenario without a cluster. Complete the host `grep`/`sed`/`awk` incident patterns there and read the `kubectl` table-vs-JSON examples as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; pod names, namespaces, and cluster responses below are illustrative, and a live cluster will differ.
 
 ```bash
 kubectl get pods -n platform | awk '{print $1, $2, $3, $4}'
@@ -559,7 +591,13 @@ D) Use `sed` without boundaries for speed.
 
 ## Hands-On Exercises
 
-- [ ] Generate a reproducible Kubernetes operational report from JSON and verify sorting and readiness status columns with expected output.
+- [ ] *(Cluster path — optional)* Generate a reproducible Kubernetes operational report from JSON and verify sorting and readiness status columns with expected output. Needs `kubectl` on a running cluster; on the host-only path, read the JSON/`jq` section as a worked example instead.
+
+> **Host-only vs cluster fork:** This exercise uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-7.2-text-processing` is an Ubuntu host scenario without a cluster. Skip this optional report and complete the host log-parsing exercises below — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; pod names, namespaces, and readiness values below are illustrative, and a live cluster will differ.
 
 ```bash
 kubectl get pods -A -o json \
@@ -574,7 +612,7 @@ Verifiable output: file exists, line count is non-zero, and the first rows show 
 For a 2-pod fixture with one missing Ready condition, expected readiness output should include:
 `default	p2	Pending	Unknown`.
 
-- [ ] Validate mixed structured and unstructured parsing by splitting log records, converting, and producing top endpoint offenders from structured access data.
+- [ ] Validate mixed structured and unstructured parsing by splitting log records, converting, and producing top endpoint offenders from structured access data. *(Host-only — required)*
 
 ```bash
 mkdir -p /tmp/log_scan
@@ -610,7 +648,7 @@ Expected output is deterministic because this fixture is fixed; `/tmp/endpoint_o
      1 /api/v2/auth
 ```
 
-- [ ] Process compressed historical logs with null-safe pipelines, then confirm matched incident markers exist per file.
+- [ ] Process compressed historical logs with null-safe pipelines, then confirm matched incident markers exist per file. *(Host-only — required)*
 
 ```bash
 mkdir -p /tmp/log_scan/input /tmp/log_scan/output
@@ -728,7 +766,7 @@ Before handing over the final report, create a short interpretation section that
 
 ## Readiness Checklist Before Incident Use
 
-If this module is used in an active incident, run a quick readiness pass before the first command. Confirm shell and tool availability, verify kubectl context, and review API permissions for the namespace and cluster objects you will query. Then verify that temporary output locations are writable and that expected cleanup policies are clear. This pre-flight prevents avoidable delays where the tooling itself becomes part of the incident. A reliable text-processing workflow assumes the environment is prepared before parsing starts.
+If this module is used in an active incident, run a quick readiness pass before the first command. Confirm shell and host-tool availability first; `kubectl` context and API permissions apply only on the optional cluster path. Then verify that temporary output locations are writable and that expected cleanup policies are clear. This pre-flight prevents avoidable delays where the tooling itself becomes part of the incident. A reliable text-processing workflow assumes the environment is prepared before parsing starts. Host log parsing does not need a cluster.
 
 Set explicit failure criteria for each stage before entering production execution. For each command group, decide what output size is plausible and what shape means a valid parse. If an output count is zero, decide if that is an expected condition or a pipeline break. This guardrail protects operators from treating command failures as normal states. Reproducible investigations include these criteria because they document not only what success looks like, but what warning signals require stop-and-investigation behavior.
 
