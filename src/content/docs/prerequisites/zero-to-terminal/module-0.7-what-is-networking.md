@@ -5,7 +5,7 @@ sidebar:
   order: 8
 revision_pending: false
 ---
-> **Complexity**: `[QUICK]` - Absolute beginner
+> **Complexity**: `[MEDIUM]` - Long-form foundational read for absolute beginners
 >
 > **Time to Complete**: 90–120 minutes (long-form beginner read)
 >
@@ -343,7 +343,7 @@ An anti-pattern worth calling out early is treating a successful ping as proof t
 
 Another anti-pattern is treating a `404` as a network outage. A `404` means the server was reached and the application decided the requested path does not exist. That is often a route, URL, deployment, or content problem. If you tell a networking team that DNS is broken when the server is returning `404`, you send the investigation in the wrong direction.
 
-For quick modules, the "when this does not apply" section is intentionally modest, but the habit scales. When later modules introduce SSH, servers, Kubernetes Services, and Ingress controllers, you will keep asking the same sequence of questions with more context. What name did the client use? What address did that name produce? Which port was attempted? Which protocol response came back? The vocabulary expands, but the reasoning pattern stays familiar.
+For introductory modules, the "when this does not apply" section is intentionally modest, but the habit scales. When later modules introduce SSH, servers, Kubernetes Services, and Ingress controllers, you will keep asking the same sequence of questions with more context. What name did the client use? What address did that name produce? Which port was attempted? Which protocol response came back? The vocabulary expands, but the reasoning pattern stays familiar.
 
 ---
 

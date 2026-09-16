@@ -11,7 +11,7 @@ lab:
   difficulty: "beginner"
   environment: "ubuntu"
 ---
-> **Complexity**: `[QUICK]` - Type what you see, save, verify, and run a tiny script
+> **Complexity**: `[MEDIUM]` - Long-form practice: type what you see, save, verify, and run a tiny script
 >
 > **Time to Complete**: 80–100 minutes (read + editor drills)
 >
@@ -341,7 +341,7 @@ These patterns are intentionally modest because beginner reliability comes from 
 
 ## When You'd Use This vs Alternatives
 
-For this quick module, the decision framework is intentionally simple. Choose the tool that matches the amount of change and the amount of risk. If there is no change to make, use a viewer. If the change is small and the environment is terminal-only, use `nano`. If the edit is complex and you are comfortable with modal editing, use `vim`. If you are working on a local project with many files, a graphical code editor may be the better environment.
+For this module, the decision framework is intentionally simple. Choose the tool that matches the amount of change and the amount of risk. If there is no change to make, use a viewer. If the change is small and the environment is terminal-only, use `nano`. If the edit is complex and you are comfortable with modal editing, use `vim`. If you are working on a local project with many files, a graphical code editor may be the better environment.
 
 | Need | Better Choice | Why |
 |------|---------------|-----|

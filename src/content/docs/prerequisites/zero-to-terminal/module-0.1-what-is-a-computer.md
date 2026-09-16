@@ -5,7 +5,7 @@ sidebar:
   order: 2
 revision_pending: false
 ---
-> **Complexity**: `[QUICK]` - No technical experience needed
+> **Complexity**: `[MEDIUM]` - Long-form foundational read; no technical experience needed
 >
 > **Time to Complete**: 90–120 minutes (long-form beginner read + inventory practice)
 >
@@ -301,7 +301,7 @@ This habit also prevents expensive but ineffective upgrades. Buying a larger dri
 
 ## Patterns & Anti-Patterns
 
-Because this is a quick introductory module, the main pattern is simple: keep the four resources separate in your head, then map symptoms to resources before choosing an action. The anti-pattern is treating "computer problem" as one vague category and applying generic fixes. That habit may work by accident on a personal laptop, but it fails quickly when you operate servers, cloud systems, or Kubernetes clusters.
+Because this is an introductory module, the main pattern is simple: keep the four resources separate in your head, then map symptoms to resources before choosing an action. The anti-pattern is treating "computer problem" as one vague category and applying generic fixes. That habit may work by accident on a personal laptop, but it fails quickly when you operate servers, cloud systems, or Kubernetes clusters.
 
 | Pattern | When to Use It | Why It Works |
 |---|---|---|
