@@ -22,7 +22,7 @@ _CODEX_MCP_SERVER_FIELDS = frozenset(
         "bearer_token_env_var",
     }
 )
-_HERMES_LANE_AGENTS = frozenset({"deepseek", "grok", "qwen", "hermes"})
+_HERMES_LANE_AGENTS = frozenset({"qwen"})  # residual hermes transport; deepseek/grok/hermes retired
 
 
 def _canonical_agent_name(agent: str) -> str | None:

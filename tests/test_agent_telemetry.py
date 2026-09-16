@@ -45,11 +45,12 @@ def test_agent_stats_handles_empty() -> None:
 
 
 def test_harness_of_mapping() -> None:
-    assert harness_of("deepseek") == "hermes"   # model-lane on hermes
-    assert harness_of("qwen") == "hermes"
+    assert harness_of("deepseek") == "opencode"  # deepseek-direct via opencode
+    assert harness_of("qwen") == "hermes"         # residual hermes transport
     assert harness_of("opencode") == "opencode"
     assert harness_of("codex") == "codex"
     assert harness_of("agy") == "antigravity"
+    assert harness_of("grok") == "grok-cli"
     assert harness_of("somethingnew") == "somethingnew"  # unknown lane == own harness
     assert harness_of(None) == "?"
 
@@ -57,16 +58,16 @@ def test_harness_of_mapping() -> None:
 def test_build_rolls_up_by_harness_and_model(tmp_path) -> None:
     logs = tmp_path / "logs"
     logs.mkdir()
-    # deepseek (model-lane on hermes) + hermes (lane) both -> hermes harness
+    # deepseek → opencode harness; residual hermes lane stays hermes; cursor own
     dispatches = [
-        {"task_id": "a", "agent": "deepseek", "model": "deepseek-v4-pro", "ok": True,
+        {"task_id": "a", "agent": "deepseek", "model": "deepseek-flash", "ok": True,
          "response_chars": 9, "elapsed_s": 100, "task_class": "review"},
         {"task_id": "b", "agent": "hermes", "model": "claude-sonnet-4-6", "ok": True,
          "response_chars": 9, "elapsed_s": 50, "task_class": "review"},
         {"task_id": "c", "agent": "cursor", "model": "auto", "ok": True,
          "response_chars": 9, "elapsed_s": 30, "task_class": "draft"},
     ]
-    outcomes = [{"task_id": "a", "agent": "deepseek", "model": "deepseek-v4-pro",
+    outcomes = [{"task_id": "a", "agent": "deepseek", "model": "deepseek-flash",
                  "outcome": "fabrication"}]
     (logs / "smart_dispatch.jsonl").write_text(
         "\n".join(json.dumps(d) for d in dispatches), encoding="utf-8")
@@ -76,16 +77,14 @@ def test_build_rolls_up_by_harness_and_model(tmp_path) -> None:
     data = build_agent_telemetry(tmp_path)
     assert data["dispatch_total"] == 3
     by_h = {h["harness"]: h for h in data["by_harness"]}
-    # deepseek + hermes lanes collapse into one hermes harness row
-    assert by_h["hermes"]["dispatches"] == 2
-    assert by_h["hermes"]["annotated"] == 1
-    assert by_h["hermes"]["miss_pct"] == 100.0   # 1 fabrication / 1 annotated
+    assert by_h["opencode"]["dispatches"] == 1
+    assert by_h["opencode"]["annotated"] == 1
+    assert by_h["opencode"]["miss_pct"] == 100.0
+    assert by_h["hermes"]["dispatches"] == 1
     assert by_h["cursor"]["dispatches"] == 1
-    # lane view keeps them separate, each with its harness label
     lanes = {x["lane"]: x for x in data["lanes"]}
-    assert lanes["deepseek"]["harness"] == "hermes"
+    assert lanes["deepseek"]["harness"] == "opencode"
     assert lanes["hermes"]["harness"] == "hermes"
-    # by_model keeps the brains distinct
     by_m = {m["model"]: m for m in data["by_model"]}
-    assert by_m["deepseek-v4-pro"]["dispatches"] == 1
+    assert by_m["deepseek-flash"]["dispatches"] == 1
     assert by_m["claude-sonnet-4-6"]["dispatches"] == 1

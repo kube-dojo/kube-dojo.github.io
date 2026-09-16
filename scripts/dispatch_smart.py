@@ -99,15 +99,13 @@ LOG_PATH = PRIMARY_REPO / "logs" / "smart_dispatch.jsonl"
 RESPONSE_DIR = PRIMARY_REPO / "logs" / "dispatch_responses"
 MCP_CONFIG_PATH = PRIMARY_REPO / ".mcp.json"
 # gemini-cli RETIRED 2026-07-01 (no gemini-cli; the Google lane is now agy).
-# agy loads MCP NATIVELY from ~/.gemini/config/mcp_config.json, so it needs no
-# per-dispatch --mcp flag. Claude gates on repo .mcp.json; the deepseek Hermes
-# lane gates on ~/.hermes/config.yaml (which it reads natively at runtime).
-# grok/qwen Hermes MCP is DEFERRED (#2131 follow-up): grok routes through the
-# native grok CLI (not Hermes), and qwen's adapter lacks the mcp__sources__ ->
-# mcp_sources_ prompt rewrite — advertising them would let a dry-run claim MCP
-# is on while no MCP path fires. Re-add each once its runtime wiring lands.
-MCP_SUPPORTED_AGENTS = frozenset({"claude", "deepseek"})
-HERMES_MCP_AGENTS = frozenset({"deepseek"})
+# Hermes RETIRED for dispatch (2026-09-16): deepseek → opencode deepseek-direct;
+# grok-4.6 → native grok CLI. Claude gates MCP on repo .mcp.json. agy loads MCP
+# natively from ~/.gemini/config/mcp_config.json (no --mcp flag). qwen still
+# rides the residual hermes adapter but is NOT advertised as --mcp-capable
+# (#2131) — it lacks the mcp__sources__ → mcp_sources_ prompt rewrite.
+MCP_SUPPORTED_AGENTS = frozenset({"claude"})
+HERMES_MCP_AGENTS = frozenset()  # hermes dispatch retired; empty by design
 HERMES_MCP_TASK_CLASSES = frozenset({"draft", "edit"})
 # review/search -> read-only sources tools; draft/edit -> write-capable author
 # tools (both curated in scripts/dispatch.py). See _import_dispatch_mcp_constants.
@@ -136,10 +134,21 @@ SUPPORTED_AGENTS = (
     # "gemini" RETIRED 2026-07-01 — no gemini-cli; use "agy" for the Google
     # lane (agy has its own `--model` display names, e.g. gemini-3.1-pro-high).
     "grok",
+    # "hermes" RETIRED 2026-09-16 — kept in argparse only to fail closed with
+    # a redirect message; not a live dispatch seat.
     "hermes",
     "kimi",  # ACP oneshot (kimi -p is text-only; prefer kimi-code/k3-256k)
     "opencode",
     "qwen",
+)
+
+HERMES_RETIRED_MESSAGE = (
+    "[smart] REFUSED: --agent hermes is retired. "
+    "Use --agent grok --model grok-4.6 for xAI content/CF "
+    "(native grok CLI; grok-build is gone). "
+    "Use --agent deepseek for DeepSeek via opencode "
+    "(deepseek-direct/deepseek-flash, local-only). "
+    "Qwen: --agent opencode --model openrouter/qwen/… or residual --agent qwen."
 )
 
 
@@ -152,20 +161,21 @@ class TaskClassConfig:
     codex_search: bool = False  # opt-in per class
 
 
-# Model slugs below are LIVE defaults as of 2026-09-14. Re-probe before trusting
-# memory: ``agy models``, ``agent --list-models``, ``hermes status``, kimi
+# Model slugs below are LIVE defaults as of 2026-09-16. Re-probe before trusting
+# memory: ``agy models``, ``grok models``, ``opencode models``, kimi
 # ``default_model`` in ~/.kimi-code/config.toml. Override per call with `--model`.
 # Unrecognized agy slug falls back to the adapter default.
+# Hermes RETIRED — no hermes keys. Native grok defaults to grok-4.6 (grok-build
+# removed from the grok CLI catalog). DeepSeek = opencode deepseek-direct.
 TASK_CLASSES: dict[str, TaskClassConfig] = {
     "search": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-haiku-4-5-20251001",
             "codex": "gpt-5.4-mini",
-            "deepseek": "deepseek-flash",  # V4.1 Flash (canonical API id)
-            "grok": "grok-build",
+            "deepseek": "deepseek-flash",  # V4.1 Flash via opencode deepseek-direct
+            "grok": "grok-4.6",
             "cursor": "auto",
-            "hermes": "qwen-3.6-flash",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.6-flash",
             "qwen": "qwen/qwen3.6-flash",
@@ -180,10 +190,9 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.3-codex-spark",
-            "deepseek": "deepseek-flash",  # V4.1 Flash
-            "grok": "grok-build",
+            "deepseek": "deepseek-flash",
+            "grok": "grok-4.6",
             "cursor": "auto",
-            "hermes": "grok-4.6",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
             "qwen": "qwen/qwen3.6-plus",
@@ -198,10 +207,9 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
-            "deepseek": "deepseek-flash",  # V4.1 Flash
-            "grok": "grok-build",
+            "deepseek": "deepseek-flash",
+            "grok": "grok-4.6",
             "cursor": "auto",
-            "hermes": "grok-4.6",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
             "qwen": "qwen/qwen3.6-plus",
@@ -216,10 +224,9 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
-            "deepseek": "deepseek-flash",  # V4.1 Flash
-            "grok": "grok-build",
+            "deepseek": "deepseek-flash",
+            "grok": "grok-4.6",
             "cursor": "auto",
-            "hermes": "grok-4.6",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
             "qwen": "qwen/qwen3.6-plus",
@@ -234,10 +241,9 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-opus-4-8",
             "codex": "gpt-5.5",
-            "deepseek": "deepseek-flash",  # V4.1 Flash
-            "grok": "grok-build",
+            "deepseek": "deepseek-flash",
+            "grok": "grok-4.6",
             "cursor": "auto",
-            "hermes": "grok-4.6",
             "kimi": "kimi-code/k3",
             "opencode": "openrouter/anthropic/claude-sonnet-4.5",
             "qwen": "qwen/qwen3.6-plus",
@@ -312,8 +318,10 @@ def make_task_id(task_class: str, agent: str) -> str:
 # China-hosted AI providers that must NEVER be called from GH Actions / CI
 # (.claude/rules + feedback_no_china_apis_from_gh_actions). The GLM coherence-audit
 # lane (`--agent opencode --model zai-coding-plan/glm-5.2`, #2171) is LOCAL-ONLY.
-# NOTE: `openrouter/*` is a US-hosted proxy, so openrouter-routed qwen/deepseek model
-# ids are intentionally NOT matched here — only DIRECT China endpoints are blocked.
+# First-party DeepSeek (``--agent deepseek`` / ``deepseek-direct/*``) is also
+# LOCAL-ONLY. NOTE: `openrouter/*` is a US-hosted proxy, so openrouter-routed
+# qwen/deepseek model ids are intentionally NOT matched here — only DIRECT China
+# endpoints / agent lanes are blocked.
 _CI_BLOCKED_PROVIDER_MARKERS = (
     "zai-coding-plan",
     "z.ai",
@@ -321,6 +329,7 @@ _CI_BLOCKED_PROVIDER_MARKERS = (
     "glm-",
     "bigmodel",
     "zhipu",
+    "deepseek-direct",
 )
 
 
@@ -336,10 +345,18 @@ def guard_no_china_provider_in_ci(agent: str, model: str) -> None:
 
     Defense-in-depth: no LLM dispatch runs in CI today (feedback_no_llm_review_in_ci),
     so this can never break a legitimate CI path — it only hard-blocks the local-only
-    GLM/z.ai lane if it is ever wired into an Actions workflow by mistake.
+    GLM/z.ai and first-party DeepSeek lanes if they are ever wired into an Actions
+    workflow by mistake.
     """
     if not _running_in_ci():
         return
+    # Bare --agent deepseek always hits api.deepseek.com via opencode.
+    if agent == "deepseek":
+        raise SystemExit(
+            f"[smart] REFUSED: agent={agent!r} model={model!r} is first-party "
+            f"DeepSeek (China-hosted, local-only) and must never be called from "
+            f"GH Actions / CI (feedback_no_china_apis_from_gh_actions)."
+        )
     haystack = f"{agent} {model}".lower()
     for marker in _CI_BLOCKED_PROVIDER_MARKERS:
         if marker in haystack:
@@ -347,7 +364,7 @@ def guard_no_china_provider_in_ci(agent: str, model: str) -> None:
                 f"[smart] REFUSED: '{marker}' (agent={agent!r} model={model!r}) is a "
                 f"China-hosted AI provider and must never be called from GH Actions / CI "
                 f"(.claude/rules + feedback_no_china_apis_from_gh_actions). The GLM "
-                f"coherence-audit lane is local-only."
+                f"coherence-audit / DeepSeek lanes are local-only."
             )
 
 
@@ -366,36 +383,12 @@ def _available_mcp_servers() -> list[str]:
 
 
 def _available_hermes_mcp_servers() -> list[str]:
-    """Return MCP server names the Hermes lanes can reach.
+    """Residual helper: Hermes MCP discovery is retired with --agent hermes.
 
-    Hermes discovers MCP servers from ``~/.hermes/config.yaml`` at runtime, NOT
-    from the repo ``.mcp.json`` (which is gitignored and absent on clean
-    checkouts). Gating the deepseek ``--mcp`` path on ``.mcp.json`` would reject
-    a valid request on any machine/CI that lacks that local file — so Hermes
-    lanes gate here instead. Returns only servers that are enabled and have a
-    reachable endpoint.
+    Returns ``[]`` always. Kept so older tests/call sites importing the name
+    do not explode; new code must not rely on Hermes MCP.
     """
-    hermes_config = Path.home() / ".hermes" / "config.yaml"
-    if not hermes_config.is_file():
-        return []
-    try:
-        import yaml  # hermes/deepseek adapters already depend on PyYAML
-    except ImportError:
-        return []
-    try:
-        data = yaml.safe_load(hermes_config.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
-        return []
-    servers = (data or {}).get("mcp_servers")
-    if not isinstance(servers, dict):
-        return []
-    return sorted(
-        name
-        for name, cfg in servers.items()
-        if isinstance(cfg, dict)
-        and cfg.get("enabled") is not False
-        and (cfg.get("url") or cfg.get("command"))
-    )
+    return []
 
 
 def _load_dispatch_str_constant(name: str) -> str:
@@ -741,18 +734,7 @@ def _router_command(agent: str, model: str, prompt: str) -> list[str]:
     if agent == "grok":
         return [_grok_binary(), "-p", prompt, "-m", model, "--output-format", "plain"]
     if agent == "hermes":
-        cli_model = _hermes_cli_model(model)
-        # --oneshot (-z): one-shot mode; PROMPT must be a single argv token.
-        # Use ``--oneshot=<prompt>`` so flag-like prompts (e.g. ``--provider``)
-        # are bound as the flag value, not parsed as a separate CLI flag.
-        return [
-            _hermes_binary(),
-            "--provider",
-            _hermes_provider_for_model(model),
-            "-m",
-            cli_model,
-            f"--oneshot={prompt}",
-        ]
+        raise ValueError(HERMES_RETIRED_MESSAGE)
     raise ValueError(f"unsupported direct router agent: {agent}")
 
 
@@ -828,7 +810,7 @@ def fire(
     if worktree:
         print(f"[smart] cwd={worktree}")
     print(f"[smart] task_id={task_id}")
-    if agent in {"cursor", "hermes", "opencode", "grok"}:
+    if agent in {"cursor", "opencode", "grok"}:
         print("[smart] mode is advisory for this router CLI")
 
     started = time.time()
@@ -843,7 +825,7 @@ def fire(
         env = os.environ.copy()
         env["KUBEDOJO_DISPATCHED"] = "1"
         os.environ.update(env)
-        if agent in {"cursor", "hermes", "opencode", "grok"}:
+        if agent in {"cursor", "opencode", "grok"}:
             ok, response, stderr_excerpt = _run_router_agent(
                 agent=agent,
                 prompt=prompt,
@@ -854,13 +836,13 @@ def fire(
             session_id = None
         else:
             sys.path.insert(0, str(REPO / "scripts"))
-            from agent_runtime.runner import invoke
             from agent_runtime.errors import (
                 AgentStalledError,
                 AgentTimeoutError,
                 AgentUnavailableError,
                 RateLimitedError,
             )
+            from agent_runtime.runner import invoke
 
             max_retries = 3 if agent in {"agy", "kimi"} else 1
             base_delay = 10
@@ -987,7 +969,7 @@ def main() -> int:
         "--mode",
         choices=["read-only", "workspace-write", "danger"],
         help="Override task-class default mode. For opencode, "
-        "hermes, and cursor this is advisory; their CLIs "
+        "grok, and cursor this is advisory; their CLIs "
         "enforce their own sandbox behavior.",
     )
     p.add_argument(
@@ -1025,15 +1007,18 @@ def main() -> int:
         help=(
             "Enable a named MCP server for this dispatch "
             "(e.g. --mcp sources for Ukrainian corpus verification). "
-            "Claude: review/search task classes. Hermes lane (deepseek): "
-            "draft/edit task classes. agy loads MCP natively."
+            "Claude: review/search/draft/edit task classes. "
+            "agy loads MCP natively. Hermes MCP is retired."
         ),
     )
     args = p.parse_args()
 
+    if args.agent == "hermes":
+        raise SystemExit(HERMES_RETIRED_MESSAGE)
+
     cfg = TASK_CLASSES[args.task_class]
     model = args.model or cfg.models[args.agent]
-    guard_no_china_provider_in_ci(args.agent, model)  # #2171: GLM/z.ai is local-only
+    guard_no_china_provider_in_ci(args.agent, model)  # #2171: GLM/z.ai / DeepSeek local-only
     mode = args.mode or cfg.default_mode
     timeout_s = args.timeout or cfg.default_timeout_s
     task_id = args.task_id or make_task_id(args.task_class, args.agent)
@@ -1198,7 +1183,7 @@ def main() -> int:
         print("[dry-run] prompt_begin")
         print(prompt)
         print("[dry-run] prompt_end")
-        if args.agent in {"cursor", "hermes", "opencode", "grok"}:
+        if args.agent in {"cursor", "opencode", "grok"}:
             print(f"[dry-run] argv={_router_command(args.agent, model, prompt)!r}")
         elif tool_config and args.agent in MCP_SUPPORTED_AGENTS:
             print(
