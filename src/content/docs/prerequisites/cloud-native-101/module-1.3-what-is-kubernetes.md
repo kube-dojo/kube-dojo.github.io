@@ -5,7 +5,7 @@ slug: prerequisites/cloud-native-101/module-1.3-what-is-kubernetes
 sidebar:
   order: 4
 ---
-> **Complexity**: `[QUICK]` - High-level overview
+> **Complexity**: `[MEDIUM]` - Long-form conceptual overview
 >
 > **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 >

@@ -5,7 +5,7 @@ slug: prerequisites/cloud-native-101/module-1.5-monolith-to-microservices
 sidebar:
   order: 6
 ---
-> **Complexity**: `[QUICK]` - Architectural concepts
+> **Complexity**: `[MEDIUM]` - Long-form architectural read
 >
 > **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
 >
@@ -337,7 +337,7 @@ This is where "smart beginner" intuition matters. If a service diagram looks ele
 
 ## Patterns & Anti-Patterns
 
-For a QUICK introductory module, the main pattern is not "always choose microservices" or "always keep the monolith." The useful pattern is to preserve optionality: keep boundaries clean inside the monolith, collect evidence about scaling and ownership pain, and extract services where independence has a measurable payoff. This creates a path from simple operations to distributed operations without pretending the destination is free.
+For an introductory module, the main pattern is not "always choose microservices" or "always keep the monolith." The useful pattern is to preserve optionality: keep boundaries clean inside the monolith, collect evidence about scaling and ownership pain, and extract services where independence has a measurable payoff. This creates a path from simple operations to distributed operations without pretending the destination is free.
 
 | Pattern | When to Use It | Why It Works | Scaling Consideration |
 |---|---|---|---|

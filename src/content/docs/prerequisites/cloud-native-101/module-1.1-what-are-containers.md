@@ -5,7 +5,7 @@ slug: prerequisites/cloud-native-101/module-1.1-what-are-containers
 sidebar:
   order: 2
 ---
-> **Complexity**: `[QUICK]` - Foundational concepts.
+> **Complexity**: `[MEDIUM]` - Long-form foundational read
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >

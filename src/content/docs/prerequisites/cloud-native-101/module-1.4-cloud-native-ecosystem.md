@@ -5,7 +5,7 @@ slug: prerequisites/cloud-native-101/module-1.4-cloud-native-ecosystem
 sidebar:
   order: 5
 ---
-> **Complexity**: `[QUICK]` - Orientation, not deep dives
+> **Complexity**: `[MEDIUM]` - Long-form orientation across a wide ecosystem
 >
 > **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
 >
@@ -344,7 +344,7 @@ The anti-pattern is tempting because every tool can be justified in isolation. P
 
 ## When You'd Use This vs Alternatives
 
-For a quick module, the decision framework is a compact comparison rather than a full architecture review process. You are choosing among "do nothing yet," "use Kubernetes built-ins," "adopt a CNCF project," "use a managed provider feature," and "buy a commercial platform." Each option can be correct. The wrong move is pretending the choice has no trade-off.
+For an introductory module, the decision framework is a compact comparison rather than a full architecture review process. You are choosing among "do nothing yet," "use Kubernetes built-ins," "adopt a CNCF project," "use a managed provider feature," and "buy a commercial platform." Each option can be correct. The wrong move is pretending the choice has no trade-off.
 
 | Option | Use It When | Avoid It When | Trade-Off |
 |---|---|---|---|
