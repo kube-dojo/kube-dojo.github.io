@@ -55,30 +55,42 @@ def test_dispatch_smart_agy_danger_no_worktree_passes_guards() -> None:
     )
 
 
-def test_hermes_router_argv_puts_oneshot_last() -> None:
-    """Hermes --oneshot=<prompt> must follow --provider and -m (equals-form)."""
+def test_hermes_agent_is_retired_fail_closed() -> None:
+    """--agent hermes must refuse with a redirect to grok / deepseek."""
+    result = _run_dispatch_smart(
+        ["review", "--agent", "hermes", "--dry-run", "x"]
+    )
+    assert result.returncode != 0
+    merged = (result.stdout or "") + (result.stderr or "")
+    assert "retired" in merged.lower()
+    assert "grok" in merged.lower()
+    assert "deepseek" in merged.lower()
+
+
+def test_hermes_router_command_raises() -> None:
+    """Direct router path also refuse hermes (defense in depth)."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-    from dispatch_smart import _router_command
+    import pytest
+    from dispatch_smart import HERMES_RETIRED_MESSAGE, _router_command
 
-    cmd = _router_command("hermes", "qwen-3.6-flash", "hello")
-    assert cmd[-1] == "--oneshot=hello"
-    assert "-z" not in cmd
-    assert cmd[1:5] == ["--provider", "openrouter", "-m", "qwen/qwen3.6-flash"]
+    with pytest.raises(ValueError, match="retired"):
+        _router_command("hermes", "grok-4.6", "hello")
+    assert "grok-4.6" in HERMES_RETIRED_MESSAGE
 
 
-def test_hermes_router_argv_handles_flag_like_prompt() -> None:
-    """Flag-like prompts bind via --oneshot= so argparse never treats them as flags."""
+def test_grok_default_model_is_grok_46() -> None:
+    """Native grok lane defaults to grok-4.6 (grok-build catalog removed)."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-    from dispatch_smart import _router_command
+    from dispatch_smart import TASK_CLASSES
 
-    argv = _router_command("hermes", "qwen-3.6-flash", "--provider")
-    assert "--oneshot=--provider" in argv
-    assert "-z" not in argv
+    for task_class, cfg in TASK_CLASSES.items():
+        assert cfg.models["grok"] == "grok-4.6", task_class
+        assert "hermes" not in cfg.models
 
 
-def test_hermes_provider_deepseek_routes_first_party(monkeypatch) -> None:
-    """deepseek-* via --agent hermes must hit the first-party DeepSeek API —
-    the old catch-all sent it to OpenRouter and drained the account (#2245)."""
+def test_hermes_provider_helpers_still_map_deepseek_first_party(monkeypatch) -> None:
+    """Residual _hermes_provider_for_model keeps #2245 first-party mapping for
+    leftover bridge/qwen callers — not a live --agent hermes path."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
     from dispatch_smart import _hermes_provider_for_model
 
@@ -92,7 +104,6 @@ def test_hermes_provider_unknown_model_raises(monkeypatch) -> None:
     """Unknown models raise instead of silently billing a metered proxy (#2245)."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
     import pytest
-
     from dispatch_smart import _hermes_provider_for_model
 
     monkeypatch.delenv("KUBEDOJO_HERMES_PROVIDER", raising=False)
@@ -229,36 +240,25 @@ def test_dispatch_smart_codex_review_no_worktree_required() -> None:
     assert "requires --worktree" not in merged_output
 
 
-def test_ci_marker_guard_matches_glm_markers_only_not_deepseek_slugs(monkeypatch) -> None:
-    """The marker guard fires on the GLM/z.ai markers and on nothing else here.
-
-    This asserts ONLY the mechanical behavior of ``_CI_BLOCKED_PROVIDER_MARKERS``
-    (GLM/z.ai/Zhipu direct-endpoint markers). It is NOT a residency claim:
-
-    - The ``deepseek/…`` (OpenRouter-slug) case merely shows the marker guard
-      does not match it. That is NOT an assertion that OpenRouter DeepSeek is
-      residency-safe — OpenRouter can still route to DeepSeek's China API unless
-      providers are pinned (see ``_resolve_provider`` in the deepseek adapter).
-    - The first-party ``deepseek-v4-pro`` case is China-hosted; it is absent from
-      the marker list and is governed by the broader no-LLM-in-CI policy, not by
-      this marker guard.
-
-    Regression guard for #2240.
-    """
+def test_ci_marker_guard_blocks_glm_and_first_party_deepseek(monkeypatch) -> None:
+    """CI guard refuses GLM/z.ai markers and the first-party DeepSeek lane."""
     sys.path.insert(0, str(SCRIPTS_DIR))
     import pytest
     from dispatch_smart import guard_no_china_provider_in_ci
 
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
 
-    # GLM / z.ai local-only lane carries a marker → refused in CI.
     with pytest.raises(SystemExit):
         guard_no_china_provider_in_ci("opencode", "zai-coding-plan/glm-5.2")
 
-    # Neither deepseek slug carries a China marker → guard does not fire.
-    # (Mechanical only; NOT a residency guarantee — see docstring.)
-    guard_no_china_provider_in_ci("deepseek", "deepseek/deepseek-v3.2-exp")
-    guard_no_china_provider_in_ci("deepseek", "deepseek-v4-pro")
+    with pytest.raises(SystemExit):
+        guard_no_china_provider_in_ci("deepseek", "deepseek-flash")
+
+    with pytest.raises(SystemExit):
+        guard_no_china_provider_in_ci("opencode", "deepseek-direct/deepseek-flash")
+
+    # OpenRouter-routed deepseek slug is not a direct China marker.
+    guard_no_china_provider_in_ci("opencode", "openrouter/deepseek/deepseek-chat")
 
 
 def test_ci_guard_noop_outside_ci(monkeypatch) -> None:
@@ -268,5 +268,5 @@ def test_ci_guard_noop_outside_ci(monkeypatch) -> None:
 
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     monkeypatch.delenv("CI", raising=False)
-    # No raise even for the GLM marker when not running in CI.
     guard_no_china_provider_in_ci("opencode", "zai-coding-plan/glm-5.2")
+    guard_no_china_provider_in_ci("deepseek", "deepseek-flash")

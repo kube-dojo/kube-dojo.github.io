@@ -8,11 +8,12 @@ dispatch, stored in `logs/agent_outcomes.jsonl` (gitignored, like the dispatch
 log), joined back to the dispatch log on `task_id`.
 
 **Harness ⟂ model** (the durable-content decomposition): a dispatch lane pairs a
-HARNESS (the runtime — hermes, cursor, codex, antigravity…) with a MODEL (the
-brain — deepseek-v4-pro, gpt-5.5, gemini-3.1-pro…). The `--agent` slug is the
+HARNESS (the runtime — opencode, cursor, codex, antigravity, residual hermes…) with a MODEL (the
+brain — deepseek-flash, gpt-5.5, gemini-3.8-flash-high…). The `--agent` slug is the
 LANE; some lanes are bare harnesses, others are model-named lanes that run *on* a
-harness (e.g. `deepseek` and `qwen` both run on `hermes`). Telemetry rolls up by
-lane, by harness, and by model so you can tell a flaky harness from a weak model.
+harness (e.g. `deepseek` rides opencode `deepseek-direct`; residual `qwen` still
+rides hermes). Telemetry rolls up by lane, by harness, and by model so you can tell
+a flaky harness from a weak model.
 
 Usage::
 
@@ -40,12 +41,13 @@ ACTIVITIES = ("author", "review", "fix", "research", "mechanical")
 _MISS = {"fabrication", "overturned"}  # outcomes that count against trust
 
 # Lane -> harness (the runtime a lane dispatches through), derived from the
-# adapters: deepseek/qwen wrap `hermes`; cursor/opencode/codex/agy/gemini/claude
-# are their own CLIs. A lane absent here == its own harness.
+# adapters: deepseek wraps opencode (deepseek-direct); qwen still wraps residual
+# hermes; cursor/opencode/codex/agy/gemini/claude/grok are their own CLIs.
+# A lane absent here == its own harness.
 HARNESS_BY_LANE = {
-    "deepseek": "hermes",       # hermes --provider deepseek
-    "qwen": "hermes",           # hermes --provider openrouter (qwen)
-    "hermes": "hermes",
+    "deepseek": "opencode",     # opencode --model deepseek-direct/…
+    "qwen": "hermes",           # residual hermes --provider openrouter (qwen)
+    "hermes": "hermes",         # retired dispatch seat (fail-closed)
     "opencode": "opencode",
     "cursor": "cursor",
     "codex": "codex",
@@ -217,7 +219,7 @@ def _print_table(title: str, key_name: str, rows: list[dict]) -> None:
         miss = f"{r['miss_pct']}%" if r["miss_pct"] is not None else "—"
         avg = round(r["avg_elapsed_s"]) if r["avg_elapsed_s"] is not None else 0
         print(
-            f"{str(r[key_name]):<11}{side:<14}{r['dispatches']:>5}{fail:>7}{avg:>7}"
+            f"{r[key_name]!s:<11}{side:<14}{r['dispatches']:>5}{fail:>7}{avg:>7}"
             f"{r['annotated']:>6}{miss:>7}  {oc}"
         )
 

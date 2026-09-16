@@ -1,47 +1,17 @@
-"""DeepSeekAdapter — wraps ``hermes -z`` (deepseek provider) for the agent runtime.
+"""DeepSeekAdapter — wraps opencode CLI for first-party DeepSeek (deepseek-direct).
 
-Fourth production adapter. Brings deepseek-v4 Pro (and successors) online as a
-peer to codex / claude / gemini for code review, deliberation, and fix lanes.
+Hermes is retired for DeepSeek dispatch (KubeDojo + learn-ukrainian topology).
+Default route: ``opencode run --format json -m deepseek-direct/<model>`` against
+``api.deepseek.com``. Catalog default remains ``deepseek-flash`` (V4.1 Flash);
+legacy ``deepseek-v4-*`` aliases still map to the first-party provider.
 
-Key design points:
-
-- **Transport:** ``hermes`` CLI in oneshot mode (``--oneshot=<prompt>``
-  argv binding). Two provider lanes: ``deepseek`` (DEFAULT — first-party
-  API, China-hosted, cheapest, local-only) and ``openrouter`` (opt-in —
-  US-hosted proxy for residency / failover / CI-eligibility). Provider is
-  resolved by ``_resolve_provider`` (tool_config > env > model slug).
-- **Modes:** All three (read-only / workspace-write / danger) supported.
-  Mode → hermes toolset mapping is conservative for read-only (no
-  terminal/file tools), permissive for workspace-write and danger.
-- **Project context:** hermes injects KubeDojo project state via its
-  ``memory`` + ``skills`` toolsets unless suppressed. We keep this on for
-  review/code work (gives DeepSeek situational awareness) but disable via
-  ``--ignore-user-config --ignore-rules`` when the caller passes
-  ``tool_config={"isolated": True}`` (used for benchmark / calibration).
-- **No session resume.** ``resume_policy=never`` in the registry — hermes
-  has session semantics but cross-worktree contamination would mirror the
-  Codex footgun. Defensively ignored even if passed.
-- **Liveness:** hermes streams output to stdout, so the runner's stdout
-  watchdog handles liveness. ``liveness_signal_paths()`` returns ``()``.
-
-Calibration (2026-05-17): Pro tied 5/5 with claude on content review; gold-tier
-reviewer. Hallucination rate 3/4 on code — caller should not promote a DS Pro
-claim to Green without independent verification (curl+pdftotext+grep) for
-factual claims (mirrors gemini hallucination policy per
-[[feedback_gemini_hallucinates_anchors]]). Flash is 3× faster than Pro;
-suited for plan / architect / UK translation lanes.
-
-In read-only mode, DeepSeek runs with a restricted Hermes toolset (web-only). If
-the model emits unfulfilled tool-use intent (e.g. ``<bash>`` blocks), the returned
-text is a non-executable stub and not a useful review. See
-``feedback_ds_pro_review_needs_workspace_write.md``.
-
-Status flagged for the user:
-- DeepSeek adds a second cheap/fast lane (V4 Flash) while preserving Pro for
-  high-value review roles.
+LOCAL-ONLY: prompt data egresses to China — forbidden in CI (see
+``scripts.agent_runtime.routes`` and ``dispatch_smart.guard_no_china_provider_in_ci``).
 """
+
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -49,127 +19,123 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from ..result import ParseResult
+from ..routes import (
+    deepseek_first_party_error,
+    is_deepseek_first_party_forbidden_in_ci,
+)
 from .base import InvocationPlan
 
 _logger = logging.getLogger(__name__)
-_HERMES_CONFIG_PATH = Path.home() / ".hermes" / "config.yaml"
 
-# Rate-limit patterns. DeepSeek follows Hermes transport patterns, including
-# standard 429 signaling.
-_RATE_LIMIT_PATTERNS = (
-    r"rate limit",
-    r"rate_limit",
-    r"usage limit",
-    r"quota exceeded",
-    r"too many requests",
-    r"\bHTTP 429\b",
-    r"\bstatus 429\b",
-    r"\b429\b",
-)
-_RATE_LIMIT_RE = re.compile("|".join(_RATE_LIMIT_PATTERNS), re.IGNORECASE)
-_TOOL_USE_INTENT_RE = re.compile(
-    r"<\s*(bash|tool_use|tool|terminal|shell)\b[^>]*>",
+# Bare catalog model id → first-party opencode provider route.
+_OPENCODE_MODEL_ROUTES: dict[str, str] = {
+    "deepseek-flash": "deepseek-direct/deepseek-flash",
+    "deepseek-v4-flash": "deepseek-direct/deepseek-v4-flash",
+    "deepseek-v4-pro": "deepseek-direct/deepseek-v4-pro",
+}
+
+_RATE_LIMIT_RE = re.compile(
+    r"rate limit|rate_limit|usage limit|quota exceeded|too many requests|resource_exhausted|\b429\b",
     re.IGNORECASE,
 )
 
-# Hermes startup warnings we strip before declaring success.
-_HERMES_BANNER_RE = re.compile(
-    r"^(💡 Python project detected\..*|hermes -z:.*)$",
-    re.MULTILINE,
-)
-
-# Toolsets per mode. Hermes built-in toolsets are documented under
-# `hermes tools list`. We deliberately exclude memory / skills from
-# read-only to keep calibration runs reproducible; they're great for
-# real review/code work though.
-# `browser` (headless browser automation) gives live web fact-checking WITHOUT
-# Firecrawl — the `web` tool (web_search/web_extract) is Firecrawl-gated and
-# fails closed when FIRECRAWL_API_KEY is unset, which silently starved reviews of
-# fact-checking and drove hallucination (s121, #1827). `browser` works standalone.
-_TOOLSETS_READ_ONLY = "web,browser"
-_TOOLSETS_WORKSPACE = "web,browser,file,terminal,code_execution,todo"
-_TOOLSETS_DANGER = "web,browser,file,terminal,code_execution,todo,memory,skills"
+# Effort hint → opencode --variant (same mapping as LU Glm/DeepSeek adapters).
+_EFFORT_TO_VARIANT: dict[str, str] = {
+    "low": "minimal",
+    "medium": "high",
+    "high": "high",
+    "xhigh": "max",
+    "max": "max",
+}
 
 
-def _read_hermes_config(path: Path = _HERMES_CONFIG_PATH) -> dict[str, Any]:
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
-        return {}
-    return data if isinstance(data, dict) else {}
+def _extract_text_from_stdout(stdout: str) -> str:
+    """Prefer NDJSON ``--format json`` assistant text; fall back to plain stdout."""
+    text = (stdout or "").strip()
+    if not text:
+        return ""
+
+    # NDJSON event stream (opencode run --format json).
+    if "\n" in text or text.startswith('{"type"'):
+        parsed = _parse_opencode_json_events(text)
+        if parsed:
+            return parsed
+
+    if text.startswith("{") and text.endswith("}"):
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                if "text" in data and isinstance(data["text"], str):
+                    return data["text"].strip()
+                if "response" in data and isinstance(data["response"], str):
+                    return data["response"].strip()
+        except ValueError:
+            pass
+    return text
 
 
-def _sources_mcp_registered(config: dict[str, Any]) -> bool:
-    servers = config.get("mcp_servers")
-    if not isinstance(servers, dict):
-        return False
-    sources = servers.get("sources")
-    if not isinstance(sources, dict):
-        return False
-    return bool(sources.get("enabled") is not False and sources.get("url"))
+def _parse_opencode_json_events(stdout: str) -> str:
+    """Extract the final assistant message from opencode ``--format json`` NDJSON.
 
-
-def translate_mcp_prefix_for_hermes(prompt: str) -> str:
-    """Rewrite ``mcp__sources__X`` to ``mcp_sources_X`` for Hermes routing."""
-    return prompt.replace("mcp__sources__", "mcp_sources_")
-
-
-def _resolve_provider(tool_config: dict[str, Any], model: str) -> str:
-    """Pick the Hermes provider for a DeepSeek dispatch.
-
-    Two lanes share this adapter:
-
-    1. ``deepseek`` (**default**) — DeepSeek's first-party API
-       (``api.deepseek.com``, China-hosted). Cheapest path; local-only —
-       never dispatched from CI (``feedback_no_china_apis_from_gh_actions``).
-    2. ``openrouter`` — OpenRouter's US-hosted proxy. Opt-in, for residency /
-       failover / CI-eligibility. NOTE: OpenRouter's default DeepSeek pool can
-       still route to DeepSeek's own China API — pin non-China hosts on the
-       OpenRouter side (``provider.only``/``ignore`` + ``data_collection: deny``)
-       or you keep China residency plus an extra hop.
-
-    Precedence (first match wins), mirroring
-    ``dispatch_smart._hermes_provider_for_model``:
-
-    1. explicit ``tool_config["provider"]`` — caller intent.
-    2. ``KUBEDOJO_HERMES_PROVIDER`` env — operator override.
-    3. model-slug — ONLY an explicit ``openrouter/…`` prefix routes via
-       ``openrouter``; a bare first-party slug (``deepseek-v4-pro``) via
-       ``deepseek``. Any other ``vendor/model`` form raises: the old "any
-       slash means openrouter" inference silently billed the metered
-       OpenRouter account (incident #2245, 2026-07-07).
+    Mirrors ``dispatch_smart._parse_opencode_json_events`` so the deepseek
+    adapter and the direct opencode router share one schema contract.
     """
-    explicit = tool_config.get("provider")
-    if explicit:
-        return str(explicit)
-    env_override = os.environ.get("KUBEDOJO_HERMES_PROVIDER")
-    if env_override:
-        return env_override
-    if model.startswith("openrouter/"):
-        return "openrouter"
-    if "/" in model:
-        raise ValueError(
-            f"Ambiguous DeepSeek model slug {model!r}: a vendor/model form no "
-            "longer implies the OpenRouter proxy (silent-billing incident "
-            "#2245). Opt in explicitly with an 'openrouter/…' slug, "
-            "tool_config={'provider': 'openrouter'}, or "
-            "KUBEDOJO_HERMES_PROVIDER."
-        )
-    return "deepseek"
+    texts_by_message: dict[str, list[str]] = {}
+    message_order: list[str] = []
+    final_message_id: str | None = None
+
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+
+        event_type = event.get("type")
+        part = event.get("part")
+        if not isinstance(part, dict):
+            part = {}
+
+        if event_type == "text":
+            chunk = part.get("text")
+            if not isinstance(chunk, str) or not chunk:
+                continue
+            message_id = part.get("messageID")
+            if not isinstance(message_id, str):
+                message_id = ""
+            if message_id not in texts_by_message:
+                message_order.append(message_id)
+            texts_by_message.setdefault(message_id, []).append(chunk)
+        elif event_type == "step_finish" and part.get("reason") == "stop":
+            message_id = part.get("messageID")
+            if isinstance(message_id, str):
+                final_message_id = message_id
+
+    if final_message_id and final_message_id in texts_by_message:
+        return "".join(texts_by_message[final_message_id]).strip()
+
+    for message_id in reversed(message_order):
+        chunks = texts_by_message.get(message_id)
+        if chunks:
+            return "".join(chunks).strip()
+    return ""
 
 
 class DeepSeekAdapter:
-    """Adapter for ``hermes -z`` with the deepseek provider."""
+    """Adapter for the opencode CLI with first-party DeepSeek."""
 
     name: str = "deepseek"
-    # deepseek-flash is the canonical DeepSeek-V4.1-Flash API id (first-party
-    # hermes provider=deepseek). Legacy deepseek-v4-pro / deepseek-v4-flash
-    # names still resolve upstream as temporary aliases.
-    # Override via AB_DEEPSEEK_MODEL when needed.
+    # Fleet MODEL identity (bare catalog id). The deepseek-direct provider pin
+    # is an opencode INVOCATION detail — applied in build_invocation via
+    # _OPENCODE_MODEL_ROUTES, not stored as identity.
     default_model: str = os.environ.get("AB_DEEPSEEK_MODEL", "deepseek-flash")
+    # Omitted effort defaults to high (--variant high).
+    default_effort: str = "high"
     supported_modes: frozenset[str] = frozenset({"read-only", "workspace-write", "danger"})
 
     def build_invocation(
@@ -183,117 +149,73 @@ class DeepSeekAdapter:
         session_id: str | None,
         tool_config: dict | None,
     ) -> InvocationPlan:
-        """Build the hermes oneshot invocation.
-
-        ``tool_config`` keys honored:
-            - ``isolated: bool`` — if True, pass ``--ignore-user-config
-              --ignore-rules`` to bypass hermes's project-context
-              injection. Default False (project context is feature, not
-              bug, for review/code work).
-            - ``toolsets: str`` — comma-separated override for ``-t``.
-              Wins over the mode-default mapping.
-            - ``provider: str`` — override hermes provider. Default
-              ``deepseek`` (first-party, China-hosted); pass ``openrouter``
-              (US-hosted proxy) for residency / failover / CI-eligibility.
-              Also selectable via ``KUBEDOJO_HERMES_PROVIDER`` or an
-              OpenRouter model slug — see ``_resolve_provider``.
-            - ``effort: str`` — reasoning effort label. Hermes does not
-              expose this as a flag today; we forward it via prompt
-              prefix when ``"xhigh"`` is requested. Tracking issue: see
-              ``project_hermes_model_inventory.md``.
-            - ``yolo: bool`` — pass ``--yolo`` (auto-accept tool calls).
-              Default True for write modes, False for read-only.
-            - ``accept_hooks: bool`` — pass ``--accept-hooks``. Default
-              False; opt-in for callers that want project hooks to fire.
-        """
         if mode not in self.supported_modes:
-            raise ValueError(f"DeepSeekAdapter: unsupported mode {mode!r}")
+            raise ValueError(
+                f"DeepSeekAdapter: unsupported mode {mode!r} "
+                f"(supported: {sorted(self.supported_modes)})"
+            )
 
         tc: dict[str, Any] = tool_config or {}
+        max_budget_usd = tc.get("max_budget_usd")
+        if max_budget_usd is not None:
+            _logger.warning(
+                "non-claude adapter %s ignoring max_budget_usd=%s; "
+                "use hard-timeout/silence-timeout instead",
+                self.name,
+                max_budget_usd,
+            )
 
-        binary = shutil.which("hermes") or "hermes"
-        cmd: list[str] = [binary]
+        binary = shutil.which("opencode") or "opencode"
+        target_model = model or self.default_model
+        # Route bare catalog ids to the first-party opencode provider. Explicit
+        # provider-prefixed ids (deepseek-direct/…, openrouter/…) pass through.
+        invocation_model = _OPENCODE_MODEL_ROUTES.get(target_model, target_model)
 
-        # Reasoning effort hint applied first so the final prompt string is
-        # bound via --oneshot= below.
-        effort = tc.get("effort")
-        final_prompt = prompt
-        if effort and effort != "default":
-            final_prompt = f"[Reasoning effort hint: {effort}]\n\n{prompt}"
+        provider_for_guard = "deepseek-direct"
+        if invocation_model.startswith("openrouter/"):
+            provider_for_guard = "openrouter"
+        elif "/" in invocation_model:
+            provider_for_guard = invocation_model.split("/", 1)[0]
 
-        hermes_mcp_servers = tc.get("hermes_mcp_servers") or []
-        if "sources" in hermes_mcp_servers:
-            config = _read_hermes_config()
-            if not _sources_mcp_registered(config):
-                _logger.warning(
-                    "Hermes DeepSeek did not find enabled mcp_servers.sources in "
-                    "~/.hermes/config.yaml; MCP tool availability depends on Hermes config"
+        if is_deepseek_first_party_forbidden_in_ci(provider_for_guard, invocation_model):
+            raise ValueError(
+                deepseek_first_party_error(
+                    provider=provider_for_guard,
+                    model=invocation_model,
+                    source="opencode deepseek adapter",
                 )
-            final_prompt = translate_mcp_prefix_for_hermes(final_prompt)
+            )
 
-        # Model — resolve the provider from the RAW slug first (an explicit
-        # ``openrouter/`` prefix is the opt-in marker, #2245), then strip that
-        # prefix so hermes -m receives the provider-native model id
-        # (OpenRouter's catalog uses ``vendor/model``).
-        effective_model = model or self.default_model
-        provider = _resolve_provider(tc, effective_model)
-        if effective_model.startswith("openrouter/"):
-            effective_model = effective_model.removeprefix("openrouter/")
-        cmd.extend(["-m", effective_model])
+        cmd: list[str] = [binary, "run", "--format", "json", "-m", invocation_model]
 
-        # Provider — first-party ``deepseek`` (China-hosted) is the default;
-        # OpenRouter's US-hosted proxy is EXPLICIT-ONLY: tool_config, the
-        # KUBEDOJO_HERMES_PROVIDER env, or an ``openrouter/…`` model slug.
-        # Silent fallbacks removed after incident #2245. See
-        # ``_resolve_provider``.
-        cmd.extend(["--provider", provider])
+        if mode in ("workspace-write", "danger"):
+            cmd.append("--auto")
 
-        # Toolset selection — caller override wins, else mode default.
-        toolsets = tc.get("toolsets")
-        if not toolsets:
-            if mode == "read-only":
-                toolsets = _TOOLSETS_READ_ONLY
-            elif mode == "workspace-write":
-                toolsets = _TOOLSETS_WORKSPACE
-            else:  # danger
-                toolsets = _TOOLSETS_DANGER
-        cmd.extend(["-t", toolsets])
+        effort = tc.get("effort") or self.default_effort
+        variant = _EFFORT_TO_VARIANT.get(str(effort), str(effort))
+        if variant and variant != "default":
+            cmd.extend(["--variant", variant])
 
-        # Auto-accept tool calls. Required for non-interactive runs that
-        # do file edits or shell ops. Read-only stays prompt-only by
-        # default so we don't accidentally grant network egress through
-        # the web tool's confirm step.
-        yolo_default = mode in ("workspace-write", "danger")
-        if bool(tc.get("yolo", yolo_default)):
-            cmd.append("--yolo")
+        # Prompt on stdin (same contract as dispatch_smart opencode router).
+        cmd.append("-")
 
-        if bool(tc.get("accept_hooks", False)):
-            cmd.append("--accept-hooks")
+        _logger.debug(
+            "deepseek invocation: task=%s mode=%s model=%s effort=%s",
+            task_id,
+            mode,
+            target_model,
+            effort,
+        )
 
-        # Isolation: bypass user config + project rules. Used for
-        # calibration / benchmark runs where deterministic output is
-        # more important than context awareness.
-        if bool(tc.get("isolated", False)):
-            cmd.extend(["--ignore-user-config", "--ignore-rules"])
-
-        # --oneshot (-z): one-shot mode; PROMPT must be a single argv token.
-        # Use ``--oneshot=<prompt>`` so flag-like prompts (e.g. ``--provider``)
-        # are bound as the flag value, not parsed as a separate CLI flag.
-        # Do NOT use stdin (``hermes -z -``) — that is interpreted as
-        # "no prompt, project-introspection mode".
-        cmd.append(f"--oneshot={final_prompt}")
-
-        # Defensively drop session_id — resume_policy=never.
         _ = session_id
-        _ = task_id
 
         return InvocationPlan(
             cmd=cmd,
             cwd=cwd,
-            stdin_payload="",  # prompt is in argv; stdin must be empty
+            stdin_payload=prompt,
             output_file=None,
-            env_overrides={},
-            liveness_paths=(),
+            env_overrides={"OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX": "131072"},
+            liveness_paths=self._liveness_paths(),
         )
 
     def parse_response(
@@ -302,56 +224,29 @@ class DeepSeekAdapter:
         stdout: str,
         stderr: str,
         returncode: int,
-        output_file: Path | None,
+        output_file: Path | None = None,
         plan: InvocationPlan | None = None,
         call_start_time: float | None = None,
     ) -> ParseResult:
-        """Parse hermes -z output.
-
-        Hermes prints the final assistant message to stdout. Diagnostic
-        warnings ("💡 Python project detected.", argument errors) appear
-        in stdout/stderr depending on how hermes was invoked.
-        """
-        _ = output_file
-        _ = plan
-        _ = call_start_time
-
-        # Strip hermes banners that aren't part of the response.
-        clean_stdout = _HERMES_BANNER_RE.sub("", stdout or "").strip()
-        tool_use_unfulfilled = bool(_TOOL_USE_INTENT_RE.search(clean_stdout))
-
-        if tool_use_unfulfilled and len(clean_stdout) < 1000:
-            return ParseResult(
-                ok=False,
-                response="",
-                stderr_excerpt=(
-                    "DS Pro returned tool-use intent without execution "
-                    f"({len(clean_stdout)} chars). The hermes toolset for this mode "
-                    "doesn't include the requested tool. For DS Pro reviews, re-dispatch "
-                    "with --mode workspace-write (grants terminal/file tools), or fall "
-                    "back to qwen/claude. Raw stub: " + clean_stdout[:200]
-                ),
-                rate_limited=False,
-                session_id=None,
-                tokens=None,
-            )
-
-        combined = f"{clean_stdout}\n{stderr or ''}"
+        _ = (output_file, plan, call_start_time)
+        text = _extract_text_from_stdout(stdout)
+        combined = f"{stderr or ''}\n{stdout or ''}"
         pattern_hit = bool(_RATE_LIMIT_RE.search(combined))
-        call_failed = returncode != 0 or not bool(clean_stdout)
+        call_failed = returncode != 0 or not bool(text)
+        # Only treat rate-limit phrasing as a rate-limit failure when the call
+        # actually failed — success stdout may discuss "rate limit" policy.
         rate_limited = pattern_hit and call_failed
 
-        ok = returncode == 0 and bool(clean_stdout) and not rate_limited
-        response = clean_stdout if ok else ""
+        ok = returncode == 0 and bool(text) and not rate_limited
 
         stderr_excerpt: str | None = None
         if not ok:
-            excerpt_source = (stderr or "").strip() or (stdout or "").strip()
-            stderr_excerpt = excerpt_source[:500] or None
+            source = (stderr or "").strip() or (stdout or "").strip() or ""
+            stderr_excerpt = source[:500] if source else f"opencode exit code {returncode}"
 
         return ParseResult(
             ok=ok,
-            response=response,
+            response=text if ok else "",
             stderr_excerpt=stderr_excerpt,
             rate_limited=rate_limited,
             session_id=None,
@@ -359,6 +254,9 @@ class DeepSeekAdapter:
         )
 
     def liveness_signal_paths(self, plan: InvocationPlan) -> tuple[Path, ...]:
-        """Hermes streams to stdout; the runner's stdout watchdog covers liveness."""
         _ = plan
-        return ()
+        return self._liveness_paths()
+
+    def _liveness_paths(self) -> tuple[Path, ...]:
+        opencode_dir = Path.home() / ".config" / "opencode"
+        return (opencode_dir,) if opencode_dir.exists() else ()
