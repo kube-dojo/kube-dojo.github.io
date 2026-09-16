@@ -538,6 +538,8 @@ This exercise walks through the same evidence path you should use during real re
 
 **Environment**: Linux system (Ubuntu/Debian for AppArmor examples)
 
+**Environment honesty**: the commands below were written against a Debian/Ubuntu-style lab host, matching the Ubuntu-based Killercoda environment in the frontmatter. On Fedora, RHEL, or their derivatives, AppArmor is usually absent and SELinux is the active mandatory access control layer, so `aa-status` will not exist and Part 3 becomes an SELinux inspection instead (`sestatus`, `getenforce`). Part 2 requires `sudo` for `setcap` and a C compiler; some kernels also set `net.ipv4.ip_unprivileged_port_start` low enough that an unprivileged bind to port 80 succeeds, so treat that as a kernel-configuration finding rather than a failed exercise. The Docker parts assume a local Docker daemon. Nothing here was validated against a production host: run the privileged steps only on a throwaway VM, lab instance, or sandbox you are allowed to modify.
+
 #### Part 1: Viewing Capabilities
 
 Start with your current shell because it gives you a safe baseline before you inspect containers. The effective set shows what the shell can use right now, while the bounding set shows what it cannot regain later. If `capsh` is not installed, install the distribution package that provides it, usually `libcap2-bin` on Debian and Ubuntu systems.
@@ -680,6 +682,39 @@ docker run --rm --cap-drop=ALL --cap-add=NET_RAW alpine ping -c 1 8.8.8.8  # Wor
 
 The default container should show nonzero capability masks, while the `--cap-drop=ALL` container should show a much smaller or empty effective set. The `ping` comparison demonstrates why adding a single capability is more defensible than restoring broad defaults. If your network blocks ICMP, decode the masks instead and verify that `NET_RAW` appears only when explicitly added.
 </details>
+
+### Cleanup and Reset
+
+This exercise leaves small but real traces behind. Part 2 creates a test binary and its C source in `/tmp` and attaches a file capability to the binary; Part 5 pulls container images into the local Docker cache. None of it belongs on a shared machine, so run the reset even though the footprint is modest. If you can simply destroy or snapshot-revert the lab VM, that is an equally valid reset.
+
+```bash
+# 1. Remove the Part 2 test binary and source. Deleting the file removes
+#    its capability along with it; if you kept the binary for any reason,
+#    strip the capability first with:
+#    sudo setcap -r /tmp/test-bind
+rm -f /tmp/test-bind /tmp/test-bind.c
+
+# 2. Confirm no file capability remains on the test path
+getcap /tmp/test-bind 2>/dev/null || echo "no test-bind capability remains"
+
+# 3. Containers used --rm, so no containers persist. Confirm:
+docker ps -a --filter ancestor=alpine 2>/dev/null
+
+# 4. Optionally reclaim the images pulled during Parts 4-5
+docker rmi alpine 2>/dev/null
+```
+
+Parts 1, 3, and 4 are read-only inspections (`/proc` reads, `getcap` scans, `aa-status`, kernel config checks), so there is no host state to restore for them. Nothing in this exercise loads, changes, or unloads an AppArmor profile or seccomp filter on the host.
+
+Verify the reset before treating the lab as closed:
+
+- [ ] `ls /tmp/test-bind /tmp/test-bind.c` reports both files absent.
+- [ ] `getcap -r /tmp 2>/dev/null` shows no leftover capability entries from this exercise.
+- [ ] `docker ps -a` shows no `alpine` or `nginx` containers left from the exercise.
+- [ ] `docker images` shows only images you intend to keep (if you ran the optional `docker rmi`).
+- [ ] `sudo aa-status` (Ubuntu/Debian) still shows the same profile counts as before the exercise, confirming you did not alter LSM state.
+
+If any check fails, remove the leftover artifact explicitly and re-run the checklist. A file capability or test container that survives cleanup is exactly the kind of quiet residue that confuses the next audit, so treat verification as part of the exercise rather than an optional extra.
 
 ### Success Criteria
 
