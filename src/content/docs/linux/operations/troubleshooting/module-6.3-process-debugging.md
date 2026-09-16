@@ -805,7 +805,7 @@ printf '%s\n' \
 'os.unlink(path)' \
 'print(os.getpid(), flush=True)' \
 'time.sleep(600)' > "$python_script"
-HOLD_FILE="$WORKDIR/held.log" .venv/bin/python "$python_script" >"$WORKDIR/holder.pid" &
+HOLD_FILE="$WORKDIR/held.log" python3 "$python_script" >"$WORKDIR/holder.pid" &
 HOLDER_PID="$(cat "$WORKDIR/holder.pid")"
 echo "HOLDER_PID=$HOLDER_PID"
 ls -l "$WORKDIR" | sed -n '1,20p'
