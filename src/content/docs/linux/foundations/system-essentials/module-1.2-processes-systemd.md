@@ -775,6 +775,8 @@ The process tree indicates that the container runtime, not a host-level `nginx.s
 
 **Environment**: Any Linux system with systemd. Use a VM, WSL distribution with systemd enabled, or a disposable lab machine rather than a production host.
 
+**Environment honesty**: Privileged unit-file writes (`sudo tee`, `sudo systemctl`) and this hands-on lab were written for the Ubuntu Killercoda scenario `linux-1.2-processes-systemd`, or a disposable Linux host where systemd is PID 1 and you have `sudo`. A Kubernetes cluster is not required; the `k` alias in the outcomes is a later-transfer convention, not a lab dependency. WSL counts only when systemd is actually enabled; a macOS checkout cannot run these units. Do not create `hello.service` or `broken-web.service` on a production host or on a shared workstation you do not own. The GRUB2, `update-grub`, `grub-install`, and rescue-target commands in the bootloader section are recovery reference, not this lab: they change boot media and must not be run on Killercoda or any host you cannot rebuild.
+
 This lab starts with observation before modification because that is the habit you need in real operations. You will first identify your own shell and process tree, then send reversible signals to a harmless background process, create a short-lived zombie for learning, inspect service state through systemd, and finally repair an intentionally broken unit. Keep notes on which command answers identity, state, ownership, logs, and persistence.
 
 #### Part 1: Process Exploration
@@ -948,6 +950,35 @@ sudo systemctl daemon-reload
 The unit asks an unprivileged user to bind a privileged port, so the service should fail until you move it to a higher port or change the privilege model. The better learning move is to confirm the exact failure in `systemctl status` and `journalctl` before editing. After changing the unit, `daemon-reload` is required because systemd must reread the unit file before the next start uses the new command.
 </details>
 
+### Cleanup/reset
+
+Reset on the same Killercoda Ubuntu session or disposable Linux host where you created objects. This run's leftover objects are the `hello.service` unit from Try This, the `broken-web.service` unit from Part 5, `/tmp/zombie_creator.sh` plus the parent PID that script printed, and the `sleep 300` PID from Part 2 if it was not terminated. Part 1 and Part 4 are inspect-only (`ps`, `pstree`, `systemctl status` and `journalctl` against existing units) and do not persist new units. Inspect first, and do not stop or delete anything whose unit name, PID, or path you did not create during this run.
+
+```bash
+systemctl status hello.service broken-web.service --no-pager 2>/dev/null || true
+ls /etc/systemd/system/hello.service /etc/systemd/system/broken-web.service 2>/dev/null || true
+ls /tmp/zombie_creator.sh 2>/dev/null || true
+ps -o pid,ppid,stat,comm,args -p "$PID" 2>/dev/null || true
+```
+
+If those unit files exist from this lab, stop and disable only those two names, remove only those two files, then reload. If the printed sleep or zombie-creator PID still matches this run, stop only that PID. If `/tmp/zombie_creator.sh` remains, remove only that file.
+
+```bash
+sudo systemctl stop hello.service broken-web.service 2>/dev/null || true
+sudo systemctl disable hello.service broken-web.service 2>/dev/null || true
+sudo rm -f /etc/systemd/system/hello.service /etc/systemd/system/broken-web.service
+sudo systemctl daemon-reload
+kill "$PID" 2>/dev/null || true
+rm -f /tmp/zombie_creator.sh
+```
+
+Forbidden on shared or production hosts: `systemctl stop ssh`, `systemctl stop sshd`, `killall sleep`, `killall python`, `pkill -9`, `rm -rf /tmp`, `systemctl isolate rescue.target`, `grub-install`, or any glob that can match units you did not create. A missing unit in `systemctl status` does not prove the file is gone if `/etc/systemd/system/` still holds it; inspect that exact path. Journal entries for these units age out with the journal and are not a cleanup target.
+
+- [ ] `systemctl status hello.service` and `systemctl status broken-web.service` report the units absent, or you investigated why they remained.
+- [ ] `ls /etc/systemd/system/hello.service /etc/systemd/system/broken-web.service` reports both files absent.
+- [ ] `/tmp/zombie_creator.sh` is gone, and `ps` does not show this run's sleep or zombie-creator PIDs.
+- [ ] You did not use broad destructive cleanup, and you did not run GRUB or rescue-target commands as part of reset.
+
 ### Success Criteria
 
 - [ ] Found your shell's PID and PPID, then traced its parent chain.
@@ -956,6 +987,7 @@ The unit asks an unprivileged user to bind a privileged port, so the service sho
 - [ ] Created and observed a zombie process, then identified the parent process responsible for cleanup.
 - [ ] Used `systemctl status`, `journalctl`, and dependency inspection to explore services.
 - [ ] Diagnosed and fixed a broken systemd service using evidence rather than guessing.
+- [ ] Ran Cleanup/reset against only this run's lab units and PIDs and verified they are gone, or investigated a refused cleanup without deleting unrelated resources.
 - [ ] Explained how the same signal behavior applies to Kubernetes 1.35+ pod termination with the `k` alias.
 
 ## Sources
