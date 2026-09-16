@@ -62,9 +62,9 @@ export function routeManifestIntegration() {
             plugins: [configModule],
             resolve: {
               alias: {
-                '#kubedojo-quality-starlight-routing': privateStarlightModule('./utils/routing/index.ts'),
-                '#kubedojo-quality-starlight-slugs': privateStarlightModule('./utils/slugs.ts'),
-                '#kubedojo-quality-starlight-canonical': privateStarlightModule('./utils/canonical.ts'),
+                '#kubedojo-quality-starlight-routing': privateStarlightModule('./utils/routing/index.js'),
+                '#kubedojo-quality-starlight-slugs': privateStarlightModule('./utils/slugs.js'),
+                '#kubedojo-quality-starlight-canonical': privateStarlightModule('./utils/canonical.js'),
               },
             },
           },
