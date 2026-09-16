@@ -18,22 +18,25 @@ lab:
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > This medium-depth lesson assumes you can already read basic Linux commands and Kubernetes pod output, and it focuses on turning cgroup files into practical operational decisions.
+>
+> A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-2.2-cgroups` is an Ubuntu host scenario with no cluster provided, and the full cgroup exercise — including every host success criterion — completes on any Linux host without `kubectl`. Live `kubectl` inspection is gated behind the Host-only vs cluster fork in the OOM-diagnosis section below.
 
 ## Prerequisites
 
 Before starting this module, make sure the namespace model from the previous lesson is comfortable enough that you can separate visibility isolation from resource enforcement while reading examples.
 
-- **Required**: [Module 2.1: Linux Namespaces](../module-2.1-namespaces/)
+- **Required**: [Module 2.1: Linux Namespaces](../module-2.1-namespaces/), and a Linux host or VM for the hands-on exercise
 - **Helpful**: Understanding of CPU and memory concepts
+- **Optional (Kubernetes cluster path)**: `kubectl` access to a running cluster, for example a local [`kind`](https://kind.sigs.k8s.io/) cluster, for the gated live-inspection examples
 
 ## Learning Outcomes
 
 After this module, you will be able to perform resource diagnosis and design work that can be checked against real cgroup files, Kubernetes status, and lab evidence.
 
-- **Diagnose** OOMKilled containers by reading cgroup memory accounting, Kubernetes events, and kernel logs.
-- **Compare** cgroups v1 and v2 by tracing where CPU, memory, I/O, and PIDs controllers live.
-- **Implement** CPU, memory, PID, and I/O limits with raw cgroups, systemd units, and Kubernetes resources.
-- **Evaluate** Kubernetes requests, limits, and QoS classes when designing node capacity for production workloads.
+- **Diagnose** OOMKilled containers by reading cgroup memory accounting, Kubernetes events, and kernel logs. *(Host-only for cgroup accounting and kernel logs; live Kubernetes events follow the cluster fork below.)*
+- **Compare** cgroups v1 and v2 by tracing where CPU, memory, I/O, and PIDs controllers live. *(Host-only)*
+- **Implement** CPU, memory, PID, and I/O limits with raw cgroups, systemd units, and Kubernetes resources. *(Host-only for raw cgroups and systemd units; Kubernetes resources follow the cluster fork below.)*
+- **Evaluate** Kubernetes requests, limits, and QoS classes when designing node capacity for production workloads. *(Cluster path — optional: live pod inspection needs `kubectl`; the design reasoning works from the worked examples alone.)*
 
 ## Why This Module Matters
 
@@ -180,23 +183,24 @@ Stop and think: if a Java application with a 512MB heap size is placed in a cont
 When memory exceeds the limit, the sequence is short and harsh. The kernel invokes OOM handling for the constrained cgroup, chooses a victim process within that context, sends `SIGKILL`, and the container runtime reports termination to Kubernetes. Kubernetes may restart the container according to the pod restart policy, but the process that was killed cannot catch `SIGKILL`, flush final application logs, or finish an in-flight request. This is why OOMKilled incidents often have an empty application log and a much more useful kernel or Kubernetes event trail.
 
 ```bash
-# Check if OOM killed
+# Host-only: check kernel logs for OOM kills
 dmesg | grep -i "oom"
 # or
 journalctl -k | grep -i "oom"
-
-# In Kubernetes
-kubectl describe pod <pod-name> | grep -i oom
-# Look for: OOMKilled
 ```
 
-This module uses the Kubernetes shorthand `k` for later commands. Define it once in your shell before you use the Kubernetes examples, then prefer the alias in incident notes so commands stay readable under pressure.
+> **Host-only vs cluster fork:** The live Kubernetes inspection below uses `kubectl` and needs a running cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-2.2-cgroups` is an Ubuntu host scenario without a cluster. The kernel-log checks above and the raw cgroup reads below are the complete required host path — read the `kubectl` commands as a worked example instead of running them.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the pod inspection commands live on it.
+> - **Skip-as-read:** Without a cluster, read the commands as illustrative; pod names, restart counts, and events below are illustrative, and a live cluster will differ.
 
-In the upstream Kubernetes documentation, the full command name is `kubectl`; in this curriculum, the local shorthand is introduced beside that first mention so every later `k get`, `k describe`, or `k logs` example is unambiguous.
+*(Cluster path — optional)* In Kubernetes, this module uses the shorthand `k` for the optional cluster examples. Define it once in your shell before running them; in the upstream Kubernetes documentation the full command name is `kubectl`, and this curriculum introduces the local shorthand beside that first mention so every later `k get`, `k describe`, or `k logs` example is unambiguous. Prefer the alias in incident notes so commands stay readable under pressure.
 
 ```bash
 alias k=kubectl
 k describe pod <pod-name> | grep -i oom
+# Look for: OOMKilled
 ```
 
 The raw cgroup files tell you whether the kernel had room left inside the cgroup, not just whether the node had free memory somewhere else. On cgroup v2, `memory.max` is the hard ceiling, `memory.current` is current charged usage, and `memory.stat` breaks that usage into categories such as anonymous memory, file cache, kernel memory, and shared memory. Reading those files near the time of failure helps distinguish a heap leak from cache growth, shared memory abuse, or a workload that was simply sized without enough overhead.
@@ -348,6 +352,8 @@ find /sys/fs/cgroup -name "*<container-id-prefix>*" 2>/dev/null
 ```
 
 On a Kubernetes node, a precise investigation usually starts with Kubernetes and ends with the kernel. Use `k get pod -o wide` to identify the node, `k describe pod` to read requests, limits, QoS class, restart history, and events, and then inspect the host's cgroup path for the container process. The YAML explains what Kubernetes intended, while `/sys/fs/cgroup` shows what the kernel is enforcing. If those differ, look at kubelet configuration, the runtime cgroup driver, and whether you are inspecting the correct container process.
+
+> **Cluster path — optional:** The `k` commands below need `kubectl` on a running cluster, per the fork in the OOM-diagnosis section. On the host-only path, read them as a worked example and complete the raw cgroup inspection instead.
 
 ```bash
 k get pod <pod-name> -o wide
@@ -537,7 +543,7 @@ This lab keeps the original hands-on idea but turns it into a repeatable inciden
 
 **Objective**: Understand cgroup structure, limits, and throttling well enough to explain which file proves each diagnosis and which control plane should own the fix.
 
-**Environment**: Use a Linux system with cgroups v1 or v2, preferably a disposable VM or lab node where systemd and cgroup inspection commands are safe to run.
+**Environment**: Use a Linux system with cgroups v1 or v2, preferably a disposable VM or lab node where systemd and cgroup inspection commands are safe to run. A running Kubernetes cluster is **not** required: all five parts complete on the Killercoda `linux-2.2-cgroups` Ubuntu host scenario or any local Linux host without `kubectl`.
 
 #### Part 1: Identify cgroup Version
 
@@ -661,11 +667,13 @@ This optional exercise should be done only on a disposable host or lab VM. If th
 
 ### Success Criteria
 
-- [ ] Diagnose OOMKilled containers by identifying the cgroup version and the correct memory accounting files.
-- [ ] Compare cgroups v1 and v2 by explaining why the same memory metric appears under different paths.
-- [ ] Implement a small v2 cgroup memory limit on a lab host or explain why your environment should not run that optional step.
-- [ ] Evaluate CPU throttling by reading `cpu.max`, `cpu.stat`, `nr_throttled`, and `throttled_usec`.
-- [ ] Evaluate Kubernetes requests, limits, and QoS class for a pod using `k describe pod` and raw cgroup evidence.
+All criteria except the last one are host-only: a learner on the Killercoda `linux-2.2-cgroups` ubuntu lab or any local Linux host can complete them without a Kubernetes cluster. The last criterion follows the cluster fork from the OOM-diagnosis section.
+
+- [ ] Diagnose OOMKilled containers by identifying the cgroup version and the correct memory accounting files. *(Host-only)*
+- [ ] Compare cgroups v1 and v2 by explaining why the same memory metric appears under different paths. *(Host-only)*
+- [ ] Implement a small v2 cgroup memory limit on a lab host or explain why your environment should not run that optional step. *(Host-only)*
+- [ ] Evaluate CPU throttling by reading `cpu.max`, `cpu.stat`, `nr_throttled`, and `throttled_usec`. *(Host-only)*
+- [ ] *(Cluster path — optional)* Evaluate Kubernetes requests, limits, and QoS class for a pod using `k describe pod` and raw cgroup evidence. Needs `kubectl` on a running cluster; on the host-only path, evaluate the same reasoning from the Kubernetes Requests, Limits, QoS, and Raw cgroups worked example and complete the raw cgroup inspection instead.
 
 ## Sources
 
