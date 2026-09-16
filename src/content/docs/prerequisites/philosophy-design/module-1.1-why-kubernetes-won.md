@@ -5,7 +5,7 @@ sidebar:
   order: 2
 revision_pending: false
 ---
-> **Complexity**: `[QUICK]` - Conceptual foundation with a practical evaluation exercise
+> **Complexity**: `[MEDIUM]` - Long-form conceptual foundation with a practical evaluation exercise
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >

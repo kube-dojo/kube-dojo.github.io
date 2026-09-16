@@ -5,7 +5,7 @@ sidebar:
   order: 4
 revision_pending: false
 ---
-> **Complexity**: `[QUICK]` - Setting expectations
+> **Complexity**: `[MEDIUM]` - Long-form module for setting expectations
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
@@ -263,7 +263,7 @@ This is why KubeDojo keeps returning to deliberate boundaries. The boundary is n
 
 ## When This Doesn't Apply
 
-Because this is a quick orientation module, the main pattern is simple: use KubeDojo as an exam path when your primary goal is passing a Kubernetes certification in the near term. The pattern works best when you have a fixed exam date, limited study hours, and enough discipline to keep advanced topics in a separate backlog. It also works well for teams because it creates shared language around scope. Instead of arguing whether a topic is interesting, the team can ask whether it is exam scope, supporting context, or post-exam specialization.
+Because this is an orientation module, the main pattern is simple: use KubeDojo as an exam path when your primary goal is passing a Kubernetes certification in the near term. The pattern works best when you have a fixed exam date, limited study hours, and enough discipline to keep advanced topics in a separate backlog. It also works well for teams because it creates shared language around scope. Instead of arguing whether a topic is interesting, the team can ask whether it is exam scope, supporting context, or post-exam specialization.
 
 The anti-pattern is equally simple: do not use an exam-focused path as your only production training plan. If you are on call for a real cluster tomorrow, you may need provider-specific runbooks, company incident procedures, backup validation, dashboards, logging conventions, and tool-specific safety checks before you finish a certification track. Exam focus is not an excuse to ignore operational risk. It is a way to keep one learning goal from swallowing another.
 

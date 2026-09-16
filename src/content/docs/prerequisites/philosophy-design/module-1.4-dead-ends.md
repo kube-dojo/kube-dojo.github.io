@@ -6,7 +6,7 @@ sidebar:
   order: 5
 ---
 
-> **Complexity**: `[QUICK]` - Understanding what not to learn.
+> **Complexity**: `[MEDIUM]` - Long-form guidance on what not to learn.
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
