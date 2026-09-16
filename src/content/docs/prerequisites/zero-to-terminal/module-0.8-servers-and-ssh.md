@@ -11,7 +11,7 @@ lab:
   difficulty: "beginner"
   environment: "ubuntu"
 ---
-> **Complexity**: `[QUICK]` - Concepts and a hands-on connection
+> **Complexity**: `[MEDIUM]` - Long-form: concepts plus a hands-on connection
 >
 > **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >

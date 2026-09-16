@@ -5,7 +5,7 @@ sidebar:
   order: 11
 revision_pending: false
 ---
-> **Complexity**: `[QUICK]` - Concepts that click into place
+> **Complexity**: `[MEDIUM]` - Long-form conceptual read; concepts that click into place
 >
 > **Time to Complete**: 80–100 minutes (long-form beginner read)
 >

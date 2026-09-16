@@ -11,7 +11,7 @@ lab:
   difficulty: "beginner"
   environment: "ubuntu"
 ---
-> **Complexity**: `[QUICK]` - Absolute beginner
+> **Complexity**: `[MEDIUM]` - Long-form foundational read for absolute beginners
 >
 > **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >

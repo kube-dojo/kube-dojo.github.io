@@ -5,7 +5,7 @@ sidebar:
   order: 3
 revision_pending: false
 ---
-> **Complexity**: `[QUICK]` - Absolute beginner
+> **Complexity**: `[MEDIUM]` - Long-form foundational read for absolute beginners
 >
 > **Time to Complete**: 90–120 minutes (long-form beginner read + hands-on prompts)
 >

@@ -6,7 +6,7 @@ sidebar:
   order: 7
 ---
 
-> **Complexity**: `[QUICK]`
+> **Complexity**: `[MEDIUM]` - Long-form foundational read with git drills
 >
 > **Time to Complete**: 90–120 minutes (long-form beginner read + git drills)
 >

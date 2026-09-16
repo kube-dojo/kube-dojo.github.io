@@ -11,7 +11,7 @@ lab:
   difficulty: "beginner"
   environment: "ubuntu"
 ---
-> **Complexity**: `[QUICK]` - Follow along and type what you see
+> **Complexity**: `[MEDIUM]` - Long-form practice module: follow along and type what you see
 >
 > **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >
