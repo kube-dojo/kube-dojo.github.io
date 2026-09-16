@@ -21,8 +21,10 @@ lab:
 Before starting this module, you must have completed the following:
 
 - **Required**: [Module 7.3: Practical Scripts](../module-7.3-practical-scripts/)
-- **Required**: Fundamental understanding of Kubernetes architecture and the `kubectl` command-line tool.
+- **Optional (Kubernetes cluster path)**: Fundamental understanding of Kubernetes architecture and the `kubectl` command-line tool, needed only to run the live kubectl examples.
 - **Helpful**: Previous exposure to continuous integration and continuous deployment paradigms.
+
+A running Kubernetes cluster is **not** required for this module. The linked lab `linux-7.4-devops-automation` is an Ubuntu host scenario with no cluster provided, and the host automation path — writing each script, validating it with `bash -n` and ShellCheck, and exercising the pure-Bash supply-chain tools — completes without `kubectl`. Every section that runs `kubectl` against live cluster state opens with an explicit **Host-only vs cluster fork**; on the host-only path, read those scripts as worked examples and verify them with syntax checks instead of live runs.
 
 In this module, `kubectl` remains visible inside the protected legacy scripts because those examples are meant to run as standalone files on any workstation. For interactive discussion, define the common shortcut with `alias k=kubectl`, then read commands such as `k get`, `k logs`, and `k rollout status` as the same Kubernetes client calls written in shorter form.
 
@@ -30,11 +32,11 @@ In this module, `kubectl` remains visible inside the protected legacy scripts be
 
 After completing this module, you will be able to:
 
-- **Design** idempotent deployment automation that records state, waits for rollout health, and rolls back failures.
-- **Implement** Kubernetes data extraction pipelines using JSONPath, `jq`, labels, and safe namespace parameters.
-- **Diagnose** distributed incidents by aggregating logs, filtering error patterns, and comparing resource signals.
-- **Evaluate** shell script safeguards including strict mode, dry-run branches, timeouts, and destructive command boundaries.
-- **Compare** external shell automation with in-cluster controllers, CI/CD jobs, and GitOps workflows.
+- **Design** idempotent deployment automation that records state, waits for rollout health, and rolls back failures. *(Cluster path)*
+- **Implement** Kubernetes data extraction pipelines using JSONPath, `jq`, labels, and safe namespace parameters. *(Cluster path)*
+- **Diagnose** distributed incidents by aggregating logs, filtering error patterns, and comparing resource signals. *(Cluster path)*
+- **Evaluate** shell script safeguards including strict mode, dry-run branches, timeouts, and destructive command boundaries. *(Host-only)*
+- **Compare** external shell automation with in-cluster controllers, CI/CD jobs, and GitOps workflows. *(Host-only)*
 
 ## Why This Module Matters
 
@@ -45,6 +47,8 @@ The important lesson is not that shell scripts magically prevent incidents. A ba
 DevOps automation sits in the middle of several systems that do not naturally share a language: a Git repository, a CI runner, a container registry, the Kubernetes API, an incident chat room, and the engineer's terminal during an emergency. Shell remains the connective tissue because it can call each system with small, composable commands. Your job is to make that tissue strong enough for production by treating every script as an operational control surface, not as a bag of shortcuts copied from a runbook.
 
 ## Automation Starts With State, Not Commands
+
+> **Host-only vs cluster fork:** Every `kubectl` command in this section needs a running cluster and is optional. On the host-only path, read them as worked examples of output-format contracts — the `bash -n` and ShellCheck checks in the hands-on exercise cover the same scripting discipline without a cluster.
 
 The first mistake many engineers make is writing the command they want to run before deciding what state they need to observe. A deployment script is not mainly a wrapper around `k set image`; it is a small decision engine that asks what is running now, whether the desired change is necessary, whether the cluster accepts the change, and whether the new workload becomes healthy. State-first thinking also makes read-only automation more useful, because diagnostic scripts can gather the same evidence every time instead of relying on whoever is holding the incident keyboard.
 
@@ -148,6 +152,8 @@ Idempotence is the practical test for whether the script is modeling state or me
 This is why mature scripts often have an early "plan" phase even when they are written in Bash. The plan phase resolves inputs, reads the current state, prints a summary, and exits before mutation when a dry-run flag is present. That structure feels heavier than a command alias, but it pays for itself the first time someone reviews a CI log during an incident. The reviewer can see the intended namespace, resource names, image tag, and decision path without reconstructing the script from memory.
 
 ## Health Automation As Diagnostic Equipment
+
+> **Host-only vs cluster fork:** The health-check scripts below query a live cluster with `kubectl` and `jq` and are optional. On the host-only path, write each script to a file and verify it with `bash -n` and ShellCheck; the strict-mode, return-code, and optional-metrics design lessons transfer without a cluster.
 
 Operational automation should collect evidence before it attempts repair. During an incident, people often ask broad questions such as "is the cluster healthy?" or "is the app down everywhere?" A good script translates those questions into concrete API reads: node conditions, pod phases, ready replica counts, service endpoints, resource usage, and recent error logs. The point is not to replace judgment; the point is to remove the slow, repetitive search steps so the engineer can spend attention on interpreting the results.
 
@@ -318,6 +324,8 @@ Health automation also changes team behavior because it makes evidence cheap. Wh
 Be careful not to turn health scripts into automatic repair scripts too quickly. Detection has a lower blast radius than remediation, and the confidence threshold should be different. It is reasonable for a script to report all non-running pods across a cluster. It is much more dangerous for the same script to delete or restart them without considering Jobs, planned maintenance, StatefulSets, and application-specific recovery rules. Treat the diagnostic script as the instrument panel, then add repair actions only when the decision logic is well understood.
 
 ## Safe Deployments Are Conversations With The Cluster
+
+> **Host-only vs cluster fork:** The rollout, rollback, and blue-green scripts below need a running cluster and are optional. On the host-only path, read them as worked examples and validate the script structure with `bash -n`; the read–mutate–wait–recover pattern is the lesson, not the live run.
 
 A deployment command changes desired state; it does not prove that the new state is serving users. Kubernetes controllers work asynchronously, so the API server may accept an image update while the Deployment later fails because a probe is wrong, an image cannot be pulled, or a new container crashes immediately. Safe automation treats a rollout as a conversation: request the change, wait for the controller to report progress, inspect the outcome, and choose whether to continue, retry, or roll back. A script that exits immediately after `k set image` ends the conversation too early.
 
@@ -546,6 +554,8 @@ Rollbacks deserve the same discipline as rollouts. It is not enough to call an u
 
 ## Incident Automation For Logs, Errors, And Evidence
 
+> **Host-only vs cluster fork:** The log-aggregation and error-search scripts below need a running cluster and are optional. On the host-only path, read them as worked examples; the label-selection and bounded-window design applies to any log source, including local files searched with `grep`.
+
 During a distributed incident, the cost of manual log collection grows faster than the number of services. Each pod name changes over time, replicas move across nodes, and failures often appear in only a few instances. An incident script should select pods by labels, collect a bounded time window, label every output block with its source, and avoid failing the entire investigation because one pod restarted or no longer exists. The goal is a coherent evidence bundle, not a perfect forensic archive.
 
 ```bash
@@ -616,6 +626,8 @@ Evidence scripts should also be careful about ordering. During an outage, a resp
 Another useful practice is to make every evidence block self-identifying. A log excerpt without the pod name, namespace, container name, and time window becomes hard to use once it is pasted into an incident document. A short header before each block costs almost nothing and prevents later confusion. This is the same habit you saw in the health scripts: automation should not only collect data, it should preserve enough context for someone else to trust and interpret that data after the adrenaline of the incident has passed.
 
 ## Supply Chain And Maintenance Automation
+
+> **Host-only vs cluster fork:** The version-bump and container-build scripts below run on any host (the build needs Docker, not Kubernetes). Only the namespace cleanup and secrets backup scripts need a running cluster and are optional — on the host-only path, verify them with `bash -n` and read them as worked examples.
 
 DevOps scripts often extend beyond cluster observation into build and release mechanics. Version numbers, container tags, registry pushes, backup files, and cleanup jobs look mundane, but they are part of the same operational chain. If a version bump script creates an ambiguous tag, a deployment script may pull the wrong artifact. If a backup script preserves cluster-generated metadata, a restore may fail or recreate resources with stale identities. Small shell decisions can therefore shape the reliability of the entire release path.
 
@@ -899,7 +911,12 @@ The report should be treated as evidence of missing resource contracts, not as a
 
 ### Building DevOps Scripts
 
-The lab asks you to build four small tools that mirror the module's teaching arc: read cluster state, deploy with guardrails, gather incident evidence, and analyze resource boundaries. Work on a disposable cluster such as kind, minikube, or an approved training environment. Do not point cleanup or deployment helpers at shared production namespaces while learning. The goal is to make each script explain what it is about to do, then prove that the result matches your expectation.
+The lab asks you to build four small tools that mirror the module's teaching arc: read cluster state, deploy with guardrails, gather incident evidence, and analyze resource boundaries. The linked lab is an Ubuntu host scenario without a cluster, so the exercise has two paths:
+
+- **Host-only path (required):** Write each script to `/tmp`, verify it parses with `bash -n`, lint it with `shellcheck`, and confirm it declares `set -euo pipefail`. For Script 2, also run `/tmp/deploy-helper.sh` with no arguments to prove the usage guard exits non-zero before any `kubectl` call.
+- **Optional cluster path:** If you have a disposable cluster such as kind, minikube, or an approved training environment, run each script live as written. Do not point cleanup or deployment helpers at shared production namespaces while learning.
+
+The goal is to make each script explain what it is about to do, then prove that the result matches your expectation.
 
 #### Script 1: Cluster Health Check
 
@@ -1121,13 +1138,32 @@ chmod +x /tmp/resource-analyzer.sh
 ```
 </details>
 
+### Host Verification
+
+On the host-only path, prove all four scripts are structurally sound without a cluster:
+
+```bash
+bash -n /tmp/cluster-health.sh && \
+bash -n /tmp/deploy-helper.sh && \
+bash -n /tmp/log-search.sh && \
+bash -n /tmp/resource-analyzer.sh && \
+echo "All four scripts parse cleanly"
+
+shellcheck /tmp/cluster-health.sh /tmp/deploy-helper.sh /tmp/log-search.sh /tmp/resource-analyzer.sh
+
+grep -l 'set -euo pipefail' /tmp/cluster-health.sh /tmp/deploy-helper.sh /tmp/log-search.sh /tmp/resource-analyzer.sh
+
+/tmp/deploy-helper.sh; echo "usage guard exit code: $?"
+```
+
 ### Success Criteria
 
-- [ ] Created and executed the diagnostic cluster health check script successfully.
-- [ ] Engineered the deployment helper script and verified behavior using the integrated dry-run mode.
-- [ ] Implemented the log searcher utility and extracted historical errors across isolated namespaces.
-- [ ] Deployed the resource analyzer script to identify workloads operating without strict compute boundaries.
-- [ ] Ensured all scripts are structurally protected utilizing strict `set -euo pipefail` declarations.
+- [ ] Wrote all four scripts and verified each parses cleanly with `bash -n` *(Host-only — required)*
+- [ ] Confirmed every script declares strict mode with `set -euo pipefail` *(Host-only — required)*
+- [ ] Ran `shellcheck` over all four scripts and resolved or justified each finding *(Host-only — required)*
+- [ ] Exercised the deployment helper's usage guard and confirmed it exits non-zero before any cluster call *(Host-only — required)*
+- [ ] *(Cluster path — optional)* Executed the cluster health check and resource analyzer live against a disposable cluster and compared the output with the script's printed context
+- [ ] *(Cluster path — optional)* Ran the deployment helper with `--dry-run` and the log searcher against a real namespace
 
 After completing the checklist, review your terminal history as if it were a production change record. You should be able to identify what each script read, what it changed, which namespace it targeted, and what output proved success or failure. If any command line is ambiguous when read later, improve the script's printed context before considering the exercise finished.
 
