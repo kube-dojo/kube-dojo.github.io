@@ -22,15 +22,18 @@ Before starting this module, you should be comfortable navigating a Linux filesy
 
 - **Required**: [Module 1.1: Kernel Architecture](/linux/foundations/system-essentials/module-1.1-kernel-architecture/) — understanding how the kernel launches processes and how the shell sits between the user and the operating system provides essential context for why startup files and process boundaries matter in Bash scripting.
 - **Helpful**: Any prior programming experience, particularly in languages where variable scope, control flow, and return codes are explicit concepts. The mental models transfer even when the syntax differs.
+- **Optional (Kubernetes cluster path)**: Basic Kubernetes familiarity (deployments, namespaces, `kubectl`) helps with the kubectl examples in the core sections and with the **Bash with Kubernetes: Scripting Patterns** section. That content is gated behind an explicit **Host-only vs cluster fork** at each kubectl example below.
+
+A running Kubernetes cluster is **not** required for this module. The linked lab `linux-7.1-bash-fundamentals` is an Ubuntu host scenario with no cluster provided, and every hands-on exercise — including every host success criterion — completes on any Linux host with Bash 4+ and no `kubectl`. Where an example runs `kubectl` against live cluster state, it is marked as an optional cluster path that you can read as a worked example instead.
 
 ## What You'll Be Able to Do
 
 After this module, you will be able to write Bash scripts that are safe for unattended execution in CI pipelines, operational runbooks, and Kubernetes automation contexts. Each outcome below maps to a concrete skill you can verify by completing the hands-on exercises at the end of the module.
 
-- **Diagnose** the startup sequence that determines which configuration files Bash reads, distinguishing between login shells, interactive non-login shells, and non-interactive shells so that your scripts never depend on accidental environment state.
-- **Predict** the result of any Bash expansion chain — brace, tilde, parameter, command substitution, arithmetic, word splitting, and pathname — and apply quoting rules that prevent the shell from silently reshaping your data before the target command receives it.
-- **Construct** control flow with `if`, `for`, `while`, and `case` that handles empty inputs, spaces in arguments, and nonzero exit codes without producing misleading success messages.
-- **Design** functions with `local` variables, explicit return codes, and separation of diagnostic output from data output so that callers can compose and test helpers independently.
+- **Diagnose** the startup sequence that determines which configuration files Bash reads, distinguishing between login shells, interactive non-login shells, and non-interactive shells so that your scripts never depend on accidental environment state. *(Host-only)*
+- **Predict** the result of any Bash expansion chain — brace, tilde, parameter, command substitution, arithmetic, word splitting, and pathname — and apply quoting rules that prevent the shell from silently reshaping your data before the target command receives it. *(Host-only)*
+- **Construct** control flow with `if`, `for`, `while`, and `case` that handles empty inputs, spaces in arguments, and nonzero exit codes without producing misleading success messages. *(Host-only)*
+- **Design** functions with `local` variables, explicit return codes, and separation of diagnostic output from data output so that callers can compose and test helpers independently. *(Host-only)*
 
 ## Why This Module Matters
 
@@ -38,7 +41,7 @@ After this module, you will be able to write Bash scripts that are safe for unat
 
 That story is not dramatic because Bash is exotic; it is dramatic because Bash is ordinary. The shell sits between humans and the operating system, between CI pipelines and package managers, between Kubernetes clients and production automation on every major Linux distribution. A small script that validates its assumptions, quotes its expansions, and reports failures honestly can be the safest tool in the room. The same script, when it relies on unquoted variables, ignores pipeline failures, or keeps running after a `cd` fails silently, becomes a production risk that no quantity of monitoring can fully mitigate.
 
-This module treats Bash as operational engineering, not as syntax trivia. You will learn the startup files that determine what state your script inherits, the expansion order that controls how the shell transforms your text before any command runs, and the quoting disciplines that prevent those transformations from becoming destructive. Kubernetes examples throughout assume the exam-friendly shorthand `alias k=kubectl` is available for interactive terminal speed, and they target Kubernetes 1.35 or newer behaviour when a command interacts with cluster resources.
+This module treats Bash as operational engineering, not as syntax trivia. You will learn the startup files that determine what state your script inherits, the expansion order that controls how the shell transforms your text before any command runs, and the quoting disciplines that prevent those transformations from becoming destructive. Kubernetes examples appear throughout as an optional cluster path, gated behind an explicit fork at each example. They assume the exam-friendly shorthand `alias k=kubectl` is available for interactive terminal speed, and they target Kubernetes 1.35 or newer behaviour when a command interacts with cluster resources. On the host-only path, read them as illustrative worked examples — no cluster is needed for the exercises or the success criteria.
 
 The real cost of Bash mistakes in SRE work is not the syntax error itself. It is the diagnostic time. An unquoted variable that splits on a space fails at 03:10 during a maintenance window, and the on-call engineer must now distinguish between a genuine service outage and a script that silently operated on the wrong files. A missing `pipefail` in a twelve-command deployment pipeline succeeds even when step three failed, and the engineer discovers the partial deployment only when users report errors hours later. Each of these scenarios shares the same root cause: the script is allowed to continue past a failure without reporting it. The techniques in this module — strict mode, expansion awareness, explicit error handling, and CI-linted ShellCheck integration — directly reduce the mean time to detect and the mean time to diagnose for every script your team writes. By the end, you will know when Bash is the right tool, when it needs guardrails, and when the job deserves a richer language — not because someone told you, but because you understand the failure modes each choice brings.
 
@@ -167,6 +170,8 @@ grep "\.txt$" files.log                             # literal dot, end-of-line
 
 A common operational pattern is constructing command lines where some arguments are fixed strings and others come from variables. Mixing quoting types within a single command is both valid and idiomatic: `rsync -av "$src" "$dst"` passes two arguments that may contain spaces, while the flags `-av` are intentionally unquoted because they must be a single word. When building argument vectors programmatically, use arrays and quoted expansions rather than string concatenation: `args=(-av --exclude '*.tmp' "$src" "$dst"); rsync "${args[@]}"` preserves each element as a separate argument regardless of internal whitespace, a pattern the [Greg's Wiki BashGuide](https://mywiki.wooledge.org/BashGuide) recommends as the standard defence against argument-splitting bugs in wrapper scripts.
 
+> **Host-only vs cluster fork:** The `kubectl` command below needs a running cluster and is optional. On the host-only path, read it as an illustrative example of array-based argument construction — the pattern transfers to any command, and the exercises require no cluster.
+
 ```bash
 # Building command arguments safely with arrays
 kubectl_args=(
@@ -187,6 +192,8 @@ kubectl "${kubectl_args[@]}"
 Conditionals in Bash follow a simple principle: `if` runs a command and branches on its exit code. In most programming languages, `if (a == b)` evaluates a boolean expression. In Bash, `if [[ "$a" == "$b" ]]; then` runs the `[[` compound command, which returns exit code 0 for true and 1 for false. This design means you can test not only string and numeric comparisons but also the success or failure of any command: `if grep -q "error" /var/log/app.log; then` checks whether the pattern was found and branches accordingly. The [Bash Conditional Constructs documentation](https://www.gnu.org/software/bash/manual/html_node/Conditional-Constructs.html) covers every variant, including the pattern-matching and regular-expression operators available inside `[[ ]]`.
 
 The choice between `[ ]` and `[[ ]]` is a practical engineering decision rather than a stylistic preference. `[[ ]]` is a Bash keyword that does not perform word splitting or pathname expansion on unquoted variable expansions, supports `&&` and `||` operators inside the construct, and provides pattern matching with `=` and regular expression matching with `=~`. `[ ]` is a POSIX command (often a shell built-in for performance) that requires careful quoting because its argument list is subject to normal shell parsing. If your script targets only Bash, `[[ ]]` eliminates an entire class of quoting bugs and should be your default. If you need the script to run under `#!/bin/sh`, you must restrict yourself to `[ ]` and quote every expansion inside it. The [POSIX test specification](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/test.html) and the [ShellCheck wiki rule SC2292](https://www.shellcheck.net/wiki/SC2292) both caution that mixing `[ ]` with Bash-specific operators like `==` creates portability hazards without providing the safety benefits of `[[ ]]`.
+
+> **Host-only vs cluster fork:** The `[[ ]]`, `(( ))`, and file tests below run on any Linux host. Only the final `kubectl get namespace` guard needs a running cluster and is optional — read it as an illustrative example on the host-only path.
 
 ```bash
 # String comparisons with [[ ]]
@@ -217,6 +224,8 @@ fi
 ```
 
 Loops in Bash iterate over words, which means the shell's word-splitting behaviour directly affects what a `for` loop sees. A safe pattern for iterating over filenames or arguments is `for item in "$@"; do ...; done`, which quotes the expansion so each argument retains its boundaries. For file globbing, `for file in *.log; do` has three common failure modes: unmatched globs that produce literal `*.log`, hidden log files that are skipped by default, and broken paths when `"$file"` is not quoted. The resilient alternative for arbitrary names is `find ... -print0 | while IFS= read -r -d '' file; do`. When iterating over command output, prefer `while IFS= read -r line` over `for line in $(command)` because the `for` version splits on all whitespace, including spaces inside values, while the `while read` version preserves each logical line. The [Greg's Wiki article on Bash loops](https://mywiki.wooledge.org/BashFAQ/001) walks through every iteration pattern and explains why naive `for line in $(cat file)` constructs are unreliable in the presence of spaces or special characters.
+
+> **Host-only vs cluster fork:** The `case` statement and numeric `for` loop structure below run on any host. The two `kubectl` loop bodies need a running cluster and are optional — read them as illustrative examples on the host-only path.
 
 ```bash
 # Case statement — cleaner than chains of if/elif for value matching
@@ -264,6 +273,8 @@ Functions give Bash scripts a maintainable structure by packaging decisions and 
 Function naming conventions are more important in Bash than in many other languages because Bash has no namespace mechanism. A function named `check` is ambiguous; a function named `validate_config_file` tells the reader exactly what it operates on and what it returns. Prefix groups of related functions with a common namespace: `log_info`, `log_error`, `log_debug`. Use lowercase and underscores, matching the style of shell built-ins. The [Google Shell Style Guide section on function names](https://google.github.io/styleguide/shellguide.html#s7.4-function-names) provides the complete naming convention. Consistent naming costs nothing and makes script reviews significantly faster because the reviewer can infer a function's role from its name alone.
 
 The most critical Bash function rule is also the easiest to violate: variables inside functions are global by default. If you assign `result="failed"` inside a function without declaring it `local`, you have modified the caller's `result` variable — potentially at a distance of hundreds of lines. The `local` built-in restricts the variable to the function's scope, and it should be used for every variable a function creates, including loop counters and temporary strings. This is not defensive coding; it is the minimum required to prevent function internals from silently corrupting the script's state, and the [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html#s7.2-variable-names) explicitly mandates function-scoped variables for this reason.
+
+> **Host-only vs cluster fork:** The function structure below — `local` declarations, exit codes, stdout-as-data — runs on any host. The `check_prerequisites` probe lists `kubectl` among required tools and `get_replicas` queries a live cluster; both are optional cluster-path illustrations — read them as worked examples without a cluster.
 
 ```bash
 # Function definitions
@@ -345,6 +356,8 @@ Process substitution is particularly valuable for differential comparisons in op
 
 Process substitution also solves a subtle problem with pipelines: a pipeline runs each command in a subshell, so variables set inside the pipeline are lost when it completes. When you need to capture data into variables while still using a pipeline-like flow, process substitution with input redirection avoids the subshell trap. For example, `while IFS= read -r line; do ...; done < <(command)` runs the loop in the current shell, allowing variable modifications to persist after the loop finishes. This pattern, documented in the [Greg's Wiki article on process substitution](https://mywiki.wooledge.org/ProcessSubstitution), is the standard workaround for the subshell-variable problem that plagues naive pipeline-based loops.
 
+> **Host-only vs cluster fork:** The `kubectl` commands below need a running cluster and are optional. On the host-only path, read them as illustrative examples — Exercise 2 at the end of this module demonstrates the same `diff <(...) <(...)` pattern with plain local files and no cluster.
+
 ```bash
 # Compare current pod state with a known-good snapshot
 diff <(kubectl get pods -o name | sort) <(cat known-good-pods.txt | sort)
@@ -360,6 +373,8 @@ column -t <(kubectl top pods)
 Redirections control where a command reads its input and sends its output. The fundamental operators are `>` (overwrite), `>>` (append), `<` (read from file), `2>` (redirect stderr), `2>&1` (merge stderr into stdout), and `&>` (Bash shorthand for redirecting both streams). The order of redirections matters: `command 2>&1 >file` redirects stderr to the current stdout (usually the terminal) and then redirects stdout to the file, so stderr still appears on the terminal. The corrected form `command >file 2>&1` first opens the file as stdout and then duplicates that file descriptor for stderr, so both streams end up in the file. This ordering nuance is one of the most frequently misunderstood aspects of shell I/O, and the [Bash Redirections manual](https://www.gnu.org/software/bash/manual/html_node/Redirections.html) explains the file descriptor duplication semantics in detail.
 
 Here-documents embed multi-line text directly in a script, which is especially useful for generating configuration files, SQL queries, or templated YAML inside shell-based deployment tools. Quoting the delimiter, as in `<<'EOF'`, prevents all expansion within the body — this is the safe default when the content contains dollar signs or backticks that should appear literally. Leaving the delimiter unquoted enables variable and command substitution, which is appropriate for templates but carries the risk of unintended expansion if the input contains untrusted text.
+
+> **Host-only vs cluster fork:** The first here-document below pipes a manifest into `kubectl apply`, which needs a running cluster and is optional. The second writes a literal script to a local path and runs on any host. On the host-only path, read the `kubectl` example as an illustrative template.
 
 ```bash
 # Here-doc for generating Kubernetes resource manifests
@@ -474,6 +489,12 @@ grep -rlZ '^#!/bin/\(bash\|sh\)' . | xargs -0 shellcheck
 Beyond CI, ShellCheck is available as an editor integration for VS Code, Vim, Emacs, and most other editors, providing real-time feedback as you write. The faster you see a warning about an unquoted variable or a missing `local` declaration, the less likely those patterns are to survive into committed code. The [ShellCheck GitHub repository](https://github.com/koalaman/shellcheck) and the [ShellCheck wiki index of rules](https://www.shellcheck.net/wiki/) are the authoritative references for understanding and configuring the tool.
 
 ## Bash with Kubernetes: Scripting Patterns
+
+> **Host-only vs cluster fork:** This section uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-7.1-bash-fundamentals` is an Ubuntu host scenario without a cluster. Complete the strict-mode, process-substitution, and parameter-expansion exercises there and read this section as a worked example — nothing here is required for the host path.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the commands below live on it.
+> - **Skip-as-read:** Without a cluster, read the commands and outputs as illustrative examples; deployment names, replica counts, and event contents below are illustrative, and a live cluster will differ.
 
 Kubernetes operational workflows are fertile ground for Bash scripting because `kubectl` is a command-line tool that produces structured output, accepts standard input, and follows Unix conventions for exit codes and standard streams. Well-structured Bash scripts can orchestrate deployments, validate cluster state, and generate configuration without requiring a full programming-language runtime in the execution environment. The key to reliability is treating `kubectl` output as structured data, using `-o json` or `-o jsonpath` whenever the result is consumed by another command rather than displayed to a human operator.
 
@@ -599,7 +620,7 @@ Bash should not contain the core logic for this workload, although it can serve 
 
 ## Hands-On Exercises
 
-These exercises turn the concepts from this module into working scripts you can run on any Linux system with Bash 4+. Work in an isolated directory so the exercises do not interfere with existing files, and read each script before executing it — the goal is to predict the output, not to copy and paste.
+These exercises turn the concepts from this module into working scripts you can run on any Linux system with Bash 4+. All three are host-only: they complete without `kubectl` or a Kubernetes cluster. Work in an isolated directory so the exercises do not interfere with existing files, and read each script before executing it — the goal is to predict the output, not to copy and paste.
 
 ### Exercise 1: Strict-Mode Template with ShellCheck CI
 
@@ -759,10 +780,11 @@ chmod +x expand-demo.sh
 
 ### Success Criteria
 
-- [ ] Created a strict-mode script template that validates arguments and passes ShellCheck analysis
-- [ ] Demonstrated process substitution by comparing two data sources without temporary files
-- [ ] Applied parameter expansion patterns for defaults, alternates, and substring operations
-- [ ] Predicted the output of each expansion pattern before running the script
+- [ ] Created a strict-mode script template that validates arguments and passes ShellCheck analysis *(Host-only — required)*
+- [ ] Demonstrated process substitution by comparing two data sources without temporary files *(Host-only — required)*
+- [ ] Applied parameter expansion patterns for defaults, alternates, and substring operations *(Host-only — required)*
+- [ ] Predicted the output of each expansion pattern before running the script *(Host-only — required)*
+- [ ] *(Cluster path — optional)* Ran the rollout-status script from **Bash with Kubernetes: Scripting Patterns** against a real deployment with `kubectl` on a running cluster; on the host-only path, read that section as a worked example instead.
 
 ## Next Module
 
