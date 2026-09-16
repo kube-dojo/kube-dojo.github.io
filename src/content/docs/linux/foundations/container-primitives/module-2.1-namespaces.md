@@ -933,10 +933,10 @@ hostname
 If `ip netns list` shows a name that matches a `kd-netns.` prefix this run printed, delete only that name. If a matching empty directory remains, remove only that directory with `rmdir`. Quote every path. `rmdir` refuses a non-empty directory, which is the intended stop: inspect the printed path instead of switching to recursive deletion.
 
 ```bash
-# Replace REPLACE_ME with the exact suffix this run printed.
-ip netns delete kd-netns.REPLACE_ME
-rmdir -- /tmp/kd-netns.REPLACE_ME
-rmdir -- /tmp/kd-mnt-lab.REPLACE_ME
+# Replace REPLACE_NETNS_SUFFIX and REPLACE_MNT_SUFFIX with the exact suffixes this run printed.
+ip netns delete kd-netns.REPLACE_NETNS_SUFFIX
+rmdir -- /tmp/kd-netns.REPLACE_NETNS_SUFFIX
+rmdir -- /tmp/kd-mnt-lab.REPLACE_MNT_SUFFIX
 ```
 
 Forbidden on shared or production hosts: `ip -all netns delete`, deleting every network namespace, `rm -rf /tmp`, `umount -a`, `killall bash`, or any glob that can match objects you did not create. A missing name in `ip netns list` does not prove the namespace is gone if another process still holds it; investigate leftover `unshare` or `ip netns exec` shells and `exit` them instead of killing unrelated processes.
