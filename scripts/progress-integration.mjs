@@ -22,9 +22,9 @@ export function progressIntegration() {
           resolveId: id => id === configId ? `\0${configId}` : undefined,
           load: id => id === `\0${configId}` ? `export default ${JSON.stringify(format)}` : undefined,
         }], resolve: { alias: {
-          '#kubedojo-progress-routes': runtime('./utils/routing/index.ts'),
-          '#kubedojo-progress-slugs': runtime('./utils/slugs.ts'),
-          '#kubedojo-progress-canonical': runtime('./utils/canonical.ts'),
+          '#kubedojo-progress-routes': runtime('./utils/routing/index.js'),
+          '#kubedojo-progress-slugs': runtime('./utils/slugs.js'),
+          '#kubedojo-progress-canonical': runtime('./utils/canonical.js'),
         } } } });
         injectRoute({ pattern: '/progress-catalog.json', entrypoint: new URL('../src/progress-endpoint.ts', import.meta.url), prerender: true });
       },

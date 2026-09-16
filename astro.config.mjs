@@ -87,7 +87,6 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'KubeDojo',
-      tagline: 'Free, comprehensive cloud native education',
       disable404Route: false,
       // GoatCounter — privacy-friendly analytics (no cookies). Injected into the
       // <head> of every page via the default Starlight Head (kept by our custom
