@@ -6,7 +6,7 @@ sidebar:
   order: 3
 ---
 
-> **Complexity**: `[QUICK]` - Conceptual understanding with production consequences
+> **Complexity**: `[MEDIUM]` - Long-form conceptual understanding with production consequences
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
