@@ -594,7 +594,9 @@ This exercise has you audit a Linux host, apply a persistent hardening file, tes
 
 ### Setup
 
-You need a Linux system with root access and permission to change sysctl values. A throwaway VM, lab instance, or Killercoda environment is ideal because you can reboot, reload, and inspect without risking shared workloads. Record the original values before changing anything so that you can explain what the hardening file actually changed.
+You need a Linux system with root access and permission to change sysctl values. A throwaway VM, lab instance, or Killercoda environment is ideal because you can reboot, reload, and inspect without risking shared workloads. Record the original values before changing anything so that you can explain what the hardening file actually changed, and so that the cleanup section at the end can restore them.
+
+**Environment honesty**: the commands in this exercise were written against a Debian/Ubuntu-style lab host, matching the Ubuntu-based Killercoda environment in the frontmatter. Paths and tool names differ on other families — for example RHEL/Rocky uses `aide --init` instead of `aideinit`, and `rpm -V` exists only on RPM systems. Default sysctl values also vary by distribution and cloud image, which is why Task 1 records your host's originals instead of assuming universal defaults. Nothing here was validated against a production fleet: do not apply the hardening file or the reset sequence to a production node without change control, a tested rollback path, and the node-role review from earlier in this module.
 
 ### Task 1: Audit Current Settings
 
@@ -759,6 +761,48 @@ Summarize your baseline in a short note that another operator could review durin
 A good note states whether the host is a normal server or Kubernetes node, names the sysctl file you created, lists the settings that changed, and explains any forwarding decision. It should also include read-back evidence from `sysctl` and the output of the audit script. If the host is a Kubernetes worker, the note should explicitly say why IP forwarding remains enabled and which controls reduce the added risk.
 
 </details>
+
+### Cleanup and Reset
+
+This exercise changes privileged host state: a persistent sysctl file under `/etc/sysctl.d/`, live kernel values loaded with `sysctl --system`, and a helper script in `/tmp`. None of it belongs on a production node, and none of it should be left behind on a shared lab machine either. The steps below return a disposable lab host to its pre-exercise posture; if you can simply destroy or reboot the VM to a clean snapshot, that is an equally valid reset.
+
+```bash
+# 1. Remove the hardening file created in Task 2
+sudo rm -f /etc/sysctl.d/99-security-hardening.conf
+
+# 2. Reload the remaining sysctl configuration
+sudo sysctl --system
+
+# 3. Restore values that a reload cannot undo on its own.
+# sysctl only applies values declared in config files; once your file is
+# gone, keys it managed keep their last-written value. Set them back to the
+# originals you recorded in Task 1. Adjust the right-hand side to match your
+# records — the examples below are common Ubuntu defaults, not guarantees:
+sudo sysctl -w kernel.kptr_restrict=1
+sudo sysctl -w kernel.yama.ptrace_scope=1
+sudo sysctl -w net.ipv4.conf.all.log_martians=0
+sudo sysctl -w net.ipv4.conf.all.rp_filter=2   # some images ship 2 (loose)
+
+# 4. Remove the audit helper script
+rm -f /tmp/audit-sysctl.sh
+
+# 5. Only if you also followed the Kubernetes section on this lab host:
+#    remove the persistent br_netfilter module entry.
+# sudo rm -f /etc/modules-load.d/br_netfilter.conf
+# Do NOT unload the module (modprobe -r br_netfilter) on any host that runs
+# Kubernetes or bridged containers; leave it loaded rather than break the
+# dataplane.
+```
+
+Verify the reset before treating the lab as closed:
+
+- [ ] `ls /etc/sysctl.d/` no longer shows `99-security-hardening.conf`.
+- [ ] `sudo sysctl --system` completes without errors referencing the removed file.
+- [ ] `sysctl kernel.randomize_va_space kernel.kptr_restrict kernel.yama.ptrace_scope net.ipv4.conf.all.rp_filter` matches the original values you recorded in Task 1.
+- [ ] `/tmp/audit-sysctl.sh` is gone.
+- [ ] No `/etc/modules-load.d/` entry you created remains (unless the host legitimately needs it).
+
+If any read-back still shows a hardened value you did not intend, set it back explicitly with `sysctl -w` and re-run the checklist. A setting that survives your cleanup is exactly the persistence trap this module warns about, so treat the verification step as part of the exercise rather than an optional extra.
 
 ### Success Criteria
 
