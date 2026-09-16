@@ -18,6 +18,8 @@ lab:
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
 > **Prerequisites**: Module 1.2 Processes & Systemd, Module 6.2 Log Analysis, basic shell pipelines, file descriptors, signals, and system calls.
+>
+> A running Kubernetes cluster is **not** required. The Killercoda lab `linux-6.3-process-debugging` is an Ubuntu host scenario with no cluster provided. Privileged inspection — `sudo cat /proc/$PID/stack`, `sudo lsof -i`, and `sudo nsenter` — completes on that Ubuntu lab or on a disposable Linux host where you have `sudo`. Do not attach tracers or enter namespaces on a production node or on a shared workstation you do not own. The Kubernetes 1.35+ playbook (`kubectl`, `k debug`) is an optional cluster path: on the host-only path, read those commands as worked examples.
 
 ---
 
@@ -714,14 +716,14 @@ You may have traced only the parent shell while the failing behavior occurred in
 
 ### Objective
 
-You will debug live Linux processes using the same progression you would use during an incident: identify the process, inspect low-risk `/proc` evidence, classify descriptors, trace a narrow behavior, interpret state, and enter a namespace when possible. The exercise uses ordinary local commands so you can practice without a special service stack.
+You will debug live Linux processes using the same progression you would use during an incident: identify the process, inspect low-risk `/proc` evidence, classify descriptors, trace a narrow behavior, interpret state, and enter a namespace when possible. The exercise uses ordinary local commands so you can practice without a special service stack. Run privileged inspection on the Killercoda `linux-6.3-process-debugging` Ubuntu lab or on a disposable Linux host where you have `sudo`. A Kubernetes cluster is not required for the parts below; do not run `strace`, `nsenter`, or `lsof` as root on a production node or on a shared workstation you do not own.
 
 ### Part 1: Establish a Safe Debugging Workspace
 
 Create a temporary directory and record the tools available on your machine. This prevents your evidence files from mixing with unrelated shell output and forces you to notice when optional tools such as `strace`, `lsof`, or `ltrace` are missing.
 
 ```bash
-WORKDIR="$(mktemp -d)"
+WORKDIR="$(mktemp -d /tmp/kd-procdebug.XXXXXX)"
 echo "$WORKDIR"
 command -v ps
 command -v strace || true
@@ -865,19 +867,30 @@ sudo nsenter --target "$TARGET_PID" --mount pwd 2>/dev/null || true
 - [ ] You can explain why host-level tests may not match a container process.
 - [ ] You know which namespace you would enter first for a network timeout.
 
-### Part 9: Clean Up
+### Cleanup/reset
 
-Stop the processes you created and remove the temporary directory. Cleanup is part of operational discipline because stray debug processes and trace files can confuse later investigations.
+Reset on the same Killercoda Ubuntu session or disposable Linux host where you started the exercise. This run's leftover objects are the `sleep` and holder PIDs this session printed, plus the directory under `/tmp/kd-procdebug.*` that `mktemp` printed. Privileged `nsenter` and `lsof` steps are inspect-only and do not persist kernel objects; a leftover `strace` attach should already have ended because those commands used `timeout`. Inspect first, and do not signal or delete anything whose PID or path you did not print during this run.
+
+```bash
+# Replace with the exact TARGET_PID, HOLDER_PID, and WORKDIR this run printed.
+ps -o pid,ppid,stat,comm,args -p "$TARGET_PID","$HOLDER_PID" 2>/dev/null || true
+ls -d /tmp/kd-procdebug.* 2>/dev/null || true
+```
+
+If those PIDs still match the `sleep` and holder commands this run started, stop only those PIDs. If a matching `/tmp/kd-procdebug.*` directory remains and its name equals the WORKDIR this run printed, remove only that directory. Quote the path. Do not expand the glob into unrelated `/tmp` entries.
 
 ```bash
 kill "$TARGET_PID" "$HOLDER_PID" 2>/dev/null || true
 wait "$TARGET_PID" "$HOLDER_PID" 2>/dev/null || true
-rm -rf "$WORKDIR"
+# Replace REPLACE_SUFFIX with the exact suffix this run printed.
+rm -rf -- /tmp/kd-procdebug.REPLACE_SUFFIX
 ```
 
-- [ ] You stopped the long-running exercise processes.
-- [ ] You removed temporary traces and scripts.
-- [ ] You verified that no exercise process remains.
+Forbidden on shared or production hosts: `killall sleep`, `killall python`, `pkill -9`, `rm -rf /tmp`, or any glob that can match processes or directories you did not create. A missing PID in `ps` does not prove the holder released the unlinked inode if another process inherited the descriptor; inspect leftover `/proc/*/fd` links only for PIDs this lab started.
+
+- [ ] `ps` shows neither TARGET_PID nor HOLDER_PID from this run, or you investigated why the PID remained.
+- [ ] No `/tmp/kd-procdebug.*` directory from this run remains.
+- [ ] You did not use broad destructive cleanup.
 - [ ] You can repeat the workflow on a real service with a narrower, safer evidence plan.
 
 ## Sources
