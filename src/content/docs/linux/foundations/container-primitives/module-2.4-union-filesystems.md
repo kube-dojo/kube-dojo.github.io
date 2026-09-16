@@ -665,10 +665,17 @@ Each task ends with its own cleanup step, but stopping mid-task leaves real host
 ```bash
 # 1. Unmount the Task 1 overlay BEFORE removing its directories.
 #    mountpoint -q confirms the mount exists so this is safe to re-run.
+#    rm -rf runs only once the mount is confirmed gone; if umount fails,
+#    an error is printed and the delete is skipped so a still-mounted
+#    backing tree is never shredded out from under the live mount.
 if mountpoint -q /tmp/overlay-test/merged 2>/dev/null; then
     sudo umount /tmp/overlay-test/merged
 fi
-rm -rf /tmp/overlay-test
+if mountpoint -q /tmp/overlay-test/merged 2>/dev/null; then
+    echo "ERROR: /tmp/overlay-test/merged still mounted; NOT deleting /tmp/overlay-test" >&2
+else
+    rm -rf /tmp/overlay-test
+fi
 
 # 2. If you also ran the inline /tmp/overlay demonstration earlier in the
 #    module and stopped before its final cleanup commands, apply the same
@@ -676,7 +683,11 @@ rm -rf /tmp/overlay-test
 if mountpoint -q /tmp/overlay/merged 2>/dev/null; then
     sudo umount /tmp/overlay/merged
 fi
-rm -rf /tmp/overlay
+if mountpoint -q /tmp/overlay/merged 2>/dev/null; then
+    echo "ERROR: /tmp/overlay/merged still mounted; NOT deleting /tmp/overlay" >&2
+else
+    rm -rf /tmp/overlay
+fi
 
 # 3. Remove the Task 3 container if it survived (-f also stops it)
 docker rm -f test-overlay 2>/dev/null
