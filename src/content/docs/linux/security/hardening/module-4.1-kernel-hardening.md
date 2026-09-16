@@ -789,10 +789,28 @@ sudo sysctl -w kernel.yama.ptrace_scope=1
 sudo sysctl -w fs.protected_hardlinks=1
 sudo sysctl -w fs.protected_symlinks=1
 
-# 4. Remove the audit helper script
+# 4. Restore the keys Task 2 wrote that Task 1 did not record. Removing the
+# drop-in and reloading does NOT reset these either, so they would keep the
+# hardened value indefinitely. Prefer values you noted on this host before
+# Task 2; otherwise use the documented kernel defaults below (per
+# docs.kernel.org/networking/ip-sysctl.html, host role). Distributions can
+# legitimately differ — for example the rp_filter docs note that some
+# distributions enable it in startup scripts — so when your noted value or
+# your distribution's own sysctl files disagree, match those instead:
+sudo sysctl -w kernel.kptr_restrict=0
+sudo sysctl -w net.ipv4.icmp_echo_ignore_broadcasts=1
+sudo sysctl -w net.ipv4.icmp_ignore_bogus_error_responses=1
+sudo sysctl -w net.ipv4.conf.default.accept_redirects=1
+sudo sysctl -w net.ipv4.conf.default.send_redirects=1
+sudo sysctl -w net.ipv4.conf.default.accept_source_route=0
+sudo sysctl -w net.ipv4.conf.all.rp_filter=0
+sudo sysctl -w net.ipv4.conf.default.rp_filter=0
+sudo sysctl -w net.ipv4.conf.all.log_martians=0
+
+# 5. Remove the audit helper script
 rm -f /tmp/audit-sysctl.sh
 
-# 5. Only if you also followed the Kubernetes section on this lab host:
+# 6. Only if you also followed the Kubernetes section on this lab host:
 #    remove the persistent br_netfilter module entry.
 # sudo rm -f /etc/modules-load.d/br_netfilter.conf
 # Do NOT unload the module (modprobe -r br_netfilter) on any host that runs
@@ -805,6 +823,7 @@ Verify the reset before treating the lab as closed:
 - [ ] `ls /etc/sysctl.d/` no longer shows `99-security-hardening.conf`.
 - [ ] `sudo sysctl --system` completes without errors referencing the removed file.
 - [ ] `sysctl kernel.randomize_va_space net.ipv4.ip_forward net.ipv6.conf.all.forwarding net.ipv4.conf.all.accept_redirects net.ipv4.conf.all.send_redirects net.ipv4.conf.all.accept_source_route net.ipv4.tcp_syncookies kernel.yama.ptrace_scope fs.protected_hardlinks fs.protected_symlinks` matches the original values you recorded in Task 1.
+- [ ] `sysctl kernel.kptr_restrict net.ipv4.icmp_echo_ignore_broadcasts net.ipv4.icmp_ignore_bogus_error_responses net.ipv4.conf.default.accept_redirects net.ipv4.conf.default.send_redirects net.ipv4.conf.default.accept_source_route net.ipv4.conf.all.rp_filter net.ipv4.conf.default.rp_filter net.ipv4.conf.all.log_martians` shows no Task 2 leftovers: each value matches what you noted before Task 2, or the documented kernel/distribution default if you did not record it.
 - [ ] `/tmp/audit-sysctl.sh` is gone.
 - [ ] No `/etc/modules-load.d/` entry you created remains (unless the host legitimately needs it).
 
