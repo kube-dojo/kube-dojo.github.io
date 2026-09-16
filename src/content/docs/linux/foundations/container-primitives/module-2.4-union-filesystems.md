@@ -507,6 +507,8 @@ OverlayFS is usually the default because it is in the mainline Linux kernel, wor
 
 This exercise uses the same progression an operator follows during a real storage investigation. You will first create a manual OverlayFS mount so the mechanics are visible without Docker metadata, then inspect image layers, grow a container writable layer, and compare Dockerfile layer choices. Run these commands on a Linux system where Docker is installed and where you can use `sudo` for the manual mount. If you are on a shared machine, use a disposable VM or lab host because the cleanup steps intentionally remove test images and temporary directories.
 
+**Environment honesty**: the commands below were written against a Debian/Ubuntu-style lab host with a local Docker daemon, matching the Ubuntu-based Killercoda environment in the frontmatter. The manual mount in Task 1 requires `sudo` and a kernel with OverlayFS support, which has been mainline since kernel 3.18, so any current distribution qualifies; the `upperdir` and `workdir` must also sit on the same backing filesystem, and placing the tree on certain network or tmpfs paths can make the mount fail or behave differently. The Docker tasks assume your user can run `docker` commands against the daemon; on Podman-only or containerd-only hosts the equivalent inspection commands exist, but the `/var/lib/docker/overlay2` paths in Tasks 2 and 3 will not. Nothing here was validated against a production host: run the privileged mount and the image-pulling steps only on a throwaway VM, lab instance, or sandbox you are allowed to modify.
+
 #### Task 1: Create a Manual Overlay
 
 ```bash
@@ -655,6 +657,52 @@ rm -rf /tmp/dockerfile-test
 The bad image keeps package-cache bytes in earlier layers even though the final layer hides them. The good image removes the cache before the layer is committed, so the final image should be smaller or at least show fewer wasted bytes in history. The exact size difference can vary with Docker version and Alpine package metadata, but the layer principle remains the same. Use `docker history` to connect the size difference to the instructions that created each layer.
 
 </details>
+
+### Cleanup and Reset
+
+Each task ends with its own cleanup step, but stopping mid-task leaves real host state behind, and even a full run keeps the pulled `alpine` images and Task 4's build cache. Run the reset below regardless of where you stopped; if you can simply destroy or snapshot-revert the lab VM, that is an equally valid reset. The most dangerous residue is a still-mounted overlay, because deleting its backing directories while the mount exists leaves stale state that confuses later mounts and audits.
+
+```bash
+# 1. Unmount the Task 1 overlay BEFORE removing its directories.
+#    mountpoint -q confirms the mount exists so this is safe to re-run.
+if mountpoint -q /tmp/overlay-test/merged 2>/dev/null; then
+    sudo umount /tmp/overlay-test/merged
+fi
+rm -rf /tmp/overlay-test
+
+# 2. If you also ran the inline /tmp/overlay demonstration earlier in the
+#    module and stopped before its final cleanup commands, apply the same
+#    pattern to /tmp/overlay.
+if mountpoint -q /tmp/overlay/merged 2>/dev/null; then
+    sudo umount /tmp/overlay/merged
+fi
+rm -rf /tmp/overlay
+
+# 3. Remove the Task 3 container if it survived (-f also stops it)
+docker rm -f test-overlay 2>/dev/null
+
+# 4. Remove the images this exercise pulled or built
+docker rmi bad-layers good-layers alpine:3.21 alpine 2>/dev/null
+
+# 5. Remove the Task 4 build context
+rm -rf /tmp/dockerfile-test
+
+# 6. Optionally reclaim the Task 4 build cache. Safe on a personal lab
+#    host; skip on a shared build host where pipelines reuse the cache.
+docker builder prune -f
+```
+
+Inspection commands such as `docker history`, `docker inspect`, `docker diff`, `docker ps -s`, and listing `/var/lib/docker/overlay2` are read-only, so there is no host state to restore for them. Nothing in this exercise changes Docker daemon configuration, kernel parameters, or storage-driver settings.
+
+Verify the reset before treating the lab as closed:
+
+- [ ] `mount | grep -E 'overlay(-test)?/merged'` returns nothing and both `/tmp/overlay-test` and `/tmp/overlay` are absent.
+- [ ] `docker ps -a --filter name=test-overlay` shows no container left from Task 3.
+- [ ] `docker images` no longer lists `bad-layers`, `good-layers`, or exercise-pulled `alpine` tags you do not intend to keep.
+- [ ] `/tmp/dockerfile-test` is absent.
+- [ ] `docker system df` shows build cache back near its pre-exercise level if you ran the optional `docker builder prune`.
+
+If any check fails, remove the leftover artifact explicitly and re-run the checklist. A stale overlay mount or an orphaned `sleep 3600` container is exactly the kind of quiet residue that confuses the next storage investigation, so treat verification as part of the exercise rather than an optional extra.
 
 ### Success Criteria
 
