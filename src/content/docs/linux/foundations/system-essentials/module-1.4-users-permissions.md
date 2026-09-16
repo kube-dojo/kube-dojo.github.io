@@ -17,17 +17,22 @@ lab:
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
-> **Prerequisites**: [Module 1.3: Filesystem Hierarchy](../module-1.3-filesystem-hierarchy/), shell navigation, basic `ls -l`, and enough Kubernetes context to read a Pod `securityContext`
+> **Prerequisites**:
+>
+> - **Required**: [Module 1.3: Filesystem Hierarchy](../module-1.3-filesystem-hierarchy/), shell navigation, basic `ls -l`, and a Linux host or VM with `sudo`.
+> - **Optional (Kubernetes cluster path)**: Enough Kubernetes context to read a Pod `securityContext` helps with the SecurityContext material and one optional hands-on exercise. That live `kubectl` exercise is gated behind an explicit fork below.
+>
+> A running Kubernetes cluster is **not** required for this module. The Killercoda lab `linux-1.4-users-permissions` is an Ubuntu host scenario with no cluster provided, and the full host identity/permissions exercise — including every host success criterion — completes on any Linux host without `kubectl`.
 
 ## What You'll Be Able to Do
 
 After completing this module, you will be able to treat Linux users and permissions as the kernel boundary behind container security, not as isolated administration trivia.
 
-- **Analyze** UID/GID resolution across `/etc/passwd`, `/etc/shadow`, `/etc/group`, NSS, SSSD, LDAP, and long-running process credentials.
-- **Diagnose** permission denials by tracing syscall intent through file mode bits, parent directories, POSIX ACL masks, capabilities, and LSM policy.
-- **Design** least-privilege ownership, octal modes, `umask`, setgid directories, sticky directories, and default ACLs for shared service paths.
-- **Evaluate** sudoers, PAM, `login.defs`, `limits.conf`, and auditd configuration for escalation risk, accountability, and operational recovery.
-- **Implement** Kubernetes `securityContext`, user namespace, rootless container, and capability-drop patterns that map cleanly to Linux kernel access checks.
+- **Analyze** UID/GID resolution across `/etc/passwd`, `/etc/shadow`, `/etc/group`, NSS, SSSD, LDAP, and long-running process credentials. *(Host-only)*
+- **Diagnose** permission denials by tracing syscall intent through file mode bits, parent directories, POSIX ACL masks, capabilities, and LSM policy. *(Host-only)*
+- **Design** least-privilege ownership, octal modes, `umask`, setgid directories, sticky directories, and default ACLs for shared service paths. *(Host-only)*
+- **Evaluate** sudoers, PAM, `login.defs`, `limits.conf`, and auditd configuration for escalation risk, accountability, and operational recovery. *(Host-only)*
+- **Implement** Kubernetes `securityContext`, user namespace, rootless container, and capability-drop patterns that map cleanly to Linux kernel access checks. *(Cluster path: the live Pod exercise needs `kubectl` access to a running cluster; on the host-only path, read the SecurityContext material and the exercise below as a worked example — see the fork in Hands-On Practice.)*
 
 ## Why This Module Matters
 
@@ -427,12 +432,14 @@ Collect `id` from the container, `stat` and `getfacl` on `/data`, the Pod securi
 
 ## Hands-On Practice
 
-- [ ] Analyze UID/GID resolution by comparing `getent passwd "$(whoami)"`, `id`, `/etc/passwd`, `/etc/group`, and `/etc/nsswitch.conf` on an Ubuntu 24.04 or RHEL 9 lab host.
-- [ ] Diagnose permission denials by creating a `root:deploy` test directory, adding a non-root account to the group, restarting the session, and proving the before/after result with the original actor.
-- [ ] Design file modes and ACLs by building a setgid shared directory under `/tmp`, adding a default ACL, creating files from two users or shells, and explaining why the new group and mask are correct.
-- [ ] Evaluate capabilities by finding file capabilities with `getcap -r`, inspecting `CapEff` in `/proc/1/status`, and explaining which capability you would drop or keep for a low-port web process.
-- [ ] Evaluate sudo and PAM policy by creating a disposable sudoers drop-in for one harmless command, validating it with `visudo -cf`, checking `sudo -l`, then removing the drop-in.
-- [ ] Implement Kubernetes SecurityContext by running a disposable Pod with explicit UID/GID, `fsGroup`, dropped capabilities, no privilege escalation, and a read-only root filesystem with an `emptyDir` mounted at `/tmp`.
+All tasks except the last one are host-only: a learner on the Killercoda `linux-1.4-users-permissions` ubuntu lab or any local Linux host with `sudo` can complete them without a Kubernetes cluster. The last task follows the cluster fork below.
+
+- [ ] Analyze UID/GID resolution by comparing `getent passwd "$(whoami)"`, `id`, `/etc/passwd`, `/etc/group`, and `/etc/nsswitch.conf` on an Ubuntu 24.04 or RHEL 9 lab host. *(Host-only)*
+- [ ] Diagnose permission denials by creating a `root:deploy` test directory, adding a non-root account to the group, restarting the session, and proving the before/after result with the original actor. *(Host-only)*
+- [ ] Design file modes and ACLs by building a setgid shared directory under `/tmp`, adding a default ACL, creating files from two users or shells, and explaining why the new group and mask are correct. *(Host-only)*
+- [ ] Evaluate capabilities by finding file capabilities with `getcap -r`, inspecting `CapEff` in `/proc/1/status`, and explaining which capability you would drop or keep for a low-port web process. *(Host-only)*
+- [ ] Evaluate sudo and PAM policy by creating a disposable sudoers drop-in for one harmless command, validating it with `visudo -cf`, checking `sudo -l`, then removing the drop-in. *(Host-only)*
+- [ ] *(Cluster path — optional)* Implement Kubernetes SecurityContext by running a disposable Pod with explicit UID/GID, `fsGroup`, dropped capabilities, no privilege escalation, and a read-only root filesystem with an `emptyDir` mounted at `/tmp`. Needs `kubectl` on a running cluster; on the host-only path, read the Implement Kubernetes SecurityContext section and the Pod exercise below as a worked example instead.
 
 Use this local exercise on a disposable Linux VM or lab host where you have sudo. It creates only temporary paths and a temporary group, and it forces you to retest with the non-root actor rather than root. If your distribution already has a `deploy` group, use a different lab group name.
 
@@ -454,7 +461,13 @@ sudo userdel -r kdsvc
 sudo groupdel kddeploy
 ```
 
-Use this Kubernetes exercise on a disposable namespace. The Pod prints its identity, writes to the `emptyDir` volume, and keeps running so you can inspect the result. The root filesystem is read-only, so `/tmp` is explicitly provided as a writable volume.
+> **Host-only vs cluster fork:** This exercise uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
+>
+> - **Killercoda lab / local Linux host:** The linked lab `linux-1.4-users-permissions` is an Ubuntu host scenario without a cluster. The host exercise above is the complete required hands-on path — read the Pod manifest and commands below as a worked example instead of running them.
+> - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the exercise below on a disposable namespace.
+> - **Skip-as-read:** Without a cluster, read the manifest and commands as illustrative; the surrounding text describes the expected identity and permission evidence, and a live cluster will differ in pod and path details.
+
+Use this Kubernetes exercise on a disposable namespace when you have cluster access. The Pod prints its identity, writes to the `emptyDir` volume, and keeps running so you can inspect the result. The root filesystem is read-only, so `/tmp` is explicitly provided as a writable volume.
 
 ```bash
 kubectl create namespace users-perms-lab
