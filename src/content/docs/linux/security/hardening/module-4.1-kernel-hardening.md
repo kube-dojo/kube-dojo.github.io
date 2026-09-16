@@ -775,13 +775,19 @@ sudo sysctl --system
 
 # 3. Restore values that a reload cannot undo on its own.
 # sysctl only applies values declared in config files; once your file is
-# gone, keys it managed keep their last-written value. Set them back to the
-# originals you recorded in Task 1. Adjust the right-hand side to match your
+# gone, keys it managed keep their last-written value. Set back exactly the
+# keys you recorded in Task 1. Adjust the right-hand side to match your
 # records — the examples below are common Ubuntu defaults, not guarantees:
-sudo sysctl -w kernel.kptr_restrict=1
+sudo sysctl -w kernel.randomize_va_space=2
+sudo sysctl -w net.ipv4.ip_forward=0
+sudo sysctl -w net.ipv6.conf.all.forwarding=0
+sudo sysctl -w net.ipv4.conf.all.accept_redirects=0
+sudo sysctl -w net.ipv4.conf.all.send_redirects=1
+sudo sysctl -w net.ipv4.conf.all.accept_source_route=0
+sudo sysctl -w net.ipv4.tcp_syncookies=1
 sudo sysctl -w kernel.yama.ptrace_scope=1
-sudo sysctl -w net.ipv4.conf.all.log_martians=0
-sudo sysctl -w net.ipv4.conf.all.rp_filter=2   # some images ship 2 (loose)
+sudo sysctl -w fs.protected_hardlinks=1
+sudo sysctl -w fs.protected_symlinks=1
 
 # 4. Remove the audit helper script
 rm -f /tmp/audit-sysctl.sh
@@ -798,7 +804,7 @@ Verify the reset before treating the lab as closed:
 
 - [ ] `ls /etc/sysctl.d/` no longer shows `99-security-hardening.conf`.
 - [ ] `sudo sysctl --system` completes without errors referencing the removed file.
-- [ ] `sysctl kernel.randomize_va_space kernel.kptr_restrict kernel.yama.ptrace_scope net.ipv4.conf.all.rp_filter` matches the original values you recorded in Task 1.
+- [ ] `sysctl kernel.randomize_va_space net.ipv4.ip_forward net.ipv6.conf.all.forwarding net.ipv4.conf.all.accept_redirects net.ipv4.conf.all.send_redirects net.ipv4.conf.all.accept_source_route net.ipv4.tcp_syncookies kernel.yama.ptrace_scope fs.protected_hardlinks fs.protected_symlinks` matches the original values you recorded in Task 1.
 - [ ] `/tmp/audit-sysctl.sh` is gone.
 - [ ] No `/etc/modules-load.d/` entry you created remains (unless the host legitimately needs it).
 
