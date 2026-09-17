@@ -45,12 +45,13 @@ This module is a capstone because it asks earlier concepts to work together at t
 | 0.3 | Commands | Navigating, creating files, checking status |
 | 0.4 | Files and directories | Creating your website's HTML file |
 | 0.5 | Editing files | Writing your web page with nano |
-| 0.6 | Networking | Understanding ports, IPs, and how browsers find servers |
-| 0.7 | Servers and SSH | Knowing what a server is and connecting to one in Option B |
-| 0.8 | Packages | Installing software on a server |
-| 0.9 | The cloud | Understanding where your server lives in Option B |
+| 0.6 | Git basics | Saving versions of your page so a broken edit is easy to undo |
+| 0.7 | Networking | Understanding ports, IPs, and how browsers find servers |
+| 0.8 | Servers and SSH | Knowing what a server is and connecting to one in Option B |
+| 0.9 | Packages | Installing software on a server |
+| 0.10 | The cloud | Understanding where your server lives in Option B |
 
-The table is also a diagnostic map. When the browser cannot load your page, you can ask which layer is failing instead of guessing randomly. A file-path problem points back to Modules 0.4 and 0.5, a port problem points back to Module 0.6, a remote-login problem points back to Module 0.7, and an installation problem points back to Module 0.8. Good troubleshooting is often just disciplined memory: name the layer, test that layer, then move to the next one.
+The table is also a diagnostic map. When the browser cannot load your page, you can ask which layer is failing instead of guessing randomly. A file-path problem points back to Modules 0.4 and 0.5, a port problem points back to Module 0.7, a remote-login problem points back to Module 0.8, and an installation problem points back to Module 0.9. Good troubleshooting is often just disciplined memory: name the layer, test that layer, then move to the next one.
 
 Before you continue, pick a path for the first pass. Choose the local container path if you want the fastest and safest proof that a server can run on your own machine. Choose the cloud VM path if you specifically want the experience of publishing a page that someone else can reach from another network. You can do both, and doing both is valuable because the differences make the shared concepts easier to see.
 
@@ -66,7 +67,14 @@ The restaurant analogy from earlier modules still helps, as long as you do not s
 
 When you type a URL, several decisions happen quickly. If the URL contains a domain, DNS turns the name into an IP address; if the URL contains a raw IP address, that step is already done. The browser chooses a port, usually port 80 for HTTP and port 443 for HTTPS, then opens a TCP connection to the server. After the connection exists, the browser sends an HTTP request such as "GET /", and nginx turns that slash path into a file lookup.
 
-Pause and predict: if nginx is running correctly but the file it expects is missing, what do you think the browser should show? Your answer should separate the network layer from the application layer. A missing file is different from a closed port, and a closed port is different from a cloud firewall timeout, even though all three can feel like "the website is broken" when you are staring at a browser tab.
+Pause and predict: if nginx is running correctly but the file it expects is missing, what do you think the browser should show? Your answer should separate the network layer from the application layer. A missing file is different from a closed port, and a closed port is different from a cloud firewall timeout, even though all three can feel like "the website is broken" when you are staring at a browser tab. Commit to your answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+The browser shows an error page from nginx itself, typically an HTTP 404 "Not Found" response. That is the key insight: the network connection succeeded, the port had a listener, and nginx answered, but the filesystem lookup failed. A closed port produces a fast "connection refused" because nothing accepted the connection, and a cloud firewall produces a long timeout because the request never reached a listener at all. Three failure shapes, three different layers, three different repairs.
+
+</details>
 
 The request path for your first server looks like this. Notice that every arrow has a test you can run later, which is why diagrams are not decoration in operations work. If a system is confusing, draw the path, write the expected handoff at each step, and test the handoffs one at a time.
 
@@ -98,7 +106,7 @@ Choose one container runtime and install it before running the commands. Docker 
 On macOS or Windows, install one of those desktop tools and start it before using the terminal. On Linux, you can install Docker or Podman through your package manager, then return to a normal shell. The Docker path may require logging out and back in after adding your user to the Docker group, because group membership is loaded when your login session starts.
 
 ```bash
-# Option A: Docker
+# Runtime choice 1: Docker
 sudo apt update && sudo apt install docker.io -y
 sudo systemctl start docker
 sudo usermod -aG docker $USER
@@ -107,7 +115,7 @@ sudo usermod -aG docker $USER
 **Important:** The new `docker` group is not active in your current shell. Start a **new terminal session** (log out and back in), or run `newgrp docker`, **before** the `docker run` commands below — otherwise you will get "permission denied".
 
 ```bash
-# Option B: Podman (no daemon, no root needed)
+# Runtime choice 2: Podman (no daemon, no root needed)
 sudo apt update && sudo apt install podman -y
 ```
 
@@ -127,7 +135,7 @@ docker run -d -p 8080:80 --name my-website nginx
 
 The `-p 8080:80` part is the most important beginner detail. The first number is the port on your computer, which is the port your browser will contact. The second number is the port inside the container, where nginx listens by default. Docker receives traffic on the host side and forwards it into the container side, which lets a containerized service appear as if it were listening directly on your machine.
 
-> **Stop and think**: Consider the concept of network ports from Module 0.6. If a port acts as a dedicated receiving dock for network traffic on your machine, what happens at the operating system level when Docker attempts to bind to port 8080 while another background application is already actively listening on that exact same port?
+> **Stop and think**: Consider the concept of network ports from Module 0.7. If a port acts as a dedicated receiving dock for network traffic on your machine, what happens at the operating system level when Docker attempts to bind to port 8080 while another background application is already actively listening on that exact same port?
 
 Use the browser only after you have a reason to believe the process started. A browser is a friendly interface, but it compresses many different failures into a few vague messages. When you visit the local URL, you are asking the host side of Docker's port mapping to forward an HTTP request into nginx inside the container.
 
@@ -234,7 +242,14 @@ Check the service state from the VM before opening a browser. `systemctl` talks 
 sudo systemctl status nginx
 ```
 
-Pause and predict: you have verified that nginx is active on the VM, but your browser at home cannot load the public IP. Which layer should you suspect first, the nginx process or the cloud firewall? A good answer explains why a local test from inside the VM can prove the backend works even while outside traffic remains blocked.
+Pause and predict: you have verified that nginx is active on the VM, but your browser at home cannot load the public IP. Which layer should you suspect first, the nginx process or the cloud firewall? A good answer explains why a local test from inside the VM can prove the backend works even while outside traffic remains blocked. Commit to your answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Suspect the cloud firewall first, because the process layer is already proven and a timeout is the signature of traffic being dropped before it reaches a listener. Run `curl http://localhost` inside the SSH session: if it returns the nginx page, the server, port, and file path on the VM are all healthy, and the only remaining suspect is the outside network path — usually a security group or provider firewall rule that blocks inbound port 80. Testing inside-out prevents you from restarting a healthy service when the real problem is a closed door in front of the VM.
+
+</details>
 
 Open your browser on your own computer and visit the public IP using plain HTTP. Do not use `localhost` for the cloud path, because `localhost` always points back to the machine where the browser runs. The public IP is the address of the VM, so it is the name of the remote destination your browser must contact.
 
@@ -373,13 +388,20 @@ Use both paths if you want the clearest mental model. Run local Docker first, th
 | Need to avoid billing risk | Yes | No |
 | Want infrastructure realism | Partial | Stronger |
 
-Which approach would you choose here and why: you need to demonstrate to a nontechnical friend that your terminal can publish a visible page within ten minutes, but you do not want to create any accounts or risk charges. The best answer is local Docker, because the goal is visibility on your own machine and the constraints make public reachability unnecessary. If the friend must open the page from their phone on another network, the answer changes because the requirement changes.
+Which approach would you choose here and why: you need to demonstrate to a nontechnical friend that your terminal can publish a visible page within ten minutes, but you do not want to create any accounts or risk charges. Commit to your answer before opening the reveal.
+
+<details>
+<summary>Check your answer</summary>
+
+The best answer is local Docker, because the goal is visibility on your own machine and the constraints make public reachability unnecessary. A cloud VM would add signup, SSH key handling, provider firewall rules, and billing considerations that the scenario explicitly excludes. If the friend must open the page from their phone on another network, the answer changes because the requirement changes — public reachability is exactly what the cloud VM path provides.
+
+</details>
 
 ---
 
 ## Did You Know?
 
-- [**The first website ever made is still online.**](https://home.cern/tags/first-website) Tim Berners-Lee created the first website at CERN during the Web's earliest days. It was [served from a NeXT computer with a handwritten note taped to it: "This machine is a server. DO NOT POWER IT DOWN!!"](https://home.cern/science/computing/birth-web/short-history-web), and you can still visit the historical copy at [info.cern.ch](http://info.cern.ch).
+- [**The first website ever made is still online.**](https://first-website.web.cern.ch/) Tim Berners-Lee created the first website at CERN during the Web's earliest days. It was [served from a NeXT computer with a handwritten note taped to it: "This machine is a server. DO NOT POWER IT DOWN!!"](https://home.cern/science/computing/the-birth-of-the-web/short-history-web/), and you can still visit the historical copy at [info.cern.ch](http://info.cern.ch).
 - **nginx was created to solve a scaling problem.** In 2002, Igor Sysoev began work connected to the "C10K problem," the challenge of serving 10,000 simultaneous connections on one server. The [official nginx site](https://nginx.org/en/) and the [official NGINX engineering write-up](https://blog.nginx.org/blog/inside-nginx-how-we-designed-for-performance-scale) explain the event-driven architecture behind that design.
 - **Port 80 is conventional, not magical.** HTTP clients assume port 80 when a URL starts with `http://` and does not specify a port, but a server can listen on another port if the client includes it explicitly. That is why `localhost:8080` works for the Docker path while the cloud path uses `http://YOUR_PUBLIC_IP` without a port suffix.
 - **The same nginx binary can serve different directories.** The official nginx Docker image serves from `/usr/share/nginx/html/` by default, while Ubuntu's nginx package commonly serves from `/var/www/html/`. That difference is a packaging and configuration choice, not a contradiction in how web servers work.
@@ -528,9 +550,9 @@ The success criteria are intentionally broader than "the page loaded once." A fi
 - [Google Cloud Free](https://cloud.google.com/free)
 - [Amazon EC2 Free Tier](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-free-tier-usage.html)
 - [AWS Free Tier](https://aws.amazon.com/free)
-- [The first website](https://home.cern/tags/first-website)
-- [A short history of the Web](https://home.cern/science/computing/birth-web/short-history-web)
-- [The birth of the Web](https://home.cern/science/computing/birth-web)
+- [CERN: Restoring the first website](https://first-website.web.cern.ch/)
+- [A short history of the Web](https://home.cern/science/computing/the-birth-of-the-web/short-history-web/)
+- [The birth of the Web](https://home.cern/science/computing/the-birth-of-the-web)
 - [First website historical copy](http://info.cern.ch)
 
 ---
