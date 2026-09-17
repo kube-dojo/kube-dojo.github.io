@@ -15,7 +15,7 @@ lab:
 >
 > **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >
-> **Prerequisites**: [Module 0.7: What is Networking?](/prerequisites/zero-to-terminal/module-0.7-what-is-networking/) - You should be comfortable with the terminal, files, and basic networking concepts.
+> **Prerequisites**: [Module 0.4: Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) and [Module 0.7: What is Networking?](/prerequisites/zero-to-terminal/module-0.7-what-is-networking/) - You should be comfortable with the terminal, navigating files, and basic networking concepts.
 
 ---
 
@@ -91,6 +91,19 @@ Hello from Go!
 Not every language makes you compile first. Python is usually interpreted, JavaScript may be interpreted or compiled just in time, and many cloud-native tools are distributed as ready-made binaries that you never build yourself. The important beginner lesson is that installation means placing the right executable files, libraries, metadata, and support files where the operating system and shell can find them reliably.
 
 Pause and predict: if a processor ultimately runs machine instructions, what has to be true before a command like `htop` can work from any terminal window? Think through the path from source code, to packaged files, to an executable location, to your shell finding the command name without you typing a full path.
+
+<details><summary>Check your prediction</summary>
+
+For a command like `htop` to run from any terminal prompt without typing a full directory path, four requirements must be satisfied:
+
+1. **Compilation and architecture match**: The source code must be compiled into machine instructions compatible with your processor architecture (such as x86_64 or arm64) and operating system kernel.
+2. **Standard executable location**: The resulting binary must be placed in a directory registered in your shell's `PATH` environment variable, such as `/usr/bin` or `/usr/local/bin`.
+3. **Execution permissions**: The binary file must have execute permissions (`chmod +x`) granted to your user or group.
+4. **Shared library resolution**: Any dynamic runtime libraries that `htop` links against (such as `libncurses` for terminal graphics) must be present in the system's shared library cache.
+
+A package manager automates all four requirements simultaneously during installation.
+
+</details>
 
 ## Packages and Package Managers
 
@@ -185,6 +198,14 @@ Package managers cannot remove all version tension, but they can make it visible
 Dependency inspection is a diagnostic skill, not trivia. When a production host suddenly behaves differently after an update, engineers ask what package changed, what dependency changed with it, and whether a service is now loading a different library. When a development laptop cannot run a tool, engineers check whether a dependency is missing or pinned to the wrong version. The package manager's metadata gives you the starting evidence for those questions.
 
 Pause and predict: imagine one command-line app strictly requires `libfoo` version 1.0 and another strictly requires `libfoo` version 2.0. If your operating system has one shared library location for that dependency, which app becomes risky to install second, and why might a container or isolated environment make the conflict easier to manage?
+
+<details><summary>Check your prediction</summary>
+
+The second app is risky to install because satisfying its requirement could upgrade or overwrite `libfoo` with version 2.0 in the shared system directory, which would immediately break the first app that depends on version 1.0. Alternatively, a defensive package manager might refuse to install the second app altogether to avoid breaking existing packages.
+
+Containers and isolated environments (such as Python virtual environments or container image filesystems) resolve this by giving each application its own isolated filesystem and library tree. Because the two applications no longer share `/usr/lib` on the host, each can load its required version of `libfoo` without interfering with the other.
+
+</details>
 
 This is also why "it installed successfully" is not the same as "the system is in the desired state." A package can install while pulling in a newer library than expected, leaving an old configuration file untouched, or enabling a service that still needs manual setup. Package managers handle a large part of the mechanical work, but verification remains your responsibility. The right question after an install is what changed and whether the tool now behaves as required.
 
@@ -316,7 +337,15 @@ Homebrew search works the same way conceptually. It searches Homebrew's formulae
 brew search keyword
 ```
 
-Which approach would you choose here and why: installing a tool immediately because a blog post says its name, or searching the package manager and inspecting the package metadata first? The second path takes a few more seconds, but it gives you evidence about the package source, version, dependencies, and maintenance status before you grant it a place on your machine.
+Pause and reflect: which approach would you choose here and why: installing a tool immediately because a blog post mentions its name, or searching the package manager and inspecting the package metadata first? Consider what operational and security risks arise when you run installation commands directly from third-party guides without verifying package provenance.
+
+<details><summary>Check your prediction</summary>
+
+Searching the catalog and inspecting metadata first is the professional choice. Although it takes a few seconds longer, checking package details gives you verifiable evidence about the package source, exact version, upstream maintainer, dependencies, and maintenance status before granting it administrative privileges on your system.
+
+A blog post may be outdated, recommend an abandoned fork, target a different operating system release, or reference an unvetted personal package archive (PPA) that could introduce vulnerabilities or broken dependencies. Inspecting metadata via `apt show` or `brew info` ensures that you install verified software from trusted repositories that matches your current system architecture.
+
+</details>
 
 Updates and removals deserve the same discipline as installs because they change the dependency graph too. An upgrade can replace a library used by several tools, and a removal can leave an automatically installed dependency behind because another package still needs it. When the package manager displays a plan, treat it as a change request in miniature. Read the packages to be installed, upgraded, removed, or left unchanged, then decide whether the plan matches your intention.
 
@@ -618,6 +647,59 @@ You are not expected to memorize every dependency. The success condition is that
 
 </details>
 
+### Task 6: Package Diagnostics (Unguided)
+
+This final task is unguided: rather than following a step-by-step recipe, inspect the three simulated terminal transcripts below. Each snapshot captures a real-world package management problem encountered by engineers on Linux and macOS hosts. For each scenario, analyze the terminal output, identify the underlying root cause, and determine your recommended diagnostic move or operational decision before opening the solution notes.
+
+Transcript A captures a shell session on a newly provisioned Ubuntu cloud server where an engineer attempts to install the Nginx web server immediately after first logging in:
+
+```text
+ubuntu@web-node-01:~$ sudo apt install nginx
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package nginx
+ubuntu@web-node-01:~$
+```
+
+Transcript B shows an installation confirmation prompt on a production server when an operator attempts to install a lightweight network diagnostic utility recommended on a community forum:
+
+```text
+admin@prod-api-02:~$ sudo apt install net-speed-check
+Reading package lists... Done
+Building dependency tree... Done
+The following additional packages will be installed:
+  libx11-6 libx11-data libxau6 libxcb1 libxdmcp6 x11-common xterm
+The following NEW packages will be installed:
+  libx11-6 libx11-data libxau6 libxcb1 libxdmcp6 net-speed-check x11-common xterm
+0 upgraded, 8 newly installed, 0 to remove and 12 not upgraded.
+Need to get 4,120 kB of archives.
+After this operation, 18.5 MB of additional disk space will be used.
+Do you want to continue? [Y/n]
+```
+
+Transcript C displays terminal outputs from two engineers comparing their local installations of `htop` across two different workstations, observing unexplained differences in output format and available hotkeys:
+
+```text
+# Engineer Alice (Ubuntu 22.04 LTS workstation):
+alice@workstation:~$ htop --version
+htop 3.0.5
+
+# Engineer Bob (Ubuntu 24.04 LTS workstation):
+bob@workstation:~$ htop --version
+htop 3.3.0
+```
+
+<details><summary>Solution notes for Task 6</summary>
+
+Transcript A: The local package index cache is empty or uninitialized. On newly provisioned cloud instances, `/var/lib/apt/lists/` often contains no package indexes or only minimal bootstrap metadata. The package manager cannot find `nginx` because it has not yet indexed the upstream Ubuntu repository catalog. The immediate fix is to run `sudo apt update` to download the current repository indexes, followed by `sudo apt install nginx`.
+
+Transcript B: The package `net-speed-check` depends on graphical X11 display libraries (`libx11-6`, `x11-common`, `xterm`) despite claiming to be a command-line tool. On a headless production server, installing unexpected graphical libraries expands the host's attack surface, consumes memory and disk space, and indicates poor package curation. The correct operational decision is to type `n` to cancel the installation immediately, inspect package details with `apt show net-speed-check`, and select a minimal, well-maintained CLI alternative (such as standard `iperf3` or `curl`).
+
+Transcript C: Alice and Bob run different Long-Term Support releases of Ubuntu (22.04 LTS vs. 24.04 LTS). Standard distribution repositories freeze stable software versions at release time to preserve ABI stability and avoid regressions across the OS lifecycle. Alice's system uses Ubuntu 22.04 (`jammy`), which packages `htop` 3.0.5, whereas Bob's system uses Ubuntu 24.04 (`noble`), which packages `htop` 3.3.0. Running `apt show htop` or `apt-cache policy htop` on each machine will verify the repository release suite and explain the version difference without reinstalling packages.
+
+</details>
+
 ### Success Criteria
 
 - [ ] Execute software installations for `htop` and `tree` using the package manager for your operating system.
@@ -626,6 +708,7 @@ You are not expected to memorize every dependency. The success condition is that
 - [ ] Diagnose dependency requirements for an installed package using `apt show`, `apt-cache depends`, or `brew info`.
 - [ ] Run `htop`, quit it with `q`, and confirm its installed version.
 - [ ] Use `tree` to display a directory and explain whether any error is a package problem or a missing-directory problem.
+- [ ] Diagnose unguided package scenarios from terminal transcripts by identifying missing catalog refreshes, evaluating unfamiliar dependency plans, and determining why versions differ across hosts.
 
 ## Sources
 
