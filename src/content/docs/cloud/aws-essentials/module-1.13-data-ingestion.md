@@ -4,17 +4,7 @@ slug: cloud/aws-essentials/module-1.13-data-ingestion
 sidebar:
   order: 14
 ---
-
-> **Complexity:** `[COMPLEX]`
->
-> **Time:** 90-120 min
->
-> **Prerequisites:**
-> [1.1-iam](../module-1.1-iam/),
-> [1.4-s3](../module-1.4-s3/),
-> [1.10-cloudwatch](../module-1.10-cloudwatch/)
-
----
+**Complexity**: `[COMPLEX]` | **Time to Complete**: 90-120 min | **Prerequisites**: [1.1-iam](../module-1.1-iam/), [1.4-s3](../module-1.4-s3/), [1.10-cloudwatch](../module-1.10-cloudwatch/)
 
 ## What You'll Be Able to Do
 

@@ -4,10 +4,7 @@ slug: cloud/aws-essentials/module-1.6-ecr
 sidebar:
   order: 7
 ---
-## Complexity: `[MEDIUM]`
-## Time to Complete: 1 hour
-
----
+**Complexity**: `[MEDIUM]` | **Time to Complete**: 1 hour | **Prerequisites**: Module 1.1 IAM, Docker fundamentals, local Docker installation, and a configured AWS CLI.
 
 ## Prerequisites
 

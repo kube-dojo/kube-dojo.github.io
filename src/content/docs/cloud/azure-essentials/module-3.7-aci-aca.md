@@ -4,12 +4,7 @@ slug: cloud/azure-essentials/module-3.7-aci-aca
 sidebar:
   order: 8
 ---
-
-> **Complexity:** `[COMPLEX]`
->
-> **Time to Complete:** 3 hours
->
-> **Prerequisites:** [Module 3.6 (ACR)](../module-3.6-acr/), [Module 3.1 (Entra ID)](../module-3.1-entra-id/)
+**Complexity**: `[COMPLEX]` | **Time to Complete**: 3 hours | **Prerequisites**: [Module 3.6 (ACR)](../module-3.6-acr/), [Module 3.1 (Entra ID)](../module-3.1-entra-id/)
 
 ## What You'll Be Able to Do
 
