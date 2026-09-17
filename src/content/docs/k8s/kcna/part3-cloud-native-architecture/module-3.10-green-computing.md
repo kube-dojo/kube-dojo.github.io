@@ -7,7 +7,7 @@ sidebar:
   order: 11
 ---
 
-> **Complexity**: `[QUICK]` - Awareness and applied analysis level
+> **Complexity**: `[MEDIUM]` - Long-form sustainability module with applied analysis and measurement practice
 > **Time to Complete**: 45-60 minutes
 > **Prerequisites**: Module 3.1 (Cloud Native Principles), Module 3.2 (CNCF Ecosystem), basic Kubernetes resource requests and limits, and the ability to inspect Kubernetes objects with `kubectl` or its common alias `k`.
 

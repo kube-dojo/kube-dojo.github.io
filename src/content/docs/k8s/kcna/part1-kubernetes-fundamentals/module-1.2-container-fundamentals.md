@@ -6,7 +6,7 @@ sidebar:
   order: 3
 ---
 
-Complexity: `[QUICK]` foundational concepts. Time to complete: 35-45 minutes. Prerequisites: Module 1.1 and basic Linux command-line comfort. The examples assume Kubernetes 1.35 or newer, and when Kubernetes commands appear later, set `alias k=kubectl` so the short `k` form is clear.
+Complexity: `[MEDIUM]` long-form foundational module with hands-on isolation and packaging practice. Time to complete: 35-45 minutes. Prerequisites: Module 1.1 and basic Linux command-line comfort. The examples assume Kubernetes 1.35 or newer, and when Kubernetes commands appear later, set `alias k=kubectl` so the short `k` form is clear.
 
 ## Learning Outcomes
 
