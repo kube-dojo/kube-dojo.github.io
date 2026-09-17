@@ -6,7 +6,7 @@ sidebar:
   order: 6
 ---
 
-- **Complexity**: `[QUICK]` - tool selection and first-run practice
+- **Complexity**: `[MEDIUM]` - Long-form observability module with tool selection and hands-on practice
 - **Time to Complete**: 40-55 minutes
 - **Prerequisites**: Module 3.4 (Observability Fundamentals), basic Kubernetes workloads, and a local Kubernetes 1.35+ cluster for the optional lab
 - **Command style**: This module uses `alias k=kubectl` in shell examples so commands stay readable while still running the standard Kubernetes CLI

@@ -6,7 +6,7 @@ sidebar:
   order: 9
 ---
 
-**Complexity**: `[QUICK]` - Organization concepts. **Time to Complete**: 35-40 minutes. **Prerequisites**: Modules 1.5-1.7. This is a fundamentals module, but it deliberately treats namespaces and labels as production reliability tools rather than vocabulary flashcards.
+**Complexity**: `[MEDIUM]` - Long-form organization module with applied namespace and label practice. **Time to Complete**: 35-40 minutes. **Prerequisites**: Modules 1.5-1.7. This is a fundamentals module, but it deliberately treats namespaces and labels as production reliability tools rather than vocabulary flashcards.
 
 This module assumes Kubernetes 1.35 or newer and uses `k` as the short alias for `kubectl`. If your shell does not already define it, run `alias k=kubectl` before the hands-on section so the commands match the examples and your muscle memory starts forming around the same compact workflow operators use during troubleshooting.
 

@@ -7,7 +7,7 @@ sidebar:
   order: 10
 ---
 
-> **Complexity**: `[QUICK]` - Fast triage mindset for Kubernetes 1.35+
+> **Complexity**: `[MEDIUM]` - Long-form debugging module with structured triage drills for Kubernetes 1.35+
 >
 > **Time to Complete**: 35-45 minutes
 >
