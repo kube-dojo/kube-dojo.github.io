@@ -8,7 +8,7 @@ sidebar:
 
 | Metadata | Value |
 |----------|-------|
-| **Complexity** | `[QUICK]` - Essential orientation |
+| **Complexity** | `[MEDIUM]` - Long-form orientation module with exam-format analysis and study-plan design |
 | **Time to Complete** | 30-35 minutes |
 | **Prerequisites** | None - this is your starting point |
 

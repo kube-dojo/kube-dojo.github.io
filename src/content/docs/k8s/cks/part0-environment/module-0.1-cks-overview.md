@@ -11,7 +11,7 @@ lab:
   difficulty: advanced
   environment: kubernetes
 ---
-> **Complexity**: `[QUICK]` - Essential orientation
+> **Complexity**: `[MEDIUM]` - Long-form orientation module with exam-format analysis and study-plan design
 >
 > **Time to Complete**: 20-25 minutes
 >
@@ -321,7 +321,7 @@ If you repeat this example across several workloads, you will notice which lens 
 
 ## Patterns & Anti-Patterns
 
-For a quick orientation module, the most useful pattern is to connect every study activity to a concrete security decision. Reading about Pod Security Standards is helpful, but applying a namespace label, deploying a violating Pod, reading the rejection, and then fixing the manifest creates exam-ready memory. The same pattern works for Falco, SBOMs, RBAC, NetworkPolicies, and kernel profiles.
+For an orientation module like this one, the most useful pattern is to connect every study activity to a concrete security decision. Reading about Pod Security Standards is helpful, but applying a namespace label, deploying a violating Pod, reading the rejection, and then fixing the manifest creates exam-ready memory. The same pattern works for Falco, SBOMs, RBAC, NetworkPolicies, and kernel profiles.
 
 Another reliable pattern is to keep a narrow evidence ladder for each domain. Start with the Kubernetes object, then check the controller or tool output, then inspect host or runtime evidence only when the task points there. This prevents random command wandering while still reminding you that not all security state is visible from one API response.
 
