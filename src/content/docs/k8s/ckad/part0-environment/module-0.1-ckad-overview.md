@@ -11,7 +11,7 @@ lab:
   difficulty: intermediate
   environment: kubernetes
 ---
-> **Complexity**: `[QUICK]` - Orientation and strategy
+> **Complexity**: `[MEDIUM]` - Long-form orientation and strategy module
 >
 > **Time to Complete**: 20-30 minutes
 >

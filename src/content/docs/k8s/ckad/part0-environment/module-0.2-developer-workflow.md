@@ -12,7 +12,7 @@ lab:
   environment: kubernetes
 ---
 
-> **Complexity**: `[QUICK]` - Essential kubectl patterns for CKAD speed and accuracy
+> **Complexity**: `[MEDIUM]` - Long-form kubectl workflow module for CKAD speed and accuracy
 >
 > **Time to Complete**: 35-45 minutes
 >
