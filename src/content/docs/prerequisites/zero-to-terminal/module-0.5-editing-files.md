@@ -15,7 +15,7 @@ lab:
 >
 > **Time to Complete**: 80–100 minutes (read + editor drills)
 >
-> **Prerequisites**: [Module 0.3 - First Terminal Commands](../module-0.3-first-commands/)
+> **Prerequisites**: [Module 0.4 - Files and Directories](../module-0.4-files-and-directories/), which builds on [Module 0.3 - First Terminal Commands](../module-0.3-first-commands/)
 
 ---
 
@@ -63,7 +63,14 @@ Here is the basic editing loop you will practice throughout this module. The loo
 +--------------------+      +--------------------+      +--------------------+
 ```
 
-Pause and predict: if you type three lines in `nano` but close the terminal window before saving, which copy of the file does a later `cat hello.txt` command read: the unsaved editor buffer or the file already stored on disk? The correct answer is the file on disk, because the shell and `cat` know nothing about the editor's unsaved memory. Thinking this through before the first exercise prevents a common surprise when a terminal editor behaves more literally than a modern graphical editor with autosave.
+Pause and predict: if you type three lines in `nano` but close the terminal window before saving, which copy of the file does a later `cat hello.txt` command read: the unsaved editor buffer or the file already stored on disk? Commit to an answer before revealing the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The correct answer is the file on disk, because the shell and `cat` know nothing about the editor's unsaved memory. Thinking this through before the first exercise prevents a common surprise when a terminal editor behaves more literally than a modern graphical editor with autosave.
+
+</details>
 
 ## Meet nano Before You Need It
 
@@ -80,7 +87,14 @@ The comparison is not an argument that one editor is morally better than another
 
 You will see the same idea when choosing between `nano` and `cat`. `nano` is for changing a file, while `cat` is for printing a file to the terminal. Opening an editor just to look at a file creates unnecessary risk because a stray keystroke can modify the buffer. Printing a file with `cat` when you meant to edit it is harmless but ineffective. The workflow is easier when each command has a clear job in your mind.
 
-Before running this, what output do you expect from `cat hello.txt` if `hello.txt` does not exist yet? Some systems will show "No such file or directory," and that is useful feedback rather than a failure of the lesson. Editors such as `nano` can create a new file when you save, while viewers such as `cat` normally expect the file to already exist. That difference explains why the same filename can be acceptable to one command and an error to another.
+Before running this, what output do you expect from `cat hello.txt` if `hello.txt` does not exist yet? Commit to an answer before revealing the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Most systems will show "No such file or directory," and that is useful feedback rather than a failure of the lesson. Editors such as `nano` can create a new file when you save, while viewers such as `cat` normally expect the file to already exist. That difference explains why the same filename can be acceptable to one command and an error to another.
+
+</details>
 
 There is another subtle editor distinction that will matter later: some editors are optimized for discoverability, and others are optimized for speed after memorization. `nano` makes common commands visible at the bottom of the screen, so it is easy to recover when you forget a shortcut. `vim` hides much of its power behind commands, modes, and combinations that become fast only after practice. This module chooses discoverability because the first milestone is not speed; it is making correct changes without getting trapped inside the tool.
 
@@ -210,7 +224,14 @@ cat hello.txt
 
 When you work on remote systems, this habit protects you from a subtle class of mistakes: editing the wrong host, the wrong directory, or a temporary copy. A quick `pwd` before editing tells you where you are, and a quick `cat` after editing tells you what landed on disk. If you are connected to a remote host, `hostname` can also confirm which machine you are changing before you touch a sensitive file.
 
-Exercise scenario: imagine you intended to edit a practice file in your home directory, but your prompt shows that you are in `/tmp`. The edit might still succeed, yet the file would be in the wrong place for the next command. In that situation, the fix is not to type faster; the fix is to stop, run `pwd`, move to the intended directory, and repeat the edit in the correct location.
+Exercise scenario: imagine you intended to edit a practice file in your home directory, but your prompt shows that you are in `/tmp`. Pause and predict: what is the focused fix, and why is typing faster not part of it? Commit to an answer before revealing the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The edit might still succeed, yet the file would be in the wrong place for the next command. In that situation, the fix is not to type faster; the fix is to stop, run `pwd`, move to the intended directory, and repeat the edit in the correct location. Rushing only produces the same mistake in less time.
+
+</details>
 
 Verification is also where you catch spelling and punctuation mistakes that the editor cannot understand for you. `nano` does not know whether "pantry" or "panty" is the right kitchen word, and Bash does not know whether a message in an `echo` line is professionally worded. The editor helps you place characters; the verification step helps you read them as the next program or person will read them. That is why experienced terminal users often print or diff a file after editing even when the change seemed simple.
 
@@ -234,7 +255,14 @@ Search:
 
 Type `special` and press Enter. The cursor should jump to the matching word in the file. If there is no match, `nano` reports that the text was not found, which is still useful information because it tells you the file does not contain the exact spelling you searched for.
 
-Which approach would you choose here and why: manually scanning a two-line note, or using Ctrl+W to find a setting in a file with several hundred lines? Manual scanning is fine when the file fits on one screen, but search becomes the safer choice once your eyes can miss a repeated word, a similar setting name, or a comment that looks like an active configuration line.
+Pause and predict: which approach would you choose here and why — manually scanning a two-line note, or using Ctrl+W to find a setting in a file with several hundred lines? Commit to an answer before revealing the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Manual scanning is fine when the file fits on one screen, but search becomes the safer choice once your eyes can miss a repeated word, a similar setting name, or a comment that looks like an active configuration line. The skill is choosing the approach by file size and risk, not by habit.
+
+</details>
 
 The tradeoff with cut and paste is that it is easy to move the wrong line if you do not verify the final arrangement. After rearranging lines, read the surrounding text before saving, then save and verify with `cat` or another viewer. In later modules, this same caution applies to YAML indentation, where moving a line to the wrong level can change the meaning of an entire Kubernetes manifest.
 
@@ -271,11 +299,18 @@ A script file is also easier to reason about than a remembered sequence of comma
 
 Save with Ctrl+O, press Enter to confirm the filename, and exit with Ctrl+X. At this point the file exists and contains valid shell commands, but it is not necessarily a program the operating system is allowed to execute directly. New files are often created as readable and writable data, not as runnable programs, and that default is a security feature.
 
-Before running `chmod`, try to run the script directly and predict the result. This is a useful experiment because it separates "the file contains commands" from "the file has execute permission." If your system replies with "Permission denied," it is doing the correct thing: it refuses to treat ordinary text as a program until you explicitly grant that permission.
+Before running `chmod`, run the script directly and predict the result. This is a useful experiment because it separates "the file contains commands" from "the file has execute permission." Commit to an answer before revealing the explanation.
 
 ```bash
 ./my-first-script.sh
 ```
+
+<details>
+<summary>Check your prediction</summary>
+
+If your system replies with "Permission denied," it is doing the correct thing: it refuses to treat ordinary text as a program until you explicitly grant that permission. The failure is not in your script content; it is in the filesystem permission layer, which you are about to change deliberately.
+
+</details>
 
 Now add execute permission with `chmod +x`. `chmod` stands for change mode, and `+x` means "add execute permission." You are telling the operating system that this file is allowed to run as a program, not merely sit on disk as text.
 
@@ -318,7 +353,14 @@ Configuration files deserve extra caution because programs read them literally. 
 
 This is why "quick edit" should not mean "careless edit." A quick edit is small, focused, and verified; a careless edit is rushed, unverified, and often performed in the wrong place. The terminal rewards precision because it gives you compact tools with very little ceremony. It also exposes mistakes quickly because those tools do exactly what you ask. Your goal is to become calm with that literalness rather than intimidated by it.
 
-Exercise scenario: you are about to change a remote service configuration, and you notice your terminal prompt includes a hostname you do not recognize. The safest next step is not to edit and hope; it is to run `hostname` and `pwd`, confirm the machine and directory, and only then open the file. Terminal editing is precise, but precision cuts both ways when you are connected to the wrong place.
+Exercise scenario: you are about to change a remote service configuration, and you notice your terminal prompt includes a hostname you do not recognize. Pause and predict: what is the safest next step, and why is "edit and hope" dangerous here? Commit to an answer before revealing the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The safest next step is not to edit and hope; it is to run `hostname` and `pwd`, confirm the machine and directory, and only then open the file. Terminal editing is precise, but precision cuts both ways when you are connected to the wrong place.
+
+</details>
 
 ## Patterns & Anti-Patterns
 
@@ -544,12 +586,34 @@ hello.txt    kitchen-memo.txt    kitchen-report.sh    my-first-script.sh
 Report complete. Kitchen is running smoothly!
 ```
 
-### Part 4: Clean up
+### Part 4: Diagnose and fix a broken script (unguided)
+
+Parts 1 through 3 told you every command to run. This part removes the scaffolding and tests whether you can diagnose a failure on your own. Create a file named `broken-report.sh` with exactly this content, including the mistakes as written:
+
+```bash
+#!/bin/bash
+
+echo "=== Broken Kitchen Report ===
+echo "Date: $(date)"
+echo "Memo follows:"
+cat kitchen-memo.txt
+```
+
+Save the file, then run it directly with `./broken-report.sh`. Something is wrong at more than one layer, and this time nobody tells you which layer fails first. Work the diagnostic sequence from this module: read the exact error message, decide whether the failure is permission, interpreter parsing, or script logic, fix only that layer, and run the script again. Repeat until the script prints the heading, the date, and the memo contents. Before you call it fixed, verify the final file contents with `cat broken-report.sh` so you can see exactly what changed.
+
+<details>
+<summary>Check your diagnosis</summary>
+
+There are two failures at two different layers. First, a newly created file has no execute permission, so `./broken-report.sh` answers "Permission denied" until you run `chmod +x broken-report.sh`. Second, the first `echo` line is missing its closing quotation mark, so after the permission is fixed Bash reports `unexpected EOF while looking for matching '"'` and a syntax error at the end of the file. Correct that line to `echo "=== Broken Kitchen Report ==="` with `nano`, save, and run `./broken-report.sh` again. A correct run prints the report heading, the current date, "Memo follows:", and the six memo lines. Notice the order in which the failures appeared: the permission layer blocked everything, and only after it was fixed could Bash even show you the content error. If you tried `bash broken-report.sh` instead, you saw the content error first because that form skips the execute-permission check; both orders are valid diagnostic evidence.
+
+</details>
+
+### Part 5: Clean up
 
 Remove the training files when you are done. Read the command before running it because `rm` removes files without sending them to a graphical trash folder. In this case the filenames are specific to the exercise, and removing them leaves your home directory tidy for the next module.
 
 ```bash
-rm hello.txt kitchen-memo.txt kitchen-report.sh my-first-script.sh
+rm hello.txt kitchen-memo.txt kitchen-report.sh my-first-script.sh broken-report.sh
 ```
 
 Success criteria:
@@ -560,6 +624,8 @@ Success criteria:
 - [ ] You wrote `kitchen-report.sh` with a valid `#!/bin/bash` shebang.
 - [ ] You used `chmod +x kitchen-report.sh` before running it directly.
 - [ ] You diagnosed any error by separating directory, save, permission, and script-content problems.
+- [ ] You diagnosed `broken-report.sh` without step-by-step guidance, identifying the permission failure and the missing-quote failure as separate layers.
+- [ ] You fixed `broken-report.sh` with `chmod +x` and a `nano` edit, then verified the corrected output by direct execution.
 
 ## Sources
 
