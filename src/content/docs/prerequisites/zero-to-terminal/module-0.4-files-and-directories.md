@@ -15,7 +15,7 @@ lab:
 >
 > **Time to Complete**: 90–120 minutes (long-form beginner read + practice)
 >
-> **Prerequisites**: [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/) — You should be able to open a terminal and type commands.
+> **Prerequisites**: [Module 0.3: First Terminal Commands](../module-0.3-first-commands/) — You should be able to open a terminal, run basic commands such as `echo` and `pwd`, and read their output. Module 0.3 builds on [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/), so complete both before starting here.
 
 ---
 
@@ -75,7 +75,14 @@ The tree starts at `/`, called the root directory. Every absolute path begins th
 
 The `~` character is a shell shortcut for your home directory, not a directory named tilde that you normally see in `ls`. That distinction matters when you read documentation. A command that points to `~/.kube/config` means "inside the current user's home directory, find a hidden `.kube` directory, then read the `config` file." It does not matter whether the user's actual home path is `/home/amina`, `/home/yourname`, or `/Users/amina` on macOS.
 
-Pause and predict: if two users on the same Linux machine both run a command that reads `~/.kube/config`, do they read the same file or different files? The answer is usually different files, because `~` expands separately for each user's shell session. That is why documentation uses `~` for personal configuration but uses absolute system paths, such as `/etc/kubernetes/manifests/`, for machine-wide configuration.
+Pause and predict: if two users on the same Linux machine both run a command that reads `~/.kube/config`, do they read the same file or different files? Commit to your answer out loud or on paper before opening the reveal, because the prediction is what trains the mental model.
+
+<details>
+<summary>Check your prediction</summary>
+
+They usually read different files, because `~` expands separately for each user's shell session. One user's `~/.kube/config` might resolve to `/home/amina/.kube/config` while another's resolves to `/home/yourname/.kube/config`, even though both typed the identical command. That is why documentation uses `~` for personal configuration but uses absolute system paths, such as `/etc/kubernetes/manifests/`, for machine-wide configuration.
+
+</details>
 
 | Concept | Beginner Meaning | Operational Consequence |
 |---------|------------------|--------------------------|
@@ -165,6 +172,20 @@ pwd
 
 Before running this, what output do you expect from the last `pwd` if the previous command was `cd /`? Make the prediction first, then run it. This habit matters because terminal work is mostly hypothesis testing: you form a mental model of where you are, run a command, and compare the output with what you expected.
 
+<details>
+<summary>Check your prediction</summary>
+
+The last `pwd` prints `/`, the root directory, because `cd /` moves you to the very top of the filesystem tree. An absolute destination like `/` always lands in the same place, no matter where your session was standing before the command. If your run printed something else, re-check the order of the commands rather than blaming the shell.
+
+</details>
+
+<details>
+<summary>Reveal the expected output</summary>
+
+The output should be a single line containing `/`, because `cd /` moves the session to the root directory and `pwd` then prints that absolute path. If your prediction was anything else, trace the sequence again: the earlier `cd ~`, `cd ..`, and `cd -` movements do not matter once `cd /` runs, because every `cd` replaces the working directory completely rather than adding to it.
+
+</details>
+
 ## Absolute and Relative Paths
 
 A **path** is a written route to a file or directory. There are two kinds you will use constantly: absolute paths and relative paths. The difference is not academic; it decides whether a command works from anywhere or only from a particular starting directory.
@@ -215,7 +236,14 @@ Example relative path (run only when your current directory is a child of the fo
 cat ../README.md
 ```
 
-Which approach would you choose here and why: an absolute path to `/home/user/projects/app/README.md`, or the relative path `../README.md`? In an interactive project session, the relative path is usually faster and clearer. In an automation script that might run from several directories, the absolute path or a path derived from the script's own location is usually safer.
+Which approach would you choose here and why: an absolute path to `/home/user/projects/app/README.md`, or the relative path `../README.md`? Commit to an answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+In an interactive project session, the relative path is usually faster and clearer. In an automation script that might run from several directories, the absolute path or a path derived from the script's own location is usually safer. The deciding question is whether the starting directory is stable and known, not which form looks shorter on the screen.
+
+</details>
 
 | Situation | Prefer | Why |
 |-----------|--------|-----|
@@ -258,7 +286,14 @@ tail log-file.txt
 tail -n 20 log-file.txt
 ```
 
-Think about it: you need to check the last few lines of a log file that is 10,000 lines long. Would you use a command that shows the whole file, or one that shows just the end? `tail` is designed for this situation because it lets you focus on the newest events without scrolling through everything that happened earlier.
+Think about it: you need to check the last few lines of a log file that is 10,000 lines long. Would you use a command that shows the whole file, or one that shows just the end? Commit to an answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+`tail` is designed for this situation because it lets you focus on the newest events without scrolling through everything that happened earlier. Printing all 10,000 lines with `cat` would bury the few recent lines you actually need and make your terminal hard to use in the process.
+
+</details>
 
 | Tool | Best For | Avoid When | Example Use |
 |------|----------|------------|-------------|
@@ -337,7 +372,14 @@ ls -a ~
 ls -l ~/.kube
 ```
 
-Pause and predict: if plain `ls ~` does not show `.bashrc`, will `cat ~/.bashrc` still work when the file exists and you have permission? Yes, because hidden status affects listing behavior, not path resolution. A hidden file can still be addressed directly by its full or relative path.
+Pause and predict: if plain `ls ~` does not show `.bashrc`, will `cat ~/.bashrc` still work when the file exists and you have permission? Commit to yes or no, and one sentence of reasoning, before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Yes, the command still works, because hidden status affects listing behavior, not path resolution. A leading dot only tells `ls` to skip the name in a default listing; the filesystem itself stores and finds `.bashrc` like any other name. A hidden file can always be addressed directly by its full or relative path, which is why commands such as `cat ~/.bashrc` succeed even when plain `ls` never showed the file.
+
+</details>
 
 ## Reading Permission Strings from `ls -l`
 
@@ -452,7 +494,14 @@ When you redirect output with `>`, the stakes change. The command `echo "Ingredi
 echo "Ingredients: coffee, mascarpone, ladyfingers, cocoa" > recipes/desserts/tiramisu.txt
 ```
 
-Pause and predict: if `tiramisu.txt` already contains three lines and you run the redirect command above, how many ingredient lines will remain afterward? The answer is one, because `>` replaces the file content with the command output. Later terminal modules will introduce append redirection and editors, but the safe habit begins here: know whether a command reads, creates, replaces, or only changes metadata.
+Pause and predict: if `tiramisu.txt` already contains three lines and you run the redirect command above, how many ingredient lines will remain afterward? Commit to a number before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Exactly one line remains, because `>` replaces the file's entire content with the command's output. The three previous lines are gone the moment the redirect runs, no matter how much work went into them. Later terminal modules will introduce append redirection and editors, but the safe habit begins here: know whether a command reads, creates, replaces, or only changes metadata before you press Enter.
+
+</details>
 
 This "read, create, replace, or move" classification also helps with command fear. `pwd` only reads your current location. `ls` reads directory metadata. `cat`, `head`, and `tail` read file contents. `mkdir` creates directories. `touch` may create a file or update a timestamp. `cd` changes your shell's current location but does not move files on disk. Once you classify a command this way, you can decide how cautious you need to be.
 
@@ -531,6 +580,30 @@ Notice that this checkpoint method does not require advanced tools. It uses only
 You can also use checkpoints to avoid accidental writes. Before creating a file with `touch` or replacing content with `>`, run `pwd` and `ls` to confirm the destination. In a beginner lab, the worst mistake is usually a messy practice directory. In professional work, writing to the wrong path can overwrite a configuration file, create a directory structure in the wrong place, or leave a script writing logs where nobody expects to find them.
 
 This carefulness is not meant to make the terminal feel dangerous. It is meant to make it feel inspectable. A graphical file browser protects you by showing context visually; the terminal protects you by making every command explicit. Once you learn to read those commands as path operations, you gain a form of control that transfers directly to remote servers, build systems, CI logs, and Kubernetes nodes where no graphical interface is available.
+
+### Diagnose It Yourself: Two Broken Reads
+
+Everything above gave you the checkpoint method in a guided order. This challenge removes the guardrails: you get two failure symptoms and no step list. For each symptom, before opening its reveal, write down what you think went wrong and which two or three commands you would run, in which order, to confirm it. There is no single correct command sequence, but some sequences gather evidence faster than others, so be ready to defend your ordering.
+
+**Symptom one**: you are standing in `~/kubedojo-practice`, and you run `cat recipes/appetizers/bruschetta.txt`. The shell answers `No such file or directory`. You remember creating that file in the hands-on exercise, and you are sure the practice tree exists. What are the two most likely explanations, and which command settles between them fastest?
+
+<details>
+<summary>Reveal a worked diagnosis for symptom one</summary>
+
+The error message is the first clue: "No such file or directory" means the path itself failed to resolve, so this is a path problem rather than a permission problem. The two most likely explanations are a wrong starting point (you are not actually inside `~/kubedojo-practice`) and a name mismatch somewhere along the route. `pwd` settles the starting-point question in one step, which is why it is usually the fastest first command. If `pwd` confirms the project directory, walk the checkpoints with `ls recipes` and then `ls recipes/appetizers`; in this scenario that listing shows the file was created as `brushetta.txt`, a one-letter transposition made during the exercise. The fix is to use the name the filesystem actually has, and the lesson is that `ls` at each checkpoint beats retyping the same failing path.
+
+</details>
+
+**Symptom two**: on a shared lab machine, a teammate asks you to review `recipes/desserts/tiramisu.txt` inside the same project. The path is correct — `ls recipes/desserts` shows the file — but `cat recipes/desserts/tiramisu.txt` answers `Permission denied`. What do you inspect, and how do you explain to your teammate who has to act?
+
+<details>
+<summary>Reveal a worked diagnosis for symptom two</summary>
+
+"Permission denied" redirects the investigation away from spelling and toward access, so the checkpoint list changes: run `ls -l recipes/desserts/tiramisu.txt` to read the file's permission string, owner, and group, and run `ls -ld recipes recipes/desserts` to confirm the parent directories let you traverse them. In this scenario the file shows `-rw-r-----` with the teammate as owner and a group you do not belong to, which means the others segment `---` blocks your read. Because this module only teaches reading permissions, not changing them, the correct outcome is an accurate escalation: you tell the teammate that the file's owner must adjust access, rather than retrying the same command and hoping. Naming the responsible person correctly is real operational skill, not a failed diagnosis.
+
+</details>
+
+Notice how the two symptoms triaged differently even though both were "the file would not open." The error message chose the branch: missing-file wording sent you to `pwd` and per-level `ls` checks, while permission wording sent you to `ls -l` and `ls -ld` checks. That branching habit is the unguided version of the cookbook, and it is the version you will actually use on unfamiliar machines.
 
 ## When This Doesn't Apply
 
@@ -790,6 +863,29 @@ The first `pwd` should end in `kubedojo-practice/recipes/desserts`. After `cd ..
 
 </details>
 
+### Diagnostic Challenge: Three Failures, No Recipe
+
+The tasks above told you which command to run at each step. This challenge gives you only symptoms. Diagnose all three using nothing but the checkpoint commands from this module — `pwd`, `ls`, `ls -a`, `ls -l`, and `ls -ld` — and write down your diagnosis for each symptom before opening the reveal. Do not fix anything yet; the goal is to name the exact checkpoint where each failure happens.
+
+**Symptom 1: wrong starting point.** You are inside `~/kubedojo-practice/recipes/desserts` and run `cat recipes/appetizers/bruschetta.txt`. The shell answers `No such file or directory`, but you are sure the file exists because you created it in task 3. Where did the relative path actually start, and which directory did the shell go looking in?
+
+**Symptom 2: file treated as a directory.** From inside the project, you run `cd recipes/desserts/tiramisu.txt` and the shell refuses with `Not a directory`. What kind of entry does the path end in, and which character of an `ls -l` permission string would have told you that in advance?
+
+**Symptom 3: access, not spelling.** On a Linux machine, you run `ls /root` as your normal user and get `Permission denied`, even though the path is spelled correctly and definitely exists. Which command shows the permissions on the `/root` directory entry itself, and what does that string tell you about who may enter?
+
+<details>
+<summary>One possible diagnosis for each symptom</summary>
+
+Symptom 1 is a relative-path failure. Running `pwd` shows you are in `.../recipes/desserts`, so the shell looked for `.../recipes/desserts/recipes/appetizers/bruschetta.txt`. Walking the checkpoints confirms it: `ls` shows no `recipes` entry here, so the failure happens at the very first checkpoint — the starting point was wrong, not the filename.
+
+Symptom 2 is a type mismatch. `tiramisu.txt` is a regular file, and `cd` can only enter directories. Running `ls -l recipes/desserts/` shows the entry's permission string beginning with `-` instead of `d`, which is the advance clue that the target can be read with `cat` but never entered.
+
+Symptom 3 is a permission failure. Running `ls -ld /root` shows the directory entry itself, typically `drwx------` owned by the `root` user, meaning only the owner may list or enter it. The path is correct, but traversal is blocked — which is exactly why the error says "Permission denied" instead of "No such file or directory."
+
+</details>
+
+If you diagnosed all three without opening the reveal, you have the troubleshooting loop this module was building toward: confirm the starting point with `pwd`, walk the path one checkpoint at a time with `ls`, and separate "the path is wrong" from "the path is fine but access is denied" with `ls -l` and `ls -ld`.
+
 ### Success Criteria
 
 You've completed this exercise when you can:
@@ -803,6 +899,7 @@ You've completed this exercise when you can:
 - [ ] Check directory permissions with `ls -ld`.
 - [ ] View hidden files with `ls -a`.
 - [ ] Navigate with `cd`, `cd ..`, and `cd ~`.
+- [ ] Diagnose a wrong-path, file-vs-directory, or permission failure using `pwd`, `ls`, `ls -l`, and `ls -ld`.
 
 ## Sources
 
