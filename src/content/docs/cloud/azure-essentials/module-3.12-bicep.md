@@ -4,9 +4,11 @@ slug: cloud/azure-essentials/module-3.12-bicep
 sidebar:
   order: 13
 ---
+**Complexity**: `[MEDIUM]` | **Time to Complete**: ~1.5h | **Prerequisites**: Module 3.1 (Entra ID) and basic Azure CLI fluency.
+
 ## What You'll Be Able to Do
 
-This **[MEDIUM]**-complexity module takes about **1.5 hours** and builds on Module 3.1 (Entra ID) plus basic Azure CLI fluency, because Bicep deployments assume you already know how to target resource groups and authenticate with `az login`. When you finish the theory sections, tool comparisons, and hands-on lab below, you will be able to accomplish the following outcomes.
+This module builds on Module 3.1 (Entra ID) plus basic Azure CLI fluency, because Bicep deployments assume you already know how to target resource groups and authenticate with `az login`. When you finish the theory sections, tool comparisons, and hands-on lab below, you will be able to accomplish the following outcomes.
 
 - **Deploy Azure resources using Bicep templates with parameters, modules, and conditional logic**
 - **Implement Bicep modules and template specs for reusable infrastructure components across teams**

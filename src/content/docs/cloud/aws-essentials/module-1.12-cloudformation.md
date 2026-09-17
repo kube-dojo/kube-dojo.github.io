@@ -4,9 +4,11 @@ slug: cloud/aws-essentials/module-1.12-cloudformation
 sidebar:
   order: 13
 ---
+**Complexity**: `[MEDIUM]` | **Time to Complete**: ~1.5h | **Prerequisites**: Infrastructure as Code concepts, AWS CLI v2 configured, and an AWS account with administrator permissions.
+
 ## Prerequisites
 
-This module is rated **[MEDIUM]** complexity, typically requires about **1.5 hours**, and belongs to the **AWS DevOps Essentials** track. Before you begin, ensure you have the following prerequisites in place, because CloudFormation templates only stay maintainable when you already understand the underlying AWS networking and security primitives they declare:
+This module belongs to the **AWS DevOps Essentials** track. Before you begin, ensure you have the following prerequisites in place, because CloudFormation templates only stay maintainable when you already understand the underlying AWS networking and security primitives they declare:
 - Familiarity with Infrastructure as Code concepts, specifically understanding the difference between declarative and imperative provisioning paradigms.
 - Experience creating AWS resources via the Command Line Interface, which establishes the baseline knowledge of the API calls that CloudFormation automates.
 - The AWS CLI version 2 installed and configured with appropriate credentials on your local workstation.

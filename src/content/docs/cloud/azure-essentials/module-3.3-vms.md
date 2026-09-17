@@ -4,10 +4,11 @@ slug: cloud/azure-essentials/module-3.3-vms
 sidebar:
   order: 4
 ---
+**Complexity**: `[MEDIUM]` | **Time to Complete**: ~2h | **Prerequisites**: [Module 3.2 (Virtual Networks)](../module-3.2-vnet/).
 
 ## What You'll Be Able to Do
 
-This module is rated **[MEDIUM]** complexity, takes about **two hours** to complete, and assumes you have finished [Module 3.2 (Virtual Networks)](../module-3.2-vnet/). When you complete it, you will be able to:
+This module assumes you have finished [Module 3.2 (Virtual Networks)](../module-3.2-vnet/). When you complete it, you will be able to:
 
 - **Deploy Azure VMs with Availability Sets and Availability Zones for high-availability compute workloads**
 - **Configure VM Scale Sets with autoscaling rules, custom images, and Flexible orchestration mode**

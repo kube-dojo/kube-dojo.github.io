@@ -4,9 +4,11 @@ slug: cloud/eks-deep-dive/module-5.1-eks-architecture
 sidebar:
   order: 2
 ---
+**Complexity**: `[MEDIUM]` | **Time to Complete**: ~2.5h | **Prerequisites**: [AWS Essentials](../../aws-essentials/) networking and IAM basics; [Cloud Architecture Patterns](../../architecture-patterns/) recommended.
+
 ## What You'll Be Able to Do
 
-This module is rated **[MEDIUM]** complexity with roughly **2.5 hours** of reading and lab time. You should be comfortable with [AWS Essentials](../../aws-essentials/) networking and IAM basics before diving into EKS control-plane design. [Cloud Architecture Patterns](../../architecture-patterns/) is a recommended companion, not required first. After completing the module, you will be able to:
+You should be comfortable with [AWS Essentials](../../aws-essentials/) networking and IAM basics before diving into EKS control-plane design. [Cloud Architecture Patterns](../../architecture-patterns/) is a recommended companion, not required first. After completing the module, you will be able to:
 
 - **Configure EKS clusters with private API endpoints, managed node groups, and Fargate profiles for production workloads**
 - **Design EKS control plane connectivity (public, private, dual-stack) based on security and availability requirements**
