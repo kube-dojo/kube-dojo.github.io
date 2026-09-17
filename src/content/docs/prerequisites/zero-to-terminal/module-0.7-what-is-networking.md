@@ -9,7 +9,7 @@ revision_pending: false
 >
 > **Time to Complete**: 90–120 minutes (long-form beginner read)
 >
-> **Prerequisites**: [Module 0.4: Files and Directories](../module-0.4-files-and-directories/) - You should be comfortable running commands and navigating directories.
+> **Prerequisites**: [Module 0.4: Files and Directories](../module-0.4-files-and-directories/), [Module 0.5: Editing Files](../module-0.5-editing-files/), and [Module 0.6: Git Basics](../module-0.6-git-basics/) - You should be comfortable navigating directories, editing and redirecting files, and working with terminal command workflows.
 
 ---
 
@@ -60,7 +60,13 @@ local address       public address                         destination address
 
 The diagram keeps the most important beginner idea visible: several addresses and systems are involved in one request. Your laptop may know its local address, your router may present a different public address to the internet, and the destination server has its own address. When troubleshooting, treating all of those as "the IP" hides the exact place where the request is failing.
 
-Pause and predict: if your laptop can reach your router's settings page at `192.168.1.1` while the internet is disconnected, what does that prove, and what does it not prove? It proves your local network path to the router works. It does not prove that DNS, your internet provider, or any public website is reachable, because those are farther along a different path.
+Pause and predict: if your laptop can reach your router's settings page at `192.168.1.1` while the internet is disconnected, what does that prove, and what does it not prove? Take a moment to separate your local physical or wireless link from the rest of the network path before reading on.
+
+<details><summary>Check your prediction</summary>
+
+It proves your local network path to the router works. It does not prove that DNS, your internet provider, or any public website is reachable, because those destinations sit farther along a different path beyond the router.
+
+</details>
 
 The goal is not to memorize every network layer today. The goal is to stop flattening every connectivity issue into "the network is broken." Once you can describe the path in pieces, you can use small terminal checks to learn whether the failure is local addressing, DNS name translation, port selection, firewall behavior, or an application response.
 
@@ -121,7 +127,13 @@ $ curl -s ifconfig.me
 203.0.113.55
 ```
 
-Before running this, what output do you expect: the same `192.168...` address your laptop uses locally, or a different address visible to the public internet? Most home and office networks return a different public address because NAT sits between your machine and the rest of the internet. If you are on a cloud VM or a specialized network, the answer can differ, which is exactly why evidence beats assumption.
+Pause and predict: before running `curl -s ifconfig.me`, what output do you expect to see: the same `192.168...` address your laptop uses on your local Wi-Fi, or a different address visible to the public internet? Think about what device connects directly to your internet service provider before checking your prediction.
+
+<details><summary>Check your prediction</summary>
+
+Most home and office networks return a different public address because NAT sits between your machine and the rest of the internet. If you are on a cloud VM or a specialized network, the answer can differ, which is exactly why evidence beats assumption.
+
+</details>
 
 IPv6 changes the address format and greatly expands the available address space, but it does not remove the need for the same reasoning habits. A destination still needs an address, routers still move traffic between networks, and a working local path still does not prove every remote path works. Kubernetes clusters may use IPv4, IPv6, or dual-stack networking, so the beginner concept is more important than one particular address style.
 
@@ -168,7 +180,13 @@ https://app.example ->  Service port 443      ->    target port 8080
       secure web              stable entry             app process
 ```
 
-Pause and predict: imagine a server at `203.0.113.55` replies to `ping`, but `curl http://203.0.113.55` times out. Which fact did `ping` prove, and which fact remains unproven? It proved some network path to the host responds to ICMP traffic. It did not prove that an HTTP service is listening on port 80 or that a firewall allows that port.
+Pause and predict: imagine a server at `203.0.113.55` replies to `ping`, but `curl http://203.0.113.55` times out. Which fact did `ping` prove, and which fact remains unproven? Consider the difference between network-layer echo requests and transport-layer application ports before revealing the answer.
+
+<details><summary>Check your prediction</summary>
+
+It proved some network path to the host responds to ICMP traffic. It did not prove that an HTTP service is listening on port 80 or that a firewall allows traffic on that port.
+
+</details>
 
 A port can be closed, filtered, or open. Closed usually means the destination actively rejects the connection because no service is listening there. Filtered usually means a firewall drops or blocks the attempt, causing a timeout. Open means something accepted the connection, though the application may still return an error if the request is malformed or the backend is unhealthy.
 
@@ -314,7 +332,13 @@ Address: 142.250.80.46
 
 A careful check usually combines commands rather than relying on one. If DNS fails, use `nslookup` to confirm the name problem. If DNS works but HTTP fails, use `curl -I` to inspect the status or timeout. If ping fails but curl succeeds, remember that ICMP may be blocked while normal web traffic is allowed.
 
-Which approach would you choose here and why: a user reports `api.example.com` is down, but you know the server's IP from deployment notes. Checking DNS first tells you whether the name maps to an address; checking `curl` against the known IP can separate DNS trouble from application trouble. The right sequence depends on the symptom, but the habit is the same: isolate one layer at a time.
+Pause and predict: a user reports that `api.example.com` is down, but you know the server's IP address from your deployment notes. Which approach would you test first—DNS name resolution or a direct HTTP request to the IP—and what would each result prove? Decide your troubleshooting order before checking the explanation.
+
+<details><summary>Check your prediction</summary>
+
+Checking DNS first tells you whether the name maps to an address; checking `curl` against the known IP can separate DNS trouble from application trouble. The right sequence depends on the symptom, but the habit is the same: isolate one layer at a time.
+
+</details>
 
 There is a useful way to read command output under pressure: translate it into a sentence beginning with "this proves." `nslookup` returning an address proves the resolver has some mapping for the name. `ping` replies prove ICMP traffic received responses from a host or network endpoint. `curl -I` returning `200 OK` proves an HTTP server answered that request successfully. Each proof is narrow, and that narrowness is the point.
 
@@ -575,6 +599,108 @@ This step connects terminal networking with file redirection. The command writes
 
 </details>
 
+### Diagnostic Challenge: Four Network Incidents, No Recipe
+
+The cookbook tasks above guided you through each command with exact arguments. In real operations, however, problems do not arrive with a command recipe; they arrive as ambiguous reports and terminal output. In this challenge, you are presented with four frozen terminal transcripts from different troubleshooting sessions. For each transcript, examine the recorded commands and output, identify which specific layer is failing (DNS name resolution, host reachability, service port or transport, or application response), explain the evidence that proves your conclusion, and decide the single most logical next check or fix. Write down your diagnosis before opening each reveal.
+
+```text
+$ nslookup api.example.com
+Server:    192.168.1.1
+Address:   192.168.1.1#53
+
+** server can't find api.example.com: NXDOMAIN
+
+$ curl -I http://203.0.113.100
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Thu, 17 Sep 2026 11:20:00 GMT
+```
+
+**Incident A: The disappearing API endpoint.** A developer files an urgent ticket stating that the staging API is completely offline because their local test suite cannot connect to `api.example.com`. You gather the two terminal checks above from the developer's workstation. Which layer has failed, what does the evidence prove, and what is the immediate next check or corrective action? Commit to your analysis before revealing the diagnosis below.
+
+<details><summary>Diagnosis and layer analysis for Incident A</summary>
+
+**Failing Layer:** DNS name resolution.
+
+**Evidence:** The `nslookup` command returned `NXDOMAIN`, meaning the DNS resolver has no record for the name `api.example.com`. Meanwhile, `curl -I` directly to the known host IP address `203.0.113.100` returned `HTTP/1.1 200 OK`, proving that the network path, server host, port 80, and HTTP web service are fully functional. The server is not down at all; the name mapping is absent.
+
+**Next Check or Action:** Verify the DNS zone configuration, registrar, or authoritative name server to ensure an `A` record points `api.example.com` to `203.0.113.100`, and check whether recent DNS record edits have propagated or expired according to their TTL. Do not restart the server or application.
+
+</details>
+
+```text
+$ ping -c 4 payment-gateway.example.com
+PING payment-gateway.example.com (198.51.100.75): 56 data bytes
+Request timeout for icmp_seq 0
+Request timeout for icmp_seq 1
+Request timeout for icmp_seq 2
+Request timeout for icmp_seq 3
+--- payment-gateway.example.com ping statistics ---
+4 packets transmitted, 0 packets received, 100.0% packet loss
+
+$ curl -I https://payment-gateway.example.com
+HTTP/2 200
+content-type: application/json
+date: Thu, 17 Sep 2026 11:22:00 GMT
+```
+
+**Incident B: The silent ping probe.** An automated alert pings `payment-gateway.example.com` and pages the on-call engineer for total packet loss. When you run `curl -I https://payment-gateway.example.com`, you receive an immediate `200` response over HTTPS. Which layer is responsible for the ping failure, what does the evidence prove, and what is the proper operational conclusion? Think through why a host may drop echo probes before checking the solution.
+
+<details><summary>Diagnosis and layer analysis for Incident B</summary>
+
+**Failing Layer:** Diagnostic protocol filtering (ICMP), not host reachability or application availability.
+
+**Evidence:** The `ping` command failed with 100% packet loss because intermediate firewalls or the destination host intentionally drop ICMP echo requests. However, `curl -I` successfully resolved the hostname, established a secure TLS connection to port 443, and received a valid HTTP response (`HTTP/2 200`). This proves that DNS works, the network route is active, port 443 is open, and the web application is healthy.
+
+**Next Check or Action:** Update the monitoring check to probe the HTTPS endpoint on port 443 (such as an HTTP health check) rather than relying on ICMP `ping`. No server or network restart is required; the service is operating normally.
+
+</details>
+
+```text
+$ curl -I https://internal-docs.example.com/team/runbooks/networking
+HTTP/1.1 404 Not Found
+Content-Type: text/html; charset=UTF-8
+Server: nginx/1.24.0
+Date: Thu, 17 Sep 2026 11:24:00 GMT
+Content-Length: 162
+```
+
+**Incident C: The missing runbook.** A colleague reports: "The internal docs server is down; nobody can access the networking runbook at `https://internal-docs.example.com/team/runbooks/networking`." You run `curl -I` against the URL and receive the output above. Which layer is failing, what does the evidence prove about the lower layers, and what should you investigate next? Separate web server availability from page routing before reading on.
+
+<details><summary>Diagnosis and layer analysis for Incident C</summary>
+
+**Failing Layer:** Application / HTTP content routing (Layer 7), not network reachability or DNS.
+
+**Evidence:** The response line `HTTP/1.1 404 Not Found` and the `Server: nginx/1.24.0` header prove that DNS successfully resolved `internal-docs.example.com`, the network routed the packets to the web server, port 443 accepted the connection, and the web server parsed the HTTP request. The failure is strictly that the web application or web server cannot find a document or route matching `/team/runbooks/networking`.
+
+**Next Check or Action:** Verify the URL path spelling, check the documentation repository for moved or renamed files, or inspect the web server routing configuration (e.g., Nginx location blocks or static document root). Do not contact the network team or escalate as an infrastructure outage.
+
+</details>
+
+```text
+$ curl http://10.0.5.50:80
+curl: (7) Failed to connect to 10.0.5.50 port 80 after 12 ms: Connection refused
+
+$ ping -c 2 10.0.5.50
+PING 10.0.5.50 (10.0.5.50): 56 data bytes
+64 bytes from 10.0.5.50: icmp_seq=0 ttl=64 time=0.824 ms
+64 bytes from 10.0.5.50: icmp_seq=1 ttl=64 time=0.791 ms
+```
+
+**Incident D: Connection refused on the database host.** A backend microservice fails to start, logging a connectivity error when attempting to reach its database host at `10.0.5.50`. An operator attempts to check the server with `curl http://10.0.5.50:80` and receives `Connection refused`, even though `ping -c 2 10.0.5.50` succeeds with sub-millisecond latency. Which layer has the misconfiguration, what does the evidence prove, and what is the immediate correction? Verify the intended service role before checking the answer.
+
+<details><summary>Diagnosis and layer analysis for Incident D</summary>
+
+**Failing Layer:** Transport / Port selection (Layer 4).
+
+**Evidence:** The ping replies prove that the host at `10.0.5.50` is online and reachable on the local private network. The error `Connection refused` on port 80 means the operating system at `10.0.5.50` actively rejected the TCP connection attempt because no web server process is listening on port 80. The machine is a dedicated PostgreSQL database server, which listens on port 5432 by default, not port 80.
+
+**Next Check or Action:** Update the microservice connection string or diagnostic probe to target port 5432 (e.g., `10.0.5.50:5432` or `nc -zv 10.0.5.50 5432`). Verify whether the database daemon is listening on port 5432 and bound to the private network interface.
+
+</details>
+
+Mastering these four diagnostic patterns ensures that you do not jump to premature conclusions when faced with a broken network path. In Kubernetes and cloud infrastructure, the same four failure modes reappear constantly: a Pod cannot resolve a Service name (DNS), a network policy blocks cross-namespace traffic (reachability), a Service selects a container port that is not listening (port mismatch), or an Ingress routes to a path that does not exist in the backend application (HTTP 404). By gathering disciplined evidence before changing code or configuration, you will diagnose issues faster and avoid creating new outages.
+
 ### Success Criteria
 
 You have completed this exercise when you can explain the evidence from each command without treating every failure as the same kind of outage:
@@ -587,6 +713,7 @@ You have completed this exercise when you can explain the evidence from each com
 - [ ] Identify `200 OK` and `404 Not Found` as different HTTP responses.
 - [ ] Save a web page to a file and read that file from the terminal.
 - [ ] Explain whether each command tested DNS, address reachability, a port, or HTTP behavior.
+- [ ] Diagnose unguided network incidents by identifying whether DNS, reachability, port configuration, or application HTTP routing failed.
 - [ ] Explain how Kubernetes Service names, Pod IPs, and API server port 6443 map to DNS, address, port, and protocol response.
 
 ---
