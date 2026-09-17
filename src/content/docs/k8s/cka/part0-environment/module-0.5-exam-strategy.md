@@ -13,7 +13,7 @@ lab:
   environment: ubuntu
 ---
 
-> **Complexity**: `[QUICK]` - Strategy, timing discipline, and exam execution habits
+> **Complexity**: `[MEDIUM]` - Long-form strategy module with timed practice and planning drills
 >
 > **Time to Complete**: 20-30 minutes to learn, repeated timed practice to internalize
 >
@@ -454,7 +454,7 @@ Patterns also help you avoid overcorrecting after one bad drill. If you ran out 
 
 ## Decision Framework
 
-For a quick module, the decision framework can stay simple: choose the next task by combining confidence, verification cost, and remaining time. If the task is familiar, direct, and easy to verify, it belongs early. If it needs several objects but the path is documented, it belongs in the middle. If it starts from symptoms or has many possible causes, it belongs late unless the point value and your confidence are unusually favorable.
+For a strategy module like this, the decision framework can stay simple: choose the next task by combining confidence, verification cost, and remaining time. If the task is familiar, direct, and easy to verify, it belongs early. If it needs several objects but the path is documented, it belongs in the middle. If it starts from symptoms or has many possible causes, it belongs late unless the point value and your confidence are unusually favorable.
 
 | Decision Question | Choose Earlier When | Choose Later When |
 |-------------------|---------------------|-------------------|

@@ -11,7 +11,7 @@ lab:
   difficulty: intermediate
   environment: kubernetes
 ---
-> **Complexity**: `[QUICK]` - Straightforward batch workloads
+> **Complexity**: `[MEDIUM]` - Long-form batch workload module with hands-on Job and CronJob practice
 >
 > **Time to Complete**: 30-40 minutes
 >

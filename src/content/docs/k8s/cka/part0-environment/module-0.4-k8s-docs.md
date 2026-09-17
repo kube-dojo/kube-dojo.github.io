@@ -12,7 +12,7 @@ lab:
   environment: kubernetes
 ---
 
-> **Complexity**: `[QUICK]` - Know where things are, find them fast
+> **Complexity**: `[MEDIUM]` - Long-form documentation workflow module with guided lookup practice
 >
 > **Time to Complete**: 20-30 minutes
 >
@@ -360,7 +360,7 @@ If two sources appear to disagree, prefer the source closest to the thing you wi
 
 This comparison also prevents over-correcting in the wrong direction. A Concepts page might describe why a Service type behaves a certain way, but it may not show every manifest field you need. A Reference page might list every legal property, but it may not show a minimal operational example. A Task page may show a sample that works, but it may use names or labels that do not match your prompt. Choosing the right source is therefore only half the job; the other half is knowing what that source is allowed to answer.
 
-For quick modules, this "use this versus alternatives" habit is more valuable than a large decision tree. You are training a reflex that runs before the command line work begins: classify the problem, choose the source, extract the smallest trustworthy example, and validate locally. When that reflex is stable, hard tasks feel less chaotic because each unfamiliar field has a known lookup path. The docs become part of your operating procedure instead of a separate activity you perform only after getting stuck, and that habit compounds across every later Kubernetes module.
+At this stage, this "use this versus alternatives" habit is more valuable than a large decision tree. You are training a reflex that runs before the command line work begins: classify the problem, choose the source, extract the smallest trustworthy example, and validate locally. When that reflex is stable, hard tasks feel less chaotic because each unfamiliar field has a known lookup path. The docs become part of your operating procedure instead of a separate activity you perform only after getting stuck, and that habit compounds across every later Kubernetes module.
 
 ## Did You Know?
 

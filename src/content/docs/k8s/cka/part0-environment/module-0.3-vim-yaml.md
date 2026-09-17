@@ -13,7 +13,7 @@ lab:
 revision_pending: false
 ---
 
-> **Complexity**: `[QUICK]` - Small command set, high exam leverage
+> **Complexity**: `[MEDIUM]` - Long-form editor workflow module with repeated YAML drills
 >
 > **Time to Complete**: 25-35 minutes
 >
