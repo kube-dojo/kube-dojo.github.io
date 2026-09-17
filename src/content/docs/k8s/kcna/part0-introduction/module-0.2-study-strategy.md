@@ -8,7 +8,7 @@ sidebar:
 
 | Metadata | Value |
 |---|---|
-| Complexity | `[QUICK]` - Essential exam preparation |
+| Complexity | `[MEDIUM]` - Long-form exam-strategy module with study-plan design and pacing practice |
 | Time to Complete | 35-45 minutes |
 | Prerequisites | Module 0.1 (KCNA Overview) |
 | Kubernetes Target | Kubernetes 1.35+ conceptual coverage |

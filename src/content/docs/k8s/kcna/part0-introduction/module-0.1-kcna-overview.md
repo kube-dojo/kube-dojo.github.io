@@ -6,7 +6,7 @@ sidebar:
   order: 2
 ---
 
-> **Complexity**: `[QUICK]` - Essential orientation
+> **Complexity**: `[MEDIUM]` - Long-form orientation module with exam-format analysis and study-plan design
 >
 > **Time to Complete**: 35-50 minutes
 >

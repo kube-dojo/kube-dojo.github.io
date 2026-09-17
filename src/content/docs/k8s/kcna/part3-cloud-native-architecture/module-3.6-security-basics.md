@@ -6,7 +6,7 @@ sidebar:
 revision_pending: false
 ---
 
-- **Complexity**: `[QUICK]` - Foundations only
+- **Complexity**: `[MEDIUM]` - Long-form security foundations module with access-control and policy evaluation practice
 - **Time to Complete**: 35-40 minutes
 - **Prerequisites**: Modules 3.1-3.5 (Cloud Native Architecture)
 - **Kubernetes target**: Kubernetes 1.35+
