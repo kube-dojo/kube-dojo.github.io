@@ -44,6 +44,8 @@ You should also expect the terminal to feel slightly uncomfortable at first beca
 
 Before we run commands, open a terminal in the environment you are using for this course. On macOS, press `Cmd + Space`, type "Terminal", and press Enter, or open Terminal from Applications > Utilities. On Linux, `Ctrl + Alt + T` opens a terminal on many desktop environments, and the application menu usually has a Terminal entry as well. On Windows, this module is written for a Unix-style shell such as Windows Subsystem for Linux, because native PowerShell has different names and defaults for several commands.
 
+If you are on Windows, ensure that you run all commands inside Windows Subsystem for Linux (WSL) rather than native PowerShell. While PowerShell defines built-in aliases such as `ls` for `Get-ChildItem`, `cp` for `Copy-Item`, and `rm` for `Remove-Item`, these aliases are not POSIX-compatible. They accept different flag conventions, handle wildcards differently, and fail when passed standard Unix flags such as `-la` or `-r`. This entire curriculum targets standard Unix shell environments, making WSL or an Ubuntu container essential on Windows.
+
 When the terminal opens, you should see a short line of text ending in a symbol such as `$` or `%`. That line is called the prompt because it is prompting you to type the next command. The exact text varies by machine, shell, and theme, so do not worry if yours does not match the example exactly. What matters is that the terminal is waiting for one complete instruction, and it will not guess beyond what you typed.
 
 ```
@@ -118,7 +120,11 @@ Pause and predict: if plain `ls` shows only names and `ls -l` shows more detail,
 ls -la
 ```
 
-The `-a` flag means "all", including hidden files whose names begin with a dot. Hidden does not mean secret or malicious; it usually means "configuration file that would clutter normal browsing." Shell startup files, editor settings, and tool caches often live this way. Beginners sometimes delete dotfiles because they look unfamiliar, but many of them control how your shell or development tools behave.
+<details>
+<summary>Check your prediction</summary>
+
+The `-a` flag stands for "all", including hidden files and directories whose names begin with a dot (`.`). Hidden does not mean secret or malicious; it usually means a configuration file or directory that would clutter normal directory browsing. Shell startup files (`.bashrc`, `.zshrc`), editor settings, and tool caches often live this way. Beginners sometimes delete dotfiles because they look unfamiliar, but many of them control how your shell and developer tools behave.
+</details>
 
 The third command is `cd`, which stands for change directory. It changes your current working directory, so every relative path after that begins from the new place. This is like walking from your office into the Documents room before picking up a folder. Nothing has been created or deleted by `cd`; only your point of view has changed.
 
@@ -190,7 +196,17 @@ Now return home so the next practice commands start from a familiar and relative
 cd ~
 ```
 
-Before running this in your own terminal, what output do you expect from `pwd` after `cd ~`? Make the prediction first, then run `pwd` and compare. This small habit matters because prediction turns terminal practice from copying into reasoning; you are building a mental model, not memorizing a list.
+Before running this in your own terminal, pause and predict: what output do you expect from `pwd` after running `cd ~`? Formulate your prediction first, then run `pwd` in your shell and compare. This small habit matters because prediction turns terminal practice from copying into reasoning; you are building a mental model, not memorizing a list.
+
+```bash
+pwd
+```
+
+<details>
+<summary>Check your prediction</summary>
+
+Running `pwd` outputs your home directory path, such as `/Users/yourname` on macOS or `/home/yourname` on Linux. The `~` symbol is shorthand for your personal home directory, so `cd ~` returned you to the base of your user workspace regardless of which folder you visited previously.
+</details>
 
 ## Create Folders and Files with `mkdir`, `touch`, `cp`, and `mv`
 
@@ -280,13 +296,25 @@ When renaming a file, the same source-then-destination pattern applies even thou
 mv menu.txt daily-specials.txt
 ```
 
-The file `menu.txt` is gone under that name, and `daily-specials.txt` appears in its place. It is the same file with a new name, not a duplicate. Which approach would you choose here and why: copying a sample configuration before editing it, or moving it into place immediately? A cautious answer is to copy when you are exploring and move when you are completing a deliberate reorganization.
+The file `menu.txt` is gone under that name, and `daily-specials.txt` appears in its place. It is the exact same file under a new name rather than a duplicate. Pause and predict: which approach would you choose when handling a new service configuration, copying a sample file first or moving it immediately, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+A cautious and professional answer is to copy (`cp`) when you are exploring or editing a sample configuration, because `cp` leaves the known-good original intact as an immediate fallback if your experimental changes fail. You should move (`mv`) only when you are completing a deliberate, permanent reorganization where keeping an outdated duplicate file would confuse other tools, automated scripts, or teammates.
+</details>
 
 ## Delete and Clean Up Safely with `rm` and `clear`
 
 Deletion is where terminal precision becomes most important. A graphical desktop usually gives you a trash or recycle bin, and it may ask for confirmation before permanent removal. The terminal's `rm` command is more direct. It removes file names immediately and usually has no built-in undo path for ordinary users. That does not mean you should fear it; it means you should build a confirmation routine before using it.
 
-Stop and think: when you delete a file by dragging it to the Trash on your desktop, where does it go? You can often recover it because the graphical environment moved it to a holding area. Now compare that with a terminal command that is designed for scripts, remote servers, and automation. A command meant to run without a person clicking confirmation boxes cannot rely on a visual trash workflow.
+Consider how everyday graphical file deletion contrasts with an automated terminal command. Pause and predict: when you drag a file to the desktop Trash, where does that item go? What safety net does that graphical workflow provide compared to running a command designed for headless automation?
+
+<details>
+<summary>Check your prediction</summary>
+
+A graphical desktop does not destroy the file immediately; it moves the file into a dedicated holding directory (the Trash or Recycle Bin), keeping the data recoverable until you explicitly empty it. In contrast, the terminal's `rm` command is designed for scripts, remote servers, and automated pipelines where no human is present to click confirmation dialogs. `rm` unlinks the file from the filesystem immediately, which means there is no holding area, no desktop undo button, and no safety prompt by default.
+</details>
 
 `rm` stands for remove. It deletes a file at the path you provide, or in the current directory if you provide only a file name. Before you run it, use `pwd` to confirm where you are and `ls` to confirm the target name. If there is any doubt, stop. A few seconds of checking is cheaper than rebuilding work you removed from the wrong directory.
 
@@ -358,7 +386,13 @@ history | grep "mkdir"
 
 `history` shows commands you have typed in the shell, and `grep "mkdir"` narrows the output to commands that included `mkdir`. This is handy when you remember part of a command but not the exact path. It also teaches a gentle diagnostic pattern: when the screen has too much information, do not read harder; filter better. The terminal rewards precise questions.
 
-Before running your own pipeline, predict which side of the pipe runs first and what text moves across the pipe. Then try changing the search word in the `history | grep "mkdir"` example to `cd` or `rm`. If a command returns no output, that does not always mean failure; it may mean the filter found no matching lines. Empty output is still information when you know what question you asked.
+Before running your own pipeline, pause and predict: which side of the pipe runs first, and what exact text moves across the pipe between the two commands? Then try changing the search word in the `history | grep "mkdir"` example to `cd` or `rm`. If a command returns no output, that does not always mean failure; it may mean the filter found no matching lines. Empty output is still information when you know what question you asked.
+
+<details>
+<summary>Check your prediction</summary>
+
+In a Unix pipeline, the operating system starts both commands concurrently (at the same time) and connects the standard output stream of the left command directly to the standard input stream of the right command. In `history | grep "mkdir"`, the text flowing across the pipe is the complete chronological list of previously typed commands. `grep` reads that text stream line by line as it arrives and prints only the lines containing the text string `mkdir`.
+</details>
 
 ## Quick Reference Card
 
@@ -515,13 +549,15 @@ These files are empty placeholders, but their paths prove that the directory str
 
 ### Step 4: Look at what you built
 
+Run directory listings across the newly created folders to inspect your restaurant file layout at progressively increasing depth:
+
 ```bash
 ls restaurant/
 ls restaurant/kitchen/
 ls restaurant/kitchen/cooking-stations/
 ```
 
-The expected output for the last command should show the two cooking-station files you created, which confirms that the nested path exists:
+Before inspecting that third command, pause and predict what files should appear inside `restaurant/kitchen/cooking-stations/`. The expected output confirms that both files were placed correctly in the nested directory:
 
 ```
 grill.txt    oven.txt
@@ -541,7 +577,7 @@ The ice cream is melting in this exercise scenario, so move it from the freezer 
 mv restaurant/storage/freezer/ice-cream.txt restaurant/kitchen/prep-area/
 ```
 
-Verify the move by listing the destination directory instead of assuming the command did what you intended after reading the prompt:
+Before verifying the move, pause and predict what entries should now appear when you list `restaurant/kitchen/prep-area/`. Then run the listing to confirm that the destination directory contains both items:
 
 ```bash
 ls restaurant/kitchen/prep-area/
@@ -573,11 +609,71 @@ ls restaurant/
 This step uses `cp` because a backup should leave the original in place. The final `ls` should show both `menu.txt` and `menu-backup.txt` in the restaurant directory.
 </details>
 
-### Step 7: Clean up
+### Step 7: Diagnostic challenge: locate and relocate a misplaced file
 
-When you are done experimenting, clean up only the disposable practice directory you created for this exercise, not any similarly named real project:
+In real systems administration and cloud operations, commands often fail or create files in unintended directories because the operator loses track of their current working location. Imagine a teammate was tasked with adding an inventory file named `olive-oil.txt` into the pantry directory at `restaurant/storage/pantry/`. They navigated into `restaurant/kitchen/` to inspect kitchen equipment, forgot their active shell context, and attempted to run the following command using an invalid relative path:
 
 ```bash
+cd ~/restaurant/kitchen
+touch storage/pantry/olive-oil.txt
+```
+
+The shell printed `touch: storage/pantry/olive-oil.txt: No such file or directory` because the relative path looked for a `storage` directory inside `kitchen`, where none exists. Confused by the error message, the teammate removed the path prefix and simply ran `touch olive-oil.txt`. The command succeeded silently with exit status zero, but when the team later inspected `restaurant/storage/pantry/`, the required inventory file was nowhere to be found.
+
+```bash
+touch olive-oil.txt
+```
+
+Your troubleshooting challenge is to diagnose and repair this misplaced file using only the commands taught in this module: `pwd`, `ls`, `cd`, and `mv`. You must not delete and recreate the file; locate the existing item and relocate it to its intended destination in the pantry.
+
+Work through this unguided diagnostic sequence in your terminal before inspecting the solution details below. First, run `pwd` and `ls` to discover where the shell is currently standing and identify where `olive-oil.txt` landed. Second, inspect the directory hierarchy to explain why `storage/pantry/` could not be reached from `kitchen`. Third, use `cd` and `mv` to relocate `olive-oil.txt` into its intended destination at `restaurant/storage/pantry/`. Finally, run `ls` on both folders to confirm the file reached the pantry and no longer clutters the kitchen.
+
+<details>
+<summary>Solution & Diagnostic Walkthrough</summary>
+
+Start by diagnosing where your shell is standing and listing what items exist in your current working directory:
+
+```bash
+pwd
+ls
+```
+
+`pwd` reports `/home/yourname/restaurant/kitchen` (or your platform equivalent), and `ls` displays `cooking-stations`, `olive-oil.txt`, and `prep-area`. This reveals that `touch olive-oil.txt` created the file inside the kitchen, because relative paths always execute against the active directory printed by `pwd`.
+
+Next, examine why the teammate's relative command failed. From `/restaurant/kitchen/`, the relative path `storage/pantry/` fails because `kitchen` and `storage` are sibling folders inside `restaurant`. The shell searched for `/restaurant/kitchen/storage/pantry/`, which does not exist.
+
+To fix the structure, navigate up to the restaurant root directory and inspect the pantry:
+
+```bash
+cd ..
+pwd
+ls storage/pantry/
+```
+
+Now relocate the misplaced file from the kitchen into the pantry using accurate relative paths from the restaurant root:
+
+```bash
+mv kitchen/olive-oil.txt storage/pantry/
+```
+
+Alternatively, you could have executed the move directly from inside the kitchen directory by using the parent directory reference: `mv olive-oil.txt ../storage/pantry/`. Both commands achieve the exact same relocation.
+
+Finally, verify that `olive-oil.txt` arrived in the pantry and was removed from the kitchen:
+
+```bash
+ls storage/pantry/
+ls kitchen/
+```
+
+The output for `storage/pantry/` now displays `flour.txt`, `olive-oil.txt`, and `sugar.txt`. The output for `kitchen/` displays only `cooking-stations` and `prep-area`. You successfully diagnosed a location-dependent error and corrected the file placement without destroying data.
+</details>
+
+### Step 8: Clean up
+
+When you are done experimenting, return to your home directory and clean up only the disposable practice directory you created for this exercise, not any similarly named real project:
+
+```bash
+cd ~
 rm -r restaurant
 ```
 
@@ -603,6 +699,7 @@ Use this success criteria checklist to confirm that you practiced every aligned 
 - [ ] You inspected the structure with `ls` at multiple levels.
 - [ ] You moved `ice-cream.txt` with `mv` and verified the new location.
 - [ ] You copied `menu.txt` with `cp` so the original and backup both existed.
+- [ ] You used `pwd` and `ls` to diagnose a command that ran in the wrong directory, then navigated with `cd` and moved the file with `mv` to restore the correct structure.
 - [ ] You removed only the disposable `restaurant` practice directory with `rm -r`.
 - [ ] You used a pipe with `grep` to verify that cleanup produced no remaining restaurant entry.
 
@@ -621,6 +718,7 @@ Use this success criteria checklist to confirm that you practiced every aligned 
 - [POSIX `cp`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/cp.html) — Standard copy utility behavior, including recursive copying.
 - [POSIX `mv`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/mv.html) — Standard move and rename utility behavior.
 - [POSIX `rm`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/rm.html) — Standard removal utility behavior and recursive deletion options.
+- [How Pixar's Toy Story 2 Was Deleted Twice](https://thenextweb.com/news/how-pixars-toy-story-2-was-deleted-twice-once-by-technology-and-again-for-its-own-good) — Account of the 1998 production incident and file recovery.
 
 ## Next Module
 
