@@ -1280,19 +1280,115 @@ In this exercise, you will deploy a containerized API service on ECS Fargate, co
 
 ### Setup
 
-You need a VPC with public and private subnets, an ECR repository with a pushed image, and the IAM roles created earlier in this module.
+This lab runs against a real VPC with at least two public and two private subnets spread across two Availability Zones. The working path is the `Dojo-Prod-VPC` network from [Module 1.2: VPC & Networking Foundations](../module-1.2-vpc/), including the NAT gateways from its Task 5 — Fargate tasks launch into the private subnets with `assignPublicIp` disabled, so they need that outbound path to pull the image from ECR. You also need the `kubedojo/ecr-exercise:v1.0.0` image pushed in [Module 1.6: Elastic Container Registry (ECR)](../module-1.6-ecr/) and the `ecsTaskExecutionRole` and `api-task-role` IAM roles created in the IAM Roles section above. The preflight below exports and validates every variable the tasks use; do not paste placeholder IDs such as `vpc-0abc123`, because Task 2 and Task 3 pass them to `create-load-balancer` and `create-service`, and an invalid value fails partway through, after billable resources already exist.
 
 ```bash
-# Set your variables (replace with your actual values)
 export CLUSTER_NAME="kubedojo-exercise"
-export VPC_ID="vpc-0abc123"
-export PRIVATE_SUBNET_1="subnet-0abc123"
-export PRIVATE_SUBNET_2="subnet-0def456"
-export PUBLIC_SUBNET_1="subnet-0ghi789"
-export PUBLIC_SUBNET_2="subnet-0jkl012"
-export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export REGION="us-east-1"
-export REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+```
+
+### Preflight: Account, Region, Cost, and Cleanup
+
+Run this preflight in a Bash shell before creating anything, and read **Task 8: Clean Up** first — stopping the terminal does not delete billable resources. Use AWS CLI v2 with an isolated AWS account and an identity authorized for the operations the tasks actually run: `ecs:CreateCluster`, `ecs:RegisterTaskDefinition`, `ecs:CreateService`, `ecs:UpdateService`, `ecs:DeleteService`, `ecs:DeleteCluster`, `ecs:DeregisterTaskDefinition`, `ecs:ExecuteCommand` (Task 5), plus the `ecs:Describe*` and `ecs:List*` read calls; `ec2:DescribeVpcs`, `ec2:DescribeSubnets`, `ec2:CreateSecurityGroup`, `ec2:AuthorizeSecurityGroupIngress`, and `ec2:DeleteSecurityGroup`; `elbv2:CreateLoadBalancer`, `elbv2:CreateTargetGroup`, `elbv2:CreateListener`, and the matching `elbv2:Describe*` and `elbv2:Delete*` actions; `iam:GetRole`, `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:DetachRolePolicy`, `iam:DeleteRole`, and `iam:PassRole` on both task roles (Task 3 passes them to Fargate, and Task 7 creates the CodeDeploy role); `application-autoscaling:RegisterScalableTarget`, `application-autoscaling:PutScalingPolicy`, and `application-autoscaling:DescribeScalingPolicies`; `deploy:CreateApplication`, `deploy:CreateDeploymentGroup`, and the matching deletes; and `ecr:DescribeImages`. One more permission lives on a role rather than your identity: because Task 3 sets `awslogs-create-group`, the `ecsTaskExecutionRole` itself needs `logs:CreateLogGroup`, which the AWS managed `AmazonECSTaskExecutionRolePolicy` does not include — attach it before Task 3 or the first task stays `PENDING`. The identity check below does not prove all of these permissions are available; stop on any non-zero command and record each returned resource ID immediately so a partial run can be cleaned up.
+
+Keep an inventory of what you actually created, including resources left behind by a failed step, and delete only this exercise's resources. For this lab the inventory is the CodeDeploy deployment group and application, the `ECSCodeDeployRole` IAM role, the auto-scaling target and policy, the `api-service` service (scale it to zero and wait for tasks to drain before deleting it, or running tasks keep billing), the cluster, the task definition revision, the listener, both target groups, the ALB, and both security groups. A run abandoned after Task 2 leaves an ALB billing hourly with nothing behind it, and the security groups cannot be deleted until the ALB releases its ENIs — that is why Task 8 sleeps before deleting them.
+
+The billable drivers are Fargate vCPU-hours and GB-hours for two to six tasks at 0.25 vCPU / 0.5 GB each across the whole window, ALB hours plus Load Balancer Capacity Units starting from the moment `create-load-balancer` returns, the public IPv4 addresses the internet-facing ALB occupies (one in-use address per subnet you pass it), CloudWatch Logs ingestion for the task log group, and — because the lab reuses the Module 1.2 network — the NAT gateways, which bill hourly plus per-GB data processing for every byte the tasks pull through them. Choose a spending limit and a cleanup deadline that cover all of these, and check current regional rates on [AWS Fargate pricing](https://aws.amazon.com/fargate/pricing/), [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/), and [Amazon VPC pricing](https://aws.amazon.com/vpc/pricing/) before provisioning; this page supplies no default budget and no universal hourly quote.
+
+Set your chosen region first, for example `export AWS_REGION=us-east-1`, and keep the AWS CLI variables consistent. The function verifies CLI v2 and your caller identity, then validates every hard prerequisite the tasks use: a real VPC with two tagged public and two tagged private subnets in at least two Availability Zones (reusing Module 1.2's `VPC_ID`, `PUB_SUB*_ID`, and `PRIV_SUB*_ID` exports when present, otherwise discovering `Dojo-Prod-VPC` and its tagged subnets by name), the ECR image, and both IAM roles. It fails fast on any unset or invalid value and returns a failure instead of closing an interactive shell; do not continue after a failure message.
+
+```bash
+ecs_fargate_preflight() {
+  if [[ -z "${AWS_REGION:-}" && -z "${AWS_DEFAULT_REGION:-}" ]]; then
+    printf '%s\n' 'Set AWS_REGION (or AWS_DEFAULT_REGION) before continuing.' >&2
+    return 1
+  fi
+  if [[ -n "${AWS_REGION:-}" && -n "${AWS_DEFAULT_REGION:-}" && "$AWS_REGION" != "$AWS_DEFAULT_REGION" ]]; then
+    printf 'AWS_REGION (%s) and AWS_DEFAULT_REGION (%s) differ; choose one region.\n' "$AWS_REGION" "$AWS_DEFAULT_REGION" >&2
+    return 1
+  fi
+  export AWS_REGION="${AWS_REGION:-$AWS_DEFAULT_REGION}"
+  export AWS_DEFAULT_REGION="$AWS_REGION"
+  export AWS_PAGER=""
+
+  AWS_VERSION=$(aws --version 2>&1) || return 1
+  if [[ "$AWS_VERSION" != aws-cli/2.* ]]; then
+    printf 'AWS CLI v2 is required; found %s.\n' "$AWS_VERSION" >&2
+    return 1
+  fi
+  printf '%s\n' "$AWS_VERSION"
+  aws sts get-caller-identity --query '{Account:Account,Arn:Arn,UserId:UserId}' --output table || return 1
+
+  export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) || return 1
+  export REGION="$AWS_REGION"
+  export REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+
+  # VPC: reuse the Module 1.2 export when present, otherwise discover by tag
+  if [[ -z "${VPC_ID:-}" ]]; then
+    VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=Dojo-Prod-VPC" \
+      --query 'Vpcs[0].VpcId' --output text) || return 1
+  fi
+  if [[ -z "$VPC_ID" || "$VPC_ID" == "None" ]]; then
+    printf 'No usable VPC_ID in %s; rerun the Module 1.2 lab or set VPC_ID to a real VPC with two public and two private subnets.\n' "$AWS_REGION" >&2
+    return 1
+  fi
+  export VPC_ID
+
+  find_subnet() {  # $1 = Module 1.2 export (may be empty), $2 = subnet Name tag
+    local sid="${1:-}"
+    if [[ -z "$sid" ]]; then
+      sid=$(aws ec2 describe-subnets \
+        --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=$2" \
+        --query 'Subnets[0].SubnetId' --output text) || return 1
+    fi
+    if [[ -z "$sid" || "$sid" == "None" ]]; then
+      printf 'No subnet tagged %s in %s; rerun Module 1.2 Task 3 or export the subnet ID.\n' "$2" "$VPC_ID" >&2
+      return 1
+    fi
+    printf '%s\n' "$sid"
+  }
+
+  PUBLIC_SUBNET_1=$(find_subnet "${PUB_SUB1_ID:-}" Public-Subnet-AZ1) || return 1
+  PUBLIC_SUBNET_2=$(find_subnet "${PUB_SUB2_ID:-}" Public-Subnet-AZ2) || return 1
+  PRIVATE_SUBNET_1=$(find_subnet "${PRIV_SUB1_ID:-}" Private-Subnet-AZ1) || return 1
+  PRIVATE_SUBNET_2=$(find_subnet "${PRIV_SUB2_ID:-}" Private-Subnet-AZ2) || return 1
+  export PUBLIC_SUBNET_1 PUBLIC_SUBNET_2 PRIVATE_SUBNET_1 PRIVATE_SUBNET_2
+
+  # Fail fast if any ID is invalid, belongs to another VPC, or is not available
+  VALID_COUNT=$(aws ec2 describe-subnets \
+    --subnet-ids "$PUBLIC_SUBNET_1" "$PUBLIC_SUBNET_2" "$PRIVATE_SUBNET_1" "$PRIVATE_SUBNET_2" \
+    --query 'length(Subnets[?VpcId==`'"$VPC_ID"'` && State==`available`])' \
+    --output text) || return 1
+  if [[ "$VALID_COUNT" -ne 4 ]]; then
+    printf 'Expected four available subnets in %s, found %s; check the IDs before continuing.\n' "$VPC_ID" "$VALID_COUNT" >&2
+    return 1
+  fi
+  AZS=$(aws ec2 describe-subnets \
+    --subnet-ids "$PUBLIC_SUBNET_1" "$PUBLIC_SUBNET_2" "$PRIVATE_SUBNET_1" "$PRIVATE_SUBNET_2" \
+    --query 'Subnets[].AvailabilityZone' --output text) || return 1
+  AZ_COUNT=$(printf '%s\n' $AZS | sort -u | wc -l | tr -d ' ')
+  if [[ "$AZ_COUNT" -lt 2 ]]; then
+    printf 'The four subnets span only %s Availability Zone; the ALB and service each need two.\n' "$AZ_COUNT" >&2
+    return 1
+  fi
+
+  # ECR image from Module 1.6
+  if ! aws ecr describe-images --repository-name kubedojo/ecr-exercise \
+      --image-ids imageTag=v1.0.0 --query 'imageIds[0]' --output text >/dev/null; then
+    printf 'Image %s/kubedojo/ecr-exercise:v1.0.0 not found; push it with the Module 1.6 lab first.\n' "$REGISTRY" >&2
+    return 1
+  fi
+
+  # IAM roles from the IAM Roles section above
+  for ROLE in ecsTaskExecutionRole api-task-role; do
+    if ! aws iam get-role --role-name "$ROLE" --query 'Role.Arn' --output text >/dev/null; then
+      printf 'IAM role %s is missing; create it in this module'\''s "IAM Roles: Execution Role vs Task Role" section.\n' "$ROLE" >&2
+      return 1
+    fi
+  done
+
+  printf 'Preflight OK: VPC %s, subnets in %s AZs, ECR image and both IAM roles present.\n' "$VPC_ID" "$AZ_COUNT"
+}
+ecs_fargate_preflight
 ```
 
 ### Task 1: Create the ECS Cluster
