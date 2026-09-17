@@ -15,7 +15,7 @@ lab:
 >
 > **Time to Complete**: 80–100 minutes (read + Killercoda lab)
 >
-> **Prerequisites**: [Module 0.5 - Editing Files](../module-0.5-editing-files/)
+> **Prerequisites**: [Module 0.5 - Editing Files](../module-0.5-editing-files/), [Module 0.6 - Git Basics](../module-0.6-git-basics/), and [Module 0.7 - What is Networking?](../module-0.7-what-is-networking/)
 
 ---
 
@@ -78,7 +78,14 @@ The table does not mean a laptop can never serve traffic or a server can never h
 
 The beginner trap is thinking remote machines are less real because they are not visible. They are very real. If you create a file on a server, disk space is consumed on that server; if you delete a directory on a server, that directory is gone from the server; if you restart a process on a server, users who depend on that process may notice.
 
-Pause and predict: if a web server has no monitor attached, how can anyone know whether its disk is full or its service is running? The answer is that operators ask through remote interfaces: SSH sessions, monitoring systems, logs, cloud consoles, serial consoles, and automation tools. SSH is the first remote interface in this beginner path because it feels like the terminal you already know.
+Pause and predict: if a production web server has no physical monitor, keyboard, or display cable attached, how can an operations engineer know whether its storage disk is completely full or its background service has crashed?
+
+<details>
+<summary>Check your prediction</summary>
+
+Operators inspect headless servers through network-accessible remote interfaces: secure shell (SSH) sessions, automated monitoring agents, centralized log collectors, cloud management consoles, serial consoles, and infrastructure automation tooling. SSH is the foundational remote interface in this learning path because it provides direct, interactive shell access over an encrypted connection using the terminal commands you already understand.
+
+</details>
 
 ## Local and Remote Are About Where Work Runs
 
@@ -101,7 +108,14 @@ pwd
 
 The three checks answer three separate questions. `hostname` answers "which machine is executing this command?" `whoami` answers "which account is executing this command?" `pwd` answers "where in the file system am I standing?" Together they reduce the chance that you apply a fix to your laptop while believing you are on the server, or worse, apply a destructive change to production while believing you are in a practice environment.
 
-Pause and predict: you open a terminal, immediately run `hostname`, and see your laptop name. Then you run `ssh admin@10.0.0.5`, authenticate successfully, run `hostname` again, and see a different name. Which machine will receive a `touch practice.txt` command now? The file is created on the remote machine because the active shell after SSH login belongs to that remote host.
+Pause and predict: you open a terminal, immediately run `hostname`, and observe your laptop name. Then you run `ssh admin@10.0.0.5`, authenticate successfully, run `hostname` again, and see a different server name. Which machine will receive a `touch practice.txt` command now, and where in the infrastructure will that file reside?
+
+<details>
+<summary>Check your prediction</summary>
+
+The file is created on the remote server (`10.0.0.5`) in the current working directory of that remote user session. Once an SSH login succeeds, your local terminal window acts strictly as an input display and keyboard relay; the active shell process interpreting your commands and writing files belongs entirely to the remote operating system.
+
+</details>
 
 The following quick classification exercise is retained from the original module because it trains the most important beginner reflex. Do not answer by looking for a fancy command; answer by asking where the work happens.
 
@@ -181,7 +195,14 @@ echo $USER
 echo $HOME
 ```
 
-Pause and predict: if you connect to a remote server using `ssh chef@192.168.1.100` and then run `echo $USER`, what output do you expect? It should print `chef`, because the command runs inside the remote session as the remote account you authenticated as. If you expected your laptop username, you were thinking about where your keyboard is, not where the shell is.
+Pause and predict: if you open an SSH connection to a remote server using `ssh chef@192.168.1.100` and then run `echo $USER`, what output do you expect to see printed in your terminal window, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+It prints `chef`, because the command executes inside the remote session under the remote user account you authenticated as during login. If you expected your local laptop username, you were thinking about where your physical keyboard is located rather than where the active shell process is evaluating its environment variables.
+
+</details>
 
 The default SSH port is usually 22, but real systems sometimes choose a different port because of network policy, lab setup, port forwarding, or a deliberate administrative decision. You specify that port with `-p`, and you specify a particular private key file with `-i`. Verbose mode, `-v`, prints connection details that are useful when authentication or network reachability fails.
 
@@ -191,7 +212,14 @@ The default SSH port is usually 22, but real systems sometimes choose a differen
 | `-i` | Use a specific key file | `ssh -i ~/.ssh/mykey chef@server.com` |
 | `-v` | Verbose mode (shows what's happening -- useful for debugging) | `ssh -v chef@server.com` |
 
-Before running this, what output do you expect from verbose mode? You should expect more diagnostic text before login succeeds or fails, not a different kind of shell. Verbose output is for explanation, not for changing the remote machine.
+Pause and predict: before running `ssh -v chef@server.com`, what kind of output do you expect to see on your screen during connection negotiation, and will enabling verbose mode alter how the remote shell behaves once connected?
+
+<details>
+<summary>Check your prediction</summary>
+
+You should expect detailed diagnostic trace text showing every phase of the connection handshake—including DNS address resolution, TCP port handshakes, server host-key verification, cipher selection, and authentication credential exchanges—before the login succeeds or fails. Verbose output exists purely for troubleshooting observation; it does not change the behavior, permissions, or shell environment of the remote host.
+
+</details>
 
 ```bash
 ssh -v chef@server.com
@@ -263,7 +291,14 @@ Are you sure you want to continue connecting (yes/no)?
 
 For a local practice connection to `localhost`, accepting the prompt is reasonable because the host is your own machine. For a production server, you should verify the fingerprint through a trusted source such as cloud console metadata, a team runbook, or an administrator-provided value. Blindly accepting changed host keys trains the exact habit SSH is trying to prevent.
 
-Which approach would you choose here and why: a shared password for five teammates, or five separate SSH key pairs with five separate public keys on the server? The separate-key approach is better because each person can be granted, audited, and removed independently. Shared credentials make revocation and accountability harder than they need to be.
+Pause and predict: which access architecture would you choose for team administration and why: sharing a single administrative account password among five engineers, or issuing five separate SSH key pairs with five distinct public keys installed on the server?
+
+<details>
+<summary>Check your prediction</summary>
+
+The separate key pair architecture is far superior because each individual team member can be granted access, audited in server authentication logs, and revoked independently when someone leaves the project. Shared passwords eliminate individual accountability and make credential revocation dangerous, requiring every remaining person to coordinate changing the password simultaneously across multiple systems.
+
+</details>
 
 ## The Lifecycle of a Remote Session
 
@@ -288,7 +323,14 @@ Your computer                          Remote server
     |  (back to local terminal)             |
 ```
 
-The first blank is command output, because the server sends back the result of the command you ran remotely. The second blank is `exit`, because that command closes the remote shell and returns you to your local terminal. `Ctrl + D` often does the same thing because it sends end-of-input to the shell, but `exit` is explicit and readable in teaching examples.
+Pause and predict: look closely at `BLANK 1` and `BLANK 2` in the lifecycle diagram above. What does the remote server send across the network in response to your commands at `BLANK 1`, and what specific command or key sequence do you send at `BLANK 2` to terminate the session?
+
+<details>
+<summary>Check your prediction</summary>
+
+`BLANK 1` represents command output: the remote operating system executes the requested binary, captures stdout and stderr, and transmits the resulting text back across the encrypted SSH connection to display in your local terminal. `BLANK 2` represents the `exit` command (or pressing `Ctrl + D` to send end-of-file), which closes the remote shell process, terminates the TCP session, and returns prompt control to your local workstation shell.
+
+</details>
 
 During the working middle of a session, every ordinary terminal command you have learned keeps its spelling but changes its target. `ls` lists remote files, `pwd` prints the remote directory, `nano` edits a remote file, and `cat /etc/os-release` reads the remote operating system information. The visible terminal window did not move, but the shell did.
 
@@ -571,6 +613,9 @@ Work slowly enough to record evidence at each stage. A good operator's notes are
 - [ ] Disconnect with `exit`, then run `hostname` again to confirm you are back at a local prompt.
 - [ ] Write one sentence explaining whether the hostname changed and why that result makes sense for `localhost`.
 - [ ] Build, but do not run, the command that would connect as `admin` to `10.0.0.5` on port `2222` with key file `~/.ssh/work_key`.
+- [ ] Diagnose the three connection failures in Incident A by matching each error symptom to its failure layer and identifying the initial diagnostic command.
+- [ ] Analyze the session transcript in Incident B to prove which machine holds the flag file using hostname, user, and session-boundary receipts.
+- [ ] Evaluate the changed host key warning in Incident C to explain why immediate key removal is hazardous and detail the out-of-band verification procedure.
 
 <details>
 <summary>Solution guidance</summary>
@@ -579,10 +624,132 @@ Your local context block should show the machine, user, and directory before con
 
 </details>
 
+### Diagnostic Challenge: SSH Failure Layers and Context Evidence
+
+The guided steps above followed a predictable recipe where the server and credentials were known in advance. In actual infrastructure operations, SSH issues arrive without recipes: a teammate cannot reach a newly deployed host, a connection is rejected during a high-priority incident, or an engineer runs commands without knowing whether the changes landed on their laptop or a remote server. In this unguided challenge, examine three frozen terminal transcripts. For each incident, identify the failing layer or machine context, point to the exact evidence in the transcript, and determine the safest immediate next step.
+
+```text
+# Terminal session 1:
+$ ssh -p 22 ubuntu@198.51.100.24
+ssh: connect to host 198.51.100.24 port 22: Connection timed out
+
+# Terminal session 2:
+$ ssh -p 22 ubuntu@198.51.100.25
+ssh: connect to host 198.51.100.25 port 22: Connection refused
+
+# Terminal session 3:
+$ ssh -i ~/.ssh/id_ed25519 devops@198.51.100.26
+devops@198.51.100.26: Permission denied (publickey).
+```
+
+Examine the three error messages recorded across the separate sessions above. A team lead initially reports that all three servers have experienced an identical crash. Using the failure layer model from this module, identify the specific failing layer for each session, contrast why their failure mechanisms differ fundamentally, and determine the single most appropriate first diagnostic check for each.
+
+<details>
+<summary>Diagnosis and layer analysis for Incident A</summary>
+
+**Session 1 (`198.51.100.24` - `Connection timed out`):**
+- **Failing Layer:** Network routing, security group, or packet filtering layer.
+- **Evidence and Mechanism:** The SSH client dispatched TCP SYN packets toward port 22 of `198.51.100.24`, but received no response before the socket timeout expired. Either an intermediate firewall, a cloud provider security group, a broken network route, or a powered-off virtual machine silently dropped the packets without acknowledging or rejecting them.
+- **First Diagnostic Check:** Check cloud provider security group rules to confirm inbound TCP port 22 is permitted from your client IP, verify VPN connectivity if connecting to private subnets, and check instance health and power status in the cloud management console.
+
+**Session 2 (`198.51.100.25` - `Connection refused`):**
+- **Failing Layer:** Service daemon or port binding layer on the destination host.
+- **Evidence and Mechanism:** Network packets successfully traversed the route and reached the destination operating system. However, the host operating system actively rejected the connection by sending back a TCP RST (reset) packet, indicating that no listening process is bound to TCP port 22.
+- **First Diagnostic Check:** Verify whether `sshd` (the OpenSSH daemon) is installed and active on the host via cloud serial console or management agent (`sudo systemctl status ssh`), or verify whether the server configuration deliberately binds SSH to an alternate port such as `2222` (requiring `ssh -p 2222`).
+
+**Session 3 (`198.51.100.26` - `Permission denied (publickey)`):**
+- **Failing Layer:** Authentication and authorization layer.
+- **Evidence and Mechanism:** Network routing succeeded, TCP handshake on port 22 completed, host key trust was established, and the remote SSH daemon is actively communicating. However, the server rejected the offered public key (`~/.ssh/id_ed25519`) or the user account `devops` does not authorize that key in its `~/.ssh/authorized_keys` file.
+- **First Diagnostic Check:** Run `ssh -v -i ~/.ssh/id_ed25519 devops@198.51.100.26` to inspect which credentials the client offers during negotiation, verify the target username with the team, and ensure the public key (`~/.ssh/id_ed25519.pub`) was appended correctly to `~devops/.ssh/authorized_keys` with `0600` file permissions.
+
+</details>
+
+```text
+laptop-user@workstation:~$ ssh deployer@worker-prod-04
+deployer@worker-prod-04:~$ whoami
+deployer
+deployer@worker-prod-04:~$ hostname
+worker-prod-04
+deployer@worker-prod-04:~$ pwd
+/var/www/site
+deployer@worker-prod-04:~$ git pull origin main
+Updating a1b2c3d..e4f5g6h
+Fast-forward
+ app.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+deployer@worker-prod-04:~$ touch maintenance.flag
+deployer@worker-prod-04:~$ exit
+logout
+Connection to 192.0.2.85 closed.
+laptop-user@workstation:~$ ls -la maintenance.flag
+ls: cannot access 'maintenance.flag': No such file or directory
+```
+
+An engineer intended to test a maintenance flag script locally, ran the sequence above, disconnected, and then grew alarmed when `ls -la maintenance.flag` failed on their workstation. Did the `touch` command fail? Explain which physical machine currently holds `maintenance.flag`, cite the exact lines of evidence from the transcript that establish session boundaries, and evaluate the operational risk introduced by the engineer's misunderstanding.
+
+<details>
+<summary>Diagnosis and context analysis for Incident B</summary>
+
+**Did the command fail?**
+The command did not fail; it executed completely and successfully returned exit status 0 without error output.
+
+**Which machine holds `maintenance.flag`?**
+The file exists on the remote production server `worker-prod-04` at the absolute path `/var/www/site/maintenance.flag`.
+
+**Transcript Evidence for Session Boundaries:**
+- The prompt `laptop-user@workstation:~$ ssh deployer@worker-prod-04` initiated a remote SSH session.
+- Once connected, running `whoami` returned `deployer`, `hostname` returned `worker-prod-04`, and `pwd` returned `/var/www/site`. These three commands prove conclusively that subsequent shell commands ran in the remote environment.
+- The command `touch maintenance.flag` executed while the shell was still active on `worker-prod-04`.
+- The command `exit` closed the remote session, verified by `logout` and `Connection to 192.0.2.85 closed.`, returning the prompt to `laptop-user@workstation:~$`.
+- The final command `ls -la maintenance.flag` ran in the local workstation directory, where the file was never created.
+
+**Operational Risk:**
+The engineer believed they were working safely on their local workstation, but actually modified a production server (`worker-prod-04`). Touching `maintenance.flag` on a production host might trigger an automated load balancer or web server rule to display a maintenance page, dropping live user traffic. Furthermore, assuming the command failed locally might lead the engineer to repeat actions blindly while production remains in an unintended state.
+
+</details>
+
+```text
+$ ssh admin@prod-api.example.com
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+The fingerprint for the ED25519 key sent by the remote host is
+SHA256:uR9v8Kx3Jb5Pq1Lm9N0w2Z4y7Xa6Ce8Gh0Ik2Mo4Qs8.
+Please contact your system administrator.
+Add correct host key in /home/user/.ssh/known_hosts to get rid of this message.
+Offending ED25519 key in /home/user/.ssh/known_hosts:42
+Host key verification failed.
+```
+
+While investigating an alert on an API server, an engineer encounters the security warning displayed above. A forum post suggests immediately running `ssh-keygen -R prod-api.example.com` to remove line 42 from `known_hosts` so the connection can proceed without warnings. Why is deleting this host key record without out-of-band verification hazardous, which security layer is raising this alert, and what exact procedure must the engineer follow before connecting?
+
+<details>
+<summary>Diagnosis and host-trust analysis for Incident C</summary>
+
+**Security Layer and Mechanism:**
+This alert is triggered by the SSH Host Identity Trust layer (specifically client-side host key validation via `~/.ssh/known_hosts`). The client compares the cryptographic public host key presented by `prod-api.example.com` against the fingerprint recorded during the initial trusted connection. Because the key does not match, the SSH client terminates the connection to protect the user from sending credentials or commands to an untrusted endpoint.
+
+**Hazard of Immediate Key Removal:**
+OpenSSH displays this warning specifically to guard against Man-in-the-Middle (MITM) attacks, DNS spoofing, or ARP poisoning, where an attacker intercepts network traffic and impersonates the destination server. Running `ssh-keygen -R` immediately wipes the stored fingerprint and blinds the operator to potential interception. If an attacker is actively spoofing the host, blindly deleting the record and accepting the new key will hand your credentials and private session traffic directly to the attacker.
+
+**Benign Causes vs Attack Scenarios:**
+A host key change is frequently benign in cloud environments—for example, if the instance was reprovisioned from a fresh operating system image, rebuilt by an automated pipeline, or if an elastic IP address was reassigned to a new virtual machine. However, the engineer must never guess or assume benign re-imaging without independent confirmation.
+
+**Required Verification Procedure:**
+1. Stop connection attempts immediately; do not delete line 42 from `~/.ssh/known_hosts`.
+2. Contact the server administrator or inspect authoritative out-of-band infrastructure sources (such as cloud provider instance system logs, cloud-init provisioning logs, or Terraform/Ansible deployment outputs) to obtain the authentic public key fingerprint generated on the host.
+3. Compare the verified fingerprint against the fingerprint reported in the warning banner (`SHA256:uR9v8Kx3Jb5Pq1Lm9N0w2Z4y7Xa6Ce8Gh0Ik2Mo4Qs8`).
+4. If and only if the fingerprints match precisely: remove the obsolete key from the local registry using `ssh-keygen -R prod-api.example.com` and reconnect, verifying the fingerprint prompt before typing `yes`. If the fingerprints do not match, escalate the incident immediately to security and network operations as an unauthorized host replacement or network interception event.
+
+</details>
+
 <details>
 <summary>Success criteria</summary>
 
-You have succeeded when your notes show a before-connection context block, an SSH command, an inside-session context block, a clean disconnect, and a final local context check. If `localhost` reports the same hostname before and after connection, explain that the protocol still opened a remote-style shell, but the remote endpoint was your own machine. If you used a different practice server, the hostname should normally change after login. In either case, the important proof is that you can identify where commands ran before you change anything.
+You have succeeded when your notes show a before-connection context block, an SSH command, an inside-session context block, a clean disconnect, and a final local context check for the guided localhost exercise. In addition, you have successfully completed the unguided diagnostic challenge: distinguishing network timeout, daemon refusal, and publickey rejection in Incident A; proving remote execution and file placement through command context and disconnect receipts in Incident B; and identifying host key verification as an essential identity protection that requires out-of-band fingerprint validation before editing `known_hosts` in Incident C. In all scenarios, you can systematically prove where commands ran and identify failure layers before making changes.
 
 </details>
 
