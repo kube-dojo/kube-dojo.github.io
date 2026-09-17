@@ -11,7 +11,7 @@ lab:
   difficulty: intermediate
   environment: kubernetes
 ---
-> **Complexity**: `[QUICK]` - Essential daily skill, simple commands
+> **Complexity**: `[MEDIUM]` - Long-form logging module covering an essential daily skill
 >
 > **Time to Complete**: 25-30 minutes
 >

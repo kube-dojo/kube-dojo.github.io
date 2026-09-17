@@ -11,7 +11,7 @@ lab:
   difficulty: intermediate
   environment: kubernetes
 ---
-> **Complexity**: `[QUICK]` - Conceptual understanding with practical commands
+> **Complexity**: `[MEDIUM]` - Long-form conceptual module with practical deprecation commands
 >
 > **Time to Complete**: 40 minutes
 >

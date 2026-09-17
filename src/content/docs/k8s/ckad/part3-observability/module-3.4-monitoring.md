@@ -11,7 +11,7 @@ lab:
   difficulty: intermediate
   environment: kubernetes
 ---
-> **Complexity**: `[QUICK]` - Basic commands, conceptual understanding
+> **Complexity**: `[MEDIUM]` - Long-form resource-monitoring module with conceptual foundations
 >
 > **Time to Complete**: 25-30 minutes
 >
