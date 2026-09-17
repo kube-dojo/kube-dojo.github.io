@@ -12,7 +12,7 @@ lab:
   environment: ubuntu
 ---
 
-> **Complexity**: `[QUICK]` - Setup once, benefit every time you touch a cluster
+> **Complexity**: `[MEDIUM]` - Long-form shell workflow module with repeated hands-on practice
 >
 > **Time to Complete**: 15-20 minutes
 >
