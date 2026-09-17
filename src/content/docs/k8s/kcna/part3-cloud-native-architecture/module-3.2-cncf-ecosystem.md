@@ -6,7 +6,7 @@ sidebar:
   order: 3
 ---
 
-> **Complexity**: `[QUICK]` - Knowledge-based
+> **Complexity**: `[MEDIUM]` - Long-form ecosystem survey with tool-selection and maturity evaluation practice
 >
 > **Time to Complete**: 35-45 minutes
 >
@@ -289,7 +289,7 @@ The certification path also reinforces why ecosystem knowledge is not trivia. A 
 
 ## Patterns & Anti-Patterns
 
-For a quick module, the most useful pattern is category-first selection. Start by naming the operational problem, then choose the category, then evaluate projects inside that category. This pattern works because it keeps teams from chasing logos before they agree on the failure they are trying to prevent. For example, "we need observability" is too broad, but "we need to alert on API error rate and latency" points toward metrics, while "we need to find which service slowed a checkout request" points toward tracing.
+For a survey module like this one, the most useful pattern is category-first selection. Start by naming the operational problem, then choose the category, then evaluate projects inside that category. This pattern works because it keeps teams from chasing logos before they agree on the failure they are trying to prevent. For example, "we need observability" is too broad, but "we need to alert on API error rate and latency" points toward metrics, while "we need to find which service slowed a checkout request" points toward tracing.
 
 Another strong pattern is maturity-aware rollout. A Graduated project can often enter a broader proof of concept sooner, while a Sandbox project should usually start in a narrow, reversible environment. This does not punish innovation; it protects production from avoidable surprises. Teams that document the maturity level, expected blast radius, support model, and rollback path are more likely to adopt useful new projects without confusing experimentation with platform commitment.
 

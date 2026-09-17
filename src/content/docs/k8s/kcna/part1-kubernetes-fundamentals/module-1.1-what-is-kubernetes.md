@@ -6,7 +6,7 @@ sidebar:
   order: 2
 ---
 
-**Complexity**: `[QUICK]` - Foundational concepts. **Time to Complete**: 35-45 minutes. **Prerequisites**: None, although basic familiarity with servers, applications, and containers will make the examples easier to connect to real work.
+**Complexity**: `[MEDIUM]` - Long-form foundational module covering orchestration concepts and platform trade-offs. **Time to Complete**: 35-45 minutes. **Prerequisites**: None, although basic familiarity with servers, applications, and containers will make the examples easier to connect to real work.
 
 ## Learning Outcomes
 
