@@ -822,7 +822,7 @@ For Challenge 1 (The Planted Workspace):
 3. `incident-token.env` contains sensitive credential material and must never be staged or committed. `temp-notes.txt` is scratch documentation. Both should be added to `.gitignore` (or deleted from disk).
 4. To clean up safely:
    - Add ignore patterns: append `incident-token.env` and `*.txt` to `.gitignore`.
-   - Unstage the incomplete YAML change: run `git restore --staged deployment.yaml` (or `git rm --cached deployment.yaml` on older Git versions).
+   - Unstage the incomplete YAML change: run `git restore --staged deployment.yaml`. On Git versions older than 2.23, the equivalent for this already-tracked file is `git reset HEAD deployment.yaml`; `git rm --cached deployment.yaml` would remove the file from tracking entirely, which is not what you want here.
    - Discard the unwanted scratch edits from the working copy: run `git restore deployment.yaml` (or remove the extra lines in `nano`).
    - Remove the untracked scratch files: `rm temp-notes.txt incident-token.env`.
    - Run `git status` to confirm that the working tree is clean.
