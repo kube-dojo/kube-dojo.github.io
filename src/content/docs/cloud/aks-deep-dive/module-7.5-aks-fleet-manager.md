@@ -4,7 +4,7 @@ slug: cloud/aks-deep-dive/module-7.5-aks-fleet-manager
 sidebar:
   order: 6
 ---
-> **AKS Deep Dive** | Complexity: `[ADVANCED]` | Time: 2.5h
+**Complexity**: `[COMPLEX]` | **Time to Complete**: 2.5h | **Prerequisites**: [Module 7.1: AKS Architecture & Node Management](../module-7.1-aks-architecture/)
 
 ## What You'll Be Able to Do
 

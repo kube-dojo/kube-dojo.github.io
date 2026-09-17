@@ -4,7 +4,7 @@ slug: cloud/aws-essentials/module-1.9-secrets
 sidebar:
   order: 10
 ---
-**Complexity:** `[MEDIUM]` | **Time to Complete:** 1.5 hours | **Track:** AWS Essentials
+**Complexity**: `[MEDIUM]` | **Time to Complete**: 1.5 hours | **Prerequisites**: Module 1.1 IAM, an AWS account with scoped SSM/Secrets Manager/KMS permissions, AWS CLI v2, and basic encryption concepts.
 
 ## Prerequisites
 

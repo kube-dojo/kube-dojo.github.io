@@ -4,14 +4,7 @@ slug: cloud/azure-essentials/module-3.15-event-hub-event-grid
 sidebar:
   order: 16
 ---
-
-> **Complexity:** `[COMPLEX]`
->
-> **Time:** 90-120 min
->
-> **Prereqs:** [3.1-entra-id](../module-3.1-entra-id/), [3.2-vnet](../module-3.2-vnet/), [3.9-key-vault](../module-3.9-key-vault/), [3.10-monitor](../module-3.10-monitor/)
-
----
+**Complexity**: `[COMPLEX]` | **Time to Complete**: 90-120 min | **Prerequisites**: [3.1-entra-id](../module-3.1-entra-id/), [3.2-vnet](../module-3.2-vnet/), [3.9-key-vault](../module-3.9-key-vault/), [3.10-monitor](../module-3.10-monitor/)
 
 ## What You'll Be Able to Do
 
