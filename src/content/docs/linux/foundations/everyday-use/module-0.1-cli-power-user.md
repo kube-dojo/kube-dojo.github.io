@@ -17,7 +17,7 @@ lab:
 >
 > **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 >
-> **Prerequisites**: Zero to Terminal (Module 0.8)
+> **Prerequisites**: [Zero to Terminal](../../../prerequisites/zero-to-terminal/) track — Module 0.3 (First Terminal Commands) and Module 0.4 (Files and Directories) cover the shell basics this lesson builds on
 >
 > This module assumes you can open a shell, move through directories, and run basic commands, then shows how those small skills become repeatable investigation workflows.
 
@@ -135,7 +135,14 @@ mkdir -p project/{src,tests,docs}
 # Creates three subdirectories inside project/
 ```
 
-Pause and predict: if you type `echo file_{1,2,3}.txt`, what exact string will the shell print, and does any file need to exist for that output to appear? The useful mental model is that the shell prepares the argument list first, then the command runs with that prepared list. Once you see that boundary, many confusing wildcard failures become explainable instead of mysterious.
+Pause and predict: if you type `echo file_{1,2,3}.txt`, what exact string will the shell print, and does any file need to exist for that output to appear? Commit to your answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+The shell prints `file_1.txt file_2.txt file_3.txt`, and no file needs to exist. Brace expansion generates strings rather than discovering files, so `echo` receives three prepared arguments whether or not anything named that way sits on disk. The useful mental model is that the shell prepares the argument list first, then the command runs with that prepared list. Once you see that boundary, many confusing wildcard failures become explainable instead of mysterious.
+
+</details>
 
 The practical workflow is to preview broad patterns before combining them with commands that change state. Use `ls`, `printf '%s\n'`, or another harmless command to inspect what the shell will pass onward, then run the destructive or expensive operation only after the target set looks right. This is the same discipline engineers use with database migrations: inspect the selected rows before issuing the write.
 
@@ -263,7 +270,14 @@ flowchart LR
 
 The factory analogy works because each station should do one clear transformation. A pipeline that lists files, filters by name, counts lines, and sorts by size is easier to debug than a single opaque script that does everything at once. If the final answer looks wrong, you can run the first two commands, inspect the intermediate stream, then add the next stage only when the data shape is correct.
 
-Stop and think: if `cmd2` prints an error message on stderr, does that error flow into `cmd3`, or does only stdout move through the pipe? This question matters during incidents because error messages can appear on the terminal even though the downstream command never processed them. A pipeline may look noisy while still producing a valid result, or it may look clean because errors were redirected away.
+Stop and think: if `cmd2` prints an error message on stderr, does that error flow into `cmd3`, or does only stdout move through the pipe? Commit to your answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Only stdout moves through the pipe; stderr still reaches the terminal unless you redirect it explicitly, because pipes connect stream 1 of one command to stream 0 of the next. This matters during incidents because error messages can appear on the terminal even though the downstream command never processed them. A pipeline may look noisy while still producing a valid result, or it may look clean because errors were redirected away.
+
+</details>
 
 ```bash
 # List files and scroll through the output page by page
@@ -318,7 +332,24 @@ cat access.log | awk '{print $9}' | sort | uniq -c | sort -rn
 #    23 500
 ```
 
-Before running the access-log pipeline, predict what would break if the `sort` before `uniq -c` were removed. `uniq` only counts adjacent duplicate lines, so identical IP addresses scattered throughout the file would be counted as separate groups. The pipeline depends on ordering before counting, which is a common pattern in command-line analysis.
+Before running the access-log pipeline, predict what would break if the `sort` before `uniq -c` were removed. Commit to your answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+`uniq` only counts adjacent duplicate lines, so identical IP addresses scattered throughout the file would be counted as several one-line groups instead of one accurate total. The pipeline depends on ordering before counting, which is a common pattern in command-line analysis: sort first, then count.
+
+</details>
+
+The `cut` tool belongs in the same toolkit when a file uses one fixed delimiter between fields. `/etc/passwd` separates fields with colons, so extracting the username and login shell is a two-flag job: `-d:` sets the delimiter and `-f1,7` keeps fields 1 and 7. Reach for `awk` instead when fields are separated by variable whitespace or when a later stage needs arithmetic on the extracted values.
+
+```bash
+# List each local user and their login shell, alphabetized
+cut -d: -f1,7 /etc/passwd | sort
+# Step by step:
+# 1. cut -d: -f1,7: split each line on ":" and keep fields 1 (username) and 7 (shell)
+# 2. sort: alphabetize the username:shell pairs
+```
 
 The contrast with temporary files shows why pipes changed daily Unix work. Temporary files can be useful when you need to preserve intermediate evidence, but they create cleanup chores and stale data risks. Pipes keep the stream moving through memory, so the final answer reflects the current command output rather than yesterday's forgotten scratch file.
 
@@ -801,7 +832,7 @@ find ~/investigation -name "*.txt"
 ```
 </details>
 
-**Task 6 (The Boss Level):** Write a single pipeline that reads all log files, filters only ERROR lines, sorts them by timestamp, takes the last 5 most recent errors, and saves them to `~/investigation/recent_critical.txt`.
+**Task 6 (Compose the Evidence Pipeline):** Write a single pipeline that reads all log files, filters only ERROR lines, sorts them by timestamp, takes the last 5 most recent errors, and saves them to `~/investigation/recent_critical.txt`.
 
 <details>
 <summary>Solution</summary>
@@ -819,12 +850,65 @@ cat ~/investigation/recent_critical.txt
 You should see the 5 most recent ERROR entries sorted by timestamp.
 </details>
 
+**Diagnostic Challenge: Name the Failure Layer**
+
+Each card below is a frozen transcript from a terminal session where something went wrong. The transcripts are simulated for this exercise, not captured from a real incident, so no live run is required. Read the command and its output, name which layer failed — shell expansion, stream routing, or pipeline ordering — and write a one-line fix before opening the reveal.
+
+**Card 1:** A teammate ran the search below from a directory containing `app.log` and a `logs/` subdirectory with three more `.log` files. Only `./app.log` was printed.
+
+```bash
+find . -name *.log
+# Output:
+# ./app.log
+```
+
+<details>
+<summary>Name the layer and the fix</summary>
+
+The failure layer is shell expansion, not `find` itself. Because `*.log` was unquoted, the shell expanded it to `app.log` before `find` started, so `find` searched recursively for files literally named `app.log` instead of applying the pattern at every level. One-line fix: `find . -name "*.log"` — quoting protects the pattern until `find` can evaluate it against each path it visits.
+</details>
+
+**Card 2:** A teammate ran the search below as a regular user. The screen filled with permission errors, and no match was visible by the time the command finished.
+
+```bash
+find / -name nginx.conf
+# Output:
+# find: '/var/lib/private': Permission denied
+# find: '/etc/ssl/private': Permission denied
+# find: '/root': Permission denied
+# ... dozens more permission lines ...
+```
+
+<details>
+<summary>Name the layer and the fix</summary>
+
+The failure layer is stream routing: valid matches on stdout are drowning in stderr diagnostics, and a real match may have scrolled past unseen. One-line fix: `find / -name nginx.conf 2> /dev/null`, or redirect stderr to a file with `2> find_errors.txt` when the skipped paths might matter. Moving stream 2 elsewhere keeps stream 1 readable.
+</details>
+
+**Card 3:** A teammate wanted per-IP request counts from an access log and got split counts for the same addresses instead of totals.
+
+```bash
+awk '{print $1}' access.log | uniq -c
+# Output:
+#      1 10.0.0.15
+#      1 10.0.0.16
+#      2 10.0.0.15
+#      1 10.0.0.16
+```
+
+<details>
+<summary>Name the layer and the fix</summary>
+
+The failure layer is pipeline ordering: `uniq -c` only counts adjacent duplicates, and the identical IPs are scattered, so each run of adjacent lines becomes its own group — `10.0.0.15` shows up as a one-line group and a two-line group instead of a single count of 3. One-line fix: `awk '{print $1}' access.log | sort | uniq -c | sort -rn` — sort first so duplicates become adjacent, then count, then rank.
+</details>
+
 You have completed this exercise when:
 
 - [ ] `~/investigation/all_errors.txt` exists and contains only ERROR lines from all three log files.
 - [ ] You can explain why Task 3 prints counts instead of matching log lines.
 - [ ] `~/investigation/recent_critical.txt` contains exactly 5 sorted error lines.
 - [ ] You completed each task using commands from this module rather than GUI tools.
+- [ ] You named the failure layer and wrote a one-line fix for each of the three frozen cards.
 
 ## Next Module
 
@@ -836,10 +920,9 @@ Next up: [Module 0.2: Environment & Permissions (Who You Are & Where You Are)](.
 - [GNU Bash Manual: Redirections](https://www.gnu.org/software/bash/manual/html_node/Redirections.html)
 - [GNU Bash Manual: Pipelines](https://www.gnu.org/software/bash/manual/html_node/Pipelines.html)
 - [GNU grep Manual](https://www.gnu.org/software/grep/manual/grep.html)
-- [GNU findutils Manual](https://www.gnu.org/software/findutils/manual/html_node/find_html/index.html)
-- [GNU findutils Manual: xargs options](https://www.gnu.org/software/findutils/manual/html_node/find_html/xargs-options.html)
+- [GNU findutils Manual](https://www.gnu.org/software/findutils/manual/html_node/index.html)
+- [GNU findutils Manual: xargs options](https://www.gnu.org/software/findutils/manual/html_node/xargs-options.html)
 - [GNU awk User's Guide](https://www.gnu.org/software/gawk/manual/gawk.html)
-- [GNU sed Manual](https://www.gnu.org/software/sed/manual/sed.html)
 - [GNU Coreutils Manual: sort invocation](https://www.gnu.org/software/coreutils/manual/html_node/sort-invocation.html)
 - [Linux man-pages: find(1)](https://man7.org/linux/man-pages/man1/find.1.html)
 - [Linux man-pages: xargs(1)](https://man7.org/linux/man-pages/man1/xargs.1.html)
