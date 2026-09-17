@@ -61,7 +61,14 @@ This is why cloud and infrastructure lessons introduce the terminal early. A Kub
 | GUI | Visual inspection, discovery, drag-and-drop work, dashboards | Repeating many exact steps, documenting every click, remote text-only servers | You mostly click visible controls |
 | Terminal | Precise commands, automation, remote access, repeatable troubleshooting | Visual editing, first-time exploration, tasks where pictures carry the meaning | You type a command and read text output |
 
-Pause and predict: if you had to rename hundreds of files the same way, which interface would make mistakes easier to avoid, and why? The answer is not that the terminal is morally better. The answer is that repeated exact changes are where a typed instruction can be tested once, reviewed, saved, and rerun without relying on hundreds of careful mouse actions.
+Pause and predict: if you had to rename hundreds of files the same way, which interface would make mistakes easier to avoid, and why? Commit to your own answer in plain language before opening the reveal, because the retrieval attempt is what makes the explanation stick.
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer is not that the terminal is morally better. The answer is that repeated exact changes are where a typed instruction can be tested once, reviewed, saved, and rerun without relying on hundreds of careful mouse actions. A GUI can still be the better choice when the renaming pattern is irregular or visual, but a uniform change across many files is exactly the kind of work where one reviewed command beats one hundred careful clicks.
+
+</details>
 
 For example, a GUI workflow for renaming many files can become a fatigue problem. You click a file, choose rename, type a new name, confirm it, then repeat that sequence again and again. A terminal can express the same pattern as a loop, which means the computer handles the repetition while you focus on whether the pattern is correct.
 
@@ -138,11 +145,16 @@ Before running this, what output do you expect from a command named `echo` when 
 echo "Hello, World!"
 ```
 
+<details>
+<summary>Check your prediction</summary>
+
 You should see this output, which confirms that `echo` received the text argument and printed it back:
 
 ```text
 Hello, World!
 ```
+
+</details>
 
 The command name is `echo`, and the argument is `"Hello, World!"`. An argument is information you give to a command so it knows what to act on. In the restaurant analogy, `echo` is the instruction "repeat this order back to me," and the quoted text is the order that should be repeated.
 
@@ -206,7 +218,14 @@ your-mac.local
 
 Machine names matter when you have more than one terminal window open. Imagine one tab is connected to a practice machine and another is connected to a production server. A visible hostname gives you a chance to stop before running the right command in the wrong place, which is one reason many engineers customize prompts to make important environments stand out.
 
-Exercise scenario: you have two terminal windows open during a practice lab. One prompt says `alex@laptop ~ $`, and the other says `alex@training-vm /tmp $`. Which one would you use to run a command that should affect only the training machine, and what part of the prompt supports your decision? Answering that question is the beginning of operational caution.
+Exercise scenario: you have two terminal windows open during a practice lab. One prompt says `alex@laptop ~ $`, and the other says `alex@training-vm /tmp $`. Which one would you use to run a command that should affect only the training machine, and what part of the prompt supports your decision? Answering that question is the beginning of operational caution, so commit to your choice before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Use the window whose prompt says `alex@training-vm /tmp $`. The hostname portion of the prompt is the decisive evidence because it names the machine this shell session is connected to, so a command typed there executes on the training VM rather than on the laptop. The username and directory add useful context, but the hostname is the part that distinguishes the two machines, and reading it before acting is exactly the habit that prevents wrong-machine mistakes on real systems.
+
+</details>
 
 The four commands in this section are also a model for how to learn future commands. Start with commands whose effects are visible and reversible, prefer questions before actions, and keep your attention on the relationship between the command line and the printed response. By the time you reach commands that create files or inspect Kubernetes resources, you will already have a habit of reading first instead of reacting.
 
@@ -278,7 +297,7 @@ The correct fix is not to panic or close the whole application. You can type the
 >
 ```
 
-That `>` is not a normal ready prompt in this situation. It is the shell asking for more input because the previous line was incomplete. Recognizing the difference between a normal prompt and a continuation prompt turns a confusing moment into a solvable one.
+That `>` is not a normal ready prompt in this situation. It is the shell asking for more input because the previous line was incomplete. PowerShell typically shows `>>` as its continuation prompt instead of `>`, but the meaning is identical: the command is unfinished, and the shell is waiting for the rest. Recognizing the difference between a normal prompt and a continuation prompt turns a confusing moment into a solvable one.
 
 Try one more safe combination. These examples insert command output into a sentence using shell-specific command names. You do not need to master command substitution or subexpressions yet; just notice that terminal commands can be composed.
 
@@ -373,7 +392,14 @@ For this introductory module, the decision framework is deliberately simple. Cho
 | Repeating the same file operation many times | Terminal | A command or script avoids repetitive clicking |
 | Exploring an unfamiliar desktop app | GUI | Menus and buttons reveal available actions |
 
-Which approach would you choose here and why: you need to document a setup process so a teammate can reproduce it tomorrow. A GUI might be easier for the first exploration, but the final instructions should include terminal commands wherever possible because text is reviewable, repeatable, and less ambiguous than "click the third checkbox unless the dialog looks different."
+Which approach would you choose here and why: you need to document a setup process so a teammate can reproduce it tomorrow. Commit to an answer before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+A GUI might be easier for the first exploration, but the final instructions should include terminal commands wherever possible because text is reviewable, repeatable, and less ambiguous than "click the third checkbox unless the dialog looks different." The strongest documentation usually combines both: screenshots to orient the reader and exact commands for the steps that must be reproduced precisely.
+
+</details>
 
 The same decision applies inside a single workflow. You might use a GUI dashboard to notice that an application is unhealthy, then use terminal commands to collect logs, check the current user, record timestamps, and run the exact diagnostic sequence again after a fix. Thinking this way keeps the terminal grounded in practical work instead of treating it as a separate world from the rest of the computer.
 
@@ -455,11 +481,18 @@ Inspect whether you copied the prompt symbol from the lesson along with the comm
 
 </details>
 
+<details>
+<summary>Question 8: Your lesson notes use `date`, but your teammate on Windows opened PowerShell. What command should they run instead, and what continuation prompt will PowerShell show if they leave a quote unclosed?</summary>
+
+They should run `Get-Date`, the native PowerShell cmdlet for the current date and time, because `date` is a Unix-style command name and PowerShell has its own command language. If a quote is left unclosed, PowerShell typically shows a `>>` continuation prompt instead of the `>` shown by Bash-like shells, but the recovery is identical: finish the quoted text and press Enter, or press Ctrl+C to cancel and return to a fresh prompt. The command names and prompt decorations change between shells, while the predict-run-compare loop and the recovery habits stay the same.
+
+</details>
+
 ## Hands-On Exercise: Your First Terminal Session
 
 ### Objective
 
-Open a terminal, run safe information commands, and practice one recovery move. This exercise is intentionally small because the goal is not speed. The goal is to build a reliable loop: predict the output, run the command, read the result, and confirm that the prompt returned.
+Open a terminal, run safe information commands, practice one recovery move, and finish by diagnosing frozen terminal snapshots without typing anything. This exercise is intentionally small because the goal is not speed. The goal is to build a reliable loop: predict the output, run the command, read the result, and confirm that the prompt returned.
 
 ### Setup
 
@@ -616,6 +649,49 @@ The shell should show a continuation prompt because the quote was not closed. Pr
 
 </details>
 
+7. Diagnose frozen terminals. This final task is unguided: there are no commands to run and no steps to follow, only evidence to read. Each transcript below is a simulated snapshot of a terminal window frozen at one moment. For each transcript, write down two things in your notes before opening the answer key: what state the shell is in (ready, running, waiting for more input, or returned to the prompt after an error), and what your next move would be.
+
+Transcript A shows a window where someone tried to echo a sentence about release notes and then pressed Enter:
+
+```text
+yourname@your-mac ~ % echo "release notes for today
+>
+```
+
+Transcript B shows simulated output from a network check that keeps reporting new lines without printing a fresh prompt:
+
+```text
+yourname@your-mac ~ % ping example.com
+64 bytes from 192.0.2.1: icmp_seq=1 ttl=56 time=12.3 ms
+64 bytes from 192.0.2.1: icmp_seq=2 ttl=56 time=11.8 ms
+64 bytes from 192.0.2.1: icmp_seq=3 ttl=56 time=12.1 ms
+```
+
+Transcript C shows what happened after a lesson command was pasted with its prompt symbol included, along with the shell's reply:
+
+```text
+yourname@your-mac ~ % $ echo "Hello, World!"
+zsh: command not found: $
+yourname@your-mac ~ %
+```
+
+Transcript D: two windows from the same practice lab, both waiting for input. You need to run a practice command that should affect only the training machine, so decide which window to use and which part of the prompt told you.
+
+```text
+alex@laptop ~ $
+```
+
+```text
+alex@training-vm /tmp $
+```
+
+<details>
+<summary>Check your diagnosis</summary>
+
+Transcript A shows a continuation prompt: the opening quote was never closed, so the shell is waiting for the rest of the text. The next move is to type the missing quote and press Enter, or press Ctrl+C to cancel and return to a normal prompt. Transcript B shows a command that is still running because output lines keep arriving and no prompt has returned; the next move is to press Ctrl+C once and wait for the prompt to come back. Transcript C shows an error caused by copying the `$` prompt symbol along with the command, and the shell has already returned to a ready prompt; the next move is to retype `echo "Hello, World!"` without the leading `$`. Transcript D shows two ready prompts on different machines; the next move is to use the `alex@training-vm /tmp $` window, because the hostname portion of the prompt identifies which machine will execute the command.
+
+</details>
+
 ### Success Criteria
 
 You've completed this exercise when you can demonstrate each item below without needing to close and reopen the terminal:
@@ -627,6 +703,7 @@ You've completed this exercise when you can demonstrate each item below without 
 - [ ] Run `whoami` and `hostname` and connect the output to your current session.
 - [ ] Run the combined shell-appropriate example: `echo "Today is $(date) and I am $(whoami)"` in Bash/zsh/WSL, or `Write-Output "Today is $(Get-Date) and I am $(whoami)"` in PowerShell.
 - [ ] Cancel an unfinished quoted command with Ctrl+C and return to a normal prompt.
+- [ ] Diagnose the shell state and next move in each frozen transcript without running any new commands.
 
 ## Sources
 
