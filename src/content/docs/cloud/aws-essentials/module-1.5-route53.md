@@ -4,10 +4,7 @@ slug: cloud/aws-essentials/module-1.5-route53
 sidebar:
   order: 6
 ---
-## Complexity: `[MEDIUM]`
-## Time to Complete: 1.5 hours
-
----
+**Complexity**: `[MEDIUM]` | **Time to Complete**: 1.5 hours | **Prerequisites**: Module 1.2 VPC, basic understanding of domain names and URL resolution, an AWS account with a registered domain, and a configured AWS CLI.
 
 ## Prerequisites
 

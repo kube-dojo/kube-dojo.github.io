@@ -4,10 +4,7 @@ slug: cloud/aws-essentials/module-1.8-lambda
 sidebar:
   order: 9
 ---
-## Complexity: `[MEDIUM]`
-## Time to Complete: 2 hours
-
----
+**Complexity**: `[MEDIUM]` | **Time to Complete**: 2 hours | **Prerequisites**: Module 1.1 IAM and Module 1.4 S3, basic Python or Node.js knowledge, and a configured AWS CLI.
 
 ## Prerequisites
 

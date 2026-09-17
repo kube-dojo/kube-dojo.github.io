@@ -4,7 +4,7 @@ slug: cloud/aws-essentials/module-1.11-cicd
 sidebar:
   order: 12
 ---
-**Complexity:** `[MEDIUM]` | **Time to Complete:** 2 hours | **Track:** AWS DevOps Essentials. This module assumes hands-on familiarity with basic Linux workflows and version control so the emphasis stays on deployment mechanics, not introductory Git or shell setup.
+**Complexity**: `[MEDIUM]` | **Time to Complete**: 2 hours | **Prerequisites**: Modules 1.6 ECR and 1.7 ECS, CI/CD familiarity, a GitHub account, AWS CLI v2, and basic Docker knowledge. This module assumes hands-on familiarity with basic Linux workflows and version control so the emphasis stays on deployment mechanics, not introductory Git or shell setup.
 
 ## Prerequisites
 
