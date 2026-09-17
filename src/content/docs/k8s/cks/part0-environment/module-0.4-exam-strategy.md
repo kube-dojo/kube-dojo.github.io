@@ -11,7 +11,7 @@ lab:
   difficulty: advanced
   environment: kubernetes
 ---
-> **Complexity**: `[QUICK]` - Critical for exam success
+> **Complexity**: `[MEDIUM]` - Long-form exam-strategy module with time-budget design and task-triage practice
 >
 > **Time to Complete**: 20-25 minutes
 >
