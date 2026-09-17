@@ -9,7 +9,7 @@ revision_pending: false
 >
 > **Time to Complete**: 80–100 minutes (long-form beginner read)
 >
-> **Prerequisites**: [Module 0.8 - Servers and SSH](/prerequisites/zero-to-terminal/module-0.8-servers-and-ssh/)
+> **Prerequisites**: [Module 0.9 - Software and Packages](/prerequisites/zero-to-terminal/module-0.9-software-and-packages/); [Module 0.1 - What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) for the hardware vocabulary this module maps cloud services onto
 
 ---
 
@@ -73,7 +73,13 @@ That second option is the cloud model. The provider has already built the data c
 
 Renting also changes how teams learn. A student, startup, or internal platform team can create a small environment, test an idea, collect evidence, and delete the environment before committing to a bigger design. That short feedback loop is one reason cloud platforms are common in modern engineering education. The risk is that speed can hide weak thinking, so responsible teams pair fast provisioning with naming conventions, account boundaries, access reviews, and written cleanup expectations.
 
-> **Pause and predict**: If a test environment is used only during business hours, which model makes it easier to stop paying for idle capacity at night, and what operational habit would the team need to build so that the savings actually happen?
+Pause and predict: if a test environment is used only during business hours, which model makes it easier to stop paying for idle capacity at night, and what operational habit would the team need to build so that the savings actually happen? Commit to an answer in your own words before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+The rented cloud model makes the savings possible because a server, disk, or whole environment can be stopped or deleted when the workday ends instead of sitting as purchased hardware that costs money whether or not anyone uses it. Possibility is not the same as reality, though: the savings appear only if the team builds the habit of actually shutting resources down, usually through scheduled stop jobs, tagging, and a cleanup review that catches what automation missed. The operational habit is the ingredient that turns a pricing model into a lower bill.
+</details>
 
 ## Build Versus Rent: The Operational Tradeoff
 
@@ -154,7 +160,13 @@ Portability deserves a careful, realistic definition here. Basic concepts transf
 
 Provider-neutral thinking is still worth practicing because it keeps your mental model from becoming a product catalog. When you see a new service name, ask what job it performs before asking whether it is impressive. Does it run code, store data, connect systems, protect access, observe behavior, or automate operations? That habit lets you learn one provider deeply without becoming helpless in another provider's documentation. It also prepares you to read Kubernetes documentation, where the same discipline of mapping names to responsibilities is essential.
 
-> **Pause and predict**: If an enterprise already uses Microsoft identity, Windows administration, and Office services heavily, which provider would probably receive an early evaluation, and what would still need to be checked before deciding?
+Pause and predict: if an enterprise already uses Microsoft identity, Windows administration, and Office services heavily, which provider would probably receive an early evaluation, and what would still need to be checked before deciding? Commit to an answer in your own words before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Azure would probably receive an early evaluation because existing Microsoft identity and administration investments can reduce friction for accounts, procurement, and support. An early look is not a decision, though: the team would still need to check whether the specific workload fits Azure's regions, managed services, pricing, and limits, and whether team skills, compliance needs, and portability concerns point elsewhere. The habit worth keeping is that integration advantage earns a provider a serious hearing, not an automatic win.
+</details>
 
 ## Mapping Cloud Services to Computer Parts
 
@@ -223,6 +235,17 @@ There is one more category that beginners often meet early: identity and access 
 
 Observability is another supporting category that becomes important as soon as a system has users. Logs tell you what software reported, metrics tell you how the system behaved over time, traces can show the path of one request through several services, and alerts tell humans when attention is needed. These tools do not replace compute, storage, or networking, but they make those resources operable. A cloud system you cannot observe is like a rented kitchen with no thermometers, receipts, or inspection records.
 
+### Classification checkpoint (unguided)
+
+This diagnostic has no answer key on purpose. Write your answers in your notes file, then revisit them after the quiz to see how your reasoning held up. For each workload, name the cloud service category you would reach for first: compute, storage, networking, database, identity, or observability.
+
+1. A photo-sharing app must keep millions of uploaded images available even if any single server dies, and the images are fetched through URLs rather than through one machine's filesystem.
+2. A data team needs two hundred machines for a three-hour processing job every night, then nothing until the next night.
+3. Customers can reach your website, but every login attempt fails with "permission denied" even for users who typed the correct password.
+4. A contractor who left the project two weeks ago can still delete production file uploads because nothing ever revoked the access.
+
+Now the failure story. On a Monday morning, customers report that the site is down. Using only the categories above, write the sequence of checks you would walk through: which category tells you whether users can reach the system at all, which tells you whether the application code is running, which tells you whether stored data is intact, which tells you whether an automated system did something it was not allowed to do, and which tells you what actually happened overnight. There is no single correct ordering, but a useful sequence moves from what users observe toward the layer where the evidence lives.
+
 ## Pay-As-You-Go Changes the Budget and the Failure Mode
 
 Cloud pricing is often usage-based, which means you can pay for capacity while you use it instead of buying the maximum expected capacity upfront. This is powerful because it makes experiments cheaper and scaling faster, but it also creates a new operational risk. A server left running, a large disk kept after a test, a logging system with runaway volume, or a data transfer pattern nobody noticed can all become real bills.
@@ -249,7 +272,13 @@ Cost visibility is a technical practice, not only an accounting practice. Engine
 
 A useful beginner habit is to ask what should happen when nobody is using a resource. A production database may need to stay available, but a practice VM, temporary load test, preview environment, or throwaway storage bucket probably does not. Cloud platforms make it easy to create those resources, so the cleanup rule must be designed before the environment exists. This habit will matter later when Kubernetes creates resources indirectly, because deleting an application object may or may not remove every cloud resource attached to it.
 
-> **Pause and predict**: Your new app gets ten times more traffic on weekends than on weekdays. Which resources would you consider scaling up for the weekend, which would you leave steady, and what signal would tell you it is safe to scale back down?
+Pause and predict: your new app gets ten times more traffic on weekends than on weekdays. Which resources would you consider scaling up for the weekend, which would you leave steady, and what signal would tell you it is safe to scale back down? Commit to an answer in your own words before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Compute is the natural candidate to scale up because more copies of the app, or larger machines, absorb the weekend surge, and the load balancer and network path may need to grow with it. Data that must stay consistent, such as the primary database and its backups, is usually changed more cautiously, and access controls should not loosen just because traffic grew. The signal to scale back down is measured behavior, not the calendar: utilization falling back toward weekday levels while latency and error rates stay healthy. Scaling on a timer alone risks paying Monday prices for Sunday traffic that never arrived, or shrinking while users are still waiting.
+</details>
 
 ## Where Kubernetes Fits
 
@@ -495,7 +524,7 @@ Review your notes and mark whether each provider separated compute, storage, eli
 - [Azure Free Account FAQ](https://azure.microsoft.com/en-us/free/free-account-faq/)
 - [AWS Shared Responsibility Model](https://docs.aws.amazon.com/whitepapers/latest/aws-risk-and-compliance/shared-responsibility-model.html)
 - [Microsoft Azure shared responsibility in the cloud](https://learn.microsoft.com/en-us/azure/security/fundamentals/shared-responsibility)
-- [Google Cloud shared fate model](https://cloud.google.com/architecture/framework/security/shared-fate)
+- [Google Cloud shared responsibility and shared fate](https://cloud.google.com/architecture/framework/security/shared-responsibility-shared-fate)
 - [AWS What is Cloud Computing?](https://aws.amazon.com/what-is-cloud-computing/)
 - [Google Cloud What is Cloud Computing?](https://cloud.google.com/learn/what-is-cloud-computing)
 
