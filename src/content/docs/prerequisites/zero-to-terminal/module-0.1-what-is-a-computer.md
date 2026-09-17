@@ -63,7 +63,13 @@ The pantry is disk storage, usually an SSD in modern laptops and servers. Storag
 
 Programs are recipes. A web browser is a recipe for requesting pages, decoding data, drawing tabs, storing cookies, playing media, and responding to your clicks. A text editor is a recipe for displaying characters, saving changes, and tracking cursor movement. The terminal, which appears in the next module, is a recipe for talking directly to the operating system through typed commands.
 
-Pause and predict: if a chef has plenty of recipes and ingredients in the pantry but almost no counter space, what happens during a busy dinner service? The chef may still be skilled, and the pantry may still be full, but work slows down because every task requires constant shuffling. That is the shape of a computer that has enough storage but not enough RAM for the programs currently open.
+Pause and predict: if a chef has plenty of recipes and ingredients in the pantry but almost no counter space, what happens during a busy dinner service? Commit to an answer in your own words before opening the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+The chef may still be skilled, and the pantry may still be full, but work slows down because every task requires constant shuffling. That is the shape of a computer that has enough storage but not enough RAM for the programs currently open. The bottleneck is the counter, not the chef's skill or the pantry's contents, which is why adding more storage would not speed this kitchen up.
+</details>
 
 ```
 Think of it this way:
@@ -86,7 +92,7 @@ This is also the first step toward thinking like an operator rather than a consu
 
 The CPU is the part of the computer that executes instructions. When you click a button, type a letter, open a browser tab, compress a file, install a package, or run a script, the CPU is involved. It reads instructions, performs arithmetic and comparisons, moves data around, and decides which branch of a program should run next. A faster CPU is like a faster chef because it can complete more steps in the same amount of time.
 
-Modern CPUs are usually described by brand names, model families, clock speeds, and core counts. You might see "Intel Core Ultra," "Apple M5," or "AMD Ryzen 5" on a laptop description. Those names are not skills you need to memorize today. The practical idea is that a core is like one working chef, so a CPU with several cores can handle several streams of work at the same time if the software is designed to use them.
+Modern CPUs are usually described by brand names, model families, clock speeds, and core counts. You might see "Intel Core Ultra," "Apple Silicon M-series," or "AMD Ryzen 5" on a laptop description. Those names are not skills you need to memorize today. The practical idea is that a core is like one working chef, so a CPU with several cores can handle several streams of work at the same time if the software is designed to use them.
 
 Clock speed is often measured in gigahertz, which means billions of cycles per second, but clock speed is not the whole story. A newer CPU can sometimes do more useful work per cycle than an older one, and a CPU with more cores can keep many tasks moving even if one task is busy. That is why "four gigahertz" is not automatically better than "three gigahertz" in every situation. Architecture, cores, power limits, cooling, and workload shape the real result.
 
@@ -105,7 +111,13 @@ Those numbers are not universal rules, but they are useful beginner anchors. A s
 
 When RAM fills up, the operating system has several unpleasant choices. It can compress memory, discard cached data that can be recreated, move less active data to disk, or in severe cases terminate programs. Moving data between RAM and disk is called swapping or paging, depending on the system. Swapping can keep a machine alive, but it is much slower than working directly in RAM, especially if the disk is also busy.
 
-> **Pause and predict**: You have 8 GB of RAM and you open a web browser with 30 tabs, a video editor, and a music player all at once. What do you think happens? If you guessed "the computer gets painfully slow," you are right. Each program needs counter space, and a browser with many tabs open can easily use several gigabytes of RAM. The OS starts shuffling data between RAM and disk, and everything feels delayed.
+> **Pause and predict**: You have 8 GB of RAM and you open a web browser with 30 tabs, a video editor, and a music player all at once. What do you think happens? Make a specific guess about what the operating system does next.
+
+<details>
+<summary>Check your prediction</summary>
+
+If you guessed "the computer gets painfully slow," you are right. Each program needs counter space, and a browser with many tabs open can easily use several gigabytes of RAM. The OS starts shuffling data between RAM and disk, and everything feels delayed.
+</details>
 
 This is why "my computer is slow" is not enough information for a good diagnosis. A slow video call with a fast network may point toward CPU pressure if the machine cannot encode or decode video smoothly. A slow laptop after opening many applications may point toward RAM pressure if the system is swapping. A slow file search may point toward disk performance or indexing. The symptom matters, but the resource under pressure matters more.
 
@@ -135,6 +147,19 @@ free -h
 
 # See your disk space
 df -h
+```
+
+On Windows, PowerShell answers the same three questions. `Get-CimInstance Win32_Processor` reports the processor name, `Get-CimInstance Win32_ComputerSystem` reports total physical memory in bytes, and `Get-PSDrive -PSProvider FileSystem` lists filesystem drives with used and free space. If you are learning on a Windows laptop, these commands are your local equivalent of the Linux tools you will meet on servers later.
+
+```powershell
+# See your CPU info on Windows (PowerShell)
+Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name
+
+# See your RAM on Windows, in bytes
+Get-CimInstance Win32_ComputerSystem | Select-Object -ExpandProperty TotalPhysicalMemory
+
+# See your disk space on Windows
+Get-PSDrive -PSProvider FileSystem
 ```
 
 Notice that none of these commands fix anything by themselves. They make the invisible visible, which is the first move in almost every technical diagnosis. A good engineer does not begin with an upgrade recommendation. A good engineer asks what is saturated, confirms it with evidence, and only then chooses a fix that matches the bottleneck.
@@ -195,7 +220,13 @@ Backups add one more layer to the pantry idea. Durable storage survives a normal
 
 This sequence is worth slowing down. The photo viewer program lives on disk when it is not running. The image file also lives on disk. When you double-click the image, both the program and the file are brought into active memory so the CPU can process them. The screen output is the result of storage, memory, CPU, graphics, and operating-system coordination.
 
-> **Stop and think**: Which approach would you choose here and why: deleting old downloads, buying more RAM, or replacing an HDD with an SSD? If the disk is full, deleting or moving files addresses the immediate problem. If the disk is not full but everything pauses while many programs are open, more RAM may help. If the machine has an older HDD and file operations are slow, an SSD can improve responsiveness even when capacity is unchanged.
+> **Stop and think**: Which approach would you choose here and why: deleting old downloads, buying more RAM, or replacing an HDD with an SSD?
+
+<details>
+<summary>Check your prediction</summary>
+
+Each fix matches a different bottleneck, which is why the diagnosis has to come before the purchase. If the disk is full, deleting or moving files addresses the immediate problem. If the disk is not full but everything pauses while many programs are open, more RAM may help. If the machine has an older HDD and file operations are slow, an SSD can improve responsiveness even when capacity is unchanged.
+</details>
 
 Beginners often say "memory" when they mean storage because product pages and casual conversations blur the words. In operations work, that blur causes real mistakes. A server with 256 GB of storage and 8 GB of RAM does not have "256 GB of memory" in the sense Kubernetes means when it schedules a workload. Kubernetes memory limits refer to RAM-like working memory, not the pantry where files are stored.
 
@@ -269,7 +300,13 @@ kubectl get nodes
 
 That command is included only as a preview, but it shows the language you will eventually use. A Kubernetes node is not an abstract cloud ghost. It is a computer known to the cluster, with resources that can be reported, scheduled, consumed, exhausted, and repaired. The cluster may hide some hardware details, but the physics remain underneath.
 
-Pause and predict: if a Kubernetes node has plenty of CPU available but almost no free memory, should a scheduler place a memory-hungry workload there? The answer should now feel obvious. A smart scheduler must consider the resource a workload actually needs, not just the resource that happens to be available. A kitchen with idle chefs but no counter space is still a bad place to prepare a large banquet.
+Pause and predict: if a Kubernetes node has plenty of CPU available but almost no free memory, should a scheduler place a memory-hungry workload there? Decide before you open the reveal.
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer should now feel obvious. A smart scheduler must consider the resource a workload actually needs, not just the resource that happens to be available. A kitchen with idle chefs but no counter space is still a bad place to prepare a large banquet.
+</details>
 
 This one-to-many jump is the reason the module starts at the beginner level but still matters for advanced work. Cloud infrastructure is not a separate universe. It is a way of renting, connecting, automating, and managing computers owned by someone else. Once you understand one computer, you have the vocabulary needed to reason about fleets, clusters, and failures at larger scale.
 
@@ -464,11 +501,38 @@ A CPU bottleneck might look like slow video export or a choppy video call while 
 Example: "My laptop has compute capacity provided by its CPU, memory capacity provided by 16 GB of RAM, and storage capacity provided by a 512 GB SSD." A Kubernetes node is also a computer, so it has finite CPU, memory, and storage. Kubernetes can schedule and manage workloads, but it cannot ignore the physical limits of the node.
 </details>
 
+### Task 6: Diagnose three telemetry profiles
+
+Each profile below is a snapshot from a different machine, written the way a monitoring tool or a teammate's message might report it. For each profile, decide which resource is saturated, name the evidence that points there, and choose one remediation that fits the bottleneck. Write your answers down before opening the reveals, because the written commitment is what turns this from reading into retrieval practice.
+
+- **Profile A: The midnight shuffle.** A laptop has 8 GB of RAM and 400 GB of free disk space. After the owner opens a browser with 40 tabs, a video call, and a code editor, switching windows takes several seconds. The system monitor shows memory at 97% and swap usage climbing steadily, while CPU usage stays near 20%.
+- **Profile B: The runaway export.** A desktop has 32 GB of RAM and 1 TB of free storage. A video export has been running for an hour; the fans are loud, the whole machine feels sluggish, and the monitor shows the export process pinned near 100% CPU with memory at 45% and swap unused.
+- **Profile C: The silent pantry.** A small server has 4 CPU cores at 10% usage and half its RAM free. Application logs stopped growing, package installs fail with "no space left" errors, and `df -h` reports the root filesystem at 99% used.
+
+<details>
+<summary>Check your diagnosis for Profile A</summary>
+
+The saturated resource is RAM, and the evidence is memory at 97% with steadily climbing swap: the counter is full, so the operating system is shuffling inactive data to disk and back. Fitting remediations include closing memory-heavy programs, reducing open browser tabs, or adding more RAM. A bigger disk would not help because 400 GB of pantry space is already free; the problem is temporary workspace, not durable storage.
+</details>
+
+<details>
+<summary>Check your diagnosis for Profile B</summary>
+
+The saturated resource is CPU, and the evidence is one process pinned near 100% CPU while memory sits at 45% and swap is unused: the chef is fully occupied with the export recipe. Fitting remediations include letting the export finish, lowering its quality settings, scheduling heavy jobs for off-hours, or moving to a processor with more cores. Adding RAM would not help because plenty of counter space is already free.
+</details>
+
+<details>
+<summary>Check your diagnosis for Profile C</summary>
+
+The saturated resource is disk space, and the evidence is the root filesystem at 99% used together with failed installs and stalled logs: the pantry has no free shelf even though the chef and counter are idle. Fitting remediations include deleting or rotating old logs, removing unused packages, moving data to another volume, or expanding the filesystem. Adding CPU or memory would not help because neither is under pressure.
+</details>
+
 ### Success Criteria
 
 - [ ] You can name your CPU, RAM, storage capacity, free storage, and operating system.
 - [ ] You can explain why RAM and storage are different without using the word "memory" ambiguously.
 - [ ] You can diagnose whether one simple symptom points first toward CPU, RAM, disk, network, or a single stuck program.
+- [ ] You can diagnose a telemetry profile by naming the saturated resource, the evidence, and a matching remediation.
 - [ ] You can explain why Kubernetes nodes are still computers with finite resources.
 
 ## Sources
