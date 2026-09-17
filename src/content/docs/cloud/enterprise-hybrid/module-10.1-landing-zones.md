@@ -4,7 +4,7 @@ slug: cloud/enterprise-hybrid/module-10.1-landing-zones
 sidebar:
   order: 2
 ---
-This module is rated **[COMPLEX]** and typically takes about three hours to complete. You should already be comfortable with Cloud Essentials across AWS, Azure, and GCP, Kubernetes basics, and cloud architecture patterns before you begin.
+**Complexity**: `[COMPLEX]` | **Time to Complete**: ~3h | **Prerequisites**: Cloud Essentials across AWS, Azure, and GCP; Kubernetes basics; cloud architecture patterns.
 
 ## What You'll Be Able to Do
 
