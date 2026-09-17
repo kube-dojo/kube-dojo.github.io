@@ -4,10 +4,7 @@ slug: cloud/aws-essentials/module-1.7-ecs-fargate
 sidebar:
   order: 8
 ---
-## Complexity: `[COMPLEX]`
-## Time to Complete: 3 hours
-
----
+**Complexity**: `[COMPLEX]` | **Time to Complete**: 3 hours | **Prerequisites**: Module 1.2 VPC and Module 1.6 ECR, basic container and Docker knowledge, JSON familiarity, and a configured AWS CLI.
 
 ## Prerequisites
 

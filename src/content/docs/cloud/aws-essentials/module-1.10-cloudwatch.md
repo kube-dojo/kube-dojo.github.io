@@ -4,9 +4,11 @@ slug: cloud/aws-essentials/module-1.10-cloudwatch
 sidebar:
   order: 11
 ---
+**Complexity**: `[MEDIUM]` | **Time to Complete**: 2 hours | **Prerequisites**: Module 1.3 EC2, an AWS account with admin or scoped CloudWatch/EC2/IAM permissions, AWS CLI v2, and a running EC2 instance to instrument.
+
 ## Prerequisites
 
-**Complexity:** `[MEDIUM]` | **Time to Complete:** 2 hours | **Track:** AWS DevOps Essentials. Before starting this module, ensure you have the following environment and background in place so the hands-on labs and CLI examples run without rework:
+Before starting this module, ensure you have the following environment and background in place so the hands-on labs and CLI examples run without rework:
 - Completed [Module 1.3: EC2 & Compute Fundamentals](../module-1.3-ec2/) (launching instances, security groups, IAM instance profiles)
 - An AWS account with admin access (or scoped permissions for CloudWatch, EC2, IAM)
 - AWS CLI v2 installed and configured locally
