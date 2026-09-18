@@ -15,7 +15,7 @@ lab:
 
 > **Complexity**: `[QUICK]` - Operator practice for Linux services, unit files, and log evidence
 >
-> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 80–110 minutes (long-form read + hands-on; Killercoda lab alone is ~45–50 min per frontmatter)
 >
 > **Prerequisites**:
 >
@@ -62,6 +62,15 @@ stateDiagram-v2
 ```
 
 `systemctl list-dependencies` is the safe way to start reading the graph before changing it. Dependencies and ordering are separate concepts: `Wants=` and `Requires=` pull units into the transaction with different failure strength, while `After=` and `Before=` order jobs that are already part of the transaction. A unit can require another unit without being ordered after it, and a unit can be ordered after another unit without pulling it in, so a boot-order incident often needs both `systemctl list-dependencies` and `systemctl show -p Wants -p Requires -p After -p Before <unit>`. ([systemd.unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html), [systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html))
+
+Before you run the next block: if `nginx.service` is enabled but inactive after reboot, which command do you expect to answer “what pulls it into the boot graph,” and which answers “what must finish before it starts”? Write both names, then check.
+
+<details>
+<summary>Check your prediction</summary>
+
+`systemctl list-dependencies` / `list-dependencies --reverse` show who pulls whom into the graph. `systemctl show -p Wants -p Requires -p After -p Before` (and often `systemd-analyze critical-chain`) separate pull-in strength from ordering. Boot-order bugs usually need both.
+
+</details>
 
 ```bash
 systemctl list-dependencies nginx.service
@@ -172,7 +181,7 @@ Restart policy is an operating contract. `Restart=no` means systemd will not aut
 | Restart policy | Use when | Avoid when | First triage command |
 |---|---|---|---|
 | `no` | A one-shot task should leave success or failure visible | A long-running daemon must self-heal after crashes | `systemctl status <unit>` |
-| `on-failure` | Availability matters and failed exits are safe to retry | Repeated failure can corrupt state or flood dependencies | `journalctl -u <unit> -p warning` (warning and more severe; syslog `warning=4`, `err=3`, `alert=1`, `emerg=0`) |
+| `on-failure` | Availability matters and failed exits are safe to retry | Repeated failure can corrupt state or flood dependencies | `journalctl -u <unit> -p warning` (warning and more severe; syslog `warning=4`, `err=3`, `crit=2`, `alert=1`, `emerg=0`) |
 | `on-abnormal` | You only want signal, timeout, or watchdog-style recovery | Normal nonzero exits should also recover | `systemctl show -p NRestarts <unit>` |
 | `on-abort` | A signal abort should be treated as crash recovery | Exit-code failures also need restart | `coredumpctl list <unit>` |
 | `on-watchdog` | The daemon participates in watchdog health checks | The daemon cannot send watchdog notifications | `journalctl -u <unit> | grep -i watchdog` |
@@ -224,25 +233,52 @@ sudo systemctl try-restart nginx.service
 
 ### Worked Outage: Pre-Start Failure
 
-**Hypothetical scenario:** An edge proxy is down after a certificate rotation. Start with `systemctl status nginx.service`. The status shows `failed`, an `ExecStartPre=` command, and a nonzero exit status. Do not restart yet. Read the effective unit with `systemctl cat nginx.service`. Then query the same unit journal with `journalctl -u nginx.service --since=-30m --until=now`. The status gave the symptom. The unit file gives the contract. The journal gives the exact failed check. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+**Hypothetical scenario:** An edge proxy is down after a certificate rotation. `systemctl status nginx.service` shows `failed`, an `ExecStartPre=` command, and a nonzero exit status.
 
-In this outage, the pre-start command might be `nginx -t`. The journal might say a certificate path is unreadable. That is better than a live proxy accepting traffic with a broken reload. The resolution is not "keep restarting." The resolution is to fix the certificate path or permissions, run the validation command directly, reload the daemon state if the unit changed, and then start the service. After recovery, save the status and journal window in the ticket. Those lines prove the cause and the fix. ([systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+Pause: what do you read next (before any restart), and what are you trying to learn from each read?
 
-The same flow works for custom workers. If `ExecStartPre=/usr/bin/test -r /etc/worker/config.yaml` fails, the service never reaches the main command. That is a configuration outage, not a process crash. Keep the service stopped until the file exists and is readable by the right user. Then start once and confirm the journal contains the successful activation path. A single clean start is stronger evidence than many blind retries.
+<details>
+<summary>Check your triage order</summary>
+
+Do not restart yet. Read the effective unit with `systemctl cat nginx.service`, then the unit journal with `journalctl -u nginx.service --since=-30m --until=now`. Status is the symptom; the unit file is the contract; the journal is the exact failed check. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+
+In this outage, the pre-start command might be `nginx -t`. The journal might say a certificate path is unreadable. Fix the path or permissions, run the validation command directly, `daemon-reload` if the unit changed, then start once. Save the status and journal window in the ticket. ([systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+
+The same flow works for custom workers. If `ExecStartPre=/usr/bin/test -r /etc/worker/config.yaml` fails, keep the service stopped until the file is readable by the right user, then start once and confirm a clean activation path in the journal.
+
+</details>
 
 ### Worked Outage: Boot-Only Race
 
-**Hypothetical scenario:** A worker fails only after reboot, but a manual restart succeeds. That symptom usually means the boot graph differs from the steady-state graph. Query the previous boot before changing anything. Use `journalctl -b -1 -u payment-worker.service`. Then inspect `systemctl is-enabled payment-worker.service` and `systemctl show -p Wants -p Requires -p After payment-worker.service`. Finish with `systemd-analyze critical-chain payment-worker.service`. These commands keep the evidence tied to the failed boot. ([journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html), [systemd-analyze](https://www.freedesktop.org/software/systemd/man/latest/systemd-analyze.html))
+**Hypothetical scenario:** A worker fails only after reboot, but a manual restart succeeds.
 
-The journal may show the worker started before a mounted secrets directory was ready. The manual restart succeeds because the mount already exists. Adding `After=var-lib-secrets.mount` may order the worker later, but it does not pull the mount into the transaction. Add the correct dependency relationship only if the worker truly requires that mount. Then keep the ordering relation beside it. Reboot a lab host or maintenance window node to prove the fix. A manual restart is not enough evidence for a boot-only failure. ([systemd.unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html), [systemd.mount](https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html))
+Pause: which boot-bound evidence do you collect first, and why is a manual restart alone not proof of a boot fix?
 
-A similar race appears with network readiness. `network.target` often means the network stack exists, not that a remote dependency is reachable. If the daemon needs a remote database during start, prefer application retry logic. If the operating contract really needs online network state, inspect the distribution's `network-online.target` behavior and the service that declares it reached. Record the tradeoff because waiting for online networking can slow boot. ([systemd.special](https://www.freedesktop.org/software/systemd/man/latest/systemd.special.html), [systemd.unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html))
+<details>
+<summary>Check your boot-race plan</summary>
+
+Query the previous boot before changing anything: `journalctl -b -1 -u payment-worker.service`, then `systemctl is-enabled`, `systemctl show -p Wants -p Requires -p After`, and `systemd-analyze critical-chain`. ([journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html), [systemd-analyze](https://www.freedesktop.org/software/systemd/man/latest/systemd-analyze.html))
+
+The journal may show the worker started before a secrets mount was ready. `After=` orders later but does not pull the mount in — add the correct dependency if required, keep ordering beside it, and prove with a reboot (lab or maintenance window), not only a manual restart. ([systemd.unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html), [systemd.mount](https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html))
+
+`network.target` often means the stack exists, not that a remote DB is reachable. Prefer application retry; if you truly need online networking, inspect `network-online.target` and record the boot-time tradeoff. ([systemd.special](https://www.freedesktop.org/software/systemd/man/latest/systemd.special.html))
+
+</details>
 
 ### Worked Outage: Crash Loop With Evidence Loss Risk
 
-**Hypothetical scenario:** A crash loop is noisy, but the first move is still evidence preservation. `systemctl status api.service` may show repeated restarts and a recent exit code. `systemctl show -p NRestarts -p ExecMainStatus -p ExecMainCode api.service` gives machine-readable counters. `journalctl -u api.service --since=-15m -o short-iso` gives the sequence. If the unit uses `Restart=always`, new attempts can quickly push useful messages out of a small volatile journal. Export the relevant window before changing restart policy. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+**Hypothetical scenario:** A crash loop is noisy under `Restart=always`.
 
-The resolution path depends on the first failure, not the last line. If the first error is "address already in use," inspect sockets and competing units. If it is "permission denied," inspect the service user and file labels. If it is "configuration parse failed," validate the config offline. Once you have a likely fix, stop the loop, apply the fix, run `systemctl daemon-reload` if the unit changed, and start the unit once. Finish by checking the journal from the fix time forward. This avoids mistaking a temporary quiet period for recovery. ([systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html), [systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html))
+Pause: what do you preserve before changing restart policy, and how do you choose the first failure over the last journal line?
+
+<details>
+<summary>Check your crash-loop plan</summary>
+
+Preserve evidence first: `systemctl status`, `systemctl show -p NRestarts -p ExecMainStatus -p ExecMainCode`, and `journalctl -u api.service --since=-15m -o short-iso`. Export the window before policy changes — volatile journals can lose early messages. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
+
+Resolve from the first failure (address in use → sockets; permission denied → user/files; parse failed → offline validate). Then stop the loop, fix, `daemon-reload` if needed, start once, and verify the journal from the fix time forward. ([systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html))
+
+</details>
 
 ## Journald as Structured Evidence
 
@@ -405,7 +441,7 @@ If a unit edit seems ignored, suspect the effective configuration path. Use `sys
 
 - Systemd separates dependency pull-in from ordering, so `After=` can order a service after PostgreSQL without starting PostgreSQL for that transaction. ([systemd.unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html))
 - A masked unit is linked to `/dev/null`, which is why systemd refuses activation even when a dependency tries to start it. ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html))
-- Journald can store logs under `/run/log/journal` for volatile data or `/var/log/journal` for persistent data, depending on storage policy. ([journald.conf](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html))
+- Journald can store logs under `/run/log/journal` for volatile data or `/var/log/journal` for persistent data, depending on storage policy; many distros default persistent journals under `/var/log/journal` with a size cap on the order of tens of percent of the filesystem (commonly around 10% via `SystemMaxUse=` unless overridden). ([journald.conf](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html))
 - Kubernetes workload logs and node service journals are different evidence paths, so `kubectl logs` and `journalctl -u kubelet` should answer different incident questions. ([Kubernetes Logging Architecture](https://v1-35.docs.kubernetes.io/docs/concepts/cluster-administration/logging/), [journalctl](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html))
 
 ## Common Mistakes
@@ -461,12 +497,13 @@ It suggests the node agent may be healthy enough and the problem may be inside t
 
 All tasks except the last one are host-only: a learner on the Killercoda `linux-0.4-services-logs` ubuntu lab or any local Linux host with `sudo` can complete them without a Kubernetes cluster. The last task follows the cluster fork from the Containers, Kubelet, and Node Logs section.
 
-- [ ] On Ubuntu 24.04, RHEL 9, or Debian 12, choose a harmless installed unit such as `ssh.service`, `cron.service`, or `nginx.service`, then capture `systemctl status`, `systemctl cat`, and `systemctl show -p Type -p Restart -p ExecStart`. *(Host-only)* ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html))
-- [ ] Run `systemctl list-dependencies <unit>` and `systemctl list-dependencies --reverse <unit>`, then write one paragraph explaining which target or service pulls the unit into the boot graph. *(Host-only)*
-- [ ] Query `journalctl -u <unit> --since=-1h --until=now -o json` and identify the fields that would survive cleanly into a central log store. *(Host-only)*
-- [ ] Create a transient debug unit with `systemd-run --collect`, inspect its journal, and explain why it is easier to audit than a background shell job. *(Host-only)*
-- [ ] Check `journalctl --list-boots` and `journalctl --disk-usage`, then decide whether the host's journal policy is acceptable for post-reboot incident review. *(Host-only)*
-- [ ] *(Cluster path — optional)* Compare `kubectl logs` for a workload with `journalctl -u kubelet` for the node agent and note which question each command answered. Needs `kubectl` on a running cluster; on the host-only path, read the Containers, Kubelet, and Node Logs section as a worked example instead.
+- [ ] On Ubuntu 24.04, RHEL 9, or Debian 12, choose a harmless installed unit such as `ssh.service`, `cron.service`, or `nginx.service`, then capture `systemctl status`, `systemctl cat`, and `systemctl show -p Type -p Restart -p ExecStart`. **Done when:** you saved those three outputs and can name the unit’s `Type=` and `Restart=` from evidence. *(Host-only)* ([systemctl](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html), [systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html))
+- [ ] Run `systemctl list-dependencies <unit>` and `systemctl list-dependencies --reverse <unit>`, then write one paragraph explaining which target or service pulls the unit into the boot graph. **Done when:** the paragraph names at least one reverse dependency and one forward dependency from the command output. *(Host-only)*
+- [ ] Query `journalctl -u <unit> --since=-1h --until=now -o json` and identify the fields that would survive cleanly into a central log store. **Done when:** you list at least three field names (for example `MESSAGE`, `PRIORITY`, `_SYSTEMD_UNIT`) taken from real JSON lines. *(Host-only)*
+- [ ] Create a transient debug unit with `systemd-run --collect`, inspect its journal, and explain why it is easier to audit than a background shell job. **Done when:** `journalctl -u <transient-unit>` shows your probe output and you can name the unit. *(Host-only)*
+- [ ] Check `journalctl --list-boots` and `journalctl --disk-usage`, then decide whether the host's journal policy is acceptable for post-reboot incident review. **Done when:** you recorded disk usage and whether a previous boot (`-b -1`) is still queryable. *(Host-only)*
+- [ ] **Configure (outcome 3):** On a disposable lab host, pick a harmless unit you may edit (or a copy under `/etc/systemd/system/`). Use `sudo systemctl edit <unit>` to add a drop-in with `ExecStartPre=/bin/true` (or a real read-only guard) and `Restart=on-failure`. Run `sudo systemctl daemon-reload`, then verify with `systemctl cat <unit>` and `systemctl show -p ExecStartPre -p Restart <unit>`. **Done when:** `systemctl cat` shows your drop-in fragment and `show` reports `Restart=on-failure` (or your chosen policy). Optional stretch: break the pre-start deliberately, capture `failed` status + journal, then restore. *(Host-only)*
+- [ ] *(Cluster path — optional)* Compare `kubectl logs` for a workload with `journalctl -u kubelet` for the node agent and note which question each command answered. Needs `kubectl` on a running cluster; on the host-only path, read the Containers, Kubelet, and Node Logs section as a worked example instead. **Done when:** you wrote one sentence per evidence source.
 
 Use this safe sequence on a disposable lab host with nginx installed. It reads state, exercises reload-or-restart, creates a transient unit, and inspects the resulting logs without changing boot enablement.
 
