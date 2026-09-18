@@ -117,12 +117,12 @@ Brace expansion is the first stage, and it operates on literal commas and ranges
 
 The real danger zone begins at stage three with parameter expansion, then compounds through command substitution, arithmetic expansion, and process substitution. Each of these stages substitutes runtime values into the command line.
 
-**Pause and predict:** `$file` is set to `my documents` and the next command is `cp $file /backup/`. How many path arguments does `cp` receive after the shell finishes expansion?
+**Pause and predict:** `$file` is set to `my documents` and the next command is `cp $file /backup/`. How many pathname operands does `cp` see after the shell finishes expansion?
 
 <details>
 <summary>Check your prediction</summary>
 
-Two, not one. Word splitting runs on the unquoted result, so `my documents` becomes two words. Pathname expansion can then turn unquoted `*` and `?` into matching filenames. Double quotes disable both of those stages.
+Three: `my`, `documents`, and `/backup/`. Word splitting turns the unquoted value into two words, and those two words are separate operands beside the destination. Pathname expansion can then turn unquoted `*` and `?` into matching filenames. Double quotes around `"$file"` keep the source as one operand.
 
 </details>
 
@@ -800,7 +800,7 @@ chmod +x expand-demo.sh
 
 An unquoted path, a green pipeline, a `grep` that found nothing, and a helper that set a variable can each look like a successful script and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
 
-**Card A: Two files, one variable.** `file` is `my documents`. The script runs `cp $file /backup/` and the operator says the copy "worked."
+**Card A: Space in the source path.** `file` is `my documents`. The script runs `cp $file /backup/` and the operator says the copy "worked."
 
 <details>
 <summary>Check your prediction</summary>
