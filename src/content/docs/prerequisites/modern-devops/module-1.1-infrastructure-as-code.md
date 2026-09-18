@@ -678,6 +678,51 @@ Deleting from the files makes the cleanup explicit and reduces the chance of rem
 
 </details>
 
+**Card A: Recovery is a folder of screenshots.** The primary environment is gone. The plan is last quarter's console tickets and one person's memory of which checkbox was clicked.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the environment is not in the repository. Next action: rebuild from reviewed files, not from memory. If the files do not exist, the first job is to write them before the next incident.
+
+</details>
+
+**Card B: The patched server fails like its twin.** Two web servers started from the same checklist. Only one received a manual OpenSSL patch. The next certificate renewal is expected to fail on both in the same way.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: undocumented drift between twins. Next action: expect the patched host to behave differently. Put the patch in the shared definition so the next build does not depend on who was on the incident call.
+
+</details>
+
+**Card C: The crashed user script is rerun from the top.** A bash pipeline created the Linux user, then crashed. The retry runs the same `useradd` with no existence check.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: imperative steps are not idempotent. Next action: expect the second run to fail because the user already exists. An idempotent tool should observe current state and change only what is missing.
+
+</details>
+
+**Card D: One project owns networks, databases, and namespaces.** Every new customer environment is one Terraform/OpenTofu root that also creates cluster namespaces.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: one tool's blast radius. Next action: keep cloud networks and databases in the infrastructure project, and put cluster objects in Kubernetes manifests or a Crossplane API that application teams can request without owning the network.
+
+</details>
+
+**Card E: Copied environment files stay twins.** Dev, staging, and prod each have a full copy. After six months they are assumed to differ only where someone intended a difference.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: copy drift. Next action: expect forgotten one-environment fixes. Share the common module and keep environment differences in small, reviewed overlays.
+
+</details>
+
 ### Success criteria
 
 - [ ] You implemented Kubernetes declarative changes with `kubectl apply -f deployment.yaml` and `kubectl apply -f config.yaml`.
