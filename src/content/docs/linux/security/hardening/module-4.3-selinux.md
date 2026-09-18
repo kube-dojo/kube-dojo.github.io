@@ -71,9 +71,15 @@ flowchart TD
     L --> M["MLS level<br>s0"]
 ```
 
-The type field is powerful because SELinux policy is mostly type enforcement. A web server process running as `httpd_t` may read files labeled `httpd_sys_content_t`, but it should not freely read a user's home directory just because the owner set the mode to world-readable. That policy expresses an application boundary in the kernel, not in the application's own code, which is why SELinux remains useful after a process is compromised.
+The type field is powerful because SELinux policy is mostly type enforcement. A web server process running as `httpd_t` may read files labeled `httpd_sys_content_t`.
 
-Pause and predict: if a process with context `httpd_t` attempts to read a file with context `user_home_t`, but the file's standard Linux permission is `777`, what should the SELinux enforcement engine decide, and what evidence would you expect to find in the audit log?
+**Pause and predict:** A process in `httpd_t` tries to read a file labeled `user_home_t`. The mode is `777`. What should enforcing mode decide, and what evidence shows up in the audit log?
+
+<details>
+<summary>Check your prediction</summary>
+
+Deny. Type enforcement does not care that the mode is world-readable. Expect an AVC denial naming `httpd_t`, `user_home_t`, and the file class. Mode bits never overrule that decision.
+</details>
 
 ```mermaid
 flowchart TD
@@ -131,7 +137,15 @@ sestatus
 | **Permissive** | Policies not enforced, violations only logged |
 | **Disabled** | SELinux completely off |
 
-Choosing among these modes is not just a technical toggle. In an incident, permissive mode can be a controlled diagnostic tool if you document the time window, collect audit logs, and return to enforcing after a targeted fix. In a regulated production environment, disabled mode may invalidate hardening assumptions and drift from the baseline your auditors expect. In a lab, permissive can teach you how policy would behave without making every mistake fatal, but it should never become the final state you copy into a node image.
+Choosing among these modes is not just a technical toggle.
+
+**Pause and predict:** A service fails to start. The vendor guide says set SELinux permissive and leave it there. What signal do you lose if that setting becomes the node image?
+
+<details>
+<summary>Check your prediction</summary>
+
+Permissive still logs AVCs but does not block, so you lose the enforcement that proves the boundary. Use it only inside a documented window, collect the denials, apply the smallest supported fix, and return to enforcing. Do not copy permissive into the node image. Disabled mode can also drop the baseline auditors expect.
+</details>
 
 ```bash
 # Temporarily set to permissive (until reboot)
@@ -208,7 +222,13 @@ sudo semanage fcontext -a -t httpd_sys_content_t "/srv/web(/.*)?"
 sudo restorecon -Rv /srv/web
 ```
 
-Before running this, what output do you expect from `ls -Zd /srv/web` before and after `restorecon`, and how would that confirm that your fix changed the default labeling rule rather than only the current file metadata?
+**Pause and predict:** You added `semanage fcontext` for `/srv/web` as `httpd_sys_content_t`, then ran `restorecon`. What should `ls -Zd /srv/web` show before and after, and which of those outputs proves the default rule changed rather than only the current inode?
+
+<details>
+<summary>Check your prediction</summary>
+
+Before `restorecon`, the inode can still show the old type even though the fcontext rule exists. After `restorecon`, `ls -Z` shows `httpd_sys_content_t`. That second reading is the proof: `restorecon` applied the default rule. A `chcon` would have been wiped by the same command.
+</details>
 
 Booleans are the other common safe repair path. A boolean is a policy switch that allows a vendor-supported optional behavior without writing a new local module. For example, a web server making outbound database connections is common enough that policy exposes a boolean rather than forcing every administrator to generate custom allow rules. Checking booleans before generating policy keeps your change aligned with the distribution's intended support model.
 
@@ -241,9 +261,15 @@ getsebool -a | grep httpd
 | `container_manage_cgroup` | Allow containers to manage cgroups |
 | `container_use_devices` | Allow containers to use devices |
 
-The `-P` flag on `setsebool` deserves the same respect as `semanage fcontext`. Without it, a boolean change is temporary and can vanish after reboot. With it, you are changing persistent policy state, so you should make the change deliberately, record why the application needs that capability, and avoid broad switches when a narrower one exists. The habit is always to prefer a vendor boolean over a custom allow rule when the boolean matches the operational need.
+The `-P` flag on `setsebool` deserves the same respect as `semanage fcontext`. Without it, a boolean change is temporary and can vanish after reboot. With it, you are changing persistent policy state, so you should make the change deliberately and record why the application needs that capability.
 
-Pause and predict: if an application running under `httpd_t` needs outbound network access but the SELinux policy currently denies it, what is the safest and least intrusive way to grant this access, and why is that safer than installing a generated policy module from the first denial you see?
+**Pause and predict:** `httpd_t` needs outbound network access and policy denies it. What is the least intrusive grant, and why is that safer than installing a generated module from the first denial?
+
+<details>
+<summary>Check your prediction</summary>
+
+Turn on the vendor boolean that matches the need, such as `httpd_can_network_connect`, with `setsebool -P`. A generated module from the first AVC can allow more than that one flow and becomes local policy you must carry forever.
+</details>
 
 ## Troubleshooting AVC Denials Without Guesswork
 
@@ -751,9 +777,48 @@ sudo semanage fcontext -d "/srv/testapp(/.*)?"
 sudo rm -rf /srv/testapp
 ```
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–6 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Mode 777, still denied.** `httpd_t` reads a `user_home_t` file. `ls -l` shows `777`. The audit log has an AVC.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: type enforcement, not DAC. Next action: relabel to a type `httpd_t` may read, or stop the read. Do not chmod.
+</details>
+
+**Card B: fcontext without restorecon.** `semanage fcontext -l` shows `httpd_sys_content_t` for `/srv/web`. `ls -Zd /srv/web` still shows the old type.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the inode was not relabeled. Next action: `restorecon -Rv /srv/web` and read `ls -Z` again. The policy line alone does not change the file.
+</details>
+
+**Card C: First AVC becomes a module.** `httpd_t` is denied an outbound connect. Someone wants `audit2allow -M` from that one line.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: a vendor boolean already covers this. Next action: `getsebool httpd_can_network_connect` and `setsebool -P` if it matches. Do not install the generated module first.
+</details>
+
+**Card D: Permissive left on the image.** The node image ships `SELINUX=permissive` because a package failed once in CI.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the mode, not the package. Next action: collect the AVCs from a timed permissive window on one node, fix the label or boolean, and ship enforcing.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Diagnosed SELinux mode and context state with `getenforce`, `sestatus`, `id -Z`, and `ls -Z`.
+- [ ] Classified each frozen SELinux-layer card before opening the reveal.
 - [ ] Implemented a temporary `chcon` change and proved `restorecon` can revert it.
 - [ ] Implemented a persistent file-context fix with `semanage fcontext` and `restorecon`.
 - [ ] Evaluated and changed an SELinux boolean, then explained temporary versus persistent behavior.
