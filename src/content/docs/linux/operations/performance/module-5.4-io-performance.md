@@ -67,9 +67,16 @@ flowchart TD
 
 The Virtual File System gives programs one consistent interface even though ext4, XFS, Btrfs, tmpfs, network filesystems, and container overlay layers behave differently underneath. The page cache then turns many read operations into memory lookups, which is why a second run of the same command can appear magically faster. Below the filesystem, the block layer transforms file-level requests into device-level operations, and the scheduler decides whether requests should be merged, reordered, or passed through with minimal interference.
 
-The most important lesson is that a completed write from the application's point of view is not always the same thing as bytes being durable on the device. Buffered writes can return after data enters the page cache, while the kernel flushes dirty pages later. Synchronous writes, `fsync`, journal commits, and storage barriers are the moments where the application asks for stronger durability, and those moments reveal the real latency of the lower layers.
+The stack above is the map for the next question. Name a layer before you read on.
 
-> **Pause and predict**: If an application writes a 1GB file to disk, but the physical disk's write throughput is only 100MB/s, why might the application report that the write completed in under a second? Consider the layers of the I/O stack and what actually happens when a write system call returns.
+**Pause and predict:** If an application writes a 1GB file to disk, but the physical disk's write throughput is only 100MB/s, why might the application report that the write completed in under a second?
+
+<details>
+<summary>Check your prediction</summary>
+
+A completed write from the application's point of view is not always bytes durable on the device. Buffered writes can return after data enters the page cache, while the kernel flushes dirty pages later. Synchronous writes, `fsync`, journal commits, and storage barriers are the moments where the application asks for stronger durability, and those moments reveal the real latency of the lower layers.
+
+</details>
 
 When you measure I/O performance, separate operations from bytes. IOPS counts how many individual operations complete per second, which matters when a database performs many small random reads or writes. Throughput counts transferred bytes per second, which matters when a backup job, video service, or image pipeline streams large contiguous files. A device can be excellent at one shape and disappointing at the other, just as a grocery store can move many customers quickly through express lanes but struggle when each customer arrives with a full cart.
 
@@ -141,9 +148,14 @@ Read `iostat` as a cluster of clues. The `r/s` and `w/s` columns describe operat
 
 Those concerning values are starting points, not laws. A busy HDD at 80 percent can become user-visible trouble because it has little parallelism and expensive seeks. A busy NVMe device can show high `%util` while keeping `await` under a millisecond, which means it is working hard but not necessarily hurting callers. The right question is whether latency and queueing are rising relative to the service objective for the application.
 
-> **Pause and predict**: You are monitoring a database server and notice that `await` is consistently high, but `%util` is hovering around 30%. What might this combination of metrics tell you about the storage subsystem's characteristics or the nature of the database's I/O patterns?
+**Pause and predict:** You are monitoring a database server and notice that `await` is consistently high, but `%util` is hovering around 30%. What might this combination of metrics tell you about the storage subsystem's characteristics or the nature of the database's I/O patterns?
 
-The likely answer is that the bottleneck may be outside a simple local saturation story. Low `%util` with high `await` can appear when operations are serialized, when a network volume adds per-request latency, when a filesystem waits on journal commits, or when the sample interval hides short bursts. You would next separate read latency from write latency, inspect queue depth, and compare the application's commit or flush pattern against the storage service's durability behavior.
+<details>
+<summary>Check your prediction</summary>
+
+The bottleneck may be outside a simple local saturation story. Low `%util` with high `await` can appear when operations are serialized, when a network volume adds per-request latency, when a filesystem waits on journal commits, or when the sample interval hides short bursts. Next, separate read latency from write latency, inspect queue depth, and compare the application's commit or flush pattern against the storage service's durability behavior.
+
+</details>
 
 `iotop` moves the investigation from the device to the process. It answers the incident question, "Who is doing the I/O right now?" rather than "How busy is the block device?" That distinction matters when a database, log shipper, backup process, container runtime, and package manager all share the same disk. The device view tells you there is pressure; the process view tells you who is creating it.
 
@@ -712,6 +724,46 @@ docker rm -f io-test
 
 </details>
 
+- [ ] I named a failure layer and a next action for each frozen I/O-layer card before opening the reveal.
+
+A fast `write`, a high `await`, a second read, and a container counter can each look like the storage story and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: One-second gigabyte.** An application reports a 1GB write finished in under a second. The disk's write throughput is about 100MB/s. You have not checked whether the process called `fsync`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: page cache, not device durability. Next action: ask whether the write was buffered, and only then time an `fsync` or a direct write.
+
+</details>
+
+**Card B: Slow awaits, quiet util.** A database shows high `await` while `%util` stays near 30%. The host graph does not look saturated.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: per-request latency outside local saturation (serialization, a network volume, a journal commit, or a hidden burst). Next action: split read and write latency and inspect queue depth before you buy a faster local disk.
+
+</details>
+
+**Card C: The second read vanishes.** The first `dd` read moves the device counters. The immediate repeat finishes faster and the device stays quiet.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: warm page cache, not a faster disk. Next action: drop caches only on a lab host, or test a cold working set, before you publish the second number as device throughput.
+
+</details>
+
+**Card D: Container I/O, unfamiliar host PID.** `docker stats` shows Block I/O for the app container. On the host, `iotop` names a runtime or a different command than the process inside the container.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: ownership and accounting, not a missing device. Next action: map the host PID back to the container before you tune the scheduler for a process that is not the writer.
+
+</details>
+
 ### Success Criteria
 
 - [ ] Identified disk devices and current utilization.
@@ -722,6 +774,7 @@ docker rm -f io-test
 - [ ] Configured the investigation notes to include scheduler and cgroup `blkio` evidence for container workloads.
 - [ ] Evaluated whether a database, logging, or cache workload needs IOPS, throughput, or latency guarantees.
 - [ ] (Cluster fork, optional) Extended that evaluation to a Kubernetes PersistentVolume workload and its StorageClass; host-only learners may skip this.
+- [ ] Classified each frozen I/O-layer card by failure layer and next action.
 
 ## Next Module
 
