@@ -41,7 +41,16 @@ Think about artifact promotion as a chain of custody. If a web application image
 
 ConfigMaps and Secrets are both core `v1` Kubernetes API resources, but they are not interchangeable. A ConfigMap is appropriate for non-sensitive values such as log levels, feature flags, application properties, Nginx snippets, or JSON configuration files. A Secret is appropriate for passwords, private keys, API tokens, TLS private material, and image pull credentials. The difference is not that Secrets are magically invisible; the difference is that Kubernetes applies different intent, access patterns, optional encryption support, and specialized types around data that should be treated as confidential.
 
-Pause and predict: if a team changes only a ConfigMap key used by a Deployment, should the container image digest change? If your answer is yes, the configuration is still coupled to the artifact somewhere. If your answer is no, you are describing the design Kubernetes is trying to support: the image stays fixed while the runtime object changes.
+**Pause and predict:** if a team changes only a ConfigMap key used by a Deployment, should the container image digest change?
+
+<details>
+<summary>Check your prediction</summary>
+
+If the digest changes, the configuration is still coupled to the artifact. The design Kubernetes is trying to support keeps the image fixed while the runtime object changes.
+
+</details>
+
+Write yes or no before you continue. The next paragraph is about rotating a leaked password. It does not answer this digest question.
 
 There is also a practical incident-response reason to separate configuration from code. If a leaked database password is baked into an image, the response path includes a new build, a registry push, a Deployment update, and cleanup of any Pods still running the old image. If the password is externalized into a Secret, the team can rotate the credential, update the Secret object, and restart the consuming Pods without changing the application binary. That difference does not remove the need for disciplined rollout automation, but it shortens the path between detection and containment.
 
@@ -225,7 +234,16 @@ Mounted ConfigMaps and Secrets behave differently because the kubelet manages fi
 
 The `subPath` option is the major exception. Teams often use `subPath` to mount a single ConfigMap key into a directory without hiding the rest of the directory contents. That convenience creates a static bind mount and breaks the kubelet's normal symlink rotation mechanism, so updates to the ConfigMap or Secret do not appear in the running container. If dynamic refresh matters, mount a directory without `subPath` and arrange the application path accordingly.
 
-Pause and predict: your application takes five minutes to start and you need to temporarily change logging from `info` to `debug` during an incident. If the application can reload a file but cannot reload environment variables, the mounted-file design is operationally better. If the application reads configuration only once at startup, both delivery methods still require a restart, so the deciding factor becomes readability, leak risk, and application convention.
+**Pause and predict:** your application takes five minutes to start and you need to temporarily change logging from `info` to `debug` during an incident. Which delivery method lets you change that level without waiting through another full start, if the application can reload a file but cannot reload environment variables?
+
+<details>
+<summary>Check your prediction</summary>
+
+The mounted-file design is operationally better when the application can reload a file and cannot reload environment variables. If the application reads configuration only once at startup, both delivery methods still require a restart, so the deciding factor becomes readability, leak risk, and application convention.
+
+</details>
+
+Write which delivery method you would choose before you continue. The next manifest is an example. It does not settle this incident.
 
 ```yaml
 apiVersion: v1
@@ -366,7 +384,16 @@ RBAC is the second major boundary, and it is easy to underestimate. Granting `ge
 
 That last point changes how you should review access requests. A role that cannot read Secrets directly may still be too powerful if it can run arbitrary workloads in the same namespace as valuable credentials. Admission policies, namespace design, service account scoping, and workload identity all help narrow that blast radius. In production, the question is not merely "who can read Secret objects?" but also "who can cause a workload to run with access to those Secret objects?"
 
-Stop and think: an attacker has a shell inside your application container, and the application reads its database password from `/etc/secrets/password`. Will the attacker be stopped because the value came from a Secret rather than a ConfigMap? No. Once the workload is compromised, the credential is available through the same path the workload uses, so the stronger controls are runtime hardening, least privilege, short-lived credentials, network policy, and rapid rotation.
+**Pause and predict:** an attacker has a shell inside your application container, and the application reads its database password from `/etc/secrets/password`. Will the attacker be stopped because the value came from a Secret rather than a ConfigMap?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Once the workload is compromised, the credential is available through the same path the workload uses. The stronger controls are runtime hardening, least privilege, short-lived credentials, network policy, and rapid rotation.
+
+</details>
+
+Write yes or no before you continue. The next paragraph is about credential scope. It does not answer whether the Secret object stops the attacker.
 
 This is why Secret design should be paired with credential design. A long-lived database password mounted into every replica creates a larger blast radius than a short-lived token scoped to one service account and rotated automatically. Kubernetes can deliver either value, but it cannot decide whether the credential itself is overpowered. Good teams review the consumer, the namespace, the service account, the network path, the database permissions, and the rotation mechanism as one system.
 
@@ -679,6 +706,42 @@ kubectl delete namespace config-lab
 <details><summary>Solution notes for Task 5</summary>
 
 The cleanup commands remove only the resources created in `config-lab`. If a delete command reports that a resource is not found, confirm you passed `-n config-lab` before assuming the resource never existed.
+
+</details>
+
+**Card A: The image was rebuilt for a log level.** A team changes one ConfigMap key. The pipeline also publishes a new image digest and rolls the Deployment onto it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: configuration is still coupled to the artifact. Next action: keep the image digest fixed and change the ConfigMap, then restart only if the process cannot reload.
+
+</details>
+
+**Card B: Debug logging cannot wait five minutes.** The process takes five minutes to start. It reloads a config file. It does not reload environment variables. You need `debug` for this incident only.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the value was delivered as an environment variable, so a file reload cannot see it. Next action: mount the key as a file the process already reloads, and do not roll a new image.
+
+</details>
+
+**Card C: A shell reads `/etc/secrets/password`.** The container is compromised. The password was mounted from a Secret. Someone argues the attacker is stuck because Secrets are protected.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the workload is already inside the trust boundary. Next action: treat the credential as exposed, rotate it, and harden the runtime. Do not rely on the Secret object type.
+
+</details>
+
+**Card D: The ConfigMap changed and the Pod did not.** `app-config` is updated. `kubectl exec` still prints the old environment value. The Pod was not recreated.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: environment variables are a snapshot from container start, not a live file. Next action: confirm the new value in the object, then recreate the Pod. Do not expect the running process to notice.
 
 </details>
 
