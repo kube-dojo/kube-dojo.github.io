@@ -53,8 +53,15 @@ it divides root's privileges into separately enabled and disabled capabilities. 
 `/etc/shadow` is where credential secrecy enters the account model. It contains password hash and aging fields and must not be readable by ordinary users if password security is to hold. `/etc/group` maps group names to numeric GIDs and member lists. Those three files explain many lab systems, but production identity often arrives through the Name Service Switch. `/etc/nsswitch.conf` tells glibc which sources to query for databases such as `passwd`, `group`, `shadow`, and `initgroups`, and the order matters because a lookup can stop on success or continue to another source. Ubuntu's SSSD documentation describes SSSD as the integration point that lets PAM and NSS recognize
 users and groups from Active Directory, LDAP, Kerberos, and similar providers, with caching for network failures. ([shadow(5)](https://man7.org/linux/man-pages/man5/shadow.5.html), [group(5)](https://man7.org/linux/man-pages/man5/group.5.html), [nsswitch.conf(5)](https://man7.org/linux/man-pages/man5/nsswitch.conf.5.html), [Ubuntu SSSD](https://documentation.ubuntu.com/server/explanation/intro-to/sssd/))
 
-An operator therefore reads identity through the same API the program uses. `cat /etc/passwd` proves only the local file; `getent passwd appsvc` proves the active NSS chain for the `passwd` database. `id appsvc` proves the UID, primary GID, and supplementary groups that a new session should receive. A long-running service or shell may still have the old group list after you edit `/etc/group`, because process credentials are copied into the process at session or exec boundaries rather than magically updated everywhere. This is why "I added the user to the group" is not the end of a permission fix. You must retest from the same type of process that failed: a fresh SSH
-login, a restarted systemd service, or a newly created container process.
+An operator therefore reads identity through the same API the program uses. `cat /etc/passwd` proves only the local file; `getent passwd appsvc` proves the active NSS chain for the `passwd` database. `id appsvc` proves the UID, primary GID, and supplementary groups that a new session should receive.
+
+**Pause and predict:** You added `appsvc` to `deploy` in `/etc/group`, but the long-running service still cannot write. What does `id` inside that still-running process show, and what must you restart before the new group takes effect?
+
+<details>
+<summary>Check your prediction</summary>
+
+Process credentials are copied at session or exec boundaries rather than magically updated everywhere, so the old group list can linger. Retest from the same type of process that failed: a fresh SSH login, a restarted systemd service, or a newly created container process — editing `/etc/group` alone is not the end of the fix.
+</details>
 
 ```bash
 getent passwd appsvc
@@ -111,6 +118,14 @@ flowchart TD
 The distinction between `EACCES` and `EPERM` is useful but not enough by itself. For `chmod`, the man page lists `EACCES` when search permission is denied on a path prefix and `EPERM` when the effective UID does not match the file owner and the process lacks `CAP_FOWNER`. A real investigation still needs the identity, parent directories, target metadata, ACL, capability set, mount flags, and LSM context. Do not prove the fix from a root shell. Root often bypasses the failing gate, which means you have only proved that root can act as root. Reproduce as the service account, container UID, or systemd unit that originally failed.
 ([chmod(2)](https://man7.org/linux/man-pages/man2/chmod.2.html))
 
+**Pause and predict:** `config.yml` is `root:deploy` mode `644`, but `/srv/app` is `700 root:root`. Would you expect `EACCES` or `EPERM` for a non-root reader, and which command proves the parent path is the problem?
+
+<details>
+<summary>Check your prediction</summary>
+
+Expect `EACCES` from a failed path search on the locked parent, not an ownership `EPERM` on the leaf. `namei -l` walks each component and exposes parent directory traversal failures; then `ls -ld` / `getfacl` / `id` / `sudo -u` confirm mode, ACL mask, and whether the actor actually has the assumed group. Retest through the real unit or workload after narrowing with `sudo -u`.
+</details>
+
 ```bash
 sudo mkdir -p /srv/app/current && sudo touch /srv/app/current/config.yml && sudo chown root:deploy /srv/app/current/config.yml
 namei -l /srv/app/current/config.yml
@@ -120,9 +135,6 @@ getfacl -p /srv/app/current /srv/app/current/config.yml
 id releasebot
 sudo -u releasebot test -w /srv/app/current/config.yml
 ```
-
-Read the evidence in order. `namei -l` exposes parent directory traversal, which catches the common case where the final file is readable but a parent directory lacks execute permission. `ls -l` shows owner, group, and mode. `getfacl` reveals named-user and named-group ACLs plus the effective mask. `id` tells you whether the actor actually has the group you assumed. `sudo -u` is a useful local reproduction when the target is a login-style service account, but it is not a perfect replacement for a systemd service with its own `User=`, `Group=`, `SupplementaryGroups=`, `ReadWritePaths=`, or `NoNewPrivileges=` settings. Use it to narrow the problem, then retest through the
-real unit or workload.
 
 Mount state is part of the same path. A process with correct UID and mode bits still cannot write through a read-only mount, and a container with a read-only root filesystem must write only to declared volumes. The kernel will report the denial near the syscall, but the fix lives in the layer that introduced the restriction. That may be a Kubernetes `readOnlyRootFilesystem` field, a systemd sandboxing option, an NFS export mode, an immutable file flag, or an LSM rule. The fastest troubleshooting habit is to classify the denial before editing: identity mismatch, path traversal mismatch, DAC or ACL mismatch, capability requirement, mount restriction, or mandatory policy.
 Once you name the class, the fix narrows naturally and you avoid the common anti-pattern of making the file world-writable when the real problem was a read-only mount or an AppArmor denial.
@@ -170,7 +182,15 @@ permission domain. The ability to explain the domain boundary is what separates 
 
 ## Design POSIX ACLs for Exceptions and Defaults
 
-POSIX ACLs extend the owner/group/other model without replacing it. The `acl(5)` page defines access ACLs for files and directories, default ACLs for directories, named user entries, named group entries, and a mask that limits named users, named groups, and the owning group. The most important operator detail is the mask. `ls -l` may show a group write bit that corresponds to the ACL mask, while `getfacl` shows a named group entry with `#effective:r--` because the mask removed write. If the ACL mask is wrong, changing the named entry alone may still leave the process denied. ([acl(5)](https://man7.org/linux/man-pages/man5/acl.5.html))
+POSIX ACLs extend the owner/group/other model without replacing it. The `acl(5)` page defines access ACLs for files and directories, default ACLs for directories, named user entries, named group entries, and a mask that limits named users, named groups, and the owning group. The most important operator detail is the mask. ([acl(5)](https://man7.org/linux/man-pages/man5/acl.5.html))
+
+**Pause and predict:** `ls -l` shows group write on a file, but the named group is still denied. What will `getfacl` print for the mask, and why does fixing only the named entry fail?
+
+<details>
+<summary>Check your prediction</summary>
+
+`getfacl` often shows a named group with `#effective:r--` because the ACL mask removed write even though `ls -l` displayed a group-write bit that mirrors the mask. If the mask is wrong, changing the named entry alone still leaves the process denied — raise or redesign the mask as part of the fix.
+</details>
 
 ```bash
 sudo setfacl -m u:releasebot:rwX /srv/app/current
@@ -205,8 +225,16 @@ Linux capabilities are the modern answer to the all-or-nothing root model. The `
 | `CAP_SYS_PTRACE` | Debuggers and profilers that inspect other processes | It can expose process memory and secrets across process boundaries |
 | `CAP_SETUID` / `CAP_SETGID` | Programs that intentionally switch identity | They can create surprising identity transitions after admission review |
 
-File capabilities let you grant a narrow privilege to an executable without making it setuid root. That is useful for a small, reviewed binary and dangerous for a generic interpreter or shell. `getcap` and `setcap` are the operational tools, while `/proc/<pid>/status` exposes process capability bitmaps such as `CapEff`. Kubernetes documents that you can inspect those bitmaps inside a container and that manifest capability names omit `CAP_`. The operator rule is simple: prefer dropping all capabilities and adding back one documented capability only when the workload's behavior proves it. Do not add `SYS_ADMIN` to make a mysterious permission problem disappear.
+File capabilities let you grant a narrow privilege to an executable without making it setuid root. That is useful for a small, reviewed binary and dangerous for a generic interpreter or shell. `getcap` and `setcap` are the operational tools, while `/proc/<pid>/status` exposes process capability bitmaps such as `CapEff`. Kubernetes documents that you can inspect those bitmaps inside a container and that manifest capability names omit `CAP_`.
 ([Kubernetes Security Context](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/security-context/))
+
+**Pause and predict:** A container cannot bind `:80`. A teammate proposes privileged mode. What narrower fix would you try first, and what should you refuse to add back?
+
+<details>
+<summary>Check your prediction</summary>
+
+Prefer a Service or reverse proxy on a high port, or add only `NET_BIND_SERVICE` after dropping `ALL`, and keep `allowPrivilegeEscalation: false`. Do not add `SYS_ADMIN` or full privileged mode to clear a mysterious bind failure — prove the need with `CapEff` / workload behavior first.
+</details>
 
 ```bash
 getcap -r /usr/bin /usr/local/bin 2>/dev/null
@@ -280,7 +308,15 @@ session       optional    pam_motd.so
 session       required    pam_limits.so
 ```
 
-The dangerous pattern is a permissive module with a strong-looking control flag in the wrong position. `auth sufficient pam_permit.so` before `pam_unix.so` is a trap: `pam_permit` always succeeds, and `sufficient` can short-circuit the rest of the stack, so the real password check may never run. A hardened stack puts real checks first, makes failures count, and uses modules such as `pam_faillock.so` to record repeated failures and slow brute-force attempts. During review, ask three questions: which management group makes the decision, which control flag can short-circuit the stack, and which module actually enforces the security property? ([pam_permit(8)](https://man7.org/linux/man-pages/man8/pam_permit.8.html), [pam_faillock(8)](https://man7.org/linux/man-pages/man8/pam_faillock.8.html))
+**Pause and predict:** `auth sufficient pam_permit.so` appears before `pam_unix.so`. Can a wrong password still succeed, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+Yes — `pam_permit` always succeeds, and `sufficient` can short-circuit the rest of the stack so the real password check never runs. A hardened stack puts real checks first, makes failures count, and uses modules such as `pam_faillock.so` to record repeated failures. During review, ask which management group decides, which control flag can short-circuit, and which module actually enforces the property.
+</details>
+
+([pam_permit(8)](https://man7.org/linux/man-pages/man8/pam_permit.8.html), [pam_faillock(8)](https://man7.org/linux/man-pages/man8/pam_faillock.8.html))
 
 These policy files are not interchangeable. `login.defs` shapes defaults used by account tools and selected login behavior, but PAM usually owns live authentication and session decisions. `limits.conf` applies per login session through `pam_limits`; it does not retroactively change already-running daemons, and it does not replace cgroups for service resource control. Sudoers controls privileged command execution after authentication; it does not decide whether SSH accepts a key or whether a password has expired. During reviews, keep a small map of which layer is responsible for which decision. That map prevents contradictory fixes, such as changing `PASS_MAX_DAYS` in
 `login.defs` while the actual password policy is enforced by PAM modules, or raising `nofile` in `limits.conf` while the failing process is a systemd service that never passed through a PAM login session.
@@ -325,8 +361,16 @@ spec:
       emptyDir: {}
 ```
 
-The YAML does not make storage semantics disappear. If a PVC arrives as `root:root` with mode `0755`, a UID `10001` process still cannot write unless the volume plugin, `fsGroup` handling, init setup, image ownership, or ACLs produce a writable group or owner path. Pod Security Standards Restricted policy goes further than "not root": it requires privilege escalation to be false, containers to run as non-root, `runAsUser` not to be zero when set, seccomp to be `RuntimeDefault` or `Localhost`, and capabilities to drop `ALL` while only allowing `NET_BIND_SERVICE` back. That policy language is Kubernetes admission vocabulary for the Linux mechanics you already learned.
+The YAML does not make storage semantics disappear. Pod Security Standards Restricted policy goes further than "not root": it requires privilege escalation to be false, containers to run as non-root, `runAsUser` not to be zero when set, seccomp to be `RuntimeDefault` or `Localhost`, and capabilities to drop `ALL` while only allowing `NET_BIND_SERVICE` back. That policy language is Kubernetes admission vocabulary for the Linux mechanics you already learned.
 ([Kubernetes Pod Security Standards](https://v1-35.docs.kubernetes.io/docs/concepts/security/pod-security-standards/))
+
+**Pause and predict:** A Pod has `runAsUser: 10001`, `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, a PVC at `/data`, and the app cannot write. Which four evidence commands do you run before anyone edits YAML?
+
+<details>
+<summary>Check your prediction</summary>
+
+Collect `id` from the container, `stat` and `getfacl` on `/data`, then compare the Pod `securityContext` / `fsGroup` / `fsGroupChangePolicy` with the volume type. A PVC that arrives as `root:root` `0755` still denies UID `10001` until the volume plugin, `fsGroup`, init setup, image ownership, or ACLs produce a writable path — choose the fix from that evidence, not from guesswork.
+</details>
 
 ```mermaid
 flowchart LR
@@ -460,6 +504,44 @@ sudo rm -rf /tmp/kd-shared
 sudo userdel -r kdsvc
 sudo groupdel kddeploy
 ```
+
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+The host recipe above stays. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: NSS / boot-time identity.** `getent passwd appsvc` works while LDAP is up; `/etc/passwd` has no `appsvc` line; the systemd unit fails on boot when the directory is unreachable.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: nsswitch/SSSD network identity without a local system account or boot-time cache. Next action: provision a local system account (or SSSD offline cache + `After=`/`Wants=` for the directory) so boot does not depend on a live LDAP path for the unit's `User=`.
+</details>
+
+**Card B: DAC class.** UID `10001` gets `EACCES` on `/srv/app/current/config.yml` (`root:deploy` `640`); `id` shows no `deploy`. On-call proposes `chmod 644`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: missing supplementary group on the actor, not an over-restrictive mode. Next action: add UID `10001` to `deploy`, restart the same process type, retest as that actor — refuse world-readable `644` when group membership is the intended control.
+</details>
+
+**Card C: setgid vs recursive chown.** A shared release directory needs deployers to create files that stay group-owned. A teammate's runbook is `chown -R` after every release.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: collaboration model — recursive `chown` is the wrong domain and fights every new file. Next action: set `root:deploy` ownership with mode `2775` (setgid) plus umask/default ACL so new files inherit the deploy group without post-release chown loops.
+</details>
+
+**Card D: sudoers / PAM policy.** Drop-in is `releasebot ALL=(root) NOPASSWD: /usr/bin/vi /etc/app.conf`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: interactive editor escape — this is not a file-edit rule; `vi` can spawn a shell. Next action: replace with `sudoedit` / a constrained helper / an exact `systemctl` alias, then `visudo -cf` before relying on the drop-in.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer. *(Host-only)*
 
 > **Host-only vs cluster fork:** This exercise uses `kubectl` and needs a running Kubernetes cluster. Pick your path before running anything:
 >
