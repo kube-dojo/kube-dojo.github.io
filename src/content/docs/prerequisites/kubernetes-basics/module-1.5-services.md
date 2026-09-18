@@ -66,7 +66,16 @@ flowchart TB
 
 A Service is a small API object with a large consequence: it creates a stable virtual destination and points that destination at a changing set of pods. Clients use the Service name or Service IP, while Kubernetes keeps the backend membership current through label selectors and endpoint objects. That means the client does not need to know whether there are two pods, ten pods, or a freshly recreated pod that arrived moments ago.
 
-Pause and predict: if a Deployment scales from three pods to ten pods, how many Service IP addresses should clients need to learn? The answer is still one, because the Service is the contract and the pods are the implementation detail. When you catch yourself wanting to publish a list of pod IPs to another application, treat that as a design smell and ask what stable Service name should represent the group instead.
+**Pause and predict:** if a Deployment scales from three pods to ten pods, how many Service IP addresses should clients need to learn?
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer is still one, because the Service is the contract and the pods are the implementation detail. Publishing a list of pod IPs to another application is a design smell. Ask what stable Service name should represent the group instead.
+
+</details>
+
+Write how many addresses you expect clients to learn before you continue. The next paragraph is about the data plane. It does not give the count.
 
 The stable address is not a physical network interface sitting on a node. In most clusters, `kube-proxy` watches Services and endpoint changes, then programs packet handling rules so traffic for the Service virtual IP reaches one of the selected pod IPs. The exact data plane can be iptables, IPVS, or an implementation supplied by the cluster networking stack, but the developer-facing promise stays the same: use the Service, not the pod IP.
 
@@ -119,7 +128,16 @@ kubectl apply -f service.yaml
 
 The declarative version makes the important fields visible. `spec.selector` tells Kubernetes which pods are eligible backends, `spec.ports[].port` tells clients which Service port to call, and `spec.ports[].targetPort` tells the data plane where the selected pods actually listen. If your application listens on port 8080 but you publish `targetPort: 80`, the Service may look valid while every connection fails at the pod boundary.
 
-Pause and predict: before running `kubectl get endpoints nginx-declarative`, what output would prove that the Service has found real pods rather than just existing as an empty virtual IP? You should expect one or more pod IP and port pairs. An empty endpoint list is not a DNS problem, a load balancer problem, or an application problem yet; it first says the Service selector did not currently match ready pod backends.
+**Pause and predict:** before running `kubectl get endpoints nginx-declarative`, what output would prove that the Service has found real pods rather than just existing as an empty virtual IP?
+
+<details>
+<summary>Check your prediction</summary>
+
+You should expect one or more pod IP and port pairs. An empty endpoint list is not a DNS problem, a load balancer problem, or an application problem yet. It first says the Service selector did not currently match ready pod backends.
+
+</details>
+
+Write the output you expect before you continue. The next paragraph is about selector precision. It does not describe that endpoints listing.
 
 A useful worked example is a frontend Deployment with labels `app=frontend` and `tier=web`. A Service with `selector: app: frontend` will include all pods with that app label, even if later you add canary pods that should not receive normal traffic. A Service with both `app: frontend` and `tier: web` is more restrictive, because every selector label must be present on the pod. That precision is powerful, but it also makes label drift one of the most common causes of silent Service outages.
 
@@ -204,7 +222,16 @@ kubectl get svc web-lb
 # EXTERNAL-IP column shows the load balancer IP
 ```
 
-Pause and predict: if you create a `LoadBalancer` Service, does it also consume a NodePort and a ClusterIP under the hood? In the common implementation, yes, because these Service types build on each other like nesting dolls: the external load balancer forwards to node-level plumbing, and the Service virtual IP still represents the cluster-internal destination. Kubernetes has options that can change pieces of this behavior, but the beginner mental model should be layered rather than isolated.
+**Pause and predict:** if you create a `LoadBalancer` Service, does it also consume a NodePort and a ClusterIP under the hood?
+
+<details>
+<summary>Check your prediction</summary>
+
+In the common implementation, yes. These Service types build on each other: the external load balancer forwards to node-level plumbing, and the Service virtual IP still represents the cluster-internal destination. Kubernetes has options that can change pieces of this behavior, but the beginner mental model should be layered rather than isolated.
+
+</details>
+
+Write yes or no, and what else you think is allocated, before you continue. The next figure is the type diagram. It does not answer this prompt.
 
 ```mermaid
 flowchart TD
@@ -309,7 +336,16 @@ kubectl get endpoints nginx
 # Shows IP:Port of matched pods
 ```
 
-Pause and predict: what happens to your Service if you manually edit a running pod and remove the `tier: frontend` label? The Service immediately drops that pod from its endpoint set because it no longer perfectly matches the selector. If that was the only matching pod, clients still resolve the Service name, but there are no ready backends behind it.
+**Pause and predict:** what happens to your Service if you manually edit a running pod and remove the `tier: frontend` label?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Service drops that pod from its endpoint set because it no longer matches the selector. If that was the only matching pod, clients still resolve the Service name, but there are no ready backends behind it.
+
+</details>
+
+Write what you expect clients to see before you continue. The next paragraph is about port mapping. It does not resolve this label edit.
 
 Port mapping adds another layer where the object can look right while traffic fails. The Service `port` is what clients call, while `targetPort` is where the application listens inside each selected pod. That translation lets you expose a clean internal contract like `http://node-backend:80` even when the container process listens on port 3000, but it also means you must know the real application port rather than copying random examples.
 
@@ -556,6 +592,42 @@ Delete the Deployment and both Services so the namespace returns to its original
 kubectl delete deployment web
 kubectl delete svc web web-external
 ```
+
+**Card A: Ten pod addresses after a scale-out.** A Deployment grows from three pods to ten. A teammate pastes ten pod IPs into the client config and says the Service must have grown with them.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the client learned pod identity instead of the Service contract. Next action: point the client at the Service name and delete the pod-IP list.
+
+</details>
+
+**Card B: The Service exists and the endpoint list is empty.** `kubectl get svc` shows a ClusterIP. `kubectl get endpoints` shows no addresses. DNS for the Service name still resolves.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the selector does not match ready pods, not DNS. Next action: compare Service selector labels with ready pod labels before you change CoreDNS.
+
+</details>
+
+**Card C: The load balancer address never appears.** `kubectl get svc` shows `EXTERNAL-IP` as pending on a laptop kind cluster. The Service type is LoadBalancer.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: no controller allocated an external address on this cluster. Next action: use ClusterIP or NodePort for the lab. Do not wait for an address this cluster will not assign.
+
+</details>
+
+**Card D: One label edit empties the backends.** The only matching pod loses `tier: frontend`. Clients still resolve the Service name. Requests fail.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: selector match, not the Service IP. Next action: read endpoints, then restore the label or fix the selector before you recreate the Service.
+
+</details>
 
 **Success criteria**: use this checklist to confirm that you designed a stable Service contract, implemented the selector and port mapping correctly, compared Service types, and diagnosed the most common empty-endpoints failure mode.
 
