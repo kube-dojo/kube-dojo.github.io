@@ -73,7 +73,16 @@ flowchart TD
 
 The maturity labels in that diagram are not decoration. A graduated project has shown broad adoption, healthy governance, documented security processes, and production use across organizations. An incubating project may already be powerful and widely used, but it is still proving some aspects of community maturity. A sandbox project is usually early exploration: useful for learning, prototypes, and future bets, but risky as the foundation of a production control path.
 
-Pause and predict: if your team needs a new policy engine that will block unsafe production deployments, would you accept more feature richness from a sandbox project, or would you prefer fewer features from a graduated or incubating project with a stronger operational record? Write down the risk you are accepting either way, because this is the kind of trade-off platform engineers make constantly.
+**Pause and predict:** If your team needs a new policy engine that will block unsafe production deployments, would you accept more feature richness from a sandbox project, or would you prefer fewer features from a graduated or incubating project with a stronger operational record?
+
+<details>
+<summary>Check your prediction</summary>
+
+Prefer the graduated or incubating project for a control that can stop production deployments. The risk you accept is fewer features. A sandbox project can be richer and still be the wrong foundation, because the risk you accept is that the block itself is immature. Write down which risk you are taking before you name a product.
+
+</details>
+
+Name the risk before you read the habit below. The next paragraph is about starting from the problem. It does not pick a maturity level for you.
 
 The important habit is to begin with the problem, then choose the category, then choose a tool. A team that says "we need Cilium" before it says "we need network policy enforcement, service visibility, and eBPF-based packet tracing" has skipped the reasoning step. Sometimes Cilium is exactly the right answer; sometimes Calico or a managed CNI is enough. The tool name should be the conclusion of an evaluation, not the opening sentence.
 
@@ -134,7 +143,18 @@ CI/CD and GitOps form the fifth layer because Kubernetes is declarative enough f
 | **Flux** | GitOps toolkit |
 | **Tekton** | K8s-native CI/CD pipelines |
 
-The sixth layer is security, which is not one product because "security" is not one problem. Image scanning checks what is inside a container before it runs. Admission policy checks whether a manifest should be allowed into the cluster. Runtime detection watches behavior after workloads start. Certificate automation protects service identity and transport security. Network policies limit lateral movement. A mature platform layers these controls because each catches a different class of mistake.
+The sixth layer is security, which is not one product because "security" is not one problem.
+
+**Pause and predict:** How many different places in the stack might need distinct security controls if a vulnerable image reaches production, opens an unexpected outbound connection, and uses an expired certificate?
+
+<details>
+<summary>Check your prediction</summary>
+
+At least five moments, not one tool. Image scanning checks the image before it runs. Admission policy checks the manifest. Runtime detection watches behavior after start. Network policy limits the unexpected connection. Certificate automation handles the expired certificate. Prevention, admission, runtime detection, network boundaries, and certificate management happen at different points in the workload lifecycle.
+
+</details>
+
+Count the moments before you read the tool table. The table is a menu of products. It is not the count.
 
 | Tool | What It Does |
 |------|--------------|
@@ -143,7 +163,7 @@ The sixth layer is security, which is not one product because "security" is not 
 | **OPA/Gatekeeper** | Policy enforcement |
 | **cert-manager** | Certificate management |
 
-Pause and predict: how many different places in the stack might need distinct security controls if a vulnerable image reaches production, opens an unexpected outbound connection, and uses an expired certificate? The point is not to buy more tools. The point is to notice that prevention, admission, runtime detection, network boundaries, and certificate management happen at different moments in the workload lifecycle.
+The point of the question was the count, not a purchase. The storage layer that follows is a different problem. Do not collapse it into the security count you just made.
 
 The seventh layer is storage and recovery. Kubernetes can request and attach persistent volumes, but that does not automatically make state safe. Teams still need storage classes, replication choices, backup schedules, restore testing, and a plan for cluster metadata. Tools such as Rook and Longhorn operate storage inside or near Kubernetes, while Velero focuses on backup and disaster recovery workflows for cluster resources and persistent volume snapshots.
 
@@ -255,11 +275,20 @@ Start with managed Kubernetes such as EKS, GKE, or AKS so the team does not own 
 
 Observability should be present from the first production deployment, but it should be proportional. Prometheus, Grafana, and a log collector such as Fluent Bit give enough visibility to answer basic questions about saturation, errors, restarts, and application logs. Distributed tracing may wait until service boundaries and latency problems justify it. A startup with one API and one worker does not need an elaborate tracing strategy before it has meaningful service-to-service calls.
 
-Security should begin with image scanning and least-privilege Kubernetes manifests. Trivy in CI can catch vulnerable packages before images reach the registry. Basic admission policies can prevent privileged containers, missing resource requests, or unsafe host mounts once the team is ready. cert-manager may be worth adding early if the cluster terminates TLS or issues internal certificates. A service mesh for universal mTLS is usually premature unless regulatory or multi-team conditions demand it.
+Security should begin with image scanning and least-privilege Kubernetes manifests. Trivy in CI can catch vulnerable packages before images reach the registry. Basic admission policies can prevent privileged containers, missing resource requests, or unsafe host mounts once the team is ready. cert-manager may be worth adding early if the cluster terminates TLS or issues internal certificates.
 
 Notice what is missing from this first stack: no complex service mesh, no custom distributed database, no hand-operated storage system, and no experimental policy engine. The missing pieces are not rejected forever. They are deferred until the team can describe the pain they solve. That restraint is what makes the platform maintainable.
 
-Pause and predict: what happens if the same team suddenly needs to encrypt all traffic between internal microservices because a customer contract requires it? The category shifts toward service mesh, certificate automation, and possibly network policy. The decision also shifts from "nice to have" to "contractual requirement," which changes the acceptable complexity budget.
+**Pause and predict:** What happens if the same team suddenly needs to encrypt all traffic between internal microservices because a customer contract requires it?
+
+<details>
+<summary>Check your prediction</summary>
+
+The category shifts toward a service mesh, certificate automation, and possibly network policy. The decision also shifts from "nice to have" to a contractual requirement, which changes the acceptable complexity budget. A mesh that was premature in the first stack can become the right category once the contract exists.
+
+</details>
+
+Name the category shift before you use the table as a shopping list. The table is a lookup. It does not decide whether this contract is enough reason to add a mesh.
 
 Here is the original quick-reference view, preserved and expanded as a decision aid. Read it left to right, not as a buying list. The phrase "when you need" should always be backed by a concrete incident, compliance requirement, scaling pressure, or developer workflow problem.
 
@@ -478,6 +507,46 @@ Good deferrals are not dismissals. A team might defer Istio until it has many se
 - [ ] You selected a storage backup or restore strategy rather than assuming Kubernetes automatically protects data.
 - [ ] You verified that at least three selected tools are graduated or mature enough for the fintech scenario.
 - [ ] You wrote one-sentence justifications that connect each tool to scenario constraints instead of to popularity.
+
+- [ ] I named a failure layer and a next action for each frozen ecosystem-layer card before opening the reveal.
+
+A richer tool, a green scan, a new mesh, and a backup job can each look like the platform is finished. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: The policy engine is a sandbox project.** It blocks more bad manifests than the graduated alternative. It has one maintainer and no documented security process. It sits on the production admission path.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: project maturity, not the feature list. Next action: move the production block to a graduated or incubating engine, and keep the sandbox project off the path that can stop deploys.
+
+</details>
+
+**Card B: Trivy is clean. The incident still happened.** CI scanning passed. The running container opened an unexpected outbound connection, and its certificate had already expired.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: one control treated as the whole program. Next action: add admission, runtime detection, network policy, and certificate automation as separate moments. Do not buy another scanner first.
+
+</details>
+
+**Card C: A mesh arrived with no contract.** The first stack added Istio "because production." There is one API and one worker. Nobody required mutual TLS. The team cannot explain the extra control plane during an incident.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: category chosen before the pain. Next action: remove the mesh until a contract or a real traffic-policy need exists, and keep certificate automation only where TLS is already terminated.
+
+</details>
+
+**Card D: Backups exist. Restore does not.** Velero runs every night. The first restore drill fails because nobody has tested a volume snapshot against a real namespace.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: recovery was never exercised. Next action: run one restore into a scratch namespace and write down what failed before you add another storage product.
+
+</details>
 
 ## Sources
 
