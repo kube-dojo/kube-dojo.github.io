@@ -74,7 +74,16 @@ The `commit-msg` hook is less about code correctness and more about history qual
 
 The `pre-push` hook is the last local checkpoint before network transfer. It can prevent accidental direct pushes to `main`, run a focused test suite, or verify that the branch name matches an issue-tracking convention. Because a push is less frequent than a commit, this hook can afford to be heavier than `pre-commit`, but it still should not replace CI. Treat it as a helpful local preview of remote expectations, not as the only place where correctness is proven.
 
-Pause and predict: what do you think happens if a developer uses `git commit --no-verify` against a repository that relies only on client-side hooks? Git skips the local hook execution that the flag is allowed to bypass, which means the local safety net disappears for that operation. This is why local hooks should express helpful developer workflow checks, while mandatory controls such as protected branches, required reviews, and server-side validation must live outside the developer's personal configuration.
+**Pause and predict:** What do you think happens if a developer uses `git commit --no-verify` against a repository that relies only on client-side hooks?
+
+<details>
+<summary>Check your prediction</summary>
+
+Git skips the local hook execution that the flag is allowed to bypass, which means the local safety net disappears for that operation. This is why local hooks should express helpful developer workflow checks, while mandatory controls such as protected branches, required reviews, and server-side validation must live outside the developer's personal configuration.
+
+</details>
+
+Write skipped or still enforced before you continue. The next paragraphs are about how a failed hook should talk to the author. They do not say what this flag does.
 
 One practical design rule follows from this distinction: write local hook messages as coaching, not as punishment. A failed hook should name the file, explain the failed rule, and suggest the next command or remediation. The engineer is already in the flow of committing or pushing, so a vague message such as "failed" wastes the moment when they are most ready to fix the problem.
 
@@ -269,7 +278,16 @@ fi
 exit 0
 ```
 
-Pause and predict: what output do you expect if a developer runs `git commit -m "WIP: fixing stuff"` with this hook installed? The hook reads the temporary message file, compares the string to the regular expression, rejects the uppercase `WIP` type because it is not in the allowed list, and prints the corrective template. The important teaching point is that the hook is validating repository history as data, not merely nagging developers about style.
+**Pause and predict:** What output do you expect if a developer runs `git commit -m "WIP: fixing stuff"` with this hook installed?
+
+<details>
+<summary>Check your prediction</summary>
+
+The hook reads the temporary message file, compares the string to the regular expression, rejects the uppercase `WIP` type because it is not in the allowed list, and prints the corrective template. The important teaching point is that the hook is validating repository history as data, not merely nagging developers about style.
+
+</details>
+
+Write accept or reject before you continue. The next steps show how to install the hook. They do not score this message.
 
 Regular expressions are useful here, but they also become maintainability risks when they try to encode every possible policy. If your organization requires ticket IDs, breaking-change trailers, signed-off-by lines, or branch-based message rules, consider whether a small script with named checks would be clearer than a single dense expression. Hooks are production code in miniature; they deserve readability, tests, and error messages that a tired engineer can understand.
 
@@ -392,7 +410,16 @@ Now imagine that the merge was not the workflow you wanted. Maybe the team prefe
 git reset --hard HEAD~1
 ```
 
-Pause and predict: if you ran `git rerere forget app-config.yaml` right now, what would happen during the next rebase? Git would discard the remembered mapping for that path, so the next identical conflict would stop for manual resolution as if rerere had never seen it. That command is the escape hatch when Git learned a bad answer or when a file's surrounding context changed enough that the old answer is no longer trustworthy.
+**Pause and predict:** If you ran `git rerere forget app-config.yaml` right now, what would happen during the next rebase?
+
+<details>
+<summary>Check your prediction</summary>
+
+Git would discard the remembered mapping for that path, so the next identical conflict would stop for manual resolution as if rerere had never seen it. That command is the escape hatch when Git learned a bad answer or when a file's surrounding context changed enough that the old answer is no longer trustworthy.
+
+</details>
+
+Write reused or stopped before you continue. The commands below are the normal record-and-replay path. They do not show this forget.
 
 ```bash
 # Switch back to the feature branch and initiate a rebase onto main
@@ -467,9 +494,16 @@ git config --global init.templatedir '~/.git-templates'
 
 Template directories are not a complete team governance system. They depend on each person's global Git configuration, and they affect new repositories rather than retroactively repairing old ones. They are excellent for personal defaults, training environments, and organizations that manage developer workstations centrally. For most application repositories, combine a tracked framework configuration with CI enforcement so the repository declares its own expectations.
 
-Which approach would you choose for a platform team that owns dozens of Kubernetes add-ons across many repositories, and why? A reasonable answer is to use a tracked framework configuration for repository-specific validation, remote branch protection for mandatory policy, and optional template directories for personal convenience. That layered design keeps the repository self-describing while still letting individual engineers carry helpful defaults across unrelated projects.
+**Pause and predict:** Which approach would you choose for a platform team that owns dozens of Kubernetes add-ons across many repositories, and why?
 
-The distribution choice should match the blast radius of the rule. A personal preference such as a log alias belongs in global configuration or a template. A repository rule such as "all manifests must pass this schema check" belongs in tracked project configuration and CI. A company-wide rule such as "no direct pushes to protected branches" belongs in the hosting platform. Mixing those levels creates confusion because contributors cannot tell whether a failure came from their machine, the repository, or the organization.
+<details>
+<summary>Check your prediction</summary>
+
+A reasonable answer is to use a tracked framework configuration for repository-specific validation, remote branch protection for mandatory policy, and optional template directories for personal convenience. That layered design keeps the repository self-describing while still letting individual engineers carry helpful defaults across unrelated projects.
+
+</details>
+
+Write the layers before you continue. Blast radius still matters, and the catalog below is not the grade for the add-on team you just considered. Read your own placement before you use that catalog.
 
 ## Patterns & Anti-Patterns
 
@@ -823,6 +857,42 @@ else
   git config --global --unset init.templatedir
 fi
 ```
+
+</details>
+
+**Card A: `--no-verify` still ran the client hook.** The repository's only check is a local `pre-commit` script. A developer passes `--no-verify` and expects the script to run anyway because the file is still on disk.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a client flag, not a server control. Next action: expect Git to skip that local hook. Put mandatory checks on the remote: protected branches, required reviews, and server-side validation.
+
+</details>
+
+**Card B: The WIP message was accepted.** The commit-msg hook is installed. `git commit -m "WIP: fixing stuff"` is expected to succeed because the words describe real work.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the type token, not the prose. Next action: expect a reject and the corrective template. `WIP` is not in the allowed type list.
+
+</details>
+
+**Card C: `rerere forget` still replays the old mapping.** `git rerere forget app-config.yaml` ran. The next rebase is expected to reuse the stored resolution for that path.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the remembered mapping was discarded. Next action: expect the next identical conflict to stop for a manual resolution. Use `forget` when the stored answer is no longer trustworthy.
+
+</details>
+
+**Card D: One client hook is the policy for every add-on repo.** Dozens of repositories need the same Kubernetes checks. The plan is a personal `pre-commit` script and nothing on the remote.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: local convenience versus mandatory policy. Next action: track repository-specific validation, enforce branch protection on the remote, and keep personal templates optional.
 
 </details>
 
