@@ -735,6 +735,7 @@ All criteria except the last one are host-only: a learner on the Killercoda `lin
 - [ ] Compare cgroups v1 and v2 by explaining why the same memory metric appears under different paths. *(Host-only)*
 - [ ] Implement a small v2 cgroup memory limit on a lab host or explain why your environment should not run that optional step. *(Host-only)*
 - [ ] Evaluate CPU throttling by reading `cpu.max`, `cpu.stat`, `nr_throttled`, and `throttled_usec`. *(Host-only)*
+- [ ] Classified each frozen cgroup-pressure card (failure layer + next action) before opening the reveal. *(Host-only)*
 - [ ] *(Cluster path — optional)* Evaluate Kubernetes requests, limits, and QoS class for a pod using `k describe pod` and raw cgroup evidence. Needs `kubectl` on a running cluster; on the host-only path, evaluate the same reasoning from the Kubernetes Requests, Limits, QoS, and Raw cgroups worked example and complete the raw cgroup inspection instead.
 
 ## Sources
