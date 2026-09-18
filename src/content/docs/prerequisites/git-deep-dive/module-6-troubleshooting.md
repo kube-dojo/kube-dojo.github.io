@@ -91,11 +91,19 @@ Bisecting: 125 revisions left to test after this (roughly 7 steps)
 [a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0] Update resource requests
 ```
 
-Pause and predict: if you run a Kubernetes validation against this checked-out commit and it succeeds, what should you tell Git next, and what does that answer mean for the remaining history? The correct answer is `git bisect good`, because success proves the regression was introduced after the current midpoint. Git can then ignore the older half of the range and continue searching only in the newer half.
+**Pause and predict:** If you run a Kubernetes validation against this checked-out commit and it succeeds, what should you tell Git next, and what does that answer mean for the remaining history?
+
+<details>
+<summary>Check your prediction</summary>
+
+The correct answer is `git bisect good`, because success proves the regression was introduced after the current midpoint. Git can then ignore the older half of the range and continue searching only in the newer half.
+
+</details>
+
+Write the bisect subcommand before you continue. The validation command below checks the manifest. It does not mark the midpoint.
 
 ```bash
 kubectl apply --dry-run=server -f deployment.yaml
-git bisect good
 ```
 
 If the same validation fails with the exact symptom you are investigating, mark the midpoint as bad instead. Be precise here: a failure caused by missing local dependencies is not the same as the Kubernetes schema regression you are hunting. Manual bisection works only when each classification reflects the target behavior, not any possible inconvenience at that historical commit.
@@ -289,7 +297,16 @@ c8d7e6f5 (Bob       2024-03-01 10:00:00 -0400 12) {{ include "mychart.labels" . 
 a1b2c3d4 (Alice     2023-11-15 09:15:00 -0400 12) {{ include "mychart.labels" . | nindent 4 }}
 ```
 
-Stop and think: you are auditing a `securityContext` block that appears to allow a container to run with more privilege than expected. Standard blame names a Jenkins user, and the commit message says it converted YAML indentation from four spaces to two. Which approach would you choose here and why? A defensible answer combines `git blame -w` with `-C` when movement is possible, because whitespace ignores the formatter while copy detection follows the block through refactors.
+**Pause and predict:** You are auditing a `securityContext` block that appears to allow a container to run with more privilege than expected. Standard blame names a Jenkins user, and the commit message says it converted YAML indentation from four spaces to two. Which approach would you choose here and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+A defensible answer combines `git blame -w` with `-C` when movement is possible, because whitespace ignores the formatter while copy detection follows the block through refactors.
+
+</details>
+
+Write the flags before you continue. The next paragraph is about what to do after you have a commit id. It does not choose those flags.
 
 The outcome you want from blame is a better next question. Once you identify the original commit, read the commit message, inspect the surrounding diff, and look for the linked issue or pull request. A suspicious line may have been a legitimate emergency workaround that never received a cleanup issue, or it may reveal a misunderstanding that deserves a test. Blame gives you coordinates in history; engineering judgment decides what to do with them.
 
@@ -343,9 +360,16 @@ diff --git a/k8s/frontend-deployment.yaml b/k8s/frontend-deployment.yaml
 +            cpu: 500m
 ```
 
-Pause and predict: if `git grep "DB_MAX_CONNECTIONS"` returns no matches, does that prove the repository never contained the variable? It does not. It proves only that the currently searched snapshot lacks the string. A Pickaxe query against history is the right tool when the suspected evidence may have been added and removed before you looked.
+**Pause and predict:** If `git grep "DB_MAX_CONNECTIONS"` returns no matches, does that prove the repository never contained the variable?
 
-The distinction between Pickaxe and snapshot search is worth memorizing because it prevents wasted time during incidents. A snapshot search answers, "Does this text exist in this tree?" A Pickaxe search answers, "Which commits changed the presence or matching diff lines of this text?" Those questions sound similar when you are tired, but they lead to different tools and different evidence.
+<details>
+<summary>Check your prediction</summary>
+
+It does not. It proves only that the currently searched snapshot lacks the string. A Pickaxe query against history is the right tool when the suspected evidence may have been added and removed before you looked. A snapshot search answers whether the text exists in this tree. A Pickaxe search answers which commits changed the presence of that text.
+
+</details>
+
+Write yes or no before you continue. Two search questions can sound alike during an incident, and chasing the wrong evidence costs time you do not have. The next section does not grade this prediction.
 
 | Command | What it Searches | Use Case |
 | :--- | :--- | :--- |
@@ -386,7 +410,16 @@ You can push the idea further by asking Git for every commit and searching those
 git grep "apiVersion: policy/v1beta1" $(git rev-list --all)
 ```
 
-Which approach would you choose here and why: a current release readiness check for deprecated APIs, or a historical compliance investigation into when deprecated APIs were introduced? For the current release, search the relevant branch or tag with `git grep`. For introduction history, use `git log -S` or `-G` so the result points to commits rather than merely showing present-day files.
+**Pause and predict:** Which approach would you choose here and why: a current release readiness check for deprecated APIs, or a historical compliance investigation into when deprecated APIs were introduced?
+
+<details>
+<summary>Check your prediction</summary>
+
+For the current release, search the relevant branch or tag with `git grep`. For introduction history, use `git log -S` or `-G` so the result points to commits rather than merely showing present-day files.
+
+</details>
+
+Write the command family before you continue. The next paragraph pairs repository search with cluster checks. It does not choose between a present-day scan and a history scan.
 
 In Kubernetes work, pair `git grep` with cluster checks when you need both intended state and observed state. A repository can show what should be deployed, while `kubectl get` and `kubectl describe` show what the API server currently knows. Use the full command in shared documentation, scripts, and copied examples so the evidence-gathering sequence does not depend on a local alias that only exists in one engineer's interactive shell.
 
@@ -721,6 +754,42 @@ git blame -L '/containerPort/',+1 deployment.yaml
 <summary><strong>Solution Explanation</strong></summary>
 
 The `git blame` command targets the regular expression `/containerPort/` and renders only that line. You will see the specific commit hash, committer identity, and timestamp associated with the port change. By chaining automated bisection with targeted line blame, you move from "the manifest is wrong" to "this commit changed this line and here is the evidence." That is the practical standard for incident forensics.
+</details>
+
+**Card A: A passing midpoint is marked bad.** The dry-run succeeds on the checked-out commit. The bisect is told `bad` anyway, because the regression is "somewhere in this history."
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: which half still contains the bug. Next action: `git bisect good`. Success means the regression is newer than this commit, so the older half can be ignored.
+
+</details>
+
+**Card B: Whitespace blame is trusted.** `securityContext` looks too privileged. Blame names a Jenkins user whose message only says the YAML indent changed from four spaces to two.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the formatter commit, not the author of the privilege. Next action: rerun with `git blame -w`, and add `-C` if the block may have moved. Then read the commit that still owns the meaning.
+
+</details>
+
+**Card C: No grep hits means the variable never existed.** `git grep "DB_MAX_CONNECTIONS"` is empty on the current tree. The incident note says the setting was removed last week.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: this snapshot versus history. Next action: do not close the search. Use a Pickaxe query (`git log -S` or `-G`) for commits that added or removed the string.
+
+</details>
+
+**Card D: A release check is run as history.** The question is whether the branch you are about to ship still contains `policy/v1beta1`. The command chosen is `git log -S`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: present files versus introduction commits. Next action: `git grep` on the release branch or tag for a current readiness check. Use `git log -S` when the question is when the API was introduced.
+
 </details>
 
 ### Success Criteria
