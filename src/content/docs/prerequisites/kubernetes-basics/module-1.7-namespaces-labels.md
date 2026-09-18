@@ -119,9 +119,16 @@ kubectl get pods
 
 Hypothetical scenario: an experienced engineer intends to delete a broken deployment in `staging`, but their current context still points at `production`. The command is syntactically perfect and operationally wrong, so Kubernetes does exactly what the engineer asked. Namespaces reduce blast radius only when humans and automation carry the namespace through the workflow. A visible prompt, explicit manifest metadata, restricted RBAC, and dry-run habits work together; no single layer is enough.
 
-Pause and predict: if a Pod in the `test` namespace tries to connect to `http://data:8080`, while the `data` Service exists only in `prod`, what namespace will DNS search first and what name would make the cross-namespace target explicit? Make a prediction before reading the next paragraph, because this detail explains many "it worked locally" failures.
+**Pause and predict:** if a Pod in the `test` namespace tries to connect to `http://data:8080`, while the `data` Service exists only in `prod`, what namespace will DNS search first and what name would make the cross-namespace target explicit?
+
+<details>
+<summary>Check your prediction</summary>
 
 Kubernetes Service DNS is namespace-aware. A short lookup such as `data` is resolved first in the querying Pod's own namespace, while a cross-namespace lookup should use a more explicit name such as `data.prod` or the fully qualified name `data.prod.svc.cluster.local`. This behavior allows two teams to use the same Service name without collision, while still allowing deliberate cross-namespace communication when the application is configured for it.
+
+</details>
+
+Write the search namespace and the explicit name before you continue. The next paragraph is about incident search. It does not name the DNS result.
 
 Namespace planning also affects how you operate during failure. If every team has separate namespaces for development, staging, and production, an incident commander can quickly ask whether the failure is isolated to one environment or spreading across shared infrastructure. If every environment shares a namespace, the first minutes of the incident are spent untangling object names, owners, and histories. The namespace boundary is not only a deployment choice; it is an incident-response search boundary.
 
@@ -287,9 +294,16 @@ Labels and annotations both live under object metadata, but they are designed fo
 
 This distinction protects the API server as well as your future self. Labels are indexed so selectors remain fast across large clusters, which means labels should remain short, bounded, and meaningful. Annotations can hold much larger strings, including JSON fragments or controller directives, because they are not part of the selector index. A backup controller, ingress controller, monitoring agent, or release tool can read annotations after watching objects without turning every piece of metadata into a cluster-wide search key.
 
-Pause and predict: consider these five metadata items before checking the worked example: team name for filtering, Git SHA of the commit, Prometheus scrape configuration, cost center for billing grouping, and an SSL certificate directive for an ingress controller. Which items should be labels because you will select or group by them, and which should be annotations because a tool reads them after discovering the object?
+**Pause and predict:** consider these five metadata items: team name for filtering, Git SHA of the commit, Prometheus scrape configuration, cost center for billing grouping, and an SSL certificate directive for an ingress controller. Which items should be labels because you will select or group by them, and which should be annotations because a tool reads them after discovering the object?
+
+<details>
+<summary>Check your prediction</summary>
 
 Team name and cost center usually belong in labels when operators use them for filtering, chargeback, or policy selection. The Git SHA, Prometheus scrape directive, and ingress certificate instruction usually belong in annotations because they are descriptive or controller-specific metadata rather than identity. Prometheus annotations are a common historical pattern, although some modern monitoring stacks prefer ServiceMonitors or PodMonitors. The key lesson is not the specific tool; it is the selection-versus-description decision.
+
+</details>
+
+Write the split before you continue. The next manifest is an example to compare with your list. The paragraph after it should not be the first place you learn the split.
 
 ```yaml
 apiVersion: v1
@@ -312,7 +326,7 @@ spec:
     image: reporting-job:latest
 ```
 
-The example keeps selection keys short and descriptive while placing longer or tool-specific details in annotations. An operator can find every analytics team reporting Pod with a label selector, and a monitoring tool can read the scrape annotations after it has discovered the Pod through the API. If you tried to store a large JSON configuration in a label, Kubernetes would reject it because label values are constrained. If you stored `team=analytics` only in an annotation, `k get pods -l team=analytics` would never find it.
+The example keeps selection keys short and descriptive while placing longer or tool-specific details beside them. An operator who needs a selector must put that key where selectors can read it. A large JSON blob does not belong in a label, because label values are length-constrained. If a value you later need in a selector is stored only where selectors cannot read it, the lookup returns nothing.
 
 Annotations are also useful for human-facing context, but they should not become a junk drawer. A runbook URL, owner contact, deployment SHA, or controller directive can be extremely helpful during an incident. A long, stale paragraph explaining why an object existed three quarters ago is usually better placed in Git history or a change ticket. The line is not about whether humans or machines read the field; it is about whether the API server should index it for selection.
 
@@ -514,6 +528,44 @@ Add stable labels that distinguish the intended component and environment, then 
 ## Hands-On Exercise: The Multi-Tenant Sandbox
 
 In this exercise, you will create a namespace, add resource guardrails, deploy a stable release, expose it through a Service, and then introduce a canary that joins the Service endpoint set because of labels. You can run this in any disposable Kubernetes 1.35+ cluster where you have permission to create namespaces, LimitRanges, ResourceQuotas, Deployments, Pods, and Services. If your current cluster is shared with other learners, choose a unique namespace name instead of `alpha-team`.
+
+These four cases are the ones to write down before you run the sandbox. Each one names a layer you can check with a read-only command. Do not fix the cluster until you have named that layer.
+
+**Card A: `http://data:8080` fails from `test`.** The Pod is in `test`. A Service named `data` exists only in `prod`. The short URL does not connect. The Service object itself is healthy.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: DNS searched the caller's namespace first. Next action: query the explicit cross-namespace name, and do not recreate the Service in `test` until you meant to.
+
+</details>
+
+**Card B: The client was given `data.prod`.** The same Pod reaches the Service after the name changes. Nothing else in the Deployment changed.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the short name, not the network plugin. Next action: keep the explicit name in the client config and confirm endpoints in `prod`.
+
+</details>
+
+**Card C: The team filter returns nothing.** `team` is present on the Pod, but only as an annotation. `kubectl get pods -l team=analytics` is empty. The objects are running.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a selection key was stored where selectors cannot see it. Next action: put `team` in labels and leave the Git SHA and scrape config as annotations.
+
+</details>
+
+**Card D: The API rejects a new Pod.** The namespace already has a ResourceQuota. The create returns forbidden. The scheduler never placed the Pod.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: namespace admission, not a node capacity failure. Next action: read the quota and the Pod requests before you add nodes.
+
+</details>
 
 Success criteria:
 
