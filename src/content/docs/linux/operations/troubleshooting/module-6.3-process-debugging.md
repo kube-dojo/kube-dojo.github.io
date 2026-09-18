@@ -108,9 +108,14 @@ stateDiagram-v2
 
 The same workflow applies whether the process is a local daemon, a shell command, or a container workload. The container case adds namespace boundaries, but the process still has descriptors, limits, system calls, and a scheduler state. You are learning Linux primitives, not a single troubleshooting recipe that only works on one distribution.
 
-**Active learning prompt:** Your team says "the service is frozen." Before choosing a command, write down two competing theories: one where the process is waiting on the kernel, and one where it is actively doing user-space work. Which first command would distinguish those theories with the least risk?
+**Pause and predict:** Your team says "the service is frozen." Before choosing a command, write down two competing theories: one where the process is waiting on the kernel, and one where it is actively doing user-space work. Which first command would distinguish those theories with the least risk?
+
+<details>
+<summary>Check your prediction</summary>
 
 A good answer usually starts with `ps -o pid,ppid,stat,wchan,comm -p "$PID"` and then uses the result to decide what to inspect next. If the process is sleeping in a recognizable wait channel, you have a kernel-side clue. If it is constantly runnable and burning CPU, you need a different path, possibly sampling or profiling instead of descriptor inspection.
+
+</details>
 
 Use the wait channel to choose a filter. `do_epoll_wait` usually points toward socket or event-loop waiting, `futex_wait_queue` toward locks or runtime scheduling, and filesystem wait channels toward storage or mount health. The name is not a root cause, but it keeps the next command specific.
 
@@ -206,9 +211,14 @@ ls -l "/proc/$PID/fd" | sed -n '1,25p'
 
 If the count is near the soft limit and most descriptors point to sockets, you probably have a connection lifecycle problem. If many descriptors point to deleted log files, you may have a rotation or cleanup problem. If the descriptors are duplicated pipes, inspect the parent and child process relationship because a pipeline or supervisor may be keeping resources open accidentally.
 
-**Active learning prompt:** A process shows a low resident memory size but hundreds of descriptors pointing to deleted files. What user-visible symptom could that create, and why would restarting only that process release disk space even though the files were already removed from the directory tree?
+**Pause and predict:** A process shows a low resident memory size but hundreds of descriptors pointing to deleted files. What user-visible symptom could that create, and why would restarting only that process release disk space even though the files were already removed from the directory tree?
 
-The answer is that [unlinked files still consume disk blocks while any process holds an open descriptor to them](https://en.wikipedia.org/wiki/Inode). Directory entries are gone, but the underlying inode remains alive until the final descriptor closes. A restart works because it closes the descriptors, not because it repairs the filesystem.
+<details>
+<summary>Check your prediction</summary>
+
+[Unlinked files still consume disk blocks while any process holds an open descriptor to them](https://en.wikipedia.org/wiki/Inode). Directory entries are gone, but the underlying inode remains alive until the final descriptor closes. A restart works because it closes the descriptors, not because it repairs the filesystem. The user-visible symptom is a full filesystem that `du` cannot explain from the directory tree.
+
+</details>
 
 For a leak suspicion, add a second sample instead of trusting a single count. A growing descriptor count plus repeated socket targets is different from a stable count near a legitimate high-water mark.
 
@@ -277,9 +287,14 @@ grep -E 'openat|stat|access|ENOENT|EACCES' /tmp/config.trace | sed -n '1,30p'
 
 If the trace shows repeated `ENOENT` for a path you did not expect, the problem is probably a search path, working directory, or environment issue. If it shows `EACCES`, the file exists but permissions, ownership, or mandatory access controls may block the process. If it shows a successful open followed by a failed read or parse, the problem moves above the kernel boundary.
 
-**Active learning prompt:** You attach `strace -e trace=file` to a running service and see nothing during a failed HTTP request. What are two plausible explanations, and which filter would you try next if the request depends on an upstream API?
+**Pause and predict:** You attach `strace -e trace=file` to a running service and see nothing during a failed HTTP request. What are two plausible explanations, and which filter would you try next if the request depends on an upstream API?
+
+<details>
+<summary>Check your prediction</summary>
 
 One explanation is that the failure path does not touch files at all; it may be waiting on a socket, timer, futex, or child process. Another is that you attached to the wrong worker or missed the child that handled the request. For an upstream API dependency, try `strace -f -e trace=network -p "$PID"` briefly, then detach after capturing the connection attempt.
+
+</details>
 
 For live processes, combine filtering with a timeout so the trace stops even if you forget to detach. This habit is especially useful during incidents because it keeps the evidence window short and lowers the chance of leaving a high-overhead tracer attached.
 
@@ -351,9 +366,14 @@ A single zombie is often a bug but not an immediate capacity emergency. Many zom
 ps -eo ppid=,stat= | awk '$2 ~ /Z/ {count[$1]++} END {for (p in count) print p, count[p]}' | sort -k2 -nr
 ```
 
-**Active learning prompt:** A host has load average above its CPU count, but `top` shows almost no CPU usage. Several database and backup processes are in `D` state. What system component would you investigate before tuning application thread pools, and why?
+**Pause and predict:** A host has load average above its CPU count, but `top` shows almost no CPU usage. Several database and backup processes are in `D` state. What system component would you investigate before tuning application thread pools, and why?
 
-You should investigate the I/O path first: local disk, cloud volume, NFS mount, storage network, or filesystem driver. Load average includes tasks waiting in uninterruptible I/O, so a high value does not always mean CPU pressure. Tuning thread pools can make the situation worse by creating more blocked work against the same failing storage dependency.
+<details>
+<summary>Check your prediction</summary>
+
+Investigate the I/O path first: local disk, cloud volume, NFS mount, storage network, or filesystem driver. Load average includes tasks waiting in uninterruptible I/O, so a high value does not always mean CPU pressure. Tuning thread pools can make the situation worse by creating more blocked work against the same failing storage dependency.
+
+</details>
 
 Signals are still useful when the process is in a normal interruptible state. `SIGTERM` asks for graceful shutdown, `SIGKILL` forces termination when deliverable, and `SIGSTOP` can freeze a process for inspection. Use them deliberately because signals alter the evidence you are collecting.
 
@@ -418,9 +438,14 @@ if [ -n "$OWNER_PID" ]; then
 fi
 ```
 
-**Active learning prompt:** You find that `/var/log/app.log (deleted)` is still open by a daemon, and `df -h` still shows the filesystem full. Would truncating the visible path help, and what action releases the blocks that are actually consuming space?
+**Pause and predict:** You find that `/var/log/app.log (deleted)` is still open by a daemon, and `df -h` still shows the filesystem full. Would truncating the visible path help, and what action releases the blocks that are actually consuming space?
+
+<details>
+<summary>Check your prediction</summary>
 
 Truncating the visible path will not affect the unlinked inode held by the daemon. The blocks are released when the process closes the descriptor, which may happen through a graceful reload, restart, or application-specific log-reopen signal. In some emergency cases, operators truncate via `/proc/$PID/fd/$FD`, but that should be done carefully because it modifies what the running process still has open.
+
+</details>
 
 ```bash
 # Inspect only; do not modify descriptors unless you understand the process.
@@ -487,9 +512,14 @@ In Kubernetes environments, the practical workflow is to identify the host PID o
 
 When you translate these ideas to Kubernetes 1.35+ clusters, keep the command style consistent with the rest of KubeDojo: define `alias k=kubectl` once in your shell and use `k` for Kubernetes commands. The Linux evidence still comes from the node and from the process namespace, not from the API server alone. `k logs` can tell you what the container emitted, but `/proc`, `nsenter`, and a careful trace explain what the process did after the log line stopped.
 
-**Active learning prompt:** A containerized application can reach a service when tested from the host, but the application itself times out. Why might host-level `curl` be misleading, and which namespace would you enter first to test from the application's point of view?
+**Pause and predict:** A containerized application can reach a service when tested from the host, but the application itself times out. Why might host-level `curl` be misleading, and which namespace would you enter first to test from the application's point of view?
+
+<details>
+<summary>Check your prediction</summary>
 
 Host-level `curl` uses the host network namespace, routing table, DNS configuration, and firewall context. The application may live in a different network namespace with different routes, DNS, or policy. Enter the target process's network namespace first, then run a minimal connection test from that perspective before changing application configuration.
+
+</details>
 
 ```bash
 PID="$(pgrep -n bash)"
@@ -892,6 +922,45 @@ Forbidden on shared or production hosts: `killall sleep`, `killall python`, `pki
 - [ ] No `/tmp/kd-procdebug.*` directory from this run remains.
 - [ ] You did not use broad destructive cleanup.
 - [ ] You can repeat the workflow on a real service with a narrower, safer evidence plan.
+- [ ] I named a failure layer and a next action for each frozen process-layer card before opening the reveal.
+
+A frozen service, a full disk with a small RSS, a silent file trace, and a host `curl` that succeeds can each point at the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Frozen, no tracer yet.** The service is not answering. You have a PID. You have not attached `strace`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: unknown wait, not a missing trace. Next action: read `stat` and `wchan` with `ps` before you attach anything.
+
+</details>
+
+**Card B: Small RSS, full disk.** Resident memory is low. Hundreds of descriptors point at deleted files. `df` is full and `du` is not.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: unlinked inodes still held open, not an application heap. Next action: name the holder and close or reopen those descriptors before you add disk.
+
+</details>
+
+**Card C: File trace is silent.** `strace -e trace=file` shows nothing during a failed HTTP request that depends on an upstream API.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the request is not a file operation, or you attached to the wrong process. Next action: follow children and trace network, briefly, then detach.
+
+</details>
+
+**Card D: Load is high, CPU is idle.** Load average is above the CPU count. `top` is quiet. Several processes are in `D`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: uninterruptible I/O, not a thread-pool shortage. Next action: inspect the storage path before you raise concurrency.
+
+</details>
 
 ## Sources
 
