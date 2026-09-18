@@ -100,7 +100,14 @@ When an alert fires, start with a hypothesis about the layer. If users see HTTP 
 
 Time synchronization quietly underpins this whole workflow. If two hosts disagree about the current time, a timeline can make an effect appear before its cause, and engineers may chase impossible sequences. In well-run environments, NTP or another time synchronization service is part of the logging system even though it does not look like one. When evidence from two systems refuses to line up, check timezone, clock skew, and timestamp precision before assuming one component lied.
 
-Pause and predict: if you need to correlate a database error with a web server error, what is the most reliable piece of information to use across both log sources? The answer is not the severity label or the exact wording of the message, because those are application-specific. The answer is a timestamp, ideally with a known timezone and enough precision to compare events that happened within seconds of one another.
+**Pause and predict:** if you need to correlate a database error with a web server error, what is the most reliable piece of information to use across both log sources?
+
+<details>
+<summary>Check your prediction</summary>
+
+Not the severity label or the exact wording of the message, because those are application-specific. Use a timestamp, ideally with a known timezone and enough precision to compare events that happened within seconds of one another.
+
+</details>
 
 **Hypothetical scenario:** An API team sees elevated 502 responses from NGINX and immediately restarts the application deployment. The restart lowers the error rate for a few minutes, but the issue returns because the real cause was a kernel-level conntrack table exhaustion on the node. The NGINX access log proved user impact, the application log showed retries, `journalctl -k` showed dropped connections, and the kubelet log showed pods being recreated on the same unhealthy node. No single log source told the whole truth.
 
@@ -361,6 +368,15 @@ Kubernetes adds a second layer of abstraction over Linux logs. The application w
 
 The stdout convention is more than style. Kubernetes logging works best when applications write operational logs to stdout and stderr because the platform can collect those streams consistently. If a process writes only to an internal file, `k logs` may show nothing useful even though the application is producing logs somewhere inside the container filesystem. That design also makes log loss more likely because container filesystems are ephemeral unless explicitly backed by a volume.
 
+**Pause and predict:** if a pod has crashed and restarted, `k logs pod-name` only shows the logs of the new, running container. Which flag do you need to view the logs of the container that actually crashed?
+
+<details>
+<summary>Check your prediction</summary>
+
+`--previous`. Kubernetes keeps a limited previous container log for restarted containers, while the current stream begins after the restart. Capture that stream, plus pod events, before another restart replaces it.
+
+</details>
+
 ```bash
 alias k=kubectl
 ```
@@ -386,11 +402,9 @@ k logs --since=1h pod-name
 k logs --since-time="2024-01-15T10:00:00Z" pod-name
 ```
 
-Pod logs are convenient, but they are not a complete incident record. `k logs pod-name` usually shows the current container's stream, so it can hide the exact crash that caused a restart. `k logs pod-name --previous` asks for the terminated container's previous stream and is one of the most important flags for crash-loop investigation. If a pod has multiple containers, you must choose the container explicitly or query all containers, otherwise you may accidentally inspect a sidecar while the application container is the one failing.
+Pod logs are convenient, but they are not a complete incident record. The current container stream can hide the crash that caused a restart. If a pod has multiple containers, you must choose the container explicitly or query all containers, otherwise you may accidentally inspect a sidecar while the application container is the one failing.
 
-The previous-log habit should happen before repeated restarts or rollouts. Each recovery action can change which evidence remains available, especially when restart counts continue climbing. If you see `CrashLoopBackOff`, capture previous logs, pod events, and relevant kubelet entries before applying a speculative fix. A fast restart that hides the crash reason can turn a five-minute diagnosis into a guessing exercise.
-
-Pause and predict: if a pod has crashed and restarted, `k logs pod-name` only shows the logs of the new, running container. Which flag do you need to view the logs of the container that actually crashed? The answer is `--previous`, and the reason is that Kubernetes keeps a limited previous container log for restarted containers, while the current stream begins after the restart.
+The habit of saving the terminated stream should happen before repeated restarts or rollouts. Each recovery action can change which evidence remains available, especially when restart counts continue climbing. If you see `CrashLoopBackOff`, capture that terminated stream, pod events, and relevant kubelet entries before applying a speculative fix. A fast restart that hides the crash reason can turn a five-minute diagnosis into a guessing exercise.
 
 ```bash
 # All pods with label
@@ -834,7 +848,47 @@ k logs -l app=nginx --all-containers --tail=100
 
 <details><summary>Solution notes for Task 6</summary>
 
-The retention commands help you design rather than merely consume logs. If a journal is large, identify whether the cause is retention policy, debug verbosity, or a noisy service. The Kubernetes commands reinforce the habit of checking previous logs, choosing the correct container, and controlling volume with labels, time filters, and tails. If no cluster is available, a not-found error is expected — the goal is recognizing the flag pattern.
+The retention commands help you design rather than merely consume logs. If a journal is large, identify whether the cause is retention policy, debug verbosity, or a noisy service. The Kubernetes commands reinforce the habit of checking the terminated container, choosing the correct container, and controlling volume with labels, time filters, and tails. If no cluster is available, a not-found error is expected — the goal is recognizing the flag pattern.
+
+</details>
+
+- [ ] I named a failure layer and a next action for each frozen log-layer card before opening the reveal.
+
+A shared clock, a restarted pod, a first 502, and a full log disk can each look like the whole story and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Two logs, one incident.** A database error and a web error landed in the same minute. The messages do not share a word. The severity labels do not match.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: correlation key, not message text. Next action: align timestamps, timezone, and precision before you decide which line caused the other.
+
+</details>
+
+**Card B: Pod restarted, logs look healthy.** `k logs` on the running container shows a clean start. The crash that paged you is not in that stream.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: you are reading the new container, not the one that died. Next action: add `--previous` before you restart it again.
+
+</details>
+
+**Card C: First 502, then a restart.** NGINX 502s fell for a few minutes after an application restart, then returned. Nobody opened the kernel log.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the first application line was impact, not cause. Next action: keep the 502 as the symptom and check node network state before you call the restart the fix.
+
+</details>
+
+**Card D: `/var/log` is nearly full.** The fastest recovery is to vacuum or delete logs during the incident.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: evidence about to be deleted, not only disk space. Next action: export the incident window, then reclaim space.
 
 </details>
 
@@ -847,6 +901,7 @@ The retention commands help you design rather than merely consume logs. If a jou
 - [ ] Practiced Kubernetes log commands using the `k` alias, including `--previous` and container selection.
 - [ ] Reviewed log retention settings without deleting evidence prematurely.
 - [ ] Wrote a short incident-style timeline with symptom time, first supporting log line, likely layer, and next question.
+- [ ] Classified each frozen log-layer card by failure layer and next action.
 
 ## Next Module
 
