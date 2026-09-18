@@ -37,7 +37,16 @@ A technology becomes a dead end when its learning value, operational value, and 
 
 Cloud-native dead ends usually share three forces. First, the abstraction stops matching the workload. Second, the governance model fails to attract competitors, cloud providers, and independent vendors. Third, the ecosystem around the winner becomes so large that alternatives must be dramatically better to justify their isolation. Kubernetes won not because it was simple, but because it became the common integration target for runtimes, networking, storage, policy, observability, security, and managed cloud services.
 
-Pause and predict: if your team finds a tool that is easier than Kubernetes for one narrow deployment path, what would have to be true before you would recommend it for a five-year platform bet? The answer should include more than feature checklists. You would need credible governance, a healthy contributor base, support from more than one cloud provider, a migration story, a security model, and evidence that the tool's abstraction will still fit when workloads become stateful, regulated, or globally distributed.
+**Pause and predict:** if your team finds a tool that is easier than Kubernetes for one narrow deployment path, what would have to be true before you would recommend it for a five-year platform bet?
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer should include more than feature checklists. You would need credible governance, a healthy contributor base, support from more than one cloud provider, a migration story, a security model, and evidence that the tool's abstraction will still fit when workloads become stateful, regulated, or globally distributed.
+
+</details>
+
+Write the conditions you would require before you continue. The next paragraph is a city-map model. It does not list those conditions.
 
 The useful mental model is a city map. A tool can be a lovely side street, but a platform needs roads, utilities, emergency services, maintenance crews, and businesses that expect the address to exist. Kubernetes is not only an orchestrator; it is the address system used by a large part of modern infrastructure. Dead ends often failed because they remained excellent side streets while the industry finished building the city somewhere else.
 
@@ -92,9 +101,18 @@ Cloud Foundry is a different kind of dead end because the product did not simply
 
 **Status**: Pivoted. The original Diego architecture was deprecated in favor of running Cloud Foundry directly on Kubernetes.
 
-Stop and think: if a platform handles routing, logging, and deployment perfectly for stateless web apps, why would users leave it for something harder like Kubernetes? The answer is control surface. Kubernetes exposes lower-level primitives that can be composed into many shapes, while a PaaS exposes a beautiful path for a narrower class of workloads. Teams left because their workloads outgrew the path, not because the old path had never been useful.
+**Pause and predict:** if a platform handles routing, logging, and deployment perfectly for stateless web apps, why would users leave it for something harder like Kubernetes?
 
-The practical diagnosis is to ask where the abstraction breaks. If your application portfolio is only stateless web services, a PaaS can be efficient. If your platform must host databases, event systems, batch jobs, machine learning pipelines, custom controllers, and policy engines, Kubernetes gives you a common substrate. Cloud Foundry eventually became a layer that can run on Kubernetes because the industry chose the more flexible "infrastructure operating system" underneath specialized developer experiences.
+<details>
+<summary>Check your prediction</summary>
+
+The answer is control surface. Kubernetes exposes lower-level primitives that can be composed into many shapes, while a PaaS exposes a beautiful path for a narrower class of workloads. Teams left because their workloads outgrew the path, not because the old path had never been useful.
+
+</details>
+
+Write why users would leave before you continue. The next paragraph asks where an abstraction breaks. It does not give this reason.
+
+The practical diagnosis is to name the break in writing before you read the product history. A portfolio can stay on one path for years and then grow a workload that path was never built to host. The later paragraphs name products. Use them to check the reason you already wrote, not to discover it.
 
 Do not learn BOSH, Diego, Mesos architecture, Marathon configuration, or Swarm service definitions as core cloud-native career skills unless a current employer pays you to maintain them. Learn the ideas they reveal: orchestration requires scheduling, health management, rollout control, and ecosystem trust. Those ideas transfer. The old product-specific workflows mostly do not.
 
@@ -106,7 +124,16 @@ The Docker story causes more confusion than any other dead end because people us
 
 **Status**: Removed from Kubernetes in version 1.24 (May 2022).
 
-Pause and predict: if Docker was the first major container runtime, why did the Kubernetes community build the CRI, the Container Runtime Interface, instead of hardcoding Docker support forever? A stable interface lets Kubernetes talk to runtimes such as containerd and CRI-O without treating one full developer platform as special. That interface reduced coupling, removed an unnecessary layer, and let node operators use leaner runtimes designed for orchestration rather than desktop convenience.
+**Pause and predict:** if Docker was the first major container runtime, why did the Kubernetes community build the CRI, the Container Runtime Interface, instead of hardcoding Docker support forever?
+
+<details>
+<summary>Check your prediction</summary>
+
+A stable interface lets Kubernetes talk to runtimes such as containerd and CRI-O without treating one full developer platform as special. That interface reduced coupling, removed an unnecessary layer, and let node operators use leaner runtimes designed for orchestration rather than desktop convenience.
+
+</details>
+
+Write why the interface exists before you continue. The next figure is a timeline, and the paragraph after it is about Dockerfiles. Neither one explains why the interface was built.
 
 ```mermaid
 timeline
@@ -192,7 +219,16 @@ Docker Compose for production is the same paradigm mismatch in a different costu
 
 **Status**: Exceptional for local development, but an anti-pattern for production deployment.
 
-Pause and predict: if `docker-compose up` brings up your entire stack locally, why is it dangerous to run that exact same command on a production server? The risk is not that the file format is ugly. The risk is that a single-node process lacks cluster scheduling, multi-node failover, native rollout control, API-driven policy, and the self-healing behavior that production users eventually demand.
+**Pause and predict:** if `docker-compose up` brings up your entire stack locally, why is it dangerous to run that exact same command on a production server?
+
+<details>
+<summary>Check your prediction</summary>
+
+The risk is not that the file format is ugly. A single-node process lacks cluster scheduling, multi-node failover, native rollout control, API-driven policy, and the self-healing behavior that production users eventually demand.
+
+</details>
+
+Write the production risk before you continue. The next block is a sample file. The paragraph after it should not be the first place you learn the risk.
 
 Consider a typical `docker-compose.yml`:
 
@@ -209,7 +245,7 @@ services:
       - db-data:/var/lib/postgresql/data
 ```
 
-If the node hosting this Compose stack crashes, the application goes down. There is no Kubernetes scheduler to place a replacement pod on a healthy node, no controller to compare desired replicas with actual replicas, and no cluster-native service object to maintain stable discovery while workloads move. You can wrap Compose in scripts, systemd units, and monitoring, but each wrapper rebuilds a small piece of the orchestrator you were trying to avoid. At some point, the simplicity becomes accidental complexity.
+Read the file as a local stack, not as a production control plane. Write down what disappears when that one host disappears, before you read the comparisons that follow. Those comparisons are about wrappers, defaults, and translation tools. They assume you already named the risk.
 
 Compose also lacks production-grade defaults for rolling updates, secrets, policy, and traffic management. A local developer can tolerate downtime while containers recreate. A user-facing service cannot. A local `.env` file may be fine for a laptop. A regulated production environment needs RBAC, secret rotation, encryption at rest, audit logs, and clear ownership boundaries. A local port mapping is enough for testing. A production platform may need ingress policy, mutual TLS, canary routing, and observability that follows workloads across nodes.
 
@@ -422,6 +458,42 @@ kubectl get deploy --all-namespaces
 <summary>Show one possible modernization plan</summary>
 
 A strong plan identifies Swarm as the production orchestration risk because it lacks the ecosystem, hiring market, and Kubernetes-native integration path expected by modern platforms. It identifies Puppet-driven pod or container repair as a paradigm mismatch because Kubernetes workloads should be described declaratively and reconciled by controllers. It keeps Dockerfiles or another OCI image build workflow while moving runtime expectations to containerd or CRI-O. It replaces one-to-one Compose translation with intentional Kubernetes design: Deployments, Services, ConfigMaps, Secrets, probes, resource requests, RBAC, and GitOps-managed changes. It also recommends a managed Kubernetes service unless the organization has a platform team ready to own the control plane.
+</details>
+
+**Card A: The easier tool looks like the platform.** It deploys one stateless service with less YAML than Kubernetes. A team wants to bet the next five years on it because the demo was faster.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a feature checklist stood in for governance and fit. Next action: ask who governs it, which clouds support it, and whether the abstraction still works when the workload is stateful.
+
+</details>
+
+**Card B: The PaaS path is perfect, until it is not.** Routing, logs, and deploys are smooth for web apps. The new workload is a database plus a custom controller. Users are leaving for Kubernetes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the control surface, not a broken old path. Next action: name the workload that no longer fits before you call the PaaS a failure.
+
+</details>
+
+**Card C: "Kubernetes removed Docker."** A junior engineer wants every Dockerfile rewritten because dockershim is gone. The build pipeline still produces OCI images.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the node runtime was coupled to one developer platform. Next action: keep the image build, and expect containerd or CRI-O under kubelet. Do not rewrite Dockerfiles for this reason.
+
+</details>
+
+**Card D: `docker-compose up` on the production host.** The same command that works on a laptop is the deploy step for a user-facing service. There is one server.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a single-node process is standing in for a cluster. Next action: stop treating that command as the production control plane, and name the scheduling and failover it does not provide.
+
 </details>
 
 ### Success Criteria
