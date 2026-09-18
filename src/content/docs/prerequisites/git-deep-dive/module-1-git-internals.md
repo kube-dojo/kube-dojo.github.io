@@ -63,11 +63,18 @@ The output is small enough to look harmless, but each entry participates in a se
 
 The original module introduced the usual names, and we will keep that coverage while putting the pieces into an operational order. The `objects/` directory is where file contents, directory snapshots, and commit metadata live. The `refs/` directory is where branch names and tag names live. `HEAD` connects your current checkout to one of those names, or sometimes directly to a commit. The index sits beside them as the staging area, which means it can disagree with both your working directory and your last commit.
 
-> **Pause and predict**: What do you think happens inside the `objects/` directory when you `git add` a file for the first time? Will Git store the entire file content, or just a diff?
+**Pause and predict:** What do you think happens inside the `objects/` directory when you `git add` a file for the first time? Will Git store the entire file content, or just a diff?
 
-That prediction matters because many engineers assume Git stores changes as a chain of patches. Git can store compressed deltas inside packfiles later, but the model you should reason with is snapshot-based. When you add a file, Git hashes the file content and writes a blob object for that content if it does not already exist. The index then records that the path should point at that blob in the next snapshot, which is why staged content can survive later edits to the working file.
+<details>
+<summary>Check your prediction</summary>
 
-This separation is the first recovery superpower. If a developer says, "I staged the fix, then my editor corrupted the file," you should not immediately assume the staged fix is gone. The staged version may already be stored as a blob object, and `git diff --staged`, `git ls-files --stage`, or `git cat-file` can help prove what the next commit would contain. You are diagnosing a state split, not a single mutable file.
+Many engineers assume Git stores changes as a chain of patches. Git can store compressed deltas inside packfiles later, but the model you should reason with is snapshot-based. When you add a file, Git hashes the file content and writes a blob object for that content if it does not already exist. The index then records that the path should point at that blob in the next snapshot, which is why staged content can survive later edits to the working file.
+
+</details>
+
+Write content or diff before you continue. The table below names repository areas. It does not say what the first `git add` writes into `objects/`.
+
+The split between the editor buffer and the staged proposal is the first recovery superpower. If a developer says, "I staged the fix, then my editor corrupted the file," you should not immediately assume the staged fix is gone. The staged version may already be stored apart from the editor buffer, and `git diff --staged`, `git ls-files --stage`, or `git cat-file` can help prove what the next commit would contain. You are diagnosing a state split, not a single mutable file.
 
 | Repository area | What it stores | Common diagnostic command | Failure symptom |
 |---|---|---|---|
@@ -214,9 +221,16 @@ Add initial ConfigMap
 
 Here, the `tree` line points to the root tree object for this commit. If this were not the first commit, you would also see a `parent` line. The author records who originally wrote the change, while the committer records who placed it into this repository history. Those can differ during rebases, cherry-picks, and patch application workflows, which is why incident reviews should avoid assuming that one name explains every action.
 
-> **Stop and think**: Which approach would you choose here: `git log` or `git cat-file -p <commit_hash>` to quickly inspect the commit message of the latest commit, and why?
+**Pause and predict:** Which approach would you choose here: `git log` or `git cat-file -p <commit_hash>` to quickly inspect the commit message of the latest commit, and why?
+
+<details>
+<summary>Check your prediction</summary>
 
 For everyday work, `git log -1` is the better porcelain command because it formats history for humans and handles common display concerns. For internals work, `git cat-file -p <commit_hash>` proves exactly what object Git stored and makes the tree and parent links visible. The senior habit is not to memorize one "right" command; it is to choose the layer that answers the question with the least ambiguity.
+
+</details>
+
+Write which command you would run before you continue. The next section is about annotated tags. It does not choose between these two commands.
 
 #### Annotated Tags Are Objects Too
 Annotated tags are the fourth core object type. Unlike a lightweight tag, which is only a ref file under `.git/refs/tags/`, an annotated tag creates a tag object that can carry a tagger identity, message, and a pointer to the object being named.
@@ -250,9 +264,16 @@ The staging area, also known as the index, is a crucial intermediate step betwee
 
 When you run `git add <file>`, Git computes the object ID for the file content, writes a blob object if needed, and updates the index entry for that path. If you edit the same file afterward, the working tree changes but the index still points at the earlier blob. This is the behavior behind the familiar `git status` message that a file is both staged and modified. Internally, Git is simply comparing three states: `HEAD`, index, and working tree.
 
-> **Stop and think**: If the index is just a binary file storing proposed changes, what happens to the blob objects created by `git add` if you decide to unstage the file using `git restore --staged`? Do the blob objects get immediately deleted?
+**Pause and predict:** If the index is just a binary file storing proposed changes, what happens to the blob objects created by `git add` if you decide to unstage the file using `git restore --staged`? Do the blob objects get immediately deleted?
+
+<details>
+<summary>Check your prediction</summary>
 
 They do not disappear immediately. Unstaging changes the index pointer, but the blob object may remain in the object database as an unreachable object until Git's housekeeping eventually prunes it according to its safety windows. This is why aggressive cleanup commands should not be part of a recovery reflex. Until garbage collection removes unreachable objects, the database may still contain content that no branch currently names.
+
+</details>
+
+Write deleted or kept before you continue. The next steps modify a sample file. They do not say what happened to the old blob.
 
 Let's modify our `configmap.yaml`, stage it, and see the index:
 
@@ -286,7 +307,16 @@ git ls-files --stage
 
 The second column is the object ID of the blob currently staged for `configmap.yaml`. If you commit now, Git will create a tree pointing to that blob, then create a commit pointing to the tree, then move the current branch ref to the new commit. If you edit the file again before committing, the index still points at this staged blob until you add the file again. That is the core reason staging supports carefully curated commits.
 
-> **Pause and predict**: Before running this in a real repository, what output do you expect from `git diff`, `git diff --staged`, and `git status --short` after you stage a file and then edit it again? The first command compares working tree to index, so it should show the second edit. The staged diff compares index to `HEAD`, so it should show the first edit. Status should reveal both staged and unstaged changes for the same path.
+**Pause and predict:** Before running this in a real repository, what output do you expect from `git diff`, `git diff --staged`, and `git status --short` after you stage a file and then edit it again?
+
+<details>
+<summary>Check your prediction</summary>
+
+`git diff` compares the working tree to the index, so it should show the second edit. The staged diff compares the index to `HEAD`, so it should show the first edit. Status should reveal both staged and unstaged changes for the same path.
+
+</details>
+
+Write the three outputs before you continue. The next paragraph is about partial staging. It does not describe those three commands.
 
 The index also supports advanced workflows such as partial staging, conflict stages during merges, and mode changes. During a merge conflict, `git ls-files --stage` may show multiple entries for the same path with different stage numbers, representing the merge base, "ours," and "theirs." You do not need that detail for every commit, but it explains why the index is more than a clipboard. It is a structured staging database that lets Git model unresolved states before producing a clean tree.
 
@@ -393,7 +423,16 @@ That layered view prevents two opposite mistakes. One mistake is to deny that pa
 
 Hashing also has social consequences in distributed teams. Because object IDs are derived locally from content, two developers can create identical blob objects without coordinating with a server. Because commit objects include parent IDs, author data, committer data, timestamps, tree IDs, and messages, two commits with identical file changes can still have different commit IDs. That is why rebasing changes commit IDs even when the final files look the same. The graph records both content and ancestry, and collaboration tools build their review logic on that graph.
 
-> **Stop and think**: Which approach would you choose here and why: inspect a suspected missing file by searching old commits with porcelain commands, or inspect raw objects with plumbing first? In a normal repository, start with porcelain such as `git log -- path` and `git show <commit>:<path>` because paths and commits preserve meaning. Drop to plumbing when porcelain cannot answer the question, such as when a branch pointer moved, the path name is uncertain, or you only have an object ID from `git fsck` or reflog output.
+**Pause and predict:** Which approach would you choose here and why: inspect a suspected missing file by searching old commits with porcelain commands, or inspect raw objects with plumbing first?
+
+<details>
+<summary>Check your prediction</summary>
+
+In a normal repository, start with porcelain such as `git log -- path` and `git show <commit>:<path>` because paths and commits preserve meaning. Drop to plumbing when porcelain cannot answer the question, such as when a branch pointer moved, the path name is uncertain, or you only have an object ID from `git fsck` or reflog output.
+
+</details>
+
+Write which layer you would open first before you continue. The next paragraph is about what hashes do not replace. It does not choose porcelain or plumbing.
 
 The integrity tradeoff is also worth stating carefully. Hashes make accidental corruption visible, but they do not replace reviews, backups, signed releases, or protected branches. A valid commit can still delete the wrong file, and a forced push can still move a shared branch to a harmful commit. Git's object model gives you tools for investigation and recovery; it does not make operational discipline optional.
 
@@ -583,6 +622,51 @@ Run `git hash-object configmap.yaml` twice without changing the file and confirm
 Make a second commit on `main` (for example, add a comment line to `configmap.yaml`, stage, and commit) so the branch has at least two commits. Note the first commit hash with `git rev-list --max-parents=0 HEAD`. Check out that commit in detached `HEAD` with `git switch --detach "$(git rev-list --max-parents=0 HEAD)"`, make a small edit, stage, and commit. Inspect `cat .git/HEAD` — it should show a raw commit hash, not `ref: refs/heads/...`. Before switching away, create a branch at the current commit with `git branch recovered-detached-work HEAD`. Switch back to `main` with `git switch main` and verify with `git rev-parse recovered-detached-work` that the preserved commit ID matches your detached commit. The success condition is that no useful commit depends only on detached `HEAD`.
 
 For a related unreachable-object check, create a throwaway branch with one commit that is not merged anywhere, delete that branch, and run `git fsck --unreachable`. The success condition is that you can identify the dangling commit or blob as recoverable evidence before any reflog expiration or pruning.
+</details>
+
+**Card A: `git add` is treated as a patch.** A teammate says the object database only stored the lines that changed. The file was added for the first time.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: snapshot versus patch. Next action: hash the file content and look for a blob, not a diff chain. Packfile deltas are a storage detail, not the model.
+
+</details>
+
+**Card B: Plumbing for a normal message.** Someone runs `git cat-file -p` to read the latest commit message during a standup. `git log -1` would have shown it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the wrong layer for the question. Next action: use `git log -1` for the human message. Save `cat-file` for when you need the stored tree and parent links.
+
+</details>
+
+**Card C: Unstage is assumed to delete the blob.** `git restore --staged` removed the path from the index. A recovery plan says the content is gone because no branch names it yet.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the index pointer moved; the object may still be unreachable, not deleted. Next action: do not run aggressive prune commands. Look for the object before housekeeping removes it.
+
+</details>
+
+**Card D: One diff after two edits.** A file was staged, then edited again. `git diff` is empty, so the reviewer says nothing changed.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the three comparisons were collapsed into one. Next action: read `git diff` for the second edit, `git diff --staged` for the first, and `git status --short` for both.
+
+</details>
+
+**Card E: Plumbing first for a missing path.** The file is gone from the working tree. The first command is `git cat-file` on a guessed hash. The path and branch still exist.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: raw objects before names. Next action: start with `git log -- path` and `git show <commit>:<path>`. Use plumbing when you only have an object ID.
+
 </details>
 
 ### Success Criteria
