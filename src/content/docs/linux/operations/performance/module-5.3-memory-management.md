@@ -136,7 +136,14 @@ echo 3 | sudo tee /proc/sys/vm/drop_caches  # Drop caches (for testing)
 
 `drop_caches` is useful in controlled experiments because it lets you compare cold-cache and warm-cache behavior. It is a poor operational habit because it throws away useful data, forces avoidable disk I/O, and can make every service slower at once. If a cron job drops cache to keep a dashboard green, the dashboard is measuring the wrong thing.
 
-Pause and predict: if you drop the page cache on a busy package repository mirror, what changes first: the `free` column, application memory, disk read latency, or the rate of OOM kills? The best answer is that `free` jumps immediately, disk read latency often gets worse, application anonymous memory does not shrink, and OOM behavior only changes if the system was actually blocked on reclaimable cache.
+**Pause and predict:** if you drop the page cache on a busy package repository mirror, what changes first: the `free` column, application memory, disk read latency, or the rate of OOM kills?
+
+<details>
+<summary>Check your prediction</summary>
+
+`free` jumps immediately, disk read latency often gets worse, application anonymous memory does not shrink, and OOM behavior only changes if the system was actually blocked on reclaimable cache.
+
+</details>
 
 This distinction matters for containers too, because cgroup memory accounting can include file cache charged to the container. A pod that reads or writes many files can grow its cgroup usage even if the application heap is stable. That is why a dashboard based only on process RSS can miss the memory that actually pushes a container over its enforced limit.
 
@@ -274,9 +281,14 @@ journalctl -k | grep -i oom
 
 An OOM log line is a crime-scene note, not the whole story. It tells you which process died and shows useful memory categories such as anonymous RSS, file RSS, and shared memory RSS. It does not tell you why the workload grew, whether the container limit was too tight, whether a neighboring workload triggered node pressure, or whether the kubelet evicted a pod before the kernel killed it.
 
-Pause and predict: a BestEffort pod uses 100MiB, a Guaranteed pod uses 10GiB, and the node experiences global memory pressure. Which pod is more likely to die first? In Kubernetes, the BestEffort pod is deliberately made the easiest victim because its `oom_score_adj` is set to the highest risk class, even though the Guaranteed pod is using far more memory.
+**Pause and predict:** a BestEffort pod uses 100MiB, a Guaranteed pod uses 10GiB, and the node experiences global memory pressure. Which pod is more likely to die first?
 
-That policy can surprise teams who expect the largest process to die. The largest process is often a candidate, but Kubernetes changes the math because it must protect workloads that made explicit resource commitments. If a small BestEffort sidecar is expendable and a large Guaranteed database is business-critical, this behavior is exactly the point of QoS.
+<details>
+<summary>Check your prediction</summary>
+
+The BestEffort pod. Kubernetes sets its `oom_score_adj` to the highest risk class, even though the Guaranteed pod is using far more memory. That policy can surprise teams who expect the largest process to die. The largest process is often a candidate, but Kubernetes changes the math because it must protect workloads that made explicit resource commitments. If a small BestEffort sidecar is expendable and a large Guaranteed database is business-critical, this behavior is exactly the point of QoS.
+
+</details>
 
 There is also a human factor in OOM response. Restarting the killed process may restore service, but it destroys evidence unless you captured logs, memory trends, and workload timing first. A strong incident response preserves the OOM log, the pod events, the deployment version, and the memory slope before mitigation, because those details determine whether the next action is code repair, limit sizing, placement change, or alert correction.
 
@@ -313,7 +325,14 @@ free | grep Swap
 
 Kubernetes 1.35+ can operate with explicit swap behavior, but that does not make swap a universal default for production nodes. You still need to decide whether the workload benefits from survival under pressure or suffers more from tail-latency amplification. Batch jobs, development clusters, and some memory-spiky services may tolerate swap; real-time request paths usually deserve tighter memory sizing and faster failure.
 
-Pause and predict: if a Kubernetes node has swap enabled and a pod leaks memory beyond its intended budget, which workloads feel the pain first? The leaking pod may survive longer, but healthy pods on the same node can experience storage-backed memory latency if global reclaim begins, so swap can spread one workload's memory mistake across the node.
+**Pause and predict:** if a Kubernetes node has swap enabled and a pod leaks memory beyond its intended budget, which workloads feel the pain first?
+
+<details>
+<summary>Check your prediction</summary>
+
+The leaking pod may survive longer, but healthy pods on the same node can feel it first as storage-backed memory latency once global reclaim begins. Swap can spread one workload's memory mistake across the node.
+
+</details>
 
 ```bash
 # Reduce swappiness (keep more in RAM)
@@ -813,6 +832,46 @@ Compare `MemoryPressure` with host `MemAvailable` and PSI, then treat `OOMKilled
 
 </details>
 
+- [ ] I named a failure layer and a next action for each frozen memory-layer card before opening the reveal.
+
+A cache drop, a QoS class, a swap device, and a file-cache charge can each look like the memory story and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Cache dropped on a busy mirror.** Someone ran `drop_caches` on a package mirror that was serving well. You have `free -h` from the next minute and a disk-latency graph, and you have not opened the OOM log.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: reclaimable page cache, not an application heap shrink. Next action: expect `free` to jump and read latency to worsen before you hunt OOM kills.
+
+</details>
+
+**Card B: Small pod, large pod, node pressure.** A BestEffort pod is using about 100MiB. A Guaranteed pod is using about 10GiB. The node is under global memory pressure. You have not read `oom_score_adj`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: QoS adjustment, not raw RSS. Next action: expect the BestEffort pod to be the easier victim, and read `oom_score_adj` before you blame the largest process.
+
+</details>
+
+**Card C: Swap on, one pod leaking.** Swap is enabled. One pod is past its budget and still running. Neighbor request latency is climbing.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: swap spreading one leak into node-wide reclaim latency. Next action: name the healthy pods in the note and check swap traffic before you only restart the leaker.
+
+</details>
+
+**Card D: RSS flat, limit near.** Process RSS is steady. The container's cgroup usage is climbing toward `memory.max` while it serves files.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: file cache charged to the cgroup, not an anonymous leak. Next action: split `anon` and `file` in `memory.stat` before you raise the limit or call it a heap leak.
+
+</details>
+
 ### Success Criteria
 
 - [ ] Diagnose memory pressure by comparing `free`, `MemAvailable`, `/proc/meminfo`, `vmstat`, and PSI rather than relying on one number.
@@ -821,6 +880,7 @@ Compare `MemoryPressure` with host `MemAvailable` and PSI, then treat `OOMKilled
 - [ ] Configure a Kubernetes memory plan that leaves overhead between runtime heap, request, limit, and node allocatable memory (cluster fork — Part 6; optional for host-only learners).
 - [ ] Implement a troubleshooting workflow that separates leaks, cache growth, cgroup limit kills, and node pressure.
 - [ ] Compare node `MemoryPressure` with host PSI and inspect an `OOMKilled` pod's last state, or explain why you skipped that work (cluster fork — Part 6; optional for host-only learners).
+- [ ] Classified each frozen memory-layer card by failure layer and next action.
 
 ## Next Module
 
