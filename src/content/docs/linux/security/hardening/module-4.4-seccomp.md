@@ -62,15 +62,25 @@ flowchart TD
 
 The important idea in the flow is that seccomp is not checking whether `/tmp/file` is allowed or whether a process label matches an object label. It is deciding whether the kernel should even consider the requested operation. If a profile blocks `ptrace`, the process cannot use `ptrace` against any target, even a target that file permissions or labels might otherwise permit. That makes seccomp a blunt but powerful reduction of kernel attack surface.
 
-> **Stop and think**: If AppArmor is already restricting a container from accessing `/etc/shadow`, what additional security value does blocking the `open` system call via seccomp provide? Consider the difference between restricting *targets* versus restricting *actions*.
+> **Pause and predict:** AppArmor already blocks this container from `/etc/shadow`. What extra value, if any, does blocking the `open` syscall with seccomp add?
 
-The answer is that `open` is broader than one sensitive file, and syscall filtering is often too coarse to replace path-aware controls. Blocking `open` would also break ordinary reads that many programs require, so a real profile usually allows file-opening syscalls while relying on AppArmor, SELinux, read-only mounts, and Linux permissions to constrain targets. The value of seccomp is strongest for operations the workload should never need at all, such as loading kernel modules, changing the system clock, entering namespaces, or tracing unrelated processes.
+<details>
+<summary>Check your prediction</summary>
+
+Little, and the cost is high. `open` is broader than one file. Blocking it also breaks ordinary reads. A real profile usually allows file-opening syscalls and uses AppArmor, SELinux, read-only mounts, and mode bits for targets. Seccomp pays off on actions the workload should never need: loading modules, changing the clock, entering namespaces, or tracing other processes.
+</details>
+
+Path policy and syscall policy are not substitutes. A filter that removes a common syscall has a wider blast radius than a rule that names one path.
 
 seccomp filters in modern container environments use BPF programs. That BPF program evaluates a small data structure containing the architecture, syscall number, instruction pointer, and syscall arguments. The profile author normally writes JSON in the container runtime format, while libseccomp and the runtime translate that intent into the kernel filter. This is why a Kubernetes YAML file does not contain BPF instructions directly; it names a runtime default or local profile, and the runtime handles the kernel attachment.
 
-> **Pause and predict**: If a seccomp filter evaluates a syscall and encounters multiple matching rules with different actions, such as one rule that allows the call and another rule that kills it, which outcome should a security-focused runtime prefer, and why?
+**Pause and predict:** A seccomp filter matches one syscall with two rules: one allows it, one kills the process. Which outcome should a security-focused runtime prefer, and why?
 
-The conservative answer is that the most restrictive effective action should win when the kernel combines filters, because a process may accumulate filters from multiple layers. In practice, profile authors should avoid ambiguous rule sets and think in terms of a default action plus explicit exceptions. A clean profile is easier to audit, easier to explain during an incident, and less likely to behave differently after a runtime or libseccomp update.
+<details>
+<summary>Check your prediction</summary>
+
+The most restrictive effective action should win when the kernel combines filters, because a process may accumulate filters from several layers. Authors should still avoid ambiguous rule sets: a default action plus explicit exceptions is easier to audit and less likely to change after a runtime or libseccomp update.
+</details>
 
 ### seccomp Actions
 
@@ -239,9 +249,13 @@ docker run --security-opt seccomp=unconfined nginx
 
 The operational trap is that `unconfined` often appears during emergency debugging and then survives because the application starts working. That does not prove the profile was wrong in principle; it proves some syscall or argument pattern was not accounted for. A better path is to reproduce with logging, identify the denied syscall, decide whether the syscall is legitimate, and either update the profile or fix the application behavior that reached for an unnecessary kernel feature.
 
-> **Stop and think**: Kubernetes provides a `RuntimeDefault` seccomp profile. In a highly locked-down environment, why might relying solely on `RuntimeDefault` be insufficient for a container that only runs a simple static Go web server?
+**Pause and predict:** Kubernetes already applies `RuntimeDefault`. Why can that still be too wide for a container that only runs a small static Go web server?
 
-`RuntimeDefault` is a baseline shared across many workloads, so it allows more than a small static service usually needs. A Go HTTP server that accepts TCP connections, reads configuration, writes logs, and exits cleanly does not normally need namespace creation, kernel module loading, tracing other processes, or privileged clock changes. If the service is exposed to untrusted input, narrowing the profile reduces what an exploit can do after it reaches code execution.
+<details>
+<summary>Check your prediction</summary>
+
+`RuntimeDefault` is a shared baseline, so it allows more than that server needs. A Go HTTP server that accepts TCP, reads config, writes logs, and exits does not need namespace creation, module loading, `ptrace`, or clock changes. Narrowing the profile reduces what an exploit can do after code execution.
+</details>
 
 ```yaml
 apiVersion: v1
@@ -412,7 +426,15 @@ This restrictive example is intentionally recognizable as a starting point, not 
 
 Argument filtering is where seccomp becomes more precise. The example permits `socket` only when argument zero equals `2`, which corresponds to `AF_INET` on Linux, so a process can create IPv4 sockets without receiving blanket permission for every socket family. This technique is powerful for syscalls with dangerous modes, but it is also easier to get wrong because the meaning of each argument depends on the syscall, architecture, and constants used by the kernel headers.
 
-Before running this in a shared environment, predict which workloads would fail if only `AF_INET` sockets were permitted. A service that uses Unix domain sockets for local metrics, IPv6 sockets for dual-stack networking, or netlink sockets for certain system interactions would behave differently from a simple IPv4-only web server. That prediction step matters because a profile is a compatibility promise, and compatibility promises should be tested before production traffic depends on them.
+**Pause and predict:** A profile allows `socket` only for `AF_INET`. Which workloads fail, and why is that a compatibility promise rather than a tightening you can ship untested?
+
+<details>
+<summary>Check your prediction</summary>
+
+Unix-domain metrics sockets, IPv6 dual-stack listeners, and netlink clients fail. A simple IPv4 web server may not. Test the profile before production traffic depends on it.
+</details>
+
+A profile is a compatibility promise. Argument filters are precise only when the constants match the kernel headers the binary was built against.
 
 A practical custom-profile workflow usually produces three artifacts. The first artifact is the raw evidence: audit logs, `strace` summaries, runtime events, and notes about the traffic or lifecycle path that generated them. The second artifact is the reviewed profile with comments or accompanying documentation explaining why non-obvious syscalls are allowed. The third artifact is a regression test that runs the workload under the profile after application, base image, kernel, or runtime upgrades. Without the third artifact, a profile that was correct last quarter can become stale without warning.
 
@@ -744,9 +766,48 @@ The broken profile allows only `exit_group`, so even a simple `echo` cannot perf
 
 </details>
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+The lab parts stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Block `open` to hide `/etc/shadow`.** AppArmor already denies that path. A reviewer wants seccomp to block `open` as well.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: action filter used as a path filter. Next action: keep `open` allowed and let the LSM name the path. Block syscalls the process should never call.
+</details>
+
+**Card B: Allow and kill on the same number.** Two rules match one syscall. One returns `ALLOW`, one returns `KILL`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: ambiguous actions. Next action: make the default the restrictive action and list explicit exceptions, so a later filter cannot loosen it by accident.
+</details>
+
+**Card C: RuntimeDefault on a static server.** The pod only serves files over TCP. The profile is `RuntimeDefault`. An exploit still calls `unshare`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: shared baseline, not a missing annotation. Next action: write a localhost profile that drops namespace, module, and `ptrace` syscalls this binary does not use.
+</details>
+
+**Card D: IPv4-only socket rule.** Metrics scrape over a Unix socket starts failing after the profile allows only `AF_INET`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: argument filter, not the metrics binary. Next action: allow the socket family the sidecar actually uses, and test it before the profile is the node default.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Verified seccomp is enabled
+- [ ] Classified each frozen seccomp-layer card before opening the reveal.
 - [ ] Compared default vs unconfined profiles
 - [ ] Created and tested custom profile
 - [ ] Used audit mode to see syscalls
