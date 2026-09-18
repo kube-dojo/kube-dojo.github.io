@@ -138,18 +138,25 @@ Most incident timelines improve first by reducing contention and cgroup pressure
 
 `chrt` changes policy and real-time priority. This is a governance decision more than a tuning preference. Safe usage pattern is small scoped change, pre-incident metrics, and rollback plan at the same time.
 
-Use this order on a single service: baseline signals first, adjust only one priority dimension, run a fixed measurement window, and confirm improved queue delay without collateral effects. If p99 improves while CPU throttling counters remain high, the next layer is almost always cgroup budget, not just nice value changes.
+Use this order on a single service: baseline signals first, adjust only one priority dimension, run a fixed measurement window, and confirm improved queue delay without collateral effects.
 
 ```bash
 # Inspect policy for current process
 type chrt >/dev/null 2>&1 && chrt -p 1
 ```
 
-## Did You Know 2: `nice` Is Relative, Not Absolute
+**Pause and predict:** you lower `nice` on a latency-sensitive process, its ranking improves, and p99 stays bad. Did that change create more CPU runtime?
 
-> **DYK:** A lower `nice` value helps ordering, but if a pod is already budget-limited in cgroups, it will still hit throttle boundaries and cannot exceed granted runtime for sustained periods.
+<details>
+<summary>Check your prediction</summary>
 
-This is the single most common misunderstanding in CPU incidents. The ranking can improve, but if there is no cgroup headroom, ranking cannot create runtime that is not granted.
+No. A lower `nice` value helps ordering, but if a pod is already budget-limited in cgroups, it still hits the throttle boundary and cannot exceed granted runtime. The ranking can improve, but if there is no cgroup headroom, ranking cannot create runtime that is not granted. If p99 improves while CPU throttling counters remain high, the next layer is cgroup budget, not another nice change.
+
+</details>
+
+## Did You Know 2: `nice` Stays Inside the Policy
+
+> **DYK:** `nice` only reweights tasks that are already in `SCHED_OTHER`. It does not change the policy class.
 
 ## Monitoring Stack for Scheduler Root-Cause Work (LO-4)
 
@@ -188,11 +195,16 @@ This three-file pattern is reliable because it ties runnable demand, fairness ac
 
 ## Cgroups v2 CPU Controls and Kubernetes Resource Mapping (LO-5)
 
-cgroups v2 exposes controls that directly bound what each workload can do. `cpu.weight` handles relative scheduling share under contention. `cpu.max` imposes hard runtime budget per period. `cpu.stat` shows period count and throttling metrics. `cpu.pressure` reveals CPU pressure experienced under demand.
+**Pause and predict:** host CPU graphs look calm and request latency is spiking. Which layer do you read before you add node capacity?
 
-For Kubernetes, mapping is direct in operations practice. Requests set expected baseline and scheduler placement behavior, while limits impose hard ceilings on burst behavior and sustained progress.
+<details>
+<summary>Check your prediction</summary>
 
-When a pod throttles, `nr_throttled` and `throttled_usec` often explain latency spikes while host graphs are misleadingly calm. The critical command pattern is to read `cpu.max` and `cpu.stat` from inside the pod and then compare with `kubectl top` and external scheduling traces.
+The cgroup quota, not the host average. When a pod throttles, `nr_throttled` and `throttled_usec` often explain latency spikes while host graphs are misleadingly calm. Read `cpu.max` and `cpu.stat` from inside the pod and then compare with `kubectl top` and external scheduling traces. `cpu.weight` is the relative share under contention; `cpu.max` is the hard runtime budget per period; `cpu.pressure` shows the stall.
+
+</details>
+
+Record the layer in the change note before you resize a limit or add a node. Kubernetes requests set the expected baseline and placement behavior, while limits impose the hard ceiling. The commands below read that boundary from the process cgroup.
 
 ```bash
 # Typical pod cgroup paths map from namespace file
@@ -612,6 +624,50 @@ kill $PINNED_PID
 ```
 
 Expected output: the task should run only on the selected CPUs and core distribution should change in a controlled way, with no unexpected migration into unrelated queues while the binding remains active.
+
+- [ ] I named a failure layer and a next action for each frozen scheduler-layer card before opening the reveal.
+
+A calm host average, a nicer ranking, a real-time policy, and a pinned task can each look like the fix and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Calm host, slow requests.** Node CPU graphs sit well below the ceiling. An API's p99 is climbing. You have not opened the pod's cgroup files yet.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: cgroup CPU quota, not host capacity. Next action: read `cpu.max` and the `nr_throttled` / `throttled_usec` trend before you add a node.
+
+</details>
+
+**Card B: Nice changed, latency did not.** You lowered `nice` on the hot process. Its rank improved. The same window still shows the cgroup out of budget.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: missing cgroup runtime, not scheduler rank. Next action: stop retuning `nice` and inspect `cpu.max` headroom.
+
+</details>
+
+**Card C: Real-time on a mixed node.** A latency ticket led someone to set `SCHED_FIFO` on a user-facing thread. Control-plane and neighbor tasks are now starved.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: real-time policy on a shared node, not ordinary fairness. Next action: revert to `SCHED_OTHER` and keep RT only where ownership and rollback already exist.
+
+</details>
+
+**Card D: Pinned, still jittery.** `taskset` shows the thread on cores 0 and 1. Tail latency did not settle. Interrupt counters on those same cores are still climbing.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: IRQ and neighbor traffic on the pinned cores, not an unpinned thread. Next action: steer interrupts off those cores and remeasure the same workload before you pin more threads.
+
+</details>
+
+### Success Criteria
+
+- [ ] Classified each frozen scheduler-layer card by failure layer and next action
 
 ## Sources
 
