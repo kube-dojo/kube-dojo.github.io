@@ -65,7 +65,16 @@ The important difference in the diagram is not that Deployments are more complic
 
 This contract is especially valuable because failure rarely arrives in one neat category. A node can drain during unexpected hardware maintenance, an image can fail to pull in one specific geographic region, a poorly tuned resource request can make new Pods unschedulable, or a readiness probe can reveal that a new version starts cleanly but completely fails to serve application traffic. Deployments give you a single, unified control plane to observe all those disparate situations. Crucially, they make the default operational response deeply conservative: the controller will obstinately keep enough old Pods available to serve users while repeatedly trying to move the cluster toward the new requested version.
 
-Pause and predict: if you manually delete two Pods from a five-replica Deployment, what exact object notices first, and what object creates the replacements? The answer matters deeply because operators casually say "the Deployment recreated my Pods," but the truth is more nuanced: the Deployment delegates that immediate, fast-path replica math directly to the active ReplicaSet. The ReplicaSet's tight informer loop notices that the number of running Pods matching its selector has dropped below the desired count and immediately stamps out replacements. That architectural distinction becomes incredibly useful when you are under pressure inspecting a stuck rollout; you need to quickly know whether the Deployment, the new ReplicaSet, or the failing Pods are the layer generating the actual bottleneck symptom.
+**Pause and predict:** if you manually delete two Pods from a five-replica Deployment, what exact object notices first, and what object creates the replacements?
+
+<details>
+<summary>Check your prediction</summary>
+
+Operators casually say "the Deployment recreated my Pods," but the Deployment delegates that immediate replica math to the active ReplicaSet. The ReplicaSet notices that the number of running Pods matching its selector has dropped below the desired count and stamps out replacements. During a stuck rollout, decide whether the Deployment, the new ReplicaSet, or the failing Pods are the layer generating the symptom.
+
+</details>
+
+Write which object notices first, and which object creates the replacements, before you continue. The next paragraph is a debugging map. It does not name the creator.
 
 The Deployment is therefore both a safety mechanism and a debugging map. When an application is healthy, you mostly interact with the Deployment because it is the source of truth. When it is unhealthy, you walk down the hierarchy: Deployment conditions explain rollout progress, ReplicaSet counts explain old-versus-new balancing, and Pod status explains scheduling, image, readiness, or crash behavior.
 
@@ -154,9 +163,18 @@ kubectl get deploy,rs,pods
 
 A useful debugging pattern is to start broad and descend only when the broad layer points you downward. `kubectl describe deployment nginx` shows conditions such as progress and availability, recent events, selector information, and desired versus available counts. If those counts are off, `kubectl get rs` shows whether the old or new ReplicaSet has replicas, and `kubectl get pods` shows the concrete reason a specific instance is waiting, crashing, or not ready.
 
-Direct ReplicaSet edits are tempting because the object is visible and has a replica field, but that field is not the source of truth when a Deployment owns it. The next reconciliation loop will adjust the ReplicaSet to match the Deployment's desired state, or the next Deployment update will create a different ReplicaSet entirely. In production, this is a feature: operators can trust that managed children return to the parent specification rather than accumulating hidden manual drift.
+Direct ReplicaSet edits are tempting because the object is visible and has a replica field, but that field is not the source of truth when a Deployment owns it.
 
-Stop and think: if you edit a ReplicaSet directly with `kubectl edit rs <name>` and change its replica count, what should the Deployment do? It should notice that the child state no longer matches the Deployment intent and correct the drift. The learning point is not "never inspect ReplicaSets"; it is "inspect them freely, but make durable changes at the Deployment layer."
+**Pause and predict:** if you edit a ReplicaSet directly with `kubectl edit rs <name>` and change its replica count, what should the Deployment do?
+
+<details>
+<summary>Check your prediction</summary>
+
+The next reconciliation loop adjusts the ReplicaSet to match the Deployment's desired state, or the next Deployment update creates a different ReplicaSet entirely. The Deployment notices that the child state no longer matches its intent and corrects the drift. Inspect ReplicaSets freely, but make durable changes at the Deployment layer.
+
+</details>
+
+Write what happens to that manual replica count before you continue. The next section is about scaling. It does not resolve this edit.
 
 ## Scaling, Self-Healing, and Day-Two Operations
 
@@ -196,7 +214,16 @@ kubectl get deployment nginx
 # READY shows 3/3
 ```
 
-Pause and predict: if you delete the underlying ReplicaSet instead of just one Pod, what will the Deployment do, and why might the workload briefly look more disrupted? The Deployment owns the ReplicaSet, so it recreates a suitable ReplicaSet, which then recreates Pods. The disruption can be larger than deleting one Pod because you removed the whole count manager at once, but the parent controller still has enough information to rebuild the intended child objects.
+**Pause and predict:** if you delete the underlying ReplicaSet instead of just one Pod, what will the Deployment do, and why might the workload briefly look more disrupted?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Deployment owns the ReplicaSet, so it recreates a suitable ReplicaSet, which then recreates Pods. The disruption can be larger than deleting one Pod because you removed the whole count manager at once. The parent controller still has enough information to rebuild the intended child objects.
+
+</details>
+
+Write what you expect the workload to do before you continue. The next paragraph is about hidden restarts. It does not name the rebuilt object.
 
 The operational tradeoff is that self-healing can hide repeated failure if you only look at the final READY count. A Pod that crashes every few minutes may be replaced quickly enough that casual checks look fine, while logs and restart counts tell a different story. Good Deployment operations therefore combine count checks with event checks, rollout checks, and application-level metrics so reconciliation does not become a mask for a broken release.
 
@@ -638,6 +665,42 @@ The rollback changes Deployment intent to the retained revision and creates the 
 <details><summary>Solution</summary>
 
 The namespace is the exercise boundary, so deleting it removes the Deployment and its managed children together. The cleanup guard checks the same context and namespace, and `--ignore-not-found=true` makes a repeated cleanup harmless. If deletion fails, report the namespace state and inspect context or API/authentication errors rather than switching contexts or deleting broader resources.
+
+</details>
+
+**Card A: Two of five Pods disappear.** A five-replica Deployment is healthy. Someone deletes two Pods. New Pods appear within seconds. The incident note says "the Deployment recreated them."
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the active ReplicaSet's replica count, not a Deployment rollout. Next action: `kubectl get rs` and compare ready Pods to that ReplicaSet's desired count before you edit the Deployment.
+
+</details>
+
+**Card B: A ReplicaSet edit does not stick.** `kubectl edit rs` sets replicas to 1 on a Deployment that still says 3. A minute later the count is 3 again.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a child object was edited while the parent still owns intent. Next action: change `.spec.replicas` on the Deployment, then confirm the ReplicaSet followed.
+
+</details>
+
+**Card C: The ReplicaSet object is gone.** `kubectl get rs` is empty. The Deployment still exists. The site blips, then Pods return.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the count manager was deleted, not the intent. Next action: watch the Deployment recreate a ReplicaSet, and do not hand-create Pods to fill the gap.
+
+</details>
+
+**Card D: The new revision never becomes ready.** The image is `nginx:does-not-exist`. Rollout status stalls. The previous Pods still answer.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the new Pod cannot pull its image, so progress is bounded. Next action: read the new Pod's status and events, then roll back. Do not delete the old ReplicaSet to "force" the rollout.
 
 </details>
 
