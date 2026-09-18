@@ -74,7 +74,13 @@ This diagram shows why image sharing works. The base and image layers can be reu
 
 Notice that a layer is not a mystical container object. It is a filesystem snapshot with rules about how it participates in the stack. Image layers are immutable once the runtime has unpacked them, which is why they are safe to share. The upper layer is mutable, which is why it must belong to one container instance unless the runtime is doing something special. The merged view is not a new copy of the whole tree; it is a kernel-mediated view over the existing directories.
 
-Pause and predict: if a process deletes `/bin/ls` inside a container, what must the upper layer record so the lower image can stay unchanged while the process no longer sees that path? The answer is not that the lower layer is edited, because that would break every other container using the same image. The answer is a whiteout, which is a special marker in the upper layer that tells the merged view to hide the lower file.
+**Pause and predict:** If a process deletes `/bin/ls` inside a container, what must the upper layer record so the lower image can stay unchanged while the process no longer sees that path?
+
+<details>
+<summary>Check your prediction</summary>
+
+The lower layer is not edited, because that would break every other container using the same image. The upper layer records a whiteout: a marker that tells the merged view to hide the lower file.
+</details>
 
 Whiteouts are the reason deletion in a union filesystem is more subtle than deletion on an ordinary directory tree. If the lower layer contains a file and the upper layer only removes it from the merged view, the system needs a durable way to remember that removal. A whiteout is that durable memory. It says, in effect, "there may be a lower file here, but this container's view should treat it as deleted." That is why removing package caches in a later Dockerfile layer can hide files without shrinking the earlier layer that still stores the bytes.
 
@@ -122,7 +128,13 @@ When a lookup happens, OverlayFS searches from the top of the stack downward. If
 
 The table hides a lot of kernel work, so do not treat it as a performance guarantee. Reading a lower-layer file is usually cheap because no copy is needed. Creating a new upper-layer file is also straightforward. Modifying an existing lower-layer file is where copy-on-write enters, and renaming directories can be expensive because the kernel may need to preserve merged-directory semantics while moving or copying metadata. Those details explain why workloads that write many files into the container layer can feel different from the same workload writing to a normal host directory.
 
-Before running this, what output do you expect after creating `new.txt`, modifying `modify.txt`, and deleting `delete.txt` through the merged directory? If your prediction says the lower directory changes, revise the model before continuing. The lower directory should stay intact because the writable state lives in the upper directory, and deletion should be represented above the lower file rather than by removing the lower file itself.
+**Pause and predict:** After creating `new.txt`, modifying `modify.txt`, and deleting `delete.txt` through the merged directory, which directory actually changes?
+
+<details>
+<summary>Check your prediction</summary>
+
+The lower directory stays intact. Writable state lives in the upper directory. Deletion is a whiteout above the lower file, not a removal of the lower file itself.
+</details>
 
 ```bash
 # Create directories
@@ -199,7 +211,13 @@ flowchart TD
 
 The lower layer is never modified, ensuring other containers can safely use it. That immutability is the reason a node can run many containers from the same image without multiplying base-image storage. It is also the reason a surprisingly small write can cause a surprisingly large upper-layer allocation. If the edited file is large, the runtime may need to copy the file into the writable layer before applying the edit, even when the logical change is tiny.
 
-Stop and think: if you append a single 1 KB line to a 5 GB log file that lives in a lower image layer, how much disk space might the operation consume in the upper layer? The dangerous answer is "about 1 KB," because the application-level write is only the appended line. The storage answer can be much closer to the full file size because the file must become writable in the upper layer before the change is recorded.
+**Pause and predict:** If you append a single 1 KB line to a 5 GB log file that lives in a lower image layer, how much disk space might the operation consume in the upper layer?
+
+<details>
+<summary>Check your prediction</summary>
+
+"About 1 KB" is the application-level write, not the storage cost. Copy-up can consume close to the full file size because the file must become writable in the upper layer before the change is recorded.
+</details>
 
 | Operation | Performance |
 |-----------|-------------|
@@ -266,7 +284,13 @@ flowchart TD
 
 One hundred containers from `nginx:alpine` do not require one hundred private copies of the image. They require one local copy of the image layers, plus one writable layer per container. Those writable layers may remain tiny if the application writes little state, or they may become the actual capacity problem if the application writes logs, cache files, uploads, or generated artifacts into paths that are not volumes. This is the storage version of a familiar platform rule: shared immutable inputs scale well, private mutable outputs need capacity planning.
 
-Pause and predict: if you change a single line of application code in your source tree, which Dockerfile layers should rebuild if dependencies were copied and installed before the application source? The efficient answer is that the dependency install layer should remain cached, and only the application copy layer plus later dependent layers should rebuild. If your Dockerfile copies the whole source tree before installing dependencies, the same source change invalidates the expensive install step.
+**Pause and predict:** If you change a single line of application code, which Dockerfile layers should rebuild when dependencies were copied and installed before the application source?
+
+<details>
+<summary>Check your prediction</summary>
+
+The dependency install layer should remain cached. Only the application copy layer and later layers rebuild. Copying the whole source tree before `RUN` install invalidates that expensive layer on the same one-line change.
+</details>
 
 ```dockerfile
 FROM ubuntu:22.04
@@ -715,9 +739,48 @@ Verify the reset before treating the lab as closed:
 
 If any check fails, remove the leftover artifact explicitly and re-run the checklist. A stale overlay mount or an orphaned `sleep 3600` container is exactly the kind of quiet residue that confuses the next storage investigation, so treat verification as part of the exercise rather than an optional extra.
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–4 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Deleted binary still in the image.** A container no longer sees `/bin/ls`, but `docker history` still shows the package layer that added it, and a second container from the same image still has `ls`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: whiteout in this container's upper layer, not an edited lower image. Next action: `docker diff` the container for a delete marker; do not rebuild the shared image to "restore" a file only this writable layer hid.
+</details>
+
+**Card B: Lower directory changed.** After creating `new.txt`, editing `modify.txt`, and deleting `delete.txt` through the merged mount, an operator checks the lower directory and expects those mutations there.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: looking at lowerdir for writable state. Next action: inspect upperdir for the new file, the copied-up modify, and the whiteout; confirm lowerdir is unchanged.
+</details>
+
+**Card C: 1 KB append, gigabytes used.** A process appends one line to a 5 GB log that lives in the image. The container's writable layer jumps by gigabytes.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: copy-up of the whole file into upperdir, not the 1 KB write. Next action: move the log path onto a volume so later appends do not copy the image file.
+</details>
+
+**Card D: One-line code change rebuilds dependencies.** `COPY . .` precedes `RUN` install. Changing one application line reruns the dependency install.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: cache invalidation order, not the package manager. Next action: copy dependency manifests and install before copying application source so the install layer stays cached.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Trace OverlayFS read write delete paths through lowerdir upperdir workdir merged.
+- [ ] Classified each frozen overlay-layer card before opening the reveal.
 - [ ] Debug container storage growth with `docker ps -s`, `docker diff`, storage driver checks, and cleanup signals.
 - [ ] Compare OverlayFS AUFS btrfs zfs devicemapper vfs tradeoffs for container runtimes.
 - [ ] Design Dockerfile layer ordering and volume boundaries that reduce rebuild time disk usage and copy-on-write penalties.
