@@ -97,7 +97,14 @@ ping -n -c 4 8.8.8.8
 
 Read ping output as a measurement rather than as decoration. Packet loss tells you whether replies disappeared, and intermittent loss often explains flaky deployments better than average latency does. Round-trip time includes outbound travel, remote handling, and the return path, so it is not a one-way measurement. TTL is useful as a clue because IP decrements it at each hop, but it is not a reliable operating-system fingerprint. RFC 791 defines the IPv4 TTL field as a lifetime limiter, and RFC 792 defines the ICMP messages that make echo tests and time-exceeded diagnostics useful.
 
-The first comparison is almost always IP address versus hostname. If `ping -c 4 8.8.8.8` succeeds but `ping example.com` fails before sending packets, you should suspect name resolution rather than the basic path to the internet. If the name resolves and packets leave but no replies return, do not stop there. Test the application port with `curl`, test the path with `tracepath` or `traceroute`, and remember that the target may simply refuse ICMP while still serving HTTPS.
+The first comparison is almost always IP address versus hostname, because two commands that look similar can test very different layers. If the name resolves and packets leave but no replies return, do not stop there. Test the application port with `curl`, test the path with `tracepath` or `traceroute`, and remember that the target may simply refuse ICMP while still serving HTTPS.
+
+**Pause and predict:** On one host, `ping -c 4 8.8.8.8` succeeds, but `ping -c 4 example.com` fails before a single packet is sent. Which layer do you suspect first, and why does the passing IP probe not clear that layer?
+
+<details><summary>Check your prediction</summary>
+
+Suspect name resolution first. The IP probe proves the host can send ICMP to one public address and receive replies, but the hostname probe failed before any packet left the machine — ping never obtained an address to send to. That failure happens inside the local resolver path, so the next evidence comes from `getent hosts` and `dig`, not from more pings. The passing IP ping cannot clear DNS, because it never exercised DNS at all.
+</details>
 
 `traceroute` and `tracepath` ask a different question: where do probes appear to travel before they reach the destination or stop producing useful answers? They use increasing TTL or hop-limit values so that routers along the way send back time-exceeded messages. That technique reveals a sequence of responding hops, but it does not reveal every device and it does not prove the return path is symmetric. Modern networks often rate-limit or suppress probe replies, so stars in the middle of the output are evidence to interpret, not proof that traffic died there.
 
@@ -115,6 +122,13 @@ tracepath example.com
 `tracepath` is useful on locked-down systems because it does not require the same privileges as some traceroute modes and it reports path MTU observations. Path MTU matters when small tests pass but large responses stall, because an oversized packet that cannot be fragmented or cannot receive the needed ICMP message can create confusing hangs. Operators often see this around VPNs, tunnels, cloud overlays, and container networks where encapsulation adds headers and reduces the usable payload size.
 
 The most useful traceroute pattern is persistence. A single high number or a row of stars at one intermediate hop is weak evidence because that router may deprioritize replies to probes while forwarding real traffic normally. A latency jump that begins at one hop and remains high through every later hop is stronger evidence. A path that reaches the destination but `curl` still times out suggests that routing is probably not the only problem. In that case, move up to DNS, TCP, TLS, service binding, or policy instead of rerunning path probes until the output looks dramatic.
+
+**Pause and predict:** A traceroute shows `* * *` at hop 3, but hops 4 through 8 reply normally and the destination answers on the final hop. Is hop 3 where your traffic is dying, and what evidence would make that claim stronger?
+
+<details><summary>Check your prediction</summary>
+
+Not on this evidence alone. Hop 3 is probably rate-limiting or refusing probe replies while forwarding real traffic, because every later hop — including the destination — still answered. Stronger evidence would be latency or loss that begins at hop 3 and persists through every hop after it, matching failures from a second vantage point, or the destination itself becoming unreachable. Treat a silent middle hop as a clue, not a culprit.
+</details>
 
 ```mermaid
 flowchart TD
@@ -160,7 +174,14 @@ curl -i https://example.com/
 curl -L --fail-with-body https://example.com/
 ```
 
-The most important part of `curl -v` is the direction marker. Lines beginning with `*` are curl's own progress and connection notes. Lines beginning with `>` are request data sent by the client. Lines beginning with `<` are response data returned by the server. If you see `Connected` followed by a TLS handshake and then `< HTTP/2 503`, you have evidence that DNS, routing, TCP, and TLS progressed far enough for the application or load balancer to return a service-unavailable response. The next move is not another ping; it is backend health, overload, routing rules, or dependency behavior.
+The most important part of `curl -v` is the direction marker. Lines beginning with `*` are curl's own progress and connection notes. Lines beginning with `>` are request data sent by the client. Lines beginning with `<` are response data returned by the server. Reading those markers in order turns a vague "the API is down" report into a precise record of which stage succeeded and which stage produced the failure.
+
+**Pause and predict:** Your transcript shows `* Connected to api.example.com`, a completed TLS handshake, and then `< HTTP/2 503`. Which layer do you inspect next, and why would another ping add nothing?
+
+<details><summary>Check your prediction</summary>
+
+Inspect the application or load-balancer layer next. The transcript proves that DNS resolved, TCP connected, and TLS verified, because an HTTP status line can only arrive after all three succeed. A 503 means something at the far end answered and declared itself unavailable, so the next evidence is backend health, overload, routing rules, or dependency behavior. Another ping would only re-prove the reachability layers that the `Connected` line and the 503 already cleared.
+</details>
 
 Headers are often enough to separate network failures from application decisions. `curl -I` sends a HEAD request, which is useful for checking status, redirects, cache headers, and server identity without downloading the body. Some applications mishandle HEAD, so compare with `curl -i` when a HEAD result disagrees with a browser, a health check, or an application client. RFC 9110 (HTTP semantics) and RFC 9112 (HTTP/1.1 message syntax) are the current references, and even when HTTP/2 or HTTP/3 is negotiated, the habit of reading method, target, headers, status, and body remains the same.
 
@@ -206,7 +227,14 @@ sudo ss -lunp
 sudo ss -ltnp 'sport = :8080'
 ```
 
-The address column is the first thing to read. `127.0.0.1:5432` means the service is listening only on IPv4 loopback, so another host cannot connect to it through a normal network interface. `0.0.0.0:8080` means the process accepts IPv4 connections on all local interfaces, subject to routing and firewall policy. `[::]:8080` means IPv6 wildcard, and depending on system settings it may or may not also accept IPv4-mapped connections. These details explain why "the process is running" is not enough evidence.
+The address column is the first thing to read. `0.0.0.0:8080` means the process accepts IPv4 connections on all local interfaces, subject to routing and firewall policy. `[::]:8080` means IPv6 wildcard, and depending on system settings it may or may not also accept IPv4-mapped connections. A specific interface address limits the listener to that one network. These details explain why "the process is running" is not enough evidence.
+
+**Pause and predict:** `sudo ss -ltnp` shows `127.0.0.1:5432` owned by PostgreSQL, and a worker on another host cannot connect no matter how many times it retries. Can that remote worker ever reach this socket, and what exactly has the `ss` line proven?
+
+<details><summary>Check your prediction</summary>
+
+No. A listener on `127.0.0.1` accepts connections only from the same host, because loopback traffic never crosses a network interface, so retrying harder from the remote worker cannot change the bind address. The `ss` line has proven that the process exists, that the kernel holds a listening socket on port 5432, and that the socket is bound to IPv4 loopback only; it has proven nothing about firewalls or routes, because remote packets never survive long enough for those layers to matter. The fix lives in the database's listen-address configuration, followed by fresh `ss` output to verify the new bind.
+</details>
 
 Process ownership is the second thing to read. With `sudo`, `ss -p` can show which process owns the socket, which helps you catch port conflicts and wrong daemons. A failed deployment may leave an old process listening while the new service crashes. A local development server may bind a port expected by a production daemon. A container runtime or sidecar may expose a listener that makes the host look healthy even though the application process inside the container is not the one answering.
 
@@ -230,7 +258,14 @@ dig +short example.com A
 dig +short example.com AAAA
 ```
 
-`dig` becomes powerful when you choose the resolver explicitly. If the local resolver returns one answer and a public resolver returns another, you have separated local caching or policy from authoritative data. If an internal resolver returns a private address and a public resolver returns no answer, that may be correct split-horizon DNS rather than an outage. If a Kubernetes pod uses CoreDNS but the node uses systemd-resolved, you must test both views before deciding where the fault lives.
+`dig` becomes powerful when you choose the resolver explicitly. If the local resolver returns one answer and a public resolver returns another, you have separated local caching or policy from authoritative data. If a Kubernetes pod uses CoreDNS but the node uses systemd-resolved, you must test both views before deciding where the fault lives.
+
+**Pause and predict:** `getent hosts app.internal.example` returns a private address, but `dig @8.8.8.8 app.internal.example` returns a public address or no answer at all. Is the local answer automatically wrong, and what do you record before changing anything?
+
+<details><summary>Check your prediction</summary>
+
+No. Private-versus-public disagreement is often correct split-horizon DNS: internal clients are supposed to receive the private address, and a public resolver has no business answering for internal names. The disagreement proves the two resolver paths differ, not that one of them is broken. Record which resolver answered, which address each returned, and the remaining TTLs, then compare against the viewpoint the failing application is supposed to use. Treating the public resolver as the source of truth is how operators "fix" working internal DNS into an outage.
+</details>
 
 ```bash
 # Compare the local configured resolver with a chosen recursive resolver.
@@ -528,6 +563,45 @@ A strong answer confirms that the OUTPUT chain changed by exactly one rule, the 
 - [ ] I inserted only a narrow temporary rule and verified its effect with a bounded request. *(Host-only)*
 - [ ] I removed the exact rule and confirmed the chain returned to its prior shape. *(Host-only)*
 - [ ] *(Cluster path — optional)* Traced pod DNS and cluster endpoints with `kubectl run dns-check`, or read the Kubernetes Touch-Points section as a worked example without a cluster.
+
+**Task 4: Frozen diagnostic cards.** Each card freezes the evidence exactly as it was captured, so nothing needs to be executed — any learner can work them from the text alone. For every card, name the failure layer and one next action in your own words before revealing the answer.
+
+**Card 1: Reachable but not serving.** From the failing host, `ping -c 4 api.example.com` succeeds with 0% loss, but `curl -v --max-time 10 https://api.example.com/health` hangs after `Trying 203.0.113.10:443...` until the timeout fires.
+
+<details><summary>Failure layer and next action</summary>
+
+Failure layer: transport or policy, not reachability — ICMP replies prove nothing about TCP 443, and a hang after `Trying` means no handshake completed. Next action: inspect host firewall counters (`sudo iptables -L -n -v --line-numbers`) and the remote side's security-group or NetworkPolicy evidence for port 443 while reproducing the timeout.
+</details>
+
+**Card 2: Listening, yet unreachable.** A remote worker reports connection timeouts to PostgreSQL on `db-01`. On `db-01`, `sudo ss -ltnp 'sport = :5432'` shows `LISTEN 0 244 127.0.0.1:5432 0.0.0.0:* users:(("postgres",pid=2140,fd=7))`.
+
+<details><summary>Failure layer and next action</summary>
+
+Failure layer: local service binding — the socket is bound to loopback only, so no remote host can ever reach it regardless of firewall or routing. Next action: review the PostgreSQL `listen_addresses` setting with the service owner and re-run `ss` after any change to prove the new bind before touching firewall rules.
+</details>
+
+**Card 3: Two resolvers, two answers.** `getent hosts app.example.com` returns `192.0.2.20`; `dig app.example.com @10.0.0.53` returns `192.0.2.20` with TTL 2400; the authoritative server returns `192.0.2.30` with TTL 300. A teammate suggests running `sudo resolvectl flush-caches` immediately.
+
+<details><summary>Failure layer and next action</summary>
+
+Failure layer: resolver caching — the recursive resolver is correctly serving a record it cached before the change, while the authoritative server already has the new answer. Next action: before any flush, record the old answer, the resolver address, and the remaining TTL so the staleness stays explainable afterward; flush only if the stale record is what the failing clients actually receive.
+</details>
+
+**Card 4: The flush proposal.** On a Kubernetes node with intermittent Service connectivity, a teammate proposes `sudo iptables -F` "to see if the firewall is the problem."
+
+<details><summary>Failure layer and next action</summary>
+
+Failure layer: unknown — and that is exactly why a flush is unacceptable, because it erases kube-proxy Service routing, CNI chains, NAT rules, and SSH protection in one step while destroying the evidence. Next action: inspect read-only state first (`iptables -V`, `iptables -S`, `iptables -L -n -v --line-numbers`, `sudo nft list ruleset`) and watch which counters increment while reproducing the failure.
+</details>
+
+**Card 5: Stars and a 503.** A traceroute to `api.example.com` shows `* * *` at hop 3 with normal replies afterward, and `curl -v https://api.example.com/health` completes TLS and returns `< HTTP/2 503`. A teammate wants to escalate hop 3 to the network provider.
+
+<details><summary>Failure layer and next action</summary>
+
+Failure layer: the application or load balancer — the destination itself answered with an HTTP status, which proves routing carried real traffic past the silent hop. Next action: hand the transcript to the service owner for backend health, overload, or routing-rule investigation; hop 3 earns an escalation only if real traffic, not just probe replies, dies there persistently.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer. *(Host-only)*
 
 ## Next Module
 
