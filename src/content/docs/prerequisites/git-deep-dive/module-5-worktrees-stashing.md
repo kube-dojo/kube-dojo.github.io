@@ -52,9 +52,16 @@ Stash has the opposite shape. It is lightweight and local, but it stores a patch
 
 That distinction is why the right question is not "Is stash bad?" but "What kind of state am I saving?" If the state is a two-line formatting cleanup before a pull, stash is appropriate. If the state includes half a feature, a failing test, a running cluster, and a branch that may be interrupted for a day, stash is hiding too much context behind a single stack entry. A senior workflow makes that difference explicit before the interruption starts.
 
-> **Pause and predict:** what do you think happens if you run `git stash` while a new file exists in your directory but has never been added with `git add`?
+**Pause and predict:** What do you think happens if you run `git stash` while a new file exists in your directory but has never been added with `git add`?
+
+<details>
+<summary>Check your prediction</summary>
 
 By default, `git stash` saves tracked modifications and staged changes, but it leaves untracked files alone. That behavior surprises engineers because a dirty `git status` can contain both tracked and untracked state, while the plain stash command captures only part of it. If the untracked file does not collide with the branch you switch to, it remains visible in the new branch. If it does collide, Git may block the branch switch or force you to decide what to do at the worst possible moment.
+
+</details>
+
+Write kept or stashed before you continue. A dirty status can mix tracked edits with files Git has never been asked to track. The next section is about naming stash entries. It does not say which of those files the plain command saves.
 
 ## Mastering Git Stash for Micro-Interruptions
 
@@ -98,9 +105,16 @@ Before applying a stash, inspect it as a patch. The `show -p` subcommand lets yo
 git stash show -p stash@{1}
 ```
 
-> **Before running this, what output do you expect if you apply `stash@{1}` rather than pop it?** Think about whether the stash stack itself should change, then verify your prediction with `git stash list`.
+**Pause and predict:** Before running this, what output do you expect if you apply `stash@{1}` rather than pop it? Think about whether the stash stack itself should change, then compare that prediction with `git stash list` after you have written it down.
+
+<details>
+<summary>Check your prediction</summary>
 
 Use `git stash apply` as the safe restoration command. `apply` takes the changes from the selected stash and attempts to put them into the current working tree, but it leaves the stash entry on the stack. If the patch applies cleanly, you can test the result before deleting the saved state. If the patch conflicts, you still have the original stash entry available, which gives you room to abort, reset, create a recovery branch, or retry in a cleaner location.
+
+</details>
+
+Write whether the stack changes before you continue. The commands below restore a stash entry. They do not print `git stash list`.
 
 ```bash
 # Applies the most recent stash
@@ -233,9 +247,16 @@ At this point you have two separate directories connected to one repository data
 
 Git enforces one important rule: a branch can be checked out in only one worktree at a time. That rule prevents two directories from updating the same branch pointer independently, which would be a recipe for confusion. If you need another directory for the same starting point, create a new branch name or check out a detached commit intentionally. Most teams should prefer a branch name because it gives the work a clear place in history.
 
-> **Pause and predict:** before running this, what output do you expect if you try to create a worktree for a branch that is already checked out in another worktree?
+**Pause and predict:** Before running this, what output do you expect if you try to create a worktree for a branch that is already checked out in another worktree?
+
+<details>
+<summary>Check your prediction</summary>
 
 The command will fail with an error explaining that the branch is already checked out. That failure is protective, not annoying. Imagine two terminals both claiming to own `feature/auth-refresh`, each with a different index and different uncommitted files. Git avoids that split-brain branch state by forcing each checked-out branch name to have one active worktree. If you see this error, list your worktrees before forcing anything.
+
+</details>
+
+Write the command result before you continue. The next command lists worktrees. It does not show the error from a second checkout of the same branch.
 
 ```bash
 git worktree list
@@ -303,9 +324,16 @@ The last anti-pattern is using worktrees to avoid committing for too long. Workt
 
 Choose the tool by asking what kind of isolation you need and how long the interruption will last. If the interruption is measured in minutes and your dirty state is simple, stash can be appropriate. If the interruption needs a clean directory, a separate branch, tests, or review work, use a worktree. If the task needs a completely independent repository configuration, credentials, hooks, or object database, use a second clone and accept the cost intentionally.
 
-> **Which approach would you choose here and why?** Your colleague asks you to review a pull request that changes two files, you have no uncommitted work, and you expect the review to take ten minutes.
+**Pause and predict:** Which approach would you choose here and why? Your colleague asks you to review a pull request that changes two files, you have no uncommitted work, and you expect the review to take ten minutes.
+
+<details>
+<summary>Check your prediction</summary>
 
 If your working tree is clean and the review is tiny, switching branches in the current directory is reasonable. A worktree is still a good option when you want to preserve editor context, keep your current branch visible, or run tests without disturbing local artifacts. The important point is that worktrees are not mandatory for every branch switch; they are valuable when the cost of mixing contexts exceeds the cost of another directory.
+
+</details>
+
+Write stash, worktree, or a branch switch before you continue. The table below is a lookup for other interruptions. Read your own prediction before you use that table.
 
 | Scenario | Recommended Strategy | Technical Rationale |
 | :--- | :--- | :--- |
@@ -514,6 +542,44 @@ Verify that the original feature work is still present and uncommitted. You shou
 cat deployment.yaml
 git status
 ```
+</details>
+
+These cards freeze four wrong moves from this module before the checklist asks you to run the hotfix lab. Read the mistaken action, commit to a failure layer, and only then open the reveal. Do not treat the lab script as the answer key for these cases.
+
+**Card A: The plain stash captured the new file.** A never-added manifest disappeared from the working tree after `git stash`, with no `-u` flag. The engineer expected every dirty path to move onto the stack.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: tracked state versus untracked files. Next action: look for the new file still in the directory. Plain `git stash` saves tracked and staged edits only. Use `-u` only when you meant to shelve untracked files too.
+
+</details>
+
+**Card B: `apply` dropped the stash.** `git stash apply stash@{1}` put the patch into the tree. The next `git stash list` is expected to be missing that entry, the way `pop` behaves after a clean apply.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: restore versus delete. Next action: expect the entry to remain. Drop it only after the tree is tested. `pop` is the command that removes a successful entry.
+
+</details>
+
+**Card C: The second worktree reused the branch.** `feature/auth-refresh` is already checked out. A second `git worktree add` uses that same branch name so both directories share one pointer.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: one checkout per branch name. Next action: expect the command to fail. Create a new branch name, or detach on purpose, and list worktrees before forcing anything.
+
+</details>
+
+**Card D: The ten-minute review required a worktree.** The tree is clean. The pull request changes two files. The review should take about ten minutes. A new directory is treated as the only safe move.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: interruption cost. Next action: switch branches in the current directory. Use a worktree when you must keep the current context, not because every review is an emergency.
+
 </details>
 
 Success criteria:
