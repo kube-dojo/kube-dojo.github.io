@@ -71,7 +71,7 @@ flowchart TD
     L --> M["MLS level<br>s0"]
 ```
 
-The type field is powerful because SELinux policy is mostly type enforcement. A web server process running as `httpd_t` may read files labeled `httpd_sys_content_t`.
+The type field is powerful because SELinux policy is mostly type enforcement. A web server process running as `httpd_t` may read files labeled `httpd_sys_content_t`. That policy expresses an application boundary in the kernel, not in the application's own code, which is why SELinux remains useful after a process is compromised.
 
 **Pause and predict:** A process in `httpd_t` tries to read a file labeled `user_home_t`. The mode is `777`. What should enforcing mode decide, and what evidence shows up in the audit log?
 
@@ -229,6 +229,8 @@ sudo restorecon -Rv /srv/web
 
 Before `restorecon`, the inode can still show the old type even though the fcontext rule exists. After `restorecon`, `ls -Z` shows `httpd_sys_content_t`. That second reading is the proof: `restorecon` applied the default rule. A `chcon` would have been wiped by the same command.
 </details>
+
+The policy database and the inode are different stores. Operators who stop after `semanage` have changed the rule future relabels will use, and they have not changed the file the process is reading now.
 
 Booleans are the other common safe repair path. A boolean is a policy switch that allows a vendor-supported optional behavior without writing a new local module. For example, a web server making outbound database connections is common enough that policy exposes a boolean rather than forcing every administrator to generate custom allow rules. Checking booleans before generating policy keeps your change aligned with the distribution's intended support model.
 
