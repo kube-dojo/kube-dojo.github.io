@@ -61,10 +61,16 @@ That separation is one reason Kubernetes commands often come in pairs: one comma
 
 There is a practical security lesson here too. Because `kubectl` talks to the API server with your identity, [every command is subject to authentication, authorization, and admission](https://v1-35.docs.kubernetes.io/docs/concepts/security/controlling-access/). A cluster may let you read pods while blocking deletes, or let you create ConfigMaps while rejecting privileged pods through policy. When a command is denied, do not work around it with a more powerful credential by reflex. First decide whether the policy is protecting the cluster from exactly the kind of change you are trying to make.
 
-> **Pause and predict:** if `kubectl` is only an API client, what happens when your kubeconfig points at a healthy cluster but your credential has expired?
-> **Answer:** the cluster can keep reconciling and pods can keep running, but your command fails before reading objects because auth is denied.
+**Pause and predict:** If `kubectl` is only an API client, what happens when your kubeconfig points at a healthy cluster but your credential has expired?
 
-That distinction is operationally important because it prevents you from treating every `kubectl` error as an application outage.
+<details>
+<summary>Check your prediction</summary>
+
+The cluster can keep reconciling and Pods can keep running, but your command fails before it reads objects because authentication is denied.
+
+</details>
+
+Separate a denied client from an application outage before you read the command anatomy. The next section is about verb, type, and name. It does not describe this expired credential.
 
 ## Command Anatomy and Read-Only Inspection
 
@@ -117,10 +123,16 @@ The namespace default is another reason read commands can mislead beginners. `ku
 
 `kubectl explain` is easy to ignore until you need it, then it becomes a permanent habit. [It reads schema information from the API server](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/), so the answer matches the Kubernetes version and Custom Resource Definitions installed on the cluster in front of you. That means you can ask for `kubectl explain deployment.spec.strategy --recursive` while authoring a manifest and get a field map without leaving the terminal. The tool is not a tutorial, but it is an accurate dictionary for the object model you are editing.
 
-> **Stop and predict:** before you run `kubectl get all -n kube-system`, what objects do you expect to see?
-> **Answer:** `all` returns a curated set of common workload resources, not every Secret, ConfigMap, Role, ServiceAccount, or CRD.
+**Pause and predict:** Before you run `kubectl get all -n kube-system`, what objects do you expect to see?
 
-It does not include every Secret, ConfigMap, Role, ServiceAccount, CRD instance, or policy object, so it is not an audit command. When completeness matters, ask for the specific resource types you need or use `kubectl api-resources` to discover what the cluster supports.
+<details>
+<summary>Check your prediction</summary>
+
+`all` returns a curated set of common workload resources. It does not include every Secret, ConfigMap, Role, ServiceAccount, CRD instance, or policy object, so it is not an audit command. When completeness matters, ask for the specific resource types you need or use `kubectl api-resources` to discover what the cluster supports.
+
+</details>
+
+Write the list you expect before you treat the command as a full inventory. The next section is about output formats. It does not enumerate what `all` skips.
 
 ## Output Formats, Filtering, and Automation
 
@@ -218,7 +230,16 @@ Server-Side Apply is the modern form of this idea for shared resources. Traditio
 
 Field ownership can sound abstract until you imagine two actors editing the same Deployment. A human may own the image tag, a rollout controller may own strategy fields, an autoscaler may influence replicas, and an admission webhook may add labels or defaults. Server-Side Apply lets the API server remember which field manager last asserted ownership of a field, so a conflicting change can be reported instead of quietly replacing somebody else's intent. For a beginner, the practical takeaway is simple: prefer server-side previews and be cautious when several tools manage one object.
 
-Pause and predict: you use `kubectl scale deployment web --replicas=5` during a spike, but your GitOps controller still has `replicas: 3` in Git. What happens at the next reconciliation? [The controller moves the live object back to the declared value because Git is its source of truth](https://raw.githubusercontent.com/open-gitops/documents/main/PRINCIPLES.md). The right fix is to update the manifest, use an autoscaler, or intentionally suspend reconciliation with a documented plan, not to keep repeating the manual scale command.
+**Pause and predict:** You use `kubectl scale deployment web --replicas=5` during a spike, but your GitOps controller still has `replicas: 3` in Git. What happens at the next reconciliation?
+
+<details>
+<summary>Check your prediction</summary>
+
+The controller moves the live object back to the declared value because Git is its source of truth. The OpenGitOps principles call that pull-based reconciliation: [desired state lives in Git](https://raw.githubusercontent.com/open-gitops/documents/main/PRINCIPLES.md). Update the manifest, use an autoscaler, or suspend reconciliation with a documented plan. Do not keep repeating the manual scale command.
+
+</details>
+
+Name who wins before you read the safe-change section. The next section is about apply, edit, patch, and set image. It does not describe this reconciliation.
 
 ## Safe Changes, Deletion, and Context Control
 
@@ -757,6 +778,46 @@ The namespace deletion can take a little time because Kubernetes removes the res
 - [ ] You used `kubectl exec -it` to run a multi-command shell snippet inside a pod.
 - [ ] You used `kubectl port-forward` to access the workload from your laptop on `localhost:8080` and saw a real HTTP response.
 - [ ] You cleaned up by deleting the namespace and confirmed it no longer exists.
+
+- [ ] I named a failure layer and a next action for each frozen client-layer card before opening the reveal.
+
+A denied command, a short inventory, a scale that disappears, and a stuck rollout can each look like the application died. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: kubectl is denied. The site still answers.** The cluster is healthy. Pods are Running. `kubectl get pods` returns `Unauthorized`. The kubeconfig token expired an hour ago.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the client credential, not the workloads. Next action: refresh the credential and retry one read before you restart anything.
+
+</details>
+
+**Card B: The audit used `get all`.** `kubectl get all -n kube-system` looks busy. A later review finds a Secret and a CRD that never appeared in that output. The reviewer treated the command as complete.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: `all` is a curated workload set. Next action: list the resource types you actually need, or start from `kubectl api-resources`.
+
+</details>
+
+**Card C: The scale lasted ten minutes.** You set `replicas: 5` during a spike. The GitOps controller still has `replicas: 3`. The next reconcile puts the Deployment back at 3.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Git is the source of truth, not the live scale. Next action: change the manifest, or suspend reconciliation on purpose. Do not scale again by hand.
+
+</details>
+
+**Card D: The rollout timed out on a bad tag.** `kubectl set image` pointed at `nginx:does-not-exist`. `kubectl rollout status` times out. Events say `ImagePullBackOff`. The previous image was serving traffic.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the image reference, not a crashed process. Next action: read Events, then set the image back to a tag that exists. Do not start with `exec`.
+
+</details>
 
 ## Sources
 
