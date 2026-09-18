@@ -119,7 +119,16 @@ Worker nodes run the kubelet, kube-proxy, and a container engine such as `contai
 
 This component split also explains why Kubernetes debugging is usually a process of narrowing responsibility. If the API server rejects a manifest, you inspect schema, authentication, authorization, or admission. If a Pod stays Pending, you inspect scheduling constraints and node capacity. If a Pod is assigned but not running, you inspect kubelet events, image pulls, runtime errors, probes, and volumes. If traffic reaches a Service but not a backend, you inspect selectors, endpoints, kube-proxy behavior, and network policy. A local cluster gives you a place to practice that narrowing without waiting for a production incident to teach it under pressure.
 
-Pause and predict: if the `kube-scheduler` process crashes but the API server and `etcd` remain healthy, what happens when you create a new Deployment? The request can still be accepted and stored, but the new Pods will remain Pending because nothing assigns them to nodes. Existing running Pods usually continue because kubelets already know about them. That prediction is the operational habit you are building: separate "the API accepted my desired state" from "a worker can actually execute it."
+**Pause and predict:** If the `kube-scheduler` process crashes but the API server and `etcd` remain healthy, what happens when you create a new Deployment?
+
+<details>
+<summary>Check your prediction</summary>
+
+The request can still be accepted and stored, but the new Pods remain Pending because nothing assigns them to nodes. Existing running Pods usually continue because kubelets already know about them. Separate "the API accepted my desired state" from "a worker can actually execute it."
+
+</details>
+
+Name that split before you choose a local tool. The next section is about kind, minikube, and k3d. It does not describe this outage.
 
 ## Section 2: Choosing a Local Kubernetes Tool
 
@@ -241,7 +250,16 @@ You can also combine multiple kubeconfig files by separating paths with a colon 
 export KUBECONFIG=~/.kube/config:/path/to/another/config.yaml
 ```
 
-Pause and predict: if a kubeconfig containing administrator credentials for a production cluster is committed to a public repository, what happens next? The practical answer is immediate incident response. Automated scanners look for exposed credentials, and an attacker with valid cluster credentials can read Secrets, create workloads, or run compute at your expense. Treat kubeconfig files like keys, not notes, and practice with local clusters so your muscle memory becomes careful before the stakes are high.
+**Pause and predict:** If a kubeconfig containing administrator credentials for a production cluster is committed to a public repository, what happens next?
+
+<details>
+<summary>Check your prediction</summary>
+
+Treat it as an incident now. Automated scanners look for exposed credentials, and an attacker with valid cluster credentials can read Secrets, create workloads, or run compute at your expense. Kubeconfig files are keys, not notes.
+
+</details>
+
+Decide the response before you bootstrap a cluster. The next section is about creating the first local cluster. It does not describe a leaked production file.
 
 ## Section 4: Bootstrapping and Verifying the First Cluster
 
@@ -288,15 +306,33 @@ System Pods in `kube-system` show the cluster running itself as Kubernetes-manag
 
 Do not skip verification just because the create command ended successfully. A command can return after bootstrapping while some background components are still settling, image pulls are completing, or CoreDNS is restarting. The node list, system Pod list, and cluster-info output together give you a fast health snapshot from three angles: node readiness, control plane reachability, and add-on state. In professional workflows, those checks become preconditions for running tests. You want failures to point at the thing under test, not at a half-created cluster that was never ready.
 
-Before running this, what output do you expect from `docker ps` on your host after creating a default `dojo-basics` cluster? You should expect one outer Docker container for the single `kind` node, not one Docker container per Kubernetes Pod visible inside the cluster. The Pods run through `containerd` inside the node container, so host Docker sees the node abstraction while Kubernetes sees the internal cluster abstraction. That layered view explains many early surprises when learners compare Docker and Kubernetes commands.
+**Pause and predict:** After you create a default `dojo-basics` kind cluster, what does `docker ps` on the host show?
+
+<details>
+<summary>Check your prediction</summary>
+
+Expect one outer Docker container for the single kind node, not one Docker container per Kubernetes Pod. The Pods run through `containerd` inside the node container. Host Docker sees the node. Kubernetes sees the Pods inside it.
+
+</details>
+
+Write the count before you compare Docker and Kubernetes views. The next section is about how your laptop reaches Pod IPs. It does not answer this `docker ps` question.
 
 ## Section 5: Local Networking and Multi-Node Design
 
 Networking is where local clusters often stop feeling intuitive. Your Pods receive IP addresses from a cluster network, but your laptop does not automatically route to that Pod network. In a `kind` cluster, nodes sit on a Docker bridge network, and the API server is the one port mapped by default so `kubectl` can communicate. If you deploy a web application, a Pod IP such as `10.244.0.5` is meaningful inside the cluster, but your browser has no native route to that address from the host.
 
-The quickest access pattern is port forwarding. A command like `kubectl port-forward svc/my-web-app 8080:80` opens a local client-side tunnel through the API server to a Service or Pod. It is excellent for debugging because it requires no permanent cluster networking setup, but it ends when the foreground process ends. For more realistic local ingress, you can configure `kind` port mappings before cluster creation and run an ingress controller. For local LoadBalancer behavior, you need an implementation such as MetalLB because your laptop does not have a cloud load balancer controller.
+The quickest access pattern is port forwarding. A command like `kubectl port-forward svc/my-web-app 8080:80` opens a local client-side tunnel through the API server to a Service or Pod. It is useful for debugging because it requires no permanent cluster networking setup. For more realistic local ingress, you can configure `kind` port mappings before cluster creation and run an ingress controller. For local LoadBalancer behavior, you need an implementation such as MetalLB because your laptop does not have a cloud load balancer controller.
 
-Pause and predict: if you start a port-forward, load the application in your browser, and then close the terminal window, what happens to the browser connection? The tunnel disappears immediately because the forwarding path is maintained by the local process. Kubernetes did not create a durable Service exposure on your host; it simply carried traffic through a live debugging connection. This distinction keeps you from mistaking a successful port-forward for a production networking design.
+**Pause and predict:** If you start a port-forward, load the application in your browser, and then close the terminal window, what happens to the browser connection?
+
+<details>
+<summary>Check your prediction</summary>
+
+The tunnel disappears immediately because the forwarding path is maintained by the local process. Kubernetes did not create a durable Service exposure on your host. It carried traffic through a live debugging connection. Closing the terminal ends that connection.
+
+</details>
+
+Name what the browser loses before you read about multi-node placement. The next paragraph is about replicas and DaemonSets. It does not describe this tunnel.
 
 A single-node cluster is enough for many first exercises, but it cannot represent placement constraints. If every control plane process and every workload share one node, you cannot test whether replicas spread across nodes, whether a DaemonSet runs once per node, or whether a workload with a node selector lands only where intended. Multi-node `kind` clusters solve that by declaring multiple node containers in a configuration file. You still run locally, but Kubernetes now has a meaningful set of nodes to choose from.
 
@@ -638,6 +674,46 @@ kind delete cluster --name broken-dojo
 - [ ] You successfully designed and provisioned a highly non-standard cluster topology utilizing a declarative YAML configuration file.
 - [ ] You empirically observed and documented the exact failure mode of `kubectl` when the control plane becomes catastrophically unreachable.
 - [ ] You practiced excellent infrastructure hygiene by successfully deleting all ephemeral clusters created during this exercise.
+
+- [ ] I named a failure layer and a next action for each frozen cluster-layer card before opening the reveal.
+
+A Pending Pod, a public file, a tidy `docker ps`, and a browser tab can each look like the cluster is fine. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: The Deployment was accepted. The Pods stay Pending.** `kubectl apply` succeeds. `etcd` and the API server are healthy. New Pods have no node name. The scheduler process is gone. Older Pods are still Running.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: scheduling, not admission. Next action: restore the scheduler, then confirm a new Pod gets a node before you change the application.
+
+</details>
+
+**Card B: The kubeconfig is on GitHub.** A commit pushed `~/.kube/config` with production admin credentials. The repository is public. The cluster still answers `kubectl`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a leaked key, not a broken API. Next action: revoke those credentials and rotate them before you debug workloads.
+
+</details>
+
+**Card C: Host Docker shows one container.** `kind create cluster --name dojo-basics` finished. `kubectl get pods` lists several Pods. `docker ps` shows one container.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: you are looking at the node, not the Pods. Next action: inspect Pods with `kubectl`. Do not expect one host container per Pod.
+
+</details>
+
+**Card D: The page dies when the terminal closes.** `kubectl port-forward` was serving the app in a browser. You closed that window. The browser can no longer load the page. The Service still exists.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the local tunnel, not the Service. Next action: restart the port-forward for debugging, or add a real exposure if the page must survive a closed terminal.
+
+</details>
 
 ## Sources
 
