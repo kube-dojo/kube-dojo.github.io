@@ -40,7 +40,16 @@ Rewriting history works by creating new commits rather than changing old commits
 
 The Golden Rule follows directly from that model: never rebase commits that other people already depend on unless the team deliberately coordinates the rewrite. A private feature branch is your notebook, and interactive rebase is fair game. A shared integration branch is a public record, and force-pushing rewritten commits makes everyone else's local clones point at abandoned history. When in doubt, ask whether another person, CI system, release process, or deployment automation could have based work on the current branch tip; if the answer is yes, prefer a merge or a revert unless you have explicit agreement.
 
-Pause and predict: if a branch contains five unpublished commits and you reword only the oldest commit message, how many commit SHAs after that point should you expect to change? The answer is all five, because every later commit names the rewritten commit as an ancestor, directly or indirectly. That cascading effect is the reason a small local edit can be safe before sharing and disruptive after sharing.
+**Pause and predict:** If a branch contains five unpublished commits and you reword only the oldest commit message, how many commit SHAs after that point should you expect to change?
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer is all five, because every later commit names the rewritten commit as an ancestor, directly or indirectly. That cascading effect is the reason a small local edit can be safe before sharing and disruptive after sharing.
+
+</details>
+
+Write a count before you continue. The next section compares merge and rebase as integration choices. It does not say how many identifiers move when only a message changes.
 
 ## Merging, Rebasing, and the Shape of Review
 
@@ -75,7 +84,16 @@ The tradeoff is that rebasing converts a historical fact into a reviewed story. 
 
 In Kubernetes work, this distinction is especially practical. A reviewer looking at a Deployment commit wants to evaluate selectors, labels, probes, resources, and rollout behavior as one coherent unit. If the liveness probe lands three commits later with a message like "fix stuff", the reviewer has to jump through history to decide whether the Deployment was ever intentionally incomplete. Any runnable Kubernetes examples in KubeDojo should use the full `kubectl` command name for copy-paste safety, targeting Kubernetes 1.35+ clusters when cluster behavior is part of the exercise.
 
-Pause and predict: what do you think happens if a merge conflict occurs during a rebase? It does not wait until the end like a single final reconciliation. Because Git replays commits one by one, it can pause on the first conflicting commit, ask you to resolve that exact historical step, continue, and then pause again if a later commit touches the same region differently. That iterative conflict model is the main pain point of rebasing and the main reason a tidy local history lowers review risk.
+**Pause and predict:** What do you think happens if a merge conflict occurs during a rebase?
+
+<details>
+<summary>Check your prediction</summary>
+
+It does not wait until the end like a single final reconciliation. Because Git replays commits one by one, it can pause on the first conflicting commit, ask you to resolve that exact historical step, continue, and then pause again if a later commit touches the same region differently. That iterative conflict model is the main pain point of rebasing and the main reason a tidy local history lowers review risk.
+
+</details>
+
+Write when you expect the stop before you continue. The table below compares what each integration style keeps. It does not describe the stop you just predicted.
 
 | Approach | What Git Preserves | Best Fit | Main Tradeoff |
 | :--- | :--- | :--- | :--- |
@@ -185,7 +203,16 @@ This distinction also changes how you talk about the pull request. Do not write 
 
 When Git executes the plan, it starts at the chosen base and works through the reordered list. It applies `3a2b1c4`, pauses for the new Deployment message, absorbs the indentation fix, absorbs the probes, applies the Service commit, applies the ConfigMap commit, and then absorbs the password-removal commit. If a conflict appears, Git stops at the exact replay step that failed, which means the conflict is interpreted in the context of that historical commit rather than the branch's final state.
 
-Pause and predict: if you used `squash` instead of `fixup` for the two Deployment follow-up commits, what would change? The file content would end up the same, but Git would open a message editor containing the original messages from the squashed commits. That can be useful when multiple commits contain meaningful explanations, but it is noise when the lower commits are "fix typo" or "try probe again."
+**Pause and predict:** If you used `squash` instead of `fixup` for the two Deployment follow-up commits, what would change?
+
+<details>
+<summary>Check your prediction</summary>
+
+The file content would end up the same, but Git would open a message editor containing the original messages from the squashed commits. That can be useful when multiple commits contain meaningful explanations, but it is noise when the lower commits are "fix typo" or "try probe again."
+
+</details>
+
+Write what would differ before you continue. The next paragraph is about how many commits a pull request should keep. It does not compare these two instructions.
 
 A professional pull request history is not necessarily one commit. It is a sequence where each commit builds, each message explains a reviewable decision, and each commit boundary matches a concept the team might later revert or inspect. For this example, two clean commits may be better than one: one for the Deployment and one for Service plus configuration. In a larger change, you might keep manifests, tests, and documentation separate if those boundaries help review and future recovery.
 
@@ -464,6 +491,42 @@ You currently have six messy commits on the `feature-web-app` branch. Your goal 
 3. **Consolidate the Service**: Reorder the instructions so the service port addition immediately follows the initial service commit, then use `fixup` to meld it into the Service commit.
 4. **Purge the Secret**: Reorder the ConfigMap commits so the removal immediately follows the addition, then use `fixup` so the plaintext password never appears in the final rewritten history.
 5. **Rename the Commits**: Use `reword` on the remaining primary commits so the two surviving feature messages are `feat: Add Web Application Deployment` and `feat: Configure Application Services and Environment`.
+
+**Card A: Only the reworded commit gets a new SHA.** Five unpublished commits sit on the branch. You change the oldest message and expect the four later identifiers to stay put because their diffs did not change.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: parent linkage, not the diff. Next action: expect every later SHA to change, because each rewritten commit names the new parent. The old sequence may still be in the reflog until it expires.
+
+</details>
+
+**Card B: The rebase conflict waits until the end.** A private branch is replayed onto `main`. Two commits touch the same Deployment lines as upstream. The plan is to resolve everything once, after Git finishes the replay.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: one-commit-at-a-time replay. Next action: resolve the first conflicting commit, continue, and be ready to stop again if a later commit conflicts differently. This is not a single final merge.
+
+</details>
+
+**Card C: `squash` and `fixup` are the same instruction.** Two follow-up commits fold into the Deployment commit. Someone picks `squash` to avoid a message editor, expecting Git to discard the "fix typo" text the way `fixup` does.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: content versus message. Next action: use `fixup` when the lower messages are noise. `squash` keeps the file result and opens an editor that still contains those messages.
+
+</details>
+
+**Card D: The rewritten secret is fully contained.** `fixup` folded the password removal into the ConfigMap commit. The plaintext string is gone from `git log -p` on this unpublished branch, so the incident is treated as closed without rotating the credential.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: repository cleanup versus exposure. Next action: rewriting surviving commits does not prove the value never left the machine. Rotate the credential if a remote, log, pull request, or CI cache could have copied it.
+
+</details>
 
 ### Success Criteria
 
