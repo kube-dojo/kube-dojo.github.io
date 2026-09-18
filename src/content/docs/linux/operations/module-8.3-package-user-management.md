@@ -87,7 +87,13 @@ sudo apt update
 # Fetched 2,345 kB in 3s (782 kB/s)
 ```
 
-Pause and predict: if a server has not refreshed package metadata for several weeks, what failure would you expect when a security team asks you to install a specific fixed version by name? The important answer is not simply "the command might fail." The deeper risk is that the administrator may conclude the fix is unavailable, when the local machine is only looking at an outdated catalog.
+**Pause and predict:** A server has not refreshed package metadata for several weeks. A security team asks you to install a specific fixed version by name. What failure should you expect, and what mistake is worse than a failed command?
+
+<details>
+<summary>Check your prediction</summary>
+
+The install can fail because the local catalog is old. The worse mistake is concluding the fix does not exist. Refresh the metadata, then look up the version again.
+</details>
 
 Installing packages is intentionally simple because the hard work happens in dependency resolution. When you ask for `nginx`, the package manager checks the current repository metadata, compares dependencies against installed packages, downloads missing pieces, verifies signatures, unpacks files, and runs package scripts. That convenience is powerful, but it also means you should read the transaction summary before confirming changes on important hosts.
 
@@ -127,7 +133,13 @@ apt list --installed
 apt list --installed 2>/dev/null | grep nginx
 ```
 
-Before running this on a real machine, ask what output would convince you that `nginx` is installed from the expected distribution repository rather than from a third-party source. The package name alone is not enough because repositories can provide packages with the same name. Version strings, repository policy, and package metadata together give you a much stronger operational picture.
+**Pause and predict:** What output would convince you that `nginx` came from the distribution repository rather than a third-party source?
+
+<details>
+<summary>Check your prediction</summary>
+
+The package name is not enough. Two repositories can ship the same name. Read the version, the origin repository, and the package metadata together.
+</details>
 
 Removal is where many administrators first learn that package managers distinguish application files from configuration. `apt remove` deletes package-managed binaries and related files, but it deliberately leaves configuration under `/etc` so a reinstall can preserve local policy. That behavior is friendly during accidental removals and frustrating when you are trying to recover from a broken configuration, so choose the removal mode based on intent.
 
@@ -401,7 +413,13 @@ wc -l /etc/passwd
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1, $3}' /etc/passwd
 ```
 
-Pause and predict: why would a command like `ls -l` need `/etc/passwd` to be readable by normal users? The file permission makes sense once you remember that many tools show owner names instead of raw UIDs. They need identity metadata, but they do not need password hashes.
+**Pause and predict:** Why does `ls -l` need `/etc/passwd` to be readable by normal users?
+
+<details>
+<summary>Check your prediction</summary>
+
+`ls` shows owner names, not only raw UIDs. It reads identity metadata from `/etc/passwd`. Password hashes stay in `/etc/shadow`, which normal users cannot read.
+</details>
 
 Password hashes live in `/etc/shadow`, which is readable only by privileged users. Each line stores the username, password hash or lock marker, password aging fields, and optional account expiration. A locked account often has `!` or `*` where a usable hash would be, which prevents password login without necessarily deleting the account or changing file ownership.
 
@@ -652,7 +670,13 @@ sudo visudo -f /etc/sudoers.d/developers
 What now? (e)dit, (x)exit without saving, (Q)quit without saving
 ```
 
-Before you write a sudo rule, describe the operational task in one sentence. "Developers need root" is not a task. "Members of `webteam` need to check and restart `nginx` during deploys" is a task, and it points to specific commands. That discipline is how sudo remains delegation instead of becoming a second path to unrestricted root access.
+**Pause and predict:** Before you write a sudo rule, what one-sentence task is specific enough to delegate, and what sentence is only a request for root?
+
+<details>
+<summary>Check your prediction</summary>
+
+"Developers need root" is not a task. "Members of `webteam` need to check and restart `nginx` during deploys" is a task, and it names the commands. Anything broader becomes a second path to unrestricted root.
+</details>
 
 ```bash
 # Basic format:
@@ -947,9 +971,50 @@ sudo rm /etc/skel/WELCOME.txt
 After cleanup, `id testdev`, `id testops`, and `id skeltest` should fail because the users no longer exist. `getent group webteam` should return no group, and `ls /etc/sudoers.d/webteam` should report that the file is absent. If `groupdel webteam` fails, check whether a remaining user still has it as a primary group, then remove or modify that user before retrying.
 </details>
 
+Linux administration tools print the local view they were given. That view can be complete for the question you asked and still wrong for the question someone else asked. Name the store you queried before you treat the output as the state of the host. A second query, against a different file or a different flag, is how you separate a plausible printout from the store the next operator will trust. Write that store name in the note before you change the host.
+
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–4 stay as the configuration recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Fix reported missing.** Metadata is three weeks old. `apt install nginx=1.24.0-2ubuntu1` says the version is not a candidate. The security advisory lists that version.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: stale local catalog, not the archive. Next action: refresh package metadata and query the version again before you tell the security team the fix is absent.
+</details>
+
+**Card B: Same name, wrong origin.** `nginx` is installed. A third-party repo is enabled. `dpkg -l` only shows the name and version.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: repository origin, not the package name. Next action: read the candidate's origin (`apt-cache policy nginx` or the rpm equivalent) before you call it the distribution build.
+</details>
+
+**Card C: passwd locked down.** Someone chmod'd `/etc/passwd` to `600` because it "contains accounts." `ls -l` now prints numeric UIDs.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: identity file, not the directory mode. Next action: restore world-read on `/etc/passwd`. Hashes belong in `/etc/shadow`.
+</details>
+
+**Card D: Developers need root.** A sudoers drop-in says `%developers ALL=(ALL) ALL` so deploys can restart nginx.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the grant is a role, not a task. Next action: replace it with the nginx check and restart commands for `webteam`, then `visudo -c`.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Diagnosed package ownership and dependency metadata with `apt`, `dpkg -S`, and `dpkg -L`
+- [ ] Classified each frozen account-layer card before opening the reveal.
 - [ ] Implemented package lifecycle controls by installing, holding, unholding, removing, purging, and cleaning packages
 - [ ] Administered users with specific UID, shell, group membership, home directory, password, and password aging settings
 - [ ] Configured group-based sudo delegation through a validated `/etc/sudoers.d/webteam` drop-in
