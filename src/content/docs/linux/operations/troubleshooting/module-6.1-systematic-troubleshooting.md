@@ -67,7 +67,14 @@ This loop is slower than panic for the first minute and much faster for the next
 
 For example, suppose checkout requests return 500 errors. One hypothesis is that the service cannot reach its database. If that is true, you would expect application logs to show connection failures, local health checks to fail when they touch database-backed endpoints, and network tests from the service host to the database port to fail or time out. Another hypothesis is that the process is restarting under memory pressure; that would predict recent OOM messages in `dmesg`, changing process start times, and perhaps failed readiness checks.
 
-Pause and predict: before restarting a failed service, what evidence would disappear if the process exits cleanly and starts again? Write down at least two examples, such as in-memory counters, recent stderr output, open file handles, temporary files, or a distinctive process state visible in `systemctl status`.
+**Pause and predict:** before restarting a failed service, what evidence would disappear if the process exits cleanly and starts again? Name at least two kinds of evidence you would lose.
+
+<details>
+<summary>Check your prediction</summary>
+
+In-memory counters, recent stderr that was not flushed to a journal, open file handles, temporary files owned by the process, and a distinctive process state visible in `systemctl status` all vanish or reset when the process exits cleanly and starts again.
+
+</details>
 
 A practical way to improve your hypotheses is to list them by likelihood and risk, not by drama. Ordinary causes deserve early checks because they are common, cheap to verify, and often fixable without broad change. Disk full, service not running, wrong configuration, expired certificate, blocked network path, exhausted memory, and permission mismatch are not glamorous, but they explain a large share of real outages.
 
@@ -193,7 +200,14 @@ If you can reproduce, make the reproduction narrow and repeatable. A vague state
 
 If you cannot reproduce, do not pretend you can. Work with logs, metrics history, user reports, event streams, and correlation across systems. Intermittent issues often require adding observability before the next occurrence, but that should be a deliberate action with a rollback plan, not a random burst of debug logging that fills disks or exposes sensitive data.
 
-Pause and predict: if one application server fails a request while another server with the same release succeeds, which three differences would you compare first? Good answers usually include environment variables, OS or kernel version, routing or DNS configuration, local firewall state, package versions, and the exact application config file.
+**Pause and predict:** if one application server fails a request while another server with the same release succeeds, which three differences would you compare first?
+
+<details>
+<summary>Check your prediction</summary>
+
+Compare environment variables, OS or kernel version, routing or DNS configuration, local firewall state, package versions, and the exact application config file. The release artifact being the same does not mean the host around it is the same.
+
+</details>
 
 ```bash
 # Environment differences
@@ -749,6 +763,46 @@ Your log should show a clear sequence rather than a pile of unrelated output. If
 
 </details>
 
+- [ ] I named a failure layer and a next action for each frozen evidence-layer card before opening the reveal.
+
+A restart, a sibling host, a green dashboard, and a failure you cannot reproduce can each look like the end of the incident and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look. Write the layer in the timeline before you open the reveal.
+
+**Card A: Restart first.** The service is down. The fastest mitigation is a restart. You have not copied `systemctl status`, the last stderr, or the process start time.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: evidence that dies with the process, not the restart button. Next action: capture status, recent logs, and start time, then restart if you still must.
+
+</details>
+
+**Card B: Same release, one host fails.** Two servers run the same build. One fails the request. The other succeeds. You have not compared the hosts.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: host difference around a shared release, not the artifact. Next action: compare environment, kernel, routing, firewall, packages, and the config file actually loaded.
+
+</details>
+
+**Card C: Dashboard green after a restart.** Mitigation restored the graph. The timeline says "fixed" and names the restart. Nobody recorded what the restart destroyed or what still explains the fault.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mitigation recorded as root cause. Next action: split the timeline into what you changed and what evidence still points at the fault.
+
+</details>
+
+**Card D: Cannot reproduce.** The user saw the failure once. Your retry succeeds. The ticket is about to be closed as unreproducible.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: missing observation window, not a cleared fault. Next action: keep the report, name what you would log next time, and do not add unbounded debug logging.
+
+</details>
+
 ### Success Criteria
 
 - [ ] Diagnose a storage hypothesis by applying the scientific method to the guided experiment and recording actual observations.
@@ -756,6 +810,7 @@ Your log should show a clear sequence rather than a pile of unrelated output. If
 - [ ] Reproduce and compare symptoms across users, hosts, pods, or time windows before making changes.
 - [ ] Evaluate hypotheses with read-only tests, one change at a time, and recorded evidence.
 - [ ] Document an incident timeline that supports handoff, post-incident review, and prevention work.
+- [ ] Classified each frozen evidence-layer card by failure layer and next action.
 
 ## Key Takeaways
 
