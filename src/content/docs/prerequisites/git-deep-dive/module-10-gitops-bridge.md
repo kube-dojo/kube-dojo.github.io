@@ -70,9 +70,18 @@ git push origin main
 # The pipeline ends here. The cluster operator takes over autonomously.
 ```
 
-Pause and predict: imagine a developer with cluster access manually deletes the production `frontend` Service after a confusing incident call. In the push model, the Service remains gone until another pipeline run happens to reapply it, and even that only works if the pipeline includes the same manifest path. In the GitOps pull model, the operator sees that the live Service no longer matches the repository and recreates it during reconciliation. The difference is not that GitOps prevents every bad command; it is that GitOps gives the platform a memory and a repair loop.
+**Pause and predict:** Imagine a developer with cluster access manually deletes the production `frontend` Service after a confusing incident call. What happens next in a push pipeline, and what happens next in a GitOps pull model?
 
-The repair loop has limits, and recognizing those limits makes you a better operator. If Git itself contains a bad manifest, the operator will faithfully attempt to apply that bad desired state unless validation blocks it first. If the operator lacks RBAC permissions for a resource, reconciliation will fail and report a degraded state. If another Kubernetes controller is supposed to manage a field dynamically, such as replica count under a Horizontal Pod Autoscaler, the GitOps operator must be configured not to fight that controller. GitOps narrows authority, but it does not remove the need for schema validation, policy checks, and clear ownership boundaries.
+<details>
+<summary>Check your prediction</summary>
+
+In the push model, the Service remains gone until another pipeline run happens to reapply it, and even that only works if the pipeline includes the same manifest path. In the GitOps pull model, the operator sees that the live Service no longer matches the repository and recreates it during reconciliation. The difference is not that GitOps prevents every bad command; it is that GitOps gives the platform a memory and a repair loop.
+
+</details>
+
+Write both outcomes before you continue. The next section is about what the repository is allowed to remember. It does not replay this deletion.
+
+Applying whatever the repository says has limits, and recognizing those limits makes you a better operator. If Git itself contains a bad manifest, the operator will faithfully attempt to apply that bad desired state unless validation blocks it first. If the operator lacks RBAC permissions for a resource, reconciliation will fail and report a degraded state. If another Kubernetes controller is supposed to manage a field dynamically, such as replica count under a Horizontal Pod Autoscaler, the GitOps operator must be configured not to fight that controller. GitOps narrows authority, but it does not remove the need for schema validation, policy checks, and clear ownership boundaries.
 
 A practical GitOps rollout often starts by changing permissions before changing tooling. Human users may keep read access and break-glass access, but routine write access to production objects should move away from laptops and CI runners. That cultural change can feel uncomfortable because engineers are used to direct rescue commands. The reward is that every ordinary change now has the same shape: propose it in Git, review it in Git, test it with automation, reconcile it from Git, and audit it later from Git.
 
@@ -170,7 +179,16 @@ patches:
   - path: patch-replicas.yaml
 ```
 
-Before running this through an operator, what final Deployment do you expect production to receive: one replica or five, and with which resource settings? The answer should be five replicas with the production resource requests and limits, while the image and container port still come from the base. That mental render is an important review skill. In mature teams, reviewers do not only approve the diff; they ask what the rendered object will look like after Kustomize, Helm, or another config tool finishes.
+**Pause and predict:** Before running this through an operator, what final Deployment do you expect production to receive: one replica or five, and with which resource settings?
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer should be five replicas with the production resource requests and limits, while the image and container port still come from the base. That mental render is an important review skill. In mature teams, reviewers do not only approve the diff; they ask what the rendered object will look like after Kustomize, Helm, or another config tool finishes.
+
+</details>
+
+Write the replica count and the resource source before you continue. The commands below render the overlay. They do not state the replica count.
 
 A common alternative is a branch per environment, such as `dev`, `staging`, and `main` for production. This feels natural to Git users because branches already represent different lines of change, but it works poorly for infrastructure. Environments are not independent product histories. They are coordinated deployments of the same system under different constraints. When each environment lives on its own branch, reviewers lose a single-page view of environment differences, cherry-picks become release management, and merge conflicts can accidentally promote the wrong configuration.
 
@@ -233,7 +251,16 @@ spec:
 
 Promotion by tag does not remove pull requests from the process. In regulated or high-risk environments, the tag may be created by a release pipeline after checks pass, and the production Application change may be reviewed as a separate pull request. That second review is valuable because it answers a different question from the original feature review. The feature review asks whether the configuration is correct. The promotion review asks whether this exact already-tested snapshot should become production now.
 
-Stop and think: you discover a critical Ingress controller security issue while `main` is carrying a large, unvalidated database upgrade for staging. Would you tag the current `main` commit and send everything to production, or would you branch from the currently deployed production tag, apply only the hotfix, create a new tag, and move production to that tag? The safer choice is to branch from the current production tag. That preserves the emergency fix while excluding the unrelated database work that has not earned production trust.
+**Pause and predict:** You discover a critical Ingress controller security issue while `main` is carrying a large, unvalidated database upgrade for staging. Would you tag the current `main` commit and send everything to production, or would you branch from the currently deployed production tag, apply only the hotfix, create a new tag, and move production to that tag?
+
+<details>
+<summary>Check your prediction</summary>
+
+The safer choice is to branch from the current production tag. That preserves the emergency fix while excluding the unrelated database work that has not earned production trust.
+
+</details>
+
+Write which commit you would tag before you continue. The next section is about how promotion is recorded. It does not choose this hotfix base.
 
 Semantic versioning gives the release tags a shared language. A patch tag should imply a narrow fix, a minor tag should imply compatible capability, and a major tag should warn reviewers that the release may require coordinated migration work. Infrastructure SemVer is not always as clean as library SemVer because operational effects depend on the environment, but the habit still improves conversation. A reviewer seeing `v2.0.0` should ask harder questions than a reviewer seeing `v1.5.1`.
 
@@ -341,7 +368,16 @@ Anti-pattern four is treating `OutOfSync` as a button-click problem. Many tools 
 
 Start with the question, "Who should be allowed to mutate the live environment during normal operation?" If the answer includes CI runners, engineer laptops, and GitOps operators at the same time, the system has too many writers. Choose a primary writer and make every routine path feed it. For Kubernetes workloads, the primary writer should usually be the GitOps operator, with Git as the reviewed source of desired state.
 
-Next, decide how much release control each environment needs. Development environments often value speed and can track `main` with automated sync. Staging may also track `main`, but it should include validation that resembles production. Production usually needs explicit promotion, immutable tags, required review, and a rollback story. The correct answer is not "tags everywhere"; the correct answer is matching the revision strategy to the environment's risk.
+**Pause and predict:** How much release control does each environment need? Should every environment track an immutable tag?
+
+<details>
+<summary>Check your prediction</summary>
+
+Development environments often value speed and can track `main` with automated sync. Staging may also track `main`, but it should include validation that resembles production. Production usually needs explicit promotion, immutable tags, required review, and a rollback story. The correct answer is not "tags everywhere"; the correct answer is matching the revision strategy to the environment's risk.
+
+</details>
+
+Write a strategy for each environment before you continue. The next paragraph is about making environment differences visible in the repository. It does not assign a revision strategy.
 
 Then choose the repository shape that makes review honest. If an environment differs because it needs three replicas, that difference should appear as a small overlay patch. If an environment differs because it is running a completely different architecture, the repository should make that bigger decision visible instead of hiding it in copied YAML. Reviewers cannot protect what they cannot see, so the best repository design is the one that exposes meaningful differences with minimal duplication.
 
@@ -584,6 +620,42 @@ kubectl kustomize catalog-api/overlays/prod
 ```
 
 If the output matches your expectations, your directory structure is mathematically sound and ready to be committed to a Git repository.
+
+</details>
+
+**Card A: The deleted Service stays gone until a human notices.** Production `frontend` was deleted by hand. In the GitOps pull model, the plan is to wait for the next person to reapply it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: reconciliation versus a one-shot pipeline. Next action: expect the operator to recreate the Service when live state no longer matches the repository. A push pipeline only repairs the path on its next run.
+
+</details>
+
+**Card B: Production receives one replica.** The overlay sets five replicas and production resource requests. The rendered Deployment is expected to keep the base replica count.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the rendered object, not the base file alone. Next action: expect five replicas and the production resource settings. The image and port still come from the base.
+
+</details>
+
+**Card C: The hotfix tag is cut from current `main`.** `main` also contains an unvalidated database upgrade. The Ingress fix is tagged from that tip and sent to production.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the promotion base. Next action: branch from the currently deployed production tag, apply only the hotfix, and move production to that new tag.
+
+</details>
+
+**Card D: Every environment tracks a tag.** Development, staging, and production are all pinned to immutable tags so the policy is uniform.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: risk, not a single revision type. Next action: let development track `main` if speed matters, and keep production on explicit promotion with a rollback story. Do not require tags everywhere.
 
 </details>
 
