@@ -101,7 +101,16 @@ Sparse checkout should also be easy to unwind. If you are about to perform a rep
 git sparse-checkout disable
 ```
 
-Pause and predict: if you have a sparse checkout configured to only show `services/payment-gateway`, and you run `git commit -a -m "update"`, will Git accidentally commit changes that someone else made to `services/inventory-api` after you pulled? The answer is no for ordinary pulled changes, because `git commit -a` records your staged or modified working tree changes, not every hidden path that changed upstream. The more important risk is the opposite: you may forget that a cross-service change requires paths outside your cone, so you should widen the cone before making repository-wide edits.
+**Pause and predict:** If you have a sparse checkout configured to only show `services/payment-gateway`, and you run `git commit -a -m "update"`, will Git accidentally commit changes that someone else made to `services/inventory-api` after you pulled?
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer is no for ordinary pulled changes, because `git commit -a` records your staged or modified working tree changes, not every hidden path that changed upstream.
+
+</details>
+
+Write yes or no before you continue. A cross-service edit can require paths outside the cone, which is a separate decision from the commit you just predicted. The next scenario is about status latency, not about this commit.
 
 Exercise scenario: a platform team tries to optimize daily work by writing a sparse checkout rule that includes any file named `deployment.yaml` anywhere in the repository. The rule seems clever because Kubernetes services usually have that filename, but it forces legacy non-cone matching across a rapidly growing tree. By the time the repository passes 30,000 tracked files, `git status` takes several seconds because every path has to be tested against the pattern. Switching to cone mode and explicitly listing service directories reduces status latency to interactive speed because Git can reason about directory prefixes rather than arbitrary wildcard matches.
 
@@ -141,7 +150,16 @@ graph TD
 git clone --filter=blob:none https://git.example.com/platform-repo.git
 ```
 
-Pause and predict: you run `git clone --filter=blob:none`, then run `git diff HEAD~5` on a path that changed several commits ago. The local repository has the commit graph and tree information needed to locate the old path, but it may not have the old blob content needed to render the patch. Git will contact the remote, fetch the missing blobs for that diff, and then continue as though the data had always been local. This is usually good for interactive work, but it can surprise CI designers who expected a job to be fully offline after clone.
+**Pause and predict:** You run `git clone --filter=blob:none`, then run `git diff HEAD~5` on a path that changed several commits ago. What does the local repository already have, and what might it still need?
+
+<details>
+<summary>Check your prediction</summary>
+
+The local repository has the commit graph and tree information needed to locate the old path, but it may not have the old blob content needed to render the patch. Git will contact the remote, fetch the missing blobs for that diff, and then continue as though the data had always been local. This is usually good for interactive work, but it can surprise CI designers who expected a job to be fully offline after clone.
+
+</details>
+
+Write offline or fetched before you continue. The next paragraph is about treeless clones. It does not describe this five-commit diff.
 
 Treeless partial clones go further by omitting historical tree objects as well. They are useful for highly ephemeral CI jobs that need the current checkout and little else, because the runner avoids downloading old directory structures that it will never traverse. The trade-off is that history exploration becomes more dependent on on-demand network fetches. If your CI job runs in an isolated network after the checkout step, or if it performs many historical comparisons, treeless clones can move cost from the start of the job to the middle of the job, where failures are more frustrating.
 
@@ -154,7 +172,16 @@ Before applying Kubernetes manifests in CI, keep the command line explicit so lo
 
 Combining partial clone and sparse checkout is often the winning move for current-state deployment jobs, but the order still matters. The clone filter decides what object data is available locally, while sparse checkout decides what paths appear in the working tree. If the job clones bloblessly and then sparsely checks out only one service, the runner avoids old file payloads and avoids materializing unrelated service directories. If the job only uses sparse checkout after a full clone, it may still transfer the very history it was trying to avoid. This is why checkout optimization belongs in the CI design, not in a late shell step copied from a developer laptop.
 
-Stop and think: which approach would you choose for a CI pipeline that runs a security scanner analyzing the evolution of RBAC permissions over the last six months, and why? A depth-one shallow clone is a poor fit because the scanner needs meaningful history. A blobless partial clone is usually a better starting point because it preserves commit and tree relationships while deferring file contents, though you should test whether the scanner repeatedly asks for old blobs and therefore needs a deeper or full checkout for stable runtime.
+**Pause and predict:** Which approach would you choose for a CI pipeline that runs a security scanner analyzing the evolution of RBAC permissions over the last six months, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+A depth-one shallow clone is a poor fit because the scanner needs meaningful history. A blobless partial clone is usually a better starting point because it preserves commit and tree relationships while deferring file contents, though you should test whether the scanner repeatedly asks for old blobs and therefore needs a deeper or full checkout for stable runtime.
+
+</details>
+
+Write the clone shape before you continue. The next paragraph is about owning the choice in CI comments. It does not pick a depth for this scanner.
 
 Clone strategy should be owned like any other build architecture decision. Put the reasoning in CI configuration comments, measure checkout time separately from test time, and revisit the choice when jobs change. A pipeline that originally linted current YAML may later grow release note generation, provenance checks, or policy drift analysis. If the clone mode remains unchanged, the team may debug strange tool behavior for hours before noticing that the runner never had the history the tool assumed.
 
@@ -219,7 +246,16 @@ git commit -m "feat: add monitoring helm chart"
 git push origin main
 ```
 
-Stop and think: if you run `git log -p` on a file tracked by LFS, what will you see in the diff? Git history contains pointer file changes, so the textual patch describes pointer metadata rather than the binary payload itself. The LFS extension makes your working tree convenient, but it does not transform Git history into a binary diff viewer. For review workflows, that means teams often pair LFS with checksum checks, provenance metadata, or artifact promotion rules so reviewers know why a large binary changed.
+**Pause and predict:** If you run `git log -p` on a file tracked by LFS, what will you see in the diff?
+
+<details>
+<summary>Check your prediction</summary>
+
+Git history contains pointer file changes, so the textual patch describes pointer metadata rather than the binary payload itself. The LFS extension makes your working tree convenient, but it does not transform Git history into a binary diff viewer. For review workflows, that means teams often pair LFS with checksum checks, provenance metadata, or artifact promotion rules so reviewers know why a large binary changed.
+
+</details>
+
+Write pointer or payload before you continue. The next scenario is a database dump that was committed as a normal blob. It does not describe this diff.
 
 Exercise scenario: a junior engineer generates a 2GB PostgreSQL database dump to test a migration and accidentally pushes it with a work-in-progress commit. Deleting the file in the next commit removes it from the current tree, but the large object stays reachable in history and every new clone pays for it. The eventual fix requires a coordinated history rewrite, temporary freeze, force push, and instructions for every developer to replace local clones or carefully repair their remotes. If the repository had tracked dump patterns through LFS before the mistake, the payload would have gone through the large-object path rather than permanently inflating normal Git history.
 
@@ -264,7 +300,16 @@ The comparison table is intentionally blunt because most submodule and subtree d
 | **Making Upstream Changes** | Difficult (detached HEAD, push ordering) | Complex but manageable (`git subtree push`) |
 | **Best Used For** | Large external projects you rarely edit | Smaller shared libraries you update occasionally |
 
-Stop and think: your team maintains a shared Terraform modules repository with 200 files updated weekly and a massive vendor CRD repository with 5,000 files updated quarterly. The Terraform modules may fit a subtree if you want ordinary clones and occasional parent-side edits, provided the parent can tolerate carrying those files. The vendor CRDs may fit a submodule if you rarely change them and want to avoid importing thousands of files, but only if your CI and onboarding documentation make recursive checkout mandatory. The decision is not about which feature is newer; it is about which failure mode your team can reliably operate.
+**Pause and predict:** Your team maintains a shared Terraform modules repository with 200 files updated weekly and a massive vendor CRD repository with 5,000 files updated quarterly. Which inclusion mechanism fits each, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Terraform modules may fit a subtree if you want ordinary clones and occasional parent-side edits, provided the parent can tolerate carrying those files. The vendor CRDs may fit a submodule if you rarely change them and want to avoid importing thousands of files, but only if your CI and onboarding documentation make recursive checkout mandatory. The decision is not about which feature is newer; it is about which failure mode your team can reliably operate.
+
+</details>
+
+Write subtree or submodule for each repo before you continue. The next paragraph is about who owns the mechanism after you choose it. It does not make this choice.
 
 The strongest teams also define ownership around inclusion mechanisms. If a subtree is used, someone must own upstream pulls and conflict resolution. If a submodule is used, someone must own pointer updates, remote availability, and CI clone configuration. The lack of ownership is why shared dependency strategies become painful: the command works once, then the repository quietly accumulates stale pointers or copied code nobody feels responsible for maintaining.
 
@@ -291,7 +336,16 @@ Commit graphs target a different bottleneck. Many Git commands need to walk comm
 git commit-graph write --reachable
 ```
 
-Pause and predict: a repository has 500,000 loose objects and no commit graph. Running `git gc` alone should improve operations that suffer from loose-object overhead, while adding `git commit-graph write --reachable` should especially help commands that traverse history, such as `git log --graph` or branch ahead-behind checks. The exact speedup depends on disk, filesystem, repository shape, and command mix, so the professional move is to measure before and after rather than promise a universal percentage.
+**Pause and predict:** A repository has 500,000 loose objects and no commit graph. What should `git gc` alone improve, and what should `git commit-graph write --reachable` add?
+
+<details>
+<summary>Check your prediction</summary>
+
+Running `git gc` alone should improve operations that suffer from loose-object overhead, while adding `git commit-graph write --reachable` should especially help commands that traverse history, such as `git log --graph` or branch ahead-behind checks. The exact speedup depends on disk, filesystem, repository shape, and command mix, so the professional move is to measure before and after rather than promise a universal percentage.
+
+</details>
+
+Write the two effects before you continue. The next paragraph is scheduled maintenance. It does not split those two commands.
 
 Modern Git also supports scheduled maintenance so users do not have to remember periodic cleanup commands. `git maintenance start` registers background tasks appropriate to the operating system, such as prefetching, loose-object cleanup, incremental repacking, and commit graph updates. This is useful for long-lived local clones of large repositories because maintenance runs while the developer is not actively waiting on Git. It is less useful for short-lived CI workspaces, where clone strategy and cache design usually dominate.
 
@@ -481,6 +535,51 @@ git commit -m "build: configure LFS tracking for helm chart tarballs"
 ```
 
 Committing `.gitattributes` makes the LFS policy part of the repository contract. Other developers and CI runners need that rule before they add or modify matching tarballs. Treat this commit as a policy change because it affects storage, authentication, and future migration work.
+</details>
+
+**Card A: `commit -a` published the hidden service.** The cone shows only `services/payment-gateway`. After a pull, `git commit -a` is expected to record a teammate's edit under `services/inventory-api`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the working tree, not every upstream path. Next action: expect ordinary pulled changes outside the cone to stay out of the commit. Widen the cone before you edit those paths yourself.
+
+</details>
+
+**Card B: The blobless diff stayed offline.** `git clone --filter=blob:none` finished. `git diff HEAD~5` on an old path is expected to render with no network, because the clone already completed.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: trees versus blobs. Next action: expect Git to fetch the missing blob for that patch. A blobless clone is not a promise that later diffs are offline.
+
+</details>
+
+**Card C: Depth one feeds a six-month scanner.** The RBAC scanner reads permission history for half a year. The pipeline uses `--depth 1` to keep checkout fast.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the scanner needs history. Next action: start from a blobless partial clone and measure whether old blobs are fetched repeatedly. A one-commit clone cannot show six months of evolution.
+
+</details>
+
+**Card D: LFS history shows the binary.** `git log -p` on an LFS-tracked file is expected to print the image or dump bytes, because the working tree opens the real file.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: pointer files in history. Next action: read the patch as pointer metadata. Pair reviews with checksums or promotion rules when the payload itself matters.
+
+</details>
+
+**Card E: The newer feature wins.** Submodules are treated as the modern choice for both the weekly Terraform modules and the quarterly vendor CRDs, because they are the later command.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: failure mode, not novelty. Next action: consider a subtree for the modules if the parent can carry them, and a submodule for the CRDs only if recursive checkout is mandatory in CI and onboarding.
+
 </details>
 
 **Success Criteria:**
