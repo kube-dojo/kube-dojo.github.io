@@ -69,7 +69,16 @@ Read that example as a tree rather than as text. The root contains three mapping
 
 The most important rule is also the easiest to underestimate: YAML indentation uses spaces, not tabs, and the Kubernetes convention is two spaces per level. Tabs are not a stylistic disagreement in YAML; they are invalid indentation. A one-space drift can also change meaning without looking dramatic in a pull request, especially when a nested sequence item is visually close to the field above it. Configure your editor to render whitespace, convert tabs to spaces, and format YAML with two-space indentation before you rely on visual review.
 
-Pause and predict: in the `users` block above, how many items are in the `users` sequence, and what type of data does `permissions` hold? There are two user items, and each item is a mapping. The `permissions` value is a sequence of scalar strings. If you answered by counting hyphens at the same indentation level, you used the same structural habit you need when reviewing Kubernetes `containers`, `ports`, and `env` blocks.
+**Pause and predict:** in the `users` block above, how many items are in the `users` sequence, and what type of data does `permissions` hold?
+
+<details>
+<summary>Check your prediction</summary>
+
+There are two user items, and each item is a mapping. The `permissions` value is a sequence of scalar strings. Counting hyphens at the same indentation level is the same habit you need when reviewing Kubernetes `containers`, `ports`, and `env` blocks.
+
+</details>
+
+Write the count and the type before you continue. The next section is about multi-line strings. It does not count the `users` items.
 
 ### Multi-Line Strings: The `|` and `>` Operators
 
@@ -95,7 +104,16 @@ description: >
 
 The operational consequence is simple: choose the scalar based on what the application expects, not on what is easier to read in your editor. A shell script mounted from a ConfigMap needs `|` because the shell reads one command line after another. A TLS certificate needs `|` because PEM boundaries and base64 line breaks are meaningful to many parsers. A human-readable annotation that an external dashboard displays as a paragraph can use `>` because the consumer wants one flowing string.
 
-Stop and think: if you are embedding a `.pem` certificate key into a Kubernetes Secret, which operator must you use and why? Use the literal block scalar, `|`, because a certificate is structured text with newline boundaries that must survive serialization. If you use `>`, the manifest may pass YAML parsing and still deliver corrupt application data, which is more dangerous than a syntax error because the failure appears later in the rollout.
+**Pause and predict:** if you are embedding a `.pem` certificate key into a Kubernetes Secret, which operator must you use and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+Use the literal block scalar, `|`, because a certificate is structured text with newline boundaries that must survive serialization. If you use `>`, the manifest may pass YAML parsing and still deliver corrupt application data, which is more dangerous than a syntax error because the failure appears later in the rollout.
+
+</details>
+
+Write the operator and the reason before you continue. The next section is about anchors. It does not name the certificate scalar.
 
 ### Advanced YAML: Anchors (`&`) and Aliases (`*`)
 
@@ -131,7 +149,16 @@ When a YAML parser resolves that document, it expands the alias before Kubernete
 }
 ```
 
-Pause and predict: after expansion, what does `frontend_pod.metadata` contain? It contains the three shared labels from `common_labels` plus the explicit `name: react-frontend` key. The merge keeps the mapping flat, which is why the JSON representation above has four sibling keys rather than a nested `base_labels` object.
+**Pause and predict:** after expansion, what does `frontend_pod.metadata` contain?
+
+<details>
+<summary>Check your prediction</summary>
+
+It contains the three shared labels from `common_labels` plus the explicit `name: react-frontend` key. The merge keeps the mapping flat, which is why the JSON representation above has four sibling keys rather than a nested `base_labels` object.
+
+</details>
+
+Write the keys you expect before you continue. The next section is the manifest anatomy. It does not expand this alias.
 
 ## 2. The Anatomy of a Kubernetes Manifest
 
@@ -164,7 +191,16 @@ The `spec` field declares desired state, which is the central idea behind Kubern
 
 Worked example: in Kubernetes 1.35, a Deployment belongs to `apps/v1`, and the pod template inside its `spec` contains the eventual container list. If you place `image: nginx:1.27` directly under `Deployment.spec`, the YAML may still be valid, but the schema is wrong because the image field belongs under `spec.template.spec.containers[]`. This is the difference between YAML validity and Kubernetes validity. YAML only proves the text can become data; Kubernetes validation proves the data matches the chosen API schema.
 
-Pause and predict: you are creating a ConfigMap, so which standard root field is replaced and what is the replacement called? A ConfigMap does not use a workload-style `spec`; it stores key-value content under `data` and optionally `binaryData`. You still need `apiVersion`, `kind`, and `metadata`, because the API server must know what object is being created and how to identify it.
+**Pause and predict:** you are creating a ConfigMap, so which standard root field is replaced and what is the replacement called?
+
+<details>
+<summary>Check your prediction</summary>
+
+A ConfigMap does not use a workload-style `spec`. It stores key-value content under `data` and optionally `binaryData`. You still need `apiVersion`, `kind`, and `metadata`, because the API server must know what object is being created and how to identify it.
+
+</details>
+
+Write the replaced field and its replacement before you continue. The next section is `kubectl explain`. It does not name this root field.
 
 ## 3. Exploring the Schema with `kubectl explain`
 
@@ -339,7 +375,16 @@ Order matters less than beginners often fear, but it still matters for clean rol
 
 For that reason, put foundational dependencies first: Namespaces, ServiceAccounts, ConfigMaps, Secrets, PersistentVolumeClaims, then workload controllers, then Services and ingress-facing resources as appropriate for your delivery system. GitOps tools such as Argo CD and Flux add their own ordering and health concepts, but they still consume manifests that must be valid Kubernetes objects. Multi-document files are not a substitute for dependency design; they are a packaging format for related desired state.
 
-Stop and think: does document order matter when you run `kubectl apply -f combined.yaml`? The client processes documents in order, but the cluster reconciles them over time. A missing dependency may cause a temporary pod failure even if the later document creates the dependency moments afterward, so order your file to reduce noisy transitional failures and make first-apply behavior easier to reason about.
+**Pause and predict:** does document order matter when you run `kubectl apply -f combined.yaml`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The client processes documents in order, but the cluster reconciles them over time. A missing dependency may cause a temporary pod failure even if the later document creates the dependency moments afterward. Order the file to reduce noisy transitional failures and make first-apply behavior easier to reason about.
+
+</details>
+
+Write whether order matters, and to whom, before you continue. The next paragraph treats the file as one validation unit. It does not say whether the client waits for reconciliation.
 
 CI/CD validation should treat multi-resource files as a single deployment unit but inspect each object separately. A syntax error near the top can prevent the entire file from parsing. A schema error in one resource can fail the apply even if other resources are valid. A selector mismatch can pass validation entirely because it is a semantic relationship between objects rather than a local schema violation. This is why mature pipelines combine YAML parsing, server-side dry runs, and sometimes policy checks or integration tests.
 
@@ -708,6 +753,51 @@ service/web-app-svc created (server dry run)
 ```
 
 If you see this, your multi-resource YAML file is structurally sound, schema-compliant, and acceptable to the target API server. Remove `--dry-run=server` only when you intend to create or update the objects in the selected namespace.
+</details>
+
+**Card A: The sequence count is off by one.** A reviewer counts every hyphen in the `users` block, including the ones under `permissions`, and reports four users.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: indentation, not the hyphen character. Next action: count hyphens only at the `users` item indent, then read `permissions` as a nested sequence of strings.
+
+</details>
+
+**Card B: The certificate parses and still fails.** A Secret embeds a `.pem` with `>`. `kubectl apply` succeeds. The process later rejects the key.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the folded scalar turned newlines into spaces. Next action: switch that block to `|` and compare the decoded text before you rotate anything else.
+
+</details>
+
+**Card C: The merge looks nested.** After `<<: *common_labels`, someone expects `metadata.base_labels.app`. The JSON shows sibling keys instead.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the merge key flattens the alias into the parent mapping. Next action: read the expanded keys, and do not look for a nested `base_labels` object.
+
+</details>
+
+**Card D: The ConfigMap uses `spec`.** The file has `apiVersion`, `kind`, and `metadata`. The keys sit under `spec.data`. The API rejects the object.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a data object was given a workload body. Next action: move the keys to `data` and keep `apiVersion`, `kind`, and `metadata`.
+
+</details>
+
+**Card E: Apply is treated as one transaction.** `combined.yaml` lists the Deployment before the ConfigMap. The first Pods fail, then recover. The pipeline calls that a broken apply.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the client sent documents in order, and the controllers reconciled later. Next action: put the ConfigMap first, and do not expect `kubectl apply` to wait until every dependency is ready.
+
 </details>
 
 ### Exercise Success Checklist
