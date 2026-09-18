@@ -46,7 +46,16 @@ The second trap was failure recovery. Containers made processes cheap to replace
 
 The third trap was coordination between teams. Once container adoption spread, application developers, security engineers, network teams, storage teams, and operations teams all needed a shared contract. Without a common API, every team invented its own deployment scripts, environment conventions, service discovery habits, and emergency procedures. Those local conventions work until teams need to share tooling or move workloads between environments, and then every hidden assumption becomes a migration cost.
 
-Pause and predict: if you had to update one hundred running containers by hand with zero downtime, which part would fail first: choosing hosts, routing traffic, rolling back a bad version, or proving afterward what actually happened? Most teams discover that the hardest part is not starting the first replacement container. The hard part is preserving intent while many small actions happen under pressure, because imperative actions leave the operator responsible for remembering the desired final state.
+**Pause and predict:** if you had to update one hundred running containers by hand with zero downtime, which part would fail first: choosing hosts, routing traffic, rolling back a bad version, or proving afterward what actually happened?
+
+<details>
+<summary>Check your prediction</summary>
+
+Most teams discover that the hardest part is not starting the first replacement container. The hard part is preserving intent while many small actions happen under pressure, because imperative actions leave the operator responsible for remembering the desired final state.
+
+</details>
+
+Write which part fails first before you continue. The next paragraph names the orchestration category. It does not pick the failure.
 
 That pressure produced a category called container orchestration. A container orchestrator schedules work, monitors health, restarts failed containers, scales replicas, connects services, coordinates rollouts, and gives the organization a vocabulary for how production should look. The contenders of the mid-2010s agreed that orchestration was necessary, but they made different bets about simplicity, scope, extensibility, and governance. Kubernetes won because those bets lined up with how infrastructure standards actually survive.
 
@@ -145,7 +154,16 @@ Docker Swarm mode also offered declarative desired-state reconciliation, so Kube
 
 The phrase "Kubernetes figures out the rest" should not be read as magic. It means the API server stores desired state, controllers watch that state, the scheduler selects nodes, kubelets run workloads, and status flows back into the control plane. Each controller owns a narrow reconciliation loop: observe reality, compare it with the desired object, and take the next safe step toward convergence. If a pod disappears but the Deployment still declares three replicas, the system does not need a human to remember that the missing pod was supposed to exist.
 
-Pause and predict: if a Deployment declares three replicas and someone manually deletes two matching pods, what should a declarative system do after it observes the mismatch? The correct answer is that it creates replacements until the observed state matches the desired state again, subject to scheduling capacity and policy. That behavior feels obvious once you know Kubernetes, but it was a profound shift from treating deployment as a one-time command sequence.
+**Pause and predict:** if a Deployment declares three replicas and someone manually deletes two matching pods, what should a declarative system do after it observes the mismatch?
+
+<details>
+<summary>Check your prediction</summary>
+
+It creates replacements until the observed state matches the desired state again, subject to scheduling capacity and policy. That behavior was a shift from treating deployment as a one-time command sequence.
+
+</details>
+
+Write the system's next action before you continue. The next paragraph is about accountability. It does not say what happens to the missing pods.
 
 Declarative design also changes accountability. In an imperative system, the record of production may be a shell history, a runbook, and a set of people who remember what was done during an incident. In a declarative system, the intended configuration can live in version-controlled manifests, reviewed changes, and auditable API objects. That does not eliminate mistakes, but it gives teams a stable source of truth to inspect when something drifts.
 
@@ -380,6 +398,42 @@ Next, compare at least two historical contenders. Use Docker Swarm to discuss th
 Then make the Kubernetes case with both strengths and limits. Mention declarative reconciliation, extensibility through the API, CNCF governance, managed cloud-provider adoption, and the availability of standard integrations. Also include one sentence describing when Kubernetes would be too much for the current workload. A persuasive platform argument is stronger when it admits the boundary where a simpler option would be better.
 
 Finally, turn your notes into a brief recommendation. It should be short enough for an architecture review comment, specific enough to survive follow-up questions, and grounded enough that another engineer can see the historical evidence behind it. Treat this as practice for the platform conversations you will have later when choosing between native Kubernetes, managed services, operators, GitOps tools, and simpler deployment systems.
+
+**Card A: One hundred containers, updated by hand.** The first replacements start. Traffic is split across old and new processes. Nobody can say which version is supposed to be live.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: intent was never stored, so each action depends on memory. Next action: write the desired state before the next host is touched. Do not treat the first successful start as the job.
+
+</details>
+
+**Card B: Two of three pods are gone.** A Deployment still says three replicas. An operator deleted two matching pods during an incident. No one has typed a create command since.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: observed state no longer matches the declared count. Next action: watch for replacements, and check capacity only if they stay pending. Do not recreate them by hand.
+
+</details>
+
+**Card C: The CTO wants a private orchestrator.** Kubernetes "feels too complex," so the proposal is a proprietary scheduler for a handful of services. The team already has container images.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: packaging was solved; placement, recovery, and a shared API were not. Next action: name those operational problems before comparing products, and include one case where Kubernetes would be too much.
+
+</details>
+
+**Card D: The only record is shell history.** After the incident, the intended replica count lives in one engineer's terminal, not in a reviewed manifest.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: imperative actions were the source of truth. Next action: recover the desired object from version control, then let controllers converge. Do not treat the shell history as the contract.
+
+</details>
 
 ### Success Criteria
 
