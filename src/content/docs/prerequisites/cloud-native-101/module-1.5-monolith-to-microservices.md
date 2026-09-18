@@ -69,9 +69,16 @@ The same togetherness becomes painful when growth makes local coupling visible. 
 
 The shared database is the most important hidden boundary in many monoliths. It gives you easy ACID transactions, simple joins, and direct reporting queries, but it also lets unrelated code paths affect one another through locks, slow queries, schema changes, and accidental coupling. A clean code module is not truly independent if every other module can reach into its tables.
 
-> **Pause and predict**: If a monolith shares a single database, what happens when the "Order Module" accidentally executes a poorly written database query that consumes all available database CPU? Think through the user-facing impact before you read further, especially for the "User Module," which may have perfectly healthy application code but depends on the same database resource.
+**Pause and predict:** If a monolith shares a single database, what happens when the Order module accidentally executes a poorly written query that consumes all available database CPU? What does a user of the User module see?
 
-The user module slows down because the shared dependency is saturated. This is the heart of architectural coupling: the failure did not need to cross a function call boundary or a source-code import to hurt another feature. The database was the shared resource, so the blast radius followed that resource instead of following the application package structure.
+<details>
+<summary>Check your prediction</summary>
+
+The User module slows down because the shared dependency is saturated. The failure did not need to cross a function call or a source import. The database was the shared resource, so the blast radius followed that resource instead of the package structure.
+
+</details>
+
+Hold the user-facing effect before you read on. The next paragraph is about a large company that kept one deployable unit. It does not describe what the saturated database did to login.
 
 A good monolith is not a bad architecture waiting to be rescued. Shopify's long-running "modular monolith" framing is a useful reminder that a carefully maintained monolith can serve very large businesses when teams invest in modularity, testing, observability, and disciplined ownership. The trap is not the monolith itself; the trap is allowing "single deployable unit" to become "single tangled unit."
 
@@ -115,17 +122,31 @@ This independence changes how teams work. A user service team can release a prof
 
 The price is the distributed system tax. A function call inside a monolith becomes an HTTP, gRPC, or message-broker interaction across a network. That network call can time out, retry, duplicate, arrive late, return a partial response, or fail because another service is rolling out. The code may still be simple, but the behavior is no longer local.
 
-> **Stop and think**: In a monolith, a function call usually takes microseconds and fails only when the process or called code fails. In microservices, a network call often takes milliseconds and can fail because of timeouts, network partitions, overloaded dependencies, certificate issues, or a remote deployment. How should that change the way you design error handling and user-facing workflows?
+**Pause and predict:** In a monolith, a function call usually takes microseconds and fails only when the process or the called code fails. In microservices, a network call often takes milliseconds and can fail because of timeouts, network partitions, overloaded dependencies, certificate issues, or a remote deployment. How should that change the way you design error handling and user-facing workflows?
 
-The practical answer is that microservice code must assume partial failure as a normal case. Timeouts need budgets, retries need limits, idempotency needs design, and fallbacks need product decisions. Without those habits, splitting the system moves failure from compile-time and test-time into production traffic, where it becomes harder to understand.
+<details>
+<summary>Check your prediction</summary>
+
+Microservice code must assume partial failure as a normal case. Timeouts need budgets, retries need limits, idempotency needs design, and fallbacks need product decisions. Without those habits, splitting the system moves failure from compile time and test time into production traffic.
+
+</details>
+
+Write that design change down before the schema discussion. The next paragraph is about who owns the tables. It is not the error-handling answer.
 
 The database-per-service pattern is another example of a trade-off rather than a slogan. It improves ownership because one service controls its schema and invariants. It also makes cross-service reporting, transactions, and consistency harder, because you cannot simply wrap a user update, inventory reservation, and payment authorization in one local transaction.
 
 Teams handle that complexity with events, sagas, outbox tables, reconciliation jobs, and careful product semantics. A checkout system may accept an order, publish an event, reserve inventory asynchronously, and later notify the customer if the reservation fails. That feels less tidy than one database transaction, but it can be more resilient when high traffic or temporary dependency failures are expected.
 
-> **Pause and predict**: A five-person startup is building its first product, still changing its user model every week, and has no dedicated platform engineer. Should it begin with separate user, billing, catalog, recommendation, and notification microservices, or should it keep one modular deployable unit until the domain stabilizes? Write down the operational work each choice creates before you continue.
+**Pause and predict:** A five-person startup is building its first product, still changing its user model every week, and has no dedicated platform engineer. Should it begin with separate user, billing, catalog, recommendation, and notification services, or should it keep one modular deployable unit until the domain stabilizes?
 
-For that startup, a modular monolith is usually the more honest decision. The team needs fast learning, cheap refactoring, and fewer moving parts. Microservices make more sense when boundaries are stable enough to become contracts and when independent deployability solves a real bottleneck rather than satisfying an architectural preference.
+<details>
+<summary>Check your prediction</summary>
+
+A modular monolith is usually the more honest decision. The team needs fast learning, cheap refactoring, and fewer moving parts. Separate services make more sense when boundaries are stable enough to become contracts and when independent deployability solves a real bottleneck.
+
+</details>
+
+List the operational work before you read how team count changes the same choice. The following paragraph is about several teams that already exist. It assumes you have already picked a starting shape.
 
 Microservices are at their strongest when the organization already has multiple teams with distinct ownership. If one team owns checkout reliability, another owns search relevance, and another owns identity, forcing them through one release train creates friction. Separate services can align the software boundary with the team boundary, which is why Conway's Law appears in nearly every serious discussion of this topic.
 
@@ -531,6 +552,46 @@ Use synchronous calls when the user needs an immediate answer, such as authentic
 - [ ] You connected at least five Kubernetes features to the operational problems they solve.
 - [ ] You evaluated synchronous and asynchronous communication with failure behavior, not only convenience.
 - [ ] You explained why at least two possible services should remain inside the monolith for now.
+
+- [ ] I named a failure layer and a next action for each frozen boundary-layer card before opening the reveal.
+
+A slow login, a hung checkout, a week-one split, and a release train can each look like an application bug. These cards freeze four transcripts so you can name the layer before you look. Read the symptom, name the boundary, and only then open the reveal.
+
+**Card A: Login is slow. The User package is healthy.** A holiday sale runs a bad Order query. Database CPU is pegged. Login requests time out. The User code did not change, and its tests still pass.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the shared database, not the User package. Next action: find the query that holds the CPU, and do not start by rewriting the login handler.
+
+</details>
+
+**Card B: Checkout hangs with no budget.** A new service calls inventory over the network. The inventory process stalls. Checkout threads wait until the browser gives up. There is no timeout and no retry limit.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the call treats the network like an in-process function. Next action: set a timeout budget and a bounded retry before you add another service hop.
+
+</details>
+
+**Card C: Five services in week one.** Five people split user, billing, catalog, recommendation, and notification into separate deployables. The user model still changes every week. There is no platform engineer.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the split arrived before a stable boundary. Next action: put the changing model back in one deployable unit until a real bottleneck shows up.
+
+</details>
+
+**Card D: Four services, one release.** The diagram shows four services. Every feature still waits for all four pipelines to go green, and they share one database write path.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a distributed monolith, not independent services. Next action: stop extracting the next noun, and name the release coupling before you add a fifth repository.
+
+</details>
 
 ## Sources
 
