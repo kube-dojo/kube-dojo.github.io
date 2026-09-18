@@ -74,9 +74,16 @@ If you want to force Git to create a merge commit anyway (often done to preserve
 
 This distinction matters in automation because a protected branch can use `--ff-only` as a guardrail rather than as a style preference. If a pipeline expects a deployment branch to be a strict descendant of a reviewed release branch, a failed fast-forward tells you the graph no longer matches the release process you thought you were following. That failure is useful evidence. It says that someone introduced independent history and that the team now needs a deliberate integration decision instead of a silent pointer move.
 
-> **Pause and predict**: Before running `git log --oneline --graph` after this merge, sketch out what you think the history graph will look like. Will there be a fork and a merge commit? 
-> 
-> *Verification*: Because this was a fast-forward merge, `main` simply moved to the tip of `feature/add-metadata`. There is no fork and no merge commit. `git log --oneline --graph` will show a single straight line of commits ending with "Add ConfigMap kind".
+**Pause and predict:** Before running `git log --oneline --graph` after this merge, sketch out what you think the history graph will look like. Will there be a fork and a merge commit?
+
+<details>
+<summary>Check your prediction</summary>
+
+Because this was a fast-forward merge, `main` simply moved to the tip of `feature/add-metadata`. There is no fork and no merge commit. `git log --oneline --graph` will show a single straight line of commits ending with "Add ConfigMap kind".
+
+</details>
+
+Sketch the graph before you continue. The next section explains what changes when both sides have new commits. It does not draw this history.
 
 #### The Three-Way Merge
 
@@ -100,7 +107,16 @@ gitGraph
 
 To resolve this divergence algorithmically, Git looks at the common ancestor (commit `E`), compares it against your current state (`C`) to see exactly what you changed, and then compares the ancestor against the incoming state (`G`) to see exactly what they changed. Git then attempts to synthesize and apply both sets of changes to the baseline `E` simultaneously. If the modifications do not overlap on the exact same lines of code, Git successfully creates a new **merge commit** (represented as `H` in the diagram) that mathematically binds the two parallel timelines together.
 
-> **Pause and predict**: What do you think happens if both branch `main` and branch `feature/rbac` modified the exact same `subjects` list in a RoleBinding manifest, but added different users? How will Git's three-way merge handle this specific scenario?
+**Pause and predict:** What do you think happens if both branch `main` and branch `feature/rbac` modified the exact same `subjects` list in a RoleBinding manifest, but added different users? How will Git's three-way merge handle this specific scenario?
+
+<details>
+<summary>Check your prediction</summary>
+
+Overlapping edits to the same lines do not auto-merge. Git stops and marks a conflict because it cannot tell which user list should survive. Non-overlapping edits on different lines can still apply together.
+
+</details>
+
+Write conflict or auto-merge before you continue. The table below names several change shapes. Read your own prediction before you use that table as a lookup.
 
 | Change Type | Branch A (main) vs Base | Branch B (feature) vs Base | Git's Action during Merge |
 | :--- | :--- | :--- | :--- |
@@ -120,26 +136,33 @@ git merge-base main feature/ingress-update
 
 The output of `git merge-base` is one selected best common ancestor commit hash for the two branches, which Git uses as the starting point for its three-way merge calculation. In criss-cross histories with multiple equally good bases, run `git merge-base --all` to list every candidate. Understanding exactly which commit acts as the base is critical when diagnosing why Git seems to be generating strange or counterintuitive conflicts.
 
-> **Pause and predict**: Look at the following branch topology:
-> ```mermaid
-> gitGraph
->    commit id: "A"
->    commit id: "B"
->    branch feature/db
->    checkout main
->    commit id: "C"
->    commit id: "D"
->    checkout feature/db
->    commit id: "E"
->    commit id: "F"
->    branch feature/cache
->    checkout feature/cache
->    commit id: "G"
->    commit id: "H"
-> ```
-> If you are on `main` and run `git merge feature/cache`, which commit is the merge base? 
-> 
-> *Answer*: The merge base is commit `B`. To find it, trace backwards from `main` (commit D) and `feature/cache` (commit H) until their paths intersect. They first meet at `B`, making it the common ancestor used for the three-way merge.
+**Pause and predict:** Look at the following branch topology. If you are on `main` and run `git merge feature/cache`, which commit is the merge base?
+
+```mermaid
+gitGraph
+   commit id: "A"
+   commit id: "B"
+   branch feature/db
+   checkout main
+   commit id: "C"
+   commit id: "D"
+   checkout feature/db
+   commit id: "E"
+   commit id: "F"
+   branch feature/cache
+   checkout feature/cache
+   commit id: "G"
+   commit id: "H"
+```
+
+<details>
+<summary>Check your prediction</summary>
+
+The merge base is commit `B`. To find it, trace backwards from `main` (commit D) and `feature/cache` (commit H) until their paths intersect. They first meet at `B`, making it the common ancestor used for the three-way merge.
+
+</details>
+
+Write the commit letter before you continue. The next paragraph names merge strategies. It does not identify the base of this topology.
 
 Git provides several merge strategies that govern how files are combined: `ort`, `recursive` (now an alias/synonym for `ort`), `resolve`, `octopus`, `ours`, and `subtree`. 
 
@@ -520,9 +543,16 @@ git checkout release-v1.35
 git merge feature/ingress feature/autoscaling feature/network-policies
 ```
 
-> **Pause and predict**: What do you think happens if Git successfully merges `feature/ingress` and `feature/autoscaling`, but then detects a complex conflict when attempting to merge `feature/network-policies`? Will it pause and ask you to resolve it like a standard three-way merge?
+**Pause and predict:** What do you think happens if Git successfully merges `feature/ingress` and `feature/autoscaling`, but then detects a complex conflict when attempting to merge `feature/network-policies`? Will it pause and ask you to resolve it like a standard three-way merge?
 
-**The All-or-Nothing Rule:** Unlike a standard two-branch three-way merge, which pauses mid-flight and leaves interactive conflict markers in your working directory while keeping the branch pointer unchanged, an octopus merge stops as soon as it hits a conflict it cannot resolve automatically. Git prints `Automatic merge failed; fix conflicts and then commit the result.`, does **not** move the branch ref, and leaves the working tree and index in a conflicted or partially merged state. Run `git merge --abort` to discard that in-progress merge and return to the pre-merge snapshot.
+<details>
+<summary>Check your prediction</summary>
+
+Unlike a standard two-branch three-way merge, which pauses mid-flight and leaves interactive conflict markers in your working directory while keeping the branch pointer unchanged, an octopus merge stops as soon as it hits a conflict it cannot resolve automatically. Git prints `Automatic merge failed; fix conflicts and then commit the result.`, does **not** move the branch ref, and leaves the working tree and index in a conflicted or partially merged state. Run `git merge --abort` to discard that in-progress merge and return to the pre-merge snapshot.
+
+</details>
+
+Write pause or stop before you continue. The next prompt asks which recovery you would choose after that failure. It does not describe the failure itself.
 
 > **Stop and think**: If an octopus merge fails due to a conflict between `feature/autoscaling` and `feature/network-policies`, which approach would you choose:
 > A) Abandon the octopus merge entirely and merge all three sequentially.
@@ -840,6 +870,42 @@ git commit -m "Merge scale-api into harden-api resolving replicas and feature mo
 git show --stat --summary HEAD
 git show HEAD
 ```
+
+</details>
+
+**Card A: A fast-forward is drawn as a merge commit.** After `feature/add-metadata` lands on an undiverged `main`, someone expects `git log --graph` to show a fork.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: pointer move versus a new commit. Next action: look for a single line ending at the feature tip. A merge commit appears only when you force `--no-ff` or the histories had already diverged.
+
+</details>
+
+**Card B: The same `subjects` lines auto-merge.** Both branches added a different user on the same RoleBinding list. The merge is expected to keep both names without a stop.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: overlapping hunks. Next action: expect a conflict, not a combined list. Different lines can still apply; the same lines cannot be guessed.
+
+</details>
+
+**Card C: The merge base is a tip.** On `main`, merging `feature/cache` from the topology above, someone names commit `D` or commit `H` as the base.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the common ancestor, not either tip. Next action: walk both histories backward until they meet. In that diagram the meeting point is `B`.
+
+</details>
+
+**Card D: An octopus conflict pauses like a two-branch merge.** `feature/network-policies` conflicts after two other branches merged cleanly. The plan is to edit markers and commit.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: all-or-nothing versus a paused two-parent merge. Next action: do not treat the partial result as a commit to finish. Abort and integrate the conflicting pair first.
 
 </details>
 
