@@ -143,7 +143,15 @@ Creating a filesystem is a destructive operation because it writes new filesyste
 
 The ext4 versus XFS decision is not about one filesystem being universally better. ext4 is flexible and familiar, including offline shrink support, which can matter in lab environments and smaller general-purpose systems. XFS is excellent for large filesystems and sustained throughput, but it can only grow, so a careless over-allocation may require backup, recreation, and restore if you later need to shrink it.
 
-Pause and predict: if you run `lvextend` on a logical volume but skip the filesystem resize step, which tool will show the new size first, `lvs` or `df -h`? The right answer reveals the boundary between block-device capacity and filesystem capacity, and that boundary is the reason LVM changes can look successful while applications still fail with old space limits.
+**Pause and predict:** You run `lvextend` on a logical volume and skip the filesystem resize. Which tool shows the new size first, `lvs` or `df -h`?
+
+<details>
+<summary>Check your prediction</summary>
+
+`lvs` shows the new block-device size first. `df -h` stays at the old filesystem size until `resize2fs`, `xfs_growfs`, or `lvextend -r`. Applications still hit the old limit.
+</details>
+
+LVM can grow the block device without growing the filesystem that applications read. That boundary is why a resize can look finished while the service still fails.
 
 ## LVM: Flexible Storage Without Repartitioning
 
@@ -270,7 +278,15 @@ The `-r` flag is the habit to build because it keeps the logical volume resize a
 | Shrinking XFS | XFS cannot be shrunk, only grown | Use ext4 if shrinking may be needed |
 | Not updating fstab | Mount lost on reboot | Add entry to `/etc/fstab` |
 
-Stop and think: you have a `vg_webservers` volume group with two physical volumes, and you need to expand `/var/www/html` on `lv_html` after adding `/dev/sde`. The efficient online sequence is to initialize the new disk as a PV, extend the existing VG, then use `lvextend -r` against the LV, because the application should keep using the same mount point while capacity grows under it.
+**Pause and predict:** `vg_webservers` has two physical volumes. You added `/dev/sde` and need more space on `/var/www/html` (`lv_html`). What is the online sequence, and why does the mount point stay put?
+
+<details>
+<summary>Check your prediction</summary>
+
+`pvcreate /dev/sde`, `vgextend vg_webservers /dev/sde`, then `lvextend -r` on `lv_html`. `-r` resizes the filesystem in the same step. The application keeps the same mount.
+</details>
+
+The application should keep using the same mount point while capacity grows under it.
 
 ## Mounting, `/etc/fstab`, and Boot Safety
 
@@ -327,7 +343,15 @@ df -h
 
 **Hypothetical scenario:** A practical war story makes this concrete. A junior sysadmin added an NFS mount to fstab without `nofail`; when the NFS server went down for weekend maintenance, every patched host that rebooted stopped in emergency mode waiting for a network dependency that was not needed to boot the operating system. The repair was one line per server, but the outage consumed hours because each host needed console access before ordinary SSH was available.
 
-Pause and predict: your database server reboots, and `/var/lib/postgresql/data` appears empty because its XFS filesystem did not mount. Before starting or restarting the database, what should you verify with `findmnt`, `blkid`, and `journalctl -b`? The safe path is to confirm the LV and filesystem are intact, mount the correct UUID at the correct directory, and only then let the service touch the data path.
+**Pause and predict:** After reboot, `/var/lib/postgresql/data` looks empty because its XFS filesystem did not mount. What do you check with `findmnt`, `blkid`, and `journalctl -b` before you start the database?
+
+<details>
+<summary>Check your prediction</summary>
+
+Confirm the LV and the XFS filesystem are intact, then mount the correct UUID on the correct directory. Only then let the service touch the data path. Starting Postgres against an empty directory creates a second, empty cluster.
+</details>
+
+Do not start the database against a directory that only looks like the data path.
 
 ## NFS, autofs, Swap, and RAID in Daily Operations
 
@@ -400,7 +424,15 @@ echo "192.168.1.10:/srv/nfs/shared  /mnt/nfs/shared  nfs  defaults,nofail,_netde
 
 For client mounts, `nofail` and `_netdev` are boot-safety options, not performance tuning. `nofail` allows the system to continue booting if the share is unavailable, while `_netdev` tells the boot process that the mount depends on networking. For application behavior, choose hard or soft mounts deliberately; hard mounts protect data integrity for many write workloads, while soft mounts can return errors sooner but may surprise applications that are not built for partial storage failures.
 
-Stop and think: a web server needs read-only uploaded content from `nfs.example.com:/srv/webuploads` at `/var/www/uploads`, and it should not block boot when the NFS server is down. A durable entry would use `ro,nofail,_netdev` and an explicit NFS version if your environment requires it, because the web tier should fail gracefully instead of turning a shared-content outage into a host boot outage.
+**Pause and predict:** A web server needs `nfs.example.com:/srv/webuploads` mounted read-only at `/var/www/uploads`, and boot must continue if the NFS server is down. Which fstab flags do that?
+
+<details>
+<summary>Check your prediction</summary>
+
+`ro,nofail,_netdev`, plus an explicit NFS version if the environment requires one. The web tier should fail the content path without turning a shared-storage outage into a host that never finishes boot.
+</details>
+
+A shared-content outage should not become a host boot outage.
 
 Swap is also a storage feature, even though it is usually discussed with memory. It gives the kernel a place to move inactive memory pages when RAM pressure rises, which can protect small systems from immediate process death. The tradeoff is latency and predictability: swapping a hot workload to disk can make a server look alive while it is too slow to meet its service objective.
 
@@ -1027,9 +1059,48 @@ df -h /mnt/exercise
 
 The third task closes the boot-safety loop. A manual mount proves only that the command worked once; an fstab entry tested with `mount -a` proves that the host can reproduce the mount declaration. In a real change, this is where you would also check service dependencies and decide whether the mount should be required for boot.
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–3 stay as the build recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Extend looked done.** `lvextend` succeeded. `lvs` shows the new size. `df -h` does not. The app is still out of space.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: filesystem, not the LV. Next action: grow the filesystem (`lvextend -r`, `resize2fs`, or `xfs_growfs`) and read `df` again.
+</details>
+
+**Card B: New disk, same mount.** `/dev/sde` is attached. `/var/www/html` is still full. The VG does not list the new disk.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the disk is not a PV in the VG yet. Next action: `pvcreate`, `vgextend`, then `lvextend -r` on `lv_html`. Do not remount.
+</details>
+
+**Card C: Empty data directory.** After reboot, `/var/lib/postgresql/data` is empty. `findmnt` does not show the XFS LV there.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the filesystem did not mount. Next action: `blkid` and `journalctl -b`, mount the UUID, then start Postgres. Do not init a new cluster in the empty directory.
+</details>
+
+**Card D: Boot hangs on NFS.** `/var/www/uploads` is an NFS mount with no `nofail`. The NFS server is down and the host never finishes boot.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: fstab boot policy, not the web content. Next action: add `nofail,_netdev` (and `ro` if the share is read-only) so boot continues.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Physical volumes created with `pvcreate`
+- [ ] Classified each frozen storage-layer card before opening the reveal.
 - [ ] Volume group created and extended with `vgcreate`/`vgextend`
 - [ ] Logical volume created and extended with `lvcreate`/`lvextend`
 - [ ] Filesystem created, mounted, and data survived extension
