@@ -81,7 +81,16 @@ That's a container.
 
 The practical difference is ownership. Without containers, production often owns the runtime environment and application teams negotiate against it. With containers, the application package declares its own runtime, dependencies, and startup command, while the platform provides a compatible kernel and runtime. That boundary does not remove operational responsibility, but it gives both sides a clearer contract: the image says what to run, and the platform decides where and under what limits it can run.
 
-Pause and predict: if a Python service uses a native library installed on the developer laptop but not on the production host, what should change when the service is packaged as a container image? The correct expectation is not that the host suddenly becomes cleaner. The important change is that the service now carries the needed user-space dependency inside the image, so the host's missing package is no longer part of the runtime contract.
+**Pause and predict:** If a Python service uses a native library installed on the developer laptop but not on the production host, what should change when the service is packaged as a container image?
+
+<details>
+<summary>Check your prediction</summary>
+
+The host does not suddenly become cleaner. The service carries the needed user-space dependency inside the image, so the host's missing package is no longer part of the runtime contract.
+
+</details>
+
+Name the boundary before you read on. The next paragraphs describe how teams use that package. They do not repeat this library case.
 
 This contract is especially useful for teams that deploy many small services. A platform team cannot safely hand-tune every server for every application version, and an application team cannot debug every production host by memory. Containers make the application artifact more complete, which lets automation do repeatable work. A scheduler can pull an image, start a process, enforce limits, restart a failed instance, and repeat the same action across hundreds of machines without reinterpreting a setup guide.
 
@@ -161,9 +170,18 @@ flowchart LR
     Namespaces --> Result
 ```
 
-The network namespace example makes the idea concrete. Three containers can each run a web server listening on port 8080 because each container has its own network namespace. Inside each namespace, the port is available. The host or orchestrator then decides which container ports are published, proxied, or connected to a service network. If every process shared the host network namespace by default, the second web server would collide with the first.
+The network namespace example makes the idea concrete. Three containers can each run a web server listening on port 8080 because each container has its own network namespace. Inside each namespace, the port is available. The host or orchestrator then decides which container ports are published, proxied, or connected to a service network.
 
-Pause and predict: imagine the `NET` namespace isolation failed while the other namespaces kept working. Three web server containers all try to listen on the same port, and only one can bind successfully on the shared host network stack. The failure would look like an ordinary "port already in use" error, but the root cause would be that the platform lost the network illusion containers rely on.
+**Pause and predict:** If `NET` namespace isolation failed while the other namespaces kept working, what would three web servers see when they all try to listen on the same port?
+
+<details>
+<summary>Check your prediction</summary>
+
+Only one process can bind that port on the shared host network stack. The failure looks like an ordinary "port already in use" error. The root cause is that the platform lost the network illusion containers rely on. If every process shared the host network namespace by default, the second web server would collide with the first.
+
+</details>
+
+Hold that prediction before the cgroup section. Resource limits are a different layer from the port you just considered.
 
 Resource limits come from control groups, usually called cgroups. Namespaces decide what a process can see. Cgroups decide how much CPU, memory, and other resources the process group can consume. This matters because isolation without limits is only a partial defense. A runaway memory leak in one application should not be allowed to starve the database, the node agent, or unrelated containers on the same host.
 
@@ -313,9 +331,18 @@ Software Containers:
 
 The analogy is powerful only if you keep its limits in mind. A shipping container standardizes the outside shape and handling equipment, not the value or fragility of what is inside. A software container standardizes packaging and runtime assumptions, not application correctness, schema design, or security posture. You can ship a broken application inside a flawless image just as easily as you can ship damaged goods in a strong steel box.
 
-The most important limit for beginners is persistence. A running container usually has a writable layer, but that layer belongs to that particular container instance. If the instance is removed and replaced, data written only to that layer is gone. This behavior is not a bug; it is what makes containers replaceable. The image remains clean, and a new container starts from the same known template.
+The most important limit for beginners is persistence. A running container usually has a writable layer, but that layer belongs to that particular container instance.
 
-Pause and predict: if you write a log file or uploaded profile picture inside a running container and then remove the container, should the data survive? The safest answer is no unless you deliberately wrote it to external storage or a mounted volume. The container's internal filesystem is convenient scratch space, not a persistence plan. Many real outages begin with someone treating it like a small durable server disk.
+**Pause and predict:** If you write a log file or an uploaded profile picture inside a running container and then remove the container, should the data survive?
+
+<details>
+<summary>Check your prediction</summary>
+
+No, unless you deliberately wrote it to external storage or a mounted volume. The container's internal filesystem is scratch space, not a persistence plan. If the instance is removed and replaced, data written only to that layer is gone. That is what makes containers replaceable: the image stays clean, and a new container starts from the same template.
+
+</details>
+
+Write the prediction down before you read the replacement rule below. The following paragraphs assume you have already decided what happens to a file that exists only inside the removed container.
 
 This is where the container mental model becomes operational rather than philosophical. Stateless processes are easy to replace because their important state lives elsewhere, such as in a database, queue, object store, or mounted volume. Stateful systems can run in containers, but they need explicit storage design, backup strategy, and careful lifecycle management. Kubernetes does not change that law; it gives you primitives such as volumes and StatefulSets, which still require correct design.
 
@@ -518,6 +545,46 @@ The cleanup command is safe to run even if the container is already stopped beca
 - [ ] You removed a container and observed that data written only inside it disappeared.
 - [ ] You can explain the difference between an image, a container, and a writable container layer.
 - [ ] You designed a simple persistence plan for data that must avoid losing state when a container is replaced.
+
+- [ ] I named a failure layer and a next action for each frozen container-layer card before opening the reveal.
+
+A missing import, a bind error, a vanished file, and an empty process list can each look like the runtime is broken. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Import fails only in production.** The image starts. Python cannot import a native module. That module is installed on the developer laptop. It is not installed on the production host. The Dockerfile never mentioned it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the image does not carry the user-space dependency. Next action: add the library to the image build, then run the import in a container that does not have the laptop's packages.
+
+</details>
+
+**Card B: Two of three servers cannot bind.** Three containers request port 8080. Two exit with "address already in use". PID, mount, and user namespaces still look separate.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: network namespace, not the application port choice. Next action: confirm each container has its own `NET` namespace before you change the listen port.
+
+</details>
+
+**Card C: The upload is gone after replace.** A profile picture was written to `/data/photo.jpg` inside the container. No volume was mounted. After `docker rm` and a new container with the same name, the file is not there.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: writable container layer, not the image. Next action: put the upload on a volume or an external store, then replace the container again and read the file from that store.
+
+</details>
+
+**Card D: The Mac shows no sleep process.** Task 3 is `ps aux | grep "sleep 3600"` on Docker Desktop. The Mac prints nothing. `docker ps` still lists `isolation-test`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: you are looking at the desktop OS, not the Linux kernel the container shares. Next action: treat the missing host PID as the Docker Desktop VM boundary, and use `docker exec` for the in-container view.
+
+</details>
 
 ## Sources
 
