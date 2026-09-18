@@ -63,9 +63,16 @@ The diagram hides an important operational consequence. In the push model, the p
 
 GitOps also changes how drift is treated. Drift means the actual cluster state differs from the desired state in Git. Some drift is accidental, such as a developer running `kubectl scale deployment web --replicas=10` during an incident and forgetting to update the manifest. Some drift is malicious, such as an attacker changing an image tag or mounting a new secret into a pod. A GitOps controller detects both cases as disagreement between declaration and reality, then either alerts, repairs, or waits for approval depending on policy.
 
-> **Pause and predict:** if Git says a Deployment should run three replicas and the cluster currently runs ten, what should a GitOps controller do by default in a strict production environment, and when might you intentionally choose a softer policy?
+**Pause and predict:** If Git says a Deployment should run three replicas and the cluster currently runs ten, what should a GitOps controller do by default in a strict production environment, and when might you intentionally choose a softer policy?
+
+<details>
+<summary>Check your prediction</summary>
 
 The right answer depends on the risk model. In a strict environment, Git wins because the unauthorized change could be a mistake or an intrusion, and automatic self-healing restores the reviewed state. In a less mature environment, a team may start with alert-only drift detection so operators can learn which manual practices still exist before enabling automatic correction. The key is to make the choice explicit, because silent drift is the worst of both worlds: the team thinks Git is authoritative while production slowly diverges from it.
+
+</details>
+
+Write heal or alert before you continue. The next paragraph names the four OpenGitOps principles. It does not choose a policy for these ten replicas.
 
 The four OpenGitOps principles provide a useful test for whether a workflow deserves the name. The system must be declarative, meaning the desired state is described rather than scripted as imperative steps. It must be versioned and immutable, so every change can be traced to a commit. It must be pulled automatically by software agents. It must be continuously reconciled, so the agent observes and corrects differences over time rather than applying a manifest once and walking away.
 
@@ -701,6 +708,42 @@ Simulate an approved pull request by editing the source file to bump the image v
 <summary>Solution</summary>
 
 Execute steps 8, 9, 10, and 11. By using `sed` or a text editor, you update the canonical source of truth first. Applying this new file rolls out the updated container image, and the cleanup removes the temporary resources.
+</details>
+
+**Card A: Ten replicas stay up in strict production.** Git says three. Someone scaled the Deployment to ten during an incident and did not change the manifest. Strict production is set to self-heal. The plan is to leave the ten running until the next commit.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: declared state versus live state. Next action: expect the controller to restore three replicas. An unauthorized scale is drift, not a new desired state, until someone commits it.
+
+</details>
+
+**Card B: Alert-only while the change might be an intrusion.** The image tag changed and no commit explains it. The controller is set to alert only, because the team has not decided whether Git should win.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the risk model was left implicit. Next action: in strict production, repair back to Git. Use alert-only only when the team has explicitly chosen to learn remaining manual practices first.
+
+</details>
+
+**Card C: Self-heal fights another controller.** `selfHeal` is on. A second controller is supposed to manage replica count after Git creates the Deployment. Argo CD keeps writing the Git number back.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: ownership. Next action: do not let the GitOps controller correct fields another system owns. Rehearse that boundary before enabling self-heal.
+
+</details>
+
+**Card D: One apply is called continuous reconciliation.** A pipeline runs `kubectl apply` when main moves, then nobody watches the cluster. The team calls that GitOps because the file lives in Git.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a one-shot apply versus a pulling agent. Next action: require a controller that keeps observing and correcting. Applying once and walking away is not continuous reconciliation.
+
 </details>
 
 ### Success Criteria Checklist
