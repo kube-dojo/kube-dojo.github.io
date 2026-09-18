@@ -90,7 +90,13 @@ Several controllers are easy to underestimate because they do not appear in the 
 
 Resource controllers are not all equally portable across orchestration layers, so you should distinguish kernel capability from platform exposure. The kernel may support a controller, systemd may expose a friendly unit property for it, and Kubernetes may or may not provide a direct per-pod field for the same control. That layering matters when a teammate asks why a limit can be set in a systemd unit but not in a Deployment manifest. The answer is often not "Linux cannot do it"; it is "this control plane has chosen a narrower API."
 
-Pause and predict: if a process is in a private PID namespace but has no useful cgroup limit, what stops it from consuming all memory on the node? The answer is almost nothing at the namespace layer; visibility isolation does not imply resource fairness. A container can have a tidy process tree and still pressure the host into reclaim, eviction, or kernel OOM behavior if its cgroup configuration leaves the workload unbounded.
+**Pause and predict:** If a process is in a private PID namespace but has no useful cgroup limit, what stops it from consuming all memory on the node?
+
+<details>
+<summary>Check your prediction</summary>
+
+Almost nothing at the namespace layer; visibility isolation does not imply resource fairness. A container can have a tidy process tree and still pressure the host into reclaim, eviction, or kernel OOM behavior if its cgroup configuration leaves the workload unbounded.
+</details>
 
 ## cgroups v1, cgroups v2, and Why the Hierarchy Changed
 
@@ -157,7 +163,13 @@ The table captures the high-level migration, but the operational consequence is 
 
 Mixed fleets deserve special care because cgroup migration usually happens through operating-system images, boot options, container runtime configuration, and kubelet configuration together. One node pool may be fully v2 while another still exposes legacy paths because it uses an older distribution or a different image pipeline. Monitoring that silently falls back to zeros can hide that split until an incident. A safer migration plan includes an explicit node check, a DaemonSet or bootstrap script that reports the detected hierarchy, and an inventory of agents that read cgroup files directly.
 
-Before running this on a node, predict which paths your runtime will use: systemd slices, CRI container scopes, or a distribution-specific pod layout. Then inspect `/proc/<pid>/cgroup` for a real process and compare your prediction with the kernel's answer. That small exercise catches many false assumptions, especially on hosts that moved from Docker-managed paths to containerd with systemd cgroup drivers.
+**Pause and predict:** Before running this on a node, which paths do you expect the runtime to use — systemd slices, CRI container scopes, or a distribution-specific pod layout?
+
+<details>
+<summary>Check your prediction</summary>
+
+Inspect `/proc/<pid>/cgroup` for a real process and compare your prediction with the kernel's answer. That small exercise catches many false assumptions, especially on hosts that moved from Docker-managed paths to containerd with systemd cgroup drivers. The path you guessed is not evidence until the kernel file agrees.
+</details>
 
 ## Memory Limits and OOM Diagnosis
 
@@ -178,7 +190,13 @@ flowchart LR
 
 The most common beginner mistake is thinking that an application memory setting and a container memory limit describe the same thing. A Java heap, Python object graph, Go heap target, or database buffer pool is only part of the process footprint. Native allocations, thread stacks, memory-mapped files, shared memory, TLS buffers, JIT metadata, page cache charged to the cgroup, and kernel memory can all contribute to the cgroup's current usage. If the limit equals the application heap, the real workload may have no room to breathe.
 
-Stop and think: if a Java application with a 512MB heap size is placed in a container with a 512MB cgroup memory limit, it will almost certainly be OOMKilled. The heap is not the whole process, and the memory controller charges more than the object space that the JVM flag describes. The safer engineering question is not "Can the heap fit?" but "Can the whole process, its runtime overhead, and its worst normal request shape fit with headroom?"
+**Pause and predict:** If a Java application with a 512MB heap size is placed in a container with a 512MB cgroup memory limit, will it stay healthy, and what question should you ask instead of "can the heap fit?"
+
+<details>
+<summary>Check your prediction</summary>
+
+It will almost certainly be OOMKilled. The heap is not the whole process, and the memory controller charges more than the object space that the JVM flag describes. Ask whether the whole process, its runtime overhead, and its worst normal request shape fit with headroom.
+</details>
 
 When memory exceeds the limit, the sequence is short and harsh. The kernel invokes OOM handling for the constrained cgroup, chooses a victim process within that context, sends `SIGKILL`, and the container runtime reports termination to Kubernetes. Kubernetes may restart the container according to the pod restart policy, but the process that was killed cannot catch `SIGKILL`, flush final application logs, or finish an in-flight request. This is why OOMKilled incidents often have an empty application log and a much more useful kernel or Kubernetes event trail.
 
@@ -256,7 +274,13 @@ flowchart LR
 
 The quota-period model explains why a single-threaded service with a half-CPU limit can suffer high tail latency during bursts. If it needs more than its allotted runtime early in the period, the kernel can pause it even though other cores are physically idle. For batch jobs, that may be acceptable because total throughput is intentionally capped. For latency-sensitive request handlers, a CPU limit can create sawtooth execution where the process runs, stalls, runs again, and produces long response-time outliers.
 
-Pause and predict: if you set a CPU limit of `0.5` for a single-threaded Node.js application and it receives a massive traffic spike, what happens to response time? The container does not crash just because it wants more CPU. The scheduler throttles the cgroup after the quota is spent, so response time rises, event-loop delay grows, and dashboards may show the process below total node CPU capacity because the limit is doing exactly what it was configured to do.
+**Pause and predict:** If you set a CPU limit of `0.5` for a single-threaded Node.js application and it receives a massive traffic spike, what happens to response time — does the container crash?
+
+<details>
+<summary>Check your prediction</summary>
+
+The container does not crash just because it wants more CPU. The scheduler throttles the cgroup after the quota is spent, so response time rises, event-loop delay grows, and dashboards may show the process below total node CPU capacity because the limit is doing exactly what it was configured to do.
+</details>
 
 | Kubernetes | Meaning | cgroup quota/period |
 |------------|---------|---------------------|
@@ -664,6 +688,44 @@ sudo rmdir /sys/fs/cgroup/test-cgroup
 This optional exercise should be done only on a disposable host or lab VM. If the shell successfully moves into the new cgroup, `/proc/$$/cgroup` should show the test path and `memory.current` should report memory charged to that group. If cleanup fails, make sure no process remains in the test cgroup before removing the directory.
 
 </details>
+
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Parts 1–5 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Tidy process tree, node memory pressure.** A container has its own PID namespace and a short `ps` tree, but the node is in memory reclaim. The pod spec sets no memory limit.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: unbounded memory cgroup — PID namespace isolation does not cap RSS. Next action: read `memory.max` / `memory.current` for that cgroup and set a limit with headroom before blaming the process tree.
+</details>
+
+**Card B: Heap equals limit.** A Java service is configured with `-Xmx512m` and a container memory limit of 512Mi. It is OOMKilled during warmup while the heap graph never reaches 512MB.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: cgroup accounting vs JVM heap — native memory, stacks, and caches are charged too. Next action: raise the cgroup limit above the heap (or lower `-Xmx`) using measured process RSS, not the heap flag alone.
+</details>
+
+**Card C: Idle cores, slow API.** A Node.js pod has `limits.cpu: 500m`. During a spike, p99 latency jumps, the process is not OOMKilled, and node CPU sits near 20%.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: CFS quota throttling, not a crash. Next action: check `cpu.stat` (`nr_throttled` / `throttled_usec`) and decide whether the limit is the intended budget or should be raised for a latency-sensitive handler.
+</details>
+
+**Card D: Guaranteed QoS, guessed memory.** A cache is Guaranteed (`request == limit`) at a round 256Mi. After rollout it OOMKills once during warmup, then stays quiet.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: missing headroom inside a hard memory boundary. Next action: measure warmup vs steady-state RSS and size the limit above the peak, or accept Burstable if burst room is the real requirement.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer. *(Host-only)*
 
 ### Success Criteria
 
