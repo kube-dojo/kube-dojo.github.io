@@ -104,9 +104,23 @@ This process-centered view also explains why AppArmor can be valuable even when 
 | **Complain** | Logs but allows violations | Testing, development, and building baseline profiles |
 | **Unconfined** | No restrictions applied | Disabled state; process relies entirely on DAC |
 
-Those modes are more than administration labels. Enforce mode is the state you want for production controls because it changes system behavior, while complain mode is the state you use to learn what the application really does without breaking it during observation. Unconfined is not a tuning mode; it is a deliberate decision to rely on the other layers only, and that decision should be visible in reviews because it removes one kernel boundary from the workload.
+Those modes are more than administration labels.
 
-Pause and predict: if DAC allows a process to read `/etc/hostname` but the AppArmor profile has no matching read rule for that path, what result should the application see? The correct mental model is that DAC success only lets the request reach the MAC decision, and AppArmor can still return `EACCES`, so the application experiences a permission error even though ownership and mode bits look correct.
+**Pause and predict:** The profile is in complain mode. The application writes a path the profile does not allow. Does the write succeed?
+
+<details>
+<summary>Check your prediction</summary>
+
+Yes. Complain logs the denial and still allows the write so you can learn the real path set. Enforce would return `EACCES` and change behavior. Unconfined is not a tuning mode; it drops this kernel boundary and should be visible in review.
+</details>
+
+**Pause and predict:** DAC allows a process to read `/etc/hostname`, but the AppArmor profile has no matching read rule for that path. What result should the application see?
+
+<details>
+<summary>Check your prediction</summary>
+
+`EACCES`. DAC success only lets the request reach the MAC decision. AppArmor can still deny it, so the application sees a permission error even though ownership and mode bits look correct.
+</details>
 
 ## Interrogating the Kernel
 
@@ -151,7 +165,13 @@ Profiles are stored as plain text files on the disk before being compiled by the
 
 **Hypothetical scenario:** A useful war story is the deployment that "worked on two nodes" and failed on the third after a routine rollout. The manifest was identical, the image digest was identical, and the team spent an hour inspecting registry credentials before checking `aa-status` on the failing node. The profile file had been copied by hand during testing but never included in the node bootstrap process, so Kubernetes asked for a `Localhost` profile that the scheduled worker had never loaded.
 
-Before running this in your own environment, what output do you expect if AppArmor is compiled into the kernel but the service has not loaded any profiles? You should expect the module to report as loaded while profile counts are low or zero, which points you toward the profile lifecycle rather than toward kernel support or application permissions.
+**Pause and predict:** AppArmor is compiled into the kernel, but the service has not loaded any profiles. What do you expect from module status versus profile counts?
+
+<details>
+<summary>Check your prediction</summary>
+
+The module reports loaded. Profile counts are low or zero. That points at the profile lifecycle, not at missing kernel support or at application permissions.
+</details>
 
 ## Anatomy of an AppArmor Profile
 
@@ -453,7 +473,13 @@ spec:
         localhostProfile: k8s-nginx
 ```
 
-Pause and predict: if you deploy the `restricted-nginx` pod above, but the `k8s-nginx` profile has not been loaded via `apparmor_parser` on the scheduled node, what happens to the pod? The kubelet asks the runtime to create the container with that profile, the runtime asks the kernel to attach a profile name the kernel does not know, and container creation fails until the profile exists on that node; `k describe pod restricted-nginx` is where you would expect to see the scheduling and container creation symptoms.
+**Pause and predict:** You deploy the `restricted-nginx` pod above, but the `k8s-nginx` profile has not been loaded with `apparmor_parser` on the scheduled node. What happens to the pod?
+
+<details>
+<summary>Check your prediction</summary>
+
+Container creation fails. The kubelet asks the runtime for that profile name, the kernel does not know it, and the pod stays unready until the profile exists on that node. `kubectl describe pod restricted-nginx` is where the create error shows up.
+</details>
 
 The most reliable cluster pattern is to treat profiles as node configuration, not as an incidental side effect of application deployment. Some teams bake profiles into immutable node images, some deploy them through privileged node agents, and some use distribution-specific security profile operators. The key is that application rollout should not be the first time a worker learns about the profile name, because a rolling deployment can otherwise become a scheduling lottery.
 
@@ -791,9 +817,48 @@ sudo rm /etc/apparmor.d/tmp.test-app.sh
 rm /tmp/test-app.sh /tmp/test-output.txt
 ```
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Parts 1–6 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Mode bits allow the read.** `/etc/hostname` is mode `644`. The process owner can read it. The profile has no read rule for that path. The application gets `EACCES`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: AppArmor MAC after DAC. Next action: read the denial in the audit log and add the path rule, or switch to complain only long enough to learn the path. Do not chmod the file.
+</details>
+
+**Card B: Kernel yes, profiles no.** `aa-status` says the module is loaded. Profile counts are zero. An app "should be confined."
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: profile lifecycle, not kernel support. Next action: load the profile with `apparmor_parser` and confirm the count before debugging the application.
+</details>
+
+**Card C: Pod pending on one node.** The manifest names `k8s-nginx`. Two nodes have the profile. The scheduled node does not.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: localhost profile missing on that node. Next action: `kubectl describe` the pod for the create error, then load the profile in node bootstrap. Do not rebuild the image.
+</details>
+
+**Card D: Complain looks like success.** A write the profile does not allow still succeeds. The log shows an AppArmor denial.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: complain mode, not a missing denial. Next action: switch that profile to enforce after the path set is known. A successful write is not proof the profile allows it.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria Checklist
 
 - [ ] Verified AppArmor kernel module status and listed loaded profiles.
+- [ ] Classified each frozen AppArmor-layer card before opening the reveal.
 - [ ] Successfully compiled and loaded a custom profile using `apparmor_parser`.
 - [ ] Toggled between enforce and complain modes to observe application behavior.
 - [ ] Traced kernel enforcement actions via `dmesg` audit streams.
