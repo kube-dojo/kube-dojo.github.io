@@ -88,9 +88,13 @@ cat /etc/hostname
 
 If the command succeeds, the kernel has permitted and completed a file read. If it fails with `Permission denied`, the kernel has refused the request after evaluating permissions. If it hangs because storage is unhealthy, the application may look stuck, but the cause may live below the application in the kernel's I/O path. The same pattern applies to listening on ports, creating child processes, allocating memory, or opening a socket to another service.
 
-> **Active learning prompt**: Before you run diagnostic commands, predict which part of the kernel contract is involved. If an application cannot bind to port 80, is the likely evidence in file permissions, networking permissions, process scheduling, or storage I/O?
+> **Pause and predict:** Before you run diagnostic commands, predict which part of the kernel contract is involved. If an application cannot bind to port 80, is the likely evidence in file permissions, networking permissions, process scheduling, or storage I/O?
 
-The answer is networking permissions and process privilege. Binding to a low-numbered privileged port requires authority the kernel does not grant to ordinary processes by default. That does not mean the application is innocent, because it may have chosen the wrong port or dropped the wrong capability. It means a good diagnosis starts by matching the symptom to the kernel subsystem most likely to enforce or fail that request.
+<details>
+<summary>Check your prediction</summary>
+
+The relevant subsystems are networking permissions and process privilege. Binding to a low-numbered privileged port requires authority the kernel does not grant to ordinary processes by default. That does not mean the application is innocent, because it may have chosen the wrong port or dropped the wrong capability. It means a good diagnosis starts by matching the symptom to the kernel subsystem most likely to enforce or fail that request.
+</details>
 
 | User-Space Request | Kernel Subsystem Involved | Evidence to Collect | Practical Interpretation |
 |---|---|---|---|
@@ -176,9 +180,13 @@ strace -e openat,read,write,close cat /etc/hostname
 
 If you are diagnosing latency, this technique helps distinguish application compute from kernel-mediated work. A process burning CPU in pure calculation may make few system calls during the hot loop. A process that constantly reads tiny chunks from storage may spend significant time crossing the user-kernel boundary and waiting on I/O. The difference affects the fix: algorithm changes, batching, caching, file-layout changes, and storage investigation solve different problems than adding more application worker threads.
 
-> **Active learning prompt**: Predict the difference between `strace -c true` and `strace -c find /usr -maxdepth 1 -type f`. Which one should make more filesystem-related system calls, and why would that matter during performance analysis?
+> **Pause and predict:** Predict the difference between `strace -c true` and `strace -c find /usr -maxdepth 1 -type f`. Which one should make more filesystem-related system calls, and why would that matter during performance analysis?
+
+<details>
+<summary>Check your prediction</summary>
 
 The `find` command should make more filesystem-related calls because it must inspect directory entries and file metadata. That does not make `find` bad; it tells you what work is being requested from the kernel. In production, this same reasoning helps explain why metadata-heavy workloads can stress storage even when they read little file content. A backup scanner, image builder, or dependency resolver may spend more time asking questions about many files than reading a few large files.
+</details>
 
 | Diagnostic Goal | Command | What You Are Testing | How to Interpret the Result |
 |---|---|---|---|
@@ -231,9 +239,13 @@ cat /proc/cmdline
 
 On some systems you might see parameters related to the root filesystem, console, quiet boot output, security modules, or cgroup hierarchy. Do not edit boot parameters casually. Treat them like infrastructure configuration: record the current state, understand the change, test on one node, and keep a rollback path. A one-word boot parameter can change how the kernel exposes cgroups, applies security modules, prints diagnostics, or handles CPU vulnerability mitigations.
 
-> **Active learning prompt**: A server reaches `systemd emergency mode` after a kernel update, but the bootloader menu appears normally and the kernel starts printing messages. Which stage is probably working, and which stage should you inspect next?
+> **Pause and predict:** A server reaches `systemd emergency mode` after a kernel update, but the bootloader menu appears normally and the kernel starts printing messages. Which stage is probably working, and which stage should you inspect next?
+
+<details>
+<summary>Check your prediction</summary>
 
 The firmware and bootloader stages are probably working because the kernel has started. The next investigation should focus on kernel initialization, `initramfs`, root filesystem mounting, and early user-space dependencies. Evidence is likely in the console messages, `dmesg`, filesystem checks, mount configuration, storage drivers, or boot parameters. The most important discipline is to avoid jumping straight to application service logs when the machine has not yet completed the earlier boot stages.
+</details>
 
 | Startup Symptom | Likely Stage | Useful Evidence | First Diagnostic Question |
 |---|---|---|---|
@@ -321,9 +333,13 @@ else
 fi
 ```
 
-> **Active learning prompt**: A Kubernetes node has the same Linux distribution as the rest of the fleet, but `modinfo overlay` fails only on that node. Would you investigate Kubernetes manifests first, or the installed kernel package and module directory for the running kernel?
+> **Pause and predict:** A Kubernetes node has the same Linux distribution as the rest of the fleet, but `modinfo overlay` fails only on that node. Would you investigate Kubernetes manifests first, or the installed kernel package and module directory for the running kernel?
+
+<details>
+<summary>Check your prediction</summary>
 
 Start with the running kernel and module directory. Kubernetes may report the failure, but the missing capability is below Kubernetes. A node can have the correct user-space packages and still lack modules for the kernel it actually booted. The distribution name does not prove the kernel package, booted kernel, module package, and runtime expectations are aligned.
+</details>
 
 ## 5. Kubernetes-Relevant Kernel Capabilities
 
@@ -396,9 +412,13 @@ sudo modprobe ip_vs
 dmesg | tail -n 20
 ```
 
-> **Active learning prompt**: If a node's kube-proxy falls back from IPVS to iptables mode, what could still be healthy about the node, and what would you verify before declaring the node broken?
+> **Pause and predict:** If a node's kube-proxy falls back from IPVS to iptables mode, what could still be healthy about the node, and what would you verify before declaring the node broken?
+
+<details>
+<summary>Check your prediction</summary>
 
 The node may still run pods and pass basic readiness checks because iptables mode is a valid kube-proxy mode in many environments. You would verify the intended cluster configuration, kube-proxy logs, kernel module availability, service-routing behavior, and whether the fallback violates the platform's performance or consistency requirements. A healthy node is one that matches the design, not merely one that can start a pod.
+</details>
 
 ## 6. Containers Share the Host Kernel
 
@@ -497,9 +517,13 @@ echo "Recent kernel messages mentioning container-adjacent features:"
 dmesg 2>/dev/null | grep -Ei 'overlay|cgroup|conntrack|br_netfilter|ip_vs' | tail -n 20
 ```
 
-> **Active learning prompt**: A vendor says their container requires Linux kernel 6.8 or newer because it uses a newer kernel feature. Your cluster has mixed node pools. What would you check before deploying the workload widely?
+> **Pause and predict:** A vendor says their container requires Linux kernel 6.8 or newer because it uses a newer kernel feature. Your cluster has mixed node pools. What would you check before deploying the workload widely?
+
+<details>
+<summary>Check your prediction</summary>
 
 Check the actual running kernel on every eligible node pool, not only the operating-system image name. Then verify boot parameters, required modules, cgroup mode, runtime configuration, and any feature-specific vendor requirements. If only some nodes qualify, constrain scheduling through labels, taints, tolerations, runtime classes, or separate node pools rather than relying on chance. The deployment decision should encode the kernel requirement so the scheduler cannot accidentally place the workload on an incompatible node.
+</details>
 
 ## Patterns & Anti-Patterns
 
@@ -754,6 +778,34 @@ Include these points in your judgment: the running kernel release, relevant boot
 A strong judgment might say, "This host is a reasonable candidate for a lab node because it runs kernel release X, uses cgroups v2, has OverlayFS available, shows no relevant kernel warnings in the inspected window, and reports expected container-adjacent modules as loaded or available. Production follow-up is required because IPVS availability is uncertain and kernel log access is restricted to administrators." The exact wording should match your evidence. The quality bar is that another engineer can reproduce or challenge every claim.
 </details>
 
+### Part 8: Classify Frozen Incidents Without Running Anything
+
+This final part has no commands to run. Each card below is a frozen snapshot of evidence collected during an incident. For each card, name the failing layer (boot stage, kernel module state, syscall boundary, scheduling constraint, or container-kernel contract) and write a one-line next action that an on-call engineer could execute immediately. Commit to your answers before expanding the solutions.
+
+**Card A — the port that will not bind.** A web service exits with `listen tcp :80: bind: permission denied` on a hardened node. A teammate has already started checking file permissions on the application's static assets and config directory. The same manifest runs fine on the developer's laptop as root. Name the layer that is actually enforcing the denial, and state the one-line next action.
+
+**Card B — the node that never came back.** After a routine kernel update and reboot, a bare-metal node sits at a `grub>` prompt on the console. It has disappeared from the cluster, so a teammate opens the kubelet systemd unit and starts reading its logs. Name the failing boot stage, and state the one-line next action.
+
+**Card C — the identical node that is not identical.** A node runs the same distribution release as the rest of the fleet, and `systemctl status kubelet` shows `active (running)` with no errors. Containers still fail to start with storage-driver errors, and `modinfo overlay` fails on this node while succeeding on its peers. Name the failing layer, and state the one-line next action.
+
+**Card D — the silent fallback.** After a node image update, kube-proxy logs that it cannot initialize IPVS mode and has fallen back to iptables mode. All pods on the node are Ready, and service traffic flows. The alert channel is quiet. Name the layer you must verify before closing the incident, and state the one-line next action.
+
+**Card E — the vendor requirement.** A vendor agent is certified for Linux kernel 6.8 or newer because it depends on a newer kernel feature. Your cluster has mixed node pools running kernels 6.1 through 6.9, all under the same distribution label. A project manager proposes deploying the agent cluster-wide as a DaemonSet next week. Name the contract that makes this unsafe, and state the one-line next action.
+
+<details>
+<summary>Diagnostic Solutions</summary>
+
+**Card A:** The enforcing layer is the kernel's networking and privilege boundary, not file permissions. Binding a privileged port below 1024 requires `CAP_NET_BIND_SERVICE` or root, and the kernel denies the `bind` call regardless of what the filesystem allows. Next action: run the service on an unprivileged port behind a load balancer, or grant `CAP_NET_BIND_SERVICE` deliberately through the pod security context after review.
+
+**Card B:** The failing stage is the bootloader. Firmware reached GRUB, but GRUB could not load the kernel image, `initramfs`, or its own configuration, so the kernel never started and kubelet has not run at all. Kubelet logs are the wrong evidence because user space was never reached. Next action: inspect the boot partition, GRUB configuration, and kernel image paths from the console or a rescue environment, then fix or select a known-good bootloader entry.
+
+**Card C:** The failing layer is the running kernel's module directory, not Kubernetes and not the kubelet. The same distribution label does not guarantee the same booted kernel, and a node that booted a kernel without its matching module package has no OverlayFS metadata on disk. Next action: compare `uname -r` and the module directory under `/lib/modules/$(uname -r)` against a healthy peer, and repair the kernel or module package for the kernel that is actually running.
+
+**Card D:** The layer to verify is the node kernel's IPVS capability against the documented platform design. Pods being Ready proves workloads started, not that service routing matches the intended kube-proxy mode; a silent fallback is configuration drift if the cluster standard requires IPVS. Next action: check `lsmod | grep '^ip_vs'` and `modinfo ip_vs` on the node, compare the result with the intended kube-proxy configuration, and reopen the incident if the fallback violates the platform baseline.
+
+**Card E:** The broken contract is container-kernel compatibility: a container image cannot supply its own kernel, so the agent will fail with missing-syscall or missing-feature errors on every node older than 6.8, regardless of distribution label. Next action: inventory `uname -r` across node pools and constrain scheduling with labels or a dedicated pool so the DaemonSet lands only on nodes running kernel 6.8 or newer until the rest are upgraded.
+</details>
+
 ### Success Criteria
 
 - [ ] Identified the running kernel release and recorded boot parameters from `/proc/cmdline`.
@@ -764,6 +816,7 @@ A strong judgment might say, "This host is a reasonable candidate for a lab node
 - [ ] If a container runtime was available, demonstrated that containers report the host kernel release.
 - [ ] Wrote a short Kubernetes node readiness judgment grounded in kernel evidence rather than distribution name alone.
 - [ ] Identified one follow-up action you would take before trusting this host for production workloads.
+- [ ] Classified all five frozen incident cards by failing layer and wrote a defensible one-line next action for each before expanding the solutions.
 
 ## Sources
 
