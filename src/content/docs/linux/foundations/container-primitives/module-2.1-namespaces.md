@@ -84,9 +84,13 @@ flowchart TD
 
 A namespace boundary answers a very practical question: "would two processes see the same thing if they ran the same inspection command?" If two processes share a network namespace, `ip addr` and `ip route` describe the same network stack for both. If two processes use different mount namespaces, the path `/etc/passwd` can refer to different files even when the path string is identical.
 
-> **Active learning prompt:** A container can resolve DNS but cannot connect to `127.0.0.1:5432`, while the database listens on `127.0.0.1:5432` on the node. Before reading further, decide which namespace boundary most likely explains the failure and why the loopback address is a clue.
+> **Pause and predict:** A container can resolve DNS but cannot connect to `127.0.0.1:5432`, while the database listens on `127.0.0.1:5432` on the node. Before reading further, decide which namespace boundary most likely explains the failure and why the loopback address is a clue.
+
+<details>
+<summary>Check your prediction</summary>
 
 Loopback is a strong clue because `127.0.0.1` always means "this network namespace," not "this physical machine." If the database listens on node loopback and the application runs inside a different network namespace, the application is connecting to itself, not to the node service. The fix might involve a service address, a host gateway, or `hostNetwork`, but the diagnosis starts by recognizing the namespace boundary.
+</details>
 
 The kernel exposes namespace membership through [symbolic links under `/proc/<pid>/ns`](https://en.wikipedia.org/wiki/Linux_namespaces). Each link points to a namespace object with a stable identity while it exists. Two processes are in the same namespace of a given type when the corresponding links point to the same object. That check is more reliable than guessing from container names or Kubernetes labels.
 
@@ -146,9 +150,13 @@ sudo readlink /proc/${target_pid}/ns/net
 
 If the link targets differ, the two processes do not share that network namespace. If they match, a network difference is probably not caused by namespace separation between those two processes, and you should move to routes, firewall rules, DNS, or service configuration.
 
-> **Active learning prompt:** Your teammate says, "The container cannot be isolated because I can see its process from the host with `ps`." Decide whether that statement proves the container lacks a PID namespace. What would you compare in `/proc/<pid>/ns` to make the claim precise?
+> **Pause and predict:** Your teammate says, "The container cannot be isolated because I can see its process from the host with `ps`." Decide whether that statement proves the container lacks a PID namespace. What would you compare in `/proc/<pid>/ns` to make the claim precise?
+
+<details>
+<summary>Check your prediction</summary>
 
 Seeing a container process from the host does not prove the container lacks a PID namespace. The host PID namespace is the parent view and can usually see descendant processes. The more important question is what the process sees from inside its own PID namespace. Compare `/proc/<host-pid>/ns/pid` with `/proc/1/ns/pid`, then enter the target PID namespace or inspect from inside the container if you need to verify the internal process view.
+</details>
 
 The following small diagnostic pattern is safe on a lab machine because it only reads namespace identities. It compares the current shell with a target PID and prints the namespace types that differ. Use it as a reading exercise before copying it into your own notes.
 
@@ -254,9 +262,13 @@ The route table deserves one precise distinction. Linux keeps several routing ta
 
 Deleting the name is also more subtle than it looks. Per [ip-netns(8)](https://man7.org/linux/man-pages/man8/ip-netns.8.html), `ip netns delete` unmounts and removes the named entry under `/var/run/netns`, but the namespace itself is freed only when its last user goes away. A running process or an open file descriptor can keep the namespace alive after its name is gone, so a missing entry in `ip netns list` does not by itself prove the namespace ceased to exist.
 
-> **Active learning prompt:** Two containers in the same pod can both reach an application on `localhost`, but two containers in different pods cannot use `localhost` to reach each other. Decide which namespace sharing decision explains the difference before reading the Kubernetes section.
+> **Pause and predict:** Two containers in the same pod can both reach an application on `localhost`, but two containers in different pods cannot use `localhost` to reach each other. Decide which namespace sharing decision explains the difference before reading the Kubernetes section.
+
+<details>
+<summary>Check your prediction</summary>
 
 The answer is network namespace sharing. Containers in the same Kubernetes pod share one network namespace by default, so `localhost` refers to the same network stack for those containers. Containers in different pods have different network namespaces, so each pod has its own loopback device and port space. They must communicate through pod IPs, Services, or another network path.
+</details>
 
 The network namespace is also why host-level checks can be false reassurance. A successful `curl` from the node proves the node namespace has connectivity. It does not prove the target container namespace has the same route, DNS configuration, firewall behavior, or source address. When the symptom is network-specific, run the network inspection from the target namespace.
 
@@ -524,9 +536,13 @@ spec:
 
 A careful reviewer asks what problem each host namespace option solves. Node network agents may need `hostNetwork` because they configure or observe node-level networking. Process inspectors may need `hostPID` during controlled debugging. General application pods usually do not need either. If the reason is "it made the error go away," the team has hidden the boundary rather than understood it.
 
-> **Active learning prompt:** A sidecar needs to scrape an admin endpoint from the main container. The team proposes `hostNetwork: true` because `localhost` worked during a node test. Evaluate that proposal and choose a safer pod-level design.
+> **Pause and predict:** A sidecar needs to scrape an admin endpoint from the main container. The team proposes `hostNetwork: true` because `localhost` worked during a node test. Evaluate that proposal and choose a safer pod-level design.
+
+<details>
+<summary>Check your prediction</summary>
 
 The safer design is usually to keep the shared pod network namespace and have the sidecar call `localhost:<admin-port>` inside the pod. `hostNetwork` is unnecessary for container-to-container communication within one pod because they already share the pod network namespace. Enabling host networking would expose the pod to node port conflicts and reduce isolation without solving a real namespace problem.
+</details>
 
 ## Patterns & Anti-Patterns
 
@@ -911,6 +927,52 @@ Scenario D: A minimal image has no network tools, but you need to inspect its ro
 - [ ] Your plan separates observation from configuration change.
 - [ ] Your plan explains why the chosen namespace boundary fits the symptom.
 
+### Part 7: Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Parts 1–6 stay as the evidence-collection and planning recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: DNS OK, loopback miss.** A container resolves the database hostname but cannot connect to `127.0.0.1:5432`. On the node, PostgreSQL listens on `127.0.0.1:5432`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: network namespace — `127.0.0.1` is this netns, not the physical node. Next action: connect via Service/pod IP or host gateway; compare `/proc/<pid>/ns/net` before enabling `hostNetwork`.
+</details>
+
+**Card B: Host `ps` visibility.** A teammate claims the container is not isolated because `ps` on the node lists the container process.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: misunderstanding host vs container PID views — host visibility does not prove a missing PID namespace. Next action: compare `/proc/<host-pid>/ns/pid` with `/proc/1/ns/pid` (and the in-namespace process tree) before changing the pod spec.
+</details>
+
+**Card C: Same-pod localhost.** Two containers in one pod both reach an admin port on `localhost`; two containers in different pods cannot.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: pod-shared network namespace vs per-pod netns. Next action: keep sidecar scrape on `localhost` inside the pod; use Service/pod IPs across pods — do not treat cross-pod `localhost` as a bug.
+</details>
+
+**Card D: Sidecar scrape via hostNetwork.** A team proposes `hostNetwork: true` so a sidecar can scrape the main container after a node-level `localhost` test succeeded.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: unnecessary host namespace shortcut. Next action: use the shared pod network namespace (`localhost:<admin-port>` in-pod); reserve `hostNetwork` for trusted node agents, not sidecar coupling.
+</details>
+
+**Card E (optional): Named netns gone, process remains.** `ip netns delete lab-ns` succeeds and `ip netns list` no longer shows the name, but a stuck process still holds the namespace.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: namespace lifetime vs name entry — delete removes the `/var/run/netns` name, not necessarily the last user. Next action: find holders (`lsns`/`fuser`/open FDs) and stop them before assuming the namespace is gone.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Final Exercise Success Criteria
 
 - [ ] You inspected namespace membership through `/proc/<pid>/ns`.
@@ -919,6 +981,7 @@ Scenario D: A minimal image has no network tools, but you need to inspect its ro
 - [ ] You ran Cleanup/reset against only prefixed lab objects from this run and verified they are gone, or you investigated a refused cleanup without deleting unrelated resources.
 - [ ] You explained at least one interaction between two namespace types.
 - [ ] You designed a targeted debugging plan for a realistic container symptom.
+- [ ] You classified each frozen namespace-boundary card before opening the reveal.
 
 ### Cleanup/reset
 
