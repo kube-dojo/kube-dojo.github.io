@@ -132,7 +132,13 @@ usable range:  10.244.2.1 - 10.244.2.254
 broadcast:     10.244.2.255
 ```
 
-> **Predict:** Before reading the network and broadcast lines, compute them yourself for `10.244.9.200/24`.
+**Pause and predict:** For `10.244.9.200/24`, what are the network address, the broadcast address, and the usable host range?
+
+<details>
+<summary>Check your prediction</summary>
+
+Network `10.244.9.0`, broadcast `10.244.9.255`, usable hosts `10.244.9.1`–`10.244.9.254`. The `/24` above this prompt is a different address; do not copy those lines.
+</details>
 
 A Kubernetes cluster normally has at least three address domains. Node IPs belong to the underlay: cloud VPC, bare-metal VLAN, or host network. Pod IPs come from CNI-managed ranges and must be reachable according to the cluster networking design. Service ClusterIPs come from a Service CIDR and are virtual destinations that kube-proxy or another dataplane captures and redirects. Kubernetes states that normal Services resolve to cluster IPs, while headless Services return endpoint IPs instead of relying on virtual IP forwarding. ([Kubernetes DNS for Services and Pods](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/dns-pod-service/), [Kubernetes Services](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/))
 
@@ -172,7 +178,13 @@ sudo ip neigh flush dev eth0 nud failed
 
 Neighbor state matters when the failure looks like "same subnet but no traffic." If a node believes `192.168.10.44` is on-link, it will ARP for that address instead of sending the packet to a gateway. If no host answers, packets queue and then fail below TCP. If the wrong host answers, traffic goes to the wrong MAC. Active-active VIP systems amplify this risk: two nodes advertising the same virtual IP can create neighbor cache flapping, especially when gratuitous ARP or unsolicited NDP announcements are misconfigured.
 
-Use neighbor evidence before changing routes. A route such as `192.168.10.0/24 dev eth0` can be correct while a stale neighbor entry points to an old MAC after failover. Conversely, a failed neighbor lookup may be the symptom of a bad prefix: the host is ARPing because it incorrectly thinks the destination is local. This is why CIDR and ARP/NDP must be read together.
+**Pause and predict:** A route `192.168.10.0/24 dev eth0` is installed, but traffic to a host on that prefix still fails after a VIP failover. Is the next check the route table or the neighbor table, and what would each prove?
+
+<details>
+<summary>Check your prediction</summary>
+
+Check the neighbor table first. The route can be correct while a stale entry still points at the old MAC. A failed neighbor lookup can also mean the prefix is wrong: the host is ARPing because it thinks the destination is local. CIDR and ARP/NDP have to be read together.
+</details>
 
 VIP failover is the place where this becomes operationally sharp. A load balancer pair may move `192.168.10.50` from node A to node B and send gratuitous ARP so peers update their caches. If one switch, host, or security appliance ignores the update, some clients continue sending frames to the old MAC. Kubernetes does not remove that failure mode when you run bare-metal ingress or external load balancers. You still need to inspect the neighbor entry on the client, the gateway, and the node that should own the VIP.
 
@@ -223,9 +235,15 @@ stateDiagram-v2
     TIME_WAIT --> CLOSED: 2MSL timeout
 ```
 
-> **Predict:** A client shows `SYN-SENT` for 30 seconds — is this a refused connection or a timeout, and which command proves it?
+**Pause and predict:** A client shows `SYN-SENT` for 30 seconds. Is this a refused connection or a timeout, and which command proves it?
 
-Read `ss -tan` as evidence. `SYN-SENT` on a client means SYN packets left or are queued but no SYN-ACK has completed the handshake. `SYN-RECV` on a server means SYNs arrived and replies were attempted, but the final ACK did not complete or accept queue pressure exists; it is the `SYN_RECEIVED` state in the diagram above. `ESTAB` proves the handshake completed. `CLOSE-WAIT` means the peer closed and the local application has not closed its side. `TIME-WAIT` is normal on the side that actively closed; it prevents old duplicate segments from corrupting a later connection using the same tuple.
+<details>
+<summary>Check your prediction</summary>
+
+Timeout, not refusal. `SYN-SENT` means SYNs left but no SYN-ACK completed the handshake. `ss -tan state syn-sent` shows that state. A refusal is a RST and does not sit in `SYN-SENT`.
+</details>
+
+Read the other states in `ss -tan` the same way. `SYN-RECV` on a server means SYNs arrived and replies were attempted, but the final ACK did not complete or accept queue pressure exists; it is the `SYN_RECEIVED` state in the diagram above. `ESTAB` proves the handshake completed. `CLOSE-WAIT` means the peer closed and the local application has not closed its side. `TIME-WAIT` is normal on the side that actively closed; it prevents old duplicate segments from corrupting a later connection using the same tuple.
 
 ```bash
 ss -tan
@@ -318,7 +336,13 @@ ping -M do -s 1472 192.168.10.20
 
 Overlay networking makes MTU visible because encapsulation adds outer headers. VXLAN runs over UDP and Linux documents VXLAN devices as tunnel devices; IPIP, GRE, Geneve, WireGuard, and cloud fabrics have their own overhead. If the physical NIC MTU is 1500 and the overlay adds headers, the pod-facing MTU must usually be smaller. Otherwise small health checks pass while larger TLS records, image pulls, or gRPC responses stall. ([Linux VXLAN documentation](https://docs.kernel.org/networking/vxlan.html))
 
-The operational clue is size sensitivity. A TCP handshake succeeds, small requests work, and larger payloads hang or retransmit. Packet captures may show ICMP Fragmentation Needed or IPv6 Packet Too Big messages, or they may show silence if a firewall drops those control messages. Fixing the app will not help if the path cannot carry the packet size the app emits.
+**Pause and predict:** A TCP handshake succeeds and small requests work, but larger payloads hang after you enable VXLAN. Which layer do you test next, and why is the application the wrong first suspect?
+
+<details>
+<summary>Check your prediction</summary>
+
+Test path MTU, not the app. Encapsulation shrinks the usable payload. Captures may show ICMP Fragmentation Needed or IPv6 Packet Too Big, or silence if a firewall drops those messages. The handshake fits; the large packet does not.
+</details>
 
 MTU incidents are often introduced by an otherwise correct migration. Moving from direct routing to VXLAN, adding WireGuard encryption, enabling a cloud transit gateway, or chaining a service mesh sidecar can all reduce usable payload size. The service owner sees TLS, HTTP, or gRPC errors because those are the protocols that notice the stall, but the first broken assumption is lower: the path cannot carry the encapsulated packet without fragmentation or PMTUD. Compare the pod device MTU, tunnel MTU, node NIC MTU, and any route-specific MTU before changing application chunk sizes.
 
@@ -517,9 +541,48 @@ ip route get 1.1.1.1
 
 Find the egress interface MTU and any PMTU clue from `tracepath`. If you are on an overlay node, compare the pod-facing device MTU with the physical NIC MTU and account for encapsulation overhead.
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 0–5 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Thirty seconds of SYN-SENT.** `ss -tan` shows a client stuck in `SYN-SENT` toward `203.0.113.1:443`. A teammate calls it "connection refused."
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: packets disappearing (route, firewall, neighbor, or filter), not a RST. Next action: keep the `ss` state as timeout evidence and capture the path; do not debug a missing listener first.
+</details>
+
+**Card B: Route is right, frames are old.** `ip route get 192.168.10.50` selects `eth0` on-link. After a VIP move, some clients still reach the previous node.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: stale neighbor cache, not the FIB. Next action: `ip neigh show` on the client and gateway; look for the old MAC before changing the route.
+</details>
+
+**Card C: Handshake works, body hangs.** After VXLAN, `nc` to port 443 succeeds and a 64-byte request returns. A 16 KB response never finishes.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: overlay MTU / PMTUD, not the listener. Next action: compare pod-facing MTU with the physical NIC and encapsulation overhead; watch for ICMP Fragmentation Needed.
+</details>
+
+**Card D: Public name, cluster queries first.** A pod with `options ndots:5` resolves `api.example.com` slowly. CoreDNS logs show failed `api.example.com.svc.cluster.local` queries before the public answer.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: search-list expansion, not a broken authoritative server. Next action: compare a trailing-dot query (`api.example.com.`) with the short name, then decide whether `dnsConfig` or the application name should change.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Analyze a failing host connection by separating link, neighbor, route, transport, conntrack, DNS, and application evidence (extend to a Kubernetes connection when using the cluster fork).
+- [ ] Classified each frozen TCP/IP-layer card before opening the reveal.
 - [ ] Calculate IPv4 and IPv6 prefix boundaries, then decide whether a pod, node, Service, gateway, or VIP is local, routed, or virtual.
 - [ ] Trace TCP connection state from `SYN-SENT` through `TIME-WAIT` and use `ss -tan` output to distinguish refusal, timeout, backlog, close, and keepalive symptoms.
 - [ ] Diagnose Service and ingress failures by connecting Linux conntrack, DNAT, netfilter hooks, sockets, and kube-proxy proxy modes (cluster fork — Tasks 3–4; optional for host-only learners).
