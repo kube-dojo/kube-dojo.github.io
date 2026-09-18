@@ -15,7 +15,7 @@ lab:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 90–120 minutes (reading + in-page tasks: ~55–85 min; Killercoda lab: ~35 min)
 >
 > **Prerequisites**: See [Prerequisites](#prerequisites) below
 
@@ -123,9 +123,14 @@ systemd(1)─┬─sshd(800)───sshd(1200)───bash(1234)───pstre
            └─kubelet(400)
 ```
 
-Read a process tree from left to right as a story of responsibility. In the example, `bash` did not come directly from systemd; it came from `sshd`, which means an interactive login created it. The `nginx` process under `containerd-shim` did not come from a host-level `nginx.service`; it came from the container runtime, which changes how you inspect logs, signals, cgroups, and restart policy. The same binary name can mean different operational ownership depending on where it sits in the tree.
+Read a process tree from left to right as a story of responsibility. In the example, `bash` did not come directly from systemd; it came from `sshd`, which means an interactive login session created it. Process lineage identifies which supervisor or daemon spawned a worker, which determines how lifecycle events propagate through the hierarchy. The same binary name can represent completely different operational ownership depending on where it sits in the process tree.
 
-Pause and predict: you run `pstree` and notice your application is a child of `containerd-shim` rather than `systemd`. What does that tell you about the control plane that will restart it, where you should look for container logs, and why `systemctl restart` may not touch it?
+**Pause and predict:** You run `pstree` on a production host and notice an application worker is a direct child of `containerd-shim` rather than `systemd`. What does that tell you about which control plane manages its restarts, where its standard output logs are captured, and why running `systemctl restart` against that binary name will fail to affect it?
+
+<details><summary>Check your prediction</summary>
+
+Because the process is supervised by `containerd-shim`, the container runtime (such as containerd or CRI-O directed by Kubernetes) acts as the operational control plane rather than the host's systemd init system. Restarts, health probes, and resource bounds are managed by the container orchestrator, not a host unit file. Application logs are written to container stdout/stderr streams collected by the runtime logging driver (viewable via `kubectl logs` or `/var/log/pods/`) rather than host-level systemd journal files. Running `systemctl restart` against the application name will report unit not found or affect only a dormant host package, leaving the containerized workload untouched.
+</details>
 
 ### Special PIDs
 
@@ -290,9 +295,14 @@ flowchart TD
     end
 ```
 
-Best practice is to send `SIGTERM`, wait long enough for the application and workload to shut down, inspect state if it does not exit, and use `SIGKILL` only when the operational risk of waiting is worse than the risk of abrupt termination. A database that ignores `SIGTERM` may be flushing or stuck in I/O; a stateless worker may be safe to kill sooner; a process in `D` state may not disappear even after `SIGKILL` because it cannot return from the kernel path where it is blocked.
+Best practice is to send `SIGTERM`, wait long enough for the application and workload to shut down cleanly, inspect state if it does not exit, and use `SIGKILL` only when the operational risk of waiting is worse than the risk of abrupt termination. A database that ignores `SIGTERM` may still be flushing write-ahead log buffers or rolling back active transactions, whereas a stateless worker may be safe to terminate sooner. Understanding what the process is waiting on prevents destructive operational interventions that cause data inconsistency.
 
-Pause and predict: you sent `SIGTERM` to a misbehaving database process, but it is still running after 10 seconds. Which `ps` state would make you wait and inspect storage before using stronger force, and which logs would you collect before changing tactics?
+**Pause and predict:** You send `SIGTERM` to a misbehaving database process, but it remains running after 10 seconds. Which process execution state reported by `ps` indicates that the process is blocked in the kernel on storage or hardware I/O rather than looping in user space, and what kernel logs and stack traces should you inspect before attempting escalation?
+
+<details><summary>Check your prediction</summary>
+
+State `D` (Uninterruptible Sleep) indicates that the process is suspended inside a kernel system call—typically waiting on disk I/O, NFS locks, or hardware response—and cannot process any asynchronous signal, including `SIGKILL`. Escalating to `kill -9` will not terminate the process and may leave an unkillable process accumulating in the process table. Before changing tactics, inspect `dmesg -T` or `journalctl -k` for storage controller resets, disk errors, or filesystem hangs, and inspect `/proc/<PID>/stack` or `/proc/<PID>/wchan` to identify the exact kernel function where the thread is blocked.
+</details>
 
 ### Signals in Kubernetes
 
@@ -438,9 +448,14 @@ The security options are not decoration. Running as a dedicated user reduces bla
 | notify | Like simple, sends notification | systemd-aware apps |
 | idle | Like simple, waits for jobs | Low priority |
 
-Choosing the wrong `Type=` is a classic reason for confusing service state. A `simple` service is considered started as soon as the process is launched; a `oneshot` service is expected to finish; a `notify` service can tell systemd when it is actually ready; and a `forking` service preserves compatibility with older daemons that parent-exit after startup. Readiness matters when dependent services start too early and fail because a socket, database schema, or cache is not actually ready yet.
+Choosing the wrong `Type=` is a classic reason for confusing service state and race conditions during boot. The service type defines how systemd determines that a process has transitioned from initial execution into an active, operational state. If systemd marks a unit active prematurely, dependent services that rely on its sockets, network interfaces, or data stores will launch and immediately crash with connection failures. Designing unit contracts requires matching the process's runtime lifecycle to systemd's notification and readiness expectations.
 
-Stop and think: you are creating a script that must run once during boot to initialize a database schema, and other services must wait until it finishes before they can start. Which systemd service `Type` should you choose, and which dependent units should order themselves after it?
+**Pause and predict:** You are writing a systemd unit for a database migration script that must execute to completion during system startup before the web application backend starts. If the migration script exits with status 0, dependent services may proceed; if it fails, startup must halt. Which service `Type` and state retention directive must you configure, and how should the application unit specify ordering and dependency?
+
+<details><summary>Check your prediction</summary>
+
+The migration unit should use `Type=oneshot` paired with `RemainAfterExit=yes`. `Type=oneshot` instructs systemd to wait for the `ExecStart` process to exit with code 0 before considering the unit `active` and starting downstream units. `RemainAfterExit=yes` ensures systemd considers the unit successfully active even after the script process terminates, preventing restart thrashing. The dependent application service must declare `After=db-migrate.service` (to guarantee execution order) and `Requires=db-migrate.service` (to ensure the migration runs and fails the application startup if the migration fails).
+</details>
 
 ### Try This: Create a Service
 
@@ -571,7 +586,7 @@ Exam tip: the LFCS may ask you to change default kernel parameters or recover a 
 
 ## Viewing and Diagnosing Processes
 
-`ps`, `top`, and `htop` answer different versions of the same question. `ps` gives you a point-in-time snapshot that is excellent for scripts, sorting, and exact formatting. `top` gives you a live view of changing CPU, memory, load, and process state. `htop` adds a friendlier interactive interface, tree view, filters, and signal sending, which makes it useful during exploratory diagnosis on a host you can access directly.
+While basic process inspection commands were introduced during lifecycle exploration, this section synthesizes the advanced triage toolset for incident investigation. `ps`, `top`, and `htop` answer different versions of the same question. `ps` gives you a point-in-time snapshot that is excellent for scripts, sorting, and exact formatting. `top` gives you a live view of changing CPU, memory, load, and process state. `htop` adds a friendlier interactive interface, tree view, filters, and signal sending, which makes it useful during exploratory diagnosis on a host you can access directly.
 
 The trap is to treat these tools as dashboards instead of evidence collectors. A high CPU process, a high RSS process, a process in `D` state, and a growing process count all lead to different hypotheses. Your job is to connect the tool output back to the lifecycle and ownership model: what started the process, what state is it in, what resources does it hold, what supervisor will restart it, and what logs record its last transition?
 
@@ -927,9 +942,7 @@ systemctl status broken-web
 journalctl -u broken-web -n 10 --no-pager
 
 # 4. Fix the service
-# Hint: Port 80 requires root privileges, but this service runs as 'nobody'
-# Edit the file to use port 8080 instead:
-# ExecStart=/usr/bin/python3 -m http.server 8080
+# Use journal evidence to diagnose why the service failed, then apply the fix:
 sudo vi /etc/systemd/system/broken-web.service
 
 # 5. Apply the fix and verify
@@ -947,7 +960,58 @@ sudo systemctl daemon-reload
 <details>
 <summary>Solution notes for Part 5</summary>
 
-The unit asks an unprivileged user to bind a privileged port, so the service should fail until you move it to a higher port or change the privilege model. The better learning move is to confirm the exact failure in `systemctl status` and `journalctl` before editing. After changing the unit, `daemon-reload` is required because systemd must reread the unit file before the next start uses the new command.
+The service fails because TCP ports below 1024 are privileged ports on Linux, requiring root privileges or the `CAP_NET_BIND_SERVICE` capability. Because the unit specifies `User=nobody`, the process lacks authorization to bind port 80, resulting in `PermissionError: [Errno 13] Permission denied` visible in `journalctl -u broken-web`. The fix is to edit `/etc/systemd/system/broken-web.service` and change `ExecStart` to bind an unprivileged port such as `8080` (`ExecStart=/usr/bin/python3 -m http.server 8080`). After modifying the unit file, run `sudo systemctl daemon-reload` so systemd reloads configuration, then start the service with `sudo systemctl start broken-web` and verify with `systemctl status broken-web`.
+</details>
+
+#### Part 6: Diagnostic Triage Challenge (Frozen Incident Cards)
+
+The following four production incident cards present frozen failure scenarios that require root-cause classification and immediate operational triage. Each card evaluates your ability to locate the failure layer, identify the underlying kernel or systemd mechanism, and specify a precise one-line intervention without guessing. Review each card's symptoms, commit to your diagnostic plan, and compare your findings with the provided solution notes.
+
+##### Card A: Zombie Reaping and PID Exhaustion
+
+During an alert for elevated PID allocation on a worker node, `ps aux` reveals 350 `<defunct>` worker processes, all showing PPID 1842 (`api-worker-pool`). The `top` utility reports 0.0% CPU utilization and minimal memory consumption across all defunct entries. An on-call engineer proposes executing a bash loop to run `kill -9` against each individual zombie PID to reclaim the process table slots immediately.
+
+**Triage Task:** Classify the failure layer, explain why the proposed `kill -9` intervention will fail to remove the zombie processes, and specify the single one-line command to resolve the defunct processes at the parent level.
+
+##### Card B: Container PID 1 Signal Forwarding Failure
+
+A Go backend service executing as PID 1 inside a Kubernetes pod consistently takes exactly 30 seconds to terminate when stopped with `k delete pod backend-0`. Pod events record `Killing container backend with 30s grace period` followed immediately by forceful SIGKILL termination, while application logs reveal that in-flight database transactions are terminated abruptly without executing clean shutdown routines.
+
+**Triage Task:** Identify the failure layer, diagnose why the Go backend failed to terminate gracefully upon receiving SIGTERM, and prescribe the one-line configuration or application change required to ensure proper signal reception.
+
+##### Card C: systemd Unit Dependency Race Condition
+
+An engineering team provisions an application service `api.service` configured with `Type=simple` and `Wants=db-migrate.service`. Following a host reboot, `api.service` crashes repeatedly with connection refused errors, while journal logs confirm that `db-migrate.service` was still applying database schema migrations when `api.service` attempted to query tables.
+
+**Triage Task:** Identify the failure layer, diagnose why the service configuration allowed `api.service` to launch before migrations finished, and specify the necessary unit configuration directives in both unit files to eliminate the startup race condition.
+
+##### Card D: Early Boot Recovery on Corrupted Filesystem Mount
+
+A host fails to complete boot after a storage configuration update. The console halts before the root filesystem is mounted read-write, reporting that an invalid UUID in `/etc/fstab` prevented systemd from reaching `local-fs.target`. Standard multi-user target cannot be reached, and emergency maintenance access is required to edit `/etc/fstab` and correct the UUID.
+
+**Triage Task:** Identify the failure layer, evaluate whether `rescue.target`, `emergency.target`, or the kernel parameter `rd.break` is required to access the system before pivot-root failure, and specify the command sequence to remount the root filesystem read-write and launch an editor.
+
+<details><summary>Diagnostic Solutions</summary>
+
+**Card A Solution (Zombie Reaping / PID Table Pressure):**
+- **Failure Layer:** Application / Process Lifecycle Layer (user-space parent reaping defect).
+- **Diagnosis:** Zombie processes are already dead (`TASK_DEAD`); they hold no executable memory or file descriptors, and their only footprint is an entry in the kernel's process table preserving their exit code. Because zombies cannot execute user-space code or receive signals, `kill -9` has zero effect. The parent process (PID 1842) failed to handle `SIGCHLD` and did not invoke `wait()` or `waitpid()` to read the children's exit status.
+- **One-line Next Action:** Execute `kill -TERM 1842` (or `kill -HUP 1842` if supported) to terminate or restart the parent, causing orphaned zombies to be adopted by PID 1 (`systemd`), which immediately reaps them from the process table.
+
+**Card B Solution (Container PID 1 Signal Forwarding):**
+- **Failure Layer:** Container PID Namespace / Signal Handling Layer.
+- **Diagnosis:** Linux treats PID 1 in a PID namespace specially: the kernel does not install default signal handlers for `SIGTERM` or `SIGINT` on PID 1. If the Go application does not explicitly register a signal channel with `signal.Notify()`, incoming `SIGTERM` signals sent by the container runtime are silently ignored by the kernel. The runtime waits for `terminationGracePeriodSeconds` (default 30s) before issuing an uncatchable `SIGKILL`.
+- **One-line Next Action:** Add a minimal init process wrapper such as `tini` by configuring `ENTRYPOINT ["/usr/bin/tini", "--", "/app/backend"]` in the container image, or register an explicit `SIGTERM` signal channel in the Go application's entrypoint.
+
+**Card C Solution (systemd Startup Race Condition):**
+- **Failure Layer:** Service Manager / Dependency Graph Layer (`systemd`).
+- **Diagnosis:** `Type=simple` causes systemd to consider `api.service` active immediately after the process forks, without waiting for any readiness verification. Furthermore, `Wants=` creates a weak dependency that starts units in parallel without enforcing order unless `After=` is also declared. Because `After=db-migrate.service` was missing and `db-migrate` was not typed as a blocking task, `api.service` launched concurrently with the migration script.
+- **One-line Next Action:** Set `Type=oneshot` with `RemainAfterExit=yes` in `db-migrate.service`, and add `After=db-migrate.service` and `Requires=db-migrate.service` under the `[Unit]` section of `api.service`.
+
+**Card D Solution (Boot Recovery Evaluation on Corrupted Mount):**
+- **Failure Layer:** Bootloader & Early Userspace / Initramfs Layer.
+- **Diagnosis:** Because the corrupted `/etc/fstab` prevents the root filesystem from being mounted read-write during early boot, neither `rescue.target` nor `emergency.target` can load properly because they reside on the broken root filesystem itself. The boot sequence must be halted inside the initial ramdisk (initramfs) before systemd attempts to pivot to the root filesystem.
+- **One-line Next Action:** In the GRUB2 menu, edit the kernel boot line to append `rd.break`, boot with `Ctrl+X`, and at the initramfs emergency prompt run: `mount -o remount,rw /sysroot && chroot /sysroot vi /etc/fstab`.
 </details>
 
 ### Cleanup/reset
@@ -987,6 +1051,7 @@ Forbidden on shared or production hosts: `systemctl stop ssh`, `systemctl stop s
 - [ ] Created and observed a zombie process, then identified the parent process responsible for cleanup.
 - [ ] Used `systemctl status`, `journalctl`, and dependency inspection to explore services.
 - [ ] Diagnosed and fixed a broken systemd service using evidence rather than guessing.
+- [ ] Evaluated production incident triage cards for zombie reaping, container signal propagation, unit dependency ordering, and early bootloader recovery.
 - [ ] Ran Cleanup/reset against only this run's lab units and PIDs and verified they are gone, or investigated a refused cleanup without deleting unrelated resources.
 - [ ] Explained how the same signal behavior applies to Kubernetes 1.35+ pod termination with the `k` alias.
 
