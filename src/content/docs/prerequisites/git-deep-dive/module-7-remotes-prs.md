@@ -90,7 +90,16 @@ origin  git@github.com:kubedojo/core-platform.git (fetch)
 origin  git@github.com:kubedojo/core-platform.git (push)
 ```
 
-Pause and predict: if you run `git commit` while checked out on local `main`, what branch reference moves, and what branch reference stays still? Your local `main` moves to the new commit, while `origin/main` remains unchanged until a fetch, pull, or push updates your local knowledge. That is why `git status` can report that your branch is ahead of its upstream without proving anything new happened on the server since your last fetch.
+**Pause and predict:** If you run `git commit` while checked out on local `main`, what branch reference moves, and what branch reference stays still?
+
+<details>
+<summary>Check your prediction</summary>
+
+Your local `main` moves to the new commit, while `origin/main` remains unchanged until a fetch, pull, or push updates your local knowledge. That is why `git status` can report that your branch is ahead of its upstream without proving anything new happened on the server since your last fetch.
+
+</details>
+
+Write which ref moves before you continue. The next paragraph is about fetching before you diagnose a teammate's work. It does not name the two references from this commit.
 
 This distinction is the foundation for safe diagnosis. Before rebasing a feature branch, deleting a remote branch, or deciding that a teammate has not pushed work, run `git fetch --all --prune` and then inspect the updated references. Fetching does not merge incoming commits into your working tree; it updates evidence. Treat that step as reconnaissance in the same way you would check the current cluster context before applying a Kubernetes manifest.
 
@@ -150,7 +159,16 @@ Before running a pull during real work, ask a sharper question: "Do I want only 
 
 Consider a Kubernetes example. Suppose you are editing `deployment.yaml` for a backend rollout and a teammate has just changed `configmap.yaml` on `origin/main`. Running `git fetch origin` lets you inspect the teammate's commit before your local files move. You can compare branch tips, read the diff, and decide whether to rebase now or finish your local commit first. After the history is intentionally updated, validate the manifest with a server-side dry run such as `kubectl apply --dry-run=server -f deployment.yaml` rather than treating tidy history as proof that the cluster will accept the object.
 
-Before running this, what output do you expect from `git status` after a fetch when your working tree has uncommitted edits? The files should remain exactly as they were, while the upstream comparison may change because the remote-tracking reference moved. If you expected files to change, you were thinking of pull, merge, checkout, or rebase rather than fetch. This difference is the reason fetch is the safest first command in uncertain collaboration state.
+**Pause and predict:** Before running this, what output do you expect from `git status` after a fetch when your working tree has uncommitted edits?
+
+<details>
+<summary>Check your prediction</summary>
+
+The files should remain exactly as they were, while the upstream comparison may change because the remote-tracking reference moved. If you expected files to change, you were thinking of pull, merge, checkout, or rebase rather than fetch. This difference is the reason fetch is the safest first command in uncertain collaboration state.
+
+</details>
+
+Write what happens to the files before you continue. The next section is the fork-and-pull boundary. It does not describe this status output.
 
 ## 3. Fork-and-Pull Workflows Create a Deliberate Security Boundary
 
@@ -191,7 +209,16 @@ git rebase upstream/main
 git push origin main
 ```
 
-Pause and predict: if you accidentally run `git push upstream main` from a repository where you lack direct write permissions, what output do you expect and why? The expected result is a permission rejection from the hosting platform, often an HTTP permission error or an SSH authorization failure. That rejection is not a nuisance. It is the security boundary doing its job by forcing changes through pull requests instead of direct mutation.
+**Pause and predict:** If you accidentally run `git push upstream main` from a repository where you lack direct write permissions, what output do you expect and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+The expected result is a permission rejection from the hosting platform, often an HTTP permission error or an SSH authorization failure. That rejection is not a nuisance. It is the security boundary doing its job by forcing changes through pull requests instead of direct mutation.
+
+</details>
+
+Write the result before you continue. The next paragraph is about which remote you fetched. It does not describe this push.
 
 The fork workflow also gives you cleaner diagnostic language. If your branch is missing a teammate's merged work, ask whether you fetched from `upstream`, not whether "GitHub is behind." If your pull request does not update after a push, ask whether you pushed to `origin` and whether the PR source branch points to that fork. If local `main` differs from both `origin/main` and `upstream/main`, ask which one represents your personal mirror and which one represents the project authority.
 
@@ -213,7 +240,16 @@ The safer tool is `--force-with-lease`, which turns the push into a conditional 
 git push --force-with-lease origin feature/helm-migration
 ```
 
-Stop and think: why does the lease check use your remote-tracking branch instead of trusting your memory of the branch? Git can compare object IDs precisely, while human memory collapses branch state into phrases like "I fetched recently." A lease converts "recently" into a specific expected commit. If the server does not match that expected commit, Git refuses to proceed until you fetch and inspect the new state.
+**Pause and predict:** Why does the lease check use your remote-tracking branch instead of trusting your memory of the branch?
+
+<details>
+<summary>Check your prediction</summary>
+
+Git can compare object IDs precisely, while human memory collapses branch state into phrases like "I fetched recently." A lease converts "recently" into a specific expected commit. If the server does not match that expected commit, Git refuses to proceed until you fetch and inspect the new state.
+
+</details>
+
+Write the comparison Git can make before you continue. The next paragraph is the repair loop after a refusal. It does not explain why memory is the wrong input.
 
 When a lease is rejected, the correct response is not to fall back to `--force`. Fetch the remote, inspect the new commits, and decide how to incorporate them. A typical repair loop is `git fetch origin`, `git log origin/feature/helm-migration`, and then a deliberate rebase or merge that includes the teammate's work. Only after your local branch is based on the updated remote state should you try `--force-with-lease` again.
 
@@ -356,7 +392,16 @@ Tone matters because review is a technical control performed by humans who must 
 
 Reviewers should also know when to test locally. A documentation-only change might be safe to read in the web diff, but a Kubernetes manifest update deserves schema validation and often a dry run against an appropriate cluster context. The goal is not to create ceremony around every pull request. The goal is to match verification effort to blast radius and to make sure the branch structure gives reviewers enough evidence to do that work efficiently.
 
-Which approach would you choose here and why: a reviewer asks for a one-line label fix in the last commit of your PR, while another teammate says they are testing your branch locally? If the teammate is only reading and you own the branch, amend and push with a lease. If the teammate might push to the same branch, coordinate first or ask them to open a separate branch, because Git cannot infer team intent from a branch name.
+**Pause and predict:** Which approach would you choose here and why: a reviewer asks for a one-line label fix in the last commit of your PR, while another teammate says they are testing your branch locally?
+
+<details>
+<summary>Check your prediction</summary>
+
+If the teammate is only reading and you own the branch, amend and push with a lease. If the teammate might push to the same branch, coordinate first or ask them to open a separate branch, because Git cannot infer team intent from a branch name.
+
+</details>
+
+Write amend or coordinate before you continue. The next section is patterns and anti-patterns. It does not choose for this teammate.
 
 ## Patterns & Anti-Patterns
 
@@ -667,6 +712,51 @@ git fetch upstream
 git rebase upstream/main
 git push origin main
 ```
+
+**Card A: A local commit moved `origin/main`.** You committed on local `main` and expected the remote-tracking ref to advance with it, because the branch name is the same.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: local ref versus remote-tracking ref. Next action: expect only local `main` to move. `origin/main` changes when you fetch, pull, or push, not when you commit.
+
+</details>
+
+**Card B: Fetch rewrote the dirty files.** `deployment.yaml` has uncommitted edits. After `git fetch`, those edits are expected to be gone because the remote moved.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: evidence update versus worktree update. Next action: expect the files to stay as they were. The upstream comparison may change. Pull, merge, checkout, and rebase are the commands that change files.
+
+</details>
+
+**Card C: The rejected push is a Git bug.** `git push upstream main` failed with a permission error. The plan is to retry with `--force` because the objects are valid.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the hosting permission boundary. Next action: treat the rejection as the fork model working. Open a pull request. Do not force a branch you cannot write.
+
+</details>
+
+**Card D: The lease trusts "I fetched recently."** A force-with-lease is skipped because the last fetch "felt recent." The remote-tracking ref is not consulted.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: memory versus an object id. Next action: let the lease compare the server to `origin/<branch>`. If that id does not match, fetch and read the new commits before trying again.
+
+</details>
+
+**Card E: Amend while a teammate may push.** A one-line label fix is amended and force-pushed. The teammate said they are testing the branch and might push their own commit to it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: branch ownership. Next action: coordinate, or ask them to use a separate branch. Amend with a lease only when you own the branch and they are only reading.
+
+</details>
 
 ### Success Criteria Checklist
 
