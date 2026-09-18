@@ -57,7 +57,16 @@ kubectl get pods --all-namespaces
 kubectl auth can-i list pods --all-namespaces
 ```
 
-Pause and predict: if you spend one evening practicing `kubectl describe`, `kubectl logs`, `kubectl auth can-i`, and `kubectl get events`, then spend another evening reading a cloud provider's managed node group documentation, which evening is more likely to improve your exam score next week, and why? The answer is not that cloud infrastructure is unimportant. The answer is that the exam can directly measure your native troubleshooting workflow, while provider-specific infrastructure knowledge belongs to a different learning objective.
+**Pause and predict:** if you spend one evening practicing `kubectl describe`, `kubectl logs`, `kubectl auth can-i`, and `kubectl get events`, then spend another evening reading a cloud provider's managed node group documentation, which evening is more likely to improve your exam score next week, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+Cloud infrastructure is not unimportant. The exam can directly measure your native troubleshooting workflow, while provider-specific infrastructure knowledge belongs to a different learning objective.
+
+</details>
+
+Write which evening you choose, and the reason, before you continue. The next paragraph is about the discomfort of a narrow curriculum. It does not pick the evening.
 
 The tradeoff is real. A focused curriculum can feel incomplete when your workplace uses tools we deliberately do not teach in depth, and it can feel conservative when a new project becomes popular faster than exam objectives change. We accept that discomfort because certification learning has a different job than production onboarding. KubeDojo teaches the portable layer first, then points you toward credible sources for role-specific depth after the exam pressure is gone.
 
@@ -119,7 +128,16 @@ The cloud-native ecosystem is full of excellent tools that sit beside Kubernetes
 
 There is one subtle exception: Helm is currently explicit in CKAD scope, while it is not the center of CKA or CKS study. That does not mean Helm is unimportant; it means your depth should match the exam you are taking. For CKAD, standard chart operations are worth practicing because the objective says so. For CKA or CKS, Helm may remain useful context, but it should not crowd out native troubleshooting, cluster maintenance, workload configuration, or security tasks.
 
-Stop and think: if your company uses Istio heavily, should you study it for the CKA? The disciplined answer is that you should learn enough at work to avoid being dangerous in production, but you should not spend certification study blocks learning service mesh internals unless your immediate goal has changed. Balancing usefulness at work with exam readiness means naming the goal of each study session before you start.
+**Pause and predict:** if your company uses Istio heavily, should you study it for the CKA?
+
+<details>
+<summary>Check your prediction</summary>
+
+Learn enough at work to avoid being dangerous in production. Do not spend certification study blocks on service mesh internals unless your immediate goal has changed. Name the goal of each study session before you start.
+
+</details>
+
+Write yes or no, and which hours you would use, before you continue. The next section is about why the curriculum makes these cuts. It does not answer the Istio question.
 
 ---
 
@@ -182,7 +200,16 @@ gantt
     Expert Level        :g2, 0, 10
 ```
 
-Pause and predict: look at the depth chart above and decide why etcd backup has a small exam-depth bar but a large expert-depth bar. The exam can ask you to execute a bounded recovery workflow, so the necessary skill is precise command practice with the documented snapshot process. Production expertise is wider because a real restore can affect every workload, every controller, and every API object in the cluster, and a mistake can turn a recoverable incident into data loss.
+**Pause and predict:** look at the depth chart above and decide why etcd backup has a small exam-depth bar but a large expert-depth bar.
+
+<details>
+<summary>Check your prediction</summary>
+
+The exam can ask you to execute a bounded recovery workflow, so the necessary skill is precise command practice with the documented snapshot process. Production expertise is wider because a real restore can affect every workload, every controller, and every API object in the cluster, and a mistake can turn a recoverable incident into data loss.
+
+</details>
+
+Write why the two bars differ before you continue. The next paragraph is about false equivalence between other topics. It does not explain these two bars.
 
 This principle also helps you avoid false equivalence. A topic can be simple to name and still require deep expertise, while another topic can look complex and still require only a practical slice for the exam. "NetworkPolicy" sounds like one object, but real network isolation requires careful label design, namespace boundaries, plugin behavior, default-deny posture, and testing. "Cluster Autoscaler" sounds like an operational basics topic, but it depends heavily on infrastructure providers and node provisioning behavior, so it belongs outside the generic certification path for most learners.
 
@@ -386,6 +413,42 @@ Create a short document with three headings: `Exam Scope`, `Supporting Context`,
 <summary>Solution guidance</summary>
 
 A strong answer should not delete advanced topics. It should move them into a visible post-exam roadmap so you can return to them without letting them compete with the current certification. Your `Exam Scope` list should contain native Kubernetes practice such as workloads, Services, RBAC, scheduling, storage, troubleshooting, security primitives, and any tool explicitly named by the objective for your exam. Your `Supporting Context` list should be small and should explain a tested concept rather than introduce a new toolchain. Your `Post-Exam Specialization` list should contain provider details, GitOps tools, service mesh depth, deep CNI internals, production cost optimization, and role-specific reliability work.
+</details>
+
+**Card A: Two evenings, one exam next week.** One evening is `kubectl describe`, logs, `auth can-i`, and events. The other is a cloud provider's managed node group guide. A friend says both are "Kubernetes" so they count the same.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mixing a measured exam workflow with a different objective. Next action: give the exam evening to the native commands. Park the node-group guide until the exam pressure is gone.
+
+</details>
+
+**Card B: Istio is the production mesh.** The company runs Istio. The learner's next exam is the CKA. The study block this week is booked for VirtualService internals.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: work usefulness was treated as the certification goal. Next action: keep a short production safety note, and spend the certification block on native tasks unless the goal itself changed.
+
+</details>
+
+**Card C: The etcd bars look inconsistent.** The chart shows a short exam bar and a long expert bar for backup and restore. Someone concludes the topic is either trivial or out of scope.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: exam depth was confused with production blast radius. Next action: practice the documented snapshot commands, and do not treat a full-cluster restore drill as this week's exam task.
+
+</details>
+
+**Card D: The mesh tutorial replaced the policy drill.** The backlog has an Istio traffic-policy video and no NetworkPolicy practice. The exam objectives name NetworkPolicy, not the mesh.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: an adjacent tool displaced the tested object. Next action: move the video to the post-exam list and put NetworkPolicy reps in this week's plan.
+
 </details>
 
 ### Success Criteria
