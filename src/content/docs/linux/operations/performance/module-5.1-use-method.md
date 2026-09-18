@@ -98,7 +98,14 @@ The diagram shows why the method is useful even before you become an expert in e
 | Disk I/O | `iostat %util` | `iostat avgqu-sz` | `smartctl`, `dmesg` |
 | Network | `sar -n DEV` | `netstat`, `ss` | `ip -s link` |
 
-Pause and predict: if every utilization graph looks moderate but the user-facing latency is severe, which USE category would you inspect next and why? A strong answer names saturation first, because queues can grow during short bursts that averages smooth away. It also keeps errors in view, because packet drops or device faults may create latency without a sustained utilization ceiling.
+**Pause and predict:** if every utilization graph looks moderate but the user-facing latency is severe, which USE category would you inspect next and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+A strong answer names saturation first, because queues can grow during short bursts that averages smooth away. It also keeps errors in view, because packet drops or device faults may create latency without a sustained utilization ceiling.
+
+</details>
 
 USE is not a rigid order that forbids judgment. If the alert says `DiskPressure=True`, start with disk and then complete the rest of the pass. If a node just received a burst of traffic, start with network and CPU before memory. The discipline is that you do not stop after the first interesting number unless the evidence already explains the symptom and you know what risk remains untested.
 
@@ -218,7 +225,14 @@ dmesg | grep -i "memory\|ecc\|error"
 # Uncorrectable errors = hardware failing
 ```
 
-Pause and predict: if `free -h` shows 100Mi free, 8Gi available, and `vmstat 1` shows `si` and `so` consistently at zero, is the system experiencing memory saturation? The evidence says no, because reclaimable cache explains the low free value and there is no queue through swap. A better next step is to continue the USE pass instead of tuning memory blindly.
+**Pause and predict:** if `free -h` shows 100Mi free, 8Gi available, and `vmstat 1` shows `si` and `so` consistently at zero, is the system experiencing memory saturation?
+
+<details>
+<summary>Check your prediction</summary>
+
+The evidence says no, because reclaimable cache explains the low free value and there is no queue through swap. A better next step is to continue the USE pass instead of tuning memory blindly.
+
+</details>
 
 Memory errors and memory saturation also lead to different actions. Saturation usually means demand exceeds policy or capacity, so you inspect workloads, limits, leaks, cache behavior, and eviction decisions. Errors may mean hardware trouble, firmware issues, or a failing host. Conflating the two wastes time because adding memory to a workload does not repair faulty RAM, and replacing hardware does not fix an application that allocates without bound.
 
@@ -608,6 +622,7 @@ Open two terminals if possible. Use the first terminal to create or observe load
 - [ ] Interpret load average, run queue, swap activity, disk queue depth, packet drops, and CPU steal in a short incident note. *(Host-only)*
 - [ ] Implement a repeatable USE checklist script that automates initial triage without hiding the reasoning. *(Host-only)*
 - [ ] Compare your script output with manual commands and explain any missing evidence. *(Host-only)*
+- [ ] I named a failure layer and a next action for each frozen USE-layer card before opening the reveal. *(Host-only)*
 
 #### Part 1: CPU Analysis
 
@@ -736,6 +751,44 @@ Your final note should name the healthiest and least healthy resource categories
 
 </details>
 
+A utilization number, a memory column, a disk wait, and a container limit can each look like the bottleneck and still be the wrong layer. The lab walks one USE pass. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Moderate graphs, severe latency.** Every utilization graph for the last hour sits in the middle of its range. Users still report multi-second delays. You have not opened the saturation or error columns yet.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: saturation (and errors if counters are moving), not the moderate utilization average. Next action: sample the run queue, disk queue, or drop counters over a short window instead of tuning the busiest-looking average.
+
+</details>
+
+**Card B: Almost no free memory.** `free -h` shows about 100Mi free and about 8Gi available. `vmstat` shows `si` and `so` at zero for several samples.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: not memory saturation. Available memory is the utilization signal, and zero swap traffic means there is no queue through storage. Next action: continue the USE pass; do not add RAM or shrink cache from this transcript alone.
+
+</details>
+
+**Card C: Disk looks busy while swap churns.** `iowait` is high and `iostat` shows the disk working. The same samples show continuous nonzero `si` and `so`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: memory saturation showing up as storage traffic, not a disk that is full or failing by itself. Next action: record swap activity next to the disk queue before you retune the storage device.
+
+</details>
+
+**Card D: One container, two memory stories.** A container is near its memory limit. The node still reports plenty of available memory. No OOM line is in `dmesg` yet.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the container cgroup limit, not node memory. Next action: name that layer in the note and inspect the workload's limit before you scale the node.
+
+</details>
+
 ### Success Criteria
 
 All of these criteria are host-only: a learner on the Killercoda ubuntu lab or any local Linux host can complete every one without a Kubernetes cluster.
@@ -746,6 +799,7 @@ All of these criteria are host-only: a learner on the Killercoda ubuntu lab or a
 - [ ] Checked network errors and drops
 - [ ] Ran complete USE scan
 - [ ] Identified which resources are healthy
+- [ ] Classified each frozen USE-layer card by failure layer and next action
 
 ## Next Module
 
