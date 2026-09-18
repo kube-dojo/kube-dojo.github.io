@@ -570,9 +570,29 @@ Another anti-pattern is hiding security-sensitive assumptions in shell startup f
 
 ## Decision Framework
 
-### Failure-Layer Diagnostic
+### Failure-Layer Diagnostic Challenge
 
-Before changing anything, classify the failure into exactly one layer. Each layer has a cheapest first check and a characteristic wrong reflex to avoid, and jumping straight to `sudo` or `chmod 777` skips the classification that makes the repair narrow and reversible.
+Keep Tasks 1–4 for hands-on practice. First, classify these **frozen** failures without changing anything on a machine. For each card, name the failure layer (lookup, mode, export, ownership, directory-write, or sudo-redirection) and write one narrow one-line fix. Do not open the reveal until you have written your answer.
+
+**Card 1.** You run `deploy.sh` and get `command not found`. `ls` in the current directory shows `deploy.sh` is present.
+
+**Card 2.** You run `./deploy.sh` and get `Permission denied`. `ls -l` shows mode `-rw-r--r--`.
+
+**Card 3.** In the parent shell, `echo $PROJECT_NAME` prints a value. A child script started from that shell prints an empty project name.
+
+**Card 4.** You run `sudo echo "10.0.0.5 myserver" >> /etc/hosts` and still get permission denied on `/etc/hosts`.
+
+<details>
+<summary>Check your classifications (and the reference table)</summary>
+
+| Card | Failure layer | One-line fix direction |
+| :--- | :--- | :--- |
+| 1 | Lookup | Run with an explicit path (`./deploy.sh`) or put a trusted copy on `PATH` — do not chmod a name the shell never resolved. |
+| 2 | Mode | Add execute for the intended identity (`chmod u+x deploy.sh` or a precise numeric mode) — not `chmod 777`. |
+| 3 | Export | `export PROJECT_NAME=…` in the parent (or set the variable in the script) so the child process environment carries it. |
+| 4 | Sudo-redirection | Use `echo "…" \| sudo tee -a /etc/hosts` (or an editor under sudo) — the unprivileged shell still opens `>>` targets. |
+
+Use the broader layer table when you are not sure which row applies to a new symptom. Every first check is read-only on purpose.
 
 | Failure layer | Typical symptom | First read-only check | Wrong reflex |
 | :--- | :--- | :--- | :--- |
@@ -582,6 +602,8 @@ Before changing anything, classify the failure into exactly one layer. Each laye
 | Ownership | Mode looks correct, but the wrong user or group applies | `ls -l` for owner and group, `id` for the process identity | Widening the "others" bits instead of fixing ownership |
 | Directory-write | `touch` or `rm` inside a directory fails while file modes look fine | `ls -ld` on the directory and its parents | Editing modes of files that do not exist yet or are not the blocker |
 | Sudo-redirection | `sudo echo "line" >> /etc/hosts` still fails | Remember the unprivileged shell opens the redirection target | Opening a root shell instead of using `sudo tee -a` |
+
+</details>
 
 Notice that every first check in the table is read-only. That is deliberate: `type`, `echo $PATH`, `ls -l`, `ls -ld`, `id`, and `env` gather evidence without mutating the system, so you can test a hypothesis before committing to any repair. When two layers seem to apply, run the cheapest check first and let its output pick the row. A `Permission denied` on an explicit path with a correct file mode usually means the real failure lives one row down in ownership or one directory up in traversal, not in the file's own mode bits. Classifying first also gives you a stop condition: once the failing layer is identified and repaired narrowly, you are done, and there is no leftover broad permission to clean up later.
 
