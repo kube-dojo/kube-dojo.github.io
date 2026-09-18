@@ -78,7 +78,16 @@ git status
 #   new file:   service.yaml
 ```
 
-Pause and predict: what do you think happens if you run `git commit -m "Same thing"` immediately after a `git reset --soft HEAD~1`? You would recreate the same file snapshot you just removed from the branch tip, because `--soft` leaves the staging area untouched. The new commit may have a different hash, author timestamp, or message, but the tree recorded by the commit will match unless you edit or restage something first. That is why `--soft` is excellent for fixing commit messages, adding one missed file, or combining the last local commit with an adjacent change before publication.
+**Pause and predict:** What do you think happens if you run `git commit -m "Same thing"` immediately after a `git reset --soft HEAD~1`?
+
+<details>
+<summary>Check your prediction</summary>
+
+You would recreate the same file snapshot you just removed from the branch tip, because `--soft` leaves the staging area untouched. The new commit may have a different hash, author timestamp, or message, but the tree recorded by the commit will match unless you edit or restage something first.
+
+</details>
+
+Write what the new commit's tree contains before you continue. `--soft` is still the local mode for a wrong message, one missed file, or two adjacent commits that should have been one. That usefulness is a separate decision from the snapshot you just predicted.
 
 `git reset --mixed` is the default reset mode, so `git reset HEAD~1` behaves like `git reset --mixed HEAD~1`. It moves `HEAD` and rewrites the staging area to match the target commit, but it leaves the working directory files alone. In practical terms, the content from the removed commits becomes unstaged local modifications. You have not lost the YAML, scripts, or docs; you have only unpacked them from the index so you can sort them into better commits.
 
@@ -172,7 +181,16 @@ git reset --hard 7a8b9c0
 # Output: HEAD is now at 7a8b9c0 Add critical database credentials template
 ```
 
-Pause and predict: before running another command, what output do you expect if you run `git reflog` immediately after the recovery? The reflog will have a new entry at the top recording the recovery action, usually something like `reset: moving to 7a8b9c0`. Older entries will move down one position. The reflog appends movements instead of pretending the mistake never happened, which is exactly why it can function as an audit trail for local repair.
+**Pause and predict:** Before running another command, what output do you expect if you run `git reflog` immediately after the recovery?
+
+<details>
+<summary>Check your prediction</summary>
+
+The reflog will have a new entry at the top recording the recovery action, usually something like `reset: moving to 7a8b9c0`. Older entries will move down one position. The reflog appends movements instead of pretending the mistake never happened, which is exactly why it can function as an audit trail for local repair.
+
+</details>
+
+Write the first reflog line before you continue. The next paragraph is about whether to reset, branch, or cherry-pick after you have found a hash. It does not describe that first line.
 
 There is one subtle decision to make during reflog recovery: whether to reset the current branch, branch from the lost commit, or cherry-pick the lost commit onto the current branch. Reset is appropriate when the branch pointer itself went to the wrong place and you want to put it back. Creating a branch is appropriate when you are unsure what the recovered commit contains or you need to preserve the current branch state for comparison. Cherry-pick is appropriate when the current branch has legitimately moved on, but one lost changeset should be reapplied as a new commit.
 
@@ -200,7 +218,16 @@ git log --oneline
 # 1d2e3f4 Add new payment gateway service
 ```
 
-Pause and predict: if you run `git revert 9a8b7c6` on `main`, what will `git log --oneline` show immediately afterward? You should expect a new commit at the tip with a message like `Revert "Update ingress routing rules"`, while the original bad commit remains below it. The branch moves forward, not backward. That distinction is the entire collaboration contract: everyone can pull the new rollback commit without being asked to pretend the old commit never existed.
+**Pause and predict:** If you run `git revert 9a8b7c6` on `main`, what will `git log --oneline` show immediately afterward?
+
+<details>
+<summary>Check your prediction</summary>
+
+You should expect a new commit at the tip with a message like `Revert "Update ingress routing rules"`, while the original bad commit remains below it. The branch moves forward, not backward. That distinction is the entire collaboration contract: everyone can pull the new rollback commit without being asked to pretend the old commit never existed.
+
+</details>
+
+Write the new tip before you continue. The commands below perform the revert. They do not show the resulting log.
 
 ```bash
 # Revert the specific bad commit to restore service
@@ -234,7 +261,16 @@ The checkout form works because the `--` tells Git that `statefulset.yaml` is a 
 git restore statefulset.yaml
 ```
 
-Pause and predict: if `statefulset.yaml` is currently modified and staged, what will `git status` show immediately after you run `git restore --staged statefulset.yaml`? The file will move out of the "Changes to be committed" section and into the unstaged section, while the actual file contents in your working directory remain modified. That command changes the index, not the working file. If you also want to discard the working directory changes, you need a separate restore without `--staged`.
+**Pause and predict:** If `statefulset.yaml` is currently modified and staged, what will `git status` show immediately after you run `git restore --staged statefulset.yaml`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The file will move out of the "Changes to be committed" section and into the unstaged section, while the actual file contents in your working directory remain modified. That command changes the index, not the working file. If you also want to discard the working directory changes, you need a separate restore without `--staged`.
+
+</details>
+
+Write the status sections before you continue. The next commands unstage a file. They do not print `git status`.
 
 ```bash
 # What if you already added the file to the staging area?
@@ -307,11 +343,29 @@ git add deployment.yaml
 git cherry-pick --continue
 ```
 
-Before running this, what output do you expect from `git log --oneline -3` after a clean cherry-pick? You should expect the current branch tip to be a new commit with the cherry-picked message, followed by the previous commits from the target branch. You should not expect the source branch's earlier commits to appear. That absence is the point of the operation, and it is also why cherry-picking a stack of dependent commits must be done in dependency order.
+**Pause and predict:** Before running this, what output do you expect from `git log --oneline -3` after a clean cherry-pick?
+
+<details>
+<summary>Check your prediction</summary>
+
+You should expect the current branch tip to be a new commit with the cherry-picked message, followed by the previous commits from the target branch. You should not expect the source branch's earlier commits to appear. That absence is the point of the operation, and it is also why cherry-picking a stack of dependent commits must be done in dependency order.
+
+</details>
+
+Write the three lines before you continue. The next paragraph is about applying the oldest commit first. It does not print that log.
 
 When several commits are required, apply the oldest necessary commit first. Later commits may depend on files, functions, or manifests introduced by earlier commits. Cherry-picking newest first can create avoidable conflicts or even produce a build that appears to pass while missing a prerequisite. If you need three commits from a messy branch, identify their hashes with `git log --oneline --reverse feature-x`, then apply the selected commits in the order they originally built on each other.
 
-Stop and think: which approach would you choose if you have ten messy experimental commits on a feature branch, but only three should become a clean pull request on `main`? Check out `main` or a new branch from `main`, then cherry-pick the three desired commit hashes in chronological order. That approach is usually easier to review than attempting a complicated interactive rebase that drops seven commits from the original branch, especially when the original branch still belongs to ongoing experimentation.
+**Pause and predict:** Which approach would you choose if you have ten messy experimental commits on a feature branch, but only three should become a clean pull request on `main`?
+
+<details>
+<summary>Check your prediction</summary>
+
+Check out `main` or a new branch from `main`, then cherry-pick the three desired commit hashes in chronological order. That approach is usually easier to review than attempting a complicated interactive rebase that drops seven commits from the original branch, especially when the original branch still belongs to ongoing experimentation.
+
+</details>
+
+Write the command family before you continue. The next paragraph is about backporting a fix onto a release branch. It does not choose between these two cleanups.
 
 Cherry-pick is also a common release maintenance tool. A fix may land on `main`, then need to be backported to a supported release branch without bringing the next version's features along. In that case, the destination branch's tests matter more than the source branch's tests. A patch that was correct on `main` can be incomplete on an older release because APIs, manifest layouts, or dependency versions differ. Treat every cherry-pick as a new integration event, not as a free copy.
 
@@ -551,6 +605,51 @@ ls -la
 cat hpa.yaml
 cat deployment.yaml # Should NOT contain the "replicas: 3" line
 ```
+
+</details>
+
+**Card A: `--soft` threw the snapshot away.** After `git reset --soft HEAD~1`, a commit with the same message is expected to record an empty tree because the branch tip no longer names the old commit.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the index still holds the tree. Next action: expect the new commit to match the removed snapshot unless you edit or restage first. Use this when the message was wrong, not when you meant to unpack the files.
+
+</details>
+
+**Card B: Reflog erased the mistake.** A reset moved the branch to the wrong commit. After you reset back, someone says the reflog no longer mentions the bad move, so there is nothing to audit.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the reflog appends. Next action: look for a new top entry such as `reset: moving to <hash>`. Older entries shift down. They are not deleted by the recovery.
+
+</details>
+
+**Card C: Revert deleted the bad commit.** `git revert` ran on `main` for a bad ingress commit. The expected log has that commit gone and the branch tip back at its parent.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: forward history, not a rewritten past. Next action: expect a new `Revert "..."` commit at the tip and the original commit still below it. Teammates pull that new commit.
+
+</details>
+
+**Card D: Staged restore discarded the edit.** `statefulset.yaml` was modified and staged. After `git restore --staged`, the working file is expected to match `HEAD` again.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the index, not the worktree. Next action: expect the path in "Changes not staged", still modified. A restore without `--staged` is the command that discards the working file.
+
+</details>
+
+**Card E: Drop seven commits on the experimental branch.** Ten local commits exist. Only three belong in the pull request. The plan is an interactive rebase on that same branch that deletes the other seven, while the experiment is still in progress.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the experimental branch is still the notebook. Next action: branch from `main` and cherry-pick the three hashes in chronological order. Leave the messy branch intact.
 
 </details>
 
