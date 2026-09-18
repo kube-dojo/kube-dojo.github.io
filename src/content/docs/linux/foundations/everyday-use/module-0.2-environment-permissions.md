@@ -96,7 +96,13 @@ echo "Your home is $HOME and your shell is $SHELL."
 echo "You are currently in $PWD."
 ```
 
-Pause and predict: if a script prints an empty value for `$PROJECT_NAME` but your prompt prints the expected value, what process boundary should you investigate first? The right answer is usually not "the script is broken." It is usually "the variable exists in the parent shell but was never exported to the child process," or "the command was launched from a different shell that never loaded the same configuration."
+Pause and predict: if a script prints an empty value for `$PROJECT_NAME` but your prompt prints the expected value, what process boundary should you investigate first? Commit to an answer before revealing one below, and phrase your guess as a hypothesis you could test with one read-only command, such as `env | grep PROJECT_NAME` run inside the child shell itself.
+
+<details><summary>Reveal the predicted answer</summary>
+
+The right answer is usually not "the script is broken." It is usually "the variable exists in the parent shell but was never exported to the child process," or "the command was launched from a different shell that never loaded the same configuration."
+
+</details>
 
 `PS1` deserves special mention because it proves that environment and shell settings overlap but are not identical. `PS1` controls the interactive prompt in shells such as Bash, and changing it can help you display the current directory, cluster name, or user. However, prompt changes are a convenience for humans, not a permission control. A prompt that says `prod` does not prove your commands target production, and a prompt that says `dev` does not protect you from a dangerous `KUBECONFIG`.
 
@@ -209,7 +215,13 @@ Do not add the current directory, `.`, to the beginning of `PATH`. The convenien
 
 **Hypothetical scenario:** A team inherits an old build host where root's `PATH` began with `.` because an administrator wanted local helper scripts to feel convenient. During an incident, a temporary directory contained a file named `ls` from a failed tool extraction. A root shell entered that directory and ran `ls`, which executed the local file instead of `/usr/bin/ls`. The compromise was contained quickly, but the root cause was not an advanced exploit; it was command lookup order combined with unnecessary root authority.
 
-Before running this, what output do you expect from `type deploy.sh` when `deploy.sh` exists in the current directory but no directory in `PATH` contains that name? If you expect "command not found," you are tracking the shell's perspective correctly. Existence in the current directory is not enough for name-based lookup, and the shell does not treat visible files as commands unless the path rules say it should.
+Before running this, what output do you expect from `type deploy.sh` when `deploy.sh` exists in the current directory but no directory in `PATH` contains that name? Commit to a prediction before revealing one below.
+
+<details><summary>Reveal the predicted answer</summary>
+
+If you expect "command not found," you are tracking the shell's perspective correctly. Existence in the current directory is not enough for name-based lookup, and the shell does not treat visible files as commands unless the path rules say it should.
+
+</details>
 
 ## 3. Startup Files Make Settings Persistent
 
@@ -258,7 +270,6 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias cls='clear'
 alias ports='ss -tulnp'
-alias myip='curl -s ifconfig.me'
 ```
 
 These aliases are typical because they shorten commands people run constantly, but they also show the boundary of alias usefulness. `ll` is a harmless display preference, while `rm='rm -i'` changes safety behavior and deserves a team convention. Aliases are personal shell features, so they should never be required for automation unless the script defines its own behavior explicitly. A CI job should call the real command or a committed wrapper script, not depend on someone's private `.bashrc`.
@@ -317,7 +328,13 @@ command ls
 unalias ll
 ```
 
-Which approach would you choose here and why: add `~/downloads` to `PATH`, move one trusted binary into `~/bin`, or run it by explicit path from `~/downloads`? For a one-time tool, explicit path is usually clearest. For a trusted personal tool you use every week, `~/bin` is reasonable. Adding a general downloads directory to `PATH` is weak because downloads are often unreviewed and cluttered.
+Which approach would you choose here and why: add `~/downloads` to `PATH`, move one trusted binary into `~/bin`, or run it by explicit path from `~/downloads`? Commit to a choice before revealing one below.
+
+<details><summary>Reveal a recommended choice</summary>
+
+For a one-time tool, explicit path is usually clearest. For a trusted personal tool you use every week, `~/bin` is reasonable. Adding a general downloads directory to `PATH` is weak because downloads are often unreviewed and cluttered.
+
+</details>
 
 ---
 
@@ -423,7 +440,13 @@ chmod 700 ~/.ssh
 chmod 444 important-record.txt
 ```
 
-Pause and predict: you have a directory where users should be able to enter and list files but must not create or delete anything. Which bits are required on the directory, and which bit must be absent? Read plus execute are required for listing and traversal, while write must be absent. For owner-only access that pattern is `500`; for a typical shared read-only directory it may appear as `755` when the owner still needs write permission.
+Pause and predict: you have a directory where users should be able to enter and list files but must not create or delete anything. Which bits are required on the directory, and which bit must be absent? Commit to a prediction before revealing one below, and express it as a numeric mode rather than only a list of letters so you can compare it directly against real `ls -ld` output.
+
+<details><summary>Reveal the predicted answer</summary>
+
+Read plus execute are required for listing and traversal, while write must be absent. For owner-only access that pattern is `500`; for a typical shared read-only directory it may appear as `755` when the owner still needs write permission.
+
+</details>
 
 | Pattern | Numeric | Use Case |
 | :--- | :--- | :--- |
@@ -547,6 +570,21 @@ Another anti-pattern is hiding security-sensitive assumptions in shell startup f
 
 ## Decision Framework
 
+### Failure-Layer Diagnostic
+
+Before changing anything, classify the failure into exactly one layer. Each layer has a cheapest first check and a characteristic wrong reflex to avoid, and jumping straight to `sudo` or `chmod 777` skips the classification that makes the repair narrow and reversible.
+
+| Failure layer | Typical symptom | First read-only check | Wrong reflex |
+| :--- | :--- | :--- | :--- |
+| Lookup | `command not found` for a command name | `type name`, then inspect `echo $PATH` | Changing permissions on a file the shell never resolved |
+| Mode | `Permission denied` on an explicit path such as `./deploy.sh` | `ls -l file` | Applying `chmod 777` to make the error disappear |
+| Export | Child process or script sees an empty variable | Confirm `export` in the parent, then `env \| grep NAME` in the child | Re-assigning the same unexported value in the parent shell |
+| Ownership | Mode looks correct, but the wrong user or group applies | `ls -l` for owner and group, `id` for the process identity | Widening the "others" bits instead of fixing ownership |
+| Directory-write | `touch` or `rm` inside a directory fails while file modes look fine | `ls -ld` on the directory and its parents | Editing modes of files that do not exist yet or are not the blocker |
+| Sudo-redirection | `sudo echo "line" >> /etc/hosts` still fails | Remember the unprivileged shell opens the redirection target | Opening a root shell instead of using `sudo tee -a` |
+
+Notice that every first check in the table is read-only. That is deliberate: `type`, `echo $PATH`, `ls -l`, `ls -ld`, `id`, and `env` gather evidence without mutating the system, so you can test a hypothesis before committing to any repair. When two layers seem to apply, run the cheapest check first and let its output pick the row. A `Permission denied` on an explicit path with a correct file mode usually means the real failure lives one row down in ownership or one directory up in traversal, not in the file's own mode bits. Classifying first also gives you a stop condition: once the failing layer is identified and repaired narrowly, you are done, and there is no leftover broad permission to clean up later.
+
 Start with the error boundary. If the shell says `command not found`, ask whether you typed a command name or a path. For command names, run `type name`, inspect `PATH`, and decide whether the tool belongs in an existing searched directory, a trusted personal directory, or should be run by explicit path. Do not use `chmod` to fix a lookup problem, because execute permission is irrelevant until the shell has resolved the file to execute.
 
 If the shell found the file but the kernel says `Permission denied`, inspect `ls -l file` and `ls -ld` on the parent directories. Add execute permission only when the file should be runnable, and add directory execute permission only when users should traverse that directory. If the file is owned by the wrong user or group, correct ownership instead of granting broad access. If the operation touches system paths, use a targeted `sudo` command rather than opening a root shell.
@@ -623,7 +661,7 @@ The editor ran as root and saved the file with root ownership, so the normal app
 Run `type python3` to see what the shell resolves first, then inspect the order of directories in `echo $PATH`. The shell stops at the first matching executable, so `/usr/bin` winning means your custom directory is absent or appears later. To intentionally prefer the custom build in interactive shells, add `export PATH="/opt/custom/bin:$PATH"` to the correct startup file and source it. Be careful with this kind of override because system tools may expect the distribution-provided interpreter.
 </details>
 
-## Hands-On Exercise: Environment and Permissions Boot Camp
+## Hands-On Exercise: Environment and Permissions Triage Lab
 
 You are setting up a development environment on a new server. The goal is not to memorize commands; it is to practice identifying which layer owns each failure. You will inspect inherited environment values, make a shell shortcut persistent, create a script that fails for a real permission reason, repair it narrowly, and secure a local config file without using `sudo` for files you own.
 
