@@ -115,7 +115,18 @@ flowchart LR
 
 Brace expansion is the first stage, and it operates on literal commas and ranges before any variable is expanded. `mkdir -p project/{src,tests,docs}` creates three directories in one command. Tilde expansion follows immediately, translating `~` and `~user` only at word boundaries. These two stages are safe because they operate on literal text rather than on substituted values.
 
-The real danger zone begins at stage three with parameter expansion, then compounds through command substitution, arithmetic expansion, and process substitution. Each of these stages substitutes runtime values into the command line. After substitution, the shell proceeds to word splitting on unquoted results, which is why `$file` with a value of "my documents" becomes two words. The shell then performs pathname expansion, turning `*` and `?` characters into matching filenames. Both of these destructive stages are disabled by double quotes. Understanding this sequence means you can look at any Bash command and predict its word boundaries without running it.
+The real danger zone begins at stage three with parameter expansion, then compounds through command substitution, arithmetic expansion, and process substitution. Each of these stages substitutes runtime values into the command line.
+
+**Pause and predict:** `$file` is set to `my documents` and the next command is `cp $file /backup/`. How many path arguments does `cp` receive after the shell finishes expansion?
+
+<details>
+<summary>Check your prediction</summary>
+
+Two, not one. Word splitting runs on the unquoted result, so `my documents` becomes two words. Pathname expansion can then turn unquoted `*` and `?` into matching filenames. Double quotes disable both of those stages.
+
+</details>
+
+Write the word count down before you add quotes. The stages after substitution are where a script that looked fine in review starts acting on the wrong files.
 
 For day-to-day reliability, use this practical quoting decision pattern: quote all substitutions by default, then remove quotes only when you intentionally want word splitting. For comparisons and tests in Bash, `[[ ... ]]` avoids many legacy `[` pitfalls and is generally safer when variables might be empty. For file names, paths, service identifiers, and URLs, prefer `"$var"` so spaces or special characters stay intact. For command templates and option lists, use arrays instead of a single string (`args=("$@")`) so each argument is passed exactly once. This small discipline is often the difference between a script that scales safely and one that fails silently during the first edge case. It also keeps your scripts readable under pressure, because the data flow is explicit: either the shell receives an atomic value, or you explicitly asked it to split.
 
@@ -421,7 +432,14 @@ Strict mode is the combination of shell options that transforms Bash from a perm
 
 `set -u` (nounset) treats references to unset variables as errors and exits the script immediately. This catches typos in variable names and missing environment variables before they propagate through the rest of the script. When you genuinely need to test whether a variable is set, use parameter expansion with a default — `${var:-}` expands to nothing when `var` is unset, satisfying `set -u` while allowing the check to proceed.
 
-`set -o pipefail` changes the exit status of a pipeline to the exit status of the last (rightmost) command that failed, rather than the exit status of the last command in the pipeline. Without `pipefail`, `false | true` returns 0 because `true` succeeds, masking the earlier failure. With `pipefail`, the pipeline returns the exit status of `false`, so `set -e` can react to pipeline failures. This is essential for pipelines like `curl ... | jq ...` where a fetch failure followed by `jq` producing empty output silently hides the real error.
+**Pause and predict:** a script has `set -e` and runs `curl -s https://api.example.com/data | jq '.items' > output.json`. `curl` times out. The pipeline step still reports success. Why did `set -e` not stop the script?
+
+<details>
+<summary>Check your prediction</summary>
+
+Without `set -o pipefail`, a pipeline's exit status is the status of the last command. `jq` can exit 0 on empty input, so the `curl` failure never becomes the pipeline status and `set -e` has nothing to catch. `pipefail` makes the pipeline return the rightmost non-zero status, which is what lets `set -e` see the fetch failure.
+
+</details>
 
 ```bash
 #!/bin/bash
@@ -778,6 +796,46 @@ chmod +x expand-demo.sh
 ./expand-demo.sh
 ```
 
+- [ ] I named a failure layer and a next action for each frozen expansion-layer card before opening the reveal.
+
+An unquoted path, a green pipeline, a `grep` that found nothing, and a helper that set a variable can each look like a successful script and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Two files, one variable.** `file` is `my documents`. The script runs `cp $file /backup/` and the operator says the copy "worked."
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: word splitting, not `cp`. Next action: quote `"$file"` and rerun against a path that contains a space.
+
+</details>
+
+**Card B: Pipeline is green, data is empty.** `set -e` is on. `curl | jq` exits 0. The JSON file is empty because `curl` timed out.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: pipeline status without `pipefail`, not a successful fetch. Next action: add `set -o pipefail` and treat an empty body as a failed fetch.
+
+</details>
+
+**Card C: No matches, script dies.** `set -e` is on. `grep error /var/log/app.log` finds nothing and the script exits.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: `grep`'s exit code 1 treated as a fatal error. Next action: decide whether "no match" is success, and write that as `if grep -q` or an explicit `|| true`.
+
+</details>
+
+**Card D: Helper changed the caller's variable.** A function sets `status=failed` without `local`. Later the main script reads `$status` and gets `failed`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a global assignment, not the caller's own logic. Next action: declare `local status` inside the function and retest the caller.
+
+</details>
+
 ### Success Criteria
 
 - [ ] Created a strict-mode script template that validates arguments and passes ShellCheck analysis *(Host-only — required)*
@@ -785,6 +843,7 @@ chmod +x expand-demo.sh
 - [ ] Applied parameter expansion patterns for defaults, alternates, and substring operations *(Host-only — required)*
 - [ ] Predicted the output of each expansion pattern before running the script *(Host-only — required)*
 - [ ] *(Cluster path — optional)* Ran the rollout-status script from **Bash with Kubernetes: Scripting Patterns** against a real deployment with `kubectl` on a running cluster; on the host-only path, read that section as a worked example instead.
+- [ ] Classified each frozen expansion-layer card by failure layer and next action.
 
 ## Next Module
 
