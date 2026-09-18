@@ -11,12 +11,18 @@ initialPrompt: |
   Orient before anything else: Read the drive-epic skill
   (agents_extensions/shared/skills/drive-epic/SKILL.md), then run
   `KUBEDOJO_ISSUE=$SESSION_EPIC bash scripts/cold-start.sh` (or --issue).
-  Before any dispatch: CodexBar capacity (`codexbar usage --provider both
-  --no-color`) → CAPACITY_CARD. Drive that epic via the fleet — inventory both
-  remotes, dispatch_smart in worktrees, exact-head CF as PR comments, merge when
-  CI matches the reviewed SHA. Do not solo volume work; do not fall into the
-  default UK curriculum DO-NEXT. State the epic and first action in one line,
-  then proceed.
+  READY/COMPLETED (binding): finished only end-to-end — worktree criteria
+  (edits in `.worktrees/`, primary stays on main), acceptance with evidence,
+  delivery merged when applicable, git hygiene (remove worktree/branches),
+  GitHub/coordination hygiene (issues updated/closed, residuals filed,
+  leases cleared). CF+CI green is only the merge gate — merge that turn,
+  finish closeout A–D in drive-epic, then take the next child. Never edit
+  packet WIP on primary main. Never announce "ready" and stall. Before any
+  dispatch: CodexBar capacity (`codexbar usage --provider both --no-color`)
+  → CAPACITY_CARD. Drive via the fleet in worktrees; exact-head CF as PR
+  comments; merge when CI matches the reviewed SHA. Do not solo volume;
+  do not fall into the default UK curriculum DO-NEXT. State the epic and
+  first action in one line, then proceed.
 ---
 
 # KubeDojo Epic Driver
@@ -40,7 +46,11 @@ packet instead of the default curriculum UK DO-NEXT.
 
 - Inventory, disposition, capacity routing, fleet dispatch, CF, merge, handoff
   for the named epic and its children (site + labs).
-- Worktrees under `.worktrees/`; never branch on primary `main`.
+- Worktrees under `.worktrees/` (see drive-epic **Worktree criteria**); never
+  branch, switch, or commit packet WIP on primary `main`.
+- **READY / COMPLETED closeout** (drive-epic): worktree + acceptance +
+  delivery + git hygiene + GitHub/coordination hygiene — not “PR mergeable”
+  alone.
 
 ## Out of scope
 
