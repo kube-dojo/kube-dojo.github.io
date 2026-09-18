@@ -111,9 +111,13 @@ cat /etc/hosts
 
 Kubernetes also writes `/etc/hosts` inside pods, usually for `localhost` and the pod's own hostname. That file does not replace CoreDNS service discovery, but it does mean the same principle applies inside containers: the local resolver may consult local files before the cluster DNS service. If you are diagnosing a pod, inspect the file from inside that pod rather than assuming it matches the node or another workload.
 
-Pause and predict: an application server has `10.0.0.150 legacy-api.example.com` in `/etc/hosts`, while authoritative DNS now points `legacy-api.example.com` at `10.0.0.151`. What address will the application use, and what single command would you run to prove whether the system resolver agrees with the stale local override?
+**Pause and predict:** An application server has `10.0.0.150 legacy-api.example.com` in `/etc/hosts`, while authoritative DNS now points `legacy-api.example.com` at `10.0.0.151`. What address will the application use, and what single command proves whether the system resolver agrees with that stale override?
 
-The answer should point you toward `getent hosts legacy-api.example.com`, not only `dig`. `dig` can prove what DNS servers say, but `getent` proves what the Name Service Switch path hands to applications. That difference is the basis of many Linux DNS investigations: compare the specialist tool, the system resolver, and the application's actual runtime environment.
+<details>
+<summary>Check your prediction</summary>
+
+The application uses `10.0.0.150` if NSS checks files before DNS. Prove it with `getent hosts legacy-api.example.com`, not only `dig`. `dig` shows what a DNS server says; `getent` shows what the Name Service Switch path hands to applications.
+</details>
 
 ## `/etc/resolv.conf`, Search Domains, and `ndots`
 
@@ -167,7 +171,15 @@ Query: "a.b.c.example.com" (4 dots < 5)
 
 The trailing dot is the clean escape hatch when you mean "this name is already complete." In DNS notation, `api.example.com.` is absolute, while `api.example.com` may still be treated as a candidate for search expansion depending on resolver settings. That final dot looks odd in application configuration, but it can remove several failed queries per outbound request in clusters that use `ndots:5`. The tradeoff is readability and compatibility; some application libraries accept absolute names cleanly, while a few configuration validators reject the trailing dot.
 
-Kubernetes uses this behavior deliberately. A pod in the `default` namespace can connect to a Service named `payments` by using the short name `payments`, because the pod search list expands it into `payments.default.svc.cluster.local`, then broader service and cluster domains. This is ergonomic for internal calls, but the same ergonomics can punish external calls such as `api.external-partner.com`, which contains fewer dots than the Kubernetes default threshold and may trigger cluster-suffix attempts before the external query. With `ndots:5`, a name needs five or more dots before the resolver tries it as absolute first; a four-dot name like `a.b.c.example.com` still goes through search expansion.
+Kubernetes uses this behavior deliberately. A pod in the `default` namespace can connect to a Service named `payments` by using the short name `payments`, because the pod search list expands it into `payments.default.svc.cluster.local`, then broader service and cluster domains.
+
+**Pause and predict:** The same pod calls `api.external-partner.com` with `ndots:5`. Why can that lookup be slower than `api.external-partner.com.`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The name has fewer than five dots, so the resolver tries cluster search suffixes before the external query. The trailing dot marks the name absolute and skips that expansion. A four-dot name such as `a.b.c.example.com` still goes through search first.
+</details>
 
 ```bash
 # In a Kubernetes pod
@@ -179,7 +191,13 @@ search default.svc.cluster.local svc.cluster.local cluster.local
 options ndots:5
 ```
 
-Before running this in a pod, predict the query order for `db-service` from namespace `staging` when the search list is `staging.svc.cluster.local svc.cluster.local cluster.local`. You should expect the resolver to try `db-service.staging.svc.cluster.local`, then `db-service.svc.cluster.local`, then `db-service.cluster.local`, and only then the bare name. That prediction is not trivia; it tells you which Service namespace, CoreDNS record, or search-suffix assumption to inspect first.
+**Pause and predict:** From namespace `staging`, with search list `staging.svc.cluster.local svc.cluster.local cluster.local`, in what order does the resolver try `db-service`?
+
+<details>
+<summary>Check your prediction</summary>
+
+`db-service.staging.svc.cluster.local`, then `db-service.svc.cluster.local`, then `db-service.cluster.local`, and only then the bare name. That order tells you which Service namespace, CoreDNS record, or search suffix to inspect first.
+</details>
 
 Timeout and attempt settings are the second half of the performance story. A single failed lookup can become several network packets multiplied by search suffixes, retry attempts, and name server fallbacks. In a busy service mesh or API-heavy workload, that multiplication can look like application latency, connection pool pressure, or intermittent partner timeouts. Good DNS tuning is not only about making names resolve; it is about limiting how much work the resolver does before it reaches the name you intended.
 
@@ -405,7 +423,13 @@ Caching is the reason DNS scales and the reason DNS changes can feel haunted dur
 
 TTL planning is a deployment skill. If a service is going to move next week, lowering the TTL ahead of time gives caches time to age out under the shorter policy before the cutover. Lowering the TTL at the moment of migration helps future responses but does not force every existing cache to forget old answers immediately. That is why DNS change plans should include timing, cache flush options, rollback names, and application behavior, especially for clients that maintain long-lived connections or their own DNS caches.
 
-Pause and predict: a database record changes from an old IP to a new IP, the authoritative record now has a TTL of 60 seconds, and five minutes later one Ubuntu web server still connects to the old IP while `dig db.internal` returns the new one. Which layer is most suspicious, and what evidence would you collect before restarting application processes?
+**Pause and predict:** A database record moves to a new IP with a 60-second TTL. Five minutes later one Ubuntu web server still connects to the old IP, while `dig db.internal` returns the new one. Which layer is most suspicious, and what evidence do you collect before restarting processes?
+
+<details>
+<summary>Check your prediction</summary>
+
+Not authoritative DNS. Compare `getent hosts db.internal` with `dig`, check `/etc/hosts`, and read `resolvectl statistics`. A local stub cache, an application cache, or a stale hosts entry can outlive the 60-second TTL. Flush only the cache you can prove.
+</details>
 
 ```bash
 # Check resolver status (Ubuntu 22.04/24.04 canonical tool)
@@ -690,9 +714,48 @@ A good note might say: "From pod `web` in namespace `staging`, `getent hosts db-
 
 </details>
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–5 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: dig and the app disagree.** Authoritative DNS says `legacy-api.example.com` is `10.0.0.151`. The app still opens `10.0.0.150`. `/etc/hosts` contains the old address. `dig` matches DNS.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: NSS files before DNS, not the authoritative zone. Next action: `getent hosts legacy-api.example.com` on the app host, then remove the hosts override.
+</details>
+
+**Card B: Short name, wrong namespace.** A pod in `staging` calls `db-service`. CoreDNS has the Service only in `payments`. Search list is `staging.svc.cluster.local svc.cluster.local cluster.local`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: search expansion hits `staging` first. Next action: query `db-service.payments.svc.cluster.local` explicitly; do not restart CoreDNS until that FQDN is proven.
+</details>
+
+**Card C: TTL elapsed, one host is old.** Record TTL is 60 seconds. Five minutes later `dig` is new and one Ubuntu process still uses the old IP.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: local resolver or application cache, not the zone. Next action: `getent` versus `dig`, then `resolvectl statistics`, before any process restart.
+</details>
+
+**Card D: External name is slow only in the pod.** `api.external-partner.com` is fast from a laptop and slow from a pod with `ndots:5`. Upstream resolvers are quick.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: search-suffix attempts, not upstream latency. Next action: compare the trailing-dot name; keep cluster `ndots` unless internal short names were measured too.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] You can explain the difference between `dig` and `getent hosts` using evidence from your own host.
+- [ ] Classified each frozen DNS-layer card before opening the reveal.
 - [ ] You can identify the active nameserver, search domains, and `ndots` setting for a Linux host or pod.
 - [ ] You can test Kubernetes DNS from inside a pod and compare the pod nameserver with the `kube-dns` Service (cluster fork — Task 4; optional for host-only learners).
 - [ ] You can describe a stale-cache scenario without blaming authoritative DNS prematurely.
