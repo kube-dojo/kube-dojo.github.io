@@ -99,7 +99,13 @@ sudo sysctl -p /etc/sysctl.d/99-security.conf
 sudo sysctl --system
 ```
 
-Pause and predict: if you run `sudo sysctl -w net.ipv4.tcp_syncookies=1` during an attack and later find no matching line in `/etc/sysctl.d/`, what will a reboot do to your mitigation, and how would you prove the change is now persistent rather than just active in memory?
+**Pause and predict:** If you run `sudo sysctl -w net.ipv4.tcp_syncookies=1` during an attack and later find no matching line in `/etc/sysctl.d/`, what will a reboot do to your mitigation, and how do you prove the change is persistent rather than only active in memory?
+
+<details>
+<summary>Check your prediction</summary>
+
+A reboot drops the `-w` value. The kernel comes back from the sysctl files, which never recorded it. Prove persistence with a named file under `/etc/sysctl.d/` and a read-back of `sysctl net.ipv4.tcp_syncookies` after `sysctl --system`, not only the live value from the incident.
+</details>
 
 Use the command sequence as a diagnostic pattern, not just as a setup recipe. First read the current value, then decide whether the running value is wrong for the host role, then change it temporarily only if you understand the blast radius, and finally persist it in a named file that future operators can audit. That order leaves a trail of evidence and avoids the false confidence that comes from applying a command without checking whether the kernel accepted it.
 
@@ -111,10 +117,16 @@ Network hardening is where sysctl work most often collides with platform reality
 
 The right question is not whether IP forwarding is good or bad. The right question is whether this host is intentionally acting as a router, and whether firewall policy, CNI behavior, and observability match that role. A hardened laptop and a hardened Kubernetes worker can have different values for `net.ipv4.ip_forward`, and both can be correct when the decision is documented and verified.
 
-> **Stop and think**: If you apply a strict CIS baseline that sets `net.ipv4.ip_forward = 0` to a Kubernetes worker node, what specific cluster network traffic will break immediately, and which team would notice first?
+**Pause and predict:** If you apply a strict CIS baseline that sets `net.ipv4.ip_forward = 0` to a Kubernetes worker node, what specific cluster network traffic will break immediately, and which team would notice first?
+
+<details>
+<summary>Check your prediction</summary>
+
+Pod traffic that the node must route (pod-to-pod and many Service paths) stops. The platform or cluster-networking team notices before a laptop-hardening checklist does. A worker is a router for that traffic; `ip_forward` stays `1` there.
+</details>
 
 ```bash
-# Should be 0 on non-routers (1 needed for containers/K8s)
+# Read the live value before you decide the host role
 sysctl net.ipv4.ip_forward
 
 # Disable (if not needed)
@@ -209,9 +221,15 @@ Connection tracking limits deserve the same capacity-minded review. A high value
 
 Memory protections reduce exploit reliability after a vulnerability already exists. That framing matters because operators sometimes expect ASLR, stack protector, pointer restrictions, or `ptrace` policy to make vulnerable software safe. They do not. They add uncertainty, boundaries, and information hiding so an attacker has fewer stable assumptions while trying to turn a bug into code execution or data theft.
 
-ASLR changes where process memory regions appear, including stacks, heaps, libraries, and memory mappings. If an attacker knows a buffer overflow exists but cannot predict the address of useful code or data, the exploit becomes harder to automate. Full randomization is not magic, but disabling it gives attackers a simpler target and makes older exploit techniques more reliable.
+ASLR changes where process memory regions appear, including stacks, heaps, libraries, and memory mappings. Full randomization is not magic, but disabling it gives attackers a simpler target and makes older exploit techniques more reliable.
 
-> **Pause and predict**: An attacker discovers a buffer overflow vulnerability in a containerized web server. If `kernel.randomize_va_space` is set to `2`, how does this setting specifically frustrate their attempt to execute a return-to-libc attack?
+**Pause and predict:** An attacker discovers a buffer overflow in a containerized web server. If `kernel.randomize_va_space` is `2`, how does that frustrate a return-to-libc attack?
+
+<details>
+<summary>Check your prediction</summary>
+
+The attacker cannot rely on a fixed address for libc or the return target. Each execution places libraries and mappings at a new address, so a hardcoded return-to-libc chain misses.
+</details>
 
 ```bash
 # Check current setting
@@ -278,9 +296,15 @@ Disabling SysRq is straightforward when the team has other recovery options, suc
 
 ### Filesystem Security
 
-Shared writable directories create classic link attacks. A malicious user can place a symlink or hardlink in a sticky directory such as `/tmp` and hope that a privileged process follows it while writing, changing ownership, or truncating data. Filesystem protected link controls make those attacks harder by adding ownership and directory checks before the kernel allows risky link traversal.
+Shared writable directories create classic link attacks. A malicious user can place a symlink or hardlink in a sticky directory such as `/tmp` and hope that a privileged process follows it.
 
-> **Stop and think**: In a shared temporary directory like `/tmp`, how do `fs.protected_symlinks` and `fs.protected_hardlinks` prevent a malicious user from tricking a privileged process into overwriting critical system files?
+**Pause and predict:** How do `fs.protected_symlinks` and `fs.protected_hardlinks` stop that user from tricking a privileged process into overwriting a critical file?
+
+<details>
+<summary>Check your prediction</summary>
+
+The kernel adds ownership and directory checks before it follows the link. A symlink in a sticky world-writable directory is not followed when the link owner and the follower differ. A hardlink to a file the attacker does not own is refused.
+</details>
 
 ```bash
 # Protect hardlinks and symlinks
@@ -829,9 +853,48 @@ Verify the reset before treating the lab as closed:
 
 If any read-back still shows a hardened value you did not intend, set it back explicitly with `sysctl -w` and re-run the checklist. A setting that survives your cleanup is exactly the persistence trap this module warns about, so treat the verification step as part of the exercise rather than an optional extra.
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–5 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Mitigation gone after reboot.** During an attack someone ran `sysctl -w net.ipv4.tcp_syncookies=1`. `/etc/sysctl.d/` has no matching line. After reboot the value is back to `0`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: runtime sysctl, not a failed write. Next action: put the setting in a named file under `/etc/sysctl.d/` and read it back after `sysctl --system`.
+</details>
+
+**Card B: Worker dropped off the pod network.** A CIS job set `net.ipv4.ip_forward=0` on every node. Pods on the same node still answer; cross-node pod traffic does not.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the node is no longer forwarding. Next action: set `ip_forward=1` on workers and keep the laptop baseline off the node image.
+</details>
+
+**Card C: Exploit keeps missing.** `kernel.randomize_va_space=2`. A return-to-libc payload that worked in a lab with ASLR off now crashes at a random address.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: address layout, not a missing library. Next action: do not set the sysctl to `0` to "make the demo reliable" on a shared node.
+</details>
+
+**Card D: Privileged job follows `/tmp`.** A world-writable sticky directory holds a symlink to `/etc/passwd` owned by an unprivileged user. `fs.protected_symlinks=1`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: protected symlink check, not DAC on the target. Next action: confirm the sysctl is `1` and that the link owner differs from the process before blaming the privileged writer.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Audited current kernel parameters and recorded the original values.
+- [ ] Classified each frozen sysctl-layer card before opening the reveal.
 - [ ] Created persistent hardening configuration in `/etc/sysctl.d/`.
 - [ ] Verified settings were applied with read-back commands.
 - [ ] Explained the purpose and tradeoff of key network, memory, and filesystem parameters.
