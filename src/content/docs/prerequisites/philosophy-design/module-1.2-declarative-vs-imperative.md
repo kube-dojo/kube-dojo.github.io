@@ -58,9 +58,18 @@ docker ps
 # If server fails, SSH somewhere else and repeat
 ```
 
-Pause and predict: if this server reboots while the operator is asleep, what component notices that three `nginx` containers are required, and where is that requirement recorded? If your answer depends on a person remembering the desired count or on a shell history being available, you have found the weakness of imperative operation. The current state may have been correct for a moment, but the intent was never given to a system that can preserve it.
+**Pause and predict:** if this server reboots while the operator is asleep, what component notices that three `nginx` containers are required, and where is that requirement recorded?
 
-Declarative operations change the conversation. Instead of issuing each step, you describe the end state and hand that declaration to a controller that is responsible for making it true. The declaration is not a suggestion or a script transcript; it is a durable record of intent. In Kubernetes, that record is an API object stored by the control plane, observed by controllers, and used repeatedly whenever the live cluster drifts away from the target.
+<details>
+<summary>Check your prediction</summary>
+
+If the answer depends on a person remembering the desired count, or on a shell history still being available, nothing in the system was given the intent. A declarative record is an API object stored by the control plane. Controllers observe that object and act when the live cluster drifts.
+
+</details>
+
+Write the component and the record before you continue. The next paragraph introduces a different conversation. It does not name who notices the missing containers.
+
+Declarative operations change the conversation from a transcript of steps into a description you can review. The manifest that follows is an example of that description, not the answer to the reboot question. Read the fields, then decide whether anything in that file could still be true after the operator's laptop is closed. The rest of the section builds on whatever you wrote down.
 
 ```yaml
 # Declarative approach
@@ -100,7 +109,16 @@ kubectl apply -f nginx-deployment.yaml
 kubectl apply -f nginx-deployment.yaml
 ```
 
-Pause and predict: if you run the same `kubectl apply -f nginx-deployment.yaml` command a second time without changing the file, what should Kubernetes create, update, or leave alone? The correct expectation is not "run the deployment again." The correct expectation is "compare the declaration with the stored object and converge only if something differs." That property, called idempotency, is one reason declarative configuration works so well in automated pipelines.
+**Pause and predict:** if you run the same `kubectl apply -f nginx-deployment.yaml` command a second time without changing the file, what should Kubernetes create, update, or leave alone?
+
+<details>
+<summary>Check your prediction</summary>
+
+The expectation is not "run the deployment again." Compare the declaration with the stored object and converge only if something differs. That property, called idempotency, is one reason declarative configuration works in automated pipelines.
+
+</details>
+
+Write create, update, or leave alone before you continue. The next paragraph is about where long-term intent lives. It does not say what the second apply does.
 
 The distinction between the two styles is not that imperative commands are evil and declarative files are always good. The distinction is where long-term intent lives. Imperative work is useful for exploration, quick diagnostics, and temporary emergency action because it gives an operator immediate leverage. Declarative work is safer for production because intent survives the operator, can be reviewed before it changes the cluster, and can be reconciled by software after the next crash, reschedule, or rollout.
 
@@ -329,7 +347,16 @@ Think of a Kubernetes object as a contract between a team and a controller. The 
 
 This is also why status matters. A declarative object usually has a `spec`, which describes desired state, and a `status`, which describes observed state. Operators change `spec`; controllers update `status`. When troubleshooting, compare the two instead of looking only at whether the command succeeded. A successful apply means the API accepted the declaration, not necessarily that the workload is healthy. A rollout condition, event, or unavailable replica count tells you how far reality still is from the desired state.
 
-Pause and predict: if a Deployment's `spec.replicas` is five but its status reports two available replicas, is the declaration wrong, the cluster wrong, or the system still converging? The answer depends on the surrounding evidence. It may be a normal rollout in progress, a scheduling shortage, failing readiness probes, or a bad image. Declarative diagnosis starts with the gap between spec and status, then follows events and ownership until the reason for the gap becomes concrete.
+**Pause and predict:** if a Deployment's `spec.replicas` is five but its status reports two available replicas, is the declaration wrong, the cluster wrong, or the system still converging?
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer depends on the surrounding evidence. It may be a normal rollout in progress, a scheduling shortage, failing readiness probes, or a bad image. Start with the gap between spec and status, then follow events and ownership until the reason becomes concrete.
+
+</details>
+
+Write which of the three you choose, and what evidence would change your mind, before you continue. The next paragraph is about the operator's habit. It does not pick one of those three.
 
 Experienced Kubernetes operators build a habit of moving from symptom to owner to declaration to status. They do not skip inspection, but they also do not confuse inspection with repair. Logs can tell you why a container exits, events can tell you why a pod cannot schedule, and status can tell you whether a rollout is progressing. The durable repair happens when the declaration is corrected so the controller can produce the healthy state again and keep producing it after the next disruption.
 
@@ -575,6 +602,42 @@ Edit `web-deployment.yaml` so `spec.replicas` is `5`, apply it, and explain in y
 kubectl apply -f web-deployment.yaml
 kubectl delete namespace declarative-lab
 ```
+
+**Card A: The server rebooted at 03:00.** Three `nginx` containers were started from a shell before the operator went home. In the morning the host is up and the containers are gone. The shell history was not saved.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the desired count was never stored as an object. Next action: look for an API object that still says three, and do not reconstruct the count from memory.
+
+</details>
+
+**Card B: The same file is applied twice.** `nginx-deployment.yaml` did not change. The second `kubectl apply` returns quickly. A teammate asks how many new Deployments that created.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating apply as "run it again." Next action: compare the file with the stored object. Leave the Deployment alone when nothing differs.
+
+</details>
+
+**Card C: Desired five, available two.** `spec.replicas` is 5. Status says 2 available. The apply command exited 0 ten minutes ago.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the gap between spec and status, not the apply exit code. Next action: read events and readiness before you decide the declaration is wrong.
+
+</details>
+
+**Card D: The manual scale is the only record.** `kubectl scale` set replicas to 5 during an incident. The manifest in Git still says 3. The next apply is about to run from Git.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: live state and declared intent disagree, and Git is the durable record. Next action: change the manifest if 5 is the new intent, then apply. Do not leave the scale command as the contract.
+
+</details>
 
 - [ ] You created a namespace and applied a Deployment from declarative YAML.
 - [ ] You deleted a managed pod and observed Kubernetes create a replacement.
