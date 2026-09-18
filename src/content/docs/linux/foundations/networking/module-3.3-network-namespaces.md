@@ -111,9 +111,13 @@ Use this ASCII map when you need to explain "what's in the box" during an incide
 +------------------------------------------------------------------+
 ```
 
-> **Pause and predict**: if a process in namespace A binds port 80, does namespace B see anything on port 80? Write your answer before scrolling; you will verify it in the inspection commands below.
+**Pause and predict:** If a process in namespace A binds port 80, does namespace B see anything on port 80?
 
-A process in namespace B does not see namespace A's listening socket. Port binding is per network namespace. That is why two pods on the same node can both use containerPort 8080, while two containers in the same pod cannot bind the same address and port unless they use different addresses or socket options.
+<details>
+<summary>Check your prediction</summary>
+
+No. A process in namespace B does not see namespace A's listening socket. Port binding is per network namespace. That is why two pods on the same node can both use containerPort 8080, while two containers in the same pod cannot bind the same address and port unless they use different addresses or socket options.
+</details>
 
 | Term | Meaning in this module |
 |---|---|
@@ -160,9 +164,13 @@ For production pods, the named namespace may not exist as `ip netns list` output
 | `ip netns exec NS ip route get DST` | Kernel forwarding plan for `DST` | That the remote host replied |
 | `ls -l /proc/PID/ns/net` | Which namespace object a process uses | Plugin configuration correctness |
 
-> **Stop and think**: you see `kd-red` in `ip netns list`, but `ip netns exec kd-red ip link` fails with "Cannot open network namespace". What are two different root causes that fit that symptom?
+**Pause and predict:** You see `kd-red` in `ip netns list`, but `ip netns exec kd-red ip link` fails with "Cannot open network namespace". What are two different root causes that fit that symptom?
 
-One cause is a stale bind mount or permission problem under `/var/run/netns`. Another is that the namespace name you typed is not the object you think it is because an earlier partial cleanup left the filesystem handle out of sync with kernel state. The fix is not to reboot immediately; it is to inspect `/var/run/netns`, confirm whether processes still hold the namespace open, and remove the handle only after you understand what created it.
+<details>
+<summary>Check your prediction</summary>
+
+One cause is a stale bind mount or permission problem under `/var/run/netns`. Another is that the namespace name you typed is not the object you think it is because an earlier partial cleanup left the filesystem handle out of sync with kernel state. The fix is not to reboot immediately; inspect `/var/run/netns`, confirm whether processes still hold the namespace open, and remove the handle only after you understand what created it.
+</details>
 
 ## Core: Veth Pairs as the Namespace Boundary Cable
 
@@ -446,7 +454,15 @@ The sixth common failure is incomplete CNI cleanup after a crashed plugin. You m
 
 ### Walkthrough: bridge gateway on the wrong device
 
-A learner assigns `10.244.50.1/24` to each host-side veth instead of to `kd-br0`. Symptom: each namespace can ping its own host-side veth IP, but not the other namespace. Inspection sequence:
+**Pause and predict:** Each namespace can ping its own host-side veth IP, but not the other namespace. The `/24` was assigned to each host-side veth. Where must that gateway address live?
+
+<details>
+<summary>Check your prediction</summary>
+
+Only on the bridge (`kd-br0`). Host-side veth ends should not hold the gateway IP. Move the subnet address to the bridge and leave each namespace with a route via that bridge IP.
+</details>
+
+Symptom: each namespace can ping its own host-side veth IP, but not the other namespace. The `/24` is on the host-side veth ends. Inspection sequence:
 
 ```bash
 ip -br addr show master kd-br0
@@ -509,9 +525,13 @@ Use this table during a live incident to keep namespace work bounded. If any row
 | 7 | `sysctl net.ipv4.ip_forward` on host | `1` when routed egress is required |
 | 8 | Host `iptables -t nat -S POSTROUTING` (read-only) | Expected SNAT/MASQUERADE for pod CIDR if design uses NAT |
 
-> **Pause and predict**: a pod can `curl` a ClusterIP but cannot reach a pod IP on another node. Namespace checks inside the source pod are clean. Will fixing `lo` inside the source pod netns help? Write yes or no and one sentence why.
+**Pause and predict:** A pod can `curl` a ClusterIP but cannot reach a pod IP on another node. Namespace checks inside the source pod are clean. Will fixing `lo` inside the source pod netns help?
 
-No. Loopback only affects traffic destined to addresses on `lo` inside that namespace. Cross-node pod IP traffic leaves through `eth0` and the host datapath. The next investigation belongs to routes, tunnel devices, or policy on the node and intermediate path—not loopback inside a pod whose local stack already forwards correctly to its gateway.
+<details>
+<summary>Check your prediction</summary>
+
+No. Loopback only affects traffic destined to addresses on `lo` inside that namespace. Cross-node pod IP traffic leaves through `eth0` and the host datapath. The next investigation belongs to routes, tunnel devices, or policy on the node and intermediate path, not loopback inside a pod whose local stack already forwards correctly to its gateway.
+</details>
 
 ### Mapping lab objects to Kubernetes node objects
 
@@ -668,6 +688,44 @@ sysctl net.ipv4.ip_forward
 sudo iptables -t nat -S POSTROUTING | grep 10.244.50.0/24
 sudo ip netns exec kd-blue ip route get 1.1.1.1
 ```
+
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+The lab steps stay as the build recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Same port, two namespaces.** Namespace A has a listener on port 80. Namespace B's `ss -tlnp` shows nothing on 80.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: separate network namespaces, not a missing process. Next action: confirm the listener's `/proc/PID/ns/net` before changing the bind address.
+</details>
+
+**Card B: Name listed, exec fails.** `ip netns list` shows `kd-red`. `ip netns exec kd-red ip link` says "Cannot open network namespace".
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the `/var/run/netns` handle, not the kernel stack you have not opened yet. Next action: inspect that directory and which processes still hold the namespace; do not reboot first.
+</details>
+
+**Card C: ClusterIP works, remote pod IP does not.** Source-pod namespace checks are clean, including `lo`. Cross-node pod IP fails.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: host datapath after `eth0` (route, tunnel, or policy), not pod loopback. Next action: `ip route get` for the remote pod IP on the node.
+</details>
+
+**Card D: Peer namespace is silent.** Each namespace pings its own host-side veth IP. Neither reaches the other. The `/24` sits on the host veth ends, not on `kd-br0`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: gateway address on the wrong device. Next action: move `10.244.50.1/24` onto the bridge and leave the host veth ends without that address.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
 
 ### Success criteria
 
