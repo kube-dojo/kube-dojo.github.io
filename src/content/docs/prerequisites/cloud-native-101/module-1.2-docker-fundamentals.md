@@ -64,7 +64,18 @@ sudo usermod -aG docker $USER
 # Log out and back in for group changes
 ```
 
-Verification should test both the client and the engine. `docker --version` only proves the CLI binary exists, while `docker run hello-world` proves the CLI can contact the engine, pull an image, create a container, start the process, attach to its output, and remove the short-lived workload after it exits. If this command fails, read the error closely before reinstalling anything, because the common causes are an unstarted Docker Desktop VM, a permission issue on the socket, or a blocked registry connection.
+Verification should test both the client and the engine. The two commands below are the pair. Decide which one can succeed when the engine is down before you read their notes.
+
+**Pause and predict:** If the CLI binary is installed but Docker Desktop is not running, which verification command will still work and which one will fail?
+
+<details>
+<summary>Check your prediction</summary>
+
+`docker --version` can succeed because it only reads local client metadata. `docker run hello-world` needs the daemon: it must contact the engine, pull an image, create a container, start the process, and attach to its output. An unstarted Desktop VM, a socket permission error, and a blocked registry are different failures. Read the error before you reinstall.
+
+</details>
+
+Name the working command before you run the pair. The diagram after these commands is the client-server picture, not the answer to this case.
 
 ```bash
 docker --version
@@ -93,7 +104,7 @@ That engine state is why two terminals can affect the same containers. If one te
                                                    +-----------------------+
 ```
 
-Pause and predict: if the CLI binary is installed but Docker Desktop is not running, which verification command will still work and which one will fail? The version command can succeed because it only reads local client metadata, while `docker run hello-world` needs the daemon. That distinction is useful later when a Kubernetes CLI command works locally but cannot reach the cluster API server.
+A client that answers locally is not the same as a client that reached the engine. You will meet the same split later when a Kubernetes CLI command works on your laptop but cannot reach the cluster API server.
 
 ## Running Your First Container
 
@@ -101,7 +112,16 @@ An image is a packaged filesystem and metadata template; a container is a runnin
 
 The nginx example is small, but it contains almost every runtime concept you need. Docker pulls the `nginx` image if it is not present, creates a container, starts the default web server process, maps a host port to a container port, assigns the name `my-nginx`, and runs it in detached mode. The host port is the address you visit from your laptop, while the container port is the port the application listens on inside the container network namespace.
 
-> **Pause and predict**: When you run the command below, what happens if port 8080 on your host machine is already in use by another application? The command will fail because Docker cannot bind to an already occupied host port. You would need to choose a different host port, like `-p 8081:80`, while keeping the container-side port at `80` because nginx still listens there.
+**Pause and predict:** When you run the command below, what happens if port 8080 on your host machine is already in use by another application?
+
+<details>
+<summary>Check your prediction</summary>
+
+The command fails because Docker cannot bind to an already occupied host port. Choose a different host port, such as `-p 8081:80`, and keep the container-side port at `80` because nginx still listens there.
+
+</details>
+
+Read the publish flag before you decide which number to change. The notes under the command describe a successful start. They do not describe this collision.
 
 ```bash
 # Run nginx (a web server)
@@ -457,11 +477,22 @@ flowchart TD
     F --> G{{Container: running instance}}
 ```
 
-The workflow diagram is intentionally linear, but real teams repeat it many times per day. A developer edits code, rebuilds an image, runs it locally, pushes it to a registry, and lets CI or a cluster consume it. Every weak habit in the early steps compounds later: an oversized image slows every pull, a floating tag makes rollbacks ambiguous, and a root process turns an application bug into a larger security event.
+The workflow diagram is intentionally linear, but real teams repeat it many times per day. A developer edits code, rebuilds an image, runs it locally, pushes it to a registry, and lets CI or a cluster consume it. Every weak habit in the early steps compounds later. The next section asks you to name that cost before the comparison table.
 
 ## Image Quality, Security, and Runtime Shape
 
-Base image choice is one of the earliest design decisions in a Dockerfile. A full OS image feels comfortable because it has familiar tools, but it also brings packages you do not need. A slim image removes some bulk while keeping mainstream compatibility. Alpine is smaller, but its musl libc can surprise applications or dependencies expecting glibc behavior. Distroless images remove shells and package managers, which is excellent for production hardening but requires more mature observability and build discipline.
+**Pause and predict:** If you use a full OS image like `ubuntu:24.04` just to run a simple Python application, what are two major downsides?
+
+<details>
+<summary>Check your prediction</summary>
+
+Image pulls are slower because the file is large, and the attack surface is larger because unused packages can still contain vulnerabilities. A full OS image feels comfortable because it has familiar tools, but it also brings packages you do not need.
+
+</details>
+
+Hold those two costs before you read the comparison. The table is the menu of base images. It is not a substitute for naming the costs yourself.
+
+Base image choice is one of the earliest design decisions in a Dockerfile. A slim image removes some bulk while keeping mainstream compatibility. Alpine is smaller, but its musl libc can surprise applications or dependencies expecting glibc behavior. Distroless images remove shells and package managers, which is excellent for production hardening but requires more mature observability and build discipline.
 
 | Base Image Type | Example | Size | Security Surface | Best For |
 |-----------------|---------|------|------------------|----------|
@@ -474,10 +505,8 @@ The table gives approximate sizes because tags change over time, but the tradeof
 
 Patch strategy belongs in the same conversation as base image choice. A service that builds from `python:3.12-slim` inherits operating system packages from that base image, so rebuilding after the publisher updates the tag can pick up security fixes. A service pinned by digest is more reproducible, but it will not move until you deliberately update the digest. Mature teams combine rebuild automation, vulnerability scanning, and release review rather than relying on either floating tags or permanent pins alone.
 
-> **Pause and predict**: If you use a full OS image like `ubuntu:24.04` just to run a simple Python application, what are two major downsides? You will experience slower image pull times due to the large file size, and you will expose a larger attack surface because unused packages can still contain vulnerabilities.
-
 ```dockerfile
-# BAD: Full OS, huge image
+# Full OS base
 FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y python3 python3-pip
 COPY . .
@@ -499,7 +528,16 @@ Running as root inside a container is another default that deserves attention. C
 
 File ownership is the practical part of non-root images. If you switch to `USER appuser` before copying files or creating writable directories, the application may fail with permission errors. The example uses `COPY --chown=appuser:appuser` so the runtime user owns the application files. In larger images, you should create only the directories the process needs to write, assign ownership deliberately, and leave the rest of the filesystem read-only where your platform allows it.
 
-> **Pause and predict**: What happens if an attacker finds a remote code execution vulnerability in your application and your container is running as root? They immediately gain root privileges inside the container, which makes it easier to modify files, inspect mounted secrets, abuse capabilities, or attempt a container escape through a host or runtime weakness.
+**Pause and predict:** What happens if an attacker finds a remote code execution vulnerability in your application and your container is running as root?
+
+<details>
+<summary>Check your prediction</summary>
+
+They immediately gain root privileges inside the container. That makes it easier to modify files, inspect mounted secrets, abuse capabilities, or attempt a container escape through a host or runtime weakness.
+
+</details>
+
+Name the privilege they inherit before you read the `USER` example. The Dockerfile below is the fix shape, not the description of the breach.
 
 ```dockerfile
 # BAD: Running as root
@@ -819,6 +857,46 @@ Combining `apt-get update` and `apt-get install` ensures that the package index 
 - [ ] You built `my-ubuntu-curl` and entered it with an interactive shell.
 - [ ] You explained why `apt-get update` and `apt-get install` belong in the same `RUN` instruction.
 - [ ] You cleaned up containers you created during the lab.
+
+- [ ] I named a failure layer and a next action for each frozen Docker-layer card before opening the reveal.
+
+A version string, a bind error, a slow pull, and a root shell can each look like the application failed. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Version prints, hello-world does not.** `docker --version` prints a client version. `docker run hello-world` returns "Cannot connect to the Docker daemon". Docker Desktop is installed and not open.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the engine, not the CLI binary. Next action: start Docker Desktop and rerun `hello-world` before you reinstall the client.
+
+</details>
+
+**Card B: nginx never starts.** `docker run -d --name my-nginx -p 8080:80 nginx` exits with "port is already allocated". Another process on the laptop is listening on 8080.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the host publish port, not nginx. Next action: republish with a free host port, such as `-p 8081:80`, and leave the container port at 80.
+
+</details>
+
+**Card C: A one-file Python app pulls an OS.** The Dockerfile starts `FROM ubuntu:24.04` and installs Python only to run one script. Every CI pull is slow, and the scanner reports packages the script never imports.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: base image, not the application code. Next action: switch to a slim or smaller base that still runs the script, then compare the pull size.
+
+</details>
+
+**Card D: The exploit is root.** A remote code execution bug is confirmed. `docker exec` into the running container and `whoami` prints `root`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the container user, not only the application bug. Next action: rebuild with a non-root `USER` and `COPY --chown`, then confirm `whoami` is not root before you call the image done.
+
+</details>
 
 ## Sources
 
