@@ -28,7 +28,6 @@ DEFAULT_MODEL = "jev-latest"
 API_URL = "https://api.typesafe.ai/v1/systemone"
 KEY_CANDIDATES = (
     Path.home() / ".secrets" / "typesafe-ai.key",
-    Path(".secrets") / "typesafe-ai.key",
 )
 
 
@@ -210,8 +209,9 @@ def choice_is_uncertain(
     if not ans:
         return True
     conf = ans.get("confidence")
+    # Absent confidence = uncertain (fail closed for the auto-act gate)
     if conf is None:
-        return False
+        return True
     return float(conf) < min_top
 
 

@@ -65,7 +65,15 @@ FAMILY_ALIASES = {
     "deepseek": "deepseek",
 }
 
-SEAT_ORDER = ["kimi", "agy", "grok", "cursor"]  # prefer order when re-picking
+SEAT_ORDER = [
+    "kimi",
+    "agy",
+    "grok",
+    "cursor",
+    "claude",
+    "codex",
+    "deepseek",
+]  # prefer order when re-picking; never invent a seat outside this list
 
 
 def _gh_json(args: list[str]) -> Any:
@@ -122,7 +130,10 @@ def _infer_auditor_family(*texts: str) -> str | None:
 
 
 def _ci_status(rollup: list[dict[str, Any]] | None) -> tuple[bool, list[str]]:
-    """Return (ci_green, pending_or_failing names)."""
+    """Return (ci_green, pending_or_failing names).
+
+    Unknown / empty conclusions never count as green (fail closed).
+    """
     pending: list[str] = []
     if not rollup:
         return False, ["unknown"]
@@ -132,40 +143,57 @@ def _ci_status(rollup: list[dict[str, Any]] | None) -> tuple[bool, list[str]]:
         status = (c.get("status") or "").upper()
         if conclusion in ("SUCCESS", "SKIPPED", "NEUTRAL"):
             continue
-        if not conclusion and status in ("IN_PROGRESS", "QUEUED", "PENDING"):
-            pending.append(name)
-            continue
         if conclusion in ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"):
             pending.append(f"{name}:{conclusion.lower()}")
             continue
-        if not conclusion and status and status != "COMPLETED":
-            # empty conclusion often still running
+        if status in ("IN_PROGRESS", "QUEUED", "PENDING") or (
+            not conclusion and status and status != "COMPLETED"
+        ):
             pending.append(name)
+            continue
+        # COMPLETED with no conclusion, StatusContext, or anything else → not green
+        pending.append(f"{name}:unknown")
     return (len(pending) == 0), pending[:8]
 
 
-def _cf_status(pr_number: int) -> str:
-    """missing | pass | needs_changes | present_unknown — from issue comments."""
+def _cf_status(pr_number: int, head_oid: str | None = None) -> str:
+    """missing | pass | needs_changes | present_unknown — from issue comments.
+
+    When ``head_oid`` is set, only comments that mention that SHA (full or
+    short) count as exact-head CF. Stale CF on an older head → missing.
+    """
     comments = _gh_json(
         [
             "api",
             f"repos/kube-dojo/kube-dojo.github.io/issues/{pr_number}/comments",
             "--jq",
-            "[.[].body]",
+            "[.[] | {body, createdAt}]",
         ]
     )
     if not isinstance(comments, list) or not comments:
         return "missing"
-    bodies = "\n".join(str(b) for b in comments[-5:]).upper()
-    if re.search(r"\b(NEEDS[_\s-]?CHANGES|VERDICT:\s*REVISE)\b", bodies):
-        return "needs_changes"
-    if re.search(
-        r"\b(CF\s*:\s*PASS|VERDICT\s*:\s*(PASS|APPROVE|LGTM)|APPROVE_WITH_NITS)\b",
-        bodies,
-    ):
-        return "pass"
-    if re.search(r"\b(CROSS-FAMILY|R1|VERDICT)\b", bodies):
-        return "present_unknown"
+    head_short = (head_oid or "")[:7].lower()
+    head_full = (head_oid or "").lower()
+    # Prefer newest matching comments
+    for item in reversed(comments):
+        body = str(item.get("body") if isinstance(item, dict) else item)
+        if head_short:
+            lower = body.lower()
+            if head_full and head_full not in lower and head_short not in lower:
+                continue  # not exact-head
+        # Verdict markers — line-anchored, not prose mentioning the opposite
+        if re.search(
+            r"(?im)^\s*(\*\*)?verdict(\*\*)?\s*:\s*needs[_\s-]?changes\b",
+            body,
+        ) or re.search(r"(?im)^\s*(\*\*)?verdict(\*\*)?\s*:\s*revise\b", body):
+            return "needs_changes"
+        if re.search(
+            r"(?im)^\s*(\*\*)?verdict(\*\*)?\s*:\s*(pass|approve|lgtm|approve_with_nits)\b",
+            body,
+        ) or re.search(r"(?im)^\s*cf\s*:\s*pass\b", body):
+            return "pass"
+        if re.search(r"(?i)\b(cross-family|verdict)\b", body):
+            return "present_unknown"
     return "missing"
 
 
@@ -200,17 +228,20 @@ def _enrich_pr(pr: dict[str, Any]) -> dict[str, Any]:
             except (json.JSONDecodeError, OSError):
                 pass
     ci_green, pending = _ci_status(pr.get("statusCheckRollup"))
-    cf_status = _cf_status(int(num)) if num else "missing"
+    head_oid = pr.get("headRefOid") or ""
+    cf_status = _cf_status(int(num), head_oid) if num else "missing"
     return {
         "number": num,
         "title": title[:120],
-        "head": (pr.get("headRefOid") or "")[:7],
+        "head": head_oid[:7],
         "author_family": author_family,
         "auditor_family": auditor_family,
         "cf_status": cf_status,
         "ci_green": ci_green,
         "pending_checks": pending,
-        "merge_ready_hint": bool(ci_green and cf_status in ("pass",) and author_family),
+        "merge_ready_hint": bool(
+            ci_green and cf_status == "pass" and author_family
+        ),
     }
 
 
@@ -363,13 +394,14 @@ def _choice_or_uncertain(ans: dict[str, Any]) -> tuple[str | None, float | None,
     return label, top, uncertain
 
 
-def _repick_seat(preferred: str | None, exclude: set[str]) -> str:
+def _repick_seat(preferred: str | None, exclude: set[str]) -> str | None:
+    """Pick a seat not in exclude. None = no clean seat (caller must escalate)."""
     if preferred and preferred not in exclude and preferred != "none":
         return preferred
     for seat in SEAT_ORDER:
         if seat not in exclude:
             return seat
-    return "cursor"
+    return None
 
 
 def recommend(answers: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
@@ -380,7 +412,6 @@ def recommend(answers: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
     clarity = answers.get("jev_confidence_note") or {}
 
     exclude = set(state.get("exclude_families_for_cf") or [])
-    # Also exclude families from any open PR needing CF
     for pr in state.get("open_prs") or []:
         if pr.get("cf_status") == "missing":
             for key in ("author_family", "auditor_family"):
@@ -413,14 +444,19 @@ def recommend(answers: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
 
     if cf_uncertain:
         escalate_cf = True
-        raw_cf_eff = None  # force prefer-list repick
+        raw_cf_eff = None
     else:
         escalate_cf = False
         raw_cf_eff = cf_label or raw_cf
     adj_cf = _repick_seat(raw_cf_eff, exclude)
-    if raw_cf and raw_cf != adj_cf and raw_cf != "none":
+    if adj_cf is None:
+        escalate_cf = True
+        overrides.append(
+            f"cf_agent no clean seat (excluded={sorted(exclude)}); escalate"
+        )
+    elif raw_cf and raw_cf != adj_cf and raw_cf != "none":
         overrides.append(f"cf_agent {raw_cf}→{adj_cf} (family exclusion)")
-    if cf_uncertain:
+    if cf_uncertain and adj_cf:
         overrides.append(
             f"cf_agent top_prob={cf_top} < {MIN_CHOICE_TOP_PROB} → uncertain; "
             f"repicked {adj_cf}"
@@ -432,13 +468,29 @@ def recommend(answers: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
             f"author_agent top_prob={author_top} < {MIN_CHOICE_TOP_PROB} → uncertain"
         )
         adj_author = _repick_seat(None, exclude | ({adj_cf} if adj_cf else set()))
-        overrides.append(f"author_agent repicked → {adj_author}")
-    if adj_author == adj_cf and adj_author not in (None, "none"):
+        if adj_author:
+            overrides.append(f"author_agent repicked → {adj_author}")
+        else:
+            overrides.append("author_agent no clean seat; escalate")
+    if (
+        adj_author
+        and adj_cf
+        and adj_author == adj_cf
+        and adj_author not in (None, "none")
+    ):
         adj_author = _repick_seat(None, exclude | {adj_cf})
-        overrides.append(f"author_agent →{adj_author} (≠ cf seat)")
+        if adj_author:
+            overrides.append(f"author_agent →{adj_author} (≠ cf seat)")
+        else:
+            overrides.append("author_agent collides with cf; no alternate seat")
 
     escalate: list[str] = []
-    # consistency_choice_cookbook: uncertain = top_prob < 0.60
+    if adj_cf is None:
+        escalate.append(
+            f"no CF seat outside excluded families {sorted(exclude)}"
+        )
+    if adj_author is None and (author_uncertain or raw_author not in (None, "none")):
+        escalate.append("no author seat available under exclusion")
     if next_uncertain:
         ready = any(p.get("merge_ready_hint") for p in (state.get("open_prs") or []))
         if next_choice == "merge_green_cf_done" and ready:
@@ -465,7 +517,6 @@ def recommend(answers: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
         )
     if parallel_policy == "uncertain":
         escalate.append("parallel_ok uncertain band")
-    # Unknown author on a PR needing CF → lead must confirm CF≠author
     for pr in state.get("open_prs") or []:
         if pr.get("cf_status") == "missing" and not pr.get("author_family"):
             escalate.append(
@@ -473,14 +524,20 @@ def recommend(answers: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
             )
             break
 
+    cf_out: str | None
+    if adj_cf is None:
+        cf_out = None
+    elif raw_cf == "none":
+        cf_out = "none"
+    else:
+        cf_out = adj_cf
+
     return {
         "next_action": next_choice,
         "next_action_confidence": next_a.get("confidence"),
         "next_action_top_prob": next_top,
         "next_action_uncertain": next_uncertain,
-        "cf_agent": adj_cf
-        if next_choice in ("dispatch_cf", "parallel_wave", "wait_ci")
-        else (adj_cf if raw_cf != "none" else "none"),
+        "cf_agent": cf_out,
         "cf_agent_raw": raw_cf,
         "cf_agent_confidence": cf.get("confidence"),
         "cf_agent_top_prob": cf_top,
@@ -503,7 +560,8 @@ def recommend(answers: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
             f"Choice auto-act only if top_prob>={MIN_CHOICE_TOP_PROB} "
             f"(consistency_choice_cookbook). "
             f"Honor parallel_policy={parallel_policy} "
-            f"(serialize if <{PARALLEL_NO}, parallel if >{PARALLEL_YES})."
+            f"(serialize if <{PARALLEL_NO}, parallel if >{PARALLEL_YES}). "
+            "If cf_agent is null, do not dispatch — escalate."
         ),
     }
 
