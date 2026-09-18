@@ -59,7 +59,13 @@ graph TD
 
 The diagram shows why the old model is dangerous in service design. If a process needs one administrative action, the traditional approach tempts you to run it as root and accept every other privilege as collateral damage. In a container, that temptation is even more misleading because UID 0 inside a namespace does not necessarily equal host root, but it can still carry enough capabilities to change kernel-facing state in ways that matter to the node.
 
-Stop and think: if a web server process is compromised, why is it significantly worse if it runs as a traditional root user than if it runs as a non-root user with only `CAP_NET_BIND_SERVICE`? A useful answer names the specific actions that disappear from the attacker's menu, such as changing file ownership broadly, tracing unrelated processes, creating device nodes, or altering network configuration.
+**Pause and predict:** If a web server process is compromised, why is it significantly worse if it runs as a traditional root user than if it runs as a non-root user with only `CAP_NET_BIND_SERVICE`?
+
+<details>
+<summary>Check your prediction</summary>
+
+A useful answer names the specific actions that disappear from the attacker's menu, such as changing file ownership broadly, tracing unrelated processes, creating device nodes, or altering network configuration. `CAP_NET_BIND_SERVICE` only covers privileged ports; it does not restore the rest of the root menu.
+</details>
 
 ```mermaid
 graph TD
@@ -196,7 +202,13 @@ docker run --privileged nginx
 
 The `--cap-drop=ALL` pattern is a strong default because it turns privilege review into an allow-list exercise. If the container fails afterward, the failure is a signal to identify the specific operation that needs kernel privilege, not a reason to restore the entire default set. The dangerous opposite is `--privileged`, which grants broad capabilities, relaxes device isolation, and commonly disables or bypasses other runtime protections. It is a troubleshooting shortcut that often survives into production because it makes the symptom disappear while hiding the security debt.
 
-Pause and predict: if you run a container with `--cap-drop=ALL` but keep the process as UID 0, will that root user be able to modify a file owned by another user? The right answer depends on ordinary file permissions and ownership first, then on whether the missing capability would have been needed to bypass those checks. This is why capability debugging should always separate identity, discretionary access control, capability checks, and LSM policy instead of treating all permission failures as one category.
+**Pause and predict:** If you run a container with `--cap-drop=ALL` but keep the process as UID 0, will that root user be able to modify a file owned by another user?
+
+<details>
+<summary>Check your prediction</summary>
+
+The right answer depends on ordinary file permissions and ownership first, then on whether the missing capability (`CAP_DAC_OVERRIDE` / `CAP_FOWNER`) would have been needed to bypass those checks. Capability debugging should always separate identity, discretionary access control, capability checks, and LSM policy instead of treating all permission failures as one category.
+</details>
 
 Kubernetes exposes capability configuration through `securityContext`, and Kubernetes 1.35 still expects you to reason about privileges at both the pod and container levels. For command examples in Kubernetes modules, KubeDojo uses the shell alias `alias k=kubectl`; define it once in your shell before using shortened commands in a lab. The manifest below demonstrates the important habit: drop `ALL` first, then add back the single capability the application can justify.
 
@@ -263,7 +275,13 @@ getenforce
 
 These commands give you the host context you need before blaming a container manifest. If AppArmor is not loaded, an AppArmor profile reference will not protect the workload. If SELinux is enforcing, a denial may appear in audit logs rather than in the application message. If seccomp is enabled for the process, `/proc/<pid>/status` can show that a filter is active, but it will not by itself tell you which exact syscall was denied. Good diagnosis means checking the layer that could plausibly make the decision.
 
-Before running this, what output do you expect from `/sys/kernel/security/lsm` on an Ubuntu node compared with a Fedora or RHEL-family node? Make a prediction before you check, because that habit trains you to connect distribution defaults with the policy language you will actually see during incidents.
+**Pause and predict:** What output do you expect from `/sys/kernel/security/lsm` on an Ubuntu node compared with a Fedora or RHEL-family node?
+
+<details>
+<summary>Check your prediction</summary>
+
+Ubuntu commonly lists `apparmor` (often with `lockdown` and others). Fedora and RHEL-family nodes commonly list `selinux`. The exact string varies, but the policy language you will see in incidents follows that default. Check the file before you blame a container manifest for a denial that belongs to the host LSM.
+</details>
 
 ## AppArmor: Path-Based Containment
 
@@ -324,7 +342,13 @@ The `aa-status` output is useful because it distinguishes profiles that merely e
 
 The sample profile shows the mindset AppArmor encourages. Instead of allowing the process to wander across the filesystem and hoping Unix permissions are enough, the profile names the areas Nginx needs for configuration, logs, network use, and web content. The rule for `/var/www/** r` is deliberately read-only, so the web server can serve files but not overwrite them. That matters after compromise because an attacker who gains code execution inside the process still has to pass the profile's policy checks.
 
-Stop and think: if an attacker gains code execution inside this Nginx process and attempts to overwrite an HTML file in `/var/www/`, what will AppArmor do based on the profile above? The important reasoning step is that AppArmor can deny the write even if the Unix owner and mode bits would otherwise allow it, because mandatory policy is evaluated as an additional gate rather than as a suggestion to the application.
+**Pause and predict:** If an attacker gains code execution inside this Nginx process and attempts to overwrite an HTML file in `/var/www/`, what will AppArmor do based on the profile above?
+
+<details>
+<summary>Check your prediction</summary>
+
+AppArmor can deny the write even if the Unix owner and mode bits would otherwise allow it, because the profile grants `/var/www/** r` only. Mandatory policy is an additional gate, not a suggestion to the application.
+</details>
 
 ```bash
 # Docker default profile
@@ -716,9 +740,48 @@ Verify the reset before treating the lab as closed:
 
 If any check fails, remove the leftover artifact explicitly and re-run the checklist. A file capability or test container that survives cleanup is exactly the kind of quiet residue that confuses the next audit, so treat verification as part of the exercise rather than an optional extra.
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Parts 1–5 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Bind-only vs root.** A compromised web process runs as traditional root. A reviewer asks whether switching it to non-root plus only `CAP_NET_BIND_SERVICE` actually shrinks the blast radius.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: capability set, not the port bind. Next action: drop `ALL` and add back only `NET_BIND_SERVICE`, then confirm `CapEff` no longer includes `DAC_OVERRIDE`, `SYS_PTRACE`, `MKNOD`, or `NET_ADMIN`.
+</details>
+
+**Card B: UID 0, caps dropped.** A container is UID 0 with `--cap-drop=ALL`. It cannot overwrite a file owned by UID 1000 mode `600`. Someone proposes `--privileged` to "fix permissions."
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: DAC first — without `CAP_DAC_OVERRIDE` the kernel still honors mode bits. Next action: fix ownership or mode for the real writer; do not restore privileged mode to bypass the check.
+</details>
+
+**Card C: Wrong LSM language.** An Ubuntu runbook tells an operator to read SELinux AVC denials on a node whose `/sys/kernel/security/lsm` lists `apparmor`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: host LSM mismatch. Next action: read AppArmor status and the profile (`aa-status` / syslog) instead of `ausearch` for SELinux.
+</details>
+
+**Card D: Unix mode allows the write.** Nginx owns `/var/www/index.html` mode `644`, but writes still fail. The profile contains `/var/www/** r`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: AppArmor mandatory deny, not DAC. Next action: keep the profile read-only unless the service must write, and confirm the denial in AppArmor logs before chmod.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Audited and decoded Linux process capability sets from `/proc/$$/status`.
+- [ ] Classified each frozen capability-layer card before opening the reveal.
 - [ ] Found programs with file capabilities and explained why that is safer than setuid-root.
 - [ ] Configured and verified a test file capability with `setcap`, or documented why your system behavior differed.
 - [ ] Diagnosed AppArmor availability, loaded profile status, and enforce versus complain mode.
