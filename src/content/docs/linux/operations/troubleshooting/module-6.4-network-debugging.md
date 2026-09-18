@@ -89,6 +89,15 @@ sequenceDiagram
 
 Write the failing layer on the incident ticket before running the next command. If step two fails, step four is noise until you explain why transport should still be investigated.
 
+**Pause and predict:** A pod reaches `8.8.8.8` with `curl` but times out calling `https://payments.default.svc.cluster.local`. List the three layers you would prove healthy **in order**, and name one command per layer that could falsify your current guess.
+
+<details>
+<summary>Check your prediction</summary>
+
+Public IP reachability already makes a total link failure unlikely. Prove DNS next (`dig` the Service name from the pod, with the pod's resolver), then the service plane (ClusterIP versus a ready PodIP), then transport to the address you actually got (`ss` or a bounded capture on that port). If the name does not resolve, stop at DNS. If the name resolves and the PodIP answers while the ClusterIP does not, the failure is service-plane translation, not the application binary.
+
+</details>
+
 | Layer | Primary question | Example falsification command |
 |-------|------------------|------------------------------|
 | ICMP / route | Can this namespace reach the next hop toward the destination? | `ip route get <dst>` then `ping -c 2 <dst>` |
@@ -96,11 +105,9 @@ Write the failing layer on the incident ticket before running the next command. 
 | DNS | Did the client learn the intended address? | `dig +search +time=2 <name>` from the pod |
 | Service plane | Does virtual IP translation match current endpoints? | ClusterIP vs PodIP `curl` matrix + NAT inspection |
 
-**Active learning prompt:** A pod reaches `8.8.8.8` with `curl` but times out calling `https://payments.default.svc.cluster.local`. List the three layers you would prove healthy **in order**, and name one command per layer that could falsify your current guess.
-
 ### Worked example: Narrow “works by IP, fails by name” in one pass
 
-Suppose `curl -m 3 https://10.96.0.15:443` succeeds from a debug pod but `curl -m 3 https://kubernetes.default.svc.cluster.local` times out. IP reachability and likely transport toward the ClusterIP are already plausible; your next work belongs in DNS, not kube-proxy.
+Suppose the IP form of the same Service answers and the name form times out. Run the commands below from the failing pod and write which result first disagrees with the ticket. Do not name the layer in the note until those three outputs are in front of you.
 
 ```bash
 # From the failing pod (netshoot or app container)
@@ -166,7 +173,14 @@ Compare with the service Endpoints before concluding kube-proxy is broken:
 kubectl get endpointslices -n default -l kubernetes.io/service-name=target -o wide
 ```
 
-**Active learning prompt:** `ss -tan` on a node shows `LISTEN` on `0.0.0.0:8080`, but a cluster client still times out. Name two namespaces or dataplane boundaries where the listener could exist yet the client path never reaches it.
+**Pause and predict:** `ss -tan` on a node shows `LISTEN` on `0.0.0.0:8080`, but a cluster client still times out. Name two namespaces or dataplane boundaries where the listener could exist yet the client path never reaches it.
+
+<details>
+<summary>Check your prediction</summary>
+
+The socket can be in the host network namespace while the client is in a pod network namespace, or the reverse. A second boundary is the service plane: kube-proxy may never select that listener as an endpoint, so the client's packet is translated toward a different backend. Compare `ss` inside the client namespace with `ss` on the node before you restart the process that looks like it is listening.
+
+</details>
 
 ### Path discovery when ICMP is filtered
 
@@ -439,6 +453,30 @@ Five minutes assembling this bundle saves an hour of repeated commands when shif
 
 Change controls exist because some actions are irreversible in practice. Acceptable **first** mutations after evidence: scale down a retry storm, temporarily raise `nf_conntrack_max` on a canary node, add a narrow NetworkPolicy allow rule you can remove, or cordon a single bad node. Unacceptable **first** mutations: flushing all iptables/nft rules, `conntrack -F` on shared infrastructure, or deleting CNI interfaces without understanding pod churn impact.
 
+## Reading a negative result at each layer
+
+A negative result is useful only when you can say which layer produced it and which layer you have not tested yet. Operators lose time when a failed `ping` is treated as proof that DNS, the Service, and the process are all healthy, or when a failed `curl` to a name is treated as proof that the route is down. The workflow in this module is a sequence of falsifications. Each command retires one story. It does not retire the stories you have not run.
+
+Start with the namespace you are actually in. `ip route get` and `ping` on the node answer a different question from the same commands inside the pod network namespace. Overlay routes, policy routing, and `rp_filter` can make the node path succeed while the pod path fails, and the reverse is common for hostNetwork pods. Write `host` or `pod netns` next to the command before you paste the output into the ticket. A later reader cannot reconstruct that fact from a bare `ping: destination host unreachable`.
+
+ICMP is the cheapest reachability probe and the easiest one to over-read. A successful `ping` shows that some echo path works. It does not show that TCP port 443 is open, that Path MTU Discovery will succeed for a large segment, or that the Service virtual IP is programmed. A failed `ping` is also incomplete. Many networks drop ICMP and still carry TCP. When `ping` fails and the application uses TCP, move to a TCP-shaped probe and a bounded capture before you declare the route dead. Silent `traceroute` hops are the same class of negative: middle boxes that refuse TTL-exceeded messages can make a healthy path look empty. If the final destination completes a handshake in the capture, the silent hops are cosmetic.
+
+Transport evidence is the listener and the handshake, not the process name you hoped to see. `ss -tan` in the wrong namespace will show a `LISTEN` socket the client cannot reach, or it will show nothing while the pod is listening. Filter toward the destination and the port. A SYN that leaves and never returns is not the same failure as a RST, and neither is the same as a timeout while the socket stays in `SYN-SENT`. Those three shapes point at policy, a refusing process, and a blackhole respectively. Record the state name from `ss` in the note. "Connection refused" and "timed out" are not interchangeable words for the bridge call.
+
+DNS negatives need a resolver identity. `dig` from your laptop, `dig +trace`, and `dig` inside the pod are three experiments. Only the last one uses the pod's `nameserver`, `search`, and `ndots`. A short name that fails while the full cluster name succeeds is a search-path result, not a CoreDNS outage. A full name that fails inside the pod while the same name succeeds from the node is a path to the cluster DNS Service, often NetworkPolicy or a kube-proxy problem aimed at kube-dns, not an upstream resolver failure. If `dig @8.8.8.8` works and `dig` against the cluster DNS address does not, say that plainly. Do not summarize it as "DNS is down."
+
+The service plane is a translation step, not a second copy of the application. ClusterIP, NodePort, and the PodIP of a ready endpoint can disagree for mechanical reasons: no ready addresses on the EndpointSlice, a stale conntrack entry, IPVS versus iptables mode that your runbook does not match, or a selector that no longer matches the pods. The matrix is small. From the failing client namespace, try the name, the ClusterIP, and one ready PodIP on the same port. If only the PodIP works, stop blaming the container image. If none of them work and DNS returned an address, you are back at transport or policy toward that address. If the name never resolved, you are still in the previous layer and the matrix is premature.
+
+Captures answer "did the bytes exist here," which the other commands only imply. A bounded `tcpdump` on the interface `ip route get` named, with a host and port filter, will show whether a SYN left the namespace and whether a SYN-ACK came back. Capture on `any` on a busy node, or on the host NIC when the pod uses a veth, answers a different interface. Write the interface name in the same sentence as the filter. A pcap that is empty is a result only if you are sure you were on the path. An empty capture on the wrong interface is how teams "prove" a drop that never happened.
+
+Conntrack and MTU failures both preserve some flows while breaking others, which is why they get mislabeled as application bugs. A full conntrack table often leaves long-lived sessions up and refuses new ones. Clients retry, latency climbs, and CPU on the node can look ordinary. Sample `nf_conntrack_count` against `nf_conntrack_max` during the spike, not after it. An MTU blackhole shows the opposite shape: small probes succeed, large writes stall, and ICMP fragmentation-needed messages are missing because the network filters them. `ping -M do` with a size near the tunnel MTU is the falsifier. Raising replica count does not repair either failure. It multiplies the clients that hit the same table or the same tunnel.
+
+Neighbor and CNI state sit under those layers on Kubernetes nodes. After a CNI daemon restart, `ip neigh` can show `FAILED` for a peer pod IP while Services and Endpoints still look right in the API. East-west traffic on that node fails and north-south traffic, which uses a different path, still works. Compare neighbor entries and interface counters on both ends before you rewrite the application. A one-node pattern is a node pattern until the capture says otherwise.
+
+Put the negative results in the evidence bundle in the same order you ran them: route and neighbor, socket, DNS, capture, NAT and conntrack. A shift change should be able to see which layer you already falsified. Five lines of that form are worth more than a page of unsorted command output, and they are the difference between a rollback you can defend and a restart you cannot explain.
+
+When you hand the bundle to the next person, say what you did not run. A missing capture, a `dig` that was done on the laptop, or a conntrack sample taken after the spike ended are not neutral gaps. They are the places the next hypothesis will hide. Name them in the same note as the layer you did falsify, so the next operator does not repeat your command in the wrong namespace and call it confirmation. The host-only path on the Killercoda lab can still practice this sentence: route, socket, resolver, and a documented conntrack gap are enough to write the note without a cluster. The optional kind path adds the Service matrix. Neither path needs a new tool family. Both paths need the layer written down before the next command. If the note cannot name the namespace, the interface, and the layer you stopped at, the bundle is not finished, even when every command exited zero. A zero exit status on `ping` or `dig` is not a layer. The layer is the sentence you can defend when someone asks why you did not restart the process yet. Write that sentence before you paste the next command. Do it in the ticket, not only in the terminal. A later reviewer should be able to see that sentence without rerunning the exercise or guessing which namespace you were in.
+
 ## Did You Know?
 
 - `ss -p` may omit process names without sufficient privilege, even when sockets exist—always note whether the command ran as root in the correct network namespace.
@@ -463,11 +501,11 @@ Change controls exist because some actions are irreversible in practice. Accepta
 
 Each question describes a production-shaped scenario. Answer with the **next** command or inspection layer—not a generic “check the network.”
 
-**1.** A pod can `curl -m 2 http://1.1.1.1` but `curl -m 2 http://127.0.0.1:8080` to its sidecar times out. The sidecar container listens on `127.0.0.1:8080` only. Which command in the **app container’s network namespace** best shows whether anything arrived at port 8080?
+**1.** Trace an ICMP success that is not a DNS or service-plane success. A pod can `curl -m 2 http://1.1.1.1` but `curl -m 2 http://127.0.0.1:8080` to its sidecar times out. The sidecar container listens on `127.0.0.1:8080` only. Which command in the **app container’s network namespace** best shows whether anything arrived at port 8080?
 
 <details><summary>Show answer</summary>
 
-Run `ss -tan sport = :8080` (or `ss -ltn sport = :8080`) inside the app container namespace, optionally paired with a short `tcpdump -i lo port 8080` capture. Routing to `127.0.0.1` stays on loopback; if `ss` shows no SYN received and the capture is empty, the client never reached the sidecar listener—check you are curling from the correct container and not from a different network namespace.
+Run `ss -tan sport = :8080` (or `ss -ltn sport = :8080`) inside the app container namespace, optionally paired with a short `tcpdump -i lo port 8080` capture. Routing to `127.0.0.1` stays on loopback; if `ss` shows no SYN received and the capture is empty, the client never reached the sidecar listener—check you are curling from the correct container and not from a different network namespace. Trace the ICMP success to `1.1.1.1` apart from a DNS or service-plane failure: public reachability is not evidence that this local listener saw the packet.
 
 </details>
 
@@ -652,14 +690,14 @@ docker exec "$NODE" sysctl net.netfilter.nf_conntrack_max net.netfilter.nf_connt
 docker exec "$NODE" conntrack -S 2>/dev/null | head -5
 ```
 
-Generate many short-lived connections (run in one terminal):
+Generate many short-lived connections in one terminal, and leave that flood running until the sample below has finished:
 
 ```bash
 kubectl run -n default flood --rm -it --restart=Never --image=nicolaka/netshoot -- \
   sh -lc 'for i in $(seq 1 800); do curl -m1 -s http://mtu-demo.default.svc >/dev/null & done; wait; echo done'
 ```
 
-While the flood runs, sample the table in another terminal:
+While the flood runs, sample the table in another terminal and write down count versus max before you stop the generator:
 
 ```bash
 watch -n1 "docker exec \"$NODE\" sysctl net.netfilter.nf_conntrack_count"
@@ -767,6 +805,46 @@ rm -rf "$WORKDIR"
 ### Reflection (post-lab)
 
 Write three sentences answering: which layer falsified your first guess in each part (MTU, conntrack, DNS)? If you had only one minute left on a bridge call, which single command from each part would you re-run? Keep those answers in your team runbook—future you will not remember the details under stress.
+
+- [ ] I named a failure layer and a next action for each frozen network-layer card before opening the reveal.
+
+A working public IP, a `LISTEN` socket, a silent traceroute, and a small ping can each look like the whole story and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: IP works, name does not.** The pod can `curl` `8.8.8.8`. The same pod times out on `https://payments.default.svc.cluster.local`. You have not run `dig` inside the pod.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: still unknown between DNS and the service plane. Next action: resolve the name from the pod before you touch kube-proxy or the application.
+
+</details>
+
+**Card B: The node is listening.** `ss` on the node shows `LISTEN` on `0.0.0.0:8080`. A pod client times out. You have not compared namespaces.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the socket and the client are not in the same network namespace, or the Service never selects that socket. Next action: run `ss` in the client namespace and check endpoints before you restart the process.
+
+</details>
+
+**Card C: Traceroute is blank.** Hops do not answer. The application uses TCP. You have no capture.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: not proven. Silent hops can be filtered ICMP. Next action: probe with TCP and capture the handshake before you call the path dead.
+
+</details>
+
+**Card D: Small ping works, large write stalls.** `ping` succeeds. A bulk transfer hangs. Replica count is the change someone wants to make.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: MTU or conntrack, not capacity. Next action: compare a DF ping near the tunnel MTU with `nf_conntrack_count` during the stall, and do not scale first.
+
+</details>
 
 ## Next Module
 
