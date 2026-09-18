@@ -48,7 +48,15 @@ This module teaches iptables as an operational model rather than a rule cookbook
 
 netfilter is the packet inspection framework inside the Linux kernel, and iptables is one user-space tool that asks that framework to install rules. That distinction matters because a command-line rule is not an event loop and it is not a daemon watching packets. Once the rules are loaded, packets move through kernel hook points, and each hook offers selected tables a chance to inspect or alter the packet at that moment in its journey. If you remember only the command syntax, every outage feels like a flat list; if you remember the hook path, you can ask where the packet could still be changed.
 
-The practical mental model starts with the routing decision. An incoming packet first reaches PREROUTING, where Linux has not yet decided whether the packet is for a local socket or should be forwarded elsewhere. After that decision, a packet destined for the local host moves through INPUT, while a packet being routed through the host moves through FORWARD. Packets created by local processes begin at OUTPUT, and packets leaving an interface pass through POSTROUTING. Pause and predict: if a packet is addressed to a local web server and you want to drop it before the application sees it, which filter chain gives you the most direct control?
+The practical mental model starts with the routing decision. An incoming packet first reaches PREROUTING, where Linux has not yet decided whether the packet is for a local socket or should be forwarded elsewhere.
+
+**Pause and predict:** If a packet is addressed to a local web server and you want to drop it before the application sees it, which `filter` chain gives you the most direct control?
+
+<details>
+<summary>Check your prediction</summary>
+
+`filter` `INPUT`. After the routing decision, a packet for this host moves through INPUT. Forwarded packets use FORWARD. Locally created packets begin at OUTPUT, and packets leaving an interface pass through POSTROUTING. PREROUTING is earlier, but it is not a `filter` chain.
+</details>
 
 ```mermaid
 flowchart TD
@@ -92,7 +100,13 @@ Connection tracking is the quiet partner behind many rules in this module. When 
 
 Another useful way to reason about conntrack is to separate policy from memory. The first packet of a connection asks the policy question: should this flow be allowed, translated, marked, or rejected? Later packets can often use the remembered answer, which makes stateful firewalling practical and keeps NAT from requiring symmetrical hand-written rules. When conntrack is full, disabled, or bypassed through the raw table, symptoms become strange because packets that used to inherit a known flow may suddenly look new again. That is why serious troubleshooting includes conntrack capacity, state, and timeouts when counters do not match the story you expected.
 
-> **Stop and think**: If a packet needs to be dropped to block an attacker, in which chain of the `filter` table should you place the rule to drop it as early as possible before it reaches a local process?
+**Pause and predict:** If a packet needs to be dropped to block an attacker, in which chain of the `filter` table should you place the rule to drop it as early as possible before it reaches a local process?
+
+<details>
+<summary>Check your prediction</summary>
+
+`INPUT`. That is the first `filter` chain on the path to a local socket. FORWARD never sees a packet that routing already delivered to this host.
+</details>
 
 In a production incident, this distinction prevents wasted effort. A platform engineer investigating a broken health check should first decide whether the health checker targets a host process, a NodePort, a pod IP, or a Service IP. Each target implies a different route through netfilter and therefore a different first useful chain. Jumping directly to a global `iptables-save | grep DROP` can still help, but it is much slower than asking the packet-path question first and then using counters to confirm the answer.
 
@@ -185,7 +199,13 @@ sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 sudo iptables -A INPUT -j DROP
 ```
 
-Before running rules like these over SSH, pause and predict: what happens if the final drop rule lands before the SSH accept rule, or if the established-flow rule is missing while your shell is already connected? The most likely failure is self-lockout, because the packet carrying your next keystroke may no longer match an allowed path. On a real server, use a console, a temporary rollback tool such as `iptables-apply` where available, or a timed rescue job that restores a saved policy unless you cancel it after verification.
+**Pause and predict:** What happens if the final drop rule lands before the SSH accept rule, or if the established-flow rule is missing while your shell is already connected?
+
+<details>
+<summary>Check your prediction</summary>
+
+Self-lockout. The packet carrying the next keystroke no longer matches an allowed path. On a real server, use a console, `iptables-apply` where available, or a timed rescue job that restores a saved policy unless you cancel it after verification.
+</details>
 
 NAT solves a different problem from filtering. A container bridge usually uses private addresses that upstream routers cannot return to directly, so the host must rewrite the source address before the packet leaves the node. MASQUERADE is dynamic source NAT, useful when the outgoing interface address can change. SNAT is more explicit and cheaper when you know the exact egress address. DNAT and REDIRECT change the destination instead, which is why they normally happen before routing or for local output traffic.
 
@@ -286,7 +306,13 @@ flowchart TD
     KubeLb -->|Fallback| SepB
 ```
 
-Pause and predict: if a Service has three ready endpoints and you inspect the generated rules, why would the first rule not simply match all traffic? The answer is that kube-proxy must combine sequential evaluation with probabilistic matching. A packet that misses the first random match falls through to the next candidate, and the probabilities are chosen so each endpoint receives a fair share over many new connections.
+**Pause and predict:** If a Service has three ready endpoints and you inspect the generated rules, why would the first rule not simply match all traffic?
+
+<details>
+<summary>Check your prediction</summary>
+
+kube-proxy combines sequential evaluation with probabilistic matching. A packet that misses the first random match falls through to the next candidate. The probabilities are chosen so each endpoint receives a fair share over many new connections.
+</details>
 
 ```bash
 # All service-related rules
@@ -356,7 +382,15 @@ sudo iptables -t raw -D PREROUTING -p tcp --dport 80 -j TRACE
 sudo iptables -t raw -D OUTPUT -p tcp --dport 80 -j TRACE
 ```
 
-TRACE is powerful because it shows rule traversal, but it is also noisy enough to damage your ability to see anything else. On a high-traffic node, tracing a common port can flood kernel logs, increase CPU load, and rotate away useful messages from the incident. Use narrow matches, reproduce once or twice, save the evidence, and remove the trace rules immediately. Stop and think: why is a trace rule in the raw table especially risky if you forget it during peak traffic?
+TRACE is powerful because it shows rule traversal, but it is also noisy enough to damage your ability to see anything else. On a high-traffic node, tracing a common port can flood kernel logs, increase CPU load, and rotate away useful messages from the incident. Use narrow matches, reproduce once or twice, save the evidence, and remove the trace rules immediately.
+
+**Pause and predict:** Why is a trace rule in the `raw` table especially risky if you forget it during peak traffic?
+
+<details>
+<summary>Check your prediction</summary>
+
+`raw` is consulted before conntrack. A forgotten TRACE there is not limited to one flow: it can match the packet rate of the node, flood the kernel log, and rotate away the incident evidence you needed.
+</details>
 
 ```bash
 # Check if traffic is hitting rules
@@ -699,9 +733,48 @@ The busiest rule is not automatically the broken rule; it is the rule most traff
 
 </details>
 
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Parts 1–5 stay as the inspection recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Local listener, wrong chain.** A web server on the node is still reachable. The drop rule was added to `FORWARD`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: hook path. Traffic to a local socket is `filter` `INPUT`, not `FORWARD`. Next action: move the drop to `INPUT` and confirm the counter moves on one test packet.
+</details>
+
+**Card B: SSH session dies.** A policy appends `DROP` before the SSH accept, and there is no established-flow rule. The shell stops answering.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: rule order, not SSH itself. Next action: recover from a console or the timed rollback; put established/related and the SSH accept above the final drop.
+</details>
+
+**Card C: One endpoint gets every new connection.** A Service has three ready endpoints. The first generated rule matches every packet instead of a fraction.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: missing statistic/probability match, so sequential evaluation never falls through. Next action: read the generated rules for the random or nth match before changing endpoints.
+</details>
+
+**Card D: Logs vanish at peak.** A TRACE rule left in `raw` during a busy window fills the kernel log.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: `raw` before conntrack, so the trace is not scoped to one flow. Next action: delete the TRACE rule, then reproduce once with a narrow match.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Viewed and interpreted filter and nat table output without changing policy.
+- [ ] Classified each frozen netfilter-layer card before opening the reveal.
 - [ ] Created, tested, and removed a custom diagnostic chain cleanly.
 - [ ] Implemented and removed a NAT redirect while explaining why OUTPUT was the right chain.
 - [ ] Traced Kubernetes Service rules or explained why the lab cluster uses a different dataplane (cluster fork — Part 4; optional for host-only learners).
