@@ -78,7 +78,13 @@ ip route show
 
 Static IPv4 configuration looks simple, but the operational trap is that addresses, gateways, and DNS servers solve different problems. The address and prefix decide what is local. The gateway decides where nonlocal packets go. DNS decides whether human-readable service names become destination addresses at all. If a server can ping another host in `192.168.1.0/24` but cannot reach a public IP, the address is probably not the missing piece; the route table is the first evidence to inspect.
 
-Pause and predict: if your server has an IP address and can reach a neighbor on the same switch, but `ip route show` has no line beginning with `default`, what exactly will happen when the server tries to connect to `8.8.8.8`? Write down whether you expect an ARP request, an ICMP error, or an immediate local routing failure before you test it, because that prediction forces you to separate Layer 2 reachability from Layer 3 forwarding.
+**Pause and predict:** The server has an IP address and can reach a neighbor on the same switch, but `ip route show` has no line beginning with `default`. What happens when it tries to connect to `8.8.8.8`: an ARP request, an ICMP error, or an immediate local routing failure?
+
+<details>
+<summary>Check your prediction</summary>
+
+Immediate local routing failure. `8.8.8.8` is not on-link, and there is no default route, so the kernel returns "Network is unreachable" before it sends ARP or waits for ICMP.
+</details>
 
 IPv6 uses the same habits with different notation and more room for automatic behavior. Router advertisements, link-local addresses, privacy addresses, and DHCPv6 can all create usable-looking state, so do not assume the absence of an IPv4-style gateway line means the host has no path. Inspect `ip -6 addr show` and `ip -6 route show` directly, then decide whether the profile should be fully manual, automatic, or intentionally disabled for a constrained lab.
 
@@ -192,7 +198,13 @@ sudo nmcli connection down bond0-slave1
 # Traffic continues on bond0-slave2
 ```
 
-Before running this, what output do you expect in `/proc/net/bonding/bond0` after `bond0-slave1` is brought down? The important fields are not only whether `bond0` exists, but which slave is active, whether MII status is up, and whether the bond driver has recorded a link failure. If your prediction mentions only the logical interface address, you are still looking too high in the stack.
+**Pause and predict:** What do you expect in `/proc/net/bonding/bond0` after `bond0-slave1` is brought down?
+
+<details>
+<summary>Check your prediction</summary>
+
+`bond0` can still exist. Read which slave is active, whether that slave's MII status is up, and whether the driver recorded a link failure. The logical interface address alone is too high in the stack.
+</details>
 
 **Hypothetical scenario:** An LACP deployment looked healthy because both Linux interfaces were up and the switch LEDs were green. The team had configured mode 4 on the server, but the switch ports were still independent access ports rather than members of one port channel. Traffic was distributed across links that the switch did not consider a single logical path, causing out-of-order delivery, retransmissions, and intermittent timeouts that looked like an application problem. The fix was a short switch change, but the lesson was larger: link state proves cables, not aggregation semantics.
 
@@ -243,7 +255,13 @@ sudo nmcli connection up eth0-vlan10
 ip addr show eth0.10
 ```
 
-Pause and predict: if you configure `eth0.10` correctly on the server but the switch port is not carrying VLAN 10, which checks will pass and which checks will fail? You should expect the Linux interface and address to exist locally, but ARP or neighbor discovery for peers on that VLAN will fail because tagged frames are not being delivered to the matching broadcast domain.
+**Pause and predict:** `eth0.10` is configured correctly on the server, but the switch port is not carrying VLAN 10. Which checks pass, and which fail?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Linux interface and its address exist locally. ARP or neighbor discovery for peers on that VLAN fails, because tagged frames never reach the matching broadcast domain.
+</details>
 
 The design sequence for these features is simple even when the topology is not. Decide whether the host needs link failover, virtual-machine attachment, network segmentation, or a combination of those needs. Put the IP address on the logical interface that applications should use, not on a lower-level member that may become subordinate. Then test the failure mode you designed for: unplug the active link in a bond, restart a VM attached to a bridge, or confirm VLAN reachability from a peer on the same tagged segment.
 
@@ -447,7 +465,13 @@ sudo firewall-cmd --reload
 # 4. If bad: --reload to revert
 ```
 
-Pause and predict: if you add a runtime rich rule that blocks an IP address, then run `sudo firewall-cmd --reload` before making it permanent, what will happen to the block? The answer should follow directly from the two-state model: reload discards runtime-only changes and replaces them with permanent configuration from disk.
+**Pause and predict:** You add a runtime rich rule that blocks an IP address, then run `sudo firewall-cmd --reload` before making it permanent. What happens to the block?
+
+<details>
+<summary>Check your prediction</summary>
+
+The block disappears. Reload throws away runtime-only changes and loads the permanent configuration from disk.
+</details>
 
 nftables is the modern kernel packet filtering framework behind many current Linux firewalls. You do not need to abandon firewalld to understand nftables, but you should recognize the underlying objects: tables group chains, chains attach to hooks such as input or forward, and rules match packet fields before applying verdicts such as accept or drop. That knowledge helps when you are debugging a host where several tools have modified packet policy.
 
@@ -944,9 +968,50 @@ nmcli connection show static-eth0
 The profile should show the address, gateway, DNS servers, and manual IPv4 method. If `eth0` is not your interface name, use `nmcli device status` to find the correct device and recreate the profile with that name. A profile that exists but is not activated is still useful evidence because it proves your intended persistent configuration before you risk a live cutover.
 </details>
 
+The host object you just edited is not always the object the next packet uses. An address, a bond, a VLAN interface, and a firewall rule can each look finished on the host while the route, the slave, the switch, or the saved policy still disagrees.
+
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–4 stay as the configuration recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Neighbor works, public does not.** The host pings `192.168.1.10` on the same switch. `ip route show` has no `default`. A connect to `8.8.8.8` fails at once.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: local route table, not ARP. Next action: add the gateway. Do not capture on the wire for a packet the kernel never sent.
+</details>
+
+**Card B: One slave down.** `bond0` still has an address. `bond0-slave1` was shut. The operator only checked `ip addr`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: bond slave state in `/proc/net/bonding/bond0`. Next action: read the active slave and MII status, not the logical address.
+</details>
+
+**Card C: VLAN interface is up.** `eth0.10` has the right address. Peers on VLAN 10 never answer ARP. The switch port is an untagged access port.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: switch broadcast domain, not the Linux address. Next action: confirm the port carries VLAN 10 before changing the host IP.
+</details>
+
+**Card D: Block vanished after reload.** A runtime rich rule blocked an IP. `firewall-cmd --reload` ran before `--permanent`. The IP connects again.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: runtime store, not the rule syntax. Next action: add the rule with `--permanent` and reload, then confirm it is still present.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] firewalld running with custom rules for ssh, https, `8443/tcp`, and the rich rule
+- [ ] Classified each frozen network-admin card before opening the reveal.
 - [ ] SSH hardened with root login disabled, X11 forwarding disabled, and max auth tries limited
 - [ ] Chrony running, enabled, and reporting tracking data
 - [ ] Static IP profile configured via nmcli with address, gateway, DNS, and manual method
