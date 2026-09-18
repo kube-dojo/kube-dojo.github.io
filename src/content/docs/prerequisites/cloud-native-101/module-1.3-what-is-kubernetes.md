@@ -95,14 +95,25 @@ flowchart LR
 
 Every analogy has limits, but this one helps separate concerns. The control plane is the coordination system, not the place where most business workloads run. Nodes are the machines that provide CPU, memory, disk, and networking. Pods are the scheduled units of application work. Namespaces give teams a way to group resources and apply boundaries, though they are not a complete security boundary by themselves.
 
-When you interact with Kubernetes, you normally use `kubectl`, the official command-line client. Many engineers use a short interactive alias for personal typing speed, but learning material and automation should use the full command because aliases do not reliably expand in non-interactive shells. Commands such as `kubectl get pods` and `kubectl describe pod hello` talk to the API server rather than directly to a worker node. This detail is important for diagnosis: if the API server is down, management commands fail even though existing containers may continue running on their assigned nodes.
+When you interact with Kubernetes, you normally use `kubectl`, the official command-line client. Many engineers use a short interactive alias for personal typing speed, but learning material and automation should use the full command because aliases do not reliably expand in non-interactive shells. Commands such as `kubectl get pods` and `kubectl describe pod hello` talk to the API server rather than directly to a worker node.
+
+**Pause and predict:** If your laptop cannot reach the API server, but the worker nodes are healthy, what do you expect to happen to applications that are already running?
+
+<details>
+<summary>Check your prediction</summary>
+
+Existing Pods usually continue to run because the node-local kubelet and container runtime keep executing their last known assignments. Management commands fail. New deployments, scaling changes, and fresh scheduling decisions wait until the control plane becomes reachable again.
+
+</details>
+
+Name what keeps running before you try the two client commands below. Those commands are the management path. They do not show a node that has lost the API.
 
 ```bash
 kubectl version
 kubectl cluster-info
 ```
 
-Pause and predict: if your laptop cannot reach the API server, but the worker nodes are healthy, what do you expect to happen to applications that are already running? Existing pods usually continue to run because the node-local kubelet and container runtime keep executing their last known assignments. New deployments, scaling changes, and fresh scheduling decisions wait until the control plane becomes reachable again.
+A client that cannot reach the API is a different failure from a worker that has stopped its containers. You will use that split again when a command times out and the application is still serving traffic.
 
 ## Kubernetes Architecture (Simplified)
 
@@ -175,7 +186,16 @@ Worker nodes are where application containers actually run. The kubelet on each 
 | **Container Runtime** | Actually runs containers (containerd) |
 | **kube-proxy** | Handles networking for services |
 
-Pause and predict: if the scheduler is down but the API server and worker nodes are healthy, which operations still work and which ones stall? Existing pods keep running, and you can often read cluster state through the API server. New pods that need placement remain pending because no component is writing the node assignment that lets kubelet start them.
+**Pause and predict:** If the scheduler is down but the API server and worker nodes are healthy, which operations still work and which ones stall?
+
+<details>
+<summary>Check your prediction</summary>
+
+Existing Pods keep running, and you can often read cluster state through the API server. New Pods that need placement remain Pending because no component is writing the node assignment that lets kubelet start them.
+
+</details>
+
+Separate the operations that only read recorded state from the operations that need a new placement. The next paragraph is a general diagnosis habit. It is not the answer to this outage.
 
 A practical diagnosis habit follows from this architecture. When a command cannot connect, suspect the API path first. When a pod is pending, inspect scheduling constraints and available node capacity. When a pod is assigned but not starting, inspect kubelet events, image pulls, volume mounts, and runtime errors. Kubernetes feels less mysterious when you map the symptom to the component responsible for that phase of the workflow.
 
@@ -226,7 +246,16 @@ spec:
 
 The Deployment example is small, but it contains an important promise. If the desired replica count is three and one pod disappears, the controller creates another pod. If you update the template to a new image, the Deployment controller coordinates a rollout rather than asking you to stop all old pods and start all new pods manually. This is desired-state management applied to application operations.
 
-Services solve a different problem: pods are intentionally replaceable, so their IP addresses are not stable contracts for users or other services. A Service selects pods by label and exposes a stable virtual IP and DNS name that route to the current healthy backends. That is how a frontend can call a backend even while backend pods are being replaced during a rollout or after a node failure.
+**Pause and predict:** If a Deployment keeps three Pods running but those Pods are frequently destroyed and recreated with new IP addresses, how will users reliably reach the app?
+
+<details>
+<summary>Check your prediction</summary>
+
+They should not connect to Pod IPs directly. A Service selects Pods by label and exposes a stable virtual IP and DNS name that route to the current healthy backends. That is how a frontend can call a backend even while backend Pods are being replaced.
+
+</details>
+
+Name the stable contract before you read the manifest below. The YAML is one resource shape. It does not state which object you should have chosen.
 
 ```yaml
 # "Make my nginx pods accessible on port 80"
@@ -242,7 +271,7 @@ spec:
     targetPort: 80
 ```
 
-Pause and predict: if a Deployment keeps three Pods running but those Pods are frequently destroyed and recreated with new IP addresses, how will users reliably reach the app? They should not connect to Pod IPs directly. A Service gives clients a stable name and address while Kubernetes updates the list of live Pod endpoints behind that name.
+The manifest above is the shape. The stack diagram after this sentence shows how the pieces sit together. Decide how clients find the Pods before you use that diagram as a label.
 
 The relationship among these resources is easier to read as a stack. Users and other services talk to a Service. The Service finds Pods by label. The Deployment owns the template that creates those Pods and the desired replica count that keeps them present. The control plane stores all of that as resource state, and controllers keep updating the cluster when one layer changes.
 
@@ -540,6 +569,46 @@ The Pod should disappear and stay gone because you created a standalone Pod with
 - [ ] You can distinguish a standalone Pod from a Deployment-managed Pod.
 - [ ] You can explain why a Service is needed when Pods are replaceable.
 - [ ] You can assess whether this learning cluster resembles managed, self-managed, or local Kubernetes.
+
+- [ ] I named a failure layer and a next action for each frozen control-plane card before opening the reveal.
+
+A timeout, a Pending Pod, a broken client, and a Pod that stays deleted can each look like the application crashed. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: kubectl times out. The site still answers.** The laptop cannot reach the API server. `kubectl get pods` fails. The existing application keeps serving traffic. Worker nodes are Ready.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the API path, not the running containers. Next action: restore reachability to the API server before you restart workloads that are already serving.
+
+</details>
+
+**Card B: New Pods sit Pending.** The API server answers `kubectl get pods`. Pods that were already Running stay Running. Every new Pod stays Pending with no node name. The scheduler process is down.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: scheduling, not kubelet. Next action: restore the scheduler, then confirm a new Pod gets a node assignment before you change the application image.
+
+</details>
+
+**Card C: Rollout breaks the clients.** A Deployment replaces three Pods. Each new Pod has a new IP. Clients that stored the old IPs fail until someone updates them by hand.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: clients are using Pod IPs. Next action: put a Service in front of the Pods and point clients at that stable name.
+
+</details>
+
+**Card D: The deleted Pod never returns.** `kubectl delete pod hello` succeeds. A minute later `kubectl get pods` still does not show `hello`. No Deployment owns it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: there is no controller reconciling a replica count. Next action: declare a Deployment if the Pod should come back, and do not expect a standalone Pod to recreate itself.
+
+</details>
 
 ## Sources
 
