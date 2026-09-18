@@ -63,7 +63,16 @@ flowchart TD
 
 The pause container is the quiet anchor that makes this model stable. It starts first, claims the Pod's shared namespaces, and then sleeps by calling a small process that does essentially nothing. Your application containers join those namespaces after the sandbox exists. If the app crashes ten times, the Pod IP does not have to disappear ten times, because the pause container still holds the network namespace open. That stability is why Services can keep routing to a Pod while an individual container restarts, and why container restarts are not the same thing as Pod replacement.
 
-Pause and predict: if one container in a Pod binds port 8080 and a second container in the same Pod tries to bind port 8080, what should you expect? The second process fails with an address-in-use error because both containers share the same network namespace and port table. The containers have different filesystems, but the kernel sees only one loopback interface for that Pod. This is a frequent beginner mistake when teams add a metrics exporter, debug proxy, or admin endpoint and forget that ports must be unique across the whole Pod, not merely inside each container stanza.
+**Pause and predict:** if one container in a Pod binds port 8080 and a second container in the same Pod tries to bind port 8080, what should you expect?
+
+<details>
+<summary>Check your prediction</summary>
+
+The second process fails with an address-in-use error because both containers share the same network namespace and port table. The containers have different filesystems, but the kernel sees only one loopback interface for that Pod. Ports must be unique across the whole Pod, not merely inside each container stanza.
+
+</details>
+
+Write the bind failure you expect before you continue. The next paragraph is about replica boundaries. It does not name the error from this prompt.
 
 The Pod model also explains why Kubernetes does not scale containers independently inside the same Pod. A ReplicaSet, Deployment, Job, or StatefulSet creates and replaces whole Pods. If your API container needs ten replicas but its cache helper needs one, those processes should not be in one Pod. Multi-container Pods are for colocated helpers that share fate with the main process: a log tailer reading a local file, a proxy encrypting local traffic, an adapter normalizing metrics, or an init container preparing files before the app starts. The shared fate is the feature and the cost.
 
@@ -103,7 +112,16 @@ Probe timing is simple arithmetic with real consequences. `initialDelaySeconds` 
 
 The kubelet enforces this lifecycle through a sync loop. It watches the Pod objects assigned to the node, asks the container runtime about actual containers, and reconciles differences. Internally, the Pod Lifecycle Event Generator helps the kubelet react to container changes without relying on expensive constant polling. If the runtime reports that a container exited, the kubelet records the state, evaluates the Pod's restart policy, and starts the next attempt when appropriate. When a node logs that PLEG is unhealthy, the node may stop reporting accurate container state, so Pods can appear stale even though the control plane itself is still alive.
 
-Pause and predict: a web Pod is `Running`, its liveness probe succeeds, and its readiness probe fails for two minutes during a database migration. Should the kubelet restart the container? It should not restart the container solely because readiness fails. Instead, the Pod should be removed from Service endpoints until the readiness probe passes again. This lets rolling updates and dependency disruptions drain traffic without turning a temporary dependency problem into a restart storm.
+**Pause and predict:** a web Pod is `Running`, its liveness probe succeeds, and its readiness probe fails for two minutes during a database migration. Should the kubelet restart the container?
+
+<details>
+<summary>Check your prediction</summary>
+
+It should not restart the container solely because readiness fails. The Pod should leave Service endpoints until the readiness probe passes again. Rolling updates and dependency disruptions can drain traffic without turning a temporary dependency problem into a restart storm.
+
+</details>
+
+Write restart or no restart before you continue. The next paragraph is about node loss. It does not answer this probe pair.
 
 Lifecycle also clarifies why naked Pods are fragile. When a node dies, the Pod object may remain visible for a while, but the processes on that node are gone. A Deployment, StatefulSet, DaemonSet, or Job is the controller that creates replacement Pods; the Pod itself does not travel to a new node like a live virtual machine. For temporary experiments, a naked Pod is useful because it is easy to inspect. For an application that must recover, the absence of a controller is a design defect.
 
@@ -368,8 +386,7 @@ When you are unsure, write down the recovery story in one paragraph before choos
 
 In this hands-on exercise, you will create a multi-container Pod, inspect its shared namespace behavior, trigger an intentional memory failure, and practice the diagnostic sequence used during real incidents. Work in a disposable namespace or local training cluster, and use the full `kubectl` command so every example remains copy-paste runnable.
 
-<details>
-<summary>Task 1: Declarative Multi-Container Creation</summary>
+### Task 1: Declarative Multi-Container Creation
 
 Write a declarative YAML manifest named `multi-pod.yaml` that creates a single Pod containing two communicating containers. The Pod name should be `web-logger`. The first container should be named `nginx-server`, use the `nginx:1.27-alpine` public image, and mount a shared volume named `html-dir` at `/usr/share/nginx/html`. The second container should be named `content-writer`, use the `busybox:1.36.1` public image, mount the same volume at `/data`, and continuously write the current date to `/data/index.html` every 5 seconds. The shared volume must be an `emptyDir`.
 
@@ -411,10 +428,8 @@ spec:
           mountPath: /data
 ```
 </details>
-</details>
 
-<details>
-<summary>Task 2: Apply and Verify the Architecture</summary>
+### Task 2: Apply and Verify the Architecture
 
 Apply the declarative manifest to your local cluster. Verify that the Pod transitions through `Pending` into `Running`, confirm both containers become ready, and then use port-forwarding to view the generated page through the API server tunnel.
 
@@ -458,10 +473,8 @@ curl http://localhost:8080
 kill %1
 ```
 </details>
-</details>
 
-<details>
-<summary>Task 3: Interactive Namespace Exploration</summary>
+### Task 3: Interactive Namespace Exploration
 
 The `content-writer` container continuously overwrites the physical file on the shared volume. Use `kubectl exec` to open an interactive shell inside the `nginx-server` container. Once inside, install `curl` and make a local HTTP request to `localhost:80`. Explain why this works across container boundaries.
 
@@ -499,10 +512,8 @@ exit
 ```
 Even though you entered the `nginx-server` container's filesystem namespace, Nginx listens on port 80 of the Pod's shared network namespace. The loopback interface is shared by all containers in the Pod, while the mounted volume lets one container write the file another container serves.
 </details>
-</details>
 
-<details>
-<summary>Task 4: Intentionally Triggering an OOMKilled Event</summary>
+### Task 4: Intentionally Triggering an OOMKilled Event
 
 Create a new file named `oom-pod.yaml`. Define a Pod that runs the `polinux/stress` image, give it a strict memory limit of `50Mi`, and set the command to allocate more memory than the cgroup permits. Apply the file and watch its lifecycle status.
 
@@ -546,10 +557,8 @@ kubectl get pod memory-hog
 ```
 You should briefly see the Pod run and then observe a restart cycle. The process asks the kernel for substantially more memory than the configured cgroup permits, so the kernel terminates it to protect the node.
 </details>
-</details>
 
-<details>
-<summary>Task 5: Forensically Diagnosing the Death</summary>
+### Task 5: Forensically Diagnosing the Death
 
 Use `kubectl describe` to prove why the `memory-hog` Pod died. Find the exact reason and exit code in the container's last state, and connect that result back to the memory limit in the manifest.
 
@@ -574,10 +583,8 @@ kubectl describe pod memory-hog
 ```
 Scroll to the `Containers:` section, locate the `stress-test` container, and inspect the `Last State:` block. The important evidence is `Reason: OOMKilled` alongside `Exit Code: 137`, which shows that the kernel killed the process after it exceeded the configured memory limit.
 </details>
-</details>
 
-<details>
-<summary>Task 6: Systematic Clean Up</summary>
+### Task 6: Systematic Clean Up
 
 Cleanly delete both Pods created during this exercise to free cluster resources and leave the training environment ready for the next module.
 
@@ -601,6 +608,41 @@ Run `kubectl delete pod web-logger memory-hog`.
 kubectl delete pod web-logger memory-hog
 ```
 </details>
+
+**Card A: A second listener dies on port 8080.** `web-logger` is Ready. The nginx container still serves the page. `content-writer` logs `bind: address already in use` and never writes the file.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the shared Pod network namespace, not a Service or a CNI outage. Next action: give the second listener a different port, then confirm in that container's logs before you restart the node.
+
+</details>
+
+**Card B: Readiness fails and the restart count climbs.** The web Pod stays `Running`. The liveness probe passes. Readiness fails for two minutes during a migration, and the container keeps restarting.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a readiness signal was wired as liveness. Next action: read the probe definitions and stop the restart loop. Traffic should drain until the dependency is ready.
+
+</details>
+
+**Card C: The hotfix Pod does not come back.** An engineer patched a naked Pod with `kubectl` during an incident. The node is gone. Nothing creates a replacement.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: no controller owns the Pod. Next action: check `ownerReferences`, then recreate from the Git manifest through a Deployment or Job instead of another imperative create.
+
+</details>
+
+**Card D: Exit 137 is blamed on a bug.** `kubectl describe pod memory-hog` shows `Reason: OOMKilled` and exit code 137. A teammate wants an application stack trace first.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the memory cgroup limit, not an application exit. Next action: compare `resources.limits.memory` with the allocation the command requested before you change application code.
+
 </details>
 
 Success criteria:
