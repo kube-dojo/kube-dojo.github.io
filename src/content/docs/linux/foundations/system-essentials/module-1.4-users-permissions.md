@@ -15,7 +15,7 @@ lab:
 
 > **Complexity**: `[MEDIUM]` - Operator-grade Linux identity and access control
 >
-> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 80–110 minutes (reading + in-page tasks: ~50–80 min; Killercoda lab: ~30 min)
 >
 > **Prerequisites**:
 >
@@ -123,7 +123,7 @@ The distinction between `EACCES` and `EPERM` is useful but not enough by itself.
 <details>
 <summary>Check your prediction</summary>
 
-Expect `EACCES` from a failed path search on the locked parent, not an ownership `EPERM` on the leaf. `namei -l` walks each component and exposes parent directory traversal failures; then `ls -ld` / `getfacl` / `id` / `sudo -u` confirm mode, ACL mask, and whether the actor actually has the assumed group. Retest through the real unit or workload after narrowing with `sudo -u`.
+Expect `EACCES` from a failed path search on the locked parent, not an ownership `EPERM` on the leaf. `namei -l` walks each component and exposes parent directory traversal failures; then `ls -ld`, `getfacl`, `id`, and `sudo -u` confirm mode, ACL mask, and group membership. Retest through the real unit or workload after narrowing with `sudo -u`, because service manager settings like `User=`, `Group=`, `SupplementaryGroups=`, `ReadWritePaths=`, and `NoNewPrivileges=` are not identical to an interactive shell.
 </details>
 
 ```bash
@@ -505,6 +505,12 @@ sudo userdel -r kdsvc
 sudo groupdel kddeploy
 ```
 
+**Expected Evidence (Host Exercise):**
+- `id` for `kdsvc` reports membership in supplementary group `kddeploy` (`groups=...kddeploy`).
+- `ls -l /tmp/kd-shared/from-kdsvc` confirms directory setgid enforced group ownership as `kddeploy`.
+- `getfacl -p /tmp/kd-shared` confirms the default group ACL entry: `default:group:kddeploy:rwx`.
+- Cleanup commands remove `/tmp/kd-shared`, user `kdsvc`, and group `kddeploy` cleanly without orphan state.
+
 ### Diagnostic Triage Challenge (Frozen Incident Cards)
 
 The host recipe above stays. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
@@ -549,7 +555,7 @@ Failure layer: interactive editor escape — this is not a file-edit rule; `vi` 
 > - **Optional cluster path:** If you have a local [`kind`](https://kind.sigs.k8s.io/) cluster or an existing cluster with `kubectl` access, run the exercise below on a disposable namespace.
 > - **Skip-as-read:** Without a cluster, read the manifest and commands as illustrative; the surrounding text describes the expected identity and permission evidence, and a live cluster will differ in pod and path details.
 
-Use this Kubernetes exercise on a disposable namespace when you have cluster access. The Pod prints its identity, writes to the `emptyDir` volume, and keeps running so you can inspect the result. The root filesystem is read-only, so `/tmp` is explicitly provided as a writable volume.
+Use this Kubernetes exercise on a disposable namespace when you have cluster access. The Pod prints its identity, writes to the `emptyDir` volume, and keeps running so you can inspect the result. Note that this hands-on exercise focuses on container process identity and `NoNewPrivs` evidence; it intentionally uses a lightweight `/tmp` mount without exercising the `fsGroupChangePolicy` recursive walk shown in the earlier teaching example. The root filesystem is read-only, so `/tmp` is explicitly provided as a writable volume.
 
 ```bash
 kubectl create namespace users-perms-lab
