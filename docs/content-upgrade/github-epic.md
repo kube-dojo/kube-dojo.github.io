@@ -4,6 +4,22 @@ Deliver the complete KubeDojo content upgrade: all curriculum tracks, the comple
 
 Accountable lead: the Codex content-upgrade task. GitHub issues/PRs and their evidence are the authoritative progress record. Work proceeds in disjoint, bounded batches with cross-family review before merge.
 
+## Definition of READY / COMPLETED (packet / GitHub issue)
+
+**READY** and **COMPLETED** mean the same thing for a packet/child issue:
+delivered **end-to-end** for that scope. Binding checklist:
+`agents_extensions/shared/skills/drive-epic/SKILL.md` → Definition of READY / COMPLETED.
+
+Summary:
+
+1. **Worktree** — all packet edits in `.worktrees/<name>` on `codex/<name>` (labs: `kubedojo-labs/.worktrees/`); primary stays on `main`; never feature-branch or commit packet WIP on primary; never push to `main`.
+2. **Acceptance** — issue criteria met with evidence; scope/budget honored; required local proof done; dual-repo residuals explicit; no EN-only close of UK obligations.
+3. **Delivery** — if a PR: merge gate (exact-head CF ≠ author + CI green on that SHA) → merged; material findings resolved or filed as residual.
+4. **Git hygiene** — that worktree removed; local/remote branches deleted; prune/fetch; primary not left with orphaned packet files.
+5. **GitHub / coordination hygiene** — child closed with ship note + SHA (or residual filed); parent/epic not closed on a slice; leases released; driver do-next updated.
+
+**Merge gate ≠ READY.** Merge that turn, finish closeout, then take the next open child — never announce “ready” and stall.
+
 ## Non-negotiable evidence standard
 
 - Every load-bearing factual claim, historical detail, quotation, incident, numerical result, benchmark, product/version assertion, and technical instruction must have suitable evidence. Record the exact source/locator, verification date, applicability, and uncertainties.

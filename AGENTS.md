@@ -20,8 +20,16 @@ review gates below. Preserve the requested scope and any explicit LOC budget.
 ## Workspace and evidence
 
 - Start at the repository root with `git status --short --branch`.
-- Work in `.worktrees/<short-name>` on a new `codex/<short-name>` branch from
-  `main`. Keep the primary checkout on `main`; preserve pre-existing changes.
+- **Worktree criteria (binding):** do all packet/implementation/docs/script
+  edits in `.worktrees/<short-name>` on a new `codex/<short-name>` branch from
+  up-to-date `origin/main` (labs: `kubedojo-labs/.worktrees/`). Keep the
+  **primary** checkout on `main`; never `checkout`/`switch` a feature branch
+  there; never commit packet WIP on primary `main`; never push to `main`.
+  Create with
+  `git fetch origin && git worktree add -b codex/<name> .worktrees/<name> origin/main`.
+  Preserve unrelated pre-existing primary dirty files. Full READY closeout
+  (remove worktree, delete branches) is in
+  `agents_extensions/shared/skills/drive-epic/SKILL.md` → Worktree criteria.
 - Use `apply_patch` for manual edits. Do not revert others' work or delete files
   or worktrees without explicit instructions.
 - Stage explicit files. Exclude runtime output: `.pipeline/state.yaml`,

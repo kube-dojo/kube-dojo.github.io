@@ -30,6 +30,107 @@ If a claim (count, SHA, gate, cap, lab pass/fail) is not in fresh tool output,
 Sister-repo details (Killercoda layout, G04, hosted vs local evidence):
 [dual-repo.md](dual-repo.md).
 
+## Definition of READY / COMPLETED (binding — operator 2026-09-18)
+
+Use **READY** and **COMPLETED** interchangeably for a **packet or child
+issue**: the work is finished end-to-end for that scoped unit. Do not call a
+task ready/complete because a PR is mergeable or already merged.
+
+### Three layers (do not confuse them)
+
+| Layer | Meaning | Driver action |
+| --- | --- | --- |
+| **In flight** | Dispatched, PR open, CI running, CF pending, revise WIP | Keep driving; fill free lanes |
+| **Merge gate** | Exact-head CF PASS/APPROVE (≠ author; prefer ≠ auditor) **and** required CI green on **that same SHA** | **Merge this turn** (`gh pr merge --rebase` unless told squash). Never announce and stall. |
+| **READY / COMPLETED** | Acceptance + delivery + hygiene closeout for the **whole packet** (below) | Close the child issue (or file residual); take the **next** open child immediately |
+
+Epic / parent track issues are COMPLETED only when **their** closeout
+criteria are proven — never on a single slice merge.
+
+### Worktree criteria (binding — how work is done)
+
+Implementation, docs, skill, and script edits for a packet happen in a
+**git worktree**, never as WIP on primary `main`.
+
+| Rule | Requirement |
+| --- | --- |
+| **Where** | Site: `.worktrees/<short-name>/`. Labs sister repo: `kubedojo-labs/.worktrees/<short-name>/`. |
+| **Branch** | New branch from up-to-date `origin/main` (or the epic’s stated base), named `codex/<short-name>` (or the lane’s usual prefix). |
+| **Primary** | Stays on `main` (or stated base). **Never** `checkout` / `switch` a feature branch in the primary dir; **never** commit packet WIP on primary `main`; **never** push to `main`. |
+| **Create** | `git fetch origin && git worktree add -b codex/<name> .worktrees/<name> origin/main` |
+| **One concern** | One worktree ≈ one PR / one packet. Do not pile unrelated epics into one tree. |
+| **Cap** | Honor the epic’s worktree/disk cap; quote it from the issue. Before fan-out: `git worktree list` + `df -h`; reap merged/detached trees first. |
+| **Build exception** | `npm run build` / Astro validation runs from the **primary** checkout against the **intended revision** (worktree `node_modules` layout is shallow). Fetch/test that revision; do not pretend a primary build validates unmerged worktree files still only on disk. |
+| **Danger / dispatch** | `dispatch_smart` danger-mode and authors/reviewers run **in** the worktree path. |
+| **Closeout** | READY requires that packet’s worktree **removed** and branch deleted locally+remotely (see **C** below). |
+
+**Violation:** editing epic/packet files directly under the primary checkout
+and calling it done. Move work into a worktree before continuing; restore
+primary to a clean `main` (preserve unrelated pre-existing dirty files).
+
+### READY / COMPLETED checklist (all required)
+
+**A. Acceptance (scope of the issue)**
+
+1. Every acceptance criterion in the issue/packet is met with **evidence**
+   (commands, verify scripts, rubric/disposition, source locators as required) —
+   not “looks good” or “CI green.”
+2. Scope limits honored (owned paths, LOC/file budget, no unrelated edits,
+   no cloud/book unless the issue says so).
+3. Required **local** proof done when the change is user-visible
+   (`verify_module`, scenario tests, primary-checkout `npm run build` when
+   content/Astro touched). Unrun labs stay `unknown`, never claimed `pass`.
+4. Dual-repo: if the packet spans site + `kubedojo-labs`, **both** sides meet
+   their criteria or an explicit residual issue exists for the other repo.
+5. EN-only work does **not** close a bilingual/UK obligation; do not
+   introduce UK regressions in shared routes.
+
+**B. Delivery vehicle**
+
+6. Work lived in a **worktree** on a feature branch (see Worktree criteria);
+   not authored as primary-`main` WIP.
+7. If delivery is a PR: merge gate satisfied, PR **merged**, merge SHA
+   recorded on the issue.
+8. Material CF findings resolved (or explicitly deferred as a **new** residual
+   issue — not silent).
+9. No push to `main` from primary; no `--admin` merge over red required CI.
+
+**C. Git hygiene (includes worktree closeout)**
+
+10. That packet’s **worktree removed**; `git worktree prune`.
+11. Local feature branch deleted; remote branch deleted (merge `--delete-branch`
+    or equivalent); `git fetch --prune`.
+12. Primary checkout on `main` (or the epic’s stated base), not detached, **no
+    leftover packet files** on primary from this work; unrelated pre-existing
+    dirty files preserved.
+13. Prove with `git worktree list` (and `df -h` after fan-out).
+
+**D. GitHub / coordination hygiene**
+
+14. Packet/child issue: close comment with what shipped + merge SHA (or
+    residual link); **close** when complete.
+15. Parent/epic: progress comment if useful; **do not** close the epic/parent
+    on a slice unless that issue’s own completion criteria are fully proven.
+16. Follow-ups are **named** open issues (or a clear residual on the parent) —
+    never “we’ll get to it” with the child closed and nothing filed.
+17. Pipeline leases / locks for this packet released if your lane used them
+    (`/api/pipeline/leases` — do not leave zombies).
+18. Live driver pointers updated when you stop
+    (`.agent/epic-*-do-next.md` / handoff `## TODO`) so the next seat does not
+    re-invent inventory.
+
+### Explicitly NOT READY / NOT COMPLETED
+
+- CF PASS + CI green (merge gate only)
+- Packet edited on **primary `main`** instead of a worktree
+- PR merged but worktree/branch still present
+- PR merged but child issue still open with no residual filed
+- Child closed while acceptance or lab proof still missing
+- “Waiting on CI/review” while compatible lanes are free (idle failure —
+  fill or use a **named** hold code from §2)
+
+Merge gate → merge → finish **A–D** → **then** READY/COMPLETED → next child.
+
 ## Launch (thin `--epic` bind)
 
 ```bash
@@ -230,15 +331,19 @@ head moves, CF is stale — re-run before merge. Ground-check every finding
 
 Do **not** use a Gemini Flash-class model as a code/lab reviewer.
 
-### 7. Merge
+### 7. Merge gate (necessary, not sufficient for READY)
 
 PRs only. Never commit or merge on primary `main`.
 
-Order:
+**Merge gate** (do this the same turn it is true — do not announce and wait):
 
 1. Independent exact-head CF on the current SHA
 2. Required CI green on **that same head**
 3. Then merge (`gh pr merge --rebase` unless the issue/PR says squash)
+
+The merge gate is **not** the definition of READY. READY is end-to-end
+delivery + acceptance + git/GitHub hygiene (see **Definition of READY**
+above).
 
 Never treat `gh pr merge --auto` as a substitute for CF. Blocking CI red →
 never `--admin`. A driver merges **its own lane's** PR after CF+CI; flag
@@ -248,17 +353,19 @@ another lane's PR rather than merging it.
 against the intended revision — not inside `.worktrees/` (symlink
 `node_modules` is one level too shallow).
 
-### 7a. Post-merge cleanup (mandatory)
+### 7a. Post-merge → READY / COMPLETED closeout (mandatory)
 
-A merge is not done until residue is gone:
+After merge, finish Definition of READY sections **A–D** (acceptance proof,
+git hygiene, GitHub/coordination hygiene). Minimum mechanical steps:
 
-1. Confirm merge SHA; close the issue or prove residual on the parent.
-2. Remove the dispatch worktree (`git worktree remove` after processes leave).
-3. Delete the local branch if it remains; `git fetch --prune`;
-   `git worktree prune`.
-4. Prove with `git worktree list` and `df -h`.
+1. Confirm merge SHA on the issue; re-check acceptance still holds post-merge.
+2. Close the packet/child when complete, or file/prove residual — never silent.
+3. `git worktree remove` → prune; delete local/remote branches; `git fetch --prune`.
+4. Release any pipeline lease for this packet; refresh do-next/handoff TODO.
+5. Prove with `git worktree list` (and `df -h` after fan-out).
 
-Do not merge obsolete drafts merely to clear disk.
+Do not merge obsolete drafts merely to clear disk. Do not call the task
+READY/COMPLETED until A–D are done. Then take the next open child.
 
 ### 7-rollout. Local vs hosted proof
 
