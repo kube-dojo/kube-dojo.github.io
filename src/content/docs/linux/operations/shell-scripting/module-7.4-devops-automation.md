@@ -52,7 +52,18 @@ DevOps automation sits in the middle of several systems that do not naturally sh
 
 The first mistake many engineers make is writing the command they want to run before deciding what state they need to observe. A deployment script is not mainly a wrapper around `k set image`; it is a small decision engine that asks what is running now, whether the desired change is necessary, whether the cluster accepts the change, and whether the new workload becomes healthy. State-first thinking also makes read-only automation more useful, because diagnostic scripts can gather the same evidence every time instead of relying on whoever is holding the incident keyboard.
 
-Kubernetes is especially automation-friendly because the API can return structured objects instead of terminal tables. The table you see from `k get pods` is useful for a person scanning a screen, but it is a poor contract for a script because columns change, whitespace varies, and human display choices hide fields. JSON, YAML, JSONPath, custom columns, and resource names give you more explicit contracts. Before running the examples, pause and predict which format you would choose if the next command needs only pod identifiers and which format you would choose if it needs nested container images.
+Kubernetes is especially automation-friendly because the API can return structured objects instead of terminal tables. The table you see from `k get pods` is useful for a person scanning a screen, but it is a poor contract for a script because columns change, whitespace varies, and human display choices hide fields. JSON, YAML, JSONPath, custom columns, and resource names give you more explicit contracts.
+
+**Pause and predict:** If the next command needs only pod identifiers, which output format do you choose, and which format do you choose when it needs nested container images?
+
+<details>
+<summary>Check your prediction</summary>
+
+The `-o name` form is compact and stable when a following command accepts resource-qualified names such as `pod/nginx-abc123`. JSONPath is better when the next step expects raw values without the resource type prefix, while custom columns are useful when you need a small human-readable report without committing to full JSON processing. Nested container images are easier to take from JSON or YAML than from a flattened name list. The choice is less about taste than about the next consumer of the data.
+
+</details>
+
+Pick the format for the next consumer, not for how the line looks in your terminal. The examples below are the menu. They are not the answer key.
 
 ```bash
 # JSON for full data
@@ -72,7 +83,7 @@ kubectl get pods -o name
 # pod/nginx-abc123
 ```
 
-The `-o name` form is compact and stable when a following command accepts resource-qualified names such as `pod/nginx-abc123`. JSONPath is better when the next step expects raw values without the resource type prefix, while custom columns are useful when you need a small human-readable report without committing to full JSON processing. The choice is less about taste than about the next consumer of the data. Good automation reads like a series of contracts between commands, and every formatting flag should make one of those contracts clearer.
+Good automation reads like a series of contracts between commands, and every formatting flag should make one of those contracts clearer. Read one example, name the consumer that would accept it, and only then compare that guess with the reveal above.
 
 ```bash
 # Using -o name
@@ -112,7 +123,16 @@ kubectl get pods -w
 kubectl wait --for=condition=Ready pod -l app=nginx --timeout=60s
 ```
 
-Pause and predict: if a script executes a Kubernetes read that fails to find a resource, what happens by default when strict mode is absent? Bash normally records the non-zero exit code and continues unless the failing command is explicitly tested or the shell has been told to stop. That means a missing Deployment can become an empty variable, and an empty variable can become a broad command that targets more resources than intended. This is why data extraction and error handling must be designed together.
+**Pause and predict:** If a script executes a Kubernetes read that fails to find a resource, what happens by default when strict mode is absent?
+
+<details>
+<summary>Check your prediction</summary>
+
+Bash records the non-zero exit code and continues unless the failing command is explicitly tested or the shell has been told to stop. A missing Deployment can become an empty variable, and an empty variable can become a broad command that targets more resources than intended. Data extraction and the stop condition have to be designed together.
+
+</details>
+
+Treat a failed read as part of the script's contract, not as a line the shell will interpret for you. The two reads below are shape examples. They do not show the failure.
 
 ```bash
 kubectl get pods -o jsonpath='{.items[*].metadata.name}'
@@ -1166,6 +1186,46 @@ grep -l 'set -euo pipefail' /tmp/cluster-health.sh /tmp/deploy-helper.sh /tmp/lo
 - [ ] *(Cluster path — optional)* Ran the deployment helper with `--dry-run` and the log searcher against a real namespace
 
 After completing the checklist, review your terminal history as if it were a production change record. You should be able to identify what each script read, what it changed, which namespace it targeted, and what output proved success or failure. If any command line is ambiguous when read later, improve the script's printed context before considering the exercise finished.
+
+- [ ] I named a failure layer and a next action for each frozen automation-layer card before opening the reveal.
+
+A quiet success, a tidy name list, a host-only run, and a dry-run flag can each hide the layer that actually failed. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: The Deployment was missing. The script continued.** `kubectl get deployment payments -o jsonpath=...` exited non-zero. The next line still ran `kubectl delete pods -l app=payments` with an empty name filter.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: strict mode was absent, so the failed read did not stop the script. Next action: turn on `set -euo pipefail` and refuse to run the delete until the get printed a real name.
+
+</details>
+
+**Card B: The next command wanted a name and got a blob.** A follow-up `kubectl logs` was handed the full JSON document because the first command used `-o json` where the consumer expected one identifier.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: output format, not the API. Next action: match the format to the next consumer — `-o name` or JSONPath for an identifier, JSON only when the next step parses objects.
+
+</details>
+
+**Card C: Host-only path called the cluster.** The learner has no cluster. `/tmp/cluster-health.sh` fails on `kubectl get nodes` after `bash -n` already passed.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the wrong fork, not a script syntax error. Next action: stop at `bash -n` and ShellCheck on the host-only path. Run `kubectl` only on the optional disposable cluster.
+
+</details>
+
+**Card D: Dry-run still waited.** `--dry-run` was set, the script printed `DRY RUN MODE`, and then `kubectl rollout status` blocked for five minutes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the wait sits outside the dry-run guard. Next action: skip `rollout status` whenever `dry_run` is set, and confirm the set-image line carried the same flag.
+
+</details>
 
 ## Sources
 
