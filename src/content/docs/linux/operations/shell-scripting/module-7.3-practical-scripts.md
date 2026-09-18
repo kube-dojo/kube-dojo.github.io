@@ -153,7 +153,16 @@ Notice the order of the template. Configuration appears before behavior because 
 
 The tradeoff is that a template can make every script look more important than it is. Do not wrap a two-command personal helper in a hundred lines of ceremony. Use the template when the script changes shared state, runs unattended, accepts user input, deletes or rewrites files, calls a network service, talks to Kubernetes, or becomes part of a runbook. Those conditions are where the script stops being a convenience and starts being operational infrastructure.
 
-Pause and predict: if the script is launched by cron with a minimal environment, which values in this template still resolve predictably, and which values might depend on the host? The useful habit is to separate values derived from the script itself, such as `SCRIPT_NAME`, from values supplied by the surrounding system, such as writable log paths and available commands. That separation tells you what to validate before the first destructive action.
+**Pause and predict:** If this template is launched by cron with a minimal environment, which values still resolve from the script file itself, and which values can change with the host?
+
+<details>
+<summary>Check your prediction</summary>
+
+Values derived from the script file, such as `SCRIPT_NAME` via `basename`, still resolve when the file is the thing being executed. Writable log paths, `PATH`, and whether a helper command exists come from the surrounding host. Validate those host-supplied values before the first destructive action.
+
+</details>
+
+A cron job does not inherit the interactive shell you used while writing the script. Treat that gap as a preflight problem, not as a reason to hard-code one laptop's paths into every helper.
 
 ## Error Handling Patterns
 
@@ -961,7 +970,16 @@ SCRIPT
 chmod +x /tmp/log-analyzer.sh
 ```
 
-Before testing, read the argument parser and predict which command should fail first: an unknown option, a missing `-n` value, a nonexistent file, or an empty file. That prediction matters because each failure should stop before the analyzer begins work. If a script performs analysis before validating arguments, its output becomes harder to trust because errors and partial results can be interleaved.
+**Pause and predict:** Before you run the tests below, which of these should fail first: an unknown option, a missing `-n` value, a nonexistent file, or an empty file?
+
+<details>
+<summary>Check your prediction</summary>
+
+The parser rejects an unknown option and a missing `-n` value before it opens a file. A nonexistent path and an empty file fail in the validation block after parsing, still before `analyze_log`. Each of those stops should happen before the analyzer prints statistics. If analysis runs first, errors and partial results get interleaved.
+
+</details>
+
+The four failure commands are listed after this prompt. Read the `case` arms and the file checks, then run them. Do not treat a printed report as proof that validation ran.
 
 ```bash
 # Create test log
@@ -1042,6 +1060,46 @@ A preview mode should share argument parsing and validation decisions with real 
 - [ ] Runs without errors on valid input
 - [ ] Tests at least two failure paths and explains the observed exit behavior
 - [ ] Keeps new options in the same parser and usage contract as existing options
+
+- [ ] I named a failure layer and a next action for each frozen script-layer card before opening the reveal.
+
+A missing command, a green pipeline, a late file check, and a preview that lies can each look like a finished script. These cards freeze four transcripts so you can name the layer before you look.
+
+**Card A: Works in your terminal, fails at 02:00.** The same template prints a log line when you run it by hand. Cron mail says the log directory does not exist.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: host environment, not the logging function. Next action: print `PATH` and the resolved log directory under cron before you change the logger.
+
+</details>
+
+**Card B: Empty apply, exit zero.** A deploy script runs `sed` on a manifest and pipes the result to `k apply`. `sed` exits non-zero. The script still reports success and the live object is empty.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: the pipeline status ignored the earlier command. Next action: enable `pipefail`, then refuse to apply until the rendered manifest is non-empty.
+
+</details>
+
+**Card C: Statistics before the error.** `./log-analyzer.sh --bogus /tmp/test.log` prints word counts and then mentions the unknown option.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: analysis ran before the parser rejected the option. Next action: stop in the `case` arm, and do not call `analyze_log` until the option and the file checks have both passed.
+
+</details>
+
+**Card D: Preview and apply disagree.** `--dry-run` prints `rm reports/*.txt`. The real path deletes `reports` and everything under it because the unquoted glob was only in the preview branch.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: two command paths. Next action: send both preview and execute through one `run` helper, and quote the same arguments in that helper.
+
+</details>
 
 ## Next Module
 
