@@ -191,7 +191,13 @@ Use the interactive keys in `top` to answer one question at a time. Sorting by C
 | `k` | Kill a process after entering its PID |
 | `1` | Toggle showing individual CPU cores |
 
-Pause and predict: launch `top` and compare the one-minute load average with the number of CPUs visible when you press `1`. If the load is higher than the CPU count but `%Cpu` is mostly idle, what resource might be causing the queue? That question trains you to separate CPU saturation from I/O wait instead of treating all slowness as the same failure.
+Pause and predict: launch `top` and compare the one-minute load average with the number of CPUs visible when you press `1`. If the load is higher than the CPU count but `%Cpu` is mostly idle, what resource might be causing the queue?
+
+<details><summary>Check your prediction</summary>
+
+Load above the CPU count with mostly idle `%Cpu` usually means tasks are queued on uninterruptible I/O rather than competing for CPU time. Check the `wa` value on the CPU summary line, then investigate disk or storage-backed network I/O before blaming application code. The habit this question trains is separating CPU saturation from I/O wait instead of treating all slowness as the same failure.
+
+</details>
 
 `htop` gives a friendlier interface over the same basic ideas. It adds color, scrolling, search, tree view, and easier signal selection, which makes it excellent when a human is exploring an unfamiliar host. It is not guaranteed to be installed on minimal servers, so treat `htop` as a convenience and `top` as the baseline survival tool.
 
@@ -308,6 +314,8 @@ jobs
 
 Job control gives you a way to recover from small mistakes without restarting work. If a long command is already running in the foreground, Ctrl+Z sends a stop signal and returns the prompt. `bg` resumes the stopped job in the background, and `fg` brings it back to the foreground later. Ctrl+C is different: it sends SIGINT and usually terminates the foreground process.
 
+Before running this, what output do you expect from `jobs` after you pause `sleep 300` with Ctrl+Z? Predict whether the job will be marked running or stopped, then test it. The prediction matters because the terminal is not just displaying processes; it is also controlling which process group receives your keyboard signals.
+
 ```bash
 # Start a long-running command
 sleep 300
@@ -327,8 +335,6 @@ fg
 fg %1
 bg %2
 ```
-
-Before running this, what output do you expect from `jobs` after you pause `sleep 300` with Ctrl+Z? Predict whether the job will be marked running or stopped, then test it. The prediction matters because the terminal is not just displaying processes; it is also controlling which process group receives your keyboard signals.
 
 Backgrounding a command does not make it independent from your login session. If you SSH into a server, start a migration with `&`, and then the SSH session drops, the terminal can send SIGHUP to its child processes. Many shells and programs exit when they receive that hangup, so the command can die even though it was not in the foreground.
 
@@ -352,7 +358,13 @@ nohup ./long-running-script.sh > /tmp/my-output.log 2>&1 &
 | Bring to foreground | `fg` or `fg %N` |
 | Survive disconnect | `nohup command &` |
 
-Stop and think: you accidentally ran a database migration in the foreground, it will take 20 minutes, and you cannot restart it. The recoverable path is Ctrl+Z followed by `bg`, but that still leaves the process attached to the session. If the task must survive a disconnect, you should have started it under `nohup`, a terminal multiplexer, or a service manager before beginning the migration.
+Stop and think: you accidentally ran a database migration in the foreground, it will take 20 minutes, and you cannot restart it. How do you get your prompt back without losing the work, and what would have protected the migration if your SSH session dropped?
+
+<details><summary>Check your prediction</summary>
+
+The recoverable path is Ctrl+Z followed by `bg`, but that still leaves the process attached to the session. If the task must survive a disconnect, you should have started it under `nohup`, a terminal multiplexer, or a service manager before beginning the migration.
+
+</details>
 
 ## Finding Disk Pressure with `df`, `du`, and `lsblk`
 
@@ -499,7 +511,13 @@ spec:
           memory: "128Mi"
 ```
 
-Which approach would you choose here and why: if `k describe node` reports disk pressure but `top` shows low CPU and plenty of memory, should you restart the busiest application pod or inspect node filesystems first? The better first move is usually `df -h` and `du` on the node, because restarting pods can create more image and log churn on the same full disk.
+Which approach would you choose here and why: if `k describe node` reports disk pressure but `top` shows low CPU and plenty of memory, should you restart the busiest application pod or inspect node filesystems first?
+
+<details><summary>Check your prediction</summary>
+
+The better first move is usually `df -h` and `du` on the node, because restarting pods can create more image and log churn on the same full disk. Node disk pressure is a filesystem fact, and pod restarts do not free the space that caused it.
+
+</details>
 
 Graceful shutdown is the most direct bridge between this module and Kubernetes operations. If an application runs as PID 1 and ignores SIGTERM, kubelet waits for the grace period and then sends SIGKILL. That can interrupt writes, drop requests, and make rollouts look flaky. A small init process, correct signal handling, and realistic `terminationGracePeriodSeconds` are application design choices that depend on understanding Linux signals.
 
@@ -609,6 +627,35 @@ High I/O wait means tasks are waiting on storage, so disk or storage-backed netw
 </details>
 
 ## Hands-On Exercise
+
+### Failure-Layer Diagnostic Challenge
+
+Parts 1–6 below give you live practice with harmless processes on a real shell. First, classify these **frozen** failures without changing anything on a machine. For each card, name the failure layer and write one one-line next action. Do not open the reveal until you have written your answers.
+
+**Card 1.** `top` shows a load average far above the CPU count, but `%Cpu` is mostly idle and `wa` is high. A teammate wants to `kill` the busiest application PID to calm the node down.
+
+**Card 2.** You sent `kill 5678` to a runaway Python process and waited, but `ps -p 5678` still shows the same Python command running.
+
+**Card 3.** A teammate started `./migrate-db.sh &` over SSH, the laptop went to sleep, and the migration is gone when they reconnect.
+
+**Card 4.** An alert reports node disk pressure. Teammates delete old files under `/home`, but kubelet still fails image pulls and `df -h` shows `/var` at 95 percent.
+
+**Card 5.** `k describe node` reports disk pressure while `top` shows low CPU and plenty of available memory. Someone proposes restarting the busiest pod to fix it.
+
+<details>
+<summary>Check your classifications</summary>
+
+| Card | Failure layer | One-line next action |
+| :--- | :--- | :--- |
+| 1 | I/O wait, not CPU saturation | Leave the application PIDs alone; run `df -h` and drill down with `du` on the pressured mount, then check storage health |
+| 2 | Graceful shutdown still pending | Re-confirm the target with `ps -p 5678 -o pid,user,stat,cmd`, then escalate to `kill -9 5678` only if it is still the same process and termination is justified |
+| 3 | Session hangup (SIGHUP) | Restart the work under `nohup`, `tmux`, or a systemd unit so it survives disconnects |
+| 4 | Wrong filesystem | Stop cleaning `/home`; run `du -sh /var/* 2>/dev/null \| sort -rh \| head` to find the real consumer, such as logs or the container runtime image store |
+| 5 | Node disk pressure, not pod load | Inspect node filesystems with `df` and `du` instead of restarting pods, which would add image and log churn to the same full disk |
+
+Every next action above is read-only or reversible until the layer is confirmed. That is the same discipline as the diagnostic tables earlier in the module: classify the failure first, then act on the layer that is actually responsible instead of the symptom that is loudest.
+
+</details>
 
 ### Process & Resource Scavenger Hunt
 
