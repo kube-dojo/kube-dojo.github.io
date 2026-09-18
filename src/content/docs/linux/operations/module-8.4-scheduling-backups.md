@@ -87,7 +87,13 @@ The special characters are not decoration; they are how you express operational 
 */15 9-17 * * 1-5  /usr/local/bin/business-check.sh
 ```
 
-Pause and predict: if `*/15 9-17 * * 1-5` runs during business hours, does it fire at 17:45? The answer is yes, because the hour range includes the entire hour whose value is 17, and the minute step continues through that hour. That may be exactly right for a monitoring probe, but it may be wrong for a trading or billing task where the final legal window ends at 17:00 sharp.
+**Pause and predict:** If `*/15 9-17 * * 1-5` runs during business hours, does it fire at 17:45?
+
+<details>
+<summary>Check your prediction</summary>
+
+Yes. The hour field includes the whole hour numbered 17, and the minute step still runs inside that hour. That is right for a probe that should cover 17:00–17:59. It is wrong for a window that must stop at 17:00.
+</details>
 
 Cron also provides shortcut strings that improve readability when the exact minute does not matter. These shortcuts are useful for human-facing maintenance tasks, but they hide some precision. For example, `@weekly` is not "during the weekly maintenance window"; it is midnight on Sunday unless the implementation or surrounding system changes how periodic directories are launched.
 
@@ -119,7 +125,13 @@ sudo crontab -u deploy -e
 sudo crontab -u deploy -l
 ```
 
-Pause and predict: what happens if you run `crontab -r` when you meant `crontab -e`? It removes the whole crontab for that user, usually without a useful undo path unless you previously exported it. Many production teams add `crontab -l > ~/crontab.bak` to their change procedure or alias removal to interactive mode on personal shells, because a scheduler with no version history is a fragile place to store business logic.
+**Pause and predict:** What happens if you run `crontab -r` when you meant `crontab -e`?
+
+<details>
+<summary>Check your prediction</summary>
+
+It deletes that user's whole crontab. There is usually no undo unless you exported it first. Many teams run `crontab -l > ~/crontab.bak` before they edit, because the scheduler has no version history of its own.
+</details>
 
 System-wide cron locations exist because some jobs belong to the machine or an installed package rather than to a login user. The file format changes slightly depending on location, and this is a common source of broken schedules. Files under `/etc/cron.d/` and `/etc/crontab` include a username field, while personal crontabs do not, so copying a line between those contexts without adjusting it can make a valid-looking job fail.
 
@@ -222,7 +234,13 @@ systemctl list-timers --all | grep backup
 # Tue 2025-01-14 02:30:00 UTC  8h left    Mon   15h ago backup.timer  backup.service
 ```
 
-Before running this, what output do you expect from `systemctl list-timers --all | grep backup` if the timer is enabled but has never fired? You should still see a `NEXT` time and an activation target, but the `LAST` column may show `n/a`. That difference is useful during first deployment because it separates "the timer is installed" from "the service has proven it can complete."
+**Pause and predict:** The timer is enabled and has never fired. What do you expect from `systemctl list-timers --all` for that unit?
+
+<details>
+<summary>Check your prediction</summary>
+
+You should still see a `NEXT` time and an activation target. `LAST` may show `n/a`. Installed is not the same as "the service has completed once."
+</details>
 
 ```ini
 # Every day at midnight
@@ -424,7 +442,13 @@ rsync -av /source   /dest/    # Copies /source directory itself into /dest
 # Result: /dest/file.txt  vs  /dest/source/file.txt
 ```
 
-Pause and predict: what does the destination look like after `rsync -av /source /dest/` compared with `rsync -av /source/ /dest/`? The first copies the directory as an object, while the second copies the contents of that directory. This one-character distinction has caused many backups to nest unexpectedly, so test it in `/tmp` until the behavior is automatic.
+**Pause and predict:** What does the destination look like after `rsync -av /source /dest/` compared with `rsync -av /source/ /dest/`?
+
+<details>
+<summary>Check your prediction</summary>
+
+Without the trailing slash, rsync copies the directory as an object, so you get `/dest/source/`. With the slash, it copies the contents into `/dest/`. Test that one character in `/tmp` before a backup job depends on it.
+</details>
 
 ```bash
 mkdir -p /tmp/source_dir /tmp/dest1 /tmp/dest2
@@ -975,9 +999,50 @@ rm -rf ~/lab /tmp/restore-test
 Cleanup is part of the exercise because temporary schedules can become permanent surprises. Removing the crontab line stops the two-minute test cadence, and `crontab -l` confirms that you did not leave a hidden job behind. In production, cleanup also includes closing tickets, recording restore evidence, and updating runbooks with anything you learned.
 </details>
 
+A schedule line, a timer unit, and a copy command can each exit without error and still miss the window or the tree you meant to keep. The lab builds one backup path. These cards freeze four transcripts so you can name the layer before you look. Change notes for scheduled work should name the evidence you looked at, not only the command you ran. A later operator cannot reconstruct a minute field, a unit column, or a destination path from a ticket that only says the job was installed. Put that evidence next to the command so the next review does not have to rerun the lab to learn what you believed. The cleanup step belongs in the same note: record why the temporary job was safe to remove. A reviewer who was not in the room should be able to see that reason without rerunning the exercise.
+
+### Diagnostic Triage Challenge (Frozen Incident Cards)
+
+Tasks 1–5 stay as the build recipe. These cards freeze the transcript so nothing needs to run. For each card, name the failure layer and one next action before opening the reveal.
+
+**Card A: Last probe after close.** The billing window must stop at 17:00. The crontab is `*/15 9-17 * * 1-5`. A job ran at 17:45.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the hour field includes all of hour 17. Next action: end the hour range at 16 if 17:00 is the close, and name the last legal minute in the change note.
+</details>
+
+**Card B: Empty crontab.** An operator typed `crontab -r` instead of `crontab -e`. `crontab -l` prints nothing. There is no `~/crontab.bak`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the user crontab was deleted, not a failed edit. Next action: restore from the last export or from version control. Do not recreate the schedule from memory if a backup of the file exists.
+</details>
+
+**Card C: Timer armed, never ran.** The backup timer is enabled. Nothing has fired it yet. You only have `systemctl list-timers` output.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the unit is installed, not proven. Next action: start the service once, or wait for `NEXT`, and only then treat `LAST` as evidence the job completed.
+</details>
+
+**Card D: Nested archive.** The job is `rsync -av /var/data /backup/`. Operators expected files directly under `/backup/`. They are under `/backup/data/`.
+
+<details>
+<summary>Failure layer and next action</summary>
+
+Failure layer: the missing trailing slash, not the archive tool. Next action: use `/var/data/` if the contents are the backup, and restore-test the path you will actually open.
+</details>
+
+- [ ] I named a failure layer and one next action for each frozen card before revealing the answer.
+
 ### Success Criteria
 
 - [ ] Scheduling plan decision explained for cron, systemd timers, `at`, and anacron.
+- [ ] Classified each frozen schedule-layer card before opening the reveal.
 - [ ] Backup script created with `set -euo pipefail` and size verification.
 - [ ] Script tested manually and produces a valid `.tar.gz` archive.
 - [ ] Cron job scheduled and confirmed running by checking multiple archives.
