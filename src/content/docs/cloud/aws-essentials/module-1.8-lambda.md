@@ -451,6 +451,8 @@ Choose Lambda Layers when sharing common utility libraries, SDK wrappers, or lig
 
 </details>
 
+Packaging is a deployment-contract decision: it sets how fast you can ship a change, how you scan artifacts, and which size and OS-library constraints you inherit. The comparison below is the menu of those contracts, not a substitute for measuring your unzipped or image size against the quota that actually binds the workload.
+
 ### When to Use Layers vs. Container Images
 
 | Approach | Best For | Limits |
@@ -530,7 +532,7 @@ Direct synchronous function chaining introduces significant billing waste, fragi
 
 </details>
 
-Early in the serverless movement, engineering teams frequently constructed custom orchestrator functions whose primary role was synchronously invoking downstream tasks in sequence. While chaining functions with procedural code appears straightforward during initial prototyping, managing multi-step workflows in application logic tightly couples service lifecycles and complicates release coordination.
+Coordinating several functions still needs an owner for order, retries, and what happens when a step fails. The diagrams below contrast keeping that owner inside application code with moving it to a workflow service, without treating either sketch as the only production pattern.
 
 ```mermaid
 graph TD
