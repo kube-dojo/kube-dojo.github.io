@@ -63,7 +63,16 @@ A linear exam path feels fair because it resembles schoolwork: read Question 1, 
 
 The first pass is not about rushing, and it is not about ignoring hard questions. It is about protecting the questions whose solution path is familiar and whose verification path is short. If one question asks for a namespace and a ConfigMap, that is likely a reliable early win. If another question says a workload cannot reach a Service, the first few minutes may only reveal the next diagnostic branch. Both questions matter, but only one should usually be solved before you know the rest of the exam.
 
-Pause and predict: imagine the first question is a node troubleshooting task worth slightly more than the second question, which asks you to create a Service for an existing Deployment. Which one would you attempt first after the scan, and why? A strong answer considers uncertainty, verification cost, and remaining opportunities rather than raw point value alone. If your instinct is to chase the highest number immediately, the exam can pull you into a long investigation before you have banked routine work.
+**Pause and predict:** imagine the first question is a noisy node troubleshooting task worth slightly more than the second question, which asks you to create a Service for an existing Deployment. Which one would you attempt first after completing your initial exam scan, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+Bank the Service first because its solution path and verification pattern carry low uncertainty, allowing you to secure reliable points in minutes before starting the investigation. Do not chase highest points first when an open-ended troubleshooting scenario risks consuming half your exam clock before routine work is banked.
+
+</details>
+
+Securing deterministic points early builds a cushion of verified score, ensuring that an unexpected diagnostic blocker on a broken worker node cannot jeopardize your entire exam attempt.
 
 The passing score changes the mindset as well. You are not trying to produce a museum-quality cluster, and you are not trying to prove that you can solve every hard task in the order presented. You are trying to produce enough correct, verified state across enough questions. That means partial progress on a hard task can be useful, but only after you have not sacrificed predictable tasks that could have been completed and verified quickly.
 
@@ -210,9 +219,27 @@ kubectl apply -f netpol.yaml
 kubectl describe networkpolicy allow-frontend-to-backend -n web
 ```
 
-Pause and predict: before applying the NetworkPolicy, identify which Pods are being protected and which Pods are allowed to initiate traffic. If your answer mentions only one side of the relationship, reread the `podSelector` and `ingress.from` blocks until both sides are clear. That little pause is not academic; it prevents a valid but wrong manifest from consuming your troubleshooting time later.
+**Pause and predict:** before applying a NetworkPolicy manifest to your cluster, which Pods are protected by the rule and which Pods may initiate incoming traffic?
 
-Pass 2 needs a stricter checkpoint than many learners expect. If you are six minutes into a medium task and your next step is still a guess, the task has become complex. You do not need to abandon it forever, but you should choose consciously whether to keep going. When several untouched medium tasks remain, moving a stuck item to Pass 3 is usually stronger than letting it absorb the entire middle of the exam.
+<details>
+<summary>Check your prediction</summary>
+
+Both `podSelector` (protected workloads) and `ingress.from` (authorized client Pods) must be verified. Checking only one side leaves the policy incomplete and risks either locking out intended traffic or leaving sensitive endpoints completely exposed.
+
+</details>
+
+Verifying label selector alignment before issuing the apply command prevents subtle network isolation bugs that otherwise demand painful diagnostic drills across multiple namespaces.
+
+**Pause and predict:** you are six minutes into a medium task, and your next diagnostic step is still a guess. How should you reclassify the task now, and what action should you take?
+
+<details>
+<summary>Check your prediction</summary>
+
+The task has become complex; move it to Pass 3 if untouched medium work remains on your exam dashboard. Banking accessible points across the rest of the cluster ensures that challenging edge cases never monopolize the minutes required to reach a passing score.
+
+</details>
+
+Establishing explicit time boundaries around medium-tier questions guarantees that unexpected configuration puzzles do not consume the valuable minutes required for routine cluster administrative tasks.
 
 Documentation lookup belongs in Pass 2, but it needs a purpose. [Opening the Kubernetes documentation](https://docs.linuxfoundation.org/tc-docs/certification/certification-resources-allowed) to confirm the field name for a PVC or NetworkPolicy is a good use of time because you know what object you are building. Wandering through pages because you are unsure what the failure means is different; that is diagnosis, not construction. In timed practice, separate those two behaviors so you learn when documentation is accelerating work and when it is masking uncertainty.
 
@@ -696,6 +723,50 @@ rm -f /tmp/exam-strategy-pods.txt
 Write a short review note after each timed drill. Include the task you misclassified, the verification step that caught a mistake, and the next practice focus. Over several drills, this gives you a personal timing profile. That profile is more useful than a generic list of commands because it tells you which tasks should be Pass 1, Pass 2, or Pass 3 for you.
 
 </details>
+
+**Card A: Always start with the highest-point question.** A candidate opens the exam and immediately jumps to an eight-point node troubleshooting question because it carries the largest score weight on the dashboard. They spend thirty-five minutes chasing obscure kubelet configuration flags without identifying the root cause, leaving multiple straightforward two-point and four-point tasks completely untouched as time runs out. The candidate assumed that maximizing potential points per question was more important than protecting predictable, low-uncertainty points across the whole cluster.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: optimizing for raw point weight instead of point-per-minute certainty and risk-adjusted return. Next action: scan all questions first, bank low-uncertainty Pass 1 quick wins immediately, and defer high-variance troubleshooting tasks to Pass 3.
+
+</details>
+
+**Card B: If NetworkPolicy YAML parses, selector direction does not matter.** An operator constructs an ingress NetworkPolicy and validates that `kubectl apply --dry-run=client` succeeds without syntax or schema warnings. Believing that valid YAML structure guarantees correct network filtering, they invert the labels so that `podSelector` matches the client pods while `ingress.from` matches the target database. The policy successfully applies to the cluster, but it silently blocks production database traffic while failing to isolate the backend workload.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing valid declarative syntax with correct traffic-direction semantics in Kubernetes network specifications. Next action: inspect both selector boundaries explicitly, verifying that `podSelector` targets the protected workloads and `ingress.from` isolates authorized client sources before applying.
+
+</details>
+
+**Card C: Six minutes of guessing is still Pass 2 when the points are high.** A student spends six minutes configuring a persistent volume claim and an associated pod mount, but the pod remains stuck in `ContainerCreating` due to an unidentified storage class mismatch. Because the question is worth five points, the student insists on staying in Pass 2 and attempts random volume field edits for another ten minutes without an evidence-based hypothesis. They believe that abandoning the question after investing time represents wasted effort, rather than recognizing that escalating uncertainty has turned the task into complex debugging.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: falling victim to sunk-cost fallacy when a medium construction task exceeds its time box and turns into speculative troubleshooting. Next action: time-box medium tasks strictly at six minutes, preserve any valid partial resources created, and reclassify the question to Pass 3 while other untouched medium tasks remain.
+
+</details>
+
+**Card D: Wandering documentation is a good Pass 2 use of time.** When confronted with an unfamiliar RBAC binding syntax during Pass 2, an engineer opens the official documentation and starts reading full conceptual articles about authorization modules, API groups, and webhook authenticators. Twenty minutes elapse as the candidate browses multiple tabs without copying or adapting a concrete RoleBinding manifest skeleton. The engineer treated documentation during timed implementation as general exploratory study rather than as a rapid, targeted lookup for a known resource definition.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: substituting open-ended conceptual browsing for targeted procedural lookup during a timed implementation pass. Next action: restrict in-exam documentation use to copying verified YAML examples from Tasks or checking field names with `kubectl explain`, moving on immediately if the required pattern is not located within ninety seconds.
+
+</details>
+
+**Success Criteria**:
+
+- [ ] Can triage exam questions into quick, medium, and complex tiers in under three minutes.
+- [ ] Can bank Pass 1 quick wins without stalling on early high-point troubleshooting questions.
+- [ ] Can time-box Pass 2 medium tasks and demote stalled items to Pass 3 when guessing begins.
+- [ ] Can execute a question-start routine confirming context and namespace before every mutating command.
+- [ ] Can preserve partial credit during Pass 3 troubleshooting by making focused, evidence-backed fixes.
 
 ## Sources
 
