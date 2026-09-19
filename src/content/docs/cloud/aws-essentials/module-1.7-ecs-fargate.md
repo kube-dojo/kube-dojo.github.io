@@ -395,7 +395,7 @@ The `CannotPullContainerError` during `PENDING` occurs before your container sta
 
 </details>
 
-Clear separation of operational responsibilities ensures that runtime application logic cannot inadvertently tamper with infrastructure-level container lifecycle tasks. With both the compute specifications and security boundaries defined in JSON, you are ready to submit the complete blueprint to the ECS control plane.
+With CPU, memory, networking, and IAM fields filled in, the remaining step is to submit that JSON document so ECS can version it. Registration is what turns a local task-definition file into a family revision the control plane can launch.
 
 ### Registering the Task Definition
 
