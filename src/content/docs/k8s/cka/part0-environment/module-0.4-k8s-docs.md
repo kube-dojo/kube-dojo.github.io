@@ -46,7 +46,16 @@ The top-level navigation on `kubernetes.io` separates Documentation, Kubernetes 
 
 The site is also multilingual, with official documentation available in many languages, including Bengali, Chinese, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Ukrainian, and Vietnamese. That breadth is a strength of the project, but it introduces a small operational caution. If your browser remembers a translated page or if a search result sends you to localized content, make sure the page still corresponds to the Kubernetes version and object you need. The rendered examples should remain familiar, yet the fastest path during a timed English-language exam is usually the English docs because the exam task wording and most command output will match that terminology.
 
-Pause and predict: if a task asks you to create a Pod that reads a ConfigMap as environment variables, which part of the website should contain the first working YAML example, and which part should you use only after that example is not detailed enough? The answer should be Tasks first, then Reference or `kubectl explain` for specific fields. Making that prediction before you click is the habit this module is building.
+**Pause and predict:** if a task asks you to create a Pod that reads a ConfigMap as environment variables, which part of the website should contain the first working YAML example, and which part should you use only after that example is not detailed enough?
+
+<details>
+<summary>Check your prediction</summary>
+
+Start with Tasks to locate and copy a complete Pod manifest configured with environment variable bindings. Consult Reference or `kubectl explain` only after obtaining that baseline snippet if you require exact field definitions or optional attributes.
+
+</details>
+
+Developing that rapid triage instinct keeps candidates from drifting into conceptual overviews when an operational snippet is already documented under standard administrative procedures.
 
 ## Part 2: Documentation Architecture
 
@@ -91,7 +100,16 @@ API versions are the most visible place where drift becomes painful. Older Ingre
 
 You can diagnose version fit from both the web and the cluster. On the web, use the page version selector or versioned documentation subdomain when you know you need a specific minor release. In the terminal, use `kubectl version`, `kubectl api-resources`, and `kubectl explain` to see what the cluster actually exposes. These tools complement each other: the website explains intent and examples, while the cluster schema tells you what this API server will accept right now.
 
-Before running this, what output do you expect if the cluster no longer serves an old API version? A dry run against an obsolete Ingress manifest should fail before it creates anything, and `kubectl api-resources | grep -i ingress` should show the served group and version. That prediction matters because it turns a confusing apply error into a documentation drift diagnosis rather than a random YAML debugging session.
+**Pause and predict:** before running a dry run against an older manifest from a search result, what output do you expect if the cluster no longer serves an old API version, and how do you confirm the active registration?
+
+<details>
+<summary>Check your prediction</summary>
+
+A client-side or server-side dry run of an obsolete Ingress manifest fails before creating any resource in the cluster. Running `kubectl api-resources | grep -i ingress` reveals the active group and version currently served by the control plane.
+
+</details>
+
+Recognizing schema rejection early isolates documentation drift from local configuration mistakes, ensuring engineers inspect cluster capabilities before spending time attempting to patch deprecated resource definitions.
 
 ## Part 4: Search Strategies and Mechanics
 
@@ -150,7 +168,16 @@ You can also execute a field lookup instantly from the CLI when the object exist
 kubectl explain pvc.spec.accessModes
 ```
 
-Pause and predict: you search for "ingress" and the first result is a Concepts page explaining controllers, classes, and traffic routing. If you need a minimal manifest, what should your next click be? The best answer is to move from Concepts toward a Task or Reference page that contains the current `networking.k8s.io/v1` example, because a conceptual explanation may be accurate while still being slower than the source that matches your output.
+**Pause and predict:** you search for "ingress" and the first result is a Concepts page explaining controllers, classes, and traffic routing. If you need a minimal manifest, what should your next click be?
+
+<details>
+<summary>Check your prediction</summary>
+
+Navigate directly to a Task or Reference page containing the current `networking.k8s.io/v1` specification. A conceptual guide explains architectural mechanics accurately, but a correct concept page can still be the slow path when you need a copyable template.
+
+</details>
+
+Filtering documentation links by target artifact rather than search engine rank keeps implementation moving smoothly and stops exploratory reading from consuming time allocated for cluster administration.
 
 There is a small browser discipline component as well. The exam browser and many remote lab browsers are less forgiving than your normal workstation. Opening many tabs, losing the active task page, or relying on external search habits adds overhead that you do not notice during casual study. Practice with only a few tabs: one for Tasks, one for Reference, and one for Helm if the objective includes Helm. Close tabs after you extract the example, and keep the terminal as the place where final validation happens.
 
@@ -602,7 +629,43 @@ kubectl apply -f <file> --dry-run=client
 
 Score the drill honestly: 8 completed items means you are moving at exam speed, 6-7 means the route is good but needs repetition, 4-5 means you should repeat the documentation structure review, and fewer than 4 means the section map is not yet automatic. The score is not a grade on Kubernetes knowledge. It is a measurement of whether your documentation workflow is fast enough to support the knowledge you already have.
 
-### Success Criteria
+**Card A: Always open Concepts first for a ConfigMap env example.** An administrator starts every configuration task by navigating to the Concepts section to review the architectural design of ConfigMaps and Pod environment variables. Because Concepts pages focus on design theory rather than copyable configuration blocks, the administrator spends multiple minutes reading background explanations without finding a complete Pod manifest. They assume that official documentation does not contain runnable examples and attempt to construct complex volume and environment stanzas entirely from memory.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating architectural conceptual overviews with operational procedural guides. Next action: navigate directly to Tasks > Configure Pods and Containers > Configure a Pod to Use a ConfigMap to copy a verified manifest skeleton.
+
+</details>
+
+**Card B: Stay on the first Ingress Concepts hit because it ranked first.** When searching for an Ingress configuration template, an operator selects the top search result and remains on that Concepts page despite needing a practical manifest. The page outlines controllers, classes, and backend routing concepts in great detail, but provides no minimal declarative snippet ready to paste into the terminal. Believing the highest-ranked result must contain all necessary answers, the operator repeatedly scrolls through theory sections while the exam clock runs down.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming search engine rank equates to operational relevance for manifest authoring. Next action: bypass conceptual articles and jump straight to the relevant Tasks page or Reference schema containing a copyable `networking.k8s.io/v1` Ingress resource.
+
+</details>
+
+**Card C: An `extensions/v1beta1` Ingress is fine if the YAML parses.** A candidate finds an Ingress snippet in an archived community guide and checks it with a local YAML linter, which reports perfectly valid syntax. Convinced that correct formatting guarantees cluster acceptance, they attempt to apply the manifest directly to a modern Kubernetes 1.35 control plane. The API server immediately rejects the submission because the legacy extensions group was removed from served APIs, leaving the candidate confused about why a syntactically clean file failed.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing generic YAML syntax validity with Kubernetes API server schema compatibility. Next action: inspect available resources using `kubectl api-resources | grep -i ingress` and update the manifest to `networking.k8s.io/v1` with `defaultBackend.service`.
+
+</details>
+
+**Card D: `kubectl explain` replaces Tasks, so you never copy an official example.** An engineer relies exclusively on `kubectl explain` to construct every workload and networking resource from a blank file during time-pressured tasks. Although the CLI tool accurately details individual field types, it does not reveal the cohesive structure or required parent-child relationships for nested blocks like environment variable sources. The engineer spends valuable minutes running recursive CLI queries to discover field names that could have been copied in seconds from an official task page.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating schema definition tools as a complete substitute for working configuration recipes. Next action: copy a working manifest skeleton from the Tasks documentation hierarchy first, then invoke `kubectl explain` selectively for field validation and customization.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Can find a ConfigMap task page in under 30 seconds.
 - [ ] Can find an official YAML example in under one minute.
