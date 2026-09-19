@@ -11,7 +11,7 @@ sidebar:
 - **Configure least-privilege IAM policies using conditions, permission boundaries, and service control policies**
 - **Design cross-account access patterns using IAM roles and trust policies for multi-account AWS environments**
 - **Diagnose policy evaluation failures by tracing the Allow/Deny logic across identity, resource, and SCP policies**
-- **Implement automated credential rotation and eliminate long-lived access keys from your infrastructure**
+- **Eliminate long-lived access keys across infrastructure by adopting temporary credentials through AWS STS roles**
 
 ---
 
@@ -60,7 +60,14 @@ aws iam list-roles --query 'Roles[?starts_with(Path, `/aws-service-role/`)].[Rol
 aws iam get-role --role-name AWSServiceRoleForElasticLoadBalancing
 ```
 
-> **Stop and think**: If an IAM user has `AdministratorAccess`, can they directly perform actions as a service-linked role? Why might AWS restrict this?
+> **Pause and predict:** If an IAM user has `AdministratorAccess`, can they directly perform actions as a service-linked role? Consider why AWS deliberately restricts this delegation pattern across service boundaries.
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Service-linked roles are intended strictly for AWS services like Elastic Load Balancing, not human or machine administrators. Even with `AdministratorAccess`, you cannot assume or run commands directly as a service-linked role because their trust policy trusts only the linked AWS service principal. This restriction prevents administrators from circumventing IAM governance by delegating privileged operations through immutable, service-owned identities.
+
+</details>
 
 ### The Mechanism of Assuming a Role (STS)
 
@@ -294,7 +301,14 @@ Key condition operators to know when you are reducing risk without blocking legi
 | `Bool` | Boolean conditions (`aws:SecureTransport`, `aws:MultiFactorAuthPresent`) |
 | `NumericLessThan` | Numeric comparisons (e.g., max session duration) |
 
-> **Pause and predict**: If a user has an identity-based policy allowing `s3:GetObject` on `BucketA`, but `BucketA` has no resource-based policy, what happens? What if `BucketA` is in a different account?
+> **Pause and predict:** If an IAM principal possesses an identity-based policy granting `s3:GetObject` on `BucketA`, but `BucketA` contains no resource-based bucket policy at all, will the request succeed in the same account? Predict what changes in the evaluation outcome if `BucketA` resides in an entirely different AWS account.
+
+<details>
+<summary>Check your prediction</summary>
+
+In the same account, the request succeeds because an explicit allow in either the identity-based policy or the resource-based policy satisfies evaluation when no explicit deny exists. In a cross-account scenario, the request fails with Access Denied because cross-account evaluation requires an explicit allow in both accounts: the caller identity policy must allow the action and the destination bucket policy must explicitly grant access to the external principal.
+
+</details>
 
 ### The Policy Evaluation Logic
 
@@ -489,7 +503,14 @@ How do you allow developers to create their own IAM roles (to attach to their La
 
 [If `Boundary-Developer-Max-Access` allows S3 and DynamoDB, but denies EC2, then even if the developer attaches `AdministratorAccess` to their new Lambda role, the effective permissions will only be S3 and DynamoDB. The boundary restricts the maximum possible ceiling of access.](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html)
 
-> **Pause and predict**: What happens if a developer creates a role with a permission boundary attached, but does not attach any permissions policy to the role? Will the role have any permissions?
+> **Pause and predict:** What happens if a developer creates a role with a permission boundary attached, but does not attach any permissions policy to the role? Predict whether the newly created role will possess any operational permissions before an identity policy is assigned.
+
+<details>
+<summary>Check your prediction</summary>
+
+No permissions are granted to the role. A permission boundary defines only the maximum ceiling of allowable permissions that identity policies can grant; it does not grant permissions on its own. Because IAM enforces an implicit deny by default, an attached identity-based policy with an explicit Allow is still required for the principal to perform any action.
+
+</details>
 
 ```json
 // Policy attached to the developer: they can create roles, but MUST
@@ -617,7 +638,14 @@ Hypothetical scenario: a manufacturing plant runs a telemetry collector on bare-
 
 Least privilege is not a one-time activity. It is a continuous process of granting the minimum permissions needed, monitoring actual usage, and tightening further as roles and services evolve. Teams that treat it as a project task instead of an ongoing loop often start broad, then discover drift in monthly audits; the safer pattern is to build a loop where evidence and controls are collected before each review.
 
-> **Stop and think**: Why is it dangerous to start with `AdministratorAccess` and plan to remove unused permissions later, even if you intend to do it before production?
+> **Pause and predict:** Why is it dangerous to start with `AdministratorAccess` and plan to remove unused permissions later? Consider what risks emerge even if an engineering team fully intends to complete policy tightening before production.
+
+<details>
+<summary>Check your prediction</summary>
+
+Temporary broad access inevitably becomes permanent because delivery pressures and hidden dependencies intervene once services work without friction. In addition, over-permissive bootstrap credentials expose the cloud account to severe blast radius during development and testing, creating brittle architectures where workloads silently rely on privileged APIs that break when policies are eventually locked down.
+
+</details>
 
 ### Step 1: Start with Zero and Add
 
@@ -880,6 +908,10 @@ In this exercise, we will simulate a scenario where an application running in a 
 - Using Permission Boundaries to limit privilege escalation
 - Cleaning up all resources
 
+### Lab Preflight and Cost Expectations
+
+Before executing these commands, ensure your active AWS CLI profile possesses administrative IAM permissions (`iam:*`, `sts:*`, and `s3:*`) to create roles, attach managed and inline policies, and provision buckets. The operational cost of this hands-on lab is effectively zero because AWS IAM and AWS STS API calls are completely free of charge. Creating a temporary S3 bucket with several small JSON configuration files incurs negligible storage costs and does not enable billed CloudTrail data events. Performing the cleanup step at the conclusion of this lab is strictly mandatory to prevent lingering permissive test roles and orphaned storage buckets from cluttering your cloud environment.
+
 ### Task 1: Set Up Your Environment Variables
 
 ```bash
@@ -1134,6 +1166,24 @@ aws s3 ls 2>&1 && echo "BOUNDARY TEST 1: S3 allowed (expected)"
 aws ec2 describe-instances 2>&1 || echo "BOUNDARY TEST 2: EC2 blocked by boundary (expected)"
 ```
 
+### Task 7: Independent Policy Layer Diagnosis
+
+An operator testing delegated workload credentials executes an administrative inspection command against the database cluster and observes the following failure:
+
+```bash
+aws rds describe-db-instances
+An error occurred (AccessDenied) when calling the DescribeDBInstances operation: User: arn:aws:sts::123456789012:assumed-role/DojoBoundedRole/BoundaryTest is not authorized to perform: rds:DescribeDBInstances
+```
+
+Trace the IAM policy evaluation hierarchy to identify exactly which policy layer blocked this call. Determine whether the rejection occurred at the organization SCP, permissions boundary, role identity policy, or resource policy layer.
+
+<details>
+<summary>Check your diagnosis</summary>
+
+Failure layer: Role identity-based policy. Although the role has an attached permissions boundary, evaluation requires an explicit Allow in the identity-based policy (`OverreachPolicy`) for the requested action. Because `OverreachPolicy` only specifies `s3:*`, `ec2:*`, and `dynamodb:*`, the request for `rds:DescribeDBInstances` encounters an implicit deny at the identity layer, blocking the call before boundary intersection even matters.
+
+</details>
+
 ### Clean Up
 
 Clear the temporary credentials from your environment and delete all resources. This finalization step matters because it prevents accidental reuse of the demo credentials and leaves your account in a reproducible, clean state for another learner.
@@ -1166,7 +1216,43 @@ rm -f trust-policy.json permissions-policy.json config.json secret.json \
 echo "All resources cleaned up successfully."
 ```
 
-### Success Criteria
+**Card A: Same-account S3 GetObject always needs a bucket policy.** An infrastructure engineer configures an IAM role with an identity-based policy permitting `s3:GetObject` on a private company bucket in the same account. Believing that Amazon S3 objects are fundamentally inaccessible without an explicit resource policy attached to the bucket, the engineer delays deployment to write custom bucket policies for every target. They assume that identity-based permissions remain completely inactive until the destination bucket acknowledges the requesting principal directly.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Misunderstanding single-account S3 authorization logic. Next action: Rely on the identity-based policy alone for same-account access when no explicit bucket deny exists, reserving bucket policies for cross-account delegation or resource-level guardrails.
+
+</details>
+
+**Card B: A permission boundary by itself grants permissions.** A security administrator attaches a managed permission boundary allowing broad S3 and DynamoDB operations to a newly provisioned developer role. The administrator assumes the boundary immediately equips the role with active capabilities to query tables and retrieve objects across the development account. Because the policy document contains explicit Allow statements, the team deploys the role to production without attaching any standard identity policies.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Equating an authorization ceiling with an active permission grant. Next action: Attach an identity-based permissions policy containing explicit Allow statements alongside the boundary, recognizing that effective permissions require both policies to allow the action.
+
+</details>
+
+**Card C: AdministratorAccess plus a later cleanup is a safe bootstrap.** A cloud engineering team assigns `AdministratorAccess` to an experimental microservice role so that developers can build features without encountering permissions errors during early sprints. The team plans to review CloudTrail logs and replace the broad policy with fine-grained permissions right before releasing the application to production. They operate under the belief that granting temporary full privileges speeds up early delivery without imposing security exposure on non-production infrastructure.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Underestimating developmental blast radius and technical debt inertia. Next action: Start with zero permissions and iteratively grant required service actions as code evolves, preventing over-privileged credentials from persisting into production.
+
+</details>
+
+**Card D: sts:AssumeRole success means the session can do everything the role identity policy allows, ignoring SCPs and session policies.** An integration engineer successfully assumes a deployment role using the AWS CLI and confirms that the assumed-role session token was generated without error. Because STS permitted the assume-role request, the engineer assumes every action listed in the role's identity policy will execute successfully throughout the session. They overlook the fact that organization service control policies and caller-specified session policies can strictly override or reduce the active session permissions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Conflating successful role assumption with unrestricted downstream API authorization. Next action: Trace the complete authorization intersection including SCPs, permission boundaries, and session policies when diagnosing unexpected runtime denials on assumed sessions.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] I created a role with a custom trust policy and verified it with `get-role`.
 - [ ] I used `sts assume-role` to generate temporary credentials and verified my new identity with `get-caller-identity`.
