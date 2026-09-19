@@ -130,7 +130,16 @@ Let's break down the important parts: each section maps to a phase responsibilit
 
 **Cache** speeds up subsequent builds by [preserving directories like pip's download cache or Docker layers](https://docs.aws.amazon.com/codebuild/latest/userguide/build-caching.html). This can significantly reduce turnaround time, but cache lifecycle choices still matter when dependencies or base images change.
 
-> **Stop and think**: The buildspec.yml example caches `/root/.cache/pip/**/*` and `/var/lib/docker/**/*`. While caching significantly accelerates build times, what architectural or security risks might emerge if your CI pipeline relies on a stale Docker layer cache for months without invalidation, particularly regarding base OS dependencies?
+**Pause and predict:** The buildspec example caches `/root/.cache/pip/**/*` and `/var/lib/docker/**/*` to accelerate execution. What architectural and security risks emerge if a CI pipeline relies on an uninvalidated Docker layer cache across several months, particularly regarding base operating system dependencies and vulnerability scanners?
+
+<details>
+<summary>Check your prediction</summary>
+
+Unpatched base image layers and critical vulnerabilities (CVEs) persist indefinitely because Docker reuses cached filesystem snapshots instead of pulling refreshed upstream base layers. CI pipeline runs continue to report green status because builds succeed rapidly, masking critical unpatched vulnerabilities from downstream production workloads until the cache is explicitly invalidated or rebuilt from scratch.
+
+</details>
+
+Balancing build turnaround speed against artifact reproducibility requires establishing deliberate cache eviction policies alongside robust project provisioning. Setting up a dedicated CodeBuild project with fine-grained service permissions ensures the build runtime operates with strictly controlled access to external resources.
 
 ### Creating a CodeBuild Project
 
@@ -226,7 +235,16 @@ CodeBuild offers two caching modes that trade off speed against consistency. **L
 
 **S3 caching** writes the cache tarball to an S3 bucket at the end of a successful build and downloads it at the start of the next one. This guarantees cache availability across different build hosts, which matters when your build fleet scales up or down between runs. The trade-off is time: uploading and downloading a cache tarball adds latency to every build cycle. S3 caching is the right default for teams running fewer than 20 builds per day on a stable dependency graph, and for any build that uses the ARM compute type (since ARM and x86 hosts are drawn from separate pools, making local cache reuse less predictable).
 
-> **Stop and think**: If your buildspec caches `/root/.cache/pip/**/*` with S3 caching and you update `requirements.txt` to pin a newer version of a library, does the S3 cache invalidate automatically? What happens when pip sees the stale cached wheel but the lockfile demands a newer version?
+**Pause and predict:** If a CodeBuild project configures S3 caching for `/root/.cache/pip/**/*` and a developer subsequently updates `requirements.txt` to pin a newer library version, will the remote S3 cache automatically invalidate, and how does pip handle package resolution against existing cached wheels?
+
+<details>
+<summary>Check your prediction</summary>
+
+The remote S3 cache does not automatically invalidate when source files change, because CodeBuild does not compute content hashes of dependency manifests. If a specific wheel is already present in the cache directory, pip may reuse the stale artifact unless the cache location changes, cache busting is triggered, or the updated version constraint forces a fresh download.
+
+</details>
+
+Managing package cache invalidation strategies becomes especially critical as project scopes expand and build architectures grow more complex. When monolithic pipelines begin executing multiple independent test and compilation phases, decomposing work into parallel execution units shortens feedback loops considerably.
 
 ### Batch Builds
 
@@ -346,9 +364,18 @@ Hooks:
   - AfterAllowTraffic: "LambdaFunctionToRunSmokeTests"
 ```
 
-Each hook references a Lambda function that CodeDeploy invokes at that point in the deployment. If a hook function reports failure, the deployment fails, and CodeDeploy rolls back automatically only when automatic rollback is enabled for the deployment or deployment group. Hook failures therefore become decision points in the rollout, and the rollback setting determines whether CodeDeploy can revert traffic automatically or only alert human operators.
+Each hook references a dedicated Lambda function that CodeDeploy invokes sequentially at designated execution gates during the deployment lifecycle. These programmatic hooks allow systems to execute validation scripts, verify service prerequisites, or trigger notifications across external monitoring platforms before proceeding to subsequent deployment phases.
 
-> **Pause and predict**: In a CodeDeploy Blue/Green deployment, traffic is shifted to the new Green environment. If a `BeforeAllowTraffic` lifecycle hook Lambda function fails or times out due to a missing IAM permission, how will CodeDeploy handle the active ALB listener rules, and will any customer traffic be routed to the Green tasks?
+**Pause and predict:** In a CodeDeploy Blue/Green deployment, traffic shifts between target groups according to configured routing rules. If a `BeforeAllowTraffic` lifecycle hook Lambda function fails or times out due to a missing IAM permission, how will CodeDeploy handle the active ALB listener rules, and will any customer traffic reach the Green tasks?
+
+<details>
+<summary>Check your prediction</summary>
+
+Customer traffic is not shifted to the Green target group. The Application Load Balancer production listener rule remains pointed exclusively at the Blue target group, ensuring Green receives zero customer traffic. CodeDeploy halts the deployment immediately, marks the lifecycle event as failed, and initiates deployment cleanup or rollback based on deployment group configuration.
+
+</details>
+
+Safeguarding routing transitions during progressive deployments requires clear visibility into lifecycle failures before production listeners are touched. When automated verification scripts fail or external systems encounter transient issues, configuring declarative rollback rules ensures clusters return to known-good baselines cleanly.
 
 ### Automatic Rollback
 
@@ -851,7 +878,16 @@ The critical trust policy condition is `StringLike` on the `sub` claim. [This re
 | `repo:org/*:ref:refs/heads/main` | Main branch of any repo in the org |
 | `repo:org/myapp:environment:production` | Only the "production" environment |
 
-> **Stop and think**: The OIDC trust policy example strictly matches the `sub` claim to a specific repository and branch (`repo:YOUR_ORG/myapp:ref:refs/heads/main`). If you omitted the branch restriction (`:ref:refs/heads/main`), what specific attack vector would this open up regarding untrusted code execution in your AWS environment?
+**Pause and predict:** The OIDC trust policy matches the `sub` claim to a specific repository and branch (`repo:YOUR_ORG/myapp:ref:refs/heads/main`). If you omitted the branch restriction and configured `repo:YOUR_ORG/myapp:*`, what specific attack vector would this open regarding untrusted code execution inside your AWS environment?
+
+<details>
+<summary>Check your prediction</summary>
+
+Any Git reference within the repository—including unreviewed feature branches, pull requests, or forks depending on subject claim configuration—can assume the privileged IAM role. An attacker or collaborator with push access to a non-production branch could run untrusted workflow actions that assume the role and execute malicious commands directly against AWS infrastructure.
+
+</details>
+
+Enforcing narrow subject claim conditions establishes strong identity boundaries across CI/CD runners before jobs interact with cloud infrastructure. Beyond identity federation and credential lifecycle management, enterprise pipelines frequently require centralized repositories to govern package provenance and protect build dependencies from tampering.
 
 ---
 
@@ -1414,7 +1450,43 @@ aws ecr delete-repository --repository-name cicd-lab --force
 ```
 </details>
 
-### Success Criteria
+**Card A: A months-old Docker layer cache is always safe because the build still passes.** A release engineer maintains a containerized deployment pipeline where CodeBuild preserves Docker cache layers across consecutive runs to keep workflow duration under two minutes. Observing that automated integration suites consistently pass and container build steps exit with zero errors, the engineer assumes that an uninvalidated cache creates no architectural or operational risk for the organization. The team continues deploying these fast-building container artifacts into production environments for three quarters without ever forcing a fresh base image pull or rebuilding underlying layers.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: equating green build completion and fast execution with runtime container supply chain hygiene. Next action: configure periodic cache invalidation or schedule weekly builds using `--no-cache` and automated ECR container image vulnerability scanning to ensure underlying operating system dependencies receive upstream security patches.
+
+</details>
+
+**Card B: Editing `requirements.txt` automatically invalidates the S3 pip cache.** A software team modifies their Python service dependencies by bumping a critical library version inside `requirements.txt` and committing the change directly to the main development branch. Because CodeBuild downloads a remote S3 cache tarball containing previous wheel installations at the start of each execution, the developer assumes the managed build agent automatically computes file hashes of local dependency manifests to prune obsolete cache entries. Expecting the updated library release to install cleanly on the remote runner, the team skips manual cache eviction or cache key reconfiguration before triggering their next staging deployment.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming managed cloud build systems implement automated content-addressable cache invalidation for language-specific package manifests. Next action: implement deterministic cache keys based on dependency file checksums or explicitly pass `--no-cache-dir` to pip when dependency lockfiles change, ensuring stale wheel artifacts are purged from the cache directory.
+
+</details>
+
+**Card C: A failed `BeforeAllowTraffic` hook still shifts ALB traffic onto Green.** During a major microservice migration, an operations engineer reviews an automated CodeDeploy deployment where the `BeforeAllowTraffic` lifecycle validation hook times out due to missing IAM permissions on its invocation role. Believing that lifecycle hooks function purely as non-blocking telemetry triggers rather than mandatory traffic gates, the engineer assumes the Application Load Balancer proceeds to route customer requests into the newly provisioned Green task set regardless. The engineer alerts the on-call team that users have already begun interacting with the new application revision and starts inspecting frontend production telemetry to evaluate user response.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding lifecycle hook gating mechanisms and load balancer target group routing rules during blue/green deployments. Next action: verify IAM invocation permissions for the Lambda lifecycle hook before initiating deployments, recognizing that a failed pre-traffic hook halts deployment progression entirely and keeps customer traffic locked to the Blue target group.
+
+</details>
+
+**Card D: Omitting the OIDC branch restriction is fine if the GitHub repo is private.** A security team configures an OpenID Connect identity provider for GitHub Actions and sets the IAM trust policy subject condition to match the organization's private repository using a wildcard suffix (`repo:org/private-app:*`). Because the source repository requires enterprise single sign-on and is inaccessible to anonymous internet users, the engineers assume that omitting branch-specific claim constraints introduces zero security risk to their AWS cloud infrastructure. They reason that internal team boundaries eliminate the need for restrictive branch patterns and approve the wildcard role configuration across all administrative automation workflows.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating source repository read privacy with least-privilege role assumption boundaries across unreviewed feature branches and pull requests. Next action: restrict the OIDC trust policy subject claim strictly to production branch references or trusted GitHub deployment environments (`:ref:refs/heads/main` or `:environment:production`) to prevent unmerged branch workflows from assuming elevated IAM credentials.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] buildspec.yml builds Docker image and pushes to ECR
 - [ ] CodeBuild project runs successfully with privileged mode enabled
