@@ -121,7 +121,7 @@ For dual-region buckets used in disaster recovery, standard geo-replication is a
 gcloud storage buckets create gs://my-critical-dr-bucket \
   --location=US \
   --placement=us-central1,us-east1 \
-  --enable-turbo-replication
+  --rpo=ASYNC_TURBO
 ```
 
 For disaster recovery, treat Turbo Replication as an insurance policy on the replication lag window, not as a substitute for application-level backup logic. Standard dual-region replication is asynchronous: Google replicates object data between the paired regions, but there is no published maximum time for every byte to land in the secondary region before a regional outage. Turbo Replication adds a documented [15-minute recovery point objective (RPO)](https://cloud.google.com/storage/docs/availability-durability) for newly written objects in eligible dual-region buckets, which narrows how much data might be missing if you fail over reads to the surviving region immediately after a disaster. You still need runbooks that point applications at the correct endpoint, validate IAM and VPC Service Controls, and test restore procedures—GCS replication does not rewind application state or database transactions.
@@ -189,10 +189,16 @@ gcloud storage ls -L gs://my-bucket/archive.tar.gz 2>&1 | grep "Storage class"
 [Autoclass automatically moves objects between storage classes based on access patterns](https://cloud.google.com/storage/docs/autoclass). It eliminates the need to manually manage lifecycle rules for class transitions.
 
 ```bash
-# Enable Autoclass on a new bucket
+# Enable Autoclass on a new bucket (default terminal class is Nearline)
 gcloud storage buckets create gs://my-smart-bucket \
   --location=us-central1 \
   --enable-autoclass
+
+# Optional: Archive as the terminal class (Coldline is then an intermediate)
+gcloud storage buckets create gs://my-archive-terminal-bucket \
+  --location=us-central1 \
+  --enable-autoclass \
+  --autoclass-terminal-storage-class=ARCHIVE
 
 # Enable Autoclass on an existing bucket
 gcloud storage buckets update gs://existing-bucket \
@@ -202,12 +208,12 @@ gcloud storage buckets update gs://existing-bucket \
 With Autoclass enabled:
 - All objects start as STANDARD.
 - After 30 days without access, they move to NEARLINE.
-- After 90 days without access, they move to COLDLINE.
-- After 365 days without access, they move to COLDLINE (the default terminal class). Archive is opt-in via `--autoclass-terminal-storage-class=ARCHIVE` if you need the lowest at-rest rate and accept the 365-day minimum duration.
+- By default, Nearline is the [terminal storage class](https://cloud.google.com/storage/docs/autoclass): objects stay in Nearline until they are accessed, then return to Standard. The only configurable terminals are Nearline and Archive; `--autoclass-terminal-storage-class` does not accept Coldline.
+- If you set `--autoclass-terminal-storage-class=ARCHIVE`, unused objects continue colder: 90 days without access moves them to Coldline, and 365 days without access moves them to Archive.
 - If accessed again, they automatically move back to STANDARD.
 - [No retrieval fees apply when Autoclass moves objects between classes.](https://cloud.google.com/storage/pricing)
 
-Autoclass also carries a management fee of [$0.0025 per 1,000 objects per 30-day period](https://cloud.google.com/storage/pricing) for objects at least 128 KiB that Autoclass manages, prorated to the millisecond. Buckets with billions of tiny files may see fees dominate savings unless objects are large enough to benefit from tiering. Objects smaller than 128 KiB are not managed and stay on Standard pricing. When access is genuinely unpredictable—ML feature stores, ad-hoc science lakes—Autoclass often beats hand-tuned lifecycle rules because it reacts to reads rather than calendar age. When you must keep objects in Nearline for a compliance clock regardless of access, disable Autoclass and encode the duration in lifecycle conditions instead.
+Autoclass also carries a management fee of [$0.0025 per 1,000 objects per 30-day period](https://cloud.google.com/storage/pricing) for objects at least 128 KiB that Autoclass manages, prorated to the millisecond. Buckets with billions of tiny files may see fees dominate savings unless objects are large enough to benefit from tiering. Objects smaller than 128 KiB are not managed and stay on Standard pricing. When access is genuinely unpredictable—ML feature stores, ad-hoc science lakes—Autoclass often beats hand-tuned lifecycle rules because it reacts to reads rather than calendar age. GCS [rejects combining Autoclass with lifecycle `SetStorageClass` or `matchesStorageClass`](https://cloud.google.com/storage/docs/autoclass); those requests fail, so a compliance clock belongs on delete/age rules after Autoclass is off, not as a class-transition overlay. When you must keep objects in Nearline for a compliance clock regardless of access, disable Autoclass and encode the duration in lifecycle conditions instead.
 
 Location type and class interact with availability SLAs documented in the [storage classes guide](https://cloud.google.com/storage/docs/storage-classes): Standard multi-region and dual-region targets 99.95% monthly availability SLA, while regional Standard targets 99.9%. Nearline and Coldline drop to 99.0% SLA in a single region. Architectures that need five-nines read latency for a global user base might justify multi-region Standard; batch analytics landing zones in one region should not pay the multi-region premium unless regulatory geography demands it.
 
@@ -959,12 +965,12 @@ Failure layer: disabling of object ACLs under uniform bucket-level access. Next 
 
 </details>
 
-**Card D: A 15-minute signed URL is enough for any 50 GiB browser upload because resumable uploads ignore expiry.** A developer configures an image and video processing portal to issue fifteen-minute signed URLs for client-side uploads of fifty-gigabyte raw media files. The developer reasons that initiating a resumable upload session allows client browsers to continue pushing bytes until completion regardless of how long the network transfer takes. The engineering team deploys the short-lived signed URL generation service to the production customer upload portal.
+**Card D: A 15-minute signed URL is enough for any 50 GiB browser upload because resumable uploads ignore expiry.** A developer configures an image and video processing portal to issue fifteen-minute signed URLs for client-side uploads of fifty-gigabyte raw media files. The developer signs a fifteen-minute PUT of the whole object and treats resumable as a way to ignore that clock. The engineering team deploys the short-lived signed URL generation service to the production customer upload portal.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: V4 signature wall-clock expiration versus transfer duration. Next action: extend the signed URL expiration window to accommodate realistic transfer times, negotiate resumable upload session URIs, or proxy large payload uploads through backend services.
+Failure layer: V4 signature wall-clock expiration on a simple PUT versus session-URI possession after a resumable initiate. Next action: mint the resumable session server-side (the signed URL only needs to cover the initiating POST), then upload bytes to the session URI, or proxy the transfer through a backend service account.
 
 </details>
 
