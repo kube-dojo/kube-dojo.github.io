@@ -72,7 +72,7 @@ Manually creating GCP projects leads to severe operational bottlenecks and secur
 Each project repeats manual VPC provisioning, default-network deletion, API enablement, centralized log sink configuration, and IAM role binding. At fifty projects a year, repetitive manual execution introduces human error, security omissions, and drift across environments, whereas an automated project factory encodes that baseline once.
 </details>
 
-Platform engineering teams eliminate repetitive configuration overhead and environment drift by implementing programmatic provisioning workflows that establish standardized guardrails from the moment a project is created.
+The next object is the project factory mermaid. After it, Terraform is how that factory becomes a reviewable contract instead of a one-off CLI session.
 
 ### The Solution: Project Factory
 
@@ -186,7 +186,7 @@ terraform apply -var="team=payments" -var="env=prod" \
 Organization policies, Shared VPC attachments, centralized log export sinks, and folder-level IAM role bindings may not apply if the project sits directly under the organization root or inside an ungoverned folder. Without folder inheritance, the project operates in an administrative blind spot lacking perimeter defenses.
 </details>
 
-Google Cloud landing zones establish a modular foundation that enables organizations to scale services securely across structured environments. Constructing this cloud foundation requires standardizing resource containers and operational baselines before deploying application workloads.
+The next object is Organization → Folders → Projects. After that diagram, inheritance is why folder placement is a security control, not an org-chart decoration.
 
 ### Resource Hierarchy and Inheritance
 
@@ -564,7 +564,7 @@ Binary Authorization and deploy-time policy checks integrate with the CI/CD patt
 VPN membership grants broad network trust, allowing malware on a compromised laptop to scan the entire connected subnet and reach adjacent private resources. In contrast, Identity-Aware Proxy implements BeyondCorp zero-trust architecture by intercepting and authenticating every individual request or tunnel against identity, IAM roles, and device context, so a compromised laptop cannot freely traverse the internal network.
 </details>
 
-Modern enterprise security models shift perimeter enforcement from coarse-grained network tunnels directly to identity-verified application entry points. The architectural contrast between traditional network-level connectivity and application-layer proxying illustrates how access boundaries operate in practice.
+The next object is the VPN versus IAP mermaid. After it, TCP forwarding and IAM conditions are how you apply the model to VMs and internal HTTP apps.
 
 ```mermaid
 flowchart TD
@@ -718,7 +718,7 @@ Sandbox environments need cost guardrails too, not just production. Use **toolin
 Operating three disconnected control planes causes configuration drift, siloed observability, and inconsistent policy enforcement across environments. In contrast, a GCP-hosted fleet plane uses GKE Multi-Cloud, GKE attached clusters, or Google Distributed Cloud alongside Config Sync and Policy Controller to enforce a single declarative policy pack across all clusters without maintaining separate operational playbooks.
 </details>
 
-Enterprises operating hybrid and multi-cloud container infrastructure require centralized control mechanisms to coordinate distributed workloads without introducing operational silos. Fleet management architectural patterns establish unified registration and lifecycle primitives that connect heterogeneous clusters under a single management plane.
+The next object is the fleet-management mermaid. After it, Config Sync and Policy Controller appear as named products on the GCP side of the diagram.
 
 ```mermaid
 flowchart TD
