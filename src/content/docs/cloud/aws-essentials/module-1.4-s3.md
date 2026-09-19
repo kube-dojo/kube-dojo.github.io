@@ -19,7 +19,7 @@ After completing this module, you will be able to configure secure access bounda
 
 ## Why This Module Matters
 
-Publicly accessible S3 buckets have repeatedly exposed sensitive data when administrators or applications granted overly broad access. In practice, a single misconfigured bucket policy or ACL can turn private data into an internet-readable exposure until someone detects and fixes it.
+Hypothetical scenario: publicly accessible S3 buckets have repeatedly exposed sensitive data when administrators or applications granted overly broad access. In practice, a single misconfigured bucket policy or ACL can turn private data into an internet-readable exposure until someone detects and fixes it.
 
 Amazon Simple Storage Service (S3) is the foundational storage layer of the cloud. It is infinitely scalable, [highly durable, and handles trillions of objects globally](https://aws.amazon.com/s3). Because it is so accessible and easy to use, it is the standard destination for application assets, database backups, massive data lakes, and static website hosting.
 
@@ -128,7 +128,14 @@ aws s3control put-public-access-block \
     "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 ```
 
-> **Stop and think**: If an S3 bucket has Block Public Access enabled at the account level, but a developer explicitly writes a Bucket Policy granting `s3:GetObject` to `*` (everyone), which rule wins when an anonymous user tries to download a file?
+**Pause and predict:** an S3 bucket has Block Public Access enabled at the account level, but an engineer writes a Bucket Policy granting `s3:GetObject` to `*` (everyone). When an anonymous user attempts to download an object from that bucket, which rule wins, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+Account-level Block Public Access wins, and the request is denied with HTTP 403 Forbidden. Block Public Access acts as a centralized security guardrail across the entire AWS account. When `BlockPublicPolicy` or `RestrictPublicBuckets` is enabled, AWS S3 evaluates the public access block before evaluating bucket policies, effectively overriding any permissive wildcards granting public access.
+
+</details>
 
 ### 2. IAM Policies
 
@@ -245,13 +252,20 @@ upload_url = s3.generate_presigned_url(
 # For HTML form uploads, use generate_presigned_post() instead
 ```
 
-Important details to remember about pre-signed URLs are that they inherit the permissions of the IAM identity that generated them and they can be valid for up to 7 days when signed with IAM user credentials.
+Pre-signed URLs allow applications to delegate time-bound access to third parties without distributing long-lived AWS security credentials. Managing these URLs requires understanding how expiration parameters interact with the underlying identity that signed the request.
 
-- [The URL inherits the permissions of the IAM identity that generated it. If that identity loses access, existing pre-signed URLs typically stop working once that change takes effect.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
-- Maximum expiration: up to 7 days when generated with the AWS CLI or SDKs using IAM user credentials; URLs signed with temporary credentials expire when those credentials expire.
+- [Pre-signed URLs authenticate requests against AWS using cryptographic signature parameters derived from the creator's credentials.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+- Maximum expiration can be configured up to seven days when generated with the AWS CLI or SDKs using long-term IAM user credentials, whereas URLs signed with temporary STS credentials expire when those session credentials expire.
 - The AWS CLI `aws s3 presign` command generates GET URLs only; use the SDK (`generate_presigned_url` or `generate_presigned_post`) for PUT uploads.
 
-> **Stop and think**: You generate a pre-signed URL valid for 7 days using your IAM User credentials. Two days later, your IAM User is deleted by an administrator. What happens when someone tries to use the URL on day 3?
+**Pause and predict:** you generate a pre-signed URL configured with a 7-day expiration using your long-term IAM user credentials. Two days later, an administrator deletes that IAM user from the account. When a client attempts to download the object using the pre-signed URL on day 3, what happens, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+The request fails with an HTTP 403 Forbidden error. A pre-signed URL does not contain an independent authorization grant or snapshot of rights; instead, S3 evaluates the signing identity's active permissions in real time at the moment of request arrival. Because the IAM user was deleted, AWS cannot authenticate or authorize the signature, rendering the URL immediately invalid regardless of the remaining expiration window.
+
+</details>
 
 ---
 
@@ -277,7 +291,14 @@ The table above uses illustrative pricing values only; always check the [AWS S3 
 
 **S3 Intelligent-Tiering** deserves special attention. It automatically moves objects between an infrequent-access tier and a frequent-access tier based on usage patterns. [It charges a small monthly monitoring fee per object (~$0.0025 per 1,000 objects) but can save significantly on large datasets with unpredictable access patterns. There is no retrieval fee.](https://aws.amazon.com/pricing/s3/)
 
-> **Pause and predict**: If you use S3 Intelligent-Tiering for a small bucket with only 50 objects that you access constantly, will you save money compared to S3 Standard?
+**Pause and predict:** if you configure S3 Intelligent-Tiering for a dataset consisting of only 50 objects that clients access constantly every single day, will your overall AWS bill decrease compared to keeping them in S3 Standard?
+
+<details>
+<summary>Check your prediction</summary>
+
+No, you will pay more with Intelligent-Tiering. Intelligent-Tiering charges the exact same base storage rate as S3 Standard for objects residing in its Frequent Access tier. Because your 50 objects are accessed constantly, they never qualify for transition into the Infrequent or Archive tiers. In addition to standard storage pricing, AWS levies a per-object monthly monitoring and automation charge (~$0.0025 per 1,000 objects), resulting in a higher total bill with zero offsetting storage discounts.
+
+</details>
 
 ### Cost Example
 
@@ -326,7 +347,14 @@ flowchart TD
 
 You cannot transition from Glacier back to Standard-IA via a lifecycle rule. To move data "upward," you must restore and copy it manually.
 
-> **Pause and predict**: Look at the minimum object size for S3 Standard-IA (128 KB). If you configure a lifecycle rule to transition a bucket containing 10 million tiny 5 KB log files from Standard to Standard-IA, what do you expect will happen to your monthly storage bill?
+**Pause and predict:** consider the 128 KB minimum billable object size for S3 Standard-IA. If you configure a lifecycle policy to transition 10 million small 5 KB log files from Standard to Standard-IA, how will your overall monthly storage invoice change?
+
+<details>
+<summary>Check your prediction</summary>
+
+Your monthly storage bill will increase substantially rather than decrease. Although the per-gigabyte storage rate of Standard-IA is roughly half that of S3 Standard, S3 bills every object transitioned to Standard-IA as if it were at least 128 KB. Storing 10 million 5 KB objects requires only 50 GB of physical space in S3 Standard (~$1.15/month), but Standard-IA charges you for 1.28 TB (128 KB × 10 million) of capacity (~$16.00/month), plus lifecycle transition request fees ($10.00 for 10 million PUT/lifecycle requests).
+
+</details>
 
 ---
 
@@ -510,7 +538,14 @@ Important versioning behaviors to remember:
 - You pay for **every** stored version, so frequent overwrites can multiply storage costs quickly.
 - MFA Delete can require multi-factor authentication to delete versions or change versioning state.
 
-> **Stop and think**: If you have a bucket with 1 million objects, and you enable versioning but never overwrite or delete any existing objects, what happens to your storage bill?
+**Pause and predict:** you manage a bucket containing 1 million objects and enable S3 versioning, but your workload never overwrites or deletes any existing object keys. How does turning on versioning affect your monthly storage bill?
+
+<details>
+<summary>Check your prediction</summary>
+
+Your storage bill stays exactly the same. Versioning does not add extra base fees or overhead merely for being enabled on a bucket. Cost increases occur only when objects are overwritten (creating new noncurrent versions that consume additional gigabytes) or deleted (creating delete markers while retaining previous versions). If your workload performs only initial uploads without overwrites or deletions, exactly one version exists per object, incurring no additional storage charges.
+
+</details>
 
 ---
 
@@ -1010,7 +1045,43 @@ aws kms schedule-key-deletion \
 rm -rf ./backup-exercise lifecycle.json bucket-policy.json empty_bucket.py
 ```
 
-### Success Criteria
+**Card A: A bucket policy granting `s3:GetObject` to `*` overrides account Block Public Access.** An administrator attaches a resource-based policy to an S3 bucket explicitly granting `s3:GetObject` permissions to all principals (`*`). The engineer assumes that because resource policies are evaluated directly on the bucket, this explicit allow statement overrides account-wide security configurations. They believe that anonymous internet users will be able to download objects immediately despite organizational restrictions. Consequently, the team skips reviewing account-level Block Public Access settings and assumes the bucket is fully public.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding authorization precedence between account-level Block Public Access guardrails and resource-based bucket policies. Next action: enable account-level Block Public Access to enforce central protection, or explicitly disable Block Public Access settings only when public object distribution is genuinely required.
+
+</details>
+
+**Card B: A 7-day pre-signed URL keeps working after the signing IAM user is deleted.** A developer generates a pre-signed S3 download URL configured with a maximum seven-day expiration period using their long-term IAM credentials. When the developer departs the company two days later and their IAM user account is deleted, the operations team assumes the shared URL remains active for its full remaining duration. They believe the pre-signed URL acts as an autonomous token that embeds immutable access rights at the time of creation. As a result, the team expects external partners to download shared files until the expiration timestamp elapses.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming pre-signed URLs are self-contained bearer tokens rather than dynamically verified signatures tied to an active IAM principal. Next action: generate production pre-signed URLs using dedicated IAM roles or service accounts whose lifecycles are independent of individual employee credentials.
+
+</details>
+
+**Card C: Intelligent-Tiering always saves money versus Standard.** A cloud architect migrates an application bucket containing 50 frequently updated assets to S3 Intelligent-Tiering to minimize ongoing expenditure. The engineer assumes that automated storage tiering consistently reduces AWS costs regardless of object counts or access patterns. They believe that Intelligent-Tiering provides free automatic savings while maintaining identical baseline storage rates. Based on this assumption, they enable Intelligent-Tiering across all production buckets without analyzing monthly monitoring charges or access frequency.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: ignoring per-object monitoring fees and the requirement for extended idle periods before tiering discounts apply. Next action: retain actively accessed objects in S3 Standard, reserving Intelligent-Tiering for large datasets with unpredictable or variable access frequencies.
+
+</details>
+
+**Card D: Lifecycle to Standard-IA always cuts the bill for millions of tiny logs.** A DevOps team creates a lifecycle rule that moves ten million small 5 KB application log files into S3 Standard-IA after thirty days. Because Standard-IA offers a lower per-gigabyte storage rate than S3 Standard, the team expects their monthly storage charges to drop by roughly half. They assume that storage billing is calculated strictly from raw file sizes without minimum capacity thresholds. Relying on this belief, they apply the transition rule across the entire logging repository without calculating minimum object billing boundaries.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: overlooking the 128 KB minimum billable object size and per-request lifecycle transition costs enforced by S3 Standard-IA. Next action: batch small log events into larger archive objects before uploading, or keep small objects in S3 Standard until expiration rather than tiering them to Standard-IA.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] I created a bucket with Block Public Access, a customer-managed KMS key for default encryption, and versioning enabled.
 - [ ] I uploaded multiple versions of the same file and listed the version history.
