@@ -68,7 +68,7 @@ This immutability is more than a convenient audit trail. It is the reason Cloud 
 Cloud Run still creates a new revision because the revision records the full serving configuration, not only the image digest. Rollback can return the service to the previous environment without unwinding a live process or attempting in-place mutation on a running container instance.
 </details>
 
-Declarative service manifests capture this exact relationship between service endpoints, revision specifications, and traffic routing rules. The following Knative-compatible YAML definition demonstrates how traffic percentages and canary tags are configured directly within the deployment template.
+The next object is a Knative-style Service spec: traffic percentages, tags, and how those map onto Cloud Run deploy flags.
 
 ```yaml
 # Example: Knative-style traffic splitting in a Service spec
@@ -242,7 +242,7 @@ This YAML intentionally combines networking, probes, and traffic, because real p
 You must configure all-traffic VPC egress because only all-traffic egress directs external internet traffic through the VPC network for centralized inspection, Cloud NAT, or fixed outbound IPs. The private-ranges-only setting is wrong for that goal because it keeps public traffic off the connector and routes it directly to the internet, bypassing VPC inspection appliances entirely.
 </details>
 
-Selecting an egress path establishes the operational contract between application workloads and perimeter network security controls. Production environments require network architects and service owners to review connector throughput limits alongside firewall inspection requirements to prevent traffic bottlenecks during unexpected load spikes.
+Selecting an egress path is a security-and-capacity review, not a console default. The next section is identity, secrets, and why a laptop ping of Cloud SQL is not a Cloud Run connectivity test.
 
 Direct VPC egress is another option in modern Cloud Run deployments, and it can remove the connector resource for some designs. A module focused on essentials still teaches connectors because they remain common in existing environments and explain the egress model clearly. When you evaluate a real architecture, compare connector capacity, operational ownership, Shared VPC constraints, firewall logging needs, and the simplicity of direct egress. The best design is the one your network and security teams can reason about during an incident at 2 a.m.
 
@@ -288,7 +288,7 @@ gcloud run services update-traffic my-api \
 The application is not restored because Cloud Run rollback restores traffic routing, not database schema compatibility. If revision 1 cannot read or write the altered schema, user requests will continue failing; teams must pair canaries with backward-compatible migrations so both old and new revisions can safely run concurrently.
 </details>
 
-Traffic migration commands provide immediate control over which container revisions serve incoming client traffic during operational incidents. The following command updates the service route to redirect full traffic allocation back to the preceding revision while engineering teams evaluate logs and plan remediation.
+The next command is the traffic-update itself. After it, probes and revision-level logs are how you tell a bad revision from a shared dependency that routing cannot fix.
 
 ```bash
 gcloud run services update-traffic my-api \
@@ -326,7 +326,7 @@ Cold starts are not a moral failure; they are the economic trade-off that lets u
 The database saturates first rather than Cloud Run. Cloud Run will accept the burst across its instances, but the database will saturate under hundreds of simultaneous connections unless you lower concurrency, cap max instances, pool connections, or add backpressure.
 </details>
 
-Autoscaling parameters act as distributed load generators from the perspective of downstream infrastructure components. Aligning serverless capacity limits with persistent backing services requires cross-tier capacity planning so that sudden compute elasticity does not overwhelm stateful dependencies during traffic spikes.
+Autoscaling knobs are a request-admission policy, not a database sizing tool. The next comparison is when Cloud Run and GKE should share an architecture instead of competing for the same workload.
 
 Cloud Run and GKE can coexist in the same architecture. A platform team might keep shared stateful services, service mesh experiments, custom controllers, or batch systems on GKE, while moving stateless APIs, webhooks, internal admin UIs, and scheduled jobs to Cloud Run. That split can reduce cluster pressure and let teams choose the operational model per workload. The mistake is turning the decision into identity politics. The useful question is which platform exposes the fewest failure modes while meeting the service's needs.
 
