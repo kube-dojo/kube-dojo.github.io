@@ -649,7 +649,7 @@ Temporary broad access inevitably becomes permanent because delivery pressures a
 
 ### Step 1: Start with Zero and Add
 
-The first habit of reliable IAM design is to start with the minimum base and expand deliberately. Never start with broad permissions and plan to tighten later---you will not. Start with zero permissions and add only what breaks because every additional permission becomes part of the blast radius for the next engineer, script, or compromised secret.
+The first habit of reliable IAM design is to start with the minimum base and expand deliberately. Start with zero permissions and add only what breaks because every additional permission becomes part of the blast radius for the next engineer, script, or compromised secret.
 
 ### Step 2: Use IAM Access Analyzer
 
@@ -1243,7 +1243,7 @@ Failure layer: Underestimating developmental blast radius and technical debt ine
 
 </details>
 
-**Card D: sts:AssumeRole success means the session can do everything the role identity policy allows, ignoring SCPs and session policies.** An integration engineer successfully assumes a deployment role using the AWS CLI and confirms that the assumed-role session token was generated without error. Because STS permitted the assume-role request, the engineer assumes every action listed in the role's identity policy will execute successfully throughout the session. They overlook the fact that organization service control policies and caller-specified session policies can strictly override or reduce the active session permissions.
+**Card D: sts:AssumeRole success means the session can do everything the role identity policy allows, ignoring SCPs and session policies.** An integration engineer successfully assumes a deployment role using the AWS CLI and confirms that the assumed-role session token was generated without error. Because STS permitted the assume-role request, the engineer assumes every action listed in the role's identity policy will execute successfully throughout the session. They treat the assume-role API success as proof that later service calls cannot be denied.
 
 <details>
 <summary>Check your prediction</summary>
