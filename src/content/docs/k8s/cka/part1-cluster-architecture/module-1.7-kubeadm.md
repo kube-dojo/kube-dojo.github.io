@@ -285,7 +285,7 @@ ls /etc/kubernetes/manifests/
 # kube-scheduler.yaml
 ```
 
-The API server shows mirror pods for visibility, but it does not own the source of truth for static pods. If you delete the mirror pod with `kubectl`, kubelet notices that the manifest file still exists and recreates the mirror pod object in the API. The underlying container is NOT restarted by this — kubelet does not remove the manifest, so the static pod process keeps running uninterrupted. This is a classic CKA gotcha: deleting a mirror pod with `kubectl` does not restart a stuck control-plane component, because the API operation never reaches the runtime. That behavior is surprising only if you assume every pod seen through the API is controlled through the API.
+The API server lists control-plane pods so operators can inspect them with ordinary `kubectl`, but listing is not the same as owning the restart path. Treat that distinction as a troubleshooting constraint rather than trivia, because the wrong next command wastes minutes during an outage.
 
 **Pause and predict:** if you run `kubectl delete pod kube-apiserver-controlplane -n kube-system`, what changes (and what does not) at the container-runtime level, and what file decides?
 
