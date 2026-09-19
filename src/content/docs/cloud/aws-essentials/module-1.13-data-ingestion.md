@@ -267,11 +267,10 @@ or latency matters.
 Evaluating consumer access patterns before
 selecting an ingestion tier prevents costly
 replatforming later in production operations.
-When multiple downstream consumers require
-independent processing rates and historical
-replay, streaming systems must provide
-isolated cursor management and durable
-partition retention across every reader.
+The next section is the operator math for
+Kinesis shard capacity, because that is
+where write, read, and partition-key
+behavior become the first sizing job.
 
 ## Kinesis Deep Dive: Streams That Operators Can Rewind
 
@@ -664,10 +663,9 @@ useful column chunks.
 
 Storage layout directly determines how compute
 engines interact with underlying cloud stores.
-Establishing deliberate compaction policies,
-sensible buffer boundaries, and proper file
-sizing ensures queries remain predictable and
-economical as dataset volumes expand.
+The next section is Glue, because the catalog
+and job runtime sit downstream of whatever
+object shape Firehose just wrote.
 
 ## Glue Deep Dive: Catalogs, Jobs, and Schema Contracts
 
@@ -710,10 +708,9 @@ that makes Athena queries surprising.
 
 </details>
 
-Operators detect catalog drift by comparing
-producer schema changes, Glue table
-versions, crawler run history, partition
-counts, and query failures.
+Catalog ownership is a production control,
+not a background scan you forget after the
+first successful run.
 The safest production pattern is to make the
 producer schema explicit, update Catalog
 tables through reviewable infrastructure or
