@@ -145,7 +145,7 @@ No; envelope ciphertext is useless without `kms:Decrypt` on the CMK. In envelope
 
 </details>
 
-Once ciphertext exists, the remaining design work is who may *use* the key, not who may list the objects. The next section walks through the three KMS authorization documents that stack on a customer managed key.
+The next section walks through the three KMS authorization documents that stack on a customer managed key, then how grants appear when a service must use that key on your behalf.
 
 ### Key Policies, IAM Policies, and Grants
 
@@ -404,7 +404,7 @@ AWS provides pre-built Lambda rotation functions for common AWS-native databases
 - Amazon DocumentDB
 - Generic credentials (you provide the rotation logic)
 
-You supply the rotation Lambda ARN and a schedule (`rate(30 days)` or a cron expression). Secrets Manager invokes the function; the function must implement the contract expected for your secret type (single username/password string versus JSON with host and port). Custom databases use the generic template where your code implements `createSecret`, `setSecret`, `testSecret`, and `finishSecret` against your API. Test rotation in a lower environment first — rotation failures leave `AWSCURRENT` untouched, but repeated alarms often mean the generated password violates upstream policy. Document the rotation window in your runbook so on-call engineers know that brief `AWSPENDING` states are normal, not incidents. Pair rotation alarms with a dashboard showing each secret's `LastRotatedDate` field from daily `describe-secret` health checks. That small operational habit catches stuck rotations before database passwords expire unexpectedly.
+You supply the rotation Lambda ARN and a schedule (`rate(30 days)` or a cron expression). Secrets Manager invokes the function; the function must implement the contract expected for your secret type (single username/password string versus JSON with host and port). Custom databases use the generic template where your code implements `createSecret`, `setSecret`, `testSecret`, and `finishSecret` against your API. Test rotation in a lower environment first, and document the rotation window in your runbook so on-call engineers know that brief `AWSPENDING` states are normal, not incidents. Pair rotation alarms with a dashboard showing each secret's `LastRotatedDate` field from daily `describe-secret` health checks. That small operational habit catches stuck rotations before database passwords expire unexpectedly.
 
 The rotation Lambda follows a four-step protocol that moves credentials through create, test, and promotion phases:
 
@@ -429,7 +429,7 @@ The rotation execution halts immediately and rolls back without promoting the in
 
 </details>
 
-Rotation is a state machine with named stages, not a single overwrite of the live password. The sections below cover who may read a secret across accounts and how replicas behave in another Region.
+The sections below cover who may read a secret across accounts and how replica secrets behave in another Region during failover, including the KMS decrypt path that must exist in the replica Region.
 
 ### Cross-Account Access and Resource Policies
 
@@ -1110,7 +1110,7 @@ aws ecs delete-cluster --cluster-name secrets-lab
 ```
 </details>
 
-**Card A: S3 ciphertext is enough; the attacker can decrypt without the KMS key.** A security auditor assumes that obtaining read access to raw S3 bucket objects allows an unauthorized actor to immediately decrypt application secrets stored within envelope-encrypted files. The audit team believes that because the encrypted payload and the wrapped data encryption key reside side by side in the same object storage bucket, an attacker can use offline cryptanalysis tools to extract the credentials without calling AWS APIs. Consequently, they treat S3 bucket access policies as the sole security perimeter and neglect to configure restrictive key policies on the customer managed KMS key.
+**Card A: S3 ciphertext is enough; the attacker can decrypt without the KMS key.** A security auditor assumes that obtaining read access to raw S3 bucket objects allows an unauthorized actor to immediately decrypt application secrets stored within envelope-encrypted files. The audit team believes that because the encrypted payload and the wrapped data encryption key reside side by side in the same object storage bucket, an attacker can use offline cryptanalysis tools to extract the credentials without calling AWS APIs. They treat object-storage access as sufficient to recover the plaintext.
 
 <details>
 <summary>Check your prediction</summary>
