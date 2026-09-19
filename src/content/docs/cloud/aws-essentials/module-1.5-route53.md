@@ -681,7 +681,7 @@ An application-layer Route 53 health check (such as an HTTP or HTTPS check targe
 
 </details>
 
-DNS authoritative name servers operate independently from server operating systems and lack visibility into internal daemon lifecycles, memory pressure, and socket bindings. Providing automated fault isolation requires establishing an external telemetry feedback loop that tests reachability and injects endpoint health status directly into Route 53's global resolution infrastructure. Dynamic routing strategies across weighted, latency, geolocation, geoproximity, and multivalue record sets depend entirely on these active validation signals to remove degraded targets from resolver responses.
+Failover, latency, geolocation, and weighted answers are still just DNS records until something outside the query path can change which of those records is eligible. The sections below walk through how that eligibility is measured and attached, then how routing policies consume it — without assuming a guest process crash is visible to a nameserver by default.
 
 ### Creating Health Checks
 
@@ -1211,7 +1211,7 @@ Failure layer: neglecting intermediate recursive resolver caching behavior enfor
 
 </details>
 
-**Card C: Failover routing detects an application crash without a health check.** An architect deploys an active-passive failover configuration across two AWS Regions, designating us-east-1 as PRIMARY and us-west-2 as SECONDARY. When the backend Node.js application process inside the primary EC2 instance crashes while leaving the virtual machine running, the engineer assumes Route 53 will detect the service interruption and redirect incoming DNS queries automatically. Because no dedicated Route 53 health check was attached to the primary record, queries continue resolving to the dead application port while standby resources sit idle.
+**Card C: Failover routing detects an application crash without a health check.** An architect deploys an active-passive failover configuration across two AWS Regions, designating us-east-1 as PRIMARY and us-west-2 as SECONDARY. When the backend Node.js application process inside the primary EC2 instance crashes while leaving the virtual machine running, the engineer assumes Route 53 will detect the service interruption and redirect incoming DNS queries automatically. They treat the PRIMARY/SECONDARY labels as sufficient for application-level failover.
 
 <details>
 <summary>Check your prediction</summary>
