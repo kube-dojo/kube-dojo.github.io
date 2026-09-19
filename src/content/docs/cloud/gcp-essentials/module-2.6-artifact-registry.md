@@ -347,7 +347,15 @@ Building a vulnerability scanning policy means deciding three things: which seve
 | **LOW** | 0.1 - 3.9 | Track and fix at convenience |
 | **MINIMAL** | 0.0 | Informational |
 
-> **Stop and think**: If vulnerability scanning is automatic, what prevents a developer from deploying an image that was scanned but found to have CRITICAL vulnerabilities?
+**Pause and predict:** You configure automatic vulnerability scanning on an Artifact Registry repository and push an application container image that the scanner immediately flags with multiple CRITICAL CVE findings. If an engineer applies a Kubernetes deployment manifest referencing this image digest to a standard GKE cluster, what mechanism prevents the cluster from admitting and executing the vulnerable container?
+
+<details>
+<summary>Check your prediction</summary>
+
+Automatic vulnerability scanning in Artifact Registry operates strictly as an informational audit service and does not enforce admission control by itself; GKE admits and executes the image unless a Binary Authorization policy paired with cryptographic attestations explicitly evaluates and blocks unverified digests at admission time.
+</details>
+
+Decoupling registry inspection from cluster admission represents an intentional architectural separation of concerns between storage-layer reporting and compute-layer enforcement. Managing runtime risk requires bridging that boundary by wiring automated vulnerability analysis directly into deployment policy gates.
 
 ### Binary Authorization Integration
 
@@ -365,7 +373,7 @@ gcloud services enable binaryauthorization.googleapis.com
 # 4. GKE clusters only run images with valid attestations
 ```
 
-A typical production pipeline pushes the image, waits for scan completion, runs a policy check against allowed severities, and only then creates an attestation that Binary Authorization verifies at deploy time. Without this enforcement layer, automatic scanning is informational—developers see CRITICAL CVEs in the console but nothing prevents `kubectl apply` from running the vulnerable image in production.
+A typical production pipeline pushes the image and waits for scan completion. It runs a policy check against allowed severities, and only then creates an attestation that Binary Authorization verifies at deploy time. Establishing automated cryptographic attestation workflows ensures that cluster admission controllers reject unverified container digests before runtime scheduling occurs across production nodes.
 
 ---
 
@@ -471,7 +479,15 @@ flowchart LR
     AR --> Hub
 ```
 
-> **Pause and predict**: If a public registry goes down for maintenance, what happens to a CI/CD pipeline that pulls images through an Artifact Registry remote repository?
+**Pause and predict:** An upstream public container registry experiences an unscheduled complete outage while enterprise build systems are actively running. How does this upstream downtime impact CI/CD pipelines that pull their required base container images through an Artifact Registry remote repository?
+
+<details>
+<summary>Check your prediction</summary>
+
+Pipelines requesting image tags that were previously pulled and cached will continue executing normally because Artifact Registry serves cached layers directly from regional storage without contacting the upstream provider. Conversely, any pipeline requesting an uncached image tag or attempting a first-time pull will fail immediately because the remote repository cannot connect to the unreachable public registry to fetch missing blobs.
+</details>
+
+Configuring an upstream proxy establishes an intermediate storage layer that decouples build infrastructure from external registry availability and strict public rate limits. Implementing remote repositories requires provisioning dedicated regional cache endpoints and adjusting client pull targets across build configurations.
 
 ```bash
 # Create a remote repository that caches Docker Hub
@@ -505,18 +521,27 @@ gcloud artifacts repositories create pypi-cache \
 # Note: Docker Hub official images require the 'library/' namespace prefix
 docker pull us-central1-docker.pkg.dev/${PROJECT_ID}/dockerhub-cache/library/nginx:1.25
 
-# Subsequent pulls of the same image come from your local cache
+# Verify the cached image is listed in repository storage
+gcloud artifacts docker images list us-central1-docker.pkg.dev/${PROJECT_ID}/dockerhub-cache
 ```
 
-Remote repositories do not prefetch the entire upstream registry—they cache artifacts on first pull, which means the initial CI run after creating a remote repo still hits the public registry and is subject to upstream rate limits until the cache warms. Docker Hub official images require the `library/` namespace prefix when pulling through Artifact Registry, as shown in the nginx example above, because Docker Hub namespaces official images under `library/` even when users omit it in direct Hub pulls.
+Docker Hub official images require the `library/` namespace prefix when pulling through Artifact Registry, as shown in the nginx example above. Docker Hub namespaces official images under `library/` even when users omit it in direct Hub pulls. Private organization repositories on Docker Hub require the organization name in the path prefix, matching the exact namespace structure maintained by the upstream public registry.
 
 For npm, Maven, and Python remote repos, the upstream configuration uses enumerated constants like `NPMJS`, `MAVEN-CENTRAL`, and `PYPI` in the gcloud command. Remote repositories support authenticated upstream access for private Docker Hub organizations and other protected registries by storing credentials in a Secret Manager secret referenced in the remote repository configuration—see the [remote repository guide](https://cloud.google.com/artifact-registry/docs/repositories/remote-overview).
 
-Hypothetical scenario: Your CI pipeline builds 200 times per day and each build pulls `node:20-bookworm-slim` from Docker Hub. Without a remote cache, you hit Docker Hub rate limits within the first hour and builds fail unpredictably. After creating a remote repository and updating CI to pull through `us-central1-docker.pkg.dev/PROJECT/dockerhub-cache/library/node:20-bookworm-slim`, the first build populates the cache and the remaining 199 builds pull from Artifact Registry at in-region speeds with no upstream dependency.
+Hypothetical scenario: Your CI pipeline builds 200 times per day and each build pulls `node:20-bookworm-slim` from Docker Hub. Without a remote cache, you hit Docker Hub rate limits within the first hour and builds fail unpredictably. After creating a remote repository and updating CI to pull through `us-central1-docker.pkg.dev/PROJECT/dockerhub-cache/library/node:20-bookworm-slim`, daily builds consume regional network paths, protecting release velocity and eliminating outbound network transfer overhead across engineering environments.
 
 ### Virtual Repositories
 
-Virtual repositories provide a single endpoint that aggregates multiple upstream repositories (both standard and remote). [Priority values determine lookup order](https://cloud.google.com/artifact-registry/docs/repositories/virtual-overview): **higher priority wins**—when multiple upstreams contain an artifact with the same name, the upstream with the highest priority value is served. To defend against dependency confusion, your internal standard repository must have a **higher** priority than the public remote cache so internal packages win over identically named public packages.
+**Pause and predict:** You configure an Artifact Registry virtual repository. The repository aggregates an upstream public remote cache assigned priority 200 with an internal standard repository assigned priority 100. When a client requests a package whose name exists in both repositories, which artifact does Artifact Registry return, and what security vulnerability does this policy create?
+
+<details>
+<summary>Check your prediction</summary>
+
+Artifact Registry evaluates upstream policies where higher numerical priority values win, meaning the public remote cache at priority 200 is served instead of the internal artifact at priority 100. Because the public repository takes precedence, this configuration creates a dependency confusion vulnerability where an external attacker can publish a malicious package with the same name to the public registry, tricking the virtual repository into serving compromised code to internal builds. To prevent dependency confusion, internal standard repositories must always be assigned a higher priority value than public remote caches.
+</details>
+
+Virtual repositories provide a single endpoint that aggregates multiple upstream repositories (both standard and remote). [Priority values determine lookup order](https://cloud.google.com/artifact-registry/docs/repositories/virtual-overview) across configured upstreams, enabling platform teams to define deterministic resolution hierarchies. Setting up upstream policy files allows organizations to streamline client package management configurations while centralizing artifact governance across development environments.
 
 ```bash
 # Create a virtual repository that combines your internal repo and Docker Hub cache
@@ -551,7 +576,15 @@ When designing upstream priority, remember that **higher numbers win**. A common
 
 ## Cleanup Policies
 
-Cleanup policies automatically delete old images to prevent storage cost growth. [Artifact Registry evaluates policies through a periodic background job](https://cloud.google.com/artifact-registry/docs/repositories/cleanup-policy), so changes take effect within approximately one day. Use `--dry-run` mode first to preview which artifacts would be deleted before enabling destructive rules on a production repository.
+**Pause and predict:** You apply a cleanup policy configured to delete untagged container images older than thirty days. Your automated release pipeline immediately pushes an updated build that retags the floating `latest` pointer to a new digest. When does your repository storage footprint actually decrease, and how can you safely preview which artifacts match the policy before deletions occur?
+
+<details>
+<summary>Check your prediction</summary>
+
+Storage utilization does not decrease immediately because Artifact Registry evaluates cleanup policies via an asynchronous background job that executes approximately once per day; the superseded image digest remains untagged and continues to incur storage charges until that background process completes its evaluation cycle. To preview and verify which container images and package versions match the configured deletion rules without actually removing any data, execute the policy assignment command with the `--dry-run` flag.
+</details>
+
+[Cleanup policies](https://cloud.google.com/artifact-registry/docs/repositories/cleanup-policy) automatically manage artifact retention to prevent unconstrained storage cost growth across development and production repositories. Platform administrators configure declarative rules that balance automated capacity reclamation against the operational necessity of retaining historical images for incident investigation and rapid environment rollbacks.
 
 Untagged images accumulate silently when CI pipelines push both digest-pinned builds and floating tags like `latest` or branch names. Each push of `my-app:main` creates a new digest while the previous digest becomes untagged but still billable storage. A delete policy targeting untagged images older than 30 days, combined with a keep policy retaining the ten most recent `v`-prefixed release tags, balances cost control against the ability to roll back to a recent production build.
 
@@ -990,7 +1023,39 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: Automatic vulnerability scanning means a CRITICAL image cannot be deployed to GKE.** A security analyst enables automated vulnerability scanning across all Artifact Registry repositories holding microservice container images. The CI/CD pipeline builds and pushes an application image. The scanner immediately flags three CRITICAL CVEs residing within an underlying base distribution package. The analyst assumes that the active scanner findings will automatically block deployment manifests from running on the cluster. The analyst signs off on the release workflow without configuring additional admission controls.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: container registry vulnerability auditing versus Kubernetes admission control boundaries. Next action: configure a Binary Authorization policy requiring cryptographic attestations from an authorized attestor, and require CI/CD pipelines to verify zero CRITICAL findings before generating the deployment attestation.
+</details>
+
+**Card B: A remote repository means CI never fails when Docker Hub is down, even for tags never pulled before.** A DevOps engineer provisions an Artifact Registry remote repository configured to proxy and cache upstream images from Docker Hub. The engineer updates all build runners and deployment pipelines to route container base image requests through the regional remote repository endpoint. Docker Hub subsequently announces an unscheduled global maintenance outage. The engineer authorizes developers to introduce previously unused Alpine base image tags into their feature branch Dockerfiles, expecting the remote repository to absorb the upstream downtime seamlessly for all builds.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: pull-through cache misses requiring upstream network connectivity. Next action: pre-pull or warm required base image tags into the remote repository during stable upstream windows, or maintain standard internal repositories for mission-critical baseline container dependencies.
+</details>
+
+**Card C: In a virtual repository, a public remote cache at priority 200 still loses to an internal repo at priority 100 because internal always wins.** A platform engineer establishes an Artifact Registry virtual repository. The repository aggregates an internal standard repository containing proprietary packages with a remote repository caching a public package index. The engineer assigns priority 200 to the public remote cache and priority 100 to the internal standard repository. The engineer reasons that Artifact Registry's internal repository type inherently takes precedence over third-party public caches regardless of assigned priority integers. The team then instructs developers to pull internal dependencies exclusively through the virtual repository endpoint.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: numerical priority evaluation order overriding repository type semantics. Next action: configure the internal standard repository with a higher priority value (such as 200) and the public remote cache with a lower priority value (such as 100) to prevent dependency confusion attacks and ensure internal artifacts resolve first.
+</details>
+
+**Card D: Applying a cleanup policy JSON immediately deletes untagged images and frees storage the moment you retag `latest`.** A system administrator creates a cleanup policy JSON targeting untagged images older than thirty days. The administrator applies it to a bloated staging repository using `gcloud artifacts repositories set-cleanup-policies`. The repository approaches an impending project quota deadline. The administrator pushes a new commit to trigger a build that retags the `latest` pointer on an existing fifty-gigabyte release candidate image. The administrator immediately checks the billing dashboard and repository storage metrics expecting an instantaneous reduction in stored gigabytes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: asynchronous background evaluation scheduling versus synchronous tag mutation. Next action: run cleanup policies with `--dry-run` to preview eligible deletions, and account for the approximately one-day background job execution cycle when planning repository capacity adjustments.
+</details>
+
+**Success Criteria**:
 
 - [ ] Standard Docker repository created with immutable tags
 - [ ] Container image built, tagged, and pushed successfully
