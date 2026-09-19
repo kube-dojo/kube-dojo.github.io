@@ -240,12 +240,17 @@ the job is continuous high-volume delivery
 to S3, Redshift, OpenSearch, Splunk, an HTTP
 endpoint, or an Iceberg destination with
 managed buffering.
-Pause and predict: if a team says "we need
+
+**Pause and predict:** If a team says "we need
 real-time fan-out to four independent
 applications and each application must
 replay yesterday's events," which part of
 this map should make you nervous about
 choosing Firehose alone?
+
+<details>
+<summary>Check your prediction</summary>
+
 The nervous part is "four independent
 applications."
 Firehose can deliver to a configured
@@ -256,6 +261,17 @@ That phrase points toward Kinesis Data
 Streams with consumer checkpointing, and
 possibly Enhanced Fan-Out if read throughput
 or latency matters.
+
+</details>
+
+Evaluating consumer access patterns before
+selecting an ingestion tier prevents costly
+replatforming later in production operations.
+When multiple downstream consumers require
+independent processing rates and historical
+replay, streaming systems must provide
+isolated cursor management and durable
+partition retention across every reader.
 
 ## Kinesis Deep Dive: Streams That Operators Can Rewind
 
@@ -625,10 +641,15 @@ and improves Athena file scanning, but the
 newest records still wait up to the interval
 and dynamic partitioning can multiply object
 count by active prefix.
-Pause and predict: what happens to Athena
-cost if Firehose writes thousands of tiny
-Parquet files per hour instead of fewer
-larger files with the same data?
+
+**Pause and predict:** What happens to Athena
+cost and query efficiency if Firehose writes
+thousands of tiny Parquet files per hour instead
+of fewer larger files with the same data?
+
+<details>
+<summary>Check your prediction</summary>
+
 The bytes scanned may not always rise by the
 exact same factor, but query planning, file
 listing, metadata reads, and reader overhead
@@ -638,6 +659,15 @@ query touches many partitions, because the
 engine spends more effort opening and
 coordinating files rather than scanning
 useful column chunks.
+
+</details>
+
+Storage layout directly determines how compute
+engines interact with underlying cloud stores.
+Establishing deliberate compaction policies,
+sensible buffer boundaries, and proper file
+sizing ensures queries remain predictable and
+economical as dataset volumes expand.
 
 ## Glue Deep Dive: Catalogs, Jobs, and Schema Contracts
 
@@ -664,10 +694,22 @@ They become dangerous when a broad S3 prefix
 contains multiple schemas, mixed event
 versions, temporary files, backfills, and
 failed writes.
+
+**Pause and predict:** What can an automated
+Glue crawler do to the Data Catalog if that
+prefix is not a single stable schema and
+contains mixed event formats or staging data?
+
+<details>
+<summary>Check your prediction</summary>
+
 In that case, the crawler may infer a wider
 or different type than expected, create
 extra tables, or change partitions in a way
 that makes Athena queries surprising.
+
+</details>
+
 Operators detect catalog drift by comparing
 producer schema changes, Glue table
 versions, crawler run history, partition
@@ -860,6 +902,23 @@ use a different capacity model.
 Workgroups are the first production control.
 A primary workgroup with default settings is
 fine for a lab and weak for a platform.
+
+**Pause and predict:** What happens when an
+analyst runs an unconstrained `SELECT *` query
+against the raw lake on that default primary
+workgroup without operational guardrails?
+
+<details>
+<summary>Check your prediction</summary>
+
+Because the default workgroup does not enforce
+a per-query data scan limit, an unconstrained
+scan can read unbounded bytes across the entire
+raw bucket, generating unexpected charges that easily
+exceed the cost of the entire ingestion layer.
+
+</details>
+
 Create separate workgroups for automated
 jobs, analysts, incident responders, and
 experiments.
@@ -1477,7 +1536,43 @@ The architecture is still the same six-step
 pipeline: stream, deliver, catalog, produce,
 verify, query, then improve the layout.
 
-### Success Criteria
+**Card A: Firehose alone is enough for four independent apps that each need to replay yesterday.** An infrastructure architect plans a streaming ingestion pipeline where four distinct internal microservices must independently read from the incoming record stream and re-read up to twenty-four hours of historical data during operational recoveries. Because Amazon Data Firehose provides managed scaling and direct delivery into cloud storage destinations without requiring capacity provisioning, the architect decides to route all producer traffic exclusively through a single delivery stream. The team plans to connect all four downstream subscriber services directly to this stream, expecting each consumer to independently control its own read pointer.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating managed stream delivery with an immutable multi-reader distributed log. Firehose delivers data directly to configured storage destinations but does not support independent consumer offsets, consumer groups, or arbitrary replay of historical records. Next action: provision an Amazon Kinesis Data Streams data stream with a multi-day data retention window to serve as the shared event log, allowing multiple consumer applications and Firehose delivery streams to read and rewind independently.
+
+</details>
+
+**Card B: Thousands of tiny Parquet files cost the same in Athena as fewer larger files with the same bytes.** A data engineering team configures Amazon Data Firehose with a sixty-second flush interval and dynamic partitioning across several high-cardinality keys, producing thousands of small hundred-kilobyte Parquet files in Amazon S3 every hour. The team reasons that because Amazon Athena pricing is calculated strictly based on the total number of bytes scanned during query execution, the physical file count across partitions has no bearing on overall query expenditure or performance. As a result, the team schedules high-frequency analytical queries against this raw partitioned storage tier without implementing any compaction or file-coalescing strategy.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: ignoring filesystem metadata overhead, S3 GET request charges, and reader initialization penalties inherent to small files in distributed query engines. While columnar compression reduces byte volume, thousands of small objects force Athena to spend significant compute overhead on metadata retrieval and file opening rather than efficient vectorized data scanning. Next action: tune Firehose buffer hints toward larger sizes, such as 64 to 128 MB, or schedule an automated AWS Glue ETL compaction job to merge small files into optimal 128 MB to 512 MB Parquet objects.
+
+</details>
+
+**Card C: A Glue crawler over a mixed S3 prefix is always safe because it only adds partitions.** A platform team deploys an AWS Glue crawler configured to scan a broad root S3 bucket prefix where various application teams continuously drop diverse telemetry payloads, experimental schemas, and intermittent batch dumps. The platform engineers assume that crawlers are non-destructive cataloging utilities designed solely to detect newly created date partitions and append them to existing table definitions without altering column specifications. Confident that the crawler will never mutate established table contracts or introduce disruptive catalog changes, the team runs the crawler on a recurring hourly schedule across the shared storage hierarchy.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding crawler schema inference and mutation capabilities across heterogeneous data files. When a crawler encounters files with divergent column types, nested structures, or inconsistent schemas within the same prefix, it can widen data types, misclassify formats, or spontaneously register unexpected new tables that break downstream Athena queries. Next action: scope crawlers strictly to uniform, table-specific prefix locations, configure schema update policies to ignore changes, or define schemas authoritatively using AWS Glue Schema Registry and version-controlled infrastructure as code.
+
+</details>
+
+**Card D: The default Athena primary workgroup already protects you from a SELECT * scan-cost incident.** A cloud operations engineer grants junior business intelligence analysts access to the default primary Athena workgroup so they can immediately begin querying datasets stored within the enterprise S3 data lake. The engineer assumes that AWS configures sensible out-of-the-box guardrails on default services to prevent runaway queries from generating catastrophic billing surprises. Because all team members have completed security awareness training and understand best practices regarding partition filtering, the engineer decides that configuring custom workgroups with explicit per-query data limits is an unnecessary administrative burden.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: relying on administrative defaults and team compliance instead of hardware-enforced cost boundaries. The primary Athena workgroup has no per-query or workgroup-wide data scan caps enabled by default, meaning an accidental `SELECT *` without partition filters can scan an entire multi-terabyte dataset and incur massive charges. Next action: isolate distinct teams into custom Athena workgroups, enforce strict per-query data scan limits, specify dedicated query result locations with lifecycle rules, and configure CloudWatch billing alarms on query metrics.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Kinesis Data Streams stream exists in
       on-demand mode.
