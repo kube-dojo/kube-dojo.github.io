@@ -290,7 +290,7 @@ gcloud recommender recommendations list \
 No. Spot VMs can be preempted by Compute Engine at any moment with only a 30-second termination notice whenever capacity is required elsewhere. Because a 36-hour rendering job lacking checkpointing capabilities must restart from the beginning after any interruption, preemption loses all completed computation and wastes time and money.
 </details>
 
-Evaluating failure recovery and job durability boundaries ensures that compute cost reduction strategies do not compromise workload completion guarantees. Once baseline machine lifecycles and durability requirements are defined, provisioning consistent compute environments requires packaging runtime software into reproducible images.
+Evaluating failure recovery and job durability boundaries is a capacity-planning conversation, not a discount toggle. Once those boundaries are defined, provisioning consistent compute environments requires packaging runtime software into reproducible images.
 
 ---
 
@@ -368,7 +368,7 @@ gcloud compute images deprecate my-app-v1-1 \
 Bake a new custom image containing the patch and point the image family at it so the new image becomes current. Then execute a rolling replace or recreate on the instance group from an instance template that references the family, because already-running VMs continue running the old OS image until explicitly replaced or recreated.
 </details>
 
-Structuring automated replacement workflows prevents manual drift and establishes auditable release cadences across operational server fleets. In addition to immutable base operating system images, instances often require dynamic boot-time parameterization to integrate with surrounding cloud environments.
+Golden-image pipelines still leave room for boot-time configuration that should not be baked into every CVE rebuild. In addition to immutable base operating system images, instances often require dynamic boot-time parameterization to integrate with surrounding cloud environments.
 
 ### Startup Scripts, Metadata, and Golden-Image Hygiene
 
@@ -537,9 +537,9 @@ gcloud compute instance-groups managed rolling-action start-update web-mig \
 A zonal MIG keeps all VMs in one zone, making that entire zone a single blast radius. If `us-central1-a` fails, all API instances in the zone go down simultaneously and the service experiences an immediate full outage. By contrast, a regional MIG spreads instances across multiple zones within the region, ensuring that remaining healthy zones continue serving traffic while the autoscaler provisions replacement VMs.
 </details>
 
-Selecting between single-zone and multi-zone deployment boundaries dictates how infrastructure absorbs physical disruptions and maintains service-level availability. Architectural resilience requires aligning failure domains with client traffic expectations before configuring rolling deployment mechanics.
+Selecting between single-zone and multi-zone deployment boundaries is a product-SLA decision, not a Terraform default. Architectural resilience requires aligning failure domains with client traffic expectations before configuring rolling deployment mechanics.
 
-Tradeoffs matter at update time: regional rolling updates coordinate replacements across zones, which can take longer but preserve zone diversity. Zonal MIGs update faster in one place yet concentrate risk. For stateful workloads that cannot tolerate multiple live copies, neither MIG shape fixes data gravity—you still need external durable storage and a real failover story.
+Tradeoffs matter at update time: regional rolling updates coordinate replacements across zones, which can take longer but preserve zone diversity. Zonal MIGs update faster in one place. For stateful workloads that cannot tolerate multiple live copies, neither MIG shape fixes data gravity—you still need external durable storage and a real failover story.
 
 ```bash
 # Zonal MIG (single zone — use only with eyes open)
@@ -574,7 +574,7 @@ gcloud compute instance-groups managed update-autoscaling web-mig \
 
 ### Self-Healing
 
-When a health check fails, the MIG automatically recreates the unhealthy VM. This is the simplest form of self-healing in GCP. It protects request handling by replacing only the failed instance and then letting the control plane drive it back to healthy state through the same template.
+Self-healing ties instance health to group membership so operators are not paging to babysit a single VM. The diagram below is the control-plane reaction, not a license to snowflake-edit disks.
 
 ```mermaid
 flowchart LR
@@ -591,7 +591,7 @@ flowchart LR
         VM2b["VM-2<br/>FAIL"]
         VM3b["VM-3<br/>OK"]
         
-        VM2b -- "Health check fails<br/>3 consecutive times" --> Action["MIG deletes VM-2<br/>and creates VM-2-new<br/>from the template"]
+        VM2b -- "Health check fails<br/>3 consecutive times" --> Action["group membership<br/>changes"]
     end
 ```
 
@@ -603,7 +603,7 @@ flowchart LR
 The Managed Instance Group self-healing mechanism automatically deletes the unhealthy VM and creates a fresh replacement instance directly from the baseline instance template. Because the replacement instance boots from the original immutable template and disk image, the manual configuration file edits on the failed VM are permanently destroyed.
 </details>
 
-Maintaining configuration consistency across scalable fleets requires treating instances as ephemeral compute nodes rather than persistent stateful servers. Declarative infrastructure and immutable deployment pipelines guarantee that every automatically provisioned replacement matches the validated production specification.
+Maintaining configuration consistency across scalable fleets is an observability and template problem, not a one-off SSH session. Declarative infrastructure and immutable deployment pipelines keep every automatically provisioned replacement aligned with the validated production specification.
 
 ### Observability: What to Watch in Production
 
