@@ -79,7 +79,15 @@ Google’s [comparison guide](https://cloud.google.com/run/docs/functions/compar
 
 Naming convergence matters for cross-team communication. Console navigation may say **Cloud Run** while your runbooks still say **Cloud Functions (2nd gen)**; both refer to the same Cloud Run-backed functions when you pass `--gen2`. New work should default to Cloud Run functions unless you are patching a gen1-only trigger contract you cannot migrate yet. Gen1 still supports direct triggers from a smaller set of sources, while Cloud Run functions route most non-HTTP events through Eventarc, including audit-log-derived events from many GCP services. When you plan a migration, treat it as a Cloud Run service migration: revise IAM roles (`roles/run.sourceDeveloper` and related), retest idempotency, and revalidate latency because audit-log-based routes are not identical to direct storage notifications.
 
-> **Stop and think**: If Gen 2 instances can handle multiple requests concurrently, how does this affect the memory and CPU requirements of the instance itself compared to a Gen 1 instance handling a single request?
+**Pause and predict:** If a 2nd gen function instance processes multiple requests concurrently instead of dedicating an instance to each request, how must you size memory and CPU compared to a 1st gen baseline?
+
+<details>
+<summary>Check your prediction</summary>
+
+Concurrent requests share one instance’s memory and CPU, so you size for peak concurrent work, not a single request; Gen 1’s 1:1 model can look cheaper per instance while bursting more instances.
+</details>
+
+The next section examines runtime execution environments, buildpack image packaging during source deployment, and entry point bindings across supported language frameworks.
 
 ---
 
@@ -320,7 +328,7 @@ gcloud functions logs read process-upload \
 
 Eventarc is GCP's event routing layer. It connects sources such as Cloud Storage, Pub/Sub, and Cloud Audit Logs to targets such as Cloud Functions, Cloud Run, GKE, and Workflows. Think of it as a managed event bus with filtering: you declare which event types and attributes matter, and Eventarc delivers matching CloudEvents to the destination you choose. That indirection is what unlocks audit-log triggers—your function can react when an IAM policy changes or a Compute Engine instance is created even though there is no “IAM trigger” flag on `gcloud functions deploy` itself.
 
-Audit-log-sourced events are powerful but subtly different from direct resource events. They follow the path of Cloud Audit Logs being written, which can add latency compared to a direct finalize notification and may include events you did not anticipate if filters are too broad. Tighten filters on `serviceName`, `methodName`, and resource labels so your security automation does not fan out on unrelated admin activity. Eventarc also lets one trigger fan out to multiple targets in advanced architectures, though the common learning path keeps a single Cloud Run function per trigger for clarity.
+Audit-log-sourced events are powerful but structurally different from direct resource events. They capture administrative operations across Google Cloud services, which may include events you did not anticipate if filter criteria are scoped too broadly. Tighten filters on `serviceName`, `methodName`, and resource labels so your security automation does not fan out on unrelated administrative activity. Eventarc also lets one trigger fan out to multiple targets in advanced architectures, though the common learning path keeps a single Cloud Run function per trigger for clarity.
 
 ```mermaid
 graph LR
@@ -351,7 +359,15 @@ graph LR
     ET --> WF
 ```
 
-> **Pause and predict**: If Eventarc relies on Cloud Audit Logs for many of its triggers, what does that mean for the latency between an action occurring and your function being triggered?
+**Pause and predict:** If an Eventarc trigger relies on Cloud Audit Logs rather than direct resource notifications, how does that delivery path affect invocation timing and latency?
+
+<details>
+<summary>Check your prediction</summary>
+
+Many Eventarc paths wait on Audit Logs write/export, so trigger latency is higher and less predictable than a direct GCS finalize notification.
+</details>
+
+The following commands illustrate creating Eventarc triggers using the Google Cloud CLI for audit log events and Pub/Sub transport streams.
 
 ### Creating Eventarc Triggers
 
@@ -595,6 +611,16 @@ Event-driven systems fail in predictable ways: transient downstream outages, poi
 
 ### Retry Behavior
 
+**Pause and predict:** Across HTTP, Eventarc, and Pub/Sub triggers, which integration paths retry failed invocations automatically by default, and how long can those retry attempts persist?
+
+<details>
+<summary>Check your prediction</summary>
+
+HTTP does not auto-retry (caller must); Eventarc retries up to 24 hours; Pub/Sub/GCS depend on subscription and function retry settings.
+</details>
+
+The following comparison matrix outlines standard platform retry lifecycles and configuration toggles across primary Cloud Functions invocation sources and event routers.
+
 | Trigger Type | Default Retry | Configurable |
 | :--- | :--- | :--- |
 | **HTTP** | [No retry (caller must retry)](https://cloud.google.com/run/docs/tips/function-retries) | N/A |
@@ -619,11 +645,19 @@ gcloud functions deploy my-function \
 
 ### Idempotency: The Golden Rule
 
-Event-driven functions **must be idempotent**---processing the same event twice should produce the same result. [Events can be delivered more than once.](https://cloud.google.com/run/docs/tips/function-retries) Idempotency is not a library feature you install once; it is a data model choice. Store processed event IDs in a table with a uniqueness constraint, or use natural keys such as `gs://bucket/object/generation` when the storage event exposes generation numbers. Retention should exceed the maximum retry window for your trigger plus any manual replay horizon your operations team uses.
+Event-driven functions **must be idempotent**---processing the same event twice should produce the same result. [Events can be delivered more than once.](https://cloud.google.com/run/docs/tips/function-retries) Idempotency is not a library feature you install once; it is an architectural contract across distributed messaging systems. Designing for duplicate deliveries requires establishing defensive state validation before executing side effects.
 
 Side effects that cannot be rolled back—charging money, shipping physical goods, sending irreversible emails—need stronger guards than a log line. Use outbox patterns or idempotent API tokens supplied by downstream systems. HTTP webhooks should validate signatures before work begins so random retries cannot forge payloads.
 
-> **Stop and think**: If an event ID is the best way to deduplicate events, where should you store these processed IDs, and how long should you retain them? Consider cost of the store, query latency on the hot path, and whether replays after deploys should reuse the same table or a new namespace per function version.
+**Pause and predict:** When designing deduplication for event-driven functions, where should you record processed event identifiers, and how long must those records persist?
+
+<details>
+<summary>Check your prediction</summary>
+
+Durable store with a uniqueness constraint (table or `gs://bucket/object/generation`); retention ≥ retry window plus replay horizon; logs-only is not a store.
+</details>
+
+The following Python implementation contrasts a naive non-idempotent handler against a defensive implementation that records incoming event metadata before executing state mutations.
 
 ```python
 # BAD: Not idempotent (counter increments on every retry)
@@ -1074,7 +1108,39 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: Gen 2 concurrency means you can keep the same small memory as a Gen 1 one-request instance.** A development team migrates an image analysis function from 1st gen to 2nd gen and enables concurrency of 40 to reduce cold starts and container instance costs. They retain the original 256 MiB memory allocation, assuming each concurrent request operates within an isolated resource sandbox. During a traffic surge, multiple requests process images simultaneously inside the same container instance, causing spontaneous out-of-memory container restarts and 500 error spikes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: shared container instance resource pooling versus isolated concurrent execution models. Next action: calculate peak memory consumption across all concurrent threads, allocate sufficient instance memory to support maximum concurrency, or reduce concurrency limits to align with container resource constraints.
+</details>
+
+**Card B: Eventarc audit-log triggers fire as fast as a direct Cloud Storage finalize notification.** An infrastructure engineer builds an automated security pipeline that validates uploaded GCS blobs by subscribing an Eventarc trigger to Cloud Audit Logs instead of configuring a direct Cloud Storage finalize event. The engineer expects the security check to complete within milliseconds of object upload. In production, downstream consumers experience irregular delays of several seconds to minutes before the validation function executes on newly uploaded objects.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: audit log ingestion pipeline delays versus direct resource event dispatch. Next action: use direct Cloud Storage event triggers via Eventarc when low latency is required, reserving Cloud Audit Log triggers for administrative and control-plane change notifications that tolerate asynchronous ingestion latency.
+</details>
+
+**Card C: HTTP Cloud Functions retry automatically for 24 hours like Eventarc.** A payments team deploys an HTTP-triggered Cloud Run function to receive payment provider webhook notifications. The team configures no client-side retry logic and no intermediate messaging queue, assuming Google Cloud automatically persists and retries failed invocations for 24 hours. When a temporary downstream database timeout causes the function to return HTTP 500 responses, payment confirmations are permanently dropped without redelivery.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: synchronous request-response client boundaries versus asynchronous event bus redelivery guarantees. Next action: front HTTP ingestion endpoints with a durable queue like Cloud Pub/Sub or configure the external caller to execute exponential backoff retries upon receiving 5xx status codes.
+</details>
+
+**Card D: Processed event IDs can live only in Cloud Logging; no durable store is required for idempotency.** A software engineer implements deduplication for an event-driven inventory function by querying recent Cloud Logging entries for the incoming event ID before incrementing stock allocations. The engineer relies on log search rather than deploying an external datastore to avoid infrastructure costs. When Pub/Sub redelivers duplicate messages during an upstream network blip, log ingestion delays prevent the function from detecting the prior execution, resulting in duplicate inventory updates.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: log ingestion latency and query boundaries versus transactional persistence constraints. Next action: record processed event identifiers in a durable datastore with atomic uniqueness constraints, such as Cloud Firestore, Cloud SQL, or Cloud Storage generation preconditions, retaining records across the entire retry window.
+</details>
+
+**Success Criteria**:
 
 Completing the lab means you observed end-to-end causality: storage event → log lines with event ID → Pub/Sub payload. Capture screenshots or log excerpts for your portfolio if you mentor others; the failure modes are more educational than the happy path.
 
