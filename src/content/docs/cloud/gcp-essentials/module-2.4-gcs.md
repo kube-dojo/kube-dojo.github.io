@@ -144,7 +144,15 @@ When RPO requirements exceed what object replication provides—point-in-time da
 
 ---
 
-**Stop and think:** Autoclass removes retrieval fees on automatic tier transitions, which sounds like a universal win until you model buckets where regulatory policy requires Nearline retention for ninety days regardless of access, or buckets with billions of sub-128 KiB objects that never qualify for management but still incur Autoclass fees. In those cases, calendar-driven lifecycle rules or explicit class locks give auditors a stable story while Autoclass would fight your compliance narrative or charge management fees without tiering benefit.
+**Pause and predict:** Autoclass automatically transitions objects across storage classes without retrieval fees, which makes it tempting to enable everywhere as a default cost-saving feature. In what production scenarios would enabling Autoclass conflict directly with regulatory retention requirements or fail to yield cost savings for high-scale storage buckets?
+
+<details>
+<summary>Check your prediction</summary>
+
+Autoclass fights compliance class-locks and still bills management fees on tiny objects that never tier. Specifically, regulatory policies requiring objects to remain in a fixed class such as Nearline for ninety days conflict with Autoclass dynamic shifting, and buckets holding billions of sub-128 KiB objects incur per-object management fees without ever transitioning. In those scenarios, calendar-driven lifecycle rules or explicit class locks provide the auditor-stable path.
+</details>
+
+Evaluating access patterns and compliance obligations guides architectural storage decisions before selecting between automated tiering models and deterministic lifecycle rules. Aligning retrieval economics with organizational retention governance ensures that cloud storage configurations remain predictable and cost-effective.
 
 ## Storage Classes: Matching Cost to Access Patterns
 
@@ -205,7 +213,15 @@ Location type and class interact with availability SLAs documented in the [stora
 
 ---
 
-**Pause and predict:** Suppose a lifecycle rule deletes live objects older than thirty days while versioning is enabled, and an engineer overwrote a sensitive forty-day-old object five days ago. The live generation is only five days old, so the age-based delete rule does not remove it yet; the prior generation becomes noncurrent and remains billable until a separate rule targets `isLive: false` or `daysSinceNoncurrentTime`. Teams that forget the second rule discover "deleted" content still appearing on invoices as noncurrent storage.
+**Pause and predict:** A bucket has object versioning enabled and a lifecycle rule configured to delete objects older than thirty days. Five days ago, an engineer overwrote an existing forty-day-old configuration object with a new version. What happens to both the newly uploaded object and the older version during subsequent lifecycle evaluations?
+
+<details>
+<summary>Check your prediction</summary>
+
+The live generation is five days old, so the age-based delete rule does not remove it. Meanwhile, the prior generation becomes noncurrent and remains billable until a separate lifecycle rule targeting `isLive: false` or `daysSinceNoncurrentTime` explicitly cleans it up. Without a dedicated noncurrent version rule, superseded object versions accumulate indefinitely and continue generating storage charges.
+</details>
+
+Reasoning through object state lifecycles requires distinguishing between active generation tracking and superseded object versions across automated evaluation passes. Declarative lifecycle policies must explicitly reflect both current and historical object requirements to maintain operational integrity.
 
 ## Lifecycle Management
 
@@ -280,7 +296,7 @@ gcloud storage buckets update gs://my-bucket \
 
 Lifecycle rules can also use `createdBefore` to grandfather objects during migrations, or `matchesPrefix` / `matchesSuffix` when only certain key patterns should age. Custom time fields on objects (when set) enable application-defined clocks separate from upload time, which helps when data arrives late but should expire based on business dates. Not every condition combines cleanly: test JSON in lower environments because invalid rule sets are rejected at write time, but subtle logic errors only show up when monthly bills arrive.
 
-When versioning is enabled, a lifecycle rule that deletes objects based only on `age` applies to the live object and does not remove noncurrent versions automatically unless you add conditions for `isLive: false`. That is why the "Pause and predict" prompt above matters: a 30-day delete on live objects can still leave a deep stack of noncurrent generations billing storage until a companion rule trims them. Test lifecycle JSON in a sandbox bucket with synthetic version churn before attaching rules to production Terraform state buckets.
+Validating lifecycle rules in pre-production environments ensures that automated management policies behave predictably across complex multi-version storage workloads. Infrastructure teams should model multifaceted rule interactions in sandbox buckets using simulated version churn and explicit expiration testing before attaching automated lifecycle policies to production Terraform state buckets or customer data repositories.
 
 At moderate scale—say tens of terabytes with daily ingest—lifecycle mistakes show up in the invoice before they show up in monitoring. Transitioning millions of small Standard objects to Nearline saves storage rate but bills a Class A operation per transition at the destination class rate, which can dominate if objects are only a few kilobytes each. Deleting noncurrent versions saves storage but is irreversible unless soft delete or holds apply. Inventory reports and Storage Insights datasets help you simulate rule impact without listing every object interactively.
 
@@ -346,7 +362,15 @@ gcloud storage objects update gs://my-bucket/evidence.pdf \
 
 ---
 
-**Stop and think:** Uniform bucket-level access removes per-object ACLs, so a shared `invoices` bucket cannot safely isolate a hundred external clients with legacy ACL tricks. Production answers split along three lines: separate buckets per tenant with IAM on each bucket, one bucket with IAM Conditions matching object name prefixes plus audited service accounts, or private objects served through your application that mints per-user signed URLs after authenticating the user in your identity system.
+**Pause and predict:** A financial platform stores customer PDF invoices in a shared storage bucket where uniform bucket-level access is enforced. Because per-object ACLs are disabled under uniform access, how should an architecture securely isolate access so that one hundred external clients can view only their own invoices?
+
+<details>
+<summary>Check your prediction</summary>
+
+Split buckets per tenant with dedicated bucket-level IAM policies, configure IAM Conditions matching object name prefixes with audited service accounts, or keep objects private and serve them through an application that mints per-user signed URLs after identity authentication. Production architectures rely on centralized IAM and application authorization boundaries rather than legacy per-object ACLs.
+</details>
+
+Architecting multi-tenant object access requires evaluating security boundaries between cloud identity systems and application authentication layers. Selecting an appropriate authorization model ensures scalable tenant isolation while adhering to enterprise governance standards.
 
 ## Access Control: IAM vs ACLs
 
@@ -411,7 +435,15 @@ gcloud storage buckets get-iam-policy gs://my-bucket \
 
 ---
 
-**Pause and predict:** A fifteen-minute signed URL for a fifty-gigabyte upload will fail if the bytes are not fully received before expiration, because V4 signatures bind to a time window rather than to transfer progress. Resumable uploads can continue after interruption when properly implemented, but the initial signed session must be created with enough TTL for worst-case bandwidth, or the client must upload through a backend proxy that holds a service account identity instead of a short-lived browser URL.
+**Pause and predict:** A web application generates a signed URL with a fifteen-minute expiration window to allow a client browser to upload a fifty-gigabyte video file directly to a Cloud Storage bucket. What potential failure mode will this transfer encounter over a standard broadband internet connection, and how can the design avoid it?
+
+<details>
+<summary>Check your prediction</summary>
+
+V4 signature TTL is a strict wall-clock expiration window rather than a measure of transfer progress, so the upload will fail if all bytes are not completely received before the URL expires. To resolve this, generate the signed URL with a longer TTL accommodating worst-case network bandwidth, implement resumable uploads that negotiate session URIs, or proxy the upload through an internal application service authenticated via a service account.
+</details>
+
+Designing robust direct-to-object ingestion pipelines requires balancing client network constraints against token credential lifetimes. Production workflows must account for payload size variations and transient latency before deploying time-limited authorization mechanisms.
 
 ## Signed URLs: Time-Limited Access
 
@@ -900,7 +932,43 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: Autoclass is always cheaper and always compliant because it removes retrieval fees.** A cloud architect enables Autoclass across all storage buckets in an organization to minimize storage spend without incurring retrieval penalties. One target bucket contains billions of sub-128 KiB logging artifacts, while another bucket holds regulated customer records subject to a mandatory ninety-day retention policy. The architect signs off on the implementation expecting automatic cost optimization and compliance across all workloads.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: object size thresholds and compliance class-lock interference. Next action: disable Autoclass for buckets with sub-128 KiB objects where management fees exceed tiering savings, and configure explicit lifecycle rules or bucket retention locks to satisfy auditor retention schedules.
+
+</details>
+
+**Card B: A 30-day live-object delete lifecycle also deletes all noncurrent versions automatically.** A DevOps engineer configures an automated lifecycle policy with an age condition of thirty days to purge obsolete objects from a versioning-enabled bucket. The engineer assumes that deleting the active objects will cleanly remove the associated version history and reduce overall storage footprint. The team schedules the lifecycle configuration to run across all production backup repositories.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: live generation age evaluation versus noncurrent version retention. Next action: add explicit lifecycle rules with conditions targeting `isLive: false` and `daysSinceNoncurrentTime` to delete or tier noncurrent object generations.
+
+</details>
+
+**Card C: Uniform bucket-level access still lets you isolate 100 tenants with per-object ACLs.** A systems engineer migrates a legacy multi-tenant document repository to a single bucket and enables uniform bucket-level access for simplified administration. The engineer plans to assign fine-grained read permissions to individual client files using object-level access control lists for one hundred external customer organizations. The migration runbook schedules client onboarding directly after enabling uniform access on the shared bucket.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: disabling of object ACLs under uniform bucket-level access. Next action: provision dedicated per-tenant buckets, configure IAM Conditions on object name prefixes, or generate application-signed URLs for authenticated external clients.
+
+</details>
+
+**Card D: A 15-minute signed URL is enough for any 50 GiB browser upload because resumable uploads ignore expiry.** A developer configures an image and video processing portal to issue fifteen-minute signed URLs for client-side uploads of fifty-gigabyte raw media files. The developer reasons that initiating a resumable upload session allows client browsers to continue pushing bytes until completion regardless of how long the network transfer takes. The engineering team deploys the short-lived signed URL generation service to the production customer upload portal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: V4 signature wall-clock expiration versus transfer duration. Next action: extend the signed URL expiration window to accommodate realistic transfer times, negotiate resumable upload session URIs, or proxy large payload uploads through backend services.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Bucket created with versioning and uniform access
 - [ ] Multiple versions of a file uploaded
