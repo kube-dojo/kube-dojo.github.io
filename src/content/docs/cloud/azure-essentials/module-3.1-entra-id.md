@@ -125,7 +125,7 @@ Landing zone identity automation often uses infrastructure-as-code to create gro
 Azure RBAC is an additive authorization model where permissions inherit downward through the resource hierarchy. A lower-scope Reader assignment does not subtract or restrict permissions granted by a subscription-level Contributor role unless an explicit deny assignment exists.
 </details>
 
-Understanding hierarchical inheritance boundaries is essential before organizing enterprise cloud environments and inspecting management group structures with the Azure CLI commands below.
+The next object is the management-group CLI. After those commands, you can move a subscription under Production and inspect the resulting scope string.
 
 ```bash
 # List management groups
@@ -337,9 +337,9 @@ For **AKS**, the supported pattern is [Azure Workload Identity](https://learn.mi
 Federated credentials replace long-lived client secrets entirely by exchanging short-lived OpenID Connect tokens issued by GitHub for Entra ID access tokens. Supplying `client-id`, `tenant-id`, and `subscription-id` in the login action parameters is completely sufficient.
 </details>
 
-Configuring workload identity federation for automated pipelines establishes auditable authentication boundaries across development teams while standardizing continuous deployment configurations across enterprise repositories.
+The next object is the GitHub Actions federated-credential recipe. After it, the Important constraint is why you cannot chain Entra tokens as an external IdP.
 
-For **GitHub Actions**, you create a federated credential on the app registration (as shown earlier with `az ad app federated-credential create`) and use the `azure/login` action with `client-id`, `tenant-id`, and `subscription-id`. Hypothetical scenario: a platform team runs twenty repositories; rotating twenty secrets quarterly is error-prone, but one federated trust per repo branch pattern scales with policy-as-code reviews.
+For **GitHub Actions**, you create a federated credential on the app registration with `az ad app federated-credential create` as shown earlier. Hypothetical scenario: a platform team runs twenty repositories; rotating twenty secrets quarterly is error-prone, but one federated trust per repo branch pattern scales with policy-as-code reviews.
 
 **Important constraint**: [tokens issued by Microsoft Entra ID cannot be used as input to federated identity credential flows](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation)—the external IdP must be GitHub, your Kubernetes issuer, AWS Cognito, etc., not another Entra tenant token chained informally.
 
@@ -403,7 +403,7 @@ flowchart LR
 KEY INSIGHT: Global Administrator does NOT automatically have Azure RBAC access. They must "elevate" themselves first, because directory privileges and Azure resource permissions are deliberately separated. Global Administrator is an Entra ID directory role that grants control over tenant identities and policies, not an Azure RBAC role. The administrator has no default access to Azure resources and must explicitly [elevate access to User Access Administrator at the root scope](https://learn.microsoft.com/en-us/azure/role-based-access-control/elevate-access-global-admin) before they can grant themselves permissions to view or manage Azure resources.
 </details>
 
-Maintaining an explicit architectural separation between tenant administration and cloud resource governance ensures engineering organizations manage infrastructure permissions through structured role assignments across the scope hierarchy.
+The next object is `az role assignment create`. After it, management group → subscription → resource group is the scope tree you will type daily.
 
 ### Role Assignment Scope Hierarchy and `az role assignment create`
 
@@ -588,7 +588,7 @@ The activation process can require several controls before a role becomes active
 Privileged Identity Management operates by dynamically creating a temporary Azure RBAC role assignment upon activation approval. Because Azure RBAC role assignments propagate across globally distributed authorization caches, effective permissions can take several minutes to take effect worldwide.
 </details>
 
-Accounting for authorization propagation delays is an operational necessity during time-sensitive maintenance windows, whereas sustaining continuous least-privilege hygiene across enterprise organizations requires structured, recurring access reviews.
+The next object is Access Reviews. After that section, PIM limits duration while reviews ask whether the assignment should exist at all.
 
 ### Access Reviews and Governance Cadence
 
