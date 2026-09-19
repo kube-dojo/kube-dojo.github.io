@@ -122,9 +122,16 @@ The API server being the only Kubernetes component that directly stores API obje
 
 At this point the Pod may exist only as desired state. Nothing in the sequence above guarantees that a container is already running. The scheduler still has to bind the Pod to a node, the kubelet on that node still has to observe the assignment, and the container runtime still has to pull the image and create the container. This gap between "accepted by the API" and "running on a node" is where many control plane troubleshooting scenarios live.
 
-> **Pause and predict**: If the API server is unavailable but a worker node already has healthy containers running, which activities can continue and which activities stop?
+**Pause and predict:** If the API server is unavailable but a worker node already has healthy containers running, decide which activities can continue locally and which activities must wait for the control plane path to recover. Make your prediction before reading the answer, because this boundary is the fastest way to separate an application process failure from a cluster coordination failure.
 
-Pause and predict: if the API server is unavailable but a worker node already has healthy containers running, which activities can continue and which activities stop? Existing containers can keep running because kubelet and the runtime already have local work, but new API decisions, status updates, scheduling, and controller reconciliation are blocked or delayed. That prediction gives you a quick way to separate "the application process died" from "the cluster control loops cannot make progress."
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating Kubernetes as a remote process supervisor that continuously permits every running container. Next action: verify the local kubelet and runtime for already assigned containers, then use local control plane node checks because new API requests, scheduling, status updates, and controller reconciliation are blocked or delayed until the API path returns.
+
+</details>
+
+This boundary matters during partial outages because a calm application response does not prove the control plane can still accept, schedule, or reconcile new work.
 
 Kubernetes 1.35+ still follows this separation of concerns. Component flags, health endpoints, and exact manifest details evolve across releases, but the model remains stable enough for diagnostic reasoning. On a CKA-style kubeadm cluster, the control plane components are commonly defined as files under `/etc/kubernetes/manifests/`. The kubelet watches that directory and keeps the corresponding static Pods alive, which is why file recovery is often more important than `kubectl delete pod` during control plane repair.
 
@@ -212,7 +219,18 @@ kubectl get pods -n kube-system | grep etcd
 kubectl logs -n kube-system etcd-<control-plane-node>
 ```
 
-Hypothetical scenario: `kubectl get pods -A` works slowly, `kubectl apply` often times out, and API server logs show repeated storage latency warnings. You should suspect the API server is waiting on etcd rather than blaming the scheduler, because scheduling is only one later consumer of accepted state. In that case, check etcd member health, disk pressure, certificate expiration, and whether compaction or defragmentation has been neglected in a long-running cluster. The operational lesson is that every control loop depends on the shared state store being responsive.
+Hypothetical scenario: `kubectl get pods -A` works slowly, `kubectl apply` often times out, and API server logs show repeated storage latency warnings.
+
+**Pause and predict:** Which component should you suspect first, and why is this not primarily a scheduler investigation? Commit to one owner before opening logs, because broad read and write latency across many resources tests the shared API storage path before it tests later placement decisions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: blaming the scheduler for symptoms that occur before scheduling decisions can become the bottleneck. Next action: suspect the API server waiting on etcd, then check etcd member health, disk pressure, certificate expiration, and whether compaction or defragmentation has been neglected in a long-running cluster.
+
+</details>
+
+The operational lesson is that every control loop depends on the shared state store being responsive, so storage latency can make unrelated Kubernetes behaviors degrade together.
 
 > **Before running**: What output do you expect from `kubectl get --raw='/readyz?verbose'` on a healthy kubeadm control plane?
 
@@ -261,7 +279,16 @@ kubectl describe pod <pod-name>
 #  2 node(s) didn't match Pod's node affinity/selector"
 ```
 
-Pause and predict: a Pod requests 4 CPU cores and 8Gi of memory, but no single node currently has that much allocatable capacity available. The Pod should remain `Pending`, and `kubectl describe pod` should show scheduling events that mention insufficient resources or no available nodes meeting the request. That prediction is useful because it keeps you from restarting the scheduler when the scheduler is actually doing the correct thing.
+**Pause and predict:** A Pod requests 4 CPU cores and 8Gi of memory, but no single node currently has that much allocatable capacity available. Predict the Pod phase, the kind of message you expect in `kubectl describe pod`, and whether restarting the scheduler would repair the situation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: interpreting every `Pending` Pod as evidence that the scheduler process is broken. Next action: leave the scheduler running, inspect Pod Events for insufficient CPU or memory, and change the request or available capacity because the scheduler is correctly refusing an impossible placement.
+
+</details>
+
+This prediction is useful because it keeps you focused on schedulability evidence instead of spending exam time restarting a component that is already behaving correctly.
 
 ```bash
 # Scheduler pod
@@ -886,7 +913,43 @@ kubectl get pods
 kubectl delete pod recovery-test
 ```
 
-### Success Criteria
+**Card A: API server down means running containers die.** A candidate sees `kubectl` fail to connect during a practice outage and immediately assumes every application container on every worker must have exited. They begin deleting workload objects and planning redeployments even though the affected Pods were already assigned to nodes before the API server failure. The wrong belief is tempting because the API server feels like the cluster's control center, but running containers are local runtime processes once kubelet has started them.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing loss of central coordination with instant loss of local execution. Next action: check node-local kubelet and runtime evidence for already assigned Pods, then separately repair API access so new scheduling, status updates, and reconciliation can resume.
+
+</details>
+
+**Card B: Pending always means the scheduler is broken.** An operator sees a Pod remain `Pending` after a Deployment is created and jumps straight to scheduler logs, assuming the scheduling process must be hung. They overlook that the Pod requests more CPU and memory than any node can currently provide, so the scheduler has no feasible node to choose. The wrong belief turns a clear capacity or constraint message into unnecessary control plane surgery.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating `Pending` as a process-health verdict instead of a placement outcome. Next action: read `kubectl describe pod` Events first, then compare resource requests, taints, node selectors, affinity, and volume binding before touching scheduler components.
+
+</details>
+
+**Card C: Deleting the scheduler Pod in kube-system restarts scheduling when the static manifest is gone.** A learner accidentally removes `/etc/kubernetes/manifests/kube-scheduler.yaml`, notices the mirror Pod still appears for a moment, and runs `kubectl delete pod` in `kube-system` to force a clean restart. They expect the kubelet to recreate the scheduler from the deleted Pod object, but the durable source for that static Pod has disappeared. The wrong belief confuses the API mirror with the file that kubelet actually watches.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mistaking a static Pod mirror object for the authoritative static Pod definition. Next action: restore `/etc/kubernetes/manifests/kube-scheduler.yaml` with correct content and permissions, watch kubelet recreate the static Pod, and verify Pending Pods receive `nodeName` assignments.
+
+</details>
+
+**Card D: Slow kubectl get is a scheduler problem.** A team notices `kubectl get pods -A` is slow, `kubectl apply` often times out, and API server logs mention storage latency, then they focus on scheduler restarts because new Pods also appear delayed. They miss that broad API read and write slowness affects many resources before any single scheduling decision can matter. The wrong belief follows one visible workload symptom while ignoring the shared etcd-backed state path underneath it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: diagnosing a broad API storage symptom as a narrow placement symptom. Next action: check API server readiness, etcd endpoint or member health, disk pressure, certificates, and storage latency before investigating scheduler behavior.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Can identify all control plane components and their Pods.
 - [ ] Can check API server liveness and readiness using supported health endpoints.
