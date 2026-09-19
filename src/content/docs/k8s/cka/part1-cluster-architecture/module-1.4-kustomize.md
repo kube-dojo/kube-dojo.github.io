@@ -96,7 +96,16 @@ A useful review question is whether a future teammate could read the base withou
 | **Generator** | A feature that creates ConfigMaps or Secrets from literals, files, or environment files. | Does the generated object name change when content changes? |
 | **Rendered output** | The final YAML produced by Kustomize before it is applied to Kubernetes. | Did you inspect this before changing the cluster? |
 
-> **Active learning prompt:** Before reading the next section, predict what should live in a base and what should live in an overlay for a web application. If your answer puts `replicas: 10` in the base, ask whether every environment really wants that same production capacity.
+**Pause and predict:** Before reviewing the base manifests, consider what belongs in a shared base versus an environment overlay for a web application. Should a large scale setting like `replicas: 10` be defined in the base or in an overlay?
+
+<details>
+<summary>Check your prediction</summary>
+
+A production replica count such as `replicas: 10` belongs in an environment overlay rather than the shared base. The base should define only generic workload structures that all targets share safely, leaving environment-specific scale, resource boundaries, and capacity tuning to individual overlays.
+
+</details>
+
+Evaluating which fields belong in shared foundations versus environment customizations is a fundamental architectural discipline when constructing reproducible multi-cluster delivery pipelines.
 
 ---
 
@@ -230,7 +239,16 @@ The `labels` transformer is safer here than a blind selector-changing label stra
 
 The important phrase in that paragraph is "for an existing workload." Kubernetes allows many fields to change over time, but [it treats a Deployment selector as identity, not decoration](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). If a label transformer changes selectors after the Deployment already exists, the API server may reject the update because the controller would no longer own the same pod set. Even if an object is new and the apply succeeds, selector changes can still surprise operators because the Service and Deployment may stop agreeing about which pods are part of the application.
 
-> **Active learning prompt:** Predict the rendered names before running the command. Will the Service be named `webapp`, `dev-webapp`, or `webapp-dev`? Then run the preview and verify whether your mental model matched the output.
+**Pause and predict:** When Kustomize renders an overlay configured with `namePrefix: dev-` targeting a base with a Service named `webapp`, will the resulting Service be named `webapp`, `dev-webapp`, or `webapp-dev`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The rendered Service will be named `dev-webapp`. The transformer prepends prefix strings directly to `metadata.name` across all managed resources in the compilation unit.
+
+</details>
+
+Examining rendered resource identifiers prior to applying an overlay ensures that internal network routing, service discovery endpoints, and ingress definitions align predictably across deployment environments.
 
 ```bash
 kubectl kustomize webapp/overlays/dev/
@@ -550,7 +568,18 @@ secretGenerator:
     type: Opaque
 ```
 
-Sometimes teams disable hash suffixes because an old application expects a fixed ConfigMap name. That is a trade-off, not a harmless preference. A stable generated name is easier for legacy references, but it removes the automatic rollout trigger caused by name changes.
+**Pause and predict:** If a team configures `disableNameSuffixHash: true` on a ConfigMap generator and subsequently alters the data payload, will existing Pods automatically restart when the updated manifest is applied?
+
+<details>
+<summary>Check your prediction</summary>
+
+Existing Pods will not roll automatically when applied. Because the generated ConfigMap name remains static, the Deployment pod template specification is unchanged, leaving the controller with no trigger to initiate a rolling update.
+
+</details>
+
+Understanding how workload controllers evaluate template mutations prevents silent divergence between runtime process state and updated configuration stored in the cluster.
+
+Legacy software stacks occasionally mandate predictable configuration object names rather than generated hashed identifiers. Disabling hash generation accommodates those naming constraints but requires deliberate operational intervention whenever configuration values must take effect immediately.
 
 ```yaml
 # Disabling the generator hash suffix
@@ -1116,7 +1145,43 @@ kubectl kustomize webapp/overlays/prod/
 
 Read the error message, repair the path, and render again. This deliberate failure builds the diagnostic habit you need under exam pressure.
 
-### Success Criteria
+**Card A: Copying three environment folders is safer than overlays.** An engineer decides that cloning full directory trees for development, staging, and production avoids the complexity of inheritance and patch composition. They believe that having independent, completely detached manifest files in each environment eliminates the risk of unintentional shared changes reaching production unexpectedly. Over time, critical security patches, health probe adjustments, and standard label updates applied to development are never backported to production manifests because there is no shared source of truth.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mistaking duplicate file silos for configuration safety and auditability. Next action: maintain common application topology in a shared base directory, restricting environment directories to minimal overlays containing only necessary patches and transformers.
+
+</details>
+
+**Card B: `kubectl apply -k` applies the files on disk without rendering.** A junior operator assumes that pointing `kubectl apply -k` at an overlay directory sends the individual raw YAML documents directly to the Kubernetes API server in sequential order. They believe that Kustomize functions as a simple batch wrapper around standard manifest directories rather than an in-memory compilation engine. Because of this misconception, they bypass local rendering checks and fail to anticipate how transformer directives merge and mutate resource definitions before submission.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing client-side overlay composition with raw file application. Next action: run `kubectl kustomize <directory>` or `kubectl diff -k <directory>` to preview the fully rendered and transformed YAML stream before applying changes to the cluster.
+
+</details>
+
+**Card C: `commonLabels` is always safe on a live Deployment.** A cluster administrator adds `commonLabels` to a production kustomization file to enforce consistent environment tracking tags across all existing workloads. They expect the transformer to annotate all resources smoothly without disrupting active controller operations or workload reconciliation cycles. When the update is applied, the API server rejects the modified Deployment specification because the transformer mutated the immutable selector field on an existing workload.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: violating Kubernetes Deployment selector immutability rules through broad label transformation. Next action: use the modern `labels` field with `includeSelectors: false` to apply organizational metadata safely to metadata and pod templates without altering immutable selector fields.
+
+</details>
+
+**Card D: Overlay patches must target the already-prefixed name (`prod-webapp`).** A platform developer prepares a patch to increase replica counts for a production overlay that declares `namePrefix: prod-`. Seeing that the final workload will be named `prod-webapp` in the cluster, they write the patch's `metadata.name` as `prod-webapp` to match the anticipated object identifier. When Kustomize compiles the overlay, it reports an error because patches are evaluated against the original base resource name before prefix transformers take effect.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding Kustomize transformation execution ordering and patch target matching. Next action: set `metadata.name` in overlay patches to match the original resource name from the base, allowing `namePrefix` transformers to apply prefixing downstream during compilation.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] You can explain why the base contains shared resources but not environment-specific production settings.
 - [ ] You can render a base and an overlay before applying either one.
