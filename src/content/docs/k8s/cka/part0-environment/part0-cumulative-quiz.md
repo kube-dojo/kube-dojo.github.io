@@ -17,21 +17,17 @@ sidebar:
 
 ## Learning Outcomes
 
-By the end of this cumulative module, you will be able to **evaluate** whether a Kubernetes exam environment is ready before attempting scored tasks, using context checks, namespace checks, shell helpers, and quick validation commands.
-
-You will be able to **debug** common setup failures in local clusters and exam terminals, including missing schedulers, broken kubeconfig context, malformed YAML, and command output that does not match the task requirement.
-
-You will be able to **design** a repeatable question workflow that starts with context safety, chooses the right generation or documentation strategy, edits manifests efficiently, and verifies results before moving on.
-
-You will be able to **compare** fast command-line approaches against documentation-driven approaches, choosing the one that reduces risk under exam time pressure instead of choosing commands from memory alone.
-
-You will be able to **apply** the three-pass exam method to mixed task sets, deciding which tasks to complete immediately, which to defer, and which evidence proves that a task is genuinely complete.
+- **Evaluate** whether a Kubernetes exam environment is ready before attempting scored tasks, using context checks, namespace checks, shell helpers, and quick validation commands.
+- **Debug** common setup failures in local clusters and exam terminals, including missing schedulers, broken kubeconfig context, malformed YAML, and command output that does not match the task requirement.
+- **Design** a repeatable question workflow that starts with context safety, chooses the right generation or documentation strategy, edits manifests efficiently, and verifies results before moving on.
+- **Compare** fast command-line approaches against documentation-driven approaches, choosing the one that reduces risk under exam time pressure instead of choosing commands from memory alone.
+- **Apply** the three-pass exam method to mixed task sets, deciding which tasks to complete immediately, which to defer, and which evidence proves that a task is genuinely complete.
 
 ---
 
 ## Why This Module Matters
 
-A candidate can understand Pods, Deployments, Services, and scheduling perfectly and still lose the exam in the first few minutes because the working context is wrong. One engineer in a practice cohort created every resource in the wrong cluster during a mock exam because the terminal prompt looked familiar and the first task felt easy. The commands were syntactically correct, the YAML was valid, and the troubleshooting was competent, but the work produced no score because it landed in the wrong place.
+A candidate can understand Pods, Deployments, Services, and scheduling perfectly and still lose the exam in the first few minutes because the working context is wrong. Hypothetical scenario: one engineer in a practice cohort created every resource in the wrong cluster during a mock exam because the terminal prompt looked familiar and the first task felt easy. The commands were syntactically correct, the YAML was valid, and the troubleshooting was competent, but the work produced no score because it landed in the wrong place.
 
 This module treats Part 0 as a professional operating routine rather than a collection of setup trivia. The CKA environment rewards people who can keep a narrow loop: read the task, check the target, create or inspect the right object, verify the result, then move on. The difficulty is not only Kubernetes knowledge; it is the ability to preserve accuracy while the clock is running and while the browser, terminal, editor, and documentation all compete for attention.
 
@@ -72,9 +68,14 @@ The second professional habit is to keep the verification close to the task word
 
 The third professional habit is to avoid treating memory as the primary source of truth. Memorized commands are useful for speed, but the exam allows official documentation because Kubernetes is broad and exact fields matter. A senior operator knows when a command skeleton is safe from memory and when an API field must be confirmed before writing YAML.
 
-> **Active Learning Prompt**: Imagine the first exam task asks you to create a Deployment in namespace `app-prod`, but your current context points to a different cluster and your default namespace is `default`. What two commands would catch both hazards before you create anything, and why would checking only one of them still leave risk?
+**Pause and predict:** Imagine the first exam task asks you to create a Deployment in namespace `app-prod`, but your current context points to a different cluster and your default namespace is `default`. What two checks would catch both hazards before you create anything?
+
+<details>
+<summary>Check your prediction</summary>
 
 A practical answer would start with context and namespace visibility rather than resource creation. `k config current-context` catches the cluster target, while `k config view --minify --output 'jsonpath={..namespace}{"\n"}'` or an explicit `-n app-prod` catches namespace drift. Checking only the context proves the cluster, but not the namespace; checking only the namespace can still place the object in the wrong cluster.
+
+</details>
 
 This module uses `k` as the standard alias for `kubectl` after this point. The alias is not magic and does not change Kubernetes behavior. Its value is reducing typing friction so that you spend less time fighting the terminal and more time verifying the requested state.
 
@@ -190,11 +191,16 @@ k explain pod.spec.containers.readinessProbe
 
 For field-level uncertainty, `kubectl explain` is usually faster than opening a browser. It gives the resource path, field type, and description from the cluster's OpenAPI schema. For multi-step tasks such as configuring a probe, creating a NetworkPolicy, or checking Gateway API examples, the documentation site often provides better runnable examples.
 
-Documentation navigation is not a detour from exam work. It is part of the work when the task involves exact syntax. The danger is unbounded browsing, where you search broadly, open several pages, and lose the thread of the question. A bounded lookup starts with a specific missing piece, finds it, applies it, and returns to verification.
+Documentation navigation is not a detour from exam work. It is part of the work when the task involves exact syntax. The danger is unbounded browsing, where you search broadly, open several pages, and lose the thread of the question. A bounded lookup starts with a specific missing piece, finds it, applies it, and returns to verification. This is where you compare fast command-line approaches with documentation-driven approaches by asking which one reduces risk for the exact field or example you need.
 
-> **Active Learning Prompt**: You need to add a readiness probe to a Deployment, but you remember only that the field belongs somewhere under `containers`. Would you use `k explain`, documentation, or both? Decide first, then compare your choice with the reasoning in the next paragraph.
+**Pause and predict:** You need to add a readiness probe to a Deployment, but you remember only that the field belongs somewhere under `containers`. Choose `k explain`, official documentation, or both before reading the reasoning.
+
+<details>
+<summary>Check your prediction</summary>
 
 A good choice is to start with `k explain pod.spec.containers.readinessProbe` or the equivalent Deployment template path if you need field structure quickly. If you also need a complete example with HTTP path and port values, the official documentation is useful after the field path is confirmed. This two-step approach prevents both vague browsing and blind YAML editing.
+
+</details>
 
 A worked example makes the pattern concrete. Suppose a task says: "In namespace `web`, create a Deployment named `portal` with three replicas using image `nginx:1.35`, then expose it on port eighty inside the cluster." A rushed candidate may type several commands from memory and assume success. A controlled candidate generates, applies, exposes, and verifies selectors and endpoints.
 
@@ -317,9 +323,14 @@ If the scheduler manifest is missing, the kubelet cannot create the static sched
 
 The practical diagnostic question is: "Which controller or agent is responsible for the missing behavior?" If Pods are not being placed on nodes, the scheduler is involved. If a Deployment is not creating Pods, the Deployment controller and ReplicaSet chain are involved. If a static Pod does not appear, kubelet and the manifest directory are involved. If Service traffic fails, selectors, endpoints, readiness, and networking are involved.
 
-> **Active Learning Prompt**: A Pod is `Running` but the Service has no endpoints. Before reading the answer, choose the first two relationships you would inspect. Avoid choosing commands by memory; choose the resource relationships that could explain the symptom.
+**Pause and predict:** A Pod is `Running` but the Service has no endpoints. Before reading the answer, choose the first two resource relationships you would inspect to explain the symptom.
+
+<details>
+<summary>Check your prediction</summary>
 
 The first relationship is Service selector to Pod labels, because endpoints depend on matching Ready Pods. The second relationship is Pod readiness to endpoint publication, because a matching Pod may still be excluded if it is not Ready. Commands follow from those relationships: inspect `svc -o yaml`, `pods --show-labels`, `endpoints`, and Pod readiness details.
+
+</details>
 
 ```bash
 k get svc <service> -n <namespace> -o yaml
@@ -424,10 +435,15 @@ Answer these scenario-based questions without referring to earlier modules. Afte
 
 You open a new exam question that says: "Use context `cluster-b` and namespace `payments`." Your prompt still shows a familiar cluster name from the previous task, and you are confident you know the resource command. What should you do before creating anything, and what risk remains if you only check the context?
 
+1. Switch to `cluster-b`, confirm it, and use `-n payments` or verify the namespace before changing resources.
+2. Check only `k config current-context`, then create the resource because the namespace can be fixed later.
+3. Create the resource first, then move it to `payments` if verification shows it landed in `default`.
+4. Skip the target check because the prompt already displays a familiar cluster name from the previous task.
+
 <details>
 <summary>Answer</summary>
 
-Switch and confirm the context first, then either set or explicitly use the namespace in subsequent commands. A safe start is `k config use-context cluster-b`, `k config current-context`, and then commands with `-n payments` or a verified namespace setting. Checking only the context still leaves namespace risk, because namespaced resources created in `default` will not satisfy a task that requires `payments`.
+Option 1 is correct because it checks both target dimensions before any scored change: `k config use-context cluster-b`, `k config current-context`, and explicit `-n payments` commands or a verified namespace setting. Option 2 is wrong because context alone still leaves namespace drift. Option 3 is incorrect because moving namespaced resources after creation is not a safe exam workflow. Option 4 is not correct because a familiar prompt is weaker evidence than the kubeconfig state.
 
 </details>
 
@@ -435,10 +451,15 @@ Switch and confirm the context first, then either set or explicitly use the name
 
 A task asks you to create a Deployment named `worker` with two replicas, image `busybox:1.36`, and command `sleep 3600`, then save the manifest before applying it. You remember most of the Deployment structure but are not sure where command arguments belong. What approach best balances speed and correctness?
 
+1. Generate a dry-run Deployment manifest, inspect or edit command fields, confirm uncertain paths with `k explain`, then apply.
+2. Hand-write the whole Deployment from memory because saving time matters more than checking field placement.
+3. Create a Pod instead of a Deployment because Pod command fields are easier to remember.
+4. Apply the generated manifest without saving it, then edit the live object only if the Pods fail.
+
 <details>
 <summary>Answer</summary>
 
-Generate a Deployment skeleton with dry-run output, then edit the container command fields in the saved manifest and apply it. For example, use `k create deploy worker --image=busybox:1.36 --replicas=2 --dry-run=client -o yaml > worker.yaml`, then edit `spec.template.spec.containers[0].command` and `args` as needed. If unsure about the exact field shape, use `k explain pod.spec.containers.command` and `k explain pod.spec.containers.args` before applying.
+Option 1 is correct because dry-run output creates a valid Deployment skeleton while `k explain pod.spec.containers.command` and `k explain pod.spec.containers.args` resolve exact field shape before applying. Option 2 is wrong because memory-based YAML increases indentation and API-path risk. Option 3 is incorrect because the task requires a Deployment. Option 4 is not correct because the task explicitly asks to save the manifest before applying it.
 
 </details>
 
@@ -446,10 +467,15 @@ Generate a Deployment skeleton with dry-run output, then edit the container comm
 
 Your team created a Deployment successfully, but all new Pods remain `Pending`. Existing Pods in other namespaces are still running, and the API server responds normally. Which evidence should you gather first, and why is changing the image a weak first move?
 
+1. Run `k get pods -o wide` and `k describe pod` in the namespace to read scheduling state and events.
+2. Change the image immediately because Pending usually means the container image cannot start.
+3. Delete the Deployment and recreate it before collecting events so the controller gets a clean attempt.
+4. Restart the API server because existing Pods in other namespaces prove scheduling is irrelevant.
+
 <details>
 <summary>Answer</summary>
 
-Start with `k get pods -n <namespace> -o wide` and `k describe pod <pod> -n <namespace>` so you can read scheduling events. Pending usually means the Pod has not been assigned to a node or cannot be scheduled because of constraints, missing resources, taints, or scheduler problems. Changing the image targets container startup after scheduling, so it is a weak first move unless the events actually mention image pull or container creation.
+Option 1 is correct because Pending is primarily a scheduling signal until events prove otherwise. Option 2 is wrong because image changes target container startup after scheduling, not assignment to a node. Option 3 is incorrect because deletion discards useful evidence and may recreate the same failure. Option 4 is not correct because a responsive API server and existing running Pods point toward scheduling constraints or scheduler behavior, not an immediate API restart.
 
 </details>
 
@@ -457,10 +483,15 @@ Start with `k get pods -n <namespace> -o wide` and `k describe pod <pod> -n <nam
 
 A Service exists and has a ClusterIP, but traffic fails and `k get endpoints` shows no addresses. The Pods for the application are Running. What relationships should you inspect, and what result would confirm the fix?
 
+1. Compare Service selectors, Pod labels, and Pod readiness, then confirm endpoints contain the expected Pod IPs and ports.
+2. Recreate the Service with a new ClusterIP because an existing Service without endpoints must be corrupt.
+3. Restart all Running Pods because any Running Pod should automatically receive Service traffic.
+4. Change the Deployment image because empty endpoints usually mean the container image is outdated.
+
 <details>
 <summary>Answer</summary>
 
-Inspect the Service selector, Pod labels, and Pod readiness. Use `k get svc <name> -n <ns> -o yaml`, `k get pods -n <ns> --show-labels`, `k describe pod <pod> -n <ns>`, and `k get endpoints <name> -n <ns> -o wide`. The fix is confirmed when the Service selector matches Ready Pods and the endpoints object contains the expected Pod IPs and ports.
+Option 1 is correct because Services publish endpoints from matching Ready Pods, so selectors, labels, and readiness are the first relationships to inspect. Option 2 is wrong because the ClusterIP can exist while selectors match nothing. Option 3 is incorrect because Running is not the same as selected and Ready. Option 4 is not correct because an image change does not address selector or readiness evidence unless the diagnosis specifically points there.
 
 </details>
 
@@ -468,32 +499,47 @@ Inspect the Service selector, Pod labels, and Pod readiness. Use `k get svc <nam
 
 A control plane node is missing the scheduler Pod, and newly created Pods are not being assigned to nodes. You have node access. What file location and Kubernetes namespace are most relevant, and how should you verify recovery?
 
+1. Check `/etc/kubernetes/manifests/` on the control plane node and verify the scheduler mirror Pod in `kube-system`.
+2. Edit the Deployment manifests for the Pending workloads because the scheduler is controlled by application YAML.
+3. Look only in the default namespace because new Pods were created there and namespace scope controls scheduling.
+4. Delete every Pending Pod repeatedly until kubelet recreates the scheduler from the workload controller.
+
 <details>
 <summary>Answer</summary>
 
-Check `/etc/kubernetes/manifests/` on the control plane node because kubelet manages static control plane Pods from that directory. The scheduler mirror Pod should appear in the `kube-system` namespace when the manifest is present and valid. Verify with `sudo ls /etc/kubernetes/manifests/`, inspect or restore the scheduler manifest according to the task, then run `k get pods -n kube-system` and describe the scheduler Pod if it does not become healthy.
+Option 1 is correct because kubelet manages static control plane Pods from `/etc/kubernetes/manifests/`, and the scheduler mirror Pod should appear in `kube-system` when the manifest is present and valid. Option 2 is wrong because application Deployments do not control the scheduler component. Option 3 is incorrect because control plane static Pods are not found by inspecting only the default namespace. Option 4 is not correct because deleting Pending workload Pods does not restore a missing scheduler manifest.
 
 </details>
 
 ### 6. Deciding When to Use Documentation
 
-A question asks you to add an HTTP readiness probe to an existing Deployment. You know the concept, but you are uncertain about the exact YAML path under the Pod template. What is the fastest safe lookup strategy?
+A question asks you to add an HTTP readiness probe to an existing Deployment. You know the concept, but you are uncertain about the exact YAML path under the Pod template. What is the fastest safe lookup strategy when you compare fast command-line approaches with documentation-driven approaches?
+
+1. Use `k explain` for the specific probe path, then use official documentation only if you need a complete example.
+2. Search broadly across the web until you find any readiness probe YAML that looks familiar.
+3. Guess the indentation from memory because readiness probes always go directly under the Deployment spec.
+4. Skip the probe because a Deployment can roll out without readiness configuration.
 
 <details>
 <summary>Answer</summary>
 
-Use `kubectl explain` for the exact API path, then use official documentation only if you need a fuller example. Commands such as `k explain deployment.spec.template.spec.containers.readinessProbe` and related subfields can confirm where the probe belongs. This is safer than guessing indentation and faster than broad browsing, because the lookup is tied to a specific missing field.
+Option 1 is correct because `k explain deployment.spec.template.spec.containers.readinessProbe` and related subfields answer the exact API-path question quickly, while official docs help if a fuller HTTP example is needed. Option 2 is wrong because broad search is unbounded and may use irrelevant examples. Option 3 is incorrect because probe placement under the Pod template matters. Option 4 is not correct because the task requires the readiness probe, and the fast command-line versus documentation-driven approaches decision is about bounded lookup rather than avoiding the task.
 
 </details>
 
 ### 7. Applying the Three-Pass Method
 
-You scan a mock exam and see three tasks: create a namespace, add a ConfigMap volume to a Deployment, and troubleshoot why several Pods are not starting. How should you order them, and what evidence tells you that the first task is complete?
+You scan a mock exam with a mixed task set: create a namespace, add a ConfigMap volume to a Deployment, and troubleshoot why several Pods are not starting. How should you apply the three-pass exam method to order them, and what evidence tells you that the first task is complete?
+
+1. Create and verify the namespace first, handle the ConfigMap volume second, and defer broad troubleshooting until pass three.
+2. Start with the broad troubleshooting task because it might reveal information useful for every other question.
+3. Add the ConfigMap volume first, then create the namespace afterward if the apply command fails.
+4. Work strictly in page order even when the first task has uncertain scope and weak verification.
 
 <details>
 <summary>Answer</summary>
 
-Create the namespace first as a pass-one quick win, handle the ConfigMap volume as a pass-two manifest-edit task, and defer the open-ended troubleshooting task to pass three unless the symptom becomes obvious quickly. The namespace task is complete when `k get ns <name>` shows the namespace exists in the correct context. The ordering protects score by completing low-uncertainty work before spending time on broader diagnosis.
+Option 1 is correct because the namespace is a pass-one quick win, the ConfigMap volume is a pass-two manifest-edit task, and broad Pod troubleshooting belongs in pass three unless evidence makes it smaller. Option 2 is wrong because open-ended diagnosis can consume time before easy score is secured. Option 3 is incorrect because namespace existence is a prerequisite target, not an afterthought. Option 4 is not correct because page order is less important than uncertainty, verification cost, and score protection. This is how you apply the three-pass exam method to a mixed task set.
 
 </details>
 
@@ -501,10 +547,15 @@ Create the namespace first as a pass-one quick win, handle the ConfigMap volume 
 
 You update a Deployment image and `kubectl apply` reports that the object was configured. The question asks for the Deployment to run the new image successfully. What additional checks should you perform before marking the task done?
 
+1. Run rollout status and inspect the Deployment and Pods to confirm readiness and the requested image state.
+2. Stop after `configured` appears because API acceptance proves the new Pods are healthy.
+3. Delete old Pods immediately because rollout status is unnecessary after an image update.
+4. Check only the YAML file on disk because the saved manifest proves cluster convergence.
+
 <details>
 <summary>Answer</summary>
 
-Run `k rollout status deploy/<name> -n <ns>` and inspect the Deployment and Pods to confirm readiness and image state. Useful checks include `k get deploy <name> -n <ns>`, `k get pods -n <ns>`, and `k describe pod <pod> -n <ns>` if the rollout stalls. `apply` only confirms the API accepted the updated object; rollout verification proves the controller and Pods reached the requested state.
+Option 1 is correct because `k rollout status deploy/<name> -n <ns>`, Deployment status, and Pod inspection prove controller convergence and requested image state. Option 2 is wrong because `configured` only means the API accepted the object. Option 3 is incorrect because deleting Pods can mask rollout evidence and is not the normal verification step. Option 4 is not correct because a local file does not prove the cluster reached the desired state.
 
 </details>
 
@@ -599,7 +650,15 @@ Delete the namespace only after you have verified the final state and practiced 
 k delete ns part0-review
 ```
 
-### Success Criteria
+**Card A: Checking only the context is enough.** Wrong belief: if `k config current-context` matches the task, the target is safe. That belief misses namespace state, and most CKA workload objects are namespaced. Failure layer: target safety. Next action: pair context confirmation with explicit `-n <namespace>` or a verified current namespace before creating resources.
+
+**Card B: `kubectl apply` configured means the rollout succeeded.** Wrong belief: API acceptance is the same as workload convergence. `configured` only says the object was accepted; controllers, Pods, probes, and images still need to reach the requested state. Failure layer: verification. Next action: run rollout status and inspect Deployment, Pod, and event evidence before marking the task done.
+
+**Card C: A Running Pod guarantees Service endpoints.** Wrong belief: any Running Pod behind a Service will automatically receive traffic. Endpoints require matching selectors and Ready Pods, so labels and readiness can still block publication. Failure layer: resource relationship diagnosis. Next action: compare Service selectors with Pod labels, then check endpoints and readiness details.
+
+**Card D: Highest-point troubleshooting first.** Wrong belief: the largest or scariest task deserves the first minutes because it might be worth more. Open-ended diagnosis can absorb time before quick verified points are secured. Failure layer: exam strategy. Next action: classify tasks into passes, finish low-uncertainty work first, and return to broad failures with preserved notes.
+
+**Success Criteria**:
 
 - [ ] You confirmed the Kubernetes context before creating exercise resources.
 
@@ -619,10 +678,6 @@ k delete ns part0-review
 
 ---
 
-## Next Module
-
-Continue to [Part 1: Cluster Architecture](/k8s/cka/part1-cluster-architecture/)
-
 ## Sources
 
 - [docs.linuxfoundation.org: certification resources allowed](https://docs.linuxfoundation.org/tc-docs/certification/certification-resources-allowed) — The Linux Foundation resources-allowed page explicitly permits Kubernetes documentation access and explicitly allows the on-site search while forbidding external search results.
@@ -633,3 +688,10 @@ Continue to [Part 1: Cluster Architecture](/k8s/cka/part1-cluster-architecture/)
 - [kubernetes.io: kubectl explain](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/) — The official `kubectl explain` reference says information about each field is retrieved from the server in OpenAPI format.
 - [kubernetes.io: deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) — The Deployment documentation explicitly states that `.spec.selector` must match `.spec.template.metadata.labels`.
 - [kubernetes.io: endpoint slices](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/) — The EndpointSlice documentation says Services with selectors get EndpointSlices containing matching Pods and that Pod-backed endpoint readiness maps to the Pod `Ready` condition.
+- [kubernetes.io: namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) — The namespaces concept page explains namespace scoping for namespaced resources, which supports the module's namespace-target checks.
+- [kubernetes.io: service](https://kubernetes.io/docs/concepts/services-networking/service/) — The Service concept page documents Services as a way to expose applications running as Pods and explains selector-based targeting.
+- [kubernetes.io: kubectl rollout](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/) — The `kubectl rollout` reference documents rollout management commands used to verify controller progress after Deployment changes.
+
+## Next Module
+
+Continue to [Part 1: Cluster Architecture](/k8s/cka/part1-cluster-architecture/)
