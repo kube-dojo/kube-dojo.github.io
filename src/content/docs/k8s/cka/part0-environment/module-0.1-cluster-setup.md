@@ -158,7 +158,16 @@ EOF
 sudo sysctl --system
 ```
 
-Pause and predict: before you run `kubeadm init`, which command would you expect to fail if packet forwarding or bridge netfilter is wrong? The surprising answer is that bootstrap may still complete because those settings matter most when pods and services start sending traffic. That is why a cluster can look healthy at the control plane level while application connectivity fails during verification.
+**Pause and predict:** before you run `kubeadm init`, which command would you expect to fail if packet forwarding or bridge netfilter is wrong?
+
+<details>
+<summary>Check your prediction</summary>
+
+The surprising answer is that bootstrap may still complete because those settings matter most when pods and services start sending traffic. That is why a cluster can look healthy at the control plane level while application connectivity fails during verification.
+
+</details>
+
+The next paragraph is about cgroup alignment on Kubernetes 1.35, which is a host prerequisite of a different kind from the sysctl values you just considered.
 
 Kubernetes 1.35 expects modern node behavior, and cgroup v2 is now the baseline for this lab. cgroups are the kernel mechanism that lets the kubelet and container runtime place limits around CPU, memory, and process accounting. If the kubelet uses one cgroup driver while the runtime uses another, node accounting becomes inconsistent, so this module keeps the host, kubelet, and containerd aligned around systemd-managed cgroups.
 
@@ -287,7 +296,16 @@ NAME      STATUS     ROLES           AGE   VERSION
 cp-node   NotReady   control-plane   1m    v1.35.0
 ```
 
-Pause and predict: if the API server, etcd, scheduler, and controller manager are already running, why would the node still be `NotReady`? The missing piece is the CNI plugin, which writes node-level network configuration and runs pods that provide pod-to-pod routing. Until that exists, the kubelet cannot truthfully report that the node is ready for normal scheduling.
+**Pause and predict:** if the API server, etcd, scheduler, and controller manager are already running, why would the node still be `NotReady`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The missing piece is the CNI plugin, which writes node-level network configuration and runs pods that provide pod-to-pod routing. Until that exists, the kubelet cannot truthfully report that the node is ready for normal scheduling.
+
+</details>
+
+The next paragraph explains where kubeadm placed the control plane components, which is a placement question rather than the reason the node condition is still false.
 
 It helps to know where kubeadm placed the control plane components. They are static pod manifests under `/etc/kubernetes/manifests`, watched by the kubelet rather than deployed by a higher-level controller. That design is why moving one manifest out of the directory can remove a control plane component, and moving it back can restore the component without a separate deployment command.
 
@@ -450,7 +468,16 @@ ssh worker-01 "sudo journalctl -u kubelet -f"
 sudo kubeadm reset
 ```
 
-Which approach would you choose here and why: repeatedly rebuild the cluster from scratch, or snapshot the VMs after node preparation and before `kubeadm init`? For early learning, snapshots after preparation are efficient because they let you repeat bootstrap failures without redoing package installation. For exam readiness, occasional full rebuilds still matter because they test whether you remember the host prerequisites as well as the kubeadm commands.
+**Pause and predict:** which approach would you choose here and why: repeatedly rebuild the cluster from scratch, or snapshot the VMs after node preparation and before `kubeadm init`?
+
+<details>
+<summary>Check your prediction</summary>
+
+For early learning, snapshots after preparation are efficient because they let you repeat bootstrap failures without redoing package installation. For exam readiness, occasional full rebuilds still matter because they test whether you remember the host prerequisites as well as the kubeadm commands.
+
+</details>
+
+The next paragraph uses a plain nginx check so the first verification stays readable, which is a different choice from how you reset the machines between attempts.
 
 The nginx check is intentionally ordinary because ordinary checks make abnormal behavior stand out. If you choose a complex application for the first verification, you add application configuration, storage, probes, and image behavior to the same moment when you are trying to validate the cluster. A simple deployment and service keep the signal clean: can the scheduler place pods, can the runtime start containers, can the CNI provide networking, and can service routing reach a backend.
 
@@ -756,6 +783,42 @@ Prepare a new VM with the same base setup, join it as `worker-03`, verify it bec
 1. Run all preparation steps on the new node.
 2. Get a fresh join command with `kubeadm token create --print-join-command`.
 3. Label the node with `kubectl label node worker-03 node-role.kubernetes.io/worker=`.
+
+</details>
+
+**Card A: `kubeadm init` must fail if forwarding is wrong.** Packet forwarding and bridge netfilter are mis-set. The team refuses to continue until `kubeadm init` exits non-zero, and they treat a completed bootstrap as proof those sysctls were fine.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: expecting bootstrap to enforce a traffic setting. Next action: finish init, then verify pod and service traffic. Those sysctls matter when packets move, not when the control plane processes start.
+
+</details>
+
+**Card B: `NotReady` means the control-plane processes are down.** `kubectl get nodes` shows `NotReady`. The API server, etcd, scheduler, and controller manager are already running. The on-call restarts those four processes before looking at anything else.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: blaming processes that are already up. Next action: install the CNI plugin. Until it writes node network configuration, the kubelet cannot report the node ready for normal scheduling.
+
+</details>
+
+**Card C: Always rebuild from scratch.** Every bootstrap mistake means reinstalling packages on all three nodes. Snapshots after preparation are treated as cheating, including during the first afternoon of lab practice.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: one reset method for two different goals. Next action: snapshot after preparation when you are repeating bootstrap failures. Do occasional full rebuilds when you need to remember the host prerequisites for the exam.
+
+</details>
+
+**Card D: A `Ready` node means the NodePort test will pass.** All nodes are `Ready`. System pods are running. The nginx NodePort check fails from a worker, and the team starts rebuilding the cluster because readiness was supposed to prove application connectivity.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating node readiness as proof of service traffic. Next action: inspect CNI, kube-proxy, and the path from the worker to the NodePort before you rebuild. A ready node is not that test.
 
 </details>
 
