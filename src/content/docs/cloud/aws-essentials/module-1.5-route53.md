@@ -152,9 +152,16 @@ aws route53 associate-vpc-with-hosted-zone \
   --vpc VPCRegion=us-west-2,VPCId=vpc-0xyz789ghi012
 ```
 
-> **Pause and predict**: You have a public hosted zone for `example.com` and a private hosted zone for `example.com` associated with your VPC. If an EC2 instance inside that VPC queries `api.example.com`, which zone answers the query, and why?
+> **Pause and predict:** You have a public hosted zone for `example.com` and a private hosted zone for `example.com` associated with your VPC. If an EC2 instance inside that VPC queries `api.example.com`, which zone answers the query, and why?
 
-A common pattern is [split-horizon DNS: the same domain name resolves to different IPs depending on whether the query comes from inside or outside your VPC](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zone-private-considerations.html). For example, `api.yourapp.com` might resolve to a public ALB IP for external users, but to a private IP for services running inside the VPC. This reduces latency and avoids unnecessary trips through the internet gateway.
+<details>
+<summary>Check your prediction</summary>
+
+The private hosted zone answers the query. When an EC2 instance queries the VPC DNS resolver (`AmazonProvidedDNS`), Route 53 inspects associated private hosted zones before forwarding requests outward or checking public authoritative zones. Because `example.com` exists as an associated private zone, the resolver evaluates queries strictly against that private zone; if the specific record exists, its private value is returned, and if it is missing, the resolver returns `NXDOMAIN` without falling back to the public zone.
+
+</details>
+
+Architectural isolation in modern cloud networks relies heavily on [split-horizon DNS configurations to segment internal service routing from public access paths](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zone-private-considerations.html). For instance, an engineering team might publish an endpoint such as `api.yourapp.com` that points external clients toward an internet-facing application load balancer, while provisioning matching service records to steer internal VPC components toward private IP addresses. This topology optimizes network pathing by keeping East-West microservice communication bounded within VPC boundaries, cutting internet egress bandwidth costs and reinforcing security perimeters without altering application connection strings.
 
 **How split-horizon behaves in practice:** queries from EC2, EKS nodes, or Lambda in an associated VPC hit the **private** hosted zone first for overlapping names. Internet resolvers never see private zone data — they only see the public zone. That separation is powerful for security (internal service names never leak) but demands discipline: if you create `db.internal.example.com` only in a private zone, laptops on VPN need Resolver or VPN DNS paths that reach that zone, not your laptop's ISP cache.
 
@@ -314,9 +321,16 @@ Notice the `UPSERT` action in the second example. This is idempotent -- [it crea
 
 ### TTL: The Caching Knob You Must Understand
 
-> **Pause and predict**: You need to migrate a database to a new IP address on Friday at midnight. Your current DNS record has a TTL of 86400 seconds (24 hours). If you change the IP address in Route 53 at exactly midnight on Friday, when will all your global users finally connect to the new database, and how could you have prevented this delay?
+> **Pause and predict:** You need to migrate a database to a new IP address on Friday at midnight. Your current DNS record has a TTL of 86400 seconds (24 hours). If you change the IP address in Route 53 at exactly midnight on Friday, when will all your global users finally connect to the new database, and how could you have prevented this delay?
 
-TTL (Time to Live) controls how long resolvers cache your DNS records, in seconds. It is one of the most misunderstood settings in DNS:
+<details>
+<summary>Check your prediction</summary>
+
+All global users will not fully switch until Saturday at midnight (24 hours later) because intermediate recursive resolvers cache the old IP record for the full 86,400-second duration. To prevent this cutover delay, you should reduce the record's TTL to 60 or 300 seconds at least 24 hours in advance of the planned change. Once the previous 24-hour cache entries expire across public resolvers, subsequent IP updates propagate almost instantaneously to incoming clients.
+
+</details>
+
+Time to Live (TTL) establishes an authoritative caching contract that governs how downstream recursive resolvers and client operating systems cache DNS resource record sets locally. Choosing appropriate TTL durations involves balancing DNS query costs and network latency against operational flexibility and disaster-recovery reaction speed across infrastructure components:
 
 | TTL Value | Use Case | Trade-off |
 |-----------|----------|-----------|
@@ -658,9 +672,16 @@ flowchart TD
 
 ## Health Checks
 
-> **Stop and think**: You configure a failover routing policy with a primary and secondary record. If the primary application server process crashes but the underlying EC2 instance remains running, what specific mechanism is required for Route 53 to detect this application-level failure and trigger the failover?
+> **Pause and predict:** You configure a failover routing policy with a primary and secondary record. If the primary application server process crashes but the underlying EC2 instance remains running, what specific mechanism is required for Route 53 to detect this application-level failure and trigger the failover?
 
-Health checks are what make routing policies intelligent. Without them, Route 53 will happily send traffic to dead endpoints — **failover routing does not automatically fail over** unless the primary record's health check fails (or alias evaluation reports unhealthy). Weighted, latency, geolocation, geoproximity, and multivalue policies likewise **suppress unhealthy records** only when health checks (or alias target health) are attached.
+<details>
+<summary>Check your prediction</summary>
+
+An application-layer Route 53 health check (such as an HTTP or HTTPS check targeting `/health`, or a CloudWatch alarm-based health check) is required. Authoritative Route 53 DNS servers operate entirely outside your virtual machine and have no visibility into guest operating system processes or socket listeners. Without an explicit health check probing application response codes or metric thresholds, Route 53 continues returning the primary IP indefinitely.
+
+</details>
+
+DNS authoritative name servers operate independently from server operating systems and lack visibility into internal daemon lifecycles, memory pressure, and socket bindings. Providing automated fault isolation requires establishing an external telemetry feedback loop that tests reachability and injects endpoint health status directly into Route 53's global resolution infrastructure. Dynamic routing strategies across weighted, latency, geolocation, geoproximity, and multivalue record sets depend entirely on these active validation signals to remove degraded targets from resolver responses.
 
 ### Creating Health Checks
 
@@ -1172,7 +1193,43 @@ aws sns delete-topic --topic-arn ${TOPIC_ARN}
 ```
 </details>
 
-### Success Criteria
+**Card A: The public hosted zone always answers VPC queries for the same name.** A network administrator configures an identical domain name `example.com` in both an authoritative public hosted zone and an internal private hosted zone associated with the production VPC. When an EC2 workload residing inside that private VPC resolves `api.example.com`, the team assumes that internet-routable public name servers take precedence because public DNS is globally distributed. They believe internal client requests must cross the internet gateway to query the public record set unless the public zone is deleted.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding Route 53 split-horizon resolution precedence inside VPC boundaries. Next action: configure the necessary private records within the VPC-associated private hosted zone and rely on the VPC DNS Resolver (AmazonProvidedDNS), which prioritizes private hosted zones over public zones for matching domain namespaces.
+
+</details>
+
+**Card B: Changing the A record at midnight with TTL 86400 is enough for a cutover.** A systems engineer schedules a midnight production database cutover by updating the authoritative Route 53 A record to a newly provisioned endpoint exactly at 00:00. Because the current DNS record was originally published with an 86,400-second Time to Live (TTL), the engineer expects all global client traffic to instantly switch over once the API call returns successfully. When external client traffic continues bombarding the decommissioned database throughout Saturday morning, the operations team suspects a silent Route 53 API propagation outage.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: neglecting intermediate recursive resolver caching behavior enforced by DNS TTL contracts. Next action: lower the record's TTL to 60 or 300 seconds at least 24 hours prior to scheduled maintenance, wait for the old 86,400-second cache window to expire globally, execute the record change during the maintenance window, and restore standard TTL values once traffic stabilizes.
+
+</details>
+
+**Card C: Failover routing detects an application crash without a health check.** An architect deploys an active-passive failover configuration across two AWS Regions, designating us-east-1 as PRIMARY and us-west-2 as SECONDARY. When the backend Node.js application process inside the primary EC2 instance crashes while leaving the virtual machine running, the engineer assumes Route 53 will detect the service interruption and redirect incoming DNS queries automatically. Because no dedicated Route 53 health check was attached to the primary record, queries continue resolving to the dead application port while standby resources sit idle.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming DNS authoritative name servers have visibility into guest OS application process states without external monitoring probes. Next action: create a Route 53 HTTP, HTTPS, or CloudWatch alarm-based health check that targets the application's `/health` endpoint, link the health check ID directly to the PRIMARY failover record, and test automated failover triggers before production cutover.
+
+</details>
+
+**Card D: Setting every weighted record to 0 pauses all DNS traffic.** During an emergency maintenance event, an operator intends to suspend all traffic to an API service by assigning a weight of 0 to every record in a weighted routing set. The operator believes that setting all weights to zero causes Route 53 to stop answering queries, effectively creating a maintenance blackout. Instead, Route 53 evaluates a group of all-zero weighted records by distributing traffic equally among all targets, continuing to route queries to backend systems during active maintenance.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: overlooking Route 53's fallback behavior when all weights in a weighted resource record set equal zero. Next action: disable or delete the records, point the routing targets to a static maintenance page or holding endpoint, or assign non-zero weights strictly to dedicated maintenance servers rather than setting all weights to 0.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Two health checks created (primary and secondary)
 - [ ] Failover routing records created and pointing to correct IPs
