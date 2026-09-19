@@ -282,7 +282,15 @@ gcloud recommender recommendations list \
   --recommender=google.compute.instance.IdleResourceRecommender
 ```
 
-> **Pause and predict**: You are designing a video rendering pipeline. If a rendering job is interrupted, it must start over from the beginning. Some jobs take up to 36 hours. Should you use Spot VMs to save costs here?
+**Pause and predict:** You are designing a video rendering pipeline where batch jobs execute continuously for up to 36 hours and cannot resume from intermediate checkpoints if interrupted. Would selecting Spot virtual machines be an appropriate strategy to reduce operational compute expenses for this rendering workload?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Spot VMs can be preempted by Compute Engine at any moment with only a 30-second termination notice whenever capacity is required elsewhere. Because a 36-hour rendering job lacking checkpointing capabilities must restart from the beginning after any interruption, preemption loses all completed computation and wastes time and money.
+</details>
+
+Evaluating failure recovery and job durability boundaries ensures that compute cost reduction strategies do not compromise workload completion guarantees. Once baseline machine lifecycles and durability requirements are defined, provisioning consistent compute environments requires packaging runtime software into reproducible images.
 
 ---
 
@@ -352,7 +360,15 @@ gcloud compute images deprecate my-app-v1-1 \
   --replacement=my-app-v1-0
 ```
 
-> **Pause and predict**: You need to apply a critical security patch to an OS used by 50 VMs. If you're using image families, what steps must you take to ensure all VMs run the patched OS?
+**Pause and predict:** You need to apply a critical security patch to an operating system image shared by a fleet of 50 virtual machines managed via image families. What sequence of actions must you take so that every running instance in the fleet executes the patched operating system?
+
+<details>
+<summary>Check your prediction</summary>
+
+Bake a new custom image containing the patch and point the image family at it so the new image becomes current. Then execute a rolling replace or recreate on the instance group from an instance template that references the family, because already-running VMs continue running the old OS image until explicitly replaced or recreated.
+</details>
+
+Structuring automated replacement workflows prevents manual drift and establishes auditable release cadences across operational server fleets. In addition to immutable base operating system images, instances often require dynamic boot-time parameterization to integrate with surrounding cloud environments.
 
 ### Startup Scripts, Metadata, and Golden-Image Hygiene
 
@@ -513,7 +529,15 @@ gcloud compute instance-groups managed rolling-action start-update web-mig \
 
 ### Regional vs Zonal MIGs
 
-A **zonal MIG** keeps all VMs in one zone. It is simpler and sometimes required for legacy designs, but it is a single blast-radius if that zone degrades. A **regional MIG** spreads VMs across zones in a region, which is the default recommendation for production web tiers because autoscaler can add capacity wherever spare host inventory exists. Regional MIGs pair naturally with global external Application Load Balancers: each regional backend registers its own instance group, and the front end steers users to healthy endpoints.
+**Pause and predict:** A critical payment API runs inside a zonal Managed Instance Group provisioned exclusively in `us-central1-a`. What happens to the payment API if an unexpected hardware or power failure causes that entire Google Cloud zone to fail?
+
+<details>
+<summary>Check your prediction</summary>
+
+A zonal MIG keeps all VMs in one zone, making that entire zone a single blast radius. If `us-central1-a` fails, all API instances in the zone go down simultaneously and the service experiences an immediate full outage. By contrast, a regional MIG spreads instances across multiple zones within the region, ensuring that remaining healthy zones continue serving traffic while the autoscaler provisions replacement VMs.
+</details>
+
+Selecting between single-zone and multi-zone deployment boundaries dictates how infrastructure absorbs physical disruptions and maintains service-level availability. Architectural resilience requires aligning failure domains with client traffic expectations before configuring rolling deployment mechanics.
 
 Tradeoffs matter at update time: regional rolling updates coordinate replacements across zones, which can take longer but preserve zone diversity. Zonal MIGs update faster in one place yet concentrate risk. For stateful workloads that cannot tolerate multiple live copies, neither MIG shape fixes data gravity—you still need external durable storage and a real failover story.
 
@@ -571,7 +595,15 @@ flowchart LR
     end
 ```
 
-> **Stop and think**: If you manually SSH into a VM managed by a MIG and update a configuration file, what will happen if the VM fails a health check later that day?
+**Pause and predict:** If an engineer manually connects via SSH to an individual virtual machine managed by an active Managed Instance Group and edits a local configuration file on disk, what will happen to those manual edits if that VM subsequently fails a health check later that day?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Managed Instance Group self-healing mechanism automatically deletes the unhealthy VM and creates a fresh replacement instance directly from the baseline instance template. Because the replacement instance boots from the original immutable template and disk image, the manual configuration file edits on the failed VM are permanently destroyed.
+</details>
+
+Maintaining configuration consistency across scalable fleets requires treating instances as ephemeral compute nodes rather than persistent stateful servers. Declarative infrastructure and immutable deployment pipelines guarantee that every automatically provisioned replacement matches the validated production specification.
 
 ### Observability: What to Watch in Production
 
@@ -1234,7 +1266,43 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: Spot is always the right choice for a 36-hour job that cannot restart from a checkpoint.** A data engineering team provisions a pool of Spot Compute Engine instances to execute monolithic 36-hour batch rendering jobs without implementing intermediate checkpointing. The lead engineer prioritizes maximizing compute cost savings by capturing the steep Spot discount over baseline on-demand rates. The team schedules the non-preemptible rendering pipeline to launch across the spot worker cluster during peak overnight hours.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: uncheckpointed batch execution on volatile compute capacity. Next action: run long uncheckpointed tasks on standard on-demand or committed-use instances, or modify the application architecture to write frequent state checkpoints before migrating workloads to Spot VMs.
+
+</details>
+
+**Card B: Pointing an image family at a patched image automatically patches all running VMs.** A systems administrator bakes a newly patched operating system image containing critical kernel CVE fixes and updates the production image family pointer to reference the new image. The administrator assumes that all fifty currently running virtual machines deployed from that family will receive the kernel updates automatically in place. The operations schedule marks the security remediation milestone as fully resolved upon successful image registration.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: static instance boot disk immutability. Next action: trigger a rolling replace or recreate operation across the Managed Instance Group to cycle running instances through a template referencing the updated image family.
+
+</details>
+
+**Card C: Manual edits on a MIG VM survive a later health-check failure because the disk is still there.** A site reliability engineer responds to an urgent production incident by opening an interactive SSH session to a degraded virtual machine inside a Managed Instance Group and manually editing application configuration files on the root disk. The engineer resolves the immediate issue and leaves the instance in service, assuming the modified disk state persists indefinitely across routine background platform events. The engineer records the ticket as resolved without updating the central instance template.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: automated self-healing recreation of ephemeral group instances. Next action: codify all configuration changes into the instance template or startup script before triggering a coordinated rolling update across the group.
+
+</details>
+
+**Card D: A zonal MIG in one zone is as resilient as a regional MIG for a payment API.** A fintech infrastructure architect deploys a mission-critical payment processing API across a three-node Managed Instance Group restricted entirely to a single compute zone in `us-central1-a`. The architect configures autoscaling and aggressive autohealing policies, assuming the group provides high availability comparable to a regional topology because multiple compute nodes handle requests concurrently. The deployment pipeline proceeds to route production transaction volume to the zonal cluster.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: single-zone physical blast radius vulnerability. Next action: deploy the workload across a regional Managed Instance Group spanning multiple zones, ensuring surviving zones process traffic if one zone experiences an outage.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Custom VPC with subnets in two regions
 - [ ] Instance template configured with startup script
