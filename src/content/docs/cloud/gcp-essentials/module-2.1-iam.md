@@ -77,15 +77,18 @@ At the top, the **Organization** is the root node: it is created when you set up
 
 Below the project line, **resources** are the concrete services and objects you create—VMs, databases, buckets, Pub/Sub topics, and everything else you bill and secure day to day.
 
-> **Pause and predict**: If you move a Project from the "Engineering" folder to the "Finance" folder, what happens to the IAM policies applied to the Project?
-> <details>
-> <summary>Answer</summary>
-> The project will stop inheriting permissions from the "Engineering" folder and begin inheriting permissions from the "Finance" folder after IAM propagation completes. Any IAM policies applied directly to the Project itself will remain unchanged. This dynamic inheritance is why moving projects across folders is a high-risk operation.
-> </details>
+**Pause and predict:** If an infrastructure team moves an active GCP Project from an "Engineering" folder into a "Finance" folder, what happens to the effective permissions on that project, and which bindings change immediately?
+
+<details>
+<summary>Check your prediction</summary>
+
+The project immediately stops inheriting permissions from the "Engineering" folder and begins inheriting permissions from the "Finance" folder after IAM propagation completes across the control plane. Any IAM policies applied directly to the Project itself remain completely unchanged. This dynamic inheritance is why moving projects across folders is an operation that carries significant security blast radius.
+
+</details>
 
 ### Policy Inheritance: The Cascade Effect
 
-This is the single most important concept to understand about GCP IAM. **IAM policies are additive and inherit downward**. If you grant a user the `roles/editor` role at the Organization level, that user has Editor permissions on every single project in the entire organization. You cannot revoke an inherited permission at a lower level (though you can use Organization Policy Constraints or IAM Deny Policies to restrict specific actions).
+Understanding how permissions flow through the resource hierarchy requires examining the rules of policy evaluation across parent and child containers. The Google Cloud authorization engine resolves effective access at request time by walking up the resource tree. It computes the union of all bindings attached between the target resource and the organization root. This structural model ensures parent containers establish broad baseline privileges that encompass every child project nested beneath them.
 
 ```bash
 # View the IAM policy at the organization level
@@ -248,12 +251,14 @@ The table below lists predefined roles you will reference constantly when wiring
 | `roles/logging.viewer` | Read Cloud Logging logs |
 | `roles/monitoring.viewer` | Read Cloud Monitoring metrics |
 | `roles/iam.serviceAccountUser` | Act as (impersonate) a service account |
+**Pause and predict:** Your developers need to deploy Cloud Run services and connect them securely to Cloud SQL. Should you create a custom role combining both sets of permissions, or grant multiple predefined roles instead?
 
-> **Stop and think**: Your developers need to deploy Cloud Run services and connect them to Cloud SQL. Should you create a custom role combining both sets of permissions, or grant multiple predefined roles?
-> <details>
-> <summary>Answer</summary>
-> You should grant multiple predefined roles (e.g., `roles/run.admin` and `roles/cloudsql.client`). Predefined roles are maintained by Google and automatically updated when new permissions are added to a service. Custom roles must be manually maintained, which becomes an operational burden. Only use custom roles when predefined roles are explicitly too broad or too narrow.
-> </details>
+<details>
+<summary>Check your prediction</summary>
+
+You should grant multiple predefined roles (such as `roles/run.admin` and `roles/cloudsql.client`). Predefined roles are maintained by Google and automatically updated when new permissions are added to a service. Custom roles must be manually maintained, which quickly becomes an operational burden. Only use custom roles when predefined roles are explicitly too broad or too narrow.
+
+</details>
 
 #### 3. Custom Roles
 
@@ -398,9 +403,20 @@ Service accounts are the most critical---and most frequently misconfigured---asp
 | **Default** | GCP (auto) | `PROJECT_NUMBER-compute@developer.gserviceaccount.com` | You (but auto-created) |
 | **Google-managed** | GCP | `service-PROJECT_NUMBER@compute-system.iam.gserviceaccount.com` | Google (do not modify) |
 
-**Hypothetical scenario:** A security scanner flags a VM that can list every secret in Secret Manager. The VM was created with default settings. Its identity is the default Compute Engine service account, which still holds `roles/editor` on many legacy projects. The fix is not “patch the VM”—it is replace the runtime identity, remove Editor from the default SA, and deny key creation org-wide.
+**Hypothetical scenario:** A security scanner flags a VM that can list every secret in Secret Manager. The VM was created with default settings. Its identity is the default Compute Engine service account, which still holds broad legacy primitive access on many older projects. The fix is not “patch the VM”—it is replace the runtime identity, revoke excess primitive bindings from the default SA, and deny key creation org-wide.
 
-The default Compute Engine service account (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) is created when you enable the Compute Engine API. Google historically granted it `roles/editor` so tutorials worked out of the box. New organizations should treat that binding as technical debt. Create dedicated service accounts per workload class (batch, API, ETL) and set an organization policy or automation rule that rejects instance creates using the default SA email.
+The default Compute Engine service account (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) is created automatically by Google Cloud whenever you first enable the Compute Engine API within a project.
+
+**Pause and predict:** What standing role did Google Cloud historically attach to this default service account upon API enablement, and what actions can any virtual machine using that identity execute inside a legacy project?
+
+<details>
+<summary>Check your prediction</summary>
+
+Google historically granted the default Compute Engine service account the primitive `roles/editor` role so tutorials and developer quickstarts worked immediately. A virtual machine running with this identity inherits write and modification permissions across nearly every service in the project—including Cloud Storage, BigQuery, and Cloud SQL—excluding only project IAM policy modifications and billing administration.
+
+</details>
+
+New organizations and production environments should treat that standing primitive grant as severe technical debt. Platform teams should create dedicated service accounts tailored for each specific workload class, such as batch pipelines or web APIs. Furthermore, organization policies should enforce constraints that block launching instances with default service accounts.
 
 ```bash
 # Create a dedicated service account
@@ -438,7 +454,18 @@ gcloud iam service-accounts keys delete KEY_ID \
   --iam-account=my-sa@my-project.iam.gserviceaccount.com
 ```
 
-**Rule of thumb**: If you are creating a service account key, you are probably doing it wrong. In nearly every case, there is a better alternative:
+**Rule of thumb**: If you are creating a service account key, you are probably doing it wrong because modern cloud security architectures favor keyless short-lived authentication patterns over static secrets.
+
+**Pause and predict:** An automated CI/CD pipeline in GitHub Actions must deploy container images to Cloud Run, but company security policy strictly forbids generating or storing service account JSON keys. What mechanism replaces the key file, and how does authentication succeed?
+
+<details>
+<summary>Check your prediction</summary>
+
+Workload Identity Federation replaces the key file by allowing external identities to authenticate directly through OpenID Connect (OIDC). GitHub Actions requests an OIDC token from GitHub's token authority, exchanges it with the Google Cloud Security Token Service (STS) for a short-lived federated token, and impersonates a dedicated deployer service account without storing long-lived private key files anywhere.
+
+</details>
+
+Selecting the appropriate keyless identity mechanism depends on whether your workload runs inside Google Cloud or originates from an external hosting provider. For cloud workloads, native metadata servers provide credentials automatically. For external pipelines and systems, federated tokens provide equivalent security without static keys:
 
 | Scenario | Instead of Keys, Use |
 | :--- | :--- |
@@ -1200,7 +1227,43 @@ echo "Cleanup complete. Projects scheduled for deletion (30-day recovery window)
 ```
 </details>
 
-### Success Criteria
+**Card A: Moving a project to another folder leaves inherited folder IAM unchanged.** An infrastructure engineer reorganizes the resource hierarchy by moving an existing project from the Marketing folder to the Infrastructure folder. The team assumes that permissions inherited from the old folder remain bound to the project indefinitely. Engineers expect inherited access to persist without manual revocation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: resource hierarchy inheritance dynamics. Next action: audit inherited grants in target folders before moving projects, because ancestral permissions re-evaluate dynamically while only direct project bindings persist.
+
+</details>
+
+**Card B: For Cloud Run + Cloud SQL you should always invent a custom role instead of composing predefined roles.** A platform engineer deploys an internal microservice running on Cloud Run that connects to Cloud SQL. To minimize permissions down to the exact API methods needed today, the engineer begins handwriting a single custom role combining both services. The team believes this bespoke role is superior to granting multiple predefined roles.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: role lifecycle management and maintenance overhead. Next action: grant multiple predefined roles such as `roles/run.admin` and `roles/cloudsql.client` unless existing roles are proven too broad, avoiding unmanaged custom role rot.
+
+</details>
+
+**Card C: Exporting a JSON key into GitHub Secrets is the recommended way to deploy from Actions.** A continuous delivery engineer configures GitHub Actions workflows to deploy container revisions to Cloud Run. Because the deployment runner executes outside Google Cloud, the engineer generates a service account JSON key file. The pipeline saves this private key directly into repository secrets for routine deployment authentication.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: long-lived credential exposure. Next action: configure Workload Identity Federation with OpenID Connect to exchange GitHub OIDC tokens for short-lived credentials, eliminating static JSON key files entirely.
+
+</details>
+
+**Card D: The default Compute Engine service account is a least-privilege identity safe for production VMs.** When provisioning backend virtual machines to host an internal billing API, a developer leaves the instance service account setting on default. The team trusts that Google-created default service accounts are pre-configured according to secure least-privilege standards. Operations deploys the instances directly into staging.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: legacy default credential over-privilege. Next action: attach a dedicated user-managed service account with minimal IAM roles to the VM, and enforce organization policies that disable the default Compute Engine service account.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Two projects created with billing linked
 - [ ] Dedicated service accounts created (not using default SA)
