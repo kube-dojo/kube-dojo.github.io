@@ -104,7 +104,7 @@ Investigate the controller layer inside kube-controller-manager, specifically th
 
 </details>
 
-When high-level workload abstractions produce no child resources, jumping directly to node inspection or container runtime logs wastes valuable troubleshooting time. Senior cluster operators trace the object reconciliation chain from parent to child, verifying controller-driven lifecycle transitions before looking at node-level scheduling or container execution layers. Inspecting resource events at the workload tier reveals whether admission controllers blocked child creation or whether controller-manager reconciliation loops stalled due to authorization failures or resource quota limits.
+When high-level workload abstractions produce no child resources, jumping directly to node inspection or container runtime logs wastes valuable troubleshooting time. The first evidence you collect has to match the object that was actually accepted, otherwise you spend the exam clock on a layer that never saw the request.
 
 Static pod manifest misconfigurations represent one of the most common causes of total control plane failure during maintenance and certificate rotations. If an administrator edits an API server manifest with malformed YAML syntax or points to an invalid certificate path, kubelet fails to start the container and the API server vanishes. In this failure state, kubectl commands fail with connection errors because the administrative API endpoint is offline. Troubleshooting requires opening an SSH session to the control plane host, inspecting kubelet journal logs, and checking container runtime logs via command-line utilities.
 
@@ -274,7 +274,7 @@ Cordoning a node merely marks it as Unschedulable, which prevents the kube-sched
 
 </details>
 
-Node lifecycle management distinguishes between preventing future workload placement and safely preparing an existing computing resource for physical disruption. Proper maintenance workflows ensure that workloads running in production survive host maintenance events with zero unexpected application downtime. Administrators must configure PodDisruptionBudgets for critical services to establish minimum available replica thresholds, preventing automated maintenance tools from evicting too many instances simultaneously.
+A reboot is a host event, not a Kubernetes API event, so the maintenance sequence has to finish before the kernel upgrade starts or the outage clock belongs to you rather than to the scheduler. Administrators must configure PodDisruptionBudgets for critical services to establish minimum available replica thresholds, preventing automated maintenance tools from evicting too many instances simultaneously.
 
 The mechanics of the kubectl drain command rely upon the Kubernetes Eviction API rather than standard asynchronous pod deletion. Calling the Eviction API creates an Eviction subresource that evaluates active PodDisruptionBudgets, gracefully terminates container processes according to terminationGracePeriodSeconds, and coordinates with workload controllers to spin up replacement instances on alternate nodes. If an eviction violates a declared PodDisruptionBudget, the drain operation pauses and retries periodically until workload availability requirements are satisfied.
 
