@@ -136,7 +136,16 @@ aws kms create-alias \
 aws kms describe-key --key-id alias/app-secrets-key
 ```
 
-> **Stop and think**: If an attacker gains full read access to your S3 bucket where your encrypted secrets are stored, can they decrypt your data if they do not have access to the KMS key? Why or why not?
+**Pause and predict:** if an adversary gains full read access to an S3 bucket storing envelope-encrypted application secrets but lacks permissions on the backing customer managed KMS key, can they decrypt the payload?
+
+<details>
+<summary>Check your prediction</summary>
+
+No; envelope ciphertext is useless without `kms:Decrypt` on the CMK. In envelope encryption, the data stored in S3 is encrypted with a data key, and the data key itself is stored alongside the ciphertext encrypted under the CMK. Without access to invoke KMS decryption for that specific customer managed key, the raw bytes stored in the bucket remain unreadable ciphertext.
+
+</details>
+
+Evaluating access boundaries across distinct AWS layers reinforces why storage permissions and cryptographic capabilities must be configured as independent defense controls.
 
 ### Key Policies, IAM Policies, and Grants
 
@@ -263,7 +272,16 @@ aws ssm get-parameter-history \
   --name "/myapp/production/database/host"
 ```
 
-> **Pause and predict**: You need to store an API key that changes once a year and is read thousands of times per second by your application. Based on the features and pricing of SSM Parameter Store versus Secrets Manager, which service is more cost-effective for this specific workload?
+**Pause and predict:** you need to store an API key that changes once a year and is read thousands of times per second by your application. Based on the feature sets and pricing models of SSM Parameter Store versus Secrets Manager, which service is more cost-effective for this specific workload?
+
+<details>
+<summary>Check your prediction</summary>
+
+Parameter Store is significantly more cost-effective for high-read, rarely changing credentials. Parameter Store standard tier provides free parameter storage, whereas Secrets Manager charges $0.40 per secret monthly plus $0.05 per 10,000 API calls. At thousands of reads per second without caching, Secrets Manager API interaction charges quickly generate substantial recurring costs.
+
+</details>
+
+Architecting secret access for high-throughput distributed applications requires balancing automated credential rotation capabilities directly against the recurring costs of high-frequency API invocations.
 
 ### Standard vs Advanced Tier in Practice
 
@@ -281,7 +299,7 @@ You cannot downgrade an advanced parameter back to standard; you must delete and
 
 ### Parameter Store vs Secrets Manager for the Same Password
 
-Hypothetical scenario: your platform team stores a database password in Parameter Store as a `SecureString` and rotates it manually every quarter. That works until compliance asks for **automatic** rotation with audit evidence and zero-downtime cutover. Secrets Manager adds managed rotation Lambdas, version stages (`AWSCURRENT` / `AWSPENDING` / `AWSPREVIOUS`), and higher default throughput for secret retrieval. Parameter Store wins when the value is read heavily but changes rarely (feature toggles, CDN keys with external rotation), when you need hierarchical bulk load via `get-parameters-by-path`, or when hundreds of non-rotating values would cost $40/month each in Secrets Manager. Secrets Manager wins when rotation cadence, staging labels, or cross-Region secret replicas are part of the control objective — not when you only need encryption at rest.
+Hypothetical scenario: your platform team stores a database password in Parameter Store as a `SecureString` and rotates it manually every quarter. That works until compliance asks for **automatic** rotation with audit evidence and zero-downtime cutover. Secrets Manager adds managed rotation Lambdas, version stages (`AWSCURRENT` / `AWSPENDING` / `AWSPREVIOUS`), and higher default throughput for secret retrieval. Systems Manager excels when managing environment variables, hierarchical configuration trees via `get-parameters-by-path`, or non-sensitive runtime parameters that do not justify dedicated secret management overhead. Secrets Manager justifies its per-secret storage fee and operational model whenever automated rotation schedules, staging labels, or cross-Region secret replicas are mandatory control objectives — rather than simple encryption at rest.
 
 ---
 
@@ -400,9 +418,18 @@ flowchart TD
     A --> B --> C --> D
 ```
 
-If any step fails, the rotation rolls back and the existing AWSCURRENT credentials remain valid, so your application should not break during the rotation attempt.
+The rotation protocol executes sequentially across these four dedicated Lambda handler steps to coordinate credential generation, target database updates, connectivity verification, and version label promotion.
 
-> **Stop and think**: During a database credential rotation via Secrets Manager, what happens if the `testSecret` step fails because the newly generated password does not meet the database's internal complexity requirements? How does this affect the application currently using the database?
+**Pause and predict:** during an automated database credential rotation managed by Secrets Manager, what happens if the `testSecret` step fails because the newly generated password violates the database engine's complexity rules, and how does this outcome affect the application currently running in production?
+
+<details>
+<summary>Check your prediction</summary>
+
+The rotation execution halts immediately and rolls back without promoting the invalid credentials; `AWSCURRENT` remains pointed at the existing working secret version while the rejected `AWSPENDING` version is discarded. Because Secrets Manager does not advance the `AWSCURRENT` label until `finishSecret` succeeds, running application instances continue fetching and using valid credentials without service interruption.
+
+</details>
+
+Step-by-step verification safeguards protect production databases from abrupt configuration lockouts by ensuring that state transitions occur only after new credential pairs are independently validated against the target resource.
 
 ### Cross-Account Access and Resource Policies
 
@@ -1083,7 +1110,43 @@ aws ecs delete-cluster --cluster-name secrets-lab
 ```
 </details>
 
-### Success Criteria
+**Card A: S3 ciphertext is enough; the attacker can decrypt without the KMS key.** A security auditor assumes that obtaining read access to raw S3 bucket objects allows an unauthorized actor to immediately decrypt application secrets stored within envelope-encrypted files. The audit team believes that because the encrypted payload and the wrapped data encryption key reside side by side in the same object storage bucket, an attacker can use offline cryptanalysis tools to extract the credentials without calling AWS APIs. Consequently, they treat S3 bucket access policies as the sole security perimeter and neglect to configure restrictive key policies on the customer managed KMS key.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating possession of envelope ciphertext with the authorization to decrypt data encryption keys. Next action: configure restrictive KMS key policies and IAM permissions requiring explicit `kms:Decrypt` actions on the customer managed key, ensuring that compromised storage buckets yield unusable ciphertext without KMS access.
+
+</details>
+
+**Card B: Secrets Manager is always the cheaper place for a high-QPS yearly API key.** A cloud architect migrates a static third-party API token into AWS Secrets Manager because enterprise compliance standards require all credentials to be stored inside a dedicated secrets vault. The consuming microservice issues thousands of direct `GetSecretValue` API calls every second across a fleet of auto-scaling container tasks without implementing a client-side caching layer. The engineering team assumes that Secrets Manager's baseline monthly fee represents the vast majority of the service cost and expects API interaction fees to remain negligible for a single credential.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: ignoring per-request API pricing dynamics on high-throughput workloads without local caching. Next action: store static, high-read credentials in SSM Parameter Store or attach the AWS Parameters and Secrets Lambda Extension to cache secrets locally and eliminate high-frequency `GetSecretValue` API charges.
+
+</details>
+
+**Card C: If `testSecret` fails, `AWSCURRENT` is already swapped so the app breaks.** During an off-hours automated rotation window, an engineer notices that the custom database rotation Lambda failed during the `testSecret` step due to an unexpected database password complexity rule. Believing that Secrets Manager advances the `AWSCURRENT` staging label immediately upon creating the new credential string in `createSecret`, the engineer triggers an emergency rollback of all application containers. They assume the live production service is already failing authentication attempts against the database using the rejected password string.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding the Secrets Manager four-step rotation state machine and staging label promotion lifecycle. Next action: verify the secret status using `aws secretsmanager describe-secret` to confirm `AWSCURRENT` remains attached to the working version, then update the rotation Lambda logic to comply with database password requirements.
+
+</details>
+
+**Card D: Injecting secrets as ECS `environment` variables is equivalent to the `secrets` block.** A platform engineer defines sensitive database passwords directly inside the plaintext `environment` array of an ECS task definition manifest to simplify deployment automation scripts. The engineer reasons that because the container runtime presents both mechanisms as standard Linux environment variables to the application process, the two configuration approaches provide identical security boundaries. They conclude that referencing secret ARNs through the dedicated `secrets` attribute adds unnecessary IAM execution role overhead without delivering tangible security benefits.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing process-level runtime variable availability with infrastructure-level configuration exposure. Next action: migrate sensitive values to the ECS task definition `secrets` block with an IAM execution role, preventing credential exposure in task definition JSON, `DescribeTasks` API responses, and CloudTrail management events.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Secret created in Secrets Manager with JSON key-value structure
 - [ ] Execution role has `secretsmanager:GetSecretValue` permission
