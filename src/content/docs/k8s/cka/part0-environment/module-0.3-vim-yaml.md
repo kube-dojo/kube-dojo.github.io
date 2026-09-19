@@ -35,7 +35,7 @@ After this module, you will be able to:
 
 ## Why This Module Matters
 
-A candidate is twenty minutes into a performance exam when a Deployment manifest fails validation. The application idea is simple, the YAML looks almost right, and the cluster is healthy, yet the terminal shows a parser error pointing near a line that appears visually harmless. The candidate opens the file again, presses a few keys in the wrong mode, accidentally deletes part of the manifest, and loses more time recovering the editor than solving Kubernetes.
+Hypothetical scenario: a candidate is twenty minutes into a performance exam when a Deployment manifest fails validation. The application idea is simple, the YAML looks almost right, and the cluster is healthy, yet the terminal shows a parser error pointing near a line that appears visually harmless. The candidate opens the file again, presses a few keys in the wrong mode, accidentally deletes part of the manifest, and loses more time recovering the editor than solving Kubernetes.
 
 That situation is not really a vim problem. It is a workflow problem. Kubernetes work often happens in a terminal, YAML is whitespace-sensitive, and the editor becomes part of the diagnostic path. A learner who can move quickly through a file, see line numbers, preserve indentation, and validate small changes can spend attention on Kubernetes behavior instead of fighting invisible characters.
 
@@ -80,9 +80,16 @@ The diagram shows why `Esc` is the reset key. You can enter Insert mode through 
 | Insert | `i`, `a`, `o`, `O` | Type text into the file | Add `image: nginx:1.25` under a container |
 | Command | `:` from Normal mode | Save, quit, search, replace, configure vim | Run `:%s/nginx:old/nginx:1.25/g` |
 
-> **Pause and predict**: You press `j` expecting the cursor to move down, but the letter `j` appears inside `metadata.name`. Which mode are you in, what should you press, and what should you check before continuing?
+**Pause and predict:** you press `j` expecting the cursor to move down, but the letter `j` appears inside `metadata.name`. Which mode are you in, what should you press, and what should you check before continuing?
 
-The answer is that you are in Insert mode. Press `Esc` to return to Normal mode, then use `j` only for navigation. Before continuing, check whether the accidental `j` changed a meaningful field. This tiny recovery loop matters because accidental characters inside YAML values can create valid YAML that produces the wrong Kubernetes object, which is worse than an obvious parser error.
+<details>
+<summary>Check your prediction</summary>
+
+You are in Insert mode. Press `Esc` to return to Normal mode, then use `j` for navigation. Check whether the accidental character changed a real field, because valid YAML with a wrong value is worse than a parser error.
+
+</details>
+
+Recovering cleanly from unintended keystrokes is a core terminal skill when editing under pressure, because small text mutations alter manifest semantics without triggering explicit syntax warnings.
 
 ### 1.1 The Commands Worth Memorizing
 
@@ -224,9 +231,16 @@ This configuration does not turn vim into an integrated development environment.
 | `set cursorline` | Highlights the current line | Editing the wrong line in dense manifests |
 | `set hlsearch` | Highlights search matches | Missing repeated image or label values |
 
-> **Pause and explain**: Why is `tabstop=2` not enough by itself? Predict what happens if the file contains a real tab character and another machine displays tabs using a different width.
+**Pause and predict:** why is `tabstop=2` not enough by itself, and what happens if the file contains a real tab character when another machine displays tabs using a different width?
 
-`tabstop=2` only changes how a tab is displayed. It does not stop vim from inserting a tab character unless `expandtab` is also enabled. YAML cares about actual characters, not your visual preference, so a manifest can look aligned in one terminal and fail or mislead you in another. `expandtab` changes what gets written to the file, which is the behavior Kubernetes validation sees.
+<details>
+<summary>Check your prediction</summary>
+
+`tabstop=2` only changes display width; a real tab is still a tab unless `expandtab` is on. YAML cares about bytes, not the terminal tabstop, so a manifest that looks aligned on screen can still fail during automated processing or API validation.
+
+</details>
+
+Distinguishing visual editor presentation from raw byte serialization prevents costly false confidence during cluster operations, leading directly to repeatable verification practices for terminal configurations.
 
 ### 2.1 Verify the Configuration Instead of Trusting It
 
@@ -653,7 +667,16 @@ EOF
 kubectl apply -f schema-error.yaml --dry-run=client
 ```
 
-Open the file and remove the quotes around the integer, then compare that fix with the environment-variable examples earlier in the module. The same visual edit can be right in one field and wrong in another because Kubernetes schema, not personal style, defines the expected type.
+**Pause and predict:** when `kubectl` rejects this manifest, is the failure a YAML parser error or a Kubernetes schema validation error, and what exact change repairs it?
+
+<details>
+<summary>Check your prediction</summary>
+
+YAML can read the file; Kubernetes schema rejects a string where `containerPort` is `int32`. Remove the quotes around `80`; do not "fix" indentation.
+
+</details>
+
+Comparing API type constraints with simple text formatting clarifies why identical syntactic patterns succeed for environment variables but fail for port definitions across workload specifications.
 
 ```bash
 vim schema-error.yaml
@@ -1179,6 +1202,50 @@ rm -f nano-drill.yaml
 ```
 
 Use `Ctrl+O`, `Enter`, and `Ctrl+X` to save and exit. Compare your error rate, not just your time. The editor that produces valid YAML consistently is the better exam editor for you.
+
+**Card A: Seeing `j` inside `metadata.name` means the file is corrupt — retype the Pod.** An engineer spots the letter "j" appearing in the middle of a manifest line while attempting to navigate downward. Assuming the entire buffer has experienced unrecoverable corruption during a terminal glitch, they delete the file and recreate the manifest from scratch.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misidentifying an editor mode mistake as file corruption. Next action: press `Esc` to return to Normal mode, undo or delete the stray character, and verify field names before continuing.
+
+</details>
+
+**Card B: `tabstop=2` writes two spaces, so `expandtab` is optional.** A developer configures their editor with tab width set to two columns and assumes all future indentation will produce valid Kubernetes YAML automatically. Because the indentation appears identical to two spaces on their screen, they omit tab expansion settings from their environment.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing display column width with the underlying byte sequence. Next action: enable `expandtab` alongside `tabstop=2` so pressing Tab emits true space characters instead of literal tabs.
+
+</details>
+
+**Card C: A file that looks aligned cannot contain tabs.** An operator reviews a manifest in a visual editor where every nested block lines up evenly across the terminal window. Convinced that visual alignment guarantees clean whitespace formatting, they skip raw character inspection and assume any parsing error must stem from an invalid Kubernetes API version.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: relying on visual rendering instead of byte-level verification. Next action: inspect the file with `cat -A` or `:set list` to expose hidden tab characters that violate YAML specification rules.
+
+</details>
+
+**Card D: `containerPort: "80"` is valid YAML, so client dry-run must succeed.** A candidate wraps all port declarations in quotation marks to maintain uniform string styling throughout the configuration file. Because the syntax parses without error in a generic YAML parser, they assume Kubernetes client dry-run validation will accept the manifest without complaint.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: equating generic YAML syntactic validity with Kubernetes API schema compliance. Next action: remove quotation marks around numeric port values because Kubernetes schema defines `containerPort` as an integer.
+
+</details>
+
+**Success Criteria**:
+
+- [ ] You can configure vim with `expandtab`, `shiftwidth=2`, and `number` in a fresh terminal under 30 seconds.
+- [ ] You can diagnose whether a manifest failure is a YAML parser syntax error or a Kubernetes schema validation error.
+- [ ] You can inspect and eliminate hidden tab characters from a broken manifest using `cat -A` or `:set list`.
+- [ ] You can refactor Pod containers and labels using vim block-deletion, yanking, and indentation commands without retyping.
+- [ ] You can validate every manifest edit with `kubectl apply --dry-run=client` before applying changes to the cluster.
 
 ---
 
