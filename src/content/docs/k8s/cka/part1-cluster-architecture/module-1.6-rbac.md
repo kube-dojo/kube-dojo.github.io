@@ -60,7 +60,16 @@ Webhook authorization delegates the decision to an external HTTP service. That c
 
 Do not confuse Webhook authorization with validating or mutating admission webhooks. Authorization webhooks answer whether a request is allowed at all, before persistence and before admission changes the object. Admission webhooks evaluate the object after authorization has already allowed the operation, which means they are good for policy about object shape but not a replacement for correct RBAC on who may call the API.
 
-Pause and predict: if a cluster runs `Node,RBAC,Webhook`, a kubelet request may be approved by Node authorization before RBAC is consulted, while a human user's namespace request usually falls through to RBAC. What would you expect if every authorizer returns no opinion? The default answer is deny, so a clean Forbidden response often means no configured authorizer found a matching allow.
+**Pause and predict:** Consider an API server configured with the chained authorization modes `--authorization-mode=Node,RBAC,Webhook`. A kubelet request may be approved immediately by Node authorization before RBAC is evaluated, whereas an engineer requesting namespace resources usually passes through Node authorization to RBAC. What outcome do you expect if an incoming API request is evaluated across all three configured modules and every authorizer returns no opinion?
+
+<details>
+<summary>Check your prediction</summary>
+
+The default outcome is deny. Kubernetes requires at least one authorizer in the configured chain to explicitly allow the request; if every authorizer abstains or returns no opinion, the API server rejects the call with an HTTP 403 Forbidden status code.
+
+</details>
+
+Analyzing authorizer evaluation order provides a systematic operational foundation for diagnosing access rejections across multi-tenant enterprise environments and complex control plane topologies.
 
 When you troubleshoot authorization, separate the request path from the policy object. A Forbidden error on `kubectl get pods -n dev` might be caused by a missing RoleBinding, an incorrect subject, a Role in the wrong namespace, or an API group mismatch. A Forbidden error from a kubelet or aggregated API server might instead involve Node or Webhook authorization, so the first diagnostic question is always which identity and which authorizer are actually in play.
 
@@ -170,7 +179,16 @@ kubectl create clusterrole node-reader \
 
 The ClusterRole is the correct place for Node permissions because Nodes are not namespaced. If you tried to put `nodes` in a Role, the object might be accepted, but the rule cannot authorize a cluster-scoped Node request inside a namespace. That distinction is a common source of exam mistakes because many commands look similar until you ask whether the target resource has a namespace column in `kubectl api-resources`.
 
-Pause and predict: you create a Role with `verbs: ["get", "list"]` for `resources: ["pods"]` in namespace `dev`. Before you test anything, decide whether the user can see pods in `production`, list Nodes, or watch pod changes in `dev`. The correct reasoning is that namespace, resource, and verb must all match, so only `get` and `list` on `dev` pods are allowed.
+**Pause and predict:** You create a Role with `verbs: ["get", "list"]` for `resources: ["pods"]` in namespace `dev`. Before executing any commands or testing permissions with impersonation, predict whether the bound user can view pods in `production`, list cluster-wide Nodes, or watch pod events in `dev`.
+
+<details>
+<summary>Check your prediction</summary>
+
+The user cannot see pods in `production`, cannot list Nodes, and cannot watch pod changes in `dev`. Kubernetes RBAC requires an exact match across namespace, resource, and verb; because the Role is restricted to `dev` and only specifies the `get` and `list` verbs for `pods`, all other scopes, verbs, and resources remain completely unauthorized.
+
+</details>
+
+Evaluating verb and resource boundaries within namespaced scopes ensures that least-privilege role definitions do not inadvertently grant broader access across other workloads or cluster objects.
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -317,7 +335,16 @@ roleRef:
 
 One binding can contain multiple subjects, but the operational tradeoff is audit clarity. A binding named `dev-team-access` that grants a team group and a pipeline account may be convenient, but it also means future reviewers must inspect the subject list carefully to understand who has the grant. In regulated environments, separate bindings for humans and workloads often make access review easier, even when they point to the same role reference.
 
-Stop and think: you need to give a developer read-only access to pods in `staging` but not `production`. You can create a `pod-reader` Role in `staging` and bind it there, or create a reusable ClusterRole and bind that ClusterRole with a RoleBinding in `staging`. The second approach is more maintainable when many namespaces need the same rules, while the RoleBinding still keeps the actual grant namespace-scoped.
+**Pause and predict:** Suppose you must grant a developer read-only access to pods in the `staging` namespace without allowing any access to pods running in `production`. Which RBAC resource strategies allow you to fulfill this requirement, and how can you structure the definition so that the permissions remain strictly namespace-scoped?
+
+<details>
+<summary>Check your prediction</summary>
+
+You can create a `pod-reader` Role in `staging` and bind it with a RoleBinding in `staging`, or you can create a reusable ClusterRole with pod-reading rules and bind it using a RoleBinding in `staging`. Both strategies ensure the grant remains strictly namespace-scoped, while the ClusterRole approach is more maintainable when multiple namespaces share identical permission requirements.
+
+</details>
+
+Deciding between dedicated namespace Roles and reusable ClusterRoles bound locally is a key architectural choice when standardizing permissions across multi-tenant enterprise clusters.
 
 ```yaml
 # Use the built-in "edit" ClusterRole in the "production" namespace only
@@ -1044,7 +1071,43 @@ kubectl delete clusterrolebinding dm-pods
 
 </details>
 
-### Success Criteria
+**Card A: `cluster-admin` is the fastest safe grant.** An engineer troubleshooting an urgent deployment failure binds the `cluster-admin` ClusterRole to their developer ServiceAccount to bypass persistent permission errors quickly. They assume that granting complete administrative power is harmless during testing as long as the workload manifest only performs basic pod updates. Because the broad grant immediately silences authorization warnings, they leave the binding in place, inadvertently granting the workload full control over all cluster secrets, control plane nodes, and security policies.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing temporary operational convenience with safe access delegation. Next action: replace the administrative binding with a tightly scoped Role or ClusterRole that specifies only the exact API groups, resources, and verbs required by the workload.
+
+</details>
+
+**Card B: A Role in `dev` also covers pods in `production`.** A developer defines a Role containing full verbs for pods in the `dev` namespace and expects those permissions to apply automatically across all application environments. They believe that because the underlying Pod resource schema and API group are identical across namespaces, a single namespace Role grants operational parity everywhere the service runs. When automated deployment pipelines attempt to inspect pods in `production`, the API server rejects the request with an HTTP 403 Forbidden error because the Role's authority terminates strictly at its namespace boundary.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding namespace scoping rules for Kubernetes Role objects. Next action: create an equivalent Role in `production`, or define a reusable ClusterRole and attach it within each target namespace using distinct RoleBindings.
+
+</details>
+
+**Card C: A ClusterRole always means cluster-wide access.** A security auditor notices that an application team's binding references the built-in `view` ClusterRole and immediately flags the configuration as an unacceptable cluster-wide security violation. They assume that referencing any ClusterRole object inherently grants read access across all namespaces, nodes, and cluster resources without limitation. In reality, attaching a ClusterRole through a namespace-scoped RoleBinding restricts the granted permissions strictly to the namespace where the binding resides.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating the definition scope of a ClusterRole with the binding scope established by a RoleBinding. Next action: inspect the binding kind rather than just the roleRef; use a RoleBinding when reusing a ClusterRole within a single namespace, and reserve ClusterRoleBindings for true cluster-wide grants.
+
+</details>
+
+**Card D: If the Node authorizer has no opinion, the request is allowed.** A platform operator reviews control plane logs where an incoming API request from an external automation tool bypasses the Node authorizer without generating an authorization grant. Convinced that an authorizer returning no opinion permits the API server to proceed with request execution, they assume downstream admission controllers will handle any remaining security checks. Because no subsequent authorizer in the configured chain explicitly matches the request, the API server rejects the call with an authorization denial.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misinterpreting authorizer abstention as an affirmative permission grant in chained authorization. Next action: ensure that at least one configured authorizer in the `--authorization-mode` chain explicitly matches the subject, verb, and resource to return an allow decision.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Design namespace and cluster RBAC scopes for least-privilege team access.
 - [ ] Implement Roles, ClusterRoles, RoleBindings, ClusterRoleBindings, and ServiceAccount bindings.
