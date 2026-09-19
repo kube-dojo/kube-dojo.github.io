@@ -232,7 +232,7 @@ emit_metric("CheckoutLatency", 234, "Milliseconds",
             {"Environment": "production", "Region": "us-east-1"})
 ```
 
-With EMF, you get both a searchable log entry AND a CloudWatch metric from a single stdout print statement, entirely bypassing the network latency of the `put-metric-data` API. The EMF specification requires a `_aws.CloudWatchMetrics` object naming the namespace, dimension keys, and metric definitions; the metric values themselves appear as top-level JSON fields alongside optional dimensions. Lambda and container runtimes ship stdout to CloudWatch Logs automatically, so EMF is the idiomatic path for serverless business metrics. Validate EMF output in a staging log group first — malformed JSON lines are logged but do not create metrics, which can leave dashboards empty while the application appears healthy.
+With EMF, a single stdout JSON line can carry both a searchable log record and a CloudWatch metric definition. The specification requires a `_aws.CloudWatchMetrics` object naming the namespace, dimension keys, and metric definitions; the metric values themselves appear as top-level JSON fields alongside optional dimensions. Lambda and container runtimes ship stdout to CloudWatch Logs automatically, so EMF is a common path for serverless business metrics. Validate EMF output in a staging log group first — malformed JSON lines are logged but do not create metrics, which can leave dashboards empty while the application appears healthy.
 
 Teams sometimes publish custom metrics on a one-minute cron from aggregated database tables instead of per-request emission. That batch pattern keeps cardinality flat and API volume low, which is appropriate for daily revenue totals or inventory snapshots. The tradeoff is up to one period of lag before CloudWatch sees a spike; pair batch metrics with real-time log-based filters when you need both cheap aggregates and fast error detection on the same event stream.
 
@@ -321,15 +321,6 @@ aws cloudwatch put-metric-alarm \
 
 The `TreatMissingData` parameter (CLI: `--treat-missing-data`) determines whether missing samples count as healthy, unhealthy, or neutral during an evaluation window, which matters enormously for batch jobs, sparse Lambda invocations, and agents that stop reporting during deploys.
 
-| Setting | Behavior | Best For |
-|---------|----------|----------|
-| `missing` | Maintains current state | Most alarms (conservative) |
-| `notBreaching` | Treats missing data as OK | Sporadic metrics (batch jobs) |
-| `breaching` | Treats missing data as ALARM | Critical systems where silence is bad |
-| `ignore` | Skips the period entirely | Alarms with naturally gappy data |
-
-The default is `missing`, which is generally safe. But for critical continuous health checks, consider `breaching`—if your application completely stops reporting metrics, silence is itself an emergency worth alerting on.
-
 **Pause and predict:** You have an alarm monitoring a batch job that runs once an hour. If `treat-missing-data` is set to `missing`, what state will the alarm maintain during the 59 minutes the job is not running, and how might that affect your incident response?
 
 <details>
@@ -341,6 +332,17 @@ When `treat-missing-data` is set to `missing`, CloudWatch treats missing periods
 - **Recommended batch design**: For sparse batch pipelines, compare `notBreaching` (which resets the alarm to `OK` during expected gaps) against `breaching` paired with an inverted metric or dedicated heartbeat. Alternatively, configure a separate dead-man's-snitch alarm where silence itself breaches the threshold to guarantee that non-executing jobs wake on-call operators.
 
 </details>
+
+The four settings below are the menu for that evaluation choice. Composite alarms, next, combine several of those evaluations so a single noisy metric does not page on-call by itself.
+
+| Setting | Behavior | Best For |
+|---------|----------|----------|
+| `missing` | Maintains current state | Most alarms (conservative) |
+| `notBreaching` | Treats missing data as OK | Sporadic metrics (batch jobs) |
+| `breaching` | Treats missing data as ALARM | Critical systems where silence is bad |
+| `ignore` | Skips the period entirely | Alarms with naturally gappy data |
+
+The default is `missing`. For critical continuous health checks, consider `breaching`—if your application completely stops reporting metrics, silence is itself an emergency worth alerting on.
 
 ### Composite Alarms
 
