@@ -145,7 +145,7 @@ No; envelope ciphertext is useless without `kms:Decrypt` on the CMK. In envelope
 
 </details>
 
-Evaluating access boundaries across distinct AWS layers reinforces why storage permissions and cryptographic capabilities must be configured as independent defense controls.
+Once ciphertext exists, the remaining design work is who may *use* the key, not who may list the objects. The next section walks through the three KMS authorization documents that stack on a customer managed key.
 
 ### Key Policies, IAM Policies, and Grants
 
@@ -281,7 +281,7 @@ Parameter Store is significantly more cost-effective for high-read, rarely chang
 
 </details>
 
-Architecting secret access for high-throughput distributed applications requires balancing automated credential rotation capabilities directly against the recurring costs of high-frequency API invocations.
+Choosing a store is also choosing an API and rotation contract. The sections below separate Parameter Store tiering from the Secrets Manager rotation model so you can match a workload to the contract you actually need.
 
 ### Standard vs Advanced Tier in Practice
 
@@ -429,7 +429,7 @@ The rotation execution halts immediately and rolls back without promoting the in
 
 </details>
 
-Step-by-step verification safeguards protect production databases from abrupt configuration lockouts by ensuring that state transitions occur only after new credential pairs are independently validated against the target resource.
+Rotation is a state machine with named stages, not a single overwrite of the live password. The sections below cover who may read a secret across accounts and how replicas behave in another Region.
 
 ### Cross-Account Access and Resource Policies
 
