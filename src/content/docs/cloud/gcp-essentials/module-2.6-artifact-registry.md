@@ -347,7 +347,7 @@ Building a vulnerability scanning policy means deciding three things: which seve
 | **LOW** | 0.1 - 3.9 | Track and fix at convenience |
 | **MINIMAL** | 0.0 | Informational |
 
-**Pause and predict:** You configure automatic vulnerability scanning on an Artifact Registry repository and push an application container image that the scanner immediately flags with multiple CRITICAL CVE findings. If an engineer applies a Kubernetes deployment manifest referencing this image digest to a standard GKE cluster, what mechanism prevents the cluster from admitting and executing the vulnerable container?
+**Pause and predict:** You configure automatic vulnerability scanning on an Artifact Registry repository and push an application container image that the scanner immediately flags with multiple CRITICAL CVE findings. An engineer then applies a Kubernetes deployment manifest that references this image digest on a standard GKE cluster. What happens at admit time, and what would you have to add if scanning alone is not enough?
 
 <details>
 <summary>Check your prediction</summary>
@@ -355,7 +355,7 @@ Building a vulnerability scanning policy means deciding three things: which seve
 Automatic vulnerability scanning in Artifact Registry operates strictly as an informational audit service and does not enforce admission control by itself; GKE admits and executes the image unless a Binary Authorization policy paired with cryptographic attestations explicitly evaluates and blocks unverified digests at admission time.
 </details>
 
-Decoupling registry inspection from cluster admission represents an intentional architectural separation of concerns between storage-layer reporting and compute-layer enforcement. Managing runtime risk requires bridging that boundary by wiring automated vulnerability analysis directly into deployment policy gates.
+Decoupling registry inspection from cluster admission is a two-control-plane problem. The next section is how production teams attach an extra gate after the scan, not instead of it.
 
 ### Binary Authorization Integration
 
@@ -373,7 +373,7 @@ gcloud services enable binaryauthorization.googleapis.com
 # 4. GKE clusters only run images with valid attestations
 ```
 
-A typical production pipeline pushes the image and waits for scan completion. It runs a policy check against allowed severities, and only then creates an attestation that Binary Authorization verifies at deploy time. Establishing automated cryptographic attestation workflows ensures that cluster admission controllers reject unverified container digests before runtime scheduling occurs across production nodes.
+A typical production pipeline pushes the image, waits for scan completion, and only then continues the release. The next module-owned control is who is allowed to sign that continuation, and which compute service actually checks the signature before a Pod is admitted.
 
 ---
 
@@ -487,7 +487,7 @@ flowchart LR
 Pipelines requesting image tags that were previously pulled and cached will continue executing normally because Artifact Registry serves cached layers directly from regional storage without contacting the upstream provider. Conversely, any pipeline requesting an uncached image tag or attempting a first-time pull will fail immediately because the remote repository cannot connect to the unreachable public registry to fetch missing blobs.
 </details>
 
-Configuring an upstream proxy establishes an intermediate storage layer that decouples build infrastructure from external registry availability and strict public rate limits. Implementing remote repositories requires provisioning dedicated regional cache endpoints and adjusting client pull targets across build configurations.
+Configuring an upstream proxy is a client-URL problem before it is an availability story. The next commands create the regional remote repositories your build runners will actually pull from.
 
 ```bash
 # Create a remote repository that caches Docker Hub
@@ -541,7 +541,7 @@ Hypothetical scenario: Your CI pipeline builds 200 times per day and each build 
 Artifact Registry evaluates upstream policies where higher numerical priority values win, meaning the public remote cache at priority 200 is served instead of the internal artifact at priority 100. Because the public repository takes precedence, this configuration creates a dependency confusion vulnerability where an external attacker can publish a malicious package with the same name to the public registry, tricking the virtual repository into serving compromised code to internal builds. To prevent dependency confusion, internal standard repositories must always be assigned a higher priority value than public remote caches.
 </details>
 
-Virtual repositories provide a single endpoint that aggregates multiple upstream repositories (both standard and remote). [Priority values determine lookup order](https://cloud.google.com/artifact-registry/docs/repositories/virtual-overview) across configured upstreams, enabling platform teams to define deterministic resolution hierarchies. Setting up upstream policy files allows organizations to streamline client package management configurations while centralizing artifact governance across development environments.
+Virtual repositories provide a single endpoint that aggregates multiple upstream repositories (both standard and remote). The next objects are the upstream-policy file and the gcloud create that wire those upstreams together for Docker, npm, or pip clients.
 
 ```bash
 # Create a virtual repository that combines your internal repo and Docker Hub cache
@@ -584,7 +584,7 @@ When designing upstream priority, remember that **higher numbers win**. A common
 Storage utilization does not decrease immediately because Artifact Registry evaluates cleanup policies via an asynchronous background job that executes approximately once per day; the superseded image digest remains untagged and continues to incur storage charges until that background process completes its evaluation cycle. To preview and verify which container images and package versions match the configured deletion rules without actually removing any data, execute the policy assignment command with the `--dry-run` flag.
 </details>
 
-[Cleanup policies](https://cloud.google.com/artifact-registry/docs/repositories/cleanup-policy) automatically manage artifact retention to prevent unconstrained storage cost growth across development and production repositories. Platform administrators configure declarative rules that balance automated capacity reclamation against the operational necessity of retaining historical images for incident investigation and rapid environment rollbacks.
+[Cleanup policies](https://cloud.google.com/artifact-registry/docs/repositories/cleanup-policy) are how you stop a busy CI repository from growing unbounded. The next objects are the policy JSON and the gcloud command that attaches it to a named repository.
 
 Untagged images accumulate silently when CI pipelines push both digest-pinned builds and floating tags like `latest` or branch names. Each push of `my-app:main` creates a new digest while the previous digest becomes untagged but still billable storage. A delete policy targeting untagged images older than 30 days, combined with a keep policy retaining the ten most recent `v`-prefixed release tags, balances cost control against the ability to roll back to a recent production build.
 
