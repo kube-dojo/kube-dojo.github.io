@@ -88,7 +88,7 @@ The project immediately stops inheriting permissions from the "Engineering" fold
 
 ### Policy Inheritance: The Cascade Effect
 
-Understanding how permissions flow through the resource hierarchy requires examining the rules of policy evaluation across parent and child containers. The Google Cloud authorization engine resolves effective access at request time by walking up the resource tree. It computes the union of all bindings attached between the target resource and the organization root. This structural model ensures parent containers establish broad baseline privileges that encompass every child project nested beneath them.
+Understanding how permissions flow through the resource hierarchy requires examining the rules of policy evaluation across parent and child containers. The `gcloud` commands below read the bindings attached at each Resource Manager level. Use them when you need to see what was granted on the organization, a folder, or a project itself, rather than guessing from the console Permissions tab.
 
 ```bash
 # View the IAM policy at the organization level
@@ -260,6 +260,8 @@ You should grant multiple predefined roles (such as `roles/run.admin` and `roles
 
 </details>
 
+When a regulated workload still cannot live inside the predefined catalog, you need a role you own and version yourself. The next section is how that YAML is authored and what Google will not auto-update for you.
+
 #### 3. Custom Roles
 
 When predefined roles are either too broad or too narrow for a regulated workload, you can create **custom roles** that include exactly the permission strings you want—and nothing else.
@@ -416,7 +418,7 @@ Google historically granted the default Compute Engine service account the primi
 
 </details>
 
-New organizations and production environments should treat that standing primitive grant as severe technical debt. Platform teams should create dedicated service accounts tailored for each specific workload class, such as batch pipelines or web APIs. Furthermore, organization policies should enforce constraints that block launching instances with default service accounts.
+New organizations and production environments should treat that default identity as something to replace, not something to keep because tutorials still mention it. Platform teams should create dedicated service accounts tailored for each specific workload class, such as batch pipelines or web APIs. Furthermore, organization policies should enforce constraints that block launching instances with default service accounts.
 
 ```bash
 # Create a dedicated service account
@@ -465,7 +467,7 @@ Workload Identity Federation replaces the key file by allowing external identiti
 
 </details>
 
-Selecting the appropriate keyless identity mechanism depends on whether your workload runs inside Google Cloud or originates from an external hosting provider. For cloud workloads, native metadata servers provide credentials automatically. For external pipelines and systems, federated tokens provide equivalent security without static keys:
+The pattern table below is the menu of replacements teams actually ship instead of downloading a key file. Match the runtime location first, then pick the row that fits that location.
 
 | Scenario | Instead of Keys, Use |
 | :--- | :--- |
