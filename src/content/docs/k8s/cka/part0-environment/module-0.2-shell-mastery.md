@@ -52,7 +52,16 @@ Before you add anything to a startup file, separate three ideas that often get b
 
 That distinction matters because many convenience features used by Kubernetes operators are shell-specific. Process substitution, written as `<(command)`, is common in Bash and Zsh examples, but it is not a POSIX `sh` feature. Bash arrays, completion functions, and prompt hooks also belong to the interactive shell layer. Treat interactive shell setup as an operator convenience, and treat scripts as separate artifacts that must declare their interpreter with a shebang and avoid hidden interactive assumptions.
 
-Pause and predict: if the line `source <(kubectl completion bash)` works at your prompt, what do you expect to happen if the same line is executed by `/bin/sh`? The important answer is not merely "it fails." The useful diagnosis is that `/bin/sh` parses the file before `kubectl` ever runs, sees syntax it does not support, and stops with a shell syntax error. That tells you to fix the interpreter boundary rather than chasing Kubernetes authentication, RBAC, or cluster connectivity.
+**Pause and predict:** if the line `source <(kubectl completion bash)` works at your prompt, what do you expect to happen if the same line is executed by `/bin/sh`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The important answer is not merely "it fails." The useful diagnosis is that `/bin/sh` parses the file before `kubectl` ever runs, sees syntax it does not support, and stops with a shell syntax error. That tells you to fix the interpreter boundary rather than chasing Kubernetes authentication, RBAC, or cluster connectivity.
+
+</details>
+
+The next commands install completion for an interactive Bash session, which is a setup step rather than a diagnosis of which program is parsing the line.
 
 ```bash
 # Install bash-completion if it is not already present.
@@ -176,7 +185,16 @@ kgn() { kubectl get nodes "$@"; }
 kgd() { kubectl get deploy "$@"; }
 ```
 
-Which approach would you choose here and why: a local function that saves a few keystrokes, or a full `kubectl` command that any teammate can paste into a runbook? In a private exam terminal, a function can be useful if you have practiced it. In documentation, incident notes, and scripts, the full command is the better default because it carries its meaning and prerequisites with it.
+**Pause and predict:** which approach would you choose here and why: a local function that saves a few keystrokes, or a full `kubectl` command that any teammate can paste into a runbook?
+
+<details>
+<summary>Check your prediction</summary>
+
+In a private exam terminal, a function can be useful if you have practiced it. In documentation, incident notes, and scripts, the full command is the better default because it carries its meaning and prerequisites with it.
+
+</details>
+
+The next section is about editing a previous command from history, which is a speed skill rather than a choice about what you paste into a shared note.
 
 ```bash
 # Full commands remain the portable form.
@@ -245,7 +263,16 @@ kubectl_whereami() {
 }
 ```
 
-Before running this, what output do you expect after setting the namespace to `kube-system`? The function should print the active context and then `namespace=kube-system`. If the namespace line is empty, Kubernetes treats the default namespace as `default`, which is different from having a named namespace explicitly configured in kubeconfig.
+**Pause and predict:** before running this, what output do you expect after setting the namespace to `kube-system`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The function should print the active context and then `namespace=kube-system`. If the namespace line is empty, Kubernetes treats the default namespace as `default`, which is different from having a named namespace explicitly configured in kubeconfig.
+
+</details>
+
+The next section generates YAML without creating objects, which is a different kubectl habit from reading the namespace line the function just printed.
 
 ```bash
 kubectl_whereami
@@ -723,6 +750,42 @@ rm -f pod.yaml deploy.yaml svc.yaml cm.yaml secret.yaml
 <details><summary>Solution</summary>
 
 After cleanup, `ls *.yaml` should either show no files or only files unrelated to this exercise that you intentionally kept. If your shell reports "No such file or directory," that is acceptable after removal. The important check is that practice manifests do not remain in a working directory where a later bulk apply could pick them up.
+
+</details>
+
+**Card A: A `/bin/sh` failure means the kubeconfig is wrong.** The line `source <(kubectl completion bash)` works in your prompt. The same line is now executed by `/bin/sh` and exits immediately. The on-call rotates the kubeconfig and rechecks RBAC because the cluster must be rejecting the completion request.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating a shell syntax error as an API failure. Next action: fix the interpreter boundary. `/bin/sh` parses the line before `kubectl` runs.
+
+</details>
+
+**Card B: A private function belongs in the runbook.** You practiced a short function that wraps `kubectl get`. The incident note, the team script, and the shared doc all use that function name, because it saved keystrokes in the exam terminal.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a private shortcut treated as shared language. Next action: paste the full `kubectl` command in docs, notes, and scripts. Keep the function for a practiced private terminal only.
+
+</details>
+
+**Card C: An empty namespace line means `kube-system`.** You set the namespace, then the helper prints a context and a blank namespace line. The team treats that blank as `kube-system` because that was the namespace they meant to select.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: reading a missing name as the namespace you hoped for. Next action: an empty namespace line means Kubernetes uses `default`. A configured `kube-system` prints `namespace=kube-system`.
+
+</details>
+
+**Card D: Completion works the same in every shell.** Bash completion is installed and the interactive prompt completes `kubectl` subcommands. A POSIX script and `/bin/sh` are expected to load the same completion line without changes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming process substitution is portable. Next action: keep `source <(kubectl completion bash)` in interactive Bash. Do not put that line in a POSIX script.
 
 </details>
 
