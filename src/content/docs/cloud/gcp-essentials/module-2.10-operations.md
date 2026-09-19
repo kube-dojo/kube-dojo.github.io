@@ -178,13 +178,21 @@ textPayload=~"error.*timeout"
 labels."compute.googleapis.com/resource_name"="my-vm"
 ```
 
-> **Stop and think**: If a log entry matches both an inclusion filter for BigQuery and an exclusion filter for the default Cloud Logging bucket, where does the log end up?
+**Pause and predict:** If a log entry matches both an inclusion filter for BigQuery and an exclusion filter for the default Cloud Logging bucket, where does the log end up?
+
+<details>
+<summary>Check your prediction</summary>
+
+The log still routes to BigQuery while the default bucket drops it. Sinks and bucket exclusions evaluate independently in the Log Router, so a matching inclusion sink still receives a copy when `_Default` drops the log.
+</details>
+
+The next section examines sink architecture and destinations. Parallel export pipes route telemetry to BigQuery, Cloud Storage, and Pub/Sub.
 
 ---
 
 ## Log Sinks: Routing Logs to Destinations
 
-Sinks route copies of log entries to destinations outside the default Cloud Logging storage, which is essential for long-term retention, security analytics, and compliance archives that outlive the default 30-day platform retention. Each sink has its own filter and a **writer identity** service account that must be granted permission on the destination bucket, dataset, or topic—creating the sink is only half the job. Sinks operate independently of exclusions: a log can be excluded from expensive default ingestion while still being copied to BigQuery or Cloud Storage for audit teams.
+Sinks route copies of log entries to destinations outside the default Cloud Logging storage, which is essential for long-term retention, security analytics, and compliance archives that outlive the default 30-day platform retention. Each sink has its own filter and a **writer identity** service account that must be granted permission on the destination bucket, dataset, or topic—creating the sink is only half the job. Dedicated export pipes allow security, audit, and engineering teams to retain critical operational data downstream.
 
 Think of sinks as **parallel export pipes** evaluated by the Log Router for every matching entry. A common enterprise pattern uses three sinks: (1) all Admin Activity and Data Access audit logs to a BigQuery dataset for SIEM queries; (2) `severity>=ERROR` platform logs to a Cloud Storage archive bucket with 7-year lifecycle; (3) a Pub/Sub topic streaming critical security events to a real-time processor. Each sink filter should be as narrow as compliance allows—exporting `severity>=INFO` from a busy GKE cluster to BigQuery can dwarf the cost of the cluster itself because BigQuery storage and analysis charges apply downstream.
 
@@ -320,7 +328,15 @@ jsonPayload.severity = "ERROR"
 
 Use these filters in Log Explorer during incidents, then promote the same expressions into log-based metrics when a pattern should page the team automatically.
 
-> **Pause and predict**: If you use standard `print()` statements in Python on Cloud Run, they appear in Cloud Logging as plain text within `textPayload`. How does this limit your ability to create specific alerting policies compared to JSON logging?
+**Pause and predict:** If you use standard `print()` statements in Python on Cloud Run, how does that output format limit alerting policies compared to structured logging?
+
+<details>
+<summary>Check your prediction</summary>
+
+Standard print statements write to `textPayload`, which cannot drive field-based alert filters the way structured `jsonPayload.*` properties can. Substring matches cannot filter on nested attributes or evaluate numeric thresholds like latency values.
+</details>
+
+The next section introduces log-based metrics. We examine how filters convert streaming log entries into actionable time series.
 
 ---
 
@@ -328,7 +344,7 @@ Use these filters in Log Explorer during incidents, then promote the same expres
 
 Log-based metrics are the bridge between logging and monitoring: they evaluate filters as entries flow through the log router and expose matching traffic as Cloud Monitoring time series you can chart, combine with infrastructure metrics, and attach to alerting policies. **Counter** metrics increment when a filter matches (ideal for error counts and auth failures), while **distribution** metrics sample numeric fields such as latency so you can compute percentiles instead of only knowing that "something slow happened." The commands in the next two subsections show both patterns for Cloud Run workloads.
 
-Because evaluation happens **at ingestion time**, log-based metrics are not retroactive: creating a metric today does not backfill yesterday's errors. Plan metrics before launch for SLO-critical signals (5xx counts, payment failures, auth denials). Each log-based metric becomes a **chargeable custom metric** in Cloud Monitoring—budget for cardinality. User-defined log-based metrics share the custom-metric byte allotment (150 MiB free per billing account per month on the standard pricing page); high-volume broad filters can consume that allotment quickly.
+Plan metrics before launch for SLO-critical signals (5xx counts, payment failures, auth denials). Each log-based metric becomes a **chargeable custom metric** in Cloud Monitoring—budget for cardinality. User-defined log-based metrics share the custom-metric byte allotment (150 MiB free per billing account per month on the standard pricing page); high-volume broad filters can consume that allotment quickly.
 
 Label extractors add dimensions—for example grouping error counts by `resource.labels.service_name` or a `jsonPayload.error_type` field—so one metric serves many services on a dashboard. Too many unique label combinations, however, explode time-series cardinality and cost the same way high-cardinality Prometheus labels do. Prefer a small set of business-meaningful labels (`error_type`, `region`) over per-user dimensions unless you truly page on individual users.
 
@@ -367,7 +383,15 @@ gcloud logging metrics create api_latency \
   --value-extractor='EXTRACT(httpRequest.latency)'
 ```
 
-> **Pause and predict**: You create a log-based counter metric for HTTP 500 errors. Will this metric retroactively count the errors that occurred yesterday, or only the errors that happen from the moment of creation onward?
+**Pause and predict:** You create a log-based counter metric for HTTP 500 errors. Will this metric retroactively count the errors that occurred yesterday, or only errors from creation onward?
+
+<details>
+<summary>Check your prediction</summary>
+
+The metric only counts errors from the moment of creation onward. Evaluation happens exclusively at ingestion time, so creating a metric today does not backfill yesterday's errors.
+</details>
+
+The next section covers Cloud Monitoring dashboards and charts. We explore how teams combine infrastructure and application signals in a single pane.
 
 ---
 
@@ -606,7 +630,15 @@ gcloud monitoring policies update POLICY_ID \
 | **Include runbook links** | Reduce MTTR by guiding responders | Link to troubleshooting playbook in alert description |
 | **Avoid alert fatigue** | Too many alerts = ignored alerts | Only alert on actionable conditions |
 
-> **Stop and think**: You set an alert policy for CPU utilization > 80% with a duration window of 5 minutes. The CPU spikes to 99% for 4 minutes, drops to 30% for 30 seconds, and goes back to 99% for 2 minutes. Does the alert trigger? Why or why not?
+**Pause and predict:** You configure an alert policy for CPU utilization above 80% with a 5-minute duration window. If CPU spikes to 99% for 4 minutes, drops to 30% for 30 seconds, and returns to 99% for 2 minutes, does the alert trigger?
+
+<details>
+<summary>Check your prediction</summary>
+
+No, the alert does not trigger. The duration window requires the metric to violate the threshold continuously, so the 30-second dip resets the evaluation timer.
+</details>
+
+The next section introduces external uptime checks. We review how global probes verify public endpoint availability from outside GCP.
 
 ---
 
@@ -614,7 +646,7 @@ gcloud monitoring policies update POLICY_ID \
 
 Uptime checks monitor the availability of your public endpoints from Google's global probe network, which catches failures that internal metrics miss—expired TLS certificates, DNS misconfigurations, VPC egress rules blocking external clients, or regional routing issues that still leave instances "healthy" behind a load balancer. Probes run HTTP/HTTPS (or TCP) checks on a schedule you define, record per-region pass/fail time series, and integrate with alerting policies so pages fire when multiple regions agree a user-visible path is down.
 
-Google operates checkers in multiple geographic regions; configuring alerts to require failures from **two or more regions** reduces false positives when a single probe path has transient packet loss. Uptime checks bill per execution according to the [Observability pricing page](https://cloud.google.com/products/observability/pricing)—consolidate checks on user-journey URLs (`/health` on the public API gateway) rather than creating one check per internal microservice that customers never call directly. **Public** uptime checks (the default checker type) cannot reach RFC 1918 addresses on the public internet; for internal endpoints, use **VPC uptime checks** (`VPC_CHECKERS`) or other **private synthetic monitoring** patterns (Cloud Run job with VPC egress, or third-party probes inside your network) instead of expecting public checkers to hit internal load balancers.
+Google operates probe checkers across multiple geographic regions worldwide. Uptime checks bill per execution according to the [Observability pricing page](https://cloud.google.com/products/observability/pricing)—consolidate checks on user-journey URLs (`/health` on the public API gateway) rather than creating one check per internal microservice that customers never call directly. **Public** uptime checks (the default checker type) cannot reach RFC 1918 addresses on the public internet; for internal endpoints, use **VPC uptime checks** (`VPC_CHECKERS`) or other **private synthetic monitoring** patterns (Cloud Run job with VPC egress, or third-party probes inside your network) instead of expecting public checkers to hit internal load balancers.
 
 Authenticated endpoints require custom headers or OAuth tokens in advanced configurations; keep health endpoints unauthenticated but non-sensitive so probes stay simple. Pair uptime alerts with log-based error metrics: external "down" with flat error logs often implicates DNS or TLS, while uptime failure plus rising 5xx logs implicates application regression.
 
@@ -663,7 +695,15 @@ EOF
 gcloud monitoring policies create --policy-from-file=/tmp/uptime-alert.json
 ```
 
-> **Pause and predict**: Why is it considered best practice to configure uptime checks to alert only when the check fails from multiple geographic regions rather than just a single region?
+**Pause and predict:** Why is it considered best practice to configure uptime checks to alert only when the check fails from multiple geographic regions rather than a single region?
+
+<details>
+<summary>Check your prediction</summary>
+
+Requiring failures from two or more regions prevents false alarms from localized network hiccups or transient packet loss along a single probe path. Alert policies only trigger when multiple geographic vantage points confirm that the endpoint is unreachable.
+</details>
+
+The next section covers Cloud Trace and Cloud Profiler. We explore how latency analysis tools locate bottlenecks across microservice architectures.
 
 ---
 
@@ -692,11 +732,19 @@ gcloud trace list-traces \
 
 ### Cloud Profiler
 
-[Cloud Profiler](https://cloud.google.com/profiler/docs) provides continuous CPU and heap profiling for applications running on GCP with statistical sampling overhead typically under 1%, producing flame graphs that highlight hot functions rather than single slow requests. Reach for Profiler when you have evidence of high CPU or memory churn in a specific binary and need to know which methods dominate—after Trace has already ruled out external waits. Agents exist for Go, Java, Node.js, and Python; you import the library and start the profiler at process boot so production profiles accumulate without manual capture sessions.
+[Cloud Profiler](https://cloud.google.com/profiler/docs) provides continuous CPU and heap profiling for applications running on GCP with statistical sampling overhead typically under 1%, producing flame graphs that highlight hot functions rather than single slow requests. Continuous sampling helps teams analyze call trees and resource consumption across production workloads. Agents exist for Go, Java, Node.js, and Python; you import the library and start the profiler at process boot so production profiles accumulate without manual capture sessions.
 
-Profiler complements Trace rather than replacing it: Trace shows that 8 seconds elapsed between "authorize payment" and "commit order," while Profiler shows that 70% of CPU time inside the payment service is spent in JSON serialization after you ruled out network waits. For Cloud Run, enable Profiler in the container image and ensure the service account has `roles/cloudprofiler.agent` (or the broader Monitoring agent role bundles that include it). Profiles appear in the console within minutes of traffic; compare profiles before and after a deploy to spot regressions in hot paths.
+Profiler complements distributed tracing by inspecting internal execution patterns within individual application processes. For Cloud Run, enable Profiler in the container image and ensure the service account has `roles/cloudprofiler.agent` (or the broader Monitoring agent role bundles that include it). Profiles appear in the console within minutes of traffic; compare profiles before and after a deploy to spot regressions in hot paths.
 
-> **Stop and think**: If users report that clicking "Checkout" takes 10 seconds, but your system CPU utilization is hovering at a very healthy 20%, which tool should you reach for first to diagnose the issue: Cloud Trace or Cloud Profiler? Why?
+**Pause and predict:** If users report that clicking checkout takes 10 seconds while CPU utilization hovers at 20%, which tool should you reach for first: Cloud Trace or Cloud Profiler?
+
+<details>
+<summary>Check your prediction</summary>
+
+Reach for Cloud Trace first. A 10-second checkout transaction with low CPU utilization indicates a request-path wait on I/O, database locks, or downstream RPCs. Cloud Trace isolates distributed latency across external hops, whereas Cloud Profiler analyzes hot CPU or memory churn inside a process.
+</details>
+
+The next section covers multi-project monitoring architectures in Google Cloud. We examine how platform teams centralize metrics and alerts across multiple projects.
 
 ---
 
@@ -706,9 +754,17 @@ In a real-world GCP organization, resources are rarely confined to a single proj
 
 ### Metrics Scopes
 
-A **Metrics Scope** allows you to view and manage monitoring data from multiple GCP projects through a single pane of glass. You designate one **scoping project**—often a shared observability or platform project—and attach **monitored projects** whose metrics become visible in that scope. Dashboards in the scoping project can chart resources from any attached project side by side, which is how platform teams compare error rates across microservices without console project hopping. Alert policies defined in the scoping project can evaluate conditions globally (for example, any Cloud SQL instance above a CPU threshold), and IAM on the scoping project alone can grant SREs read access to organizational health without handing them Owner on every application project.
+A **Metrics Scope** allows you to view and manage monitoring data from multiple GCP projects through a single pane of glass. You designate one **scoping project**—often a shared observability or platform project—and attach **monitored projects** whose metrics become visible in that scope. Dashboards in the scoping project can chart resources from any attached project side by side, which gives platform teams cross-project visibility without console switching. Centralized role assignments on the scoping project allow site reliability engineers to inspect fleet health without requiring administrative roles in every workload project.
 
-> **Pause and predict**: If you have 10 separate production microservice projects, should you manage alert policies in each project separately, or centrally within a single metrics scoping project?
+**Pause and predict:** If an organization maintains ten separate production microservice projects, how should the operations team organize alerting policies?
+
+<details>
+<summary>Check your prediction</summary>
+
+Manage alerts centrally within a single metrics scoping project with monitored projects attached. Centralized alerting evaluates conditions across all workloads without duplicating policy definitions, notification channels, and silence windows in every separate project.
+</details>
+
+The next section introduces the Ops Agent on Compute Engine. We review how virtual machines configure unified logging and metrics collection.
 
 ---
 
@@ -1259,7 +1315,39 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: A log that matches a BigQuery inclusion sink and a `_Default` exclusion is dropped everywhere.** An operations team adds an exclusion filter to the `_Default` log bucket to control storage costs. Because the filter drops high-volume HTTP logs, engineers assume those entries are discarded completely and never reach their BigQuery export sink.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Log Router sink routing evaluation versus log bucket storage filtering. Next action: configure sink inclusion filters and bucket exclusion filters independently, recognizing that destination sinks receive matching entries regardless of bucket retention policies.
+</details>
+
+**Card B: A new log-based metric for HTTP 500s immediately charts yesterday’s errors.** After a major service outage, developers create a log-based counter metric for HTTP 500 response codes. When opening Cloud Monitoring, the team expects the new metric chart to display error counts from the previous day's incident.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: log ingestion stream processing versus historical log storage queries. Next action: define critical log-based metrics before production launches, or run BigQuery SQL queries and Log Analytics to analyze historical event data retroactively.
+</details>
+
+**Card C: CPU >80% for 4 minutes, 30 seconds at 30%, then 2 minutes at 99% still fires a 5-minute duration alert.** An engineer configures an alert policy requiring CPU utilization above 80% for a continuous 5-minute duration. During a load spike, CPU stays at 99% for 4 minutes and then dips to 30% for 30 seconds. The metric then returns to 99% for 2 minutes, leading the engineer to expect an immediate alert.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: continuous duration evaluation window versus cumulative threshold violation time. Next action: configure percentile or rolling aggregation alignment periods, or alert on symptom-driven metrics like response latency and error rates that do not reset during brief sub-threshold intervals.
+</details>
+
+**Card D: Checkout takes 10 seconds at 20% CPU, so start with Cloud Profiler.** Users report that completed checkout transactions take 10 seconds to finish. Monitoring graphs show CPU utilization hovers at 20%, prompting the on-call engineer to launch Cloud Profiler to inspect CPU flame graphs.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: in-process CPU execution bottlenecks versus distributed request latency waiting on I/O. Next action: inspect Cloud Trace waterfall spans first to locate external calls or slow database queries, reserving Cloud Profiler for methods that consume heavy CPU or memory cycles.
+</details>
+
+**Success Criteria**:
 
 - [ ] Cloud Run service deployed with structured JSON logging
 - [ ] Traffic generated (normal, slow, and error requests)
