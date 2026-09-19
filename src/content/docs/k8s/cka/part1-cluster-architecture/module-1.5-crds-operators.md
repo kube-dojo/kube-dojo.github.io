@@ -57,7 +57,7 @@ The `Database` object is stored and schema-validated by the API server if it mat
 
 </details>
 
-This split is the first diagnostic branch learners should practice, because the API server can accept intent long before any domain-specific controller turns that intent into running infrastructure. If `kubectl apply` says it has no match for a kind, discovery or CRD installation is broken. If an accepted object sits idle, continue the investigation on the controller side instead of assuming the scheduler misunderstood a new kind. If the object is rejected with a field error, the CRD schema is doing its job and the manifest does not match the declared API contract.
+This split is the first diagnostic branch learners should practice, because each apply symptom maps to a different layer of the extension stack before any domain-specific workload appears. If `kubectl apply` says it has no match for a kind, discovery or CRD installation is broken. If an accepted object sits idle, keep looking for the missing behavior path instead of assuming the scheduler misunderstood a new kind. If the object is rejected with a field error, the CRD schema is doing its job and the manifest does not match the declared API contract.
 
 A useful way to reason about CRDs is to compare them with ConfigMaps. Both can store structured information, and both can be read by controllers or applications. The difference is that a CRD gets its own resource identity, discovery metadata, schema, RBAC verbs, watch stream, status model, and lifecycle behavior. If the data is just configuration consumed by one application, a ConfigMap may be enough. If the data is a platform object that many users create, inspect, secure, and automate, a CRD becomes more appropriate.
 
