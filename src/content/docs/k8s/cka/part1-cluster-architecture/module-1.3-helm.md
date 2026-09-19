@@ -71,7 +71,16 @@ helm install myapp ./mychart
 # Don't use this anymore
 ```
 
-Pause and predict: if two engineers install the same `bitnami/nginx` chart as releases named `web` and `admin` in the same namespace, do they share one release history or get two independent histories? The chart is the shared package, but each release name becomes its own tracked instance, so status, values, history, and rollback are evaluated per release.
+**Pause and predict:** if two engineers install the same `bitnami/nginx` chart as releases named `web` and `admin` in the same namespace, do they share one release history or get two independent histories?
+
+<details>
+<summary>Check your prediction</summary>
+
+They get two independent histories. The chart is the shared package, but each release name becomes its own tracked instance, so status, values, history, and rollback are evaluated per release.
+
+</details>
+
+Carry that chart-versus-release distinction into every later command, because repository operations concern reusable packages while release operations concern one named installation in one namespace.
 
 ## Part 2: Installing the CLI and Working with Repositories
 
@@ -203,9 +212,16 @@ The distinction between `helm get values` and `helm get values --all` is worth p
 
 Values are Helm's primary customization mechanism, and their power comes from predictability. A chart author defines default values, the operator supplies one or more values files, and the command line can supply final overrides with `--set`. This layered approach lets you keep stable environment configuration in version control while still making a small emergency adjustment without editing a committed file.
 
-Pause and predict: You run `helm install my-app bitnami/nginx --set replicaCount=3 -f values.yaml` where `values.yaml` contains `replicaCount: 5`. How many replicas will you get? The command-line `--set` value has higher precedence than the file, so Helm renders three replicas unless another later override changes the same key.
+**Pause and predict:** You run `helm install my-app bitnami/nginx --set replicaCount=3 -f values.yaml` where `values.yaml` contains `replicaCount: 5`. How many replicas will you get?
 
-The precedence order is highest to lowest: `--set` flags, values files specified with `-f` where later files override earlier files, and finally the chart's default `values.yaml`. That means a production override file can build on a base file, and a one-off command-line value can still win at the very end. The tradeoff is auditability: the more you rely on ad hoc `--set` values, the harder it becomes to reconstruct intent from version control.
+<details>
+<summary>Check your prediction</summary>
+
+Helm renders three replicas unless another later override changes the same key. The command-line `--set` value has higher precedence than the file supplied with `-f`.
+
+</details>
+
+This precedence rule matters because Helm lets you layer stable environment files with temporary command-line adjustments during urgent work. That flexibility is powerful, but it creates an auditability tradeoff: the more configuration lives only in the command history, the harder it becomes to reconstruct intent from version control.
 
 ```bash
 # Example: Multiple ways to set replicas
@@ -362,7 +378,16 @@ mychart/
 └── README.md           # Documentation
 ```
 
-Stop and think: You delete the Kubernetes Secret that stores a Helm release's metadata, the one labeled `owner=helm`. Can you still run `helm upgrade` or `helm rollback` on that release? Helm depends on that release record, so the resources may keep running, but Helm can no longer reason about that release normally.
+**Pause and predict:** You delete the Kubernetes Secret that stores a Helm release's metadata, the one labeled `owner=helm`. Can you still run `helm upgrade` or `helm rollback` on that release?
+
+<details>
+<summary>Check your prediction</summary>
+
+The workloads may keep running, but Helm can no longer reason about that release normally. Helm depends on the release record to evaluate status, upgrade, history, and rollback behavior.
+
+</details>
+
+That is why release metadata deserves the same caution as live workload objects: deleting it changes Helm's operational memory without necessarily changing the Pods, Services, or Deployments still serving traffic.
 
 Templates use Go template syntax to substitute values and release metadata into Kubernetes manifests. The snippet below is intentionally small, but it shows the important pattern: `.Release.Name` comes from the chosen release, while `.Values.*` comes from the merged values hierarchy. A broken value can therefore create a broken Deployment even when the chart's default template is valid.
 
@@ -697,7 +722,43 @@ kubectl get deployment,svc,pods -n helm-lab
 ```
 </details>
 
-### Success Criteria
+**Card A: Two installs of the same chart share one release history.** An engineer sees `bitnami/nginx` in both commands and assumes Helm stores one timeline for the chart itself, regardless of which release name was used. They install `web` for customer traffic and `admin` for an internal tool in the same namespace, then expect a rollback of one install to show the same revision sequence as the other. The mistake feels plausible because package managers often emphasize the package name, but Helm's operational handle is the release.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing a reusable chart package with a named release instance. Next action: inspect `helm history web -n <namespace>` and `helm history admin -n <namespace>` separately, then use the correct release name for status, upgrade, rollback, or uninstall.
+
+</details>
+
+**Card B: A values file always wins over `--set`.** A teammate keeps environment configuration in `values.yaml` and believes that file will override any command-line flag because the file is more official and reviewable. During a rushed install, they leave an old `--set replicaCount=3` flag in the shell command while the file says `replicaCount: 5`. They expect the reviewed file to control the rendered manifest, so they skip checking the Deployment after install.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming human review importance determines Helm precedence. Next action: render or dry-run the command exactly as typed, then remove stale `--set` flags or move the intended value into the reviewed file before installing.
+
+</details>
+
+**Card C: Deleting the Helm Secret uninstalls the release and stops the workloads.** An operator finds several `sh.helm.release` Secrets and treats them like the objects that keep the application running. They delete the Helm-owned Secret expecting Kubernetes to remove the Deployment, Service, and Pods as part of the same cleanup. When traffic still reaches the application, they assume the cluster is lagging rather than recognizing that Helm's metadata and workload controllers are separate layers.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating Helm release metadata as the live workload lifecycle controller. Next action: use `helm uninstall <release> -n <namespace>` for removal, and if metadata is already missing, inspect the remaining Kubernetes objects before choosing adoption or manual cleanup.
+
+</details>
+
+**Card D: `helm upgrade` with no extra flags always reuses every previous custom value.** A pipeline owner remembers that a plain upgrade can carry prior release values forward and generalizes that memory to every upgrade shape. Later they add a small `--set image.tag=...` override and assume every omitted custom Service, Ingress, and resource setting will remain unchanged automatically. The command looks narrow, but the risk is hidden because only the changed key appears in the deployment log.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: overgeneralizing one upgrade case to upgrades that introduce new value sources. Next action: choose `--reuse-values` for a narrow additive change, or pass a complete values file when the upgrade should declare the entire desired configuration.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] You can explain the difference between the chart name, release name, namespace, and rendered Kubernetes resource names.
 - [ ] You can show the values keys used for replica count, Service type, and NodePort instead of guessing them.
