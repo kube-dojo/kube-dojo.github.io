@@ -387,7 +387,7 @@ The workloads may keep running, but Helm can no longer reason about that release
 
 </details>
 
-That is why release metadata deserves the same caution as live workload objects: deleting it changes Helm's operational memory without necessarily changing the Pods, Services, or Deployments still serving traffic.
+Treat stored release records as operational state that later Helm commands depend on, then carry that caution into the templates, values, and live objects in the rest of this section.
 
 Templates use Go template syntax to substitute values and release metadata into Kubernetes manifests. The snippet below is intentionally small, but it shows the important pattern: `.Release.Name` comes from the chosen release, while `.Values.*` comes from the merged values hierarchy. A broken value can therefore create a broken Deployment even when the chart's default template is valid.
 
