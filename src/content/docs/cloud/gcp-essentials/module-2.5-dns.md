@@ -177,9 +177,15 @@ TTL (Time to Live) controls how long resolvers cache a DNS response. Choosing th
 | **3600** | 1 hour | Stable records (MX, NS) | Fewer queries, slow to change |
 | **86400** | 1 day | Records that rarely change | Most efficient, very slow to propagate changes |
 
-**Pro tip**: Before a planned migration, lower the TTL at least one full current-TTL interval in advance so existing cached answers can expire before the cutover.
+**Pause and predict:** You are scheduling a production migration to switch a critical database endpoint to a new instance this coming Saturday at midnight. The active `db.example.com` A record is currently configured with a TTL of 86400 seconds (24 hours). What specific record adjustments should you execute on Friday ahead of the maintenance window, and how should you adjust the record once the cutover stabilizes?
 
-> **Stop and think**: You are planning to switch a critical database to a new instance this coming Saturday at midnight. The current `db.example.com` A record has a TTL of 86400 (24 hours). What specific action should you take on Friday, and what should you do after the migration is complete?
+<details>
+<summary>Check your prediction</summary>
+
+Before a planned migration, lower the TTL to a short interval (such as 60 or 300 seconds) on Friday at least 24 hours in advance so existing cached answers across recursive resolvers expire before the cutover begins. Once the maintenance window opens on Saturday at midnight, update the A record to the new database IP address. After verifying that traffic successfully reaches the new database instance and the new answer is observed globally, raise the TTL back to 86400 seconds to restore caching efficiency and reduce query volume.
+</details>
+
+Managing record lifetimes requires aligning caching windows with change-freeze milestones and client retry behaviors during planned maintenance. Establishing disciplined lifecycle procedures prevents upstream resolvers from serving obsolete targets while application teams complete cutovers.
 
 ### Delegation, Propagation, and Split-Horizon Planning
 
@@ -260,9 +266,19 @@ gcloud dns record-sets transaction add \
 
 ### Health Checks, Geofencing, and Policy Limits
 
-[Routing policies](https://cloud.google.com/dns/docs/routing-policies-overview) can attach health checks to internal load balancer VIPs (private zones) or to internet-reachable endpoints (public zones). Cloud DNS probes on an interval you configure (30–300 seconds for external endpoints) and removes unhealthy targets from answers; when every target in a policy bucket fails, behavior depends on policy type—WRR redistributes among remaining healthy weights, geolocation may fail over to the next closest region unless geofencing is enabled, and failover shifts to the backup set you defined.
+[Routing policies](https://cloud.google.com/dns/docs/routing-policies-overview) can attach health checks to internal load balancer VIPs (private zones) or to internet-reachable endpoints (public zones). Cloud DNS probes on an interval you configure (30–300 seconds for external endpoints) and removes unhealthy targets from answers; when every target in a policy bucket fails, behavior depends on policy type—WRR redistributes among remaining healthy weights, geolocation policies evaluate geographic boundaries, and failover shifts to the backup set you defined.
 
-Geolocation routing maps source geography to answers. For private DNS, Google Cloud uses the region of the VM that sent the query (or the region of the VPN tunnel, Interconnect attachment, or Router appliance for inbound server-policy entry points)—not the EDNS client subnet. For public DNS, geography follows how queries enter Google's network. Geofencing keeps traffic inside a geography even when all endpoints there are unhealthy, which avoids silent failover to a distant region but can return unhealthy VIPs because authoritative servers must still answer.
+Geolocation routing maps source geography to DNS responses. Cloud DNS determines client geography differently depending on whether queries originate internally from VPC workloads or externally across public anycast edges.
+
+**Pause and predict:** You configure a health-checked geolocation routing policy where geofencing is explicitly enabled for a specific geographic region. If an unexpected regional disruption causes every monitored endpoint within that source geography to become unhealthy, what does Cloud DNS return to clients querying from that geography, and why does this response differ from standard unfenced geolocation routing?
+
+<details>
+<summary>Check your prediction</summary>
+
+Geofencing strictly confines client resolution to the configured geography even when every endpoint in that geography fails its health checks, causing Cloud DNS to return unhealthy virtual IP addresses because the authoritative server must still provide an answer. Without geofencing enabled, standard geolocation routing fails over to the next closest healthy geographic region when all local endpoints become unavailable.
+</details>
+
+Determining client locality differs between public and private routing topologies across Google Cloud infrastructure. For private DNS, Google Cloud evaluates the region of the VM that originated the query (or the ingress region of the VPN tunnel, Dedicated Interconnect attachment, or Cloud Router appliance for hybrid entry points) rather than relying on EDNS client subnet data. For public DNS, incoming queries follow anycast ingress routing into Google edge points of presence.
 
 Weighted round robin supports weights from 0 through 1000. Zero-weight targets can act as cold standby: when health checks mark higher-weight targets unhealthy, Cloud DNS may return zero-weight records that were configured as backups. Combining WRR with geolocation in the same RRset is not supported—choose one steering model per name.
 
@@ -357,9 +373,19 @@ gcloud compute ssh vm-in-prod-vpc --zone=us-central1-a --quiet \
   --command="dig db.internal.example.com +short"
 ```
 
-> **Pause and predict**: You have a VPC with a private zone for `internal.company.com`. You just spun up a new VM in a completely different VPC in the same project and want it to resolve `db.internal.company.com`. Will the new VM be able to resolve it out of the box? If not, what must you do?
+**Pause and predict:** You manage a VPC network where a private managed zone authoritatively serves `internal.company.com`. A platform team launches a new virtual machine in a completely separate VPC network residing within the same Google Cloud project and attempts to resolve `db.internal.company.com`. Will the newly provisioned virtual machine be able to resolve this private record immediately, and what architectural configuration changes are required to enable resolution?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Private managed zones are strictly isolated and visible only to VPC networks explicitly associated with the zone. To enable cross-VPC resolution, administrators must either update the zone configuration to attach the second VPC network (`gcloud dns managed-zones update --networks=...`) or configure DNS peering between the client VPC and the authoritative host VPC.
+</details>
+
+Enterprise multi-VPC topologies require deliberate cross-network naming strategies to maintain namespace hygiene while avoiding accidental domain collision across isolated landing zones. Decoupling network boundaries from administrative domain management allows organizations to share centralized services across diverse project environments.
 
 ### Making a Private Zone Visible to Multiple VPCs
+
+Authorizing multiple networks for a single private managed zone enables workloads across heterogeneous environments to consume consistent internal endpoints. When updating zone associations, the management interface requires supplying the complete set of authorized networks to maintain existing bindings alongside new attachments:
 
 ```bash
 # Add another VPC to the zone's visibility
@@ -403,7 +429,15 @@ Memorize the precedence implications, not every bullet: **response policies and 
 
 DNS forwarding allows you to [forward queries for specific domains to external DNS servers](https://cloud.google.com/dns/docs/zones/zones-overview). This is critical in hybrid environments where on-premises resources have DNS records in on-premises DNS servers. Forwarding zones are private managed zones whose `dns-name` suffix determines which queries leave GCP: only names falling under that suffix are candidates for forwarding, which is why enterprises forward `corp.example.com.` or `ad.corp.example.com.` rather than attempting to forward "everything except googleapis.com."
 
-Hybrid designs fail in predictable ways when networking and DNS are designed separately. A forwarding zone aimed at on-prem resolvers without `[private]` routing will attempt to reach those IPs over the internet path and time out. Inbound forwarding without matching conditional forwarders on Active Directory or BIND leaves on-prem clients querying only themselves. The fix is always to draw a two-direction diagram: GCP→on-prem uses forwarding zones or alternative name servers; on-prem→GCP uses inbound server-policy addresses on the subnets that actually carry Interconnect or VPN packets.
+**Pause and predict:** You configure a Cloud DNS forwarding zone targeting on-premises RFC 1918 DNS resolvers across a hybrid interconnect, but you omit the `[private]` routing marker on the forwarding target IP addresses. How will outbound DNS queries leave the Google Cloud network, and what failure mode will client applications experience?
+
+<details>
+<summary>Check your prediction</summary>
+
+Without the `[private]` target marker, Cloud DNS attempts to route forwarding queries across the default public internet path instead of utilizing the internal VPC routing table. Because RFC 1918 private IP addresses are non-routable over the public internet, outbound resolution requests fail to reach on-premises nameservers and inevitably time out. Explicitly tagging target IP addresses with `[private]` (or configuring a private forwarding path) instructs Cloud DNS to route outbound traffic through Cloud VPN, Dedicated Interconnect, or Private Google Access paths.
+</details>
+
+Hybrid network integrations require aligning DNS query routing with transport layer encapsulation across on-premises boundaries. Inbound forwarding configurations without matching conditional forwarders on enterprise Active Directory or BIND servers leave on-premises clients querying only local domains. Robust hybrid architectures rely on bidirectional design diagrams: cloud workloads reach on-premises resolvers via targeted forwarding paths, while on-premises clients query inbound server policy addresses assigned to transit subnets.
 
 Capacity planning belongs in the same workshop: on-premises DNS teams must size their servers for GCP retry storms during incidents, and GCP teams must understand that each forwarded query bills as a Cloud DNS query plus any target-resolution lookup for hostname targets. During steady state, prefer caching on-premises forwarders with sane TTLs so Cloud DNS is not hammered for every pod restart.
 
@@ -1115,7 +1149,39 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: Changing the A record at Saturday midnight is enough because an 86400 TTL cache expires as soon as you save in Cloud DNS.** A systems administrator plans an emergency database server replacement scheduled for midnight on Saturday. The existing production database A record is configured with a Time to Live of 86400 seconds (24 hours). The administrator prepares to execute the Cloud DNS transaction to point the domain at the new database IP address precisely at midnight, expecting external resolvers to drop old answers immediately upon saving the change.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: recursive resolver cache retention versus authoritative zone update timing. Next action: reduce the record TTL to 60 or 300 seconds at least 24 hours prior to the maintenance window so intermediate resolver caches expire before cutover, execute the record change, and increase the TTL back to 86400 once resolution stabilizes.
+</details>
+
+**Card B: A private zone attached to one VPC is automatically resolvable from every other VPC in the same project.** A DevOps engineer configures a private managed DNS zone for internal service endpoints and associates it with the primary production VPC network. Later that week, another engineering team provisions a separate analytics VPC within the same Google Cloud project to run ad-hoc reporting workloads. The engineer instructs the analytics team to query internal database records directly across the project boundary without modifying existing DNS visibility settings.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: VPC network isolation boundary on private managed zone visibility. Next action: update the private managed zone configuration to attach the analytics VPC network, or configure a DNS peering zone in the analytics VPC targeting the production network.
+</details>
+
+**Card C: Geofencing plus health checks guarantees Cloud DNS never answers with an unhealthy VIP and always fails over to another region.** An infrastructure architect configures a geolocation routing policy with geofencing enabled to enforce strict geographic locality for European user traffic. The architect associates automated health checks with all regional application endpoints, reasoning that health-checking combined with geofencing will transparently redirect European users to US endpoints if all local European servers experience an outage. The deployment team rolls out the policy ahead of an anticipated regional maintenance period.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: geofencing boundary enforcement overriding health check regional failover. Next action: disable geofencing if cross-region failover is required during total regional outages, or provision redundant standby endpoints within the same fenced geography to handle local service degradation.
+</details>
+
+**Card D: A forwarding zone aimed at on-prem RFC1918 DNS IPs always uses Cloud VPN even if you omit `[private]` on the forwarding targets.** A network administrator establishes an HA Cloud VPN tunnel to connect a corporate datacenter with a Google Cloud environment and creates an outbound forwarding zone targeting on-premises resolvers at `10.200.0.53`. The administrator omits the `[private]` routing marker when listing the target IP addresses, assuming that Cloud DNS inspects the destination RFC 1918 subnet and automatically forwards queries across the VPN gateway. The administrator schedules production hybrid traffic testing immediately following zone creation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: default public internet egress routing for unmarked DNS forwarding targets. Next action: edit the forwarding zone targets to append the `[private]` routing flag (or specify internal routing) so Cloud DNS dispatches outbound queries via Cloud VPN or Dedicated Interconnect.
+</details>
+
+**Success Criteria**:
 
 - [ ] Public DNS zone created with A and CNAME records
 - [ ] Weighted routing policy created for traffic distribution
