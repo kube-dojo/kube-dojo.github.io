@@ -117,8 +117,15 @@ When designing landing zones, decide **where human access lives** (groups at MG 
 
 Landing zone identity automation often uses infrastructure-as-code to create groups, assign RBAC, and register federated credentials. The operator still must understand scope strings. A role assignment scope of `/providers/Microsoft.Management/managementGroups/Production` affects every child subscription. A scope of `/subscriptions/{id}/resourceGroups/app-rg` affects only that group. Terraform `azurerm_role_assignment` and Bicep `Microsoft.Authorization/roleAssignments` must mirror the same paths you would type in `az role assignment create`.
 
-> **Pause and predict**: If you assign a user the 'Contributor' role at the Subscription level, but explicitly assign them the 'Reader' role at a specific Resource Group level within that subscription, what effective permissions do they have on the Resource Group?
-> *Answer: They have 'Contributor' access. Azure RBAC is an additive model. Permissions flow down the hierarchy, and a lower-level assignment cannot subtract or restrict permissions granted at a higher level (unless you use Azure Blueprints or explicit Deny Assignments, which are advanced and rare).*
+**Pause and predict:** If you assign a user the 'Contributor' role at the Subscription level, but explicitly assign them the 'Reader' role at a specific Resource Group level within that subscription, what effective permissions do they have on the Resource Group?
+
+<details>
+<summary>Check your prediction</summary>
+
+Azure RBAC is an additive authorization model where permissions inherit downward through the resource hierarchy. A lower-scope Reader assignment does not subtract or restrict permissions granted by a subscription-level Contributor role unless an explicit deny assignment exists.
+</details>
+
+Understanding hierarchical inheritance boundaries is essential before organizing enterprise cloud environments and inspecting management group structures with the Azure CLI commands below.
 
 ```bash
 # List management groups
@@ -322,7 +329,17 @@ sequenceDiagram
 
 For **AKS**, the supported pattern is [Azure Workload Identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview). Enable the OIDC issuer on the cluster first. Create a user-assigned managed identity in the node resource group or a dedicated identity RG. Add a federated credential whose `issuer` is the cluster OIDC URL and whose `subject` is the Kubernetes service account (`system:serviceaccount:<namespace>:<name>`). Annotate the pod service account with `azure.workload.identity/client-id`. The pod receives Entra tokens like a VM managed identity, without mounting secrets. This curriculum targets Kubernetes **1.35**; workload identity is the modern replacement for the deprecated aad-pod-identity addon pattern.
 
-For **GitHub Actions**, you create a federated credential on the app registration (as shown earlier with `az ad app federated-credential create`) and use the `azure/login` action with `client-id`, `tenant-id`, and `subscription-id`—no `AZURE_CLIENT_SECRET`. Hypothetical scenario: a platform team runs twenty repositories; rotating twenty secrets quarterly is error-prone, but one federated trust per repo branch pattern scales with policy-as-code reviews.
+**Pause and predict:** When configuring an automated deployment workflow to authenticate against Azure using workload identity federation, does the GitHub Actions `azure/login` action still require a stored `AZURE_CLIENT_SECRET` parameter?
+
+<details>
+<summary>Check your prediction</summary>
+
+Federated credentials replace long-lived client secrets entirely by exchanging short-lived OpenID Connect tokens issued by GitHub for Entra ID access tokens. Supplying `client-id`, `tenant-id`, and `subscription-id` in the login action parameters is completely sufficient.
+</details>
+
+Configuring workload identity federation for automated pipelines establishes auditable authentication boundaries across development teams while standardizing continuous deployment configurations across enterprise repositories.
+
+For **GitHub Actions**, you create a federated credential on the app registration (as shown earlier with `az ad app federated-credential create`) and use the `azure/login` action with `client-id`, `tenant-id`, and `subscription-id`. Hypothetical scenario: a platform team runs twenty repositories; rotating twenty secrets quarterly is error-prone, but one federated trust per repo branch pattern scales with policy-as-code reviews.
 
 **Important constraint**: [tokens issued by Microsoft Entra ID cannot be used as input to federated identity credential flows](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation)—the external IdP must be GitHub, your Kubernetes issuer, AWS Cognito, etc., not another Entra tenant token chained informally.
 
@@ -378,12 +395,15 @@ flowchart LR
     end
 ```
 
-*KEY INSIGHT: Global Administrator does NOT automatically have Azure RBAC access. They must "elevate" themselves first, because directory privileges and Azure resource permissions are deliberately separated.* 
+**Pause and predict:** A new security engineer is granted the 'Global Administrator' role in Entra ID. When they log into the Azure portal, they cannot see any Virtual Machines or Storage Accounts across tenant subscriptions. Why?
 
-This is a critical detail: [a **Global Administrator** in Entra ID does **not** automatically have Owner or Contributor access to Azure subscriptions. They can *elevate* themselves to get User Access Administrator at the root scope, but it is not automatic.](https://learn.microsoft.com/en-us/azure/role-based-access-control/elevate-access-global-admin) Conversely, an **Owner** on an Azure subscription cannot create or manage Entra ID users.
+<details>
+<summary>Check your prediction</summary>
 
-> **Stop and think**: A new security engineer is granted the 'Global Administrator' role in Entra ID. When they log into the Azure portal, they cannot see any Virtual Machines or Storage Accounts. Why?
-> *Answer: Global Administrator is a directory role that grants control over Entra ID (users, groups, policies), not an Azure RBAC role. The engineer has no default access to Azure resources. They must explicitly elevate their access to gain the User Access Administrator role at the root scope before they can grant themselves permissions to view or manage Azure resources.*
+KEY INSIGHT: Global Administrator does NOT automatically have Azure RBAC access. They must "elevate" themselves first, because directory privileges and Azure resource permissions are deliberately separated. Global Administrator is an Entra ID directory role that grants control over tenant identities and policies, not an Azure RBAC role. The administrator has no default access to Azure resources and must explicitly [elevate access to User Access Administrator at the root scope](https://learn.microsoft.com/en-us/azure/role-based-access-control/elevate-access-global-admin) before they can grant themselves permissions to view or manage Azure resources.
+</details>
+
+Maintaining an explicit architectural separation between tenant administration and cloud resource governance ensures engineering organizations manage infrastructure permissions through structured role assignments across the scope hierarchy.
 
 ### Role Assignment Scope Hierarchy and `az role assignment create`
 
@@ -560,8 +580,15 @@ The activation process can require several controls before a role becomes active
 - **Approval**: A manager or security team member must approve the activation request.
 - **Ticketing**: The user must provide a valid Jira/ServiceNow ticket number as justification.
 
-> **Stop and think**: An engineer is *eligible* for the Subscription Owner role via PIM. They activate the role, which requires approval. After approval, they try to delete a resource group but get an authorization error. 15 minutes later, the deletion succeeds. Why? 
-> *Answer: Azure RBAC role assignments can take up to 10 minutes to propagate across the globally distributed authorization system. PIM works by dynamically creating a temporary role assignment when activated, so the standard propagation delay applies. The user must simply wait a few minutes after activation for the permissions to take effect.*
+**Pause and predict:** An engineer is eligible for the Subscription Owner role via Privileged Identity Management. They activate the role, which requires approval. After approval, they attempt to delete a resource group but receive an authorization error, yet fifteen minutes later the deletion succeeds. Why does this delay occur?
+
+<details>
+<summary>Check your prediction</summary>
+
+Privileged Identity Management operates by dynamically creating a temporary Azure RBAC role assignment upon activation approval. Because Azure RBAC role assignments propagate across globally distributed authorization caches, effective permissions can take several minutes to take effect worldwide.
+</details>
+
+Accounting for authorization propagation delays is an operational necessity during time-sensitive maintenance windows, whereas sustaining continuous least-privilege hygiene across enterprise organizations requires structured, recurring access reviews.
 
 ### Access Reviews and Governance Cadence
 
@@ -981,7 +1008,39 @@ az role definition delete --name "Storage Blob Lister"
 
 After cleanup, confirm the custom role no longer appears in `az role definition list --custom-role-only true`. If the role definition delete fails because assignments still exist, remove assignments first with `az role assignment delete`. Labs that skip cleanup leave custom roles and storage accounts billing quietly in sandbox subscriptions. Document your principal IDs during the lab—they help when comparing audit logs and exported Azure RBAC role assignment lists later.
 
-### Success Criteria
+**Card A: Reader at a resource group subtracts Contributor granted at the subscription.** An operations team grants an engineer Contributor at subscription scope for broad infrastructure maintenance, but assigns Reader on a sensitive production resource group intending to restrict modification rights. The team assumes that narrower child-scope role assignments override and reduce inherited higher-level privileges.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: additive role inheritance versus scope-level subtraction. Next action: avoid assigning broad subscription Contributor roles, use explicit Deny Assignments if supported, or grant targeted Contributor rights only on specific resource groups requiring active operator modification.
+</details>
+
+**Card B: Entra ID Global Administrator can see every VM and storage account by default.** A newly designated enterprise security administrator attempts to audit virtual machine configurations and review storage account firewall settings directly in the Azure portal immediately after receiving the Global Administrator directory role. The administrator assumes tenant-level directory authority automatically confers administrative visibility across Azure management groups and subscriptions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: tenant identity plane isolation versus resource management control plane authorization. Next action: elevate tenant access to User Access Administrator at the root management group scope, then explicitly assign appropriate Azure RBAC roles such as Reader or Contributor at subscription or resource group scopes.
+</details>
+
+**Card C: After PIM approval, Subscription Owner can delete a resource group immediately.** An on-call engineer receives formal manager approval for a Privileged Identity Management role activation request to assume the Subscription Owner role during a critical outage window. The engineer attempts to delete a malfunctioning resource group seconds after approval confirmation and expects immediate control-plane execution.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: synchronous workflow approval versus distributed authorization propagation latency. Next action: design operational runbooks that account for Azure RBAC cache propagation intervals across global endpoints, and verify role assignment activation using Azure CLI queries before executing destructive administrative tasks.
+</details>
+
+**Card D: GitHub Actions `azure/login` still needs `AZURE_CLIENT_SECRET` even with a federated credential.** A continuous delivery engineer configures workload identity federation between an enterprise GitHub repository and an Azure app registration. The engineer maintains a repository secret containing an application client secret, believing the `azure/login` action requires both federated OpenID Connect trust and a static client secret to authenticate.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: secretless OpenID Connect token exchange versus legacy credential authentication. Next action: remove static client secret parameters from the workflow definition, configure the federated identity credential with GitHub subject claims, and pass only `client-id`, `tenant-id`, and `subscription-id` to the login action.
+</details>
+
+**Success Criteria**:
 
 - [ ] Custom RBAC role "Storage Blob Lister" created with specific actions and data actions
 - [ ] Storage account created with a test blob in a container
