@@ -62,6 +62,8 @@ A critical design feature of Cloud Build is the `/workspace` volume. Because eac
 No, Step 2 cannot access packages installed during Step 1. Cloud Build provisions a separate container for each build step. Any modifications made by `apt-get install` alter only that individual container's ephemeral root filesystem, which is discarded when the step finishes. Cross-step persistence is strictly limited to the shared `/workspace` volume, meaning tools must be copied to `/workspace` or built into a custom builder image.
 </details>
 
+The next object is the Cloud Build vocabulary table. After it, substitutions and triggers are how you name the same pipeline in every project.
+
 ### Key Concepts
 
 To fully leverage the platform, you must internalize the vocabulary that Google Cloud uses to describe its CI/CD primitives:
@@ -147,6 +149,8 @@ Utilizing these variables prevents hardcoding environment-specific values. For i
 
 Two concurrent commits on the same branch race to push to the identical image tag, allowing one build to overwrite the other unpredictably in Artifact Registry. In contrast, tagging with `$COMMIT_SHA` provides a globally unique, immutable identifier for every commit that guarantees build artifacts are never overwritten.
 </details>
+
+The next object is custom substitutions with an underscore prefix. After the YAML, those defaults are what you override at trigger time.
 
 ### Custom Substitutions
 
@@ -263,6 +267,8 @@ In this example, we pull official images directly from Docker Hub (like `hashico
 
 Bake the proprietary binary into a custom builder container image stored in your private Artifact Registry, or copy the compiled binary directly into `/workspace` during an initial setup step. Packaging tools into a private container image guarantees reproducible execution without repeating binary downloads on every build run.
 </details>
+
+The next object is the custom builder Dockerfile. After those commands, pinning the image in Artifact Registry is a supply-chain choice.
 
 ### Creating Custom Builders
 
@@ -421,6 +427,8 @@ In this optimized configuration, the Docker build, the Python unit tests, and th
 
 The minimum time is 5 minutes, determined by max(5, 2, 4). When steps run concurrently using `waitFor: ['-']`, the elapsed duration is governed by the single longest-running step rather than the 11-minute sequential sum of all steps.
 </details>
+
+The next object is build triggers. After that section, GitHub app install and filter rules are how a yaml file starts running on every push.
 
 ## Build Triggers
 
@@ -663,6 +671,8 @@ Cloud Deploy introduces a distinct ontological model. You define a **Delivery Pi
 
 Configuring a canary deployment strategy automates progressive traffic shifting and verification phases across release targets. By routing small percentages of production traffic while evaluating system health metrics, canary deployments isolate blast radius and allow teams to reduce manual human gates on routine rollouts.
 </details>
+
+The next object is the Cloud Deploy KRM YAML. After those files, targets and approval gates are how a release moves from dev to prod.
 
 A Cloud Deploy pipeline is defined using Kubernetes Resource Model (KRM) YAML syntax. The configuration distinctly separates the overarching pipeline definition from the individual environment targets. 
 
