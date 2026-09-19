@@ -139,7 +139,7 @@ Unpatched base image layers and critical vulnerabilities (CVEs) persist indefini
 
 </details>
 
-Balancing build turnaround speed against artifact reproducibility requires establishing deliberate cache eviction policies alongside robust project provisioning. Setting up a dedicated CodeBuild project with fine-grained service permissions ensures the build runtime operates with strictly controlled access to external resources.
+Balancing build turnaround speed against operational cost is a project-design choice, not a one-time cache toggle. Setting up a dedicated CodeBuild project with fine-grained service permissions is the next step so the build runtime operates with strictly controlled access to external resources.
 
 ### Creating a CodeBuild Project
 
@@ -244,7 +244,7 @@ The remote S3 cache does not automatically invalidate when source files change, 
 
 </details>
 
-Managing package cache invalidation strategies becomes especially critical as project scopes expand and build architectures grow more complex. When monolithic pipelines begin executing multiple independent test and compilation phases, decomposing work into parallel execution units shortens feedback loops considerably.
+When a single commit starts touching several modules, sequential phases waste wall-clock time. The next section covers how CodeBuild splits that work into parallel tasks without changing the cache discussion above.
 
 ### Batch Builds
 
@@ -375,7 +375,7 @@ Customer traffic is not shifted to the Green target group. The Application Load 
 
 </details>
 
-Safeguarding routing transitions during progressive deployments requires clear visibility into lifecycle failures before production listeners are touched. When automated verification scripts fail or external systems encounter transient issues, configuring declarative rollback rules ensures clusters return to known-good baselines cleanly.
+The next section covers CloudWatch-alarm rollback on the deployment group, which is a separate safety control from the lifecycle hook you just considered.
 
 ### Automatic Rollback
 
@@ -869,14 +869,7 @@ jobs:
             --force-new-deployment
 ```
 
-The critical trust policy condition is `StringLike` on the `sub` claim. [This restricts which repository and branch can assume the role.](https://github.com/aws-actions/configure-aws-credentials) Without it, any GitHub repository could assume your role, so the trust statement is doing the authorization work at the identity boundary before temporary credentials are issued.
-
-| Condition Pattern | What It Allows |
-|-------------------|----------------|
-| `repo:org/myapp:ref:refs/heads/main` | Only main branch pushes |
-| `repo:org/myapp:*` | Any branch, any event in that repo |
-| `repo:org/*:ref:refs/heads/main` | Main branch of any repo in the org |
-| `repo:org/myapp:environment:production` | Only the "production" environment |
+The critical trust policy condition is `StringLike` on the `sub` claim. [This restricts which repository and branch can assume the role.](https://github.com/aws-actions/configure-aws-credentials) The trust statement is doing the authorization work at the identity boundary before temporary credentials are issued.
 
 **Pause and predict:** The OIDC trust policy matches the `sub` claim to a specific repository and branch (`repo:YOUR_ORG/myapp:ref:refs/heads/main`). If you omitted the branch restriction and configured `repo:YOUR_ORG/myapp:*`, what specific attack vector would this open regarding untrusted code execution inside your AWS environment?
 
@@ -887,7 +880,14 @@ Any Git reference within the repository—including unreviewed feature branches,
 
 </details>
 
-Enforcing narrow subject claim conditions establishes strong identity boundaries across CI/CD runners before jobs interact with cloud infrastructure. Beyond identity federation and credential lifecycle management, enterprise pipelines frequently require centralized repositories to govern package provenance and protect build dependencies from tampering.
+The pattern table below is the menu of `sub` shapes teams actually ship. After identity federation, enterprise pipelines still need a place to pin and audit the packages those jobs install.
+
+| Condition Pattern | What It Allows |
+|-------------------|----------------|
+| `repo:org/myapp:ref:refs/heads/main` | Only main branch pushes |
+| `repo:org/myapp:*` | Any branch, any event in that repo |
+| `repo:org/*:ref:refs/heads/main` | Main branch of any repo in the org |
+| `repo:org/myapp:environment:production` | Only the "production" environment |
 
 ---
 
