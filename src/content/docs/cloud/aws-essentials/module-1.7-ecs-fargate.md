@@ -282,7 +282,16 @@ Fargate does not let you choose arbitrary CPU/memory combinations. Here are the 
 | 8192 (8 vCPU) | 16384 - 61440 (in 4096 increments) |
 | 16384 (16 vCPU) | 32768 - 122880 (in 8192 increments) |
 
-> **Pause and predict**: You are migrating a legacy Java application that requires a large heap size (at least 6GB) but does very little processing (mostly waiting on database locks). You are also migrating a Node.js image processing worker that maxes out CPU but uses only 200MB of RAM. Which Fargate CPU/memory combinations would you choose for each, and why?
+**Pause and predict:** You are migrating a legacy Java application that requires a large heap size (at least 6GB) but does very little processing (mostly waiting on database locks). You are also migrating a Node.js image processing worker that maxes out CPU but uses only 200MB of RAM. Which Fargate CPU/memory combinations would you choose for each, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Java application is memory-bound: it needs at least 6GB (6144 MB) of RAM but very little processing capacity. Consulting the valid options table, the most cost-effective tier supporting 6GB is 1024 (1 vCPU) paired with 6144 MB, 7168 MB, or 8192 MB of memory (or 2048 / 2 vCPU if modest compute headroom is required). Selecting 1024 vCPU avoids overpaying for unneeded compute cores while satisfying the heap requirement. The Node.js image worker is CPU-bound: it maxes out compute but uses only 200MB of RAM. Because Fargate enforces a minimum memory threshold for each CPU tier, you cannot allocate 200MB with high CPU. You would choose 2048 (2 vCPU) with 4096 MB, or 4096 (4 vCPU) with 8192 MB (the lowest memory allowed for that CPU tier).
+
+</details>
+
+Careful sizing aligns compute spend with application architecture, but provisioning adequate CPU and memory is only half the configuration required to launch a containerized workload. Before tasks can successfully pull images from registries or interact with cloud services, you must configure the security identities that govern their execution.
 
 ### IAM Roles: Execution Role vs Task Role
 
@@ -377,7 +386,16 @@ aws iam put-role-policy \
   }'
 ```
 
-> **Stop and think**: You just deployed a new task. The ECS console shows the task is stuck in the `PENDING` state and eventually fails with a `CannotPullContainerError`. Later, you fix that, the container starts, but your application logs show an `AccessDenied` error when trying to write a file to an S3 bucket. Which IAM roles are misconfigured in each scenario?
+**Pause and predict:** You just deployed a new task. The ECS console shows the task is stuck in the `PENDING` state and eventually fails with a `CannotPullContainerError`. Later, you fix that, the container starts, but your application logs show an `AccessDenied` error when trying to write a file to an S3 bucket. Which IAM roles are misconfigured in each scenario?
+
+<details>
+<summary>Check your prediction</summary>
+
+The `CannotPullContainerError` during `PENDING` occurs before your container starts, meaning the ECS container agent cannot authenticate to ECR or pull the image; this indicates that the **task execution role** (`executionRoleArn`) is misconfigured (missing `ecr:BatchGetImage`, `ecr:GetAuthorizationToken`, or network connectivity to the registry). The subsequent `AccessDenied` error writing to S3 occurs at runtime from within your application code; this indicates that the **task role** (`taskRoleArn`) is misconfigured (missing `s3:PutObject` permissions or having an overly restrictive policy attached).
+
+</details>
+
+Clear separation of operational responsibilities ensures that runtime application logic cannot inadvertently tamper with infrastructure-level container lifecycle tasks. With both the compute specifications and security boundaries defined in JSON, you are ready to submit the complete blueprint to the ECS control plane.
 
 ### Registering the Task Definition
 
@@ -483,9 +501,18 @@ Below is a two-container task definition with an Envoy sidecar that terminates T
 ]
 ```
 
-The API container binds to `127.0.0.1:8080` — it is unreachable from outside the task. The Envoy sidecar binds to port 443 and forwards everything to the API container over the shared `localhost` interface. The ALB target group points to port 443 on the Envoy container. This separation means your application code contains zero TLS logic: Envoy handles certificate rotation, cipher negotiation, and ALPN entirely outside your application.
+The API container binds strictly to `127.0.0.1:8080` so that external network callers cannot reach it directly. The accompanying Envoy container binds to port 443 within the shared task network namespace and proxies incoming connections to the local API port. In this architecture, the load balancer target group registers port 443, routing external client requests directly through the proxy layer.
 
-> **Pause and predict**: A security audit requires that all traffic between ECS services be encrypted with mTLS. Your application is a Go binary that does not have built-in mTLS support. You have two months before the audit deadline. How does the sidecar pattern solve this without rewriting the application?
+**Pause and predict:** A security audit requires that all traffic between ECS services be encrypted with mTLS. Your application is a Go binary that does not have built-in mTLS support. You have two months before the audit deadline. How does the sidecar pattern solve this without rewriting the application?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Envoy sidecar container runs alongside the Go application inside the same ECS task, sharing its network namespace (`localhost`). The sidecar terminates inbound mTLS connections from upstream callers, validates client certificates, and forwards the decrypted traffic over `127.0.0.1:8080` to the Go binary as standard plaintext HTTP. For outbound requests, the Go application communicates with Envoy over a local port, and Envoy establishes the encrypted mTLS handshake with downstream destinations. This architecture offloads mutual authentication and certificate rotation entirely to the proxy layer, satisfying the audit mandate within the deadline while leaving the legacy Go source code untouched.
+
+</details>
+
+Decoupling cross-cutting infrastructure concerns into auxiliary containers simplifies long-term maintenance and compliance. Once your container topology is defined, the next critical operational challenge is securely injecting sensitive credentials and configuration into those containers at launch time without exposing secrets in task definitions.
 
 ## Secrets Injection: Beyond the Basics
 
@@ -969,7 +996,16 @@ flowchart TB
     T0 --> T1 --> T2 --> T3 --> T4
 ```
 
-> **Pause and predict**: You manage a high-traffic payment processing API. A failed deployment that causes even 30 seconds of downtime will result in thousands of dropped transactions. The new version (v2) includes a subtle database connection pool bug that only manifests under high load, meaning it will pass the initial ALB health checks. If you use a Rolling Update, what will happen when v2 is deployed? How would Blue/Green mitigate this?
+**Pause and predict:** You manage a high-traffic payment processing API. A failed deployment that causes even 30 seconds of downtime will result in thousands of dropped transactions. The new version (v2) includes a subtle database connection pool bug that only manifests under high load, meaning it will pass the initial ALB health checks. If you use a Rolling Update, what will happen when v2 is deployed? How would Blue/Green mitigate this?
+
+<details>
+<summary>Check your prediction</summary>
+
+Under a Rolling Update, ECS deploys new v2 tasks alongside v1. Because the connection pool defect manifests only under high load, initial synthetic health check pings succeed. ECS considers v2 healthy and routes live customer requests to it while draining and shutting down v1 tasks. When peak traffic hits the newly promoted v2 tasks, connection exhaustion occurs, triggering widespread transaction drops and customer-facing downtime. Reversing the rollout requires a full rollback deployment, extending the outage. Under Blue/Green deployments managed by CodeDeploy, the entire v2 fleet deploys to an isolated green target group while v1 continues serving 100 percent of production traffic undisturbed. You can route synthetic validation traffic to the green target group or execute a staged canary shift (such as 10 percent of traffic for five minutes). If CloudWatch alarms register connection spikes or error rate surges, CodeDeploy aborts the cutover instantly and points all traffic back to the healthy blue fleet without downtime.
+
+</details>
+
+Choosing the right deployment pattern protects user experience during releases, but engineering teams must also balance reliability investments against ongoing infrastructure operational costs. Once baseline service resilience and zero-downtime deployment pipelines are established, optimizing cluster compute spend becomes the primary focus for sustainable scaling.
 
 ---
 
@@ -1774,7 +1810,43 @@ echo "Cleanup complete"
 ```
 </details>
 
-### Success Criteria
+**Card A: A 6GB Java heap needs a high-vCPU Fargate size because the heap is large.** An architect plans the migration of a legacy enterprise reporting service that consumes six gigabytes of JVM heap during quiet polling cycles. Because traditional server instances bundle substantial compute whenever memory allocations grow, the team assumes they must allocate at least eight or sixteen virtual cores to satisfy the memory footprint. They schedule a large instance reservation under the impression that Fargate strictly prohibits pairing high memory allocations with modest compute configurations.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming CPU and memory must scale symmetrically on Fargate. Next action: inspect the Fargate valid configuration matrix and select a cost-effective 1 vCPU or 2 vCPU profile paired with 6GB or 8GB of memory to support the heap without overpaying for idle cores.
+
+</details>
+
+**Card B: `CannotPullContainerError` means the task role cannot pull from ECR.** A DevOps engineer observes that a newly deployed ECS task fails during startup with an explicit `CannotPullContainerError` logged in the console. Believing that all AWS service interactions for a task are governed by a single IAM identity, the engineer edits the application task role policy to grant broad Amazon ECR pull privileges. They redeploy the task repeatedly while wondering why the container runtime continues to report image authorization failures despite the updated role permissions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating the container runtime execution role with the application task role. Next action: attach the `AmazonECSTaskExecutionRolePolicy` to the task execution role (`executionRoleArn`) so the ECS agent has authority to authenticate and pull container images before task startup.
+
+</details>
+
+**Card C: The Go service must be rewritten for mTLS before the audit deadline.** A security compliance auditor notifies the platform team that all internal microservice communication must enforce mutual TLS encryption within eight weeks. The developers discover that their legacy compiled Go service only supports unencrypted HTTP and lacks internal libraries for dynamic certificate rotation and handshake negotiation. Convinced that meeting the mandate requires redesigning the application networking stack and refactoring application code, the lead engineer requests a six-month roadmap exception from leadership.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming transport security must be implemented inside the application process. Next action: compose an auxiliary sidecar container such as Envoy in the task definition to terminate incoming mTLS and proxy plaintext traffic to the application over localhost without code changes.
+
+</details>
+
+**Card D: Rolling update is safe here because ALB health checks will stop the bad v2.** A release engineer prepares to roll out version two of a critical financial transaction service using standard rolling deployment parameters. Because the service definition configures a synthetic HTTP health check endpoint on the Application Load Balancer, the engineer assumes that any defect capable of causing transactional outages will be trapped before traffic reaches the new tasks. Confident that rolling deployments eliminate customer-facing downtime unconditionally, they initiate the rollout directly against production without a traffic-shifting canary strategy.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming basic HTTP ping health checks detect load-dependent connection exhaustion bugs. Next action: use CodeDeploy blue/green deployments with canary or linear traffic shifting so failures under production load trigger automated CloudWatch alarm rollbacks before the entire fleet is replaced.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] ECS cluster created with Container Insights enabled
 - [ ] ALB created with proper security groups (ALB public, tasks private)
