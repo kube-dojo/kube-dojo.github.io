@@ -57,13 +57,18 @@ flowchart LR
     end
 ```
 
-> **Stop and think**: If a GCP VPC spans the globe by default, what happens if an application team in `europe-west1` requests a new subnet with the CIDR block `10.10.0.0/20` when the `us-central1` team is already using that exact range? How does this differ from managing CIDRs across multiple AWS regions?
+**Pause and predict:** If a GCP VPC spans the globe by default, what happens if an application team in `europe-west1` requests a new subnet with the CIDR block `10.10.0.0/20` when the `us-central1` team is already using that exact range? How does this differ from managing CIDRs across multiple AWS regions?
 
-The global VPC model has deep implications that go beyond the simple convenience of automatic cross-region routing. When you create a subnet in `us-central1` and another in `europe-west1`, both subnets share the same VPC-level route table. Google's software-defined networking fabric automatically installs routes between every subnet in the VPC without you configuring a single route entry, peering connection, or transit gateway. The subnet CIDR ranges become part of the VPC's routing topology immediately upon creation, and every VM in every region learns these routes through the virtual network interface. This means a VM in Tokyo can send a packet to a VM in Sao Paulo using only its private IP address, and the packet never leaves Google's private backbone until it reaches the destination subnet's virtual switch. The latency between these two VMs is determined purely by the speed of light through Google's fiber, not by any overlay tunneling or gateway processing overhead that you would incur with inter-region VPC peering in AWS.
+<details>
+<summary>Check your prediction</summary>
 
-This same property also makes CIDR planning a single-point-of-failure discipline. Since subnets across all regions share one VPC, you cannot have overlapping IP ranges between any two subnets in the same VPC, regardless of how far apart they are geographically. If your Tokyo team accidentally provisions `10.20.0.0/16` and your London team later tries to create `10.20.1.0/24`, the second operation fails because the VPC enforces non-overlapping CIDR ranges globally. In AWS, each regional VPC is an independent IP namespace, so `us-east-1` and `eu-west-1` can both use `10.0.0.0/16` without conflict until you peer them. The GCP model forces you to think about IP allocation as a global resource from day one, which is initially more work but ultimately prevents the painful renumbering projects that happen when AWS organizations grow organically and later try to interconnect overlapping VPCs.
+Google Cloud immediately rejects the `europe-west1` subnet creation request because all regional subnets in a GCP VPC share a single global routing namespace where CIDR ranges cannot overlap anywhere worldwide. In AWS, each regional VPC is an independent IP namespace, allowing `us-east-1` and `eu-west-1` to use identical CIDR blocks without immediate conflict until cross-region VPC peering or transit gateway interconnection is attempted.
 
-This has massive implications:
+</details>
+
+Google Cloud's software-defined networking fabric connects regional subnets across continents into a unified global route table that simplifies routing operations. When you create a subnet in `us-central1` and another in `europe-west1`, both subnets share the same VPC-level route table. Google's software-defined networking fabric automatically installs routes between every subnet in the VPC without you configuring a single route entry, peering connection, or transit gateway. The subnet CIDR ranges become part of the VPC's routing topology immediately upon creation, and every VM in every region learns these routes through the virtual network interface. This means a VM in Tokyo can send a packet to a VM in Sao Paulo using only its private IP address, and the packet never leaves Google's private backbone until it reaches the destination subnet's virtual switch. The latency between these two VMs is determined purely by the speed of light through Google's fiber, not by any overlay tunneling or gateway processing overhead that you would incur with inter-region VPC peering in AWS.
+
+Comparing this unified global software-defined network with AWS regional VPC architecture reveals foundational differences across routing, subnet boundaries, firewall scopes, and default communication policies:
 
 | Feature | AWS VPC | GCP VPC |
 | :--- | :--- | :--- |
@@ -130,11 +135,20 @@ gcloud compute networks subnets describe prod-us-central1 \
   --format="get(privateIpGoogleAccess)"
 ```
 
-Basic **Private Google Access** (`--enable-private-ip-google-access`) lets VMs without external IPs reach default `*.googleapis.com` endpoints over Google's internal backbone—it does not require Cloud NAT and does not bill general internet egress for that API traffic. It does **not** automatically install a route to the restricted-access VIP ranges below; those require explicit DNS configuration (for example Private DNS zones pointing at `private.googleapis.com` or `restricted.googleapis.com`).
+**Pause and predict:** A virtual machine is provisioned without an external IP address on a subnet with Private Google Access enabled. Can this private instance reach public `apt` or `yum` package repository mirrors across the internet to download OS updates, and what network component is necessary if it cannot?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Private Google Access provides connectivity exclusively to Google APIs and services (`*.googleapis.com`) routed across Google's internal software-defined backbone. It does not provide general outbound internet routing; downloading operating system packages from public distribution mirrors or accessing third-party SaaS APIs requires deploying Cloud NAT on top of Cloud Router.
+
+</details>
+
+Enabling **Private Google Access** (`--enable-private-ip-google-access`) configures virtual machines without external IP addresses to route requests targeted at default `*.googleapis.com` hostnames directly across Google's internal network backbone. However, this subnet flag does not automatically configure routing to restricted internal VIP ranges; routing to specialized Google API gateways requires pairing Private Google Access with explicit DNS configuration such as Cloud DNS private zones targeting `private.googleapis.com` or `restricted.googleapis.com`.
 
 The **`private.googleapis.com`** VIP range is `199.36.153.8/30` (broader Google API access over private paths). The **`restricted.googleapis.com`** VIP range is `199.36.153.4/30` (VPC Service Controls–compatible restricted endpoints). Use restricted VIPs when your organization enforces VPC-SC perimeters; use private VIPs when you need broader API coverage without traversing the public internet.
 
-When enabled on a subnet, a VM resolving `storage.googleapis.com` (or another supported API hostname) sends traffic through the internal backbone rather than the default internet route. Private Google Access only covers Google APIs and services—it does not provide general internet access for package repositories, third-party APIs, or any non-Google endpoint. For those, you still need Cloud NAT. The two features complement each other: enable Private Google Access for Google services, and layer Cloud NAT on top for everything else.
+When enabled on a subnet, internal workloads resolving supported Google service domain names steer packets automatically across Google's private planetary network rather than egressing through external transit providers. Understanding how these API routes interact with custom static routes and dynamic gateway advertisements requires inspecting the underlying routing table hierarchy that governs all VPC communication paths.
 
 ---
 
@@ -240,19 +254,26 @@ gcloud compute firewall-rules create allow-http \
   --target-tags=web-server \
   --priority=1000
 
-# The danger: anyone with compute.instances.setTags permission
-# can add the "web-server" tag to ANY VM, opening ports 80/443 on it
+# Network tags are unauthenticated strings attached as instance metadata,
+# operating independently of cryptographic service identities.
 ```
 
-> **Pause and predict**: An engineer applies the network tag `allow-db-access` to a compromised frontend VM. If the firewall rule allowing database connections on port 5432 uses `--source-tags=allow-db-access`, why does the database immediately become vulnerable, and how would using a service account have prevented this exact exploitation path?
+**Pause and predict:** An engineer applies the network tag `allow-db-access` to a compromised frontend VM. If the firewall rule allowing database connections on port 5432 uses `--source-tags=allow-db-access`, why does the database immediately become vulnerable, and how would using a service account have prevented this exact exploitation path?
+
+<details>
+<summary>Check your prediction</summary>
+
+Anyone with instance editing permissions (`compute.instances.setTags`) can attach the `allow-db-access` tag to any virtual machine without granular role checks, allowing a compromised host or rogue operator to impersonate the trusted source tag and connect directly to the database. By contrast, service account targeting binds firewall authorization to cryptographic identity; attaching or changing a service account requires strict `iam.serviceAccounts.actAs` permission, preventing unauthorized workloads from assuming the identity.
+
+</details>
 
 ### Service Account-Based Firewall Rules (The Better Way)
 
-Instead of tags, you can target firewall rules based on the **service account** attached to a VM. This is significantly more secure because:
+Instead of relying on arbitrary metadata strings, production firewall architectures filter ingress and egress traffic based on the **service account** attached to each instance. This approach anchors network security in verifiable IAM principals:
 
-1. Service accounts are IAM resources with access control.
-2. You cannot change a VM's service account without `iam.serviceAccounts.actAs` permission.
-3. There are no typos---service accounts either exist or they do not.
+1. Service accounts are first-class IAM resources subject to organization access controls and audit logging.
+2. Runtime identity is verified cryptographically by the Compute Engine virtualization layer at instance boot.
+3. Fully qualified resource identifiers eliminate the silent failure modes that arise from misspelled tag strings.
 
 ```bash
 # Create service accounts for different VM roles
@@ -526,7 +547,16 @@ flowchart TD
     SharedVPC --> SP_C
 ```
 
-> **Stop and think**: In a Shared VPC architecture, a Host Project administrator grants a Service Project developer the `compute.networkUser` role. If no IAM conditions are applied to this binding, what is the immediate blast radius of this permission, and how could a compromised developer account exploit it across different environments?
+**Pause and predict:** In a Shared VPC architecture, a Host Project administrator grants a Service Project developer the `compute.networkUser` role. If no IAM conditions are applied to this binding, what is the immediate blast radius of this permission, and how could a compromised developer account exploit it across different environments?
+
+<details>
+<summary>Check your prediction</summary>
+
+Granting `roles/compute.networkUser` at the host project level without IAM conditions authorizes the principal to use any subnet throughout the host project, including production tiers and subnets assigned to other teams. If that account is compromised, an attacker can provision instances or network interfaces directly inside sensitive production subnets, bypassing environment segregation.
+
+</details>
+
+Enterprise multi-project network architectures rely on centralized governance to separate core network infrastructure management from daily application resource deployment. Establishing clear administrative boundaries ensures central networking teams control connectivity while autonomous development teams deploy workloads into designated environments.
 
 ### Key Concepts
 
@@ -1210,7 +1240,43 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: Duplicate CIDR in another region of the same GCP VPC is fine because regions are isolated like AWS.** A cloud architect designing a multi-region deployment across `us-central1` and `europe-west1` assigns the CIDR range `10.10.0.0/20` to subnets in both regions within the same custom VPC. The architect expects each region to function as an isolated networking domain, assuming cross-region IP collisions only occur when explicit peering connections are established. The operations team prepares Terraform automation to provision both regional subnets simultaneously.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: global VPC route table collision. Next action: assign distinct, non-overlapping CIDR blocks across all regions in the VPC, recognizing that Google Cloud enforces a single global routing namespace per network.
+
+</details>
+
+**Card B: Adding a matching source-tag to a compromised VM cannot open the database firewall.** A security analyst audits an internal ingress firewall rule permitting port 5432 access when incoming packets carry the `--source-tags=allow-db-access` tag. The analyst assumes network tags serve as tamper-proof boundaries that prevent unauthorized frontend instances from reaching sensitive database infrastructure. The team maintains broad instance administrative access across development projects without restricting metadata update privileges.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: unauthenticated network tag spoofing. Next action: configure firewall filtering using `target-service-accounts` and `source-service-accounts` rather than network tags, enforcing `iam.serviceAccounts.actAs` permission boundaries.
+
+</details>
+
+**Card C: compute.networkUser on the host project without conditions only lets a developer use the subnet their team requested.** A platform engineer onboarded a service project development team by granting `roles/compute.networkUser` directly on the Shared VPC host project without specifying IAM conditions. The engineer assumes that developers will voluntarily constrain their virtual machine deployments to their designated application subnet as instructed in team documentation. The organization distributes host project service account credentials to developer pipelines across multiple environments.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: unconditioned host-project IAM scope over-privilege. Next action: grant `roles/compute.networkUser` with IAM conditions or at the individual subnet level, restricting developers strictly to authorized subnet resources.
+
+</details>
+
+**Card D: Private Google Access gives private VMs full internet egress including apt repositories.** A DevOps engineer configures private virtual machines without public IP addresses and enables Private Google Access on the hosting subnet. The engineer expects instance initialization startup scripts to download essential security patches and packages directly from public OS distribution mirrors over the internet. The team schedules automated deployment workflows assuming Private Google Access functions as a default internet outbound gateway.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: egress protocol misunderstanding of Private Google Access scope. Next action: deploy Cloud NAT alongside Cloud Router to handle general internet egress, reserving Private Google Access exclusively for Google API endpoints.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Custom VPC created with two subnets (web-tier, app-tier)
 - [ ] Shared VPC enabled with two service projects attached
