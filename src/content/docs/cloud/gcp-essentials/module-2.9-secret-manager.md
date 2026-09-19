@@ -147,7 +147,7 @@ gcloud secrets versions list prod-db-password \
 Clients requesting the latest alias resolve secret payloads dynamically at request time. Workloads consuming secrets through environment variables resolved during container instance startup retain their initial values until the instance is recycled or a new revision is deployed.
 </details>
 
-Production operational runbooks codify deployment manifests and version management workflows so operators handle secret lifecycles systematically without relying on implicit container state. The next section explores version states, distinguishing between recoverable administrative suspension and permanent destruction of secret payloads across Google Cloud infrastructure.
+The next object is disable versus destroy. After those commands, recoverability and billing are why the two verbs are not interchangeable in a production incident.
 
 ### Disabling and Destroying Versions
 
@@ -202,7 +202,7 @@ Secret Manager supports [fine-grained IAM at both the project level and the indi
 No; the viewer role lists secret metadata and configuration properties, whereas roles/secretmanager.secretAccessor is required to access secret payload bytes. Application identities should receive secret-scoped accessor bindings rather than broad project-level visibility.
 </details>
 
-The following reference table details the predefined Secret Manager IAM roles, mapping specific permission boundaries to common deployment responsibilities across administrative, operational, and automated workload identities.
+The next object is the IAM roles table. After it, per-secret bindings are how an application identity gets access without a project-wide grant.
 
 | Role | Permissions | Typical User |
 | :--- | :--- | :--- |
@@ -285,7 +285,7 @@ gcloud run deploy my-api \
 No; environment variables are visible in the process environment, but file mounts are still readable with filesystem access and do not form a security sandbox. Arbitrary code execution can exfiltrate secrets from either location.
 </details>
 
-The following section demonstrates the deployment syntax for presenting Secret Manager payloads as filesystem volumes, followed by comparison criteria for selecting between dynamic references and pinned versions.
+The next object is the filesystem mount deploy flag. After it, latest versus pinned versions is a release-safety choice, not a console default.
 
 ### As Mounted Files
 
@@ -478,7 +478,7 @@ Direct API access from pods (without CSI) is supported but uncommon when the add
 No; Secret Manager publishes a SECRET_ROTATE message to configured Cloud Pub/Sub topics. Your subscriber must create replacement material in the upstream system, invoke add_secret_version, roll consuming workloads, and disable obsolete versions.
 </details>
 
-Configuring a [rotation schedule](https://cloud.google.com/secret-manager/docs/secret-rotation) establishes an automated messaging contract between Secret Manager and downstream automation handlers across your project architecture. The following guidelines review timing requirements, Pub/Sub integration parameters, and gcloud commands for scheduling secret lifecycle events.
+The next object is the rotation-period gcloud example. After it, timing floors and billable notifications are constraints from Google’s [rotation schedule](https://cloud.google.com/secret-manager/docs/secret-rotation) documentation.
 
 Requirements from Google’s documentation worth designing around: `rotation_period` must be at least one hour; `next_rotation_time` cannot be less than five minutes in the future; in-flight rotations block another until delivery completes (retries up to seven days). [Rotation notifications are billable](https://cloud.google.com/secret-manager/pricing) after the monthly free tier (three notifications per billing account).
 
@@ -1112,7 +1112,7 @@ echo "Cleanup complete."
 ```
 </details>
 
-**Card A: Applications pinned to `latest` always pick up a new secret version with no restart.** A deployment team configures a Cloud Run microservice with `--set-secrets="DB_PASSWORD=prod-db-password:latest"`. After generating and adding version 2 of the database credential, engineers observe that running service instances continue attempting to authenticate against the database using the deprecated version 1 credential until each container instance terminates or the service receives a new revision deployment.
+**Card A: Applications pinned to `latest` always pick up a new secret version with no restart.** A deployment team configures a Cloud Run microservice with `--set-secrets="DB_PASSWORD=prod-db-password:latest"`. After generating and adding version 2 of the database credential, engineers watch live instances keep using the old password and assume the `latest` alias should have rotated them already.
 
 <details>
 <summary>Check your prediction</summary>
@@ -1128,7 +1128,7 @@ Failure layer: container startup environment variable resolution versus runtime 
 Failure layer: container execution isolation boundaries versus filesystem access permissions. Next action: adopt defense-in-depth principles including read-only root filesystems, minimal container base images, least-privilege IAM roles, and network egress controls rather than treating file paths as security perimeters.
 </details>
 
-**Card C: Secret Manager rotation schedules generate new credentials automatically.** An operations team creates a production database secret with `--rotation-period="2592000s"` and registers a target Pub/Sub topic, assuming Secret Manager autonomously provisions a replacement password on the schedule. When the rotation timestamp arrives, the team discovers no new version exists in Secret Manager because the scheduled event only published a notification to Pub/Sub without executing credential generation logic.
+**Card C: Secret Manager rotation schedules generate new credentials automatically.** An operations team creates a production database secret with `--rotation-period="2592000s"` and registers a target Pub/Sub topic, assuming Secret Manager autonomously provisions a replacement password on the schedule. When the rotation timestamp arrives, the team discovers no new version exists in Secret Manager.
 
 <details>
 <summary>Check your prediction</summary>
@@ -1136,7 +1136,7 @@ Failure layer: container execution isolation boundaries versus filesystem access
 Failure layer: event notification dispatching versus automated credential provisioning execution. Next action: implement a subscriber such as a Cloud Run function that consumes `SECRET_ROTATE` events, creates new database credentials, invokes `add_secret_version`, updates consumers, and disables deprecated versions.
 </details>
 
-**Card D: `roles/secretmanager.viewer` can read secret payloads, so it is the right role for the application service account.** An engineer assigns `roles/secretmanager.viewer` to a workload service account responsible for loading API keys during startup. Upon deployment, the service crashes with access denied errors during credential initialization because the viewer role grants permission to inspect secret metadata and version lists but explicitly forbids accessing secret version payload bytes.
+**Card D: `roles/secretmanager.viewer` can read secret payloads, so it is the right role for the application service account.** An engineer assigns `roles/secretmanager.viewer` to a workload service account responsible for loading API keys during startup. Upon deployment, the service crashes with access denied errors during credential initialization.
 
 <details>
 <summary>Check your prediction</summary>
