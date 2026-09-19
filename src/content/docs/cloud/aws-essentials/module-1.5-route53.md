@@ -681,7 +681,7 @@ An application-layer Route 53 health check (such as an HTTP or HTTPS check targe
 
 </details>
 
-Failover, latency, geolocation, and weighted answers are still just DNS records until something outside the query path can change which of those records is eligible. The sections below walk through how that eligibility is measured and attached, then how routing policies consume it — without assuming a guest process crash is visible to a nameserver by default.
+Failover, latency, geolocation, and weighted answers are still just DNS records until something outside the query path can change which of those records is eligible. The sections below walk through how that eligibility is measured and attached, then how routing policies consume it.
 
 ### Creating Health Checks
 
