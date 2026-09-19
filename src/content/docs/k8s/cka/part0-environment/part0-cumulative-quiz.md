@@ -650,13 +650,41 @@ Delete the namespace only after you have verified the final state and practiced 
 k delete ns part0-review
 ```
 
-**Card A: Checking only the context is enough.** Wrong belief: if `k config current-context` matches the task, the target is safe. That belief misses namespace state, and most CKA workload objects are namespaced. Failure layer: target safety. Next action: pair context confirmation with explicit `-n <namespace>` or a verified current namespace before creating resources.
+**Card A: Checking only the context is enough.** An operator confirms `k config current-context` matches the task name and immediately creates the Deployment. The prompt still shows a familiar cluster from the previous question, so they treat the namespace as already correct. They never pass `-n` and never inspect the current namespace setting before changing cluster state.
 
-**Card B: `kubectl apply` configured means the rollout succeeded.** Wrong belief: API acceptance is the same as workload convergence. `configured` only says the object was accepted; controllers, Pods, probes, and images still need to reach the requested state. Failure layer: verification. Next action: run rollout status and inspect Deployment, Pod, and event evidence before marking the task done.
+<details>
+<summary>Check your prediction</summary>
 
-**Card C: A Running Pod guarantees Service endpoints.** Wrong belief: any Running Pod behind a Service will automatically receive traffic. Endpoints require matching selectors and Ready Pods, so labels and readiness can still block publication. Failure layer: resource relationship diagnosis. Next action: compare Service selectors with Pod labels, then check endpoints and readiness details.
+Failure layer: treating cluster identity as the whole target. Next action: pair context confirmation with explicit `-n <namespace>` or a verified current namespace before creating resources.
 
-**Card D: Highest-point troubleshooting first.** Wrong belief: the largest or scariest task deserves the first minutes because it might be worth more. Open-ended diagnosis can absorb time before quick verified points are secured. Failure layer: exam strategy. Next action: classify tasks into passes, finish low-uncertainty work first, and return to broad failures with preserved notes.
+</details>
+
+**Card B: `kubectl apply` configured means the rollout succeeded.** A candidate updates a Deployment image, sees `configured`, and marks the question complete. They do not watch the rollout, inspect Pods, or confirm the requested image is actually running. API acceptance is treated as proof that controllers, probes, and replicas have already converged.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating apply success as workload verification. Next action: run rollout status and inspect Deployment, Pod, and event evidence before marking the task done.
+
+</details>
+
+**Card C: A Running Pod guarantees Service endpoints.** An engineer sees the application Pod in `Running` and assumes the Service must be publishing it. They skip selector comparison, label inspection, and readiness checks. Empty endpoints are blamed on the ClusterIP rather than on matching and Ready-state publication.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating Pod phase as Service membership. Next action: compare Service selectors with Pod labels, then check endpoints and readiness details.
+
+</details>
+
+**Card D: Highest-point troubleshooting first.** A candidate opens the exam and spends the first half hour on a noisy node question because it looks valuable and frightening. Several namespace, ConfigMap, and Service tasks remain untouched. They treat the largest uncertainty as the first work rather than as a later pass after verified points are banked.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: optimizing for scare and point weight instead of certainty. Next action: classify tasks into passes, finish low-uncertainty work first, and return to broad failures with preserved notes.
+
+</details>
 
 **Success Criteria**:
 
