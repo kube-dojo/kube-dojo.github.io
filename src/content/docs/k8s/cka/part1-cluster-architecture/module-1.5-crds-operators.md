@@ -48,9 +48,16 @@ There is a cost to that power. Once a CRD is installed and teams begin committin
 
 A CRD extends the Kubernetes API with a new resource type. After the CRD is accepted by the API server, the new kind participates in normal API machinery: discovery, validation, storage in etcd, watch streams, RBAC checks, `kubectl get`, `kubectl describe`, and deletion. That is powerful because clients do not need a separate database or side API to track platform intent; the cluster API becomes the shared contract.
 
-The extension is deliberately narrow. Installing a CRD does not teach the scheduler how to place a database, does not create pods, and does not run backups. The API server stores custom resources and enforces the schema you provide. Behavior comes from a controller, often called an operator, that observes the custom resources and creates or updates other resources. Pause and predict: if you define a `Database` CRD and then create a `Database` object with `replicas: 3`, what happens before any operator is installed?
+The extension is deliberately narrow. Installing a CRD does not teach the scheduler how to place a database, does not create pods, and does not run backups. The API server stores custom resources and enforces the schema you provide. Behavior comes from a controller, often called an operator, that observes the custom resources and creates or updates other resources. **Pause and predict:** if you define a `Database` CRD and then create a `Database` object with `replicas: 3` before any operator is installed, which Kubernetes component accepts the object, and which component would have to create the database Pods or StatefulSets?
 
-The distinction matters because troubleshooting starts at different layers. If `kubectl apply` says it has no match for a kind, discovery or CRD installation is broken. If the object exists but nothing changes in the workload, the controller is absent, unhealthy, unauthorized, or unable to reconcile. If the object is rejected with a field error, the CRD schema is doing its job and the manifest does not match the declared API contract.
+<details>
+<summary>Check your prediction</summary>
+
+The `Database` object is stored and schema-validated by the API server if it matches the CRD. No database Pods or StatefulSets appear until a controller watches that object and reconciles the requested state into ordinary workload resources.
+
+</details>
+
+This split is the first diagnostic branch learners should practice, because the API server can accept intent long before any domain-specific controller turns that intent into running infrastructure. If `kubectl apply` says it has no match for a kind, discovery or CRD installation is broken. If an accepted object sits idle, continue the investigation on the controller side instead of assuming the scheduler misunderstood a new kind. If the object is rejected with a field error, the CRD schema is doing its job and the manifest does not match the declared API contract.
 
 A useful way to reason about CRDs is to compare them with ConfigMaps. Both can store structured information, and both can be read by controllers or applications. The difference is that a CRD gets its own resource identity, discovery metadata, schema, RBAC verbs, watch stream, status model, and lifecycle behavior. If the data is just configuration consumed by one application, a ConfigMap may be enough. If the data is a platform object that many users create, inspect, secure, and automate, a CRD becomes more appropriate.
 
@@ -180,7 +187,16 @@ kubectl get crontabs -w
 kubectl get crontab my-cron-job -o yaml
 ```
 
-Before running the next command sequence in a practice cluster, decide which layer you expect to answer each question. Does `kubectl api-resources` prove that a controller is working, or only that the API server knows the type? Does `kubectl describe` on a custom resource show desired state, observed status, or both? That mental split makes CRD debugging feel much less random.
+Before running the next command sequence in a practice cluster, decide which layer you expect to answer each question. **Pause and predict:** when `kubectl api-resources` lists a custom type and `kubectl describe` succeeds against one instance, have you proved that the operator is healthy, or have you only proved discovery and object inspection are working?
+
+<details>
+<summary>Check your prediction</summary>
+
+`kubectl api-resources` proves that the API server knows the type through discovery; it does not prove the controller is healthy. `kubectl describe` on a custom resource can show the desired spec and any observed status the operator has written, so missing or stale status becomes evidence for the next troubleshooting branch.
+
+</details>
+
+That mental split makes CRD debugging feel much less random because every command is assigned to a specific layer before the cluster returns output.
 
 Another practical detail is that discovery can lag briefly during installation because clients cache API resource information. If you install a CRD and immediately apply a custom resource from a script, an older client cache or an ordering issue can produce a confusing "no matches" message. Re-running discovery, applying CRDs before dependent resources, and keeping installation steps explicit are simple ways to avoid that noise. In exams, slow down and prove the type exists before chasing unrelated symptoms.
 
@@ -455,9 +471,16 @@ scope: Cluster
 | **Namespaced** | Resource belongs to a team/app | Certificate, Database, Application |
 | **Cluster** | Resource is shared/global | ClusterIssuer, StorageProfile |
 
-Deleting a CRD is a lifecycle event, not a harmless cleanup command. Kubernetes removes the custom resource instances for that CRD because their type no longer exists. Objects created by an operator, such as Secrets or Deployments, may or may not be deleted depending on owner references, finalizers, and controller behavior. Stop and think: if a CRD is deleted before the operator has removed its finalizers, what evidence would you look for to confirm which resources survived?
+Deleting a CRD is a lifecycle event, not a harmless cleanup command. Kubernetes removes the custom resource instances for that CRD because their type no longer exists. Objects created by an operator, such as Secrets or Deployments, may or may not be deleted depending on owner references, finalizers, and controller behavior. **Pause and predict:** if a CRD is deleted before the operator has removed its finalizers, what evidence would you look for to confirm which resources survived, and which evidence would be gone with the custom resource type?
 
-Finalizers are another reason custom resources are more than simple YAML files. A finalizer can block deletion until a controller finishes cleanup, such as removing external cloud resources or taking a final backup. That makes deletion safer, but it also creates failure modes: if the controller is gone and the finalizer remains, the resource can stay stuck in a terminating state. The fix should be deliberate because removing a finalizer tells Kubernetes to stop waiting for cleanup.
+<details>
+<summary>Check your prediction</summary>
+
+The custom resource instances of that type are gone because their API definition is gone. Child objects may remain, so look for terminating objects, leftover owner references, surviving Secrets, surviving Deployments, and any operator logs or events that explain how far cleanup progressed.
+
+</details>
+
+This is why uninstall procedures deserve the same caution as installation procedures, especially when a custom API represents stateful infrastructure rather than a disposable training object. Finalizers are another reason custom resources are more than simple YAML files. A finalizer can block deletion until a controller finishes cleanup, such as removing external cloud resources or taking a final backup. That makes deletion safer, but it also creates failure modes: if the controller is gone and the finalizer remains, the resource can stay stuck in a terminating state. The fix should be deliberate because removing a finalizer tells Kubernetes to stop waiting for cleanup.
 
 Versioning adds one more lifecycle concern. A CRD can serve multiple versions, but one version is marked for storage. Mature APIs use this to move users gradually from one shape to another, sometimes with conversion webhooks. For CKA work, you mostly need to recognize served versions and storage versions when a manifest fails. In production, you need a migration plan before removing a served version because old manifests and automation may still depend on it.
 
@@ -1207,7 +1230,51 @@ When the script is running, the Deployment should appear after the `Website` cus
 
 </details>
 
-### Success Criteria
+**Card A: Installing a CRD creates the database Pods.** A learner sees the API server accept a `Database` custom resource and assumes the cluster must now schedule three database replicas. The wrong belief is tempting because the manifest looks declarative in the same way a Deployment manifest looks declarative. Predict which layer stores the intent, which layer creates Pods, and what evidence would separate a missing operator from a bad scheduler.
+
+<details>
+<summary>Check your prediction</summary>
+
+**Failure layer:** The failure is in reconciliation, not scheduling. A CRD installs an API type and validates matching custom resources, but an operator or controller must translate that custom resource into Pods, StatefulSets, Services, or Secrets.
+
+**Next action:** Confirm the custom resource exists, then look for the responsible controller Deployment, its logs, its RBAC permissions, and any status conditions on the custom resource.
+
+</details>
+
+**Card B: `kubectl api-resources` listing the type means the operator is healthy.** A learner runs discovery, sees the plural resource name, and treats that as proof that the installed extension is ready. The command is useful, but it answers an API-server question rather than a controller-health question. Predict which additional evidence would show that the operator has actually processed a specific custom resource.
+
+<details>
+<summary>Check your prediction</summary>
+
+**Failure layer:** Discovery only proves that the API server serves the type. It does not prove the controller is running, authorized, watching the namespace, or able to write child resources.
+
+**Next action:** Describe the custom resource, inspect status conditions and observed generation, check events, and then inspect the operator Deployment, logs, and RBAC bindings.
+
+</details>
+
+**Card C: Deleting a CRD only removes the definition; instances and children always stay.** A learner treats CRD deletion like deleting a class name from documentation while assuming every existing object survives unchanged. Kubernetes behaves more sharply because custom resources depend on their API definition for storage, discovery, and lifecycle handling. Predict what disappears immediately and what might remain for manual investigation after the operator is gone.
+
+<details>
+<summary>Check your prediction</summary>
+
+**Failure layer:** The custom resource instances disappear with the CRD because the type no longer exists. Child resources may remain or disappear depending on owner references, finalizers, and whether the controller completed cleanup before the API disappeared.
+
+**Next action:** Before uninstalling, list and back up the custom resources, understand the operator's cleanup behavior, then after deletion inspect surviving Secrets, Deployments, owner references, and terminating objects.
+
+</details>
+
+**Card D: A Certificate object exists, so a missing Secret means Kubernetes is broken.** A learner sees a valid `Certificate` custom resource and expects the Secret named in `spec.secretName` to appear automatically. The API server can store the request even when cert-manager cannot reconcile it because an issuer is wrong, RBAC is missing, or the controller is unhealthy. Predict which resource fields and controller signals would distinguish a Kubernetes API problem from a certificate-operator problem.
+
+<details>
+<summary>Check your prediction</summary>
+
+**Failure layer:** The failure is usually in the cert-manager reconciliation path, not in the core Kubernetes Secret API. A stored `Certificate` proves API acceptance, while the missing Secret means the controller has not completed issuance.
+
+**Next action:** Describe the `Certificate`, read its conditions and events, confirm the referenced Issuer or ClusterIssuer, inspect cert-manager controller logs, and verify the controller can create Secrets in the target namespace.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Design a CRD with a valid group, names, scope, version, schema, and printer columns.
 - [ ] Create custom resources and query them with plural, singular, and short-name forms.
