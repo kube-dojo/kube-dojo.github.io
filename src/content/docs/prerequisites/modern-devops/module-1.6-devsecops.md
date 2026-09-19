@@ -79,7 +79,16 @@ flowchart LR
 
 The economic reason for shifting left is straightforward. If a developer notices a hardcoded password before committing, the fix is usually a short edit. If a pre-commit hook catches it, the developer can amend the commit before the secret enters shared history. If the same password reaches a built image, a Git repository, a container registry, and production logs, the fix becomes credential rotation, audit review, incident triage, and sometimes customer notification.
 
-Pause and predict: if a developer hardcodes a database password in a feature branch, which control should catch it first, and which later control should still exist in case the first one is bypassed? A strong answer names both a local or pull-request secret scan and a server-side repository or CI scan, because real systems need layered controls rather than a single perfect checkpoint.
+**Pause and predict:** if a developer hardcodes a database password in a feature branch, which control should catch it first, and which later control should still exist in case the first one is bypassed?
+
+<details>
+<summary>Check your prediction</summary>
+
+A strong answer names both a local or pull-request secret scan and a server-side repository or CI scan, because real systems need layered controls rather than a single perfect checkpoint.
+
+</details>
+
+The next paragraph is about how noisy a scanner becomes, which is a different problem from which checkpoint should run first.
 
 The practical tradeoff is signal quality. A scanner that reports hundreds of low-confidence findings will be ignored, even if it technically runs early. A scanner that blocks a release without showing the exact file, rule, severity, and remediation path creates resentment rather than safety. Good DevSecOps programs tune rules, document exceptions, and make the secure path easier than the risky workaround.
 
@@ -99,7 +108,16 @@ Container scanning happens after the application is packaged because the final i
 
 The pipeline should be strictest where the consequence is highest and the evidence is strongest. A local warning is appropriate for an experimental branch with a medium-severity dependency that has no exploit path in the application. A production admission denial is appropriate for a privileged pod, a host filesystem mount, or an unsigned image in a regulated namespace, because those conditions create immediate platform risk.
 
-Before running a new security gate in blocking mode, ask what the developer will do when it fails. If the answer is "open a ticket and wait," the gate may still be necessary, but the operating model is incomplete. Effective teams pair each blocking rule with documentation, examples, an owner, an exception path, and a way to reproduce the failure locally.
+**Pause and predict:** before running a new security gate in blocking mode, ask what the developer will do when it fails.
+
+<details>
+<summary>Check your prediction</summary>
+
+If the answer is "open a ticket and wait," the gate may still be necessary, but the operating model is incomplete. Effective teams pair each blocking rule with documentation, examples, an owner, an exception path, and a way to reproduce the failure locally.
+
+</details>
+
+The next section starts at the image the cluster will run, which is a later boundary than the moment a blocking rule fails in front of a developer.
 
 ## Securing the Artifact Supply Chain
 
@@ -154,7 +172,16 @@ The strongest pattern is to connect build identity, scan evidence, and admission
 
 Hypothetical scenario: a platform team discovers that several services are rebuilding from `latest` base images during emergency patches. The release notes look clean, but two services pull newer packages than the staging environment used, and runtime behavior changes under load. The fix is not just "do better tagging"; the team changes the pipeline to pin base image digests, record build provenance, and reject production images without a signed digest.
 
-Which approach would you choose here and why: blocking every medium vulnerability at build time, or blocking only high-confidence reachable findings while opening tracked work for the rest? The second approach is usually more sustainable, but only if the team has a real process for aging, ownership, and escalation. A non-blocking finding with no owner is just delayed risk.
+**Pause and predict:** which approach would you choose here and why: blocking every medium vulnerability at build time, or blocking only high-confidence reachable findings while opening tracked work for the rest?
+
+<details>
+<summary>Check your prediction</summary>
+
+The second approach is usually more sustainable, but only if the team has a real process for aging, ownership, and escalation. A non-blocking finding with no owner is just delayed risk.
+
+</details>
+
+The next section asks what a trusted image is allowed to do after it is admitted, which is a different choice from how strict the vulnerability gate should be.
 
 ## Hardening Kubernetes Workloads
 
@@ -249,7 +276,16 @@ kubectl label namespace devsecops-demo pod-security.kubernetes.io/warn=restricte
 kubectl label namespace devsecops-demo pod-security.kubernetes.io/audit=restricted --overwrite
 ```
 
-Before running this in a shared cluster, what output do you expect when a developer submits the earlier insecure pod to a namespace with `enforce=restricted`? The correct expectation is an admission rejection before scheduling, because the API server evaluates the request and refuses to persist a pod that violates the selected profile.
+**Pause and predict:** before running this in a shared cluster, what output do you expect when a developer submits the earlier insecure pod to a namespace with `enforce=restricted`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The correct expectation is an admission rejection before scheduling, because the API server evaluates the request and refuses to persist a pod that violates the selected profile.
+
+</details>
+
+The next section leaves workload profiles and looks at how credentials are stored and delivered, which is a separate control from the namespace label you just considered.
 
 ## Protecting Secrets and Identity
 
@@ -405,7 +441,16 @@ spec:
 
 In this example, the API pod can receive traffic only from pods labeled `app: frontend` on port 8080 and can send traffic only to pods labeled `app: database` on port 5432. Everything else is dropped by the network layer, assuming the cluster's networking provider implements NetworkPolicy. The assumption matters because Kubernetes defines the API, but the CNI plugin provides the enforcement.
 
-Pause and predict: if you apply a default-deny NetworkPolicy to a namespace that has never used network policy before, what happens to existing pods that currently communicate freely? They do not restart, but traffic that is no longer explicitly allowed begins to fail. That is why teams should map dependencies, add allow policies, and test carefully before enforcing default-deny in a busy namespace.
+**Pause and predict:** if you apply a default-deny NetworkPolicy to a namespace that has never used network policy before, what happens to existing pods that currently communicate freely?
+
+<details>
+<summary>Check your prediction</summary>
+
+They do not restart, but traffic that is no longer explicitly allowed begins to fail. That is why teams should map dependencies, add allow policies, and test carefully before enforcing default-deny in a busy namespace.
+
+</details>
+
+The next paragraph separates network reachability from authentication, which is a different question from what existing pods do when a new default-deny policy appears.
 
 Network policy is not a substitute for authentication or authorization. It reduces reachable paths, but the database still needs credentials, TLS still matters, and the application still needs authorization checks. Defense in depth means a compromised frontend should fail at the network layer, fail at the service authentication layer, and fail at the data authorization layer.
 
@@ -768,6 +813,42 @@ The insecure deployment uses a floating image tag, runs as root, and sets `privi
 <details><summary>Solution guidance for the secure rewrite</summary>
 
 The secure deployment pins a specific image tag, defines pod-level non-root identity, disables privilege escalation, drops Linux capabilities, uses a read-only root filesystem, and adds resource requests and limits. Some applications need writable temporary directories, so a real production version may add an `emptyDir` mounted at a narrow path instead of disabling read-only mode. If the image cannot run as UID 1000, fix the Dockerfile rather than weakening the pod policy first. The goal is to make the runtime contract explicit and reviewable.
+
+</details>
+
+**Card A: One local secret scan is enough.** A developer hardcodes a database password on a feature branch. The laptop hook is installed for most people, so the team deletes the server-side repository scan to save CI minutes. A bypassed hook is treated as a process problem, not a missing control.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a single checkpoint. Next action: keep a local or pull-request secret scan and a server-side repository or CI scan. One of them will be bypassed.
+
+</details>
+
+**Card B: Block every medium finding or the program is unsafe.** The pipeline fails the build on every medium vulnerability, including ones with no reachable path. Tracked work is treated as a way to hide risk. There is no owner, no aging rule, and no exception path.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: blocking without a reachable-finding policy. Next action: block high-confidence reachable findings, and open tracked work for the rest only when aging, ownership, and escalation are real. A finding with no owner is delayed risk.
+
+</details>
+
+**Card C: The restricted namespace schedules the pod, and the kubelet rejects it.** A developer submits the earlier insecure pod to a namespace labeled `enforce=restricted`. The team expects the object to be stored, the pod to be scheduled, and the node to refuse to start it.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: expecting a node rejection of an object the API server should not store. Next action: expect an admission rejection before scheduling. The API server refuses to persist a pod that violates the selected profile.
+
+</details>
+
+**Card D: Default-deny restarts the pods.** The namespace has never used network policy. Existing pods talk freely. The team applies a default-deny policy and waits for every pod to restart before they look at dropped connections.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: expecting a restart instead of a traffic change. Next action: map dependencies and add allow policies before you enforce default-deny. Pods stay up, and traffic that is no longer allowed begins to fail.
 
 </details>
 
