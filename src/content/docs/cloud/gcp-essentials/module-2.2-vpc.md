@@ -66,7 +66,7 @@ Google Cloud immediately rejects the `europe-west1` subnet creation request beca
 
 </details>
 
-Google Cloud's software-defined networking fabric connects regional subnets across continents into a unified global route table that simplifies routing operations. When you create a subnet in `us-central1` and another in `europe-west1`, both subnets share the same VPC-level route table. Google's software-defined networking fabric automatically installs routes between every subnet in the VPC without you configuring a single route entry, peering connection, or transit gateway. The subnet CIDR ranges become part of the VPC's routing topology immediately upon creation, and every VM in every region learns these routes through the virtual network interface. This means a VM in Tokyo can send a packet to a VM in Sao Paulo using only its private IP address, and the packet never leaves Google's private backbone until it reaches the destination subnet's virtual switch. The latency between these two VMs is determined purely by the speed of light through Google's fiber, not by any overlay tunneling or gateway processing overhead that you would incur with inter-region VPC peering in AWS.
+Google Cloud's software-defined networking fabric connects regional subnets across continents into a unified global route table that simplifies routing operations. When you create a subnet in `us-central1` and another in `europe-west1`, both subnets share the same VPC-level route table. Google's software-defined networking fabric automatically installs routes between every subnet in the VPC without you configuring a single route entry, peering connection, or transit gateway. The subnet CIDR ranges become part of the VPC's routing topology immediately upon creation, and every VM in every region learns these routes through the virtual network interface. A VM in Tokyo can send a packet to a VM in Sao Paulo using only its private IP address, and the packet stays on Google's private backbone until it reaches the destination subnet's virtual switch.
 
 Comparing this unified global software-defined network with AWS regional VPC architecture reveals foundational differences across routing, subnet boundaries, firewall scopes, and default communication policies:
 
@@ -144,7 +144,7 @@ No. Private Google Access provides connectivity exclusively to Google APIs and s
 
 </details>
 
-Enabling **Private Google Access** (`--enable-private-ip-google-access`) configures virtual machines without external IP addresses to route requests targeted at default `*.googleapis.com` hostnames directly across Google's internal network backbone. However, this subnet flag does not automatically configure routing to restricted internal VIP ranges; routing to specialized Google API gateways requires pairing Private Google Access with explicit DNS configuration such as Cloud DNS private zones targeting `private.googleapis.com` or `restricted.googleapis.com`.
+Enabling **Private Google Access** (`--enable-private-ip-google-access`) is only the subnet flag. Restricted internal VIP ranges still need explicit DNS, such as Cloud DNS private zones targeting `private.googleapis.com` or `restricted.googleapis.com`.
 
 The **`private.googleapis.com`** VIP range is `199.36.153.8/30` (broader Google API access over private paths). The **`restricted.googleapis.com`** VIP range is `199.36.153.4/30` (VPC Service Controls–compatible restricted endpoints). Use restricted VIPs when your organization enforces VPC-SC perimeters; use private VIPs when you need broader API coverage without traversing the public internet.
 
@@ -254,8 +254,7 @@ gcloud compute firewall-rules create allow-http \
   --target-tags=web-server \
   --priority=1000
 
-# Network tags are unauthenticated strings attached as instance metadata,
-# operating independently of cryptographic service identities.
+# Attach the tag that this firewall rule will match.
 ```
 
 **Pause and predict:** An engineer applies the network tag `allow-db-access` to a compromised frontend VM. If the firewall rule allowing database connections on port 5432 uses `--source-tags=allow-db-access`, why does the database immediately become vulnerable, and how would using a service account have prevented this exact exploitation path?
@@ -269,11 +268,7 @@ Anyone with instance editing permissions (`compute.instances.setTags`) can attac
 
 ### Service Account-Based Firewall Rules (The Better Way)
 
-Instead of relying on arbitrary metadata strings, production firewall architectures filter ingress and egress traffic based on the **service account** attached to each instance. This approach anchors network security in verifiable IAM principals:
-
-1. Service accounts are first-class IAM resources subject to organization access controls and audit logging.
-2. Runtime identity is verified cryptographically by the Compute Engine virtualization layer at instance boot.
-3. Fully qualified resource identifiers eliminate the silent failure modes that arise from misspelled tag strings.
+Production firewall architectures can target the identity attached to each instance instead of a label you type onto the VM. The next examples show how that identity is created and referenced in `gcloud` firewall rules.
 
 ```bash
 # Create service accounts for different VM roles
