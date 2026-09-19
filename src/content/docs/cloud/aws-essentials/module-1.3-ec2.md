@@ -17,7 +17,7 @@ sidebar:
 
 ## Why This Module Matters
 
-A team that manually provisions EC2 capacity ahead of a major traffic event can still be overwhelmed if demand exceeds forecasts and new instances take too long to come online. In that mode, manual workflows create delay because every replacement decision depends on an engineer being present and accurate. This disaster is usually avoidable, because the core promise of EC2 is elastic capacity rather than static infrastructure. Amazon EC2 is not just virtual machines in the cloud; it is a programmable compute fabric. When used correctly, it scales automatically with demand so you can absorb spikes and avoid paying for idle servers during quiet periods. In this module, you will automate provisioning with AMIs and User Data, understand EBS storage mechanics, and combine Auto Scaling Groups with Application Load Balancers to build self-healing clusters that recover without human intervention. The most useful mindset shift is to treat servers as ephemeral cattle, not permanent pets.
+Hypothetical scenario: a team that manually provisions EC2 capacity ahead of a major traffic event can still be overwhelmed if demand exceeds forecasts and new instances take too long to come online. In that mode, manual workflows create delay because every replacement decision depends on an engineer being present and accurate. This disaster is usually avoidable, because the core promise of EC2 is elastic capacity rather than static infrastructure. Amazon EC2 is not just virtual machines in the cloud; it is a programmable compute fabric. When used correctly, it scales automatically with demand so you can absorb spikes and avoid paying for idle servers during quiet periods. In this module, you will automate provisioning with AMIs and User Data, understand EBS storage mechanics, and combine Auto Scaling Groups with Application Load Balancers to build self-healing clusters that recover without human intervention. The most useful mindset shift is to treat servers as ephemeral cattle, not permanent pets.
 
 ## The Building Blocks of Compute
 
@@ -68,7 +68,14 @@ The table below compares commonly used instance types across the four most popul
 
 **Key insight**: Notice how `t3.medium` and `m6i.large` both offer 2 vCPUs—but the `m6i.large` provides 8 GiB of memory (double the `t3.medium`'s 4 GiB at the same vCPU count) and consistent performance without credit-based throttling. For production workloads that need reliable, steady CPU performance, fixed-performance instance families are often a better fit than burstable T-series instances.
 
-> **Stop and think**: You are migrating a legacy, monolithic application that requires 32 GiB of memory. It idles at 15% CPU utilization 95% of the time, but during monthly reporting runs, it hits 100% CPU for several hours. Which instance family and size provides the most cost-effective baseline without risking CPU throttling during the reporting runs?
+**Pause and predict:** you are migrating a legacy monolithic application that requires 32 GiB of memory. The workload idles at 15% CPU utilization most of the time, but monthly reporting jobs drive CPU usage to 100% for several consecutive hours. Which instance family and size provides the most cost-effective baseline without risking CPU credit throttling during reporting runs?
+
+<details>
+<summary>Check your prediction</summary>
+
+An `r6i.xlarge` (or `r6g.xlarge` for Graviton) is the most cost-effective choice. A burstable instance like `t3.2xlarge` provides 32 GiB of RAM but exhausts its accrued credit balance during multi-hour 100% CPU runs, triggering aggressive throttling down to baseline performance. The memory-optimized `r6i.xlarge` supplies the required 32 GiB of RAM with 4 dedicated, unthrottled vCPUs at roughly $0.252 per hour, avoiding both throttling and the higher cost of an 8-vCPU general-purpose `m6i.2xlarge` ($0.384/hr).
+
+</details>
 
 *Note on Graviton: Instance families ending in 'g' (like m6g, c6g, r6g) use AWS Graviton processors (ARM architecture) rather than x86. They can often offer better price-performance than comparable x86-based instances, depending on workload, generation, and region. If your application stack supports ARM (most Linux workloads, containers, and interpreted languages do), Graviton instances are almost always the smarter choice.*
 
@@ -86,9 +93,16 @@ AWS offers three placement group strategies, and each one optimizes a different 
 
 **Partition placement groups**: Instances are divided into logical partitions, each representing a set of racks that share a common failure domain (power and networking). A large distributed application can then spread its replicas across partitions so that no single partition failure takes down more than one replica. This is purpose-built for distributed data systems like HDFS, Apache Kafka, Apache Cassandra, and Elasticsearch, where data replication already exists at the application layer and you want the replication topology to match the physical fault domains. Large partition groups can span hundreds of instances across up to seven partitions per AZ, and the application can query instance metadata to discover which partition an instance belongs to, enabling topology-aware replica placement.
 
-> **Pause and predict**: You are deploying a 9-node Apache Cassandra cluster. The application-level replication factor is 3, and each node handles roughly equal query load. Which placement group strategy protects you from a single-rack failure without exceeding placement group limits, and why?
+**Pause and predict:** you are deploying a 9-node Apache Cassandra cluster across a single region. The application replication factor is configured to three, and each node handles equal query load. Which placement group strategy protects this cluster against single-rack failures without breaching instance count limits, and why?
 
-Choosing the right placement group strategy is easy to get wrong in the planning phase because the trade-offs are invisible until you hit a production event. Cluster groups fail fast but are simple to reason about; spread groups give you the highest assurance for small counts; partition groups require application-level topology awareness but scale to large distributed systems. The common mistake is deploying without any placement strategy and discovering the performance or availability gap months later when the workload size changes.
+<details>
+<summary>Check your prediction</summary>
+
+Use a partition placement group with at least three partitions. Spread placement groups are strictly limited to seven running instances per Availability Zone, making them incapable of hosting a nine-node cluster in a single zone. Cluster placement groups place all instances on shared racks in a single AZ, creating a single point of failure. Partition placement groups map instances across distinct physical hardware partitions so that Cassandra replicas with RF=3 do not share common power supplies or network switches.
+
+</details>
+
+Selecting an appropriate placement configuration during initial architectural design prevents operational bottlenecks that remain hidden until production scale is reached. When teams deploy workloads without explicit placement controls, instances scatter randomly across shared server racks, leaving distributed databases vulnerable to unexpected correlated infrastructure outages. Establishing deliberate placement rules during provisioning ensures that physical network distance and hardware isolation boundaries match the availability guarantees demanded by your application architecture.
 
 ### Nitro System and Graviton: The Platform Beneath the Instance
 
@@ -124,7 +138,14 @@ How you pay for compute dramatically impacts your architecture and your monthly 
 
 **Cost example**: A continuously running `m6i.xlarge` can cost well over a thousand dollars per year on On-Demand pricing, while commitment-based discounts and Spot pricing can lower costs substantially depending on the workload design and plan you choose.
 
-> **Pause and predict**: A data science team runs a massive, parallel data processing job every night. The job takes 4 hours to complete, but it is heavily checkpointed—if a server shuts down, the job simply resumes from the last checkpoint with a 5-minute penalty. If they switch from On-Demand to Spot instances and experience 3 interruptions per night, will this architectural change save money?
+**Pause and predict:** a data science team runs a massive, parallel data processing job every night. The job takes 4 hours to complete, but it is heavily checkpointed so that an interrupted node simply resumes with a 5-minute penalty. If they switch from On-Demand to Spot instances and experience 3 interruptions per night, will this architectural change save money?
+
+<details>
+<summary>Check your prediction</summary>
+
+Yes, switching to Spot delivers substantial net savings despite the interruptions. Spot instances typically offer 70% to 90% discounts compared to standard On-Demand pricing. Three interruptions with a 5-minute restart penalty add only 15 minutes of compute time, extending the run from 4 hours to 4.25 hours (a ~6.25% runtime increase) which is completely overshadowed by the ~70-90% hourly discount.
+
+</details>
 
 *The golden rule of EC2 cost optimization: use Savings Plans for your baseline, On-Demand for unpredictable burst, and Spot for anything that can tolerate interruption. For a stable production workload, avoid staying on pure On-Demand for more than a few weeks without evaluating a commitment.*
 
@@ -148,7 +169,14 @@ The following decision table summarizes when each volume type is the right choic
 | **st1** | $ | 500 | 500 MiB/s | Double-digit ms | No | Big data, data warehouses, log processing, sequential throughput workloads |
 | **sc1** | ¢ | 250 | 250 MiB/s | High | No | Infrequent access, archival data that must remain queryable |
 
-> **Stop and think**: Your team runs a PostgreSQL database that handles 8,000 write IOPS at peak and stores 400 GiB of data. Under gp2, you needed a 2,700 GiB volume (8,000 / 3 = 2,667 GiB) to sustain that IOPS, wasting storage spend. Under gp3, you can size the volume at 400 GiB and provision 8,000 IOPS separately. What is the monthly savings at ~$0.08/GiB-month, ignoring provisioned IOPS cost? (Answer: ~$184/month just from decoupling storage from IOPS.)
+**Pause and predict:** your team operates a PostgreSQL database that requires 8,000 write IOPS at peak while storing 400 GiB of data. Under legacy gp2 volumes, achieving 8,000 sustained IOPS requires allocating approximately 2,700 GiB of storage due to the fixed three IOPS per GiB ratio. Under gp3, you can provision the 400 GiB volume and 8,000 IOPS independently. Assuming a baseline rate of $0.08 per GiB-month, how much unneeded storage capacity cost do you eliminate each month?
+
+<details>
+<summary>Check your prediction</summary>
+
+You save approximately $184 per month on raw storage capacity alone. Under gp2, obtaining 8,000 IOPS requires provisioning 2,667 GiB (rounded up to 2,700 GiB), costing $216 per month at $0.08 per GiB. Under gp3, 400 GiB of capacity costs only $32 per month, eliminating $184 per month in unneeded storage before accounting for the nominal separate charge for provisioned IOPS.
+
+</details>
 
 #### EBS Snapshots
 
@@ -284,7 +312,14 @@ echo "User Data script completed at $(date)"
 | **User Data only** | Slow (minutes) | High — change at launch | Simple script | Rapid iteration, dev/test |
 | **Hybrid (recommended)** | Medium | Balanced | Both pipelines | Production: AMI for base + User Data for config |
 
-> **Stop and think**: If a critical zero-day vulnerability is discovered in the OpenSSL library, how does your patching strategy differ if you rely entirely on a Golden AMI versus relying entirely on User Data for OS configuration? Which approach allows for faster emergency remediation across a fleet of 1,000 instances?
+**Pause and predict:** a critical zero-day vulnerability is discovered in the OpenSSL library across your fleet. How does your patching strategy differ if you rely entirely on a Golden AMI versus relying entirely on User Data for OS configuration? Which approach allows for faster emergency remediation across a fleet of 1,000 instances?
+
+<details>
+<summary>Check your prediction</summary>
+
+User Data allows you to edit the launch script immediately and trigger an instance refresh, patching instances at boot without waiting for an image build pipeline. However, 1,000 instances executing package manager downloads simultaneously can overwhelm mirrors and cause non-deterministic deployment failures. A Golden AMI requires building and validating a new image before deployment, but once published, all 1,000 instances launch in seconds with identical, verified binaries and zero external repository dependencies.
+
+</details>
 
 A hybrid approach is a common production pattern because it balances fast boot times with runtime flexibility. Bake the OS, security agents, and application runtime into the AMI (things that rarely change). Use User Data to pull the latest application version and environment-specific configuration at boot time (things that change frequently).
 
@@ -1064,7 +1099,43 @@ rm -f userdata.sh template-data.json
 echo "Cleanup complete!"
 ```
 
-### Success Criteria
+**Card A: Burstable T-series is safe for a 32 GiB app with monthly 100% CPU peaks.** An architect chooses a burstable `t3.2xlarge` instance for a thirty-two gigabyte application. The engineer assumes that twenty-nine quiet days build sufficient credit reserves. They believe that standard accumulated credits absorb extended reporting spikes easily. Consequently, the team deploys the burstable instance to production without configuring unlimited mode.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing cumulative idle credits with unlimited continuous compute duration. Next action: migrate the workload to fixed-performance instances such as `r6i.xlarge` or configure T-series Unlimited mode while budgeting for surplus credit billing overages.
+
+</details>
+
+**Card B: A cluster placement group is the HA choice for Cassandra RF=3.** A database administrator deploys a nine-node Cassandra cluster in a cluster placement group. The engineer believes that grouping instances tightly guarantees high availability by reducing network latency. They assume that local hardware redundancy inside a single zone protects quorum replicas. Therefore, the cluster is launched without distributing nodes across multiple physical server racks.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: prioritizing low network latency over physical failure domain isolation. Next action: deploy the cluster across a partition placement group or multi-AZ spread topology so that individual rack or power failures cannot simultaneously eliminate quorum replicas.
+
+</details>
+
+**Card C: gp3 still requires oversizing the volume to buy IOPS.** An engineer provisions a two-terabyte volume to guarantee six thousand sustained IOPS. Remembering that legacy gp2 required large volumes for IOPS, they purchase unneeded capacity. The architect assumes that modern gp3 volumes retain this linear storage-to-IOPS coupling. As a result, hundreds of gigabytes of expensive provisioned block storage remain unused.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: applying legacy gp2 linear scaling assumptions to decoupled gp3 storage architectures. Next action: size gp3 storage capacity strictly to data volume requirements and provision required IOPS and throughput independently using the EBS configuration parameters.
+
+</details>
+
+**Card D: User Data and Golden AMI have the same emergency OS-patch path.** A DevOps lead treats User Data scripts and pre-baked Golden AMIs as identical patching mechanisms. The engineer assumes that updating bootstrap commands patches a thousand instances with equal speed. They believe that replacement instances will download security packages simultaneously without external repository bottlenecks. Based on this assumption, emergency rollouts proceed without validating pre-baked immutable machine images.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: overlooking runtime repository dependencies and boot latency variations in bootstrap scripts. Next action: use automated AMI pipelines to validate and bake critical system patches into immutable images, reserving User Data for lightweight instance-specific initialization.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] I successfully created separate Security Groups for the ALB and web servers (defense in depth).
 - [ ] I created a Launch Template with User Data, IMDSv2 enforcement, and proper tagging.
