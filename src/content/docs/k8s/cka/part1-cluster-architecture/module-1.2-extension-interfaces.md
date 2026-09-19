@@ -77,7 +77,16 @@ That delegation is not a lack of responsibility; it is a contract model. Kuberne
 
 The table looks simple, but the sequencing matters. Kubelet uses CRI to create a Pod sandbox and run containers. During sandbox creation the runtime invokes CNI plugins to place the sandbox in the cluster network. Separately, when a Pod needs a persistent volume, Kubernetes controllers and kubelet coordinate with CSI components so that a volume exists, is attached to the right node, and is mounted into the container. When one layer fails, higher layers often show only a generic waiting state, so the CKA skill is to connect the waiting state to the interface that should have advanced next.
 
-Pause and predict: if the API server and scheduler are healthy, but no CNI configuration exists on a worker node, which Kubernetes objects will still appear normal and which Pod lifecycle phase will expose the problem? Make a prediction before you read the command examples later in this module, because this one mental model explains a large share of node-level exam troubleshooting.
+**Pause and predict:** if the API server and scheduler are healthy, but no CNI configuration exists on a worker node, which Kubernetes objects will still appear normal and which Pod lifecycle phase will expose the problem?
+
+<details>
+<summary>Check your prediction</summary>
+
+Node objects, Deployments, and scheduled Pod resources still appear completely normal in API responses. The failure manifests only when the worker node container runtime attempts sandbox creation, leaving Pods stuck in `ContainerCreating` with network plugin not ready errors.
+
+</details>
+
+Isolating control plane object acceptance from node-level sandbox network wiring prevents unnecessary control plane debugging when the underlying worker networking layer lacks configuration.
 
 The extension architecture also protects workload portability. A Deployment that runs NGINX normally does not mention containerd, Calico, or an EBS CSI driver; it asks Kubernetes for a Pod, networking, and perhaps a volume claim. That means application manifests survive many infrastructure differences. The operational manifests do not disappear, however. Cluster add-ons, node configuration, StorageClasses, and plugin DaemonSets become part of the platform contract, and platform engineers must version, monitor, and debug them with the same care they give the control plane.
 
@@ -216,7 +225,16 @@ ls /etc/cni/net.d/
 cat /etc/cni/net.d/10-calico.conflist  # Example for Calico
 ```
 
-Stop and think: you just ran `kubeadm init`, the control plane started, and CoreDNS Pods are Pending or stuck during startup. What is missing, and why does DNS reveal the problem early? The answer is that kubeadm does not install a CNI plugin for you. CoreDNS is one of the first normal workloads created by the cluster, so it quickly exposes whether Pods can be scheduled, sandboxed, assigned addresses, and connected to the cluster network.
+**Pause and predict:** you just ran `kubeadm init`, the control plane started, and CoreDNS Pods remain stuck in Pending. What is missing from the cluster, and why does CoreDNS reveal this absence before any user applications are deployed?
+
+<details>
+<summary>Check your prediction</summary>
+
+kubeadm intentionally does not install a CNI network plugin. CoreDNS is the first normal workload scheduled on the cluster, so it immediately exposes whether the node network is ready to allocate Pod IP addresses and sandboxes.
+
+</details>
+
+Recognizing that basic bootstrapping stops short of network provisioning directs your immediate focus toward cluster add-on installation rather than control plane daemon troubleshooting.
 
 ```bash
 # What CNI is running?
@@ -346,7 +364,16 @@ kubectl describe storageclass <name>
 kubectl get pv -o jsonpath='{.items[*].spec.csi.driver}'
 ```
 
-What would happen if the CSI controller pod crashed but the CSI node plugins on each worker were still running? Existing mounted volumes may keep functioning because the mount already exists on the node, but new claims and new attachments will expose the controller outage. This is the storage equivalent of separating a restaurant kitchen from the delivery drivers: a meal already delivered can be eaten, while new orders stall if the kitchen stops accepting work. The analogy is imperfect, but it helps you decide whether to inspect controller logs or node plugin logs first.
+**Pause and predict:** what would happen if the CSI controller pod crashed while the CSI node plugins on each worker were still running? Which storage operations continue functioning, and which storage operations fail immediately?
+
+<details>
+<summary>Check your prediction</summary>
+
+Existing mounted volumes keep functioning because the filesystem mounts already exist on the worker nodes. However, provisioning new PersistentVolumeClaims, attaching volumes to new nodes, and deleting unneeded storage volumes will fail immediately until the controller recovers.
+
+</details>
+
+Distinguishing centralized control-plane driver lifecycle duties from distributed node-level mount operations guides engineers to target the appropriate component logs during storage cluster outages.
 
 ```bash
 # PVC stuck in Pending
@@ -631,6 +658,42 @@ kubectl get storageclasses
 <summary>Solution notes</summary>
 
 Some lab clusters may not include dynamic CSI provisioning, while managed clusters usually do. `CSIDriver` tells you which drivers are registered, and StorageClasses tell you which provisioners application teams can request. A StorageClass without a matching healthy driver is a broken platform API.
+
+</details>
+
+**Card A: Missing CNI means the control plane is down.** An administrator notices newly scheduled Pods stuck in the ContainerCreating state across several worker nodes and immediately concludes that the control plane API server has failed. Assuming that the management layer has collapsed, they initiate a reboot of all control plane nodes rather than checking node network configuration. This misdiagnosis wastes valuable recovery time while leaving the true network plugin deficit untouched.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing control plane object scheduling with worker node sandbox networking. Next action: run `kubectl describe pod` to inspect network events and verify configuration files under `/etc/cni/net.d/` on the affected worker node.
+
+</details>
+
+**Card B: Empty `docker ps` means all cluster containers are gone.** A troubleshooter logs into a modern Kubernetes worker node and executes `docker ps` to inspect active container processes across the system. When the command prints an empty table with no active workloads, they assume all cluster Pods running on the host have crashed simultaneously. They begin an emergency escalation for container recovery without realizing the node uses containerd or CRI-O as its underlying runtime.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: querying the wrong container runtime daemon on nodes managed by CRI. Next action: inspect the node container runtime using `kubectl get nodes -o wide` and execute `crictl ps` to inspect active containers through the CRI endpoint.
+
+</details>
+
+**Card C: Pending PVC always means the node disk is full.** An engineer observes that a PersistentVolumeClaim remains stuck in the Pending state indefinitely after being submitted to the cluster. Convinced that the local physical disk storage on the target worker node has reached maximum capacity, they log into the machine to purge container images and delete log files. They spend hours freeing disk space while the volume claim continues waiting for a non-existent StorageClass provisioner.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mistaking control-plane storage volume provisioning and driver binding for local disk exhaustion. Next action: run `kubectl describe pvc <name>` to inspect controller events and verify that the specified StorageClass references a valid CSI driver.
+
+</details>
+
+**Card D: kubeadm init installed a CNI, so CoreDNS Pending is a scheduler bug.** An operator finishes bootstrapping a new single-node control plane with `kubeadm init` and discovers that CoreDNS Pods stay in the Pending state indefinitely. Believing that the bootstrap process automatically installed an operational networking plugin, they conclude that the kube-scheduler daemon has encountered an internal bug. They repeatedly restart the scheduler static pod while the cluster continues waiting for a Pod network provider.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming cluster bootstrapping tools provision Pod network plugins automatically. Next action: install a compatible CNI plugin such as Calico or Cilium so worker nodes transition to Ready and schedule CoreDNS Pods.
 
 </details>
 
