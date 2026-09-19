@@ -58,7 +58,17 @@ flowchart TD
 
 The Knative vocabulary gives names to the moving parts that Cloud Run hides behind the console and `gcloud` commands. A **Service** is the top-level resource with a stable endpoint. A **Revision** is an immutable snapshot of service configuration. An **Instance** is a running container process serving requests for one revision. A **Route** decides which revision receives which requests. In upstream Knative, a **Configuration** stores the desired template and stamps out a new revision when the template changes, while the route maps traffic to those revisions. Cloud Run exposes these ideas through service descriptions, revision lists, traffic splits, tags, and YAML exports.
 
-This immutability is more than a convenient audit trail. It is the reason Cloud Run can decouple deployment from release. You can deploy revision `my-api-v2`, send it zero public traffic, give QA a tagged URL, run synthetic checks against production dependencies, and only then move 10% of users to the new revision. If latency, errors, or business metrics regress, rollback is a route update rather than a rebuild. Pause and predict: if an environment variable changes but the image tag stays the same, what do you think Cloud Run creates, and why would that matter during rollback?
+This immutability is more than a convenient audit trail. It is the reason Cloud Run can decouple deployment from release. You can deploy revision `my-api-v2`, send it zero public traffic, give QA a tagged URL, run synthetic checks against production dependencies, and only then move 10% of users to the new revision. If latency, errors, or business metrics regress, rollback is a route update rather than a rebuild.
+
+**Pause and predict:** If an environment variable changes on a Cloud Run service while the container image tag remains identical, what object does Cloud Run create, and why does this distinction matter during an emergency rollback?
+
+<details>
+<summary>Check your prediction</summary>
+
+Cloud Run still creates a new revision because the revision records the full serving configuration, not only the image digest. Rollback can return the service to the previous environment without unwinding a live process or attempting in-place mutation on a running container instance.
+</details>
+
+Declarative service manifests capture this exact relationship between service endpoints, revision specifications, and traffic routing rules. The following Knative-compatible YAML definition demonstrates how traffic percentages and canary tags are configured directly within the deployment template.
 
 ```yaml
 # Example: Knative-style traffic splitting in a Service spec
@@ -78,7 +88,7 @@ spec:
     tag: preview  # Accessible via preview---my-api-xyz.a.run.app
 ```
 
-The answer is that a new revision appears, because the revision records the full serving configuration, not only the image digest. That behavior can surprise teams that treat Cloud Run like a mutable virtual machine process, but it is the feature that makes production recovery clean. If the new environment variable points at a misconfigured dependency, traffic can move back to the previous revision with the previous configuration. You are not trying to unwind a partially patched process on a running host.
+Decoupling deployment from traffic allocation gives engineering teams precise control over release velocity and verification windows. Staging revisions behind isolated tags allows operators to run synthetic validation suites and measure baseline performance before any public traffic reaches the updated container.
 
 Cloud Run's scale-to-zero behavior comes from the same Knative serving model. When no revision needs instances, the platform can remove them and leave an activator-like path ready to receive the next request. The first request after an idle period waits while a container instance starts, listens on the configured port, and becomes healthy enough to receive traffic. That delay is the cold start trade-off. You can keep minimum instances warm for important paths, but the moment you do, you are choosing lower tail latency in exchange for paying some idle cost.
 
@@ -224,7 +234,15 @@ spec:
 
 This YAML intentionally combines networking, probes, and traffic, because real production revisions combine them too. A canary that uses a new VPC connector path is not only testing code; it is testing DNS, firewall rules, connector capacity, service identity, and dependency behavior under a small amount of real traffic. If a canary receives 10% of user requests but all of those requests call the same private database, the database still sees a new client pattern. Good rollout plans account for downstream impact instead of assuming Cloud Run is isolated from the rest of the system.
 
-Which approach would you choose here and why: route only private ranges through the connector, or send all egress through the VPC? For most services that simply need private database or internal API access, private-ranges-only keeps public traffic simpler and avoids unnecessary connector dependence. For services that need centralized egress controls, fixed outbound IPs, or inspection through VPC infrastructure, all-traffic routing may be worth the extra operational surface. The right answer depends on security requirements and dependency paths, not on a universal preference.
+**Pause and predict:** A service only requires connectivity to a private Cloud SQL IP, but security policy mandates inspection of all outbound network requests. Which VPC egress setting should you configure, and why is the other option wrong for that goal?
+
+<details>
+<summary>Check your prediction</summary>
+
+You must configure all-traffic VPC egress because only all-traffic egress directs external internet traffic through the VPC network for centralized inspection, Cloud NAT, or fixed outbound IPs. The private-ranges-only setting is wrong for that goal because it keeps public traffic off the connector and routes it directly to the internet, bypassing VPC inspection appliances entirely.
+</details>
+
+Selecting an egress path establishes the operational contract between application workloads and perimeter network security controls. Production environments require network architects and service owners to review connector throughput limits alongside firewall inspection requirements to prevent traffic bottlenecks during unexpected load spikes.
 
 Direct VPC egress is another option in modern Cloud Run deployments, and it can remove the connector resource for some designs. A module focused on essentials still teaches connectors because they remain common in existing environments and explain the egress model clearly. When you evaluate a real architecture, compare connector capacity, operational ownership, Shared VPC constraints, firewall logging needs, and the simplicity of direct egress. The best design is the one your network and security teams can reason about during an incident at 2 a.m.
 
@@ -262,7 +280,15 @@ gcloud run services update-traffic my-api \
   --to-revisions my-api-00003=90,my-api-00004=10
 ```
 
-Rollback is intentionally boring when revisions are healthy. You point traffic back to the known-good revision and investigate later. That does not remove the need for database migration discipline. If revision 2 performs an irreversible schema write that revision 1 cannot read, traffic rollback alone may not restore service. Cloud Run solves release routing, not all compatibility problems. Mature teams pair Cloud Run canaries with backward-compatible schema changes, feature flags, idempotent retries, and migration plans that allow both old and new revisions to operate during the rollout window.
+**Pause and predict:** Revision 2 of a service ran an irreversible database schema write during a canary deployment. If you immediately point 100% of traffic back to revision 1, is the application restored?
+
+<details>
+<summary>Check your prediction</summary>
+
+The application is not restored because Cloud Run rollback restores traffic routing, not database schema compatibility. If revision 1 cannot read or write the altered schema, user requests will continue failing; teams must pair canaries with backward-compatible migrations so both old and new revisions can safely run concurrently.
+</details>
+
+Traffic migration commands provide immediate control over which container revisions serve incoming client traffic during operational incidents. The following command updates the service route to redirect full traffic allocation back to the preceding revision while engineering teams evaluate logs and plan remediation.
 
 ```bash
 gcloud run services update-traffic my-api \
@@ -292,7 +318,15 @@ The most important cost mistake is focusing only on Cloud Run price per vCPU-sec
 
 Cold starts are not a moral failure; they are the economic trade-off that lets unused capacity disappear. You reduce them by keeping minimum instances, improving startup time, shrinking images, avoiding heavy import paths, using startup CPU boost where appropriate, and setting concurrency so an existing instance can absorb bursts. You should measure cold starts separately from steady-state latency because they have different causes. A service with excellent steady-state P50 can still have painful P99 after quiet periods, and a service with a warm minimum instance can still stall if each instance handles too much concurrent work.
 
-Concurrency tuning is also a resilience control. Suppose a revision has concurrency 80 and max instances 10, so it can accept a large number of simultaneous requests before Cloud Run refuses new capacity. If every request opens a database connection, the database may see a far larger burst than it can handle. Lowering concurrency, using connection pooling, setting max instances, and introducing queues or backpressure can protect dependencies. Cloud Run autoscaling is fast, but it cannot know the real safe limit of your database unless you encode that limit through service configuration and application behavior.
+**Pause and predict:** A service revision is configured with concurrency 80 and max instances 10, and each incoming request opens a direct database connection. What saturates first during an unbuffered traffic burst?
+
+<details>
+<summary>Check your prediction</summary>
+
+The database saturates first rather than Cloud Run. Cloud Run will accept the burst across its instances, but the database will saturate under hundreds of simultaneous connections unless you lower concurrency, cap max instances, pool connections, or add backpressure.
+</details>
+
+Autoscaling parameters act as distributed load generators from the perspective of downstream infrastructure components. Aligning serverless capacity limits with persistent backing services requires cross-tier capacity planning so that sudden compute elasticity does not overwhelm stateful dependencies during traffic spikes.
 
 Cloud Run and GKE can coexist in the same architecture. A platform team might keep shared stateful services, service mesh experiments, custom controllers, or batch systems on GKE, while moving stateless APIs, webhooks, internal admin UIs, and scheduled jobs to Cloud Run. That split can reduce cluster pressure and let teams choose the operational model per workload. The mistake is turning the decision into identity politics. The useful question is which platform exposes the fewest failure modes while meeting the service's needs.
 
@@ -645,7 +679,39 @@ The second deployment should create a tagged revision with no public traffic at 
 
 </details>
 
-Success criteria:
+**Card A: Changing an environment variable with the same image tag updates the running revision in place, so rollback is unnecessary.** An operations engineer updates the database connection URL environment variable on a production Cloud Run service to point to a new read replica. Because the container image tag and digest did not change, the engineer assumes that Cloud Run mutates the running container environment in place without creating a new revision. The engineer decides not to record the previous configuration in version control or verify traffic routing commands prior to saving the change.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: immutable revision lifecycle versus in-place container configuration mutation. Next action: treat every configuration update as a new revision deployment, verify revision identifiers in deployment logs, and maintain explicit traffic routing commands to roll back to the prior revision if the new environment variable fails.
+</details>
+
+**Card B: For a private Cloud SQL client, sending all egress through the VPC connector is always the safer default.** A platform engineer connects a high-throughput Cloud Run API to a private Cloud SQL instance using a Serverless VPC Access connector. The application only queries the internal database and communicates heavily with third-party public payment gateways. To ensure maximum network encapsulation, the engineer configures the service VPC egress setting to route all outbound traffic through the connector. The engineer promotes the configuration directly to production without testing public throughput under peak load.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: serverless VPC connector bandwidth bottlenecks on public egress versus private routing boundaries. Next action: configure VPC egress to private-ranges-only so that public internet traffic bypasses the connector, reserving connector throughput exclusively for internal RFC 1918 database traffic unless centralized egress inspection is strictly mandated.
+</details>
+
+**Card C: `gcloud run services update-traffic …=100` always restores the previous application after a bad canary, even if the new revision migrated the schema.** During a phased release of a microservice, a canary revision executes a startup script that drops deprecated columns from a shared relational database table. Application monitoring alerts on a sudden surge in HTTP 500 errors across user sessions. The on-call engineer runs `gcloud run services update-traffic` to shift 100% of traffic back to the previous revision, assuming that restoring earlier compute routing completely recovers application availability. The engineer marks the incident as mitigated and pauses further investigation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: stateless compute traffic routing versus stateful database schema compatibility. Next action: implement expand-and-contract schema migrations that remain backward-compatible with older revisions, and verify database integrity rather than relying exclusively on traffic rollback when schema mutations have executed.
+</details>
+
+**Card D: Setting concurrency to 80 is always cheaper and cannot hurt a downstream database.** To minimize Cloud Run compute costs, a backend team increases container concurrency from 10 to 80 on an order-processing service. Each incoming HTTP request initiates a dedicated synchronous transaction against a PostgreSQL database without using a shared connection pool. The team observes that baseline instance count decreases during steady-state testing. Satisfied with the reduced Cloud Run resource footprint, the team deploys the setting to production ahead of a high-volume flash sale campaign.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: serverless concurrency multiplexing versus backend connection pool exhaustion. Next action: size container concurrency according to downstream database connection limits, enforce application-level connection pooling or proxying with Cloud SQL Auth Proxy, and cap maximum instances to prevent sudden connection storms from overwhelming the database.
+</details>
+
+**Success Criteria**:
 
 - [ ] The container image is stored in Artifact Registry with a visible tag.
 - [ ] The Cloud Run service is reachable over HTTPS and returns an application response.
