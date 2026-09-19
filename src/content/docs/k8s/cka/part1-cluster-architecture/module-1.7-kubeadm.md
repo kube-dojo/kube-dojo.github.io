@@ -82,7 +82,18 @@ The sequence above gives you a reliable troubleshooting order. If `kubeadm init`
 
 kubeadm also has deliberate non-goals, and those non-goals are exam-relevant. It does not install containerd, kubelet, kubeadm, or kubectl for you. It does not install a CNI plugin during `init`, because CNI choice depends on the networking model you want. It does not build an external load balancer for an HA control plane, because that belongs to your infrastructure layer. It can help add extra control-plane nodes, but a production HA design still needs a stable endpoint in front of the API servers.
 
-Before running kubeadm on a fresh host, treat prerequisites as part of the bootstrap plan rather than as a footnote. A missing container runtime socket, enabled swap, duplicate host identity, or blocked API server port causes failures that look like "Kubernetes is broken" when the real problem is the node preparation contract. Pause and predict: if kubelet is installed but the container runtime is stopped, which step in the diagram can still complete, and which step must fail when kubelet tries to start static pod containers?
+Before running kubeadm on a fresh host, treat prerequisites as part of the bootstrap plan rather than as a footnote. A missing container runtime socket, enabled swap, duplicate host identity, or blocked API server port causes failures that look like "Kubernetes is broken" when the real problem is the node preparation contract.
+
+**Pause and predict:** if kubelet is installed but the container runtime is stopped, which bootstrap step can still complete, and which must fail when kubelet tries to start static pod containers?
+
+<details>
+<summary>Check your prediction</summary>
+
+The preflight phase can render local certificates, kubeconfig files, and static pod manifests onto the host filesystem. However, control plane bootstrap stalls completely when kubelet cannot communicate with the container runtime endpoint to create the underlying static pod sandboxes.
+
+</details>
+
+Verifying node preparation and runtime socket availability before running bootstrap commands prevents diagnosing control plane failures that stem entirely from missing underlying host services.
 
 ```bash
 # Required on ALL nodes:
@@ -274,7 +285,18 @@ ls /etc/kubernetes/manifests/
 # kube-scheduler.yaml
 ```
 
-The API server shows mirror pods for visibility, but it does not own the source of truth for static pods. If you delete the mirror pod with `kubectl`, kubelet notices that the manifest file still exists and recreates the mirror pod object in the API. The underlying container is NOT restarted by this — kubelet does not remove the manifest, so the static pod process keeps running uninterrupted. This is a classic CKA gotcha: deleting a mirror pod with `kubectl` does not restart a stuck control-plane component, because the API operation never reaches the runtime. That behavior is surprising only if you assume every pod seen through the API is controlled through the API. Pause and predict: if you run `kubectl delete pod kube-apiserver-controlplane -n kube-system`, what changes (and what does not) at the container-runtime level, and what file decides the answer?
+The API server shows mirror pods for visibility, but it does not own the source of truth for static pods. If you delete the mirror pod with `kubectl`, kubelet notices that the manifest file still exists and recreates the mirror pod object in the API. The underlying container is NOT restarted by this — kubelet does not remove the manifest, so the static pod process keeps running uninterrupted. This is a classic CKA gotcha: deleting a mirror pod with `kubectl` does not restart a stuck control-plane component, because the API operation never reaches the runtime. That behavior is surprising only if you assume every pod seen through the API is controlled through the API.
+
+**Pause and predict:** if you run `kubectl delete pod kube-apiserver-controlplane -n kube-system`, what changes (and what does not) at the container-runtime level, and what file decides?
+
+<details>
+<summary>Check your prediction</summary>
+
+The mirror Pod object in the API server vanishes and is promptly recreated by kubelet, but the underlying container process running inside the container runtime does not restart. The host manifest file `/etc/kubernetes/manifests/kube-apiserver.yaml` remains the durable source of truth governing the running control plane process.
+
+</details>
+
+Understanding that runtime process lifecycles remain decoupled from API mirror objects prevents operators from attempting ineffective control plane restarts during critical cluster outages.
 
 ```text
 ┌────────────────────────────────────────────────────────────────┐
@@ -442,7 +464,18 @@ kubectl get nodes -o wide
 kubectl describe node <node-name>
 ```
 
-Good node diagnosis starts by separating desired scheduling state from health state. A node can be `Ready,SchedulingDisabled`, which means kubelet is healthy but the scheduler is not allowed to place new pods there. A node can be `NotReady`, which means the control plane has not received healthy status from kubelet or related components. Those states imply different next moves. Stop and think: if you only cordon a node before kernel maintenance, what risk remains that drain would have handled?
+Good node diagnosis starts by separating desired scheduling state from health state. A node can be `Ready,SchedulingDisabled`, which means kubelet is healthy but the scheduler is not allowed to place new pods there. A node can be `NotReady`, which means the control plane has not received healthy status from kubelet or related components. Those states imply different next moves.
+
+**Pause and predict:** if you only cordon a node before kernel maintenance, what risk remains that drain would have handled?
+
+<details>
+<summary>Check your prediction</summary>
+
+Existing workloads continue running on the node because cordon only blocks new pod scheduling. When the host reboots for kernel updates, those unevicted pods terminate abruptly rather than being gracefully evicted and rescheduled onto healthy nodes.
+
+</details>
+
+Enforcing eviction workflows before initiating disruptive node maintenance ensures application availability contracts and graceful termination budgets are fully respected across the cluster.
 
 ```bash
 # Drain node (evict pods, mark unschedulable)
@@ -1087,7 +1120,43 @@ kubectl delete deployment maint-test
 
 </details>
 
-### Success Criteria
+**Card A: `kubeadm init` also installs a CNI plugin.** An engineer runs `kubeadm init` on a fresh virtual machine, observes that the control plane components start up, and immediately deploys customer applications. When CoreDNS and workload pods remain indefinitely in the `Pending` or `ContainerCreating` status, they assume the cluster scheduler or API server has encountered an internal software bug. They spend hours investigating control plane logs and restarting system services without realizing the cluster still lacks a networking provider.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming cluster bootstrapping tools provision Pod network plugins automatically. Next action: apply an appropriate CNI plugin manifest such as Calico, Flannel, or Cilium and confirm that node status transitions to Ready.
+
+</details>
+
+**Card B: Deleting the API server Pod in kube-system restarts a stuck control plane.** An operator notices that the API server is responding slowly and attempts to restart it by executing `kubectl delete pod kube-apiserver-controlplane -n kube-system`. When the command completes and a new pod immediately appears in the output, they assume the control plane binary process was fully recycled and reloaded its flags. They conclude the troubleshooting step is finished, unaware that the underlying container runtime never restarted the static pod process.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mistaking an API server mirror pod deletion for a host-level static pod container restart. Next action: modify or touch the static pod manifest in `/etc/kubernetes/manifests/kube-apiserver.yaml` or restart the local container process directly through the container runtime using `crictl`.
+
+</details>
+
+**Card C: Cordon is enough before kernel maintenance.** A system administrator prepares a worker node for operating system kernel patching by marking it unschedulable with `kubectl cordon`. Because the node status shows `SchedulingDisabled`, they assume the machine is completely safe to reboot without interrupting existing platform traffic. They proceed immediately with the host reboot, accidentally severing active user connections and causing unhandled downtime for unevicted workloads.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing scheduling prevention with workload eviction and graceful shutdown. Next action: execute `kubectl drain <node> --ignore-daemonsets` to gracefully evict running pods to other nodes before powering down or rebooting the host.
+
+</details>
+
+**Card D: `kubeadm reset` is the first fix for a failed join.** A junior engineer encounters a certificate verification error while joining a new worker node to an existing cluster and immediately executes `kubeadm reset -f`. Convinced that clearing the node state is the fastest way to resolve any bootstrapping mismatch, they rerun the command without diagnosing why the bootstrap token failed validation. They repeat this cycle multiple times, destroying local diagnostic logs and missing an expired join token or an incorrect discovery token hash.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating destructive state teardown as a substitute for root-cause diagnosis. Next action: inspect join logs, verify the control plane endpoint and firewall rules, check token validity with `kubeadm token list`, and regenerate a fresh join token if necessary before resetting node state.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Design a kubeadm bootstrap sequence that includes preflight checks, `kubeadm init`, kubeconfig setup, CNI installation, and worker join tokens.
 - [ ] Diagnose static pod and kubelet failures with `/etc/kubernetes/manifests/`, `journalctl`, `crictl`, and local control-plane logs.
