@@ -56,9 +56,16 @@ The diagram is deliberately simple because the cultural difference is simple. Mo
 
 This difference matters most under stress. During a severe incident, people do not become more patient, more precise, or more willing to read ambiguous dashboards. They need telemetry that reduces choices. Good observability tells the responder where the user pain is, how quickly it is growing, which dependency path is involved, and what evidence supports the next action. It also helps after the incident, because the same data explains whether the fix actually restored service.
 
-Pause and predict: a web application's Prometheus metrics show a stable memory gauge, but users see intermittent connection drops and `kube_pod_status_phase` suggests pods are restarting. If the pod is killed for memory pressure between scrapes, the gauge may never show the peak. What signal would you add to avoid missing that failure next time, and why would it complement the metric instead of replacing it?
+**Pause and predict:** a web application's Prometheus metrics show a stable memory gauge, but users see intermittent connection drops and `kube_pod_status_phase` suggests pods are restarting. If the pod is killed for memory pressure between scrapes, the gauge may never show the peak. What signal would you add to avoid missing that failure next time, and why would it complement the metric instead of replacing it?
+
+<details>
+<summary>Check your prediction</summary>
 
 The practical answer is to add Kubernetes events, restart counters, and application logs that record shutdown context. Metrics are sampled, so they can miss fast spikes when the scrape interval is wider than the failure. Events and logs are discrete records, so they preserve the fact that the kubelet killed a container even if the resource graph looks calm. The lesson is not that metrics are weak; it is that every signal has a shape, and observability comes from combining shapes intelligently.
+
+</details>
+
+Each telemetry shape answers a different question, and the next section names the three classic shapes before any one of them is treated as the whole investigation.
 
 ```bash
 # Confirm the client and server are available before starting the lab.
@@ -104,7 +111,16 @@ Traces are the system's map because they show how one request moved through the 
 
 The pillars become far more powerful when they share labels and identifiers. If a Prometheus graph shows error rate rising for `service=checkout`, the trace backend should let you filter by the same service, and the log backend should contain `trace_id` fields for the failing requests. Without shared metadata, every tool becomes a separate island. With shared metadata, the responder can follow evidence in the same way a doctor moves from a vital sign to a scan to a lab result.
 
-Which approach would you choose here and why: logging every HTTP request body so you never miss detail, or emitting a request counter plus structured logs for errors and sampled slow requests? The second design is usually better because it separates measurement from diagnosis. Counters are cheap enough for every request, while logs stay focused on the events where their detail is actually needed. The first design feels safe until storage cost, privacy exposure, and query latency make the telemetry system harder to operate than the application.
+**Pause and predict:** which approach would you choose here and why: logging every HTTP request body so you never miss detail, or emitting a request counter plus structured logs for errors and sampled slow requests?
+
+<details>
+<summary>Check your prediction</summary>
+
+The second design is usually better because it separates measurement from diagnosis. Counters are cheap enough for every request, while logs stay focused on the events where their detail is actually needed. The first design feels safe until storage cost, privacy exposure, and query latency make the telemetry system harder to operate than the application.
+
+</details>
+
+The next section turns measurement into Prometheus types, because the math you are allowed to run later depends on whether the number was a counter, a gauge, or a histogram.
 
 ## Metrics With Prometheus
 
@@ -221,7 +237,16 @@ Events are adjacent to logs but not the same thing. Kubernetes events describe c
 
 The most useful logging architecture enriches records at collection time. A collector can add namespace, pod, container, node, labels, annotations, and cluster name before shipping logs to storage. That enrichment lets responders ask operational questions even when application code forgot to include the right fields. The application should still emit `trace_id`, request route, and domain context, because collectors cannot infer business meaning from stdout alone.
 
-Before running this in a real cluster, what output do you expect from `kubectl logs --previous` when a pod has never restarted? You should expect Kubernetes to report that no previous terminated container exists. That answer is useful because it tells you the failure is probably not hidden in an earlier container instance. If the pod has restarted, previous logs become the first place to look for startup exceptions, failed migrations, missing environment variables, or dependency timeouts.
+**Pause and predict:** before running this in a real cluster, what output do you expect from `kubectl logs --previous` when a pod has never restarted?
+
+<details>
+<summary>Check your prediction</summary>
+
+You should expect Kubernetes to report that no previous terminated container exists. That answer is useful because it tells you the failure is probably not hidden in an earlier container instance. If the pod has restarted, previous logs become the first place to look for startup exceptions, failed migrations, missing environment variables, or dependency timeouts.
+
+</details>
+
+The next section leaves a single container and follows one request across services, where the missing piece is a link between hops rather than one pod's last exit.
 
 ## Traces, Context Propagation, and OpenTelemetry
 
@@ -265,7 +290,16 @@ OpenTelemetry reduces lock-in by standardizing how applications create and expor
 
 Tracing also forces teams to think about sampling. Capturing every trace in a low-volume internal service may be fine, but capturing every trace in a high-frequency path can overwhelm the network and backend. Head-based sampling decides early whether to keep a trace, which is simple and cheap but may drop rare failures. Tail-based sampling waits until more of the trace is known, then keeps errors or slow requests, which is operationally richer but requires buffering and collector capacity.
 
-Stop and think: you are designing telemetry for a trading platform where individual operations are processed in microseconds. If you enable full trace retention for every transaction, the telemetry pipeline may become a meaningful part of latency and cost. A better design might sample ordinary successful requests, always keep failed or unusually slow traces, and run the collector close to the workload so span export does not sit on the critical path.
+**Pause and predict:** you are designing telemetry for a trading platform where individual operations are processed in microseconds. If you enable full trace retention for every transaction, the telemetry pipeline may become a meaningful part of latency and cost. What would you keep, what would you sample, and where should the collector run?
+
+<details>
+<summary>Check your prediction</summary>
+
+A better design might sample ordinary successful requests, always keep failed or unusually slow traces, and run the collector close to the workload so span export does not sit on the critical path.
+
+</details>
+
+The next paragraphs connect a slow span to the log line that shares its identifier, which is a different decision from how much of the trace stream you choose to retain.
 
 The most valuable traces are not isolated screenshots; they are connected evidence. If application logs include the same `trace_id`, an engineer can move from the slow span to the exact exception record for that request. If metric exemplars link a latency bucket to representative traces, a dashboard can become the starting point for investigation rather than the end of it. The goal is not to admire traces; the goal is to reduce the distance between symptom and cause.
 
@@ -624,6 +658,42 @@ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.ph
 kubectl delete deployment web
 kubectl delete service web
 ```
+</details>
+
+**Card A: A flat memory gauge means the pod was never killed.** The graph stays calm across the scrape window. Users still report dropped connections, and `kube_pod_status_phase` has been changing. The on-call closes the incident because the memory number never peaked, and they treat that panel as proof the kubelet did not intervene.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: a sampled gauge versus a discrete kill record. Next action: add restart counters, Kubernetes events, and shutdown logs. Keep the gauge, and pair it with records a scrape interval can miss.
+
+</details>
+
+**Card B: Logging every request body is the only safe design.** The team is afraid of missing a single field during the next incident, so every HTTP body is stored in the log backend. Request counters are treated as optional decoration. Privacy review and query latency are left for a later quarter, after the archive is already full.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: diagnosis stored as if it were measurement. Next action: count every request, and keep structured logs for errors and sampled slow requests. Do not archive every body to feel safe.
+
+</details>
+
+**Card C: `kubectl logs --previous` always holds the crash.** The pod is running and has never restarted. The symptom is still happening. The on-call runs the previous-container flag first and expects the exception that explains the current process, because that flag worked on the last crash loop they debugged.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: looking in a container instance that does not exist. Next action: read the message that no previous terminated container exists, then inspect the current logs and events.
+
+</details>
+
+**Card D: Every microsecond trade must be fully traced.** The platform processes operations so quickly that a slow export is visible to users. The plan is to retain every span forever and to export those spans on the same path as the trade, so no failure can be missing from the backend the next morning.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: retention and export cost on the critical path. Next action: sample ordinary successes, always keep failed or unusually slow traces, and run the collector beside the workload.
+
 </details>
 
 **Success criteria checklist**:
