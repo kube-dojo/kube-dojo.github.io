@@ -54,7 +54,13 @@ The architecture relies heavily on containerization. Every single step in your b
 
 A critical design feature of Cloud Build is the `/workspace` volume. Because each step runs in an entirely separate Docker container, you might assume that files generated in Step 1 would be lost before Step 2 begins. However, Cloud Build automatically mounts a shared network volume at `/workspace` into every container that participates in the build. The source code is initially cloned into this directory. When Step 1 compiles a binary or downloads node modules, those files reside on the `/workspace` volume. When Step 1 terminates and Step 2 spins up in a completely different container image (perhaps switching from a Java compilation image to a Docker build image), it mounts that exact same `/workspace` directory, inheriting all the compiled artifacts seamlessly.
 
-> **Pause and predict**: Cloud Build executes each step in a brand new, ephemeral Docker container. If Step 1 installs a custom software package globally using `apt-get install`, will Step 2 be able to use that software? Why or why not?
+**Pause and predict:** Cloud Build executes each step in an ephemeral Docker container. If Step 1 installs a custom software package globally using `apt-get install`, will Step 2 be able to use that software?
+
+<details>
+<summary>Check your prediction</summary>
+
+No, Step 2 cannot access packages installed during Step 1. Cloud Build provisions a separate container for each build step. Any modifications made by `apt-get install` alter only that individual container's ephemeral root filesystem, which is discarded when the step finishes. Cross-step persistence is strictly limited to the shared `/workspace` volume, meaning tools must be copied to `/workspace` or built into a custom builder image.
+</details>
 
 ### Key Concepts
 
@@ -134,7 +140,13 @@ To make your `cloudbuild.yaml` dynamic and reusable across different environment
 
 Utilizing these variables prevents hardcoding environment-specific values. For instance, using `$PROJECT_ID` allows the exact same `cloudbuild.yaml` file to be tested in a developer sandbox project and subsequently run in a production project without requiring any modifications to the file itself. 
 
-> **Stop and think**: You are using `$BRANCH_NAME` as part of your Docker image tag. If two developers commit to the same branch simultaneously, what race condition might occur in Artifact Registry, and how could using `$COMMIT_SHA` solve it?
+**Pause and predict:** You configure `$BRANCH_NAME` as part of your container image tag in Artifact Registry. If two developers push changes to the same branch concurrently, what race condition occurs during image tagging?
+
+<details>
+<summary>Check your prediction</summary>
+
+Two concurrent commits on the same branch race to push to the identical image tag, allowing one build to overwrite the other unpredictably in Artifact Registry. In contrast, tagging with `$COMMIT_SHA` provides a globally unique, immutable identifier for every commit that guarantees build artifacts are never overwritten.
+</details>
 
 ### Custom Substitutions
 
@@ -244,11 +256,17 @@ steps:
 
 In this example, we pull official images directly from Docker Hub (like `hashicorp/terraform` or `aquasec/trivy`). The `entrypoint` directive overrides the container's default startup command, allowing us to explicitly call the desired binary. 
 
-> **Pause and predict**: You need to run a proprietary, custom-built testing binary in your pipeline, but Google doesn't provide a builder image for it. What is the most efficient way to make this tool available to your Cloud Build steps?
+**Pause and predict:** You need to run a proprietary, custom-built testing binary in your pipeline, but Google does not provide an official builder image for it. How should you make this tool available to your Cloud Build steps?
+
+<details>
+<summary>Check your prediction</summary>
+
+Bake the proprietary binary into a custom builder container image stored in your private Artifact Registry, or copy the compiled binary directly into `/workspace` during an initial setup step. Packaging tools into a private container image guarantees reproducible execution without repeating binary downloads on every build run.
+</details>
 
 ### Creating Custom Builders
 
-While downloading public images is convenient, doing so heavily relies on the external registry's uptime and exposes your pipeline to potential upstream supply chain attacks if the public image is compromised. For enterprise-grade pipelines, the best practice is to construct custom builder images containing the precise, verified toolchain your organization requires, and store those images in your own private Artifact Registry.
+While downloading public images is convenient, doing so heavily relies on the external registry's uptime and exposes your pipeline to potential upstream supply chain attacks if the public image is compromised. To guarantee deterministic execution and security compliance, enterprise pipelines isolate build environments within dedicated container images managed directly in Artifact Registry.
 
 ```bash
 # Build and push a custom builder image
@@ -394,9 +412,15 @@ steps:
     args: ['push', 'my-image:$SHORT_SHA']
 ```
 
-In this optimized configuration, the Docker build, the Python unit tests, and the Ruff linting checks all launch simultaneously across separate containers. The final `push` step acts as the convergence point. It will idle in a pending state until all three preceding steps complete successfully. If the linting step fails rapidly, the pipeline will still abort, but by parallelizing the execution, the total pipeline duration is reduced to the time of the single longest running step, rather than the sum of all steps.
+In this optimized configuration, the Docker build, the Python unit tests, and the Ruff linting checks all launch simultaneously across separate containers. The final `push` step acts as the convergence point, remaining in a pending state until all preceding parallel steps complete successfully. If any individual step fails during execution, the coordinator aborts the downstream workflow immediately.
 
-> **Pause and predict**: If your unit tests take 5 minutes, linting takes 2 minutes, and building the image takes 4 minutes, what is the absolute minimum time your pipeline could take if you configure these steps to run in parallel using `waitFor: ['-']`?
+**Pause and predict:** If your unit tests take 5 minutes, linting takes 2 minutes, and building the image takes 4 minutes, what is the absolute minimum time your pipeline could take if you configure these steps to run in parallel using `waitFor: ['-']`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The minimum time is 5 minutes, determined by max(5, 2, 4). When steps run concurrently using `waitFor: ['-']`, the elapsed duration is governed by the single longest-running step rather than the 11-minute sequential sum of all steps.
+</details>
 
 ## Build Triggers
 
@@ -632,7 +656,13 @@ Cloud Deploy introduces a distinct ontological model. You define a **Delivery Pi
 
 ### Setting Up a Delivery Pipeline
 
-> **Stop and think**: In a multi-stage delivery pipeline, you notice that deployments to `prod` are causing a bottleneck because the QA team is overwhelmed with manual approvals. How could you leverage Cloud Deploy's `strategy.canary` feature (which automates traffic splitting and verification) to reduce the risk of production deployments and potentially reduce the reliance on human approval gates?
+**Pause and predict:** In a multi-stage delivery pipeline, you notice that deployments to `prod` are causing a bottleneck because the QA team is overwhelmed with manual approvals. How could you leverage Cloud Deploy's `strategy.canary` feature to reduce the risk of production deployments and potentially reduce the reliance on human approval gates?
+
+<details>
+<summary>Check your prediction</summary>
+
+Configuring a canary deployment strategy automates progressive traffic shifting and verification phases across release targets. By routing small percentages of production traffic while evaluating system health metrics, canary deployments isolate blast radius and allow teams to reduce manual human gates on routine rollouts.
+</details>
 
 A Cloud Deploy pipeline is defined using Kubernetes Resource Model (KRM) YAML syntax. The configuration distinctly separates the overarching pipeline definition from the individual environment targets. 
 
@@ -1296,7 +1326,39 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+**Card A: Step 2 can use packages `apt-get install`’d in Step 1 because `/workspace` is shared.** An engineer installs debugging utilities via `apt-get` in an initial build container. The team expects subsequent steps to execute those binaries because Cloud Build automatically mounts `/workspace` across all steps.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: container root filesystem isolation versus shared volume persistence. Next action: bake required binaries into a custom builder image stored in Artifact Registry or copy compiled tools directly into the `/workspace` directory.
+</details>
+
+**Card B: Tagging images with `$BRANCH_NAME` is unique per build and cannot be overwritten.** A development team tags generated container artifacts with `$BRANCH_NAME` during CI runs. Engineers expect each build execution to maintain an isolated, immutable release history in Artifact Registry.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mutable branch namespace tagging versus immutable commit identification. Next action: tag container images using `$COMMIT_SHA` to guarantee unique artifacts per build, reserving branch tags exclusively for floating development pointers.
+</details>
+
+**Card C: Parallel `waitFor: ['-']` for 5+2+4 minute steps makes the pipeline take 11 minutes.** A DevOps architect calculates pipeline execution duration by summing the runtimes of individual tasks. The pipeline configures parallel testing, linting, and container build steps using `waitFor: ['-']`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: sequential aggregation assumptions versus concurrent execution ceilings. Next action: determine pipeline duration using `max(step_durations)` and focus latency optimization efforts on the single longest-running parallel step.
+</details>
+
+**Card D: A proprietary test binary must be `apt-get install`’d in every Cloud Build step; custom builders are not allowed.** A team executes package installation commands inside every step container. Engineers believe Cloud Build restricts execution environments strictly to Google-managed public builder images.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: builder runtime constraints versus private custom builder support. Next action: package proprietary binaries into a custom builder container image in Artifact Registry and reference its image path in the `name` field of build steps.
+</details>
+
+**Success Criteria**:
 
 - [ ] Application with tests created locally securely using standardized frameworks
 - [ ] `cloudbuild.yaml` with explicit test, build, push, and deploy steps fully implemented
