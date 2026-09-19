@@ -44,7 +44,16 @@ Continuous Delivery builds on that foundation by producing a validated, versione
 
 Continuous Deployment removes that final human approval. If a change passes all automated gates, the system promotes it to production. This is powerful, but it is not a badge a team earns by deleting an approval button. It requires tests that catch real failures, feature flags that limit exposure, metrics that detect customer impact quickly, and rollback automation that can act faster than a meeting can be scheduled. Without those controls, Continuous Deployment simply accelerates mistakes.
 
-> **Pause and predict:** if a team moves from Continuous Delivery to Continuous Deployment, which system becomes more important than the deploy button: the test suite, the observability stack, or rollback automation? The practical answer is that all three become one safety system, because a fully automated release path needs automated evidence before, during, and after the rollout.
+**Pause and predict:** If a team moves from Continuous Delivery to Continuous Deployment, which system becomes more important than the deploy button: the test suite, the observability stack, or rollback automation?
+
+<details>
+<summary>Check your prediction</summary>
+
+The practical answer is that all three become one safety system, because a fully automated release path needs automated evidence before, during, and after the rollout.
+
+</details>
+
+Write which system you would trust before you continue. The next paragraphs contrast a manual Friday deploy with an automated one. They do not pick among those three systems.
 
 Consider two release scenarios. In the first, a developer merges to `main`, the code compiles, tests run, and a Docker image is pushed to a registry, but the operations team later SSHes into a host and manually pulls the tag on Friday evening. That team has CI, not delivery, because the deployment path still depends on human memory. In the second, the pipeline builds the image, deploys it to QA, waits for a reviewer to approve the production environment, and then performs the deployment automatically. That is Continuous Delivery because the release decision is manual while the mechanics are automated.
 
@@ -109,7 +118,16 @@ The same chain also helps teams improve without blaming whoever happened to clic
 
 This worked example shows why a pipeline is not just a set of commands in YAML. It is a sequence of claims: this source merged cleanly, this artifact was built once, this artifact passed checks, this artifact was promoted intentionally, and this deployment behaved acceptably under real conditions. If any claim is missing, the pipeline may still be automated, but it is not yet trustworthy. The engineering task is to make those claims explicit and cheap enough that every change can carry them.
 
-> **Before running this in a real project, predict the failure mode:** what do you expect if an integration test uses one image digest, but the deployment manifest points to a tag that was rebuilt later? The likely result is a confusing incident where every pipeline check appears green while production behaves differently, because the tested artifact and deployed artifact are no longer the same object.
+**Pause and predict:** Before running this in a real project, what do you expect if an integration test uses one image digest, but the deployment manifest points to a tag that was rebuilt later?
+
+<details>
+<summary>Check your prediction</summary>
+
+The likely result is a confusing incident where every pipeline check appears green while production behaves differently, because the tested artifact and deployed artifact are no longer the same object.
+
+</details>
+
+Write the failure mode before you continue. The next section is infrastructure changes in the same pipeline. It does not describe this image mismatch.
 
 ## Infrastructure as Code in the Pipeline
 
@@ -173,7 +191,16 @@ GitHub Actions is often the fastest path for teams already using GitHub because 
 
 Tekton changes the mental model by making pipeline definitions Kubernetes resources. A `PipelineRun` creates Pods for tasks, those Pods can use cluster scheduling and autoscaling, and GitOps tools can manage the pipeline resources like any other manifest. That is elegant for platform teams standardizing on Kubernetes, but it is verbose for a small static site or a simple library package. If your team cannot explain Kubernetes RBAC, Pod scheduling, storage workspaces, and controller reconciliation, Tekton may move complexity from the CI dashboard into the cluster without reducing it.
 
-> **Which approach would you choose here and why?** A startup runs every workload on Kubernetes, wants CI jobs to scale with cluster capacity, and already manages platform resources through GitOps. Tekton is architecturally aligned because it treats pipelines as Kubernetes objects, but GitHub Actions might still be the pragmatic first step if the team needs a working path this week and lacks platform engineering capacity.
+**Pause and predict:** Which approach would you choose here and why? A startup runs every workload on Kubernetes, wants CI jobs to scale with cluster capacity, and already manages platform resources through GitOps. They also need something that can ship this week, and they do not yet have a platform engineering team.
+
+<details>
+<summary>Check your prediction</summary>
+
+Tekton is architecturally aligned because it treats pipelines as Kubernetes objects, but GitHub Actions might still be the pragmatic first step if the team needs a working path this week and lacks platform engineering capacity.
+
+</details>
+
+Write the engine before you continue. The next section is about how a rollout proves itself. It does not choose this team's CI engine.
 
 ## Deployment Strategies via Pipelines
 
@@ -196,7 +223,16 @@ Canary deployment gradually exposes the new version to a small percentage of tra
 
 Shadow deployment, sometimes called dark launching, duplicates production traffic to the new version while returning only the old version's response to users. It is excellent for read-heavy services, search behavior, and performance testing under real load. It is dangerous for code paths that mutate state, send emails, charge cards, or write analytics events, because duplicated traffic can create duplicated side effects. A safe shadow pipeline needs strict controls that prevent the shadow service from writing to production systems.
 
-> **Stop and think:** why might a team choose a slower canary deployment over a near-instant blue-green switch? The answer is evidence. Blue-green proves the new version can start and pass checks before traffic moves; canary proves the new version behaves acceptably under a controlled slice of real user behavior before everyone receives it.
+**Pause and predict:** Why might a team choose a slower canary deployment over a near-instant blue-green switch?
+
+<details>
+<summary>Check your prediction</summary>
+
+The answer is evidence. Blue-green proves the new version can start and pass checks before traffic moves; canary proves the new version behaves acceptably under a controlled slice of real user behavior before everyone receives it.
+
+</details>
+
+Write the evidence each strategy collects before you continue. The next section is a pattern catalog. It does not choose canary or blue-green for this team.
 
 ## Patterns & Anti-Patterns
 
@@ -606,6 +642,42 @@ jobs:
 ```
 
 If a slow install, hung test, or stalled scan takes longer than 15 minutes, GitHub Actions cancels the job, fails the pipeline with a clear error, and frees the runner for other work.
+</details>
+
+**Card A: Only the test suite matters once deploys are automatic.** The team removed the deploy button. Rollback and observability are treated as later projects. The suite is green, so production is considered safe.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: one gate instead of a safety system. Next action: require evidence before the rollout, during it, and after it. Tests, signals, and rollback are one system once nobody is pressing deploy.
+
+</details>
+
+**Card B: A rebuilt tag is the tested digest.** CI tested image digest `sha256:abc`. The manifest deploys `app:1.4`, and that tag was rebuilt after the test. The pipeline is green, so production is expected to match the test.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: artifact identity. Next action: deploy the digest that was tested. A tag that moved is a different object, and a green pipeline does not make them the same.
+
+</details>
+
+**Card C: Tekton is required this week.** The startup runs on Kubernetes and wants cluster-scaled CI. They have no platform team and need a working path before Friday. The plan is to block on Tekton because it is the aligned design.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: architecture versus capacity. Next action: GitHub Actions can be the pragmatic first path. Move to Tekton when the team can operate pipelines as cluster objects.
+
+</details>
+
+**Card D: Blue-green already proved real-user behavior.** The new version started and passed checks, then all traffic moved. The team treats that as the same evidence a canary would have collected.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: startup checks versus a slice of real traffic. Next action: use a canary when you need to watch real behavior before everyone receives the version. Blue-green does not collect that slice.
+
 </details>
 
 ### Success Criteria
