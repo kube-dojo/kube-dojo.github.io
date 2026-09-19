@@ -367,7 +367,7 @@ graph LR
 Many Eventarc paths wait on Audit Logs write/export, so trigger latency is higher and less predictable than a direct GCS finalize notification.
 </details>
 
-The following commands illustrate creating Eventarc triggers using the Google Cloud CLI for audit log events and Pub/Sub transport streams.
+The next object is the Eventarc trigger CLI. After it, Pub/Sub and audit-log filters are how you name the event you actually wanted.
 
 ### Creating Eventarc Triggers
 
@@ -619,7 +619,7 @@ Event-driven systems fail in predictable ways: transient downstream outages, poi
 HTTP does not auto-retry (caller must); Eventarc retries up to 24 hours; Pub/Sub/GCS depend on subscription and function retry settings.
 </details>
 
-The following comparison matrix outlines standard platform retry lifecycles and configuration toggles across primary Cloud Functions invocation sources and event routers.
+The next object is the retry comparison table. After it, poison-message handling and DLQ alerting are runbook choices rather than a single console default.
 
 | Trigger Type | Default Retry | Configurable |
 | :--- | :--- | :--- |
@@ -657,7 +657,7 @@ Side effects that cannot be rolled back—charging money, shipping physical good
 Durable store with a uniqueness constraint (table or `gs://bucket/object/generation`); retention ≥ retry window plus replay horizon; logs-only is not a store.
 </details>
 
-The following Python implementation contrasts a naive non-idempotent handler against a defensive implementation that records incoming event metadata before executing state mutations.
+The next object is the Python sample pair. After those snippets, the module continues into logs, metrics, and traces for event-driven handlers.
 
 ```python
 # BAD: Not idempotent (counter increments on every retry)
