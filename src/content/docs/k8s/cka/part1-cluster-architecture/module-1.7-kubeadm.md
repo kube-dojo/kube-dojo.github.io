@@ -296,7 +296,7 @@ The mirror Pod object in the API server vanishes and is promptly recreated by ku
 
 </details>
 
-Understanding that runtime process lifecycles remain decoupled from API mirror objects prevents operators from attempting ineffective control plane restarts during critical cluster outages.
+The next command after a control-plane symptom has to match the layer that actually owns restart, otherwise the outage clock keeps running while kubectl reports success.
 
 ```text
 ┌────────────────────────────────────────────────────────────────┐
