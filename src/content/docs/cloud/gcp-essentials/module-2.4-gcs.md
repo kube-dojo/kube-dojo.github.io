@@ -152,7 +152,7 @@ When RPO requirements exceed what object replication provides—point-in-time da
 Autoclass fights compliance class-locks and still bills management fees on tiny objects that never tier. Specifically, regulatory policies requiring objects to remain in a fixed class such as Nearline for ninety days conflict with Autoclass dynamic shifting, and buckets holding billions of sub-128 KiB objects incur per-object management fees without ever transitioning. In those scenarios, calendar-driven lifecycle rules or explicit class locks provide the auditor-stable path.
 </details>
 
-Evaluating access patterns and compliance obligations guides architectural storage decisions before selecting between automated tiering models and deterministic lifecycle rules. Aligning retrieval economics with organizational retention governance ensures that cloud storage configurations remain predictable and cost-effective.
+Evaluating access patterns and compliance obligations belongs in the design review before you pick a default storage class. The next section is the class menu itself: duration, retrieval, and what you are billed for if you delete early.
 
 ## Storage Classes: Matching Cost to Access Patterns
 
@@ -221,7 +221,7 @@ Location type and class interact with availability SLAs documented in the [stora
 The live generation is five days old, so the age-based delete rule does not remove it. Meanwhile, the prior generation becomes noncurrent and remains billable until a separate lifecycle rule targeting `isLive: false` or `daysSinceNoncurrentTime` explicitly cleans it up. Without a dedicated noncurrent version rule, superseded object versions accumulate indefinitely and continue generating storage charges.
 </details>
 
-Reasoning through object state lifecycles requires distinguishing between active generation tracking and superseded object versions across automated evaluation passes. Declarative lifecycle policies must explicitly reflect both current and historical object requirements to maintain operational integrity.
+Reasoning through object state lifecycles is how you keep invoices from surprising you after a tidy-looking delete rule. Declarative lifecycle policies are the next control: predicates, actions, and how GCS evaluates them without a cron job in your cluster.
 
 ## Lifecycle Management
 
@@ -370,7 +370,7 @@ gcloud storage objects update gs://my-bucket/evidence.pdf \
 Split buckets per tenant with dedicated bucket-level IAM policies, configure IAM Conditions matching object name prefixes with audited service accounts, or keep objects private and serve them through an application that mints per-user signed URLs after identity authentication. Production architectures rely on centralized IAM and application authorization boundaries rather than legacy per-object ACLs.
 </details>
 
-Architecting multi-tenant object access requires evaluating security boundaries between cloud identity systems and application authentication layers. Selecting an appropriate authorization model ensures scalable tenant isolation while adhering to enterprise governance standards.
+Architecting multi-tenant object access is an identity-boundary problem, not a console toggle. The next section is how IAM, legacy ACLs, and request-time tokens actually compose on a download path.
 
 ## Access Control: IAM vs ACLs
 
@@ -443,7 +443,7 @@ gcloud storage buckets get-iam-policy gs://my-bucket \
 V4 signature TTL is a strict wall-clock expiration window rather than a measure of transfer progress, so the upload will fail if all bytes are not completely received before the URL expires. To resolve this, generate the signed URL with a longer TTL accommodating worst-case network bandwidth, implement resumable uploads that negotiate session URIs, or proxy the upload through an internal application service authenticated via a service account.
 </details>
 
-Designing robust direct-to-object ingestion pipelines requires balancing client network constraints against token credential lifetimes. Production workflows must account for payload size variations and transient latency before deploying time-limited authorization mechanisms.
+Designing robust direct-to-object ingestion pipelines is a client-and-bandwidth problem before it is a signing-flags problem. The next section is how signed URLs are minted, rotated, and treated as an API contract.
 
 ## Signed URLs: Time-Limited Access
 
