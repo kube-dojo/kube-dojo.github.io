@@ -28,7 +28,7 @@ After completing this module, you will be able to operate ECR as a production re
 
 ## Why This Module Matters
 
-In January 2024, a mid-stage fintech startup pushed a routine update to their payment processing service. The deployment succeeded. Five minutes later, their monitoring exploded. The application was crashing on startup, throwing cryptic "exec format error" messages. The previous container image -- the one that worked -- had been overwritten because they were using the `latest` tag with mutable tagging enabled. Their CI pipeline had pushed an ARM64 image over the existing AMD64 image. No versioning. No immutability. No way to roll back except to rebuild from source, which took 22 minutes while their payment pipeline was down. Twenty-two minutes of lost transactions for a fintech company is the kind of thing that ends up in board meeting slides.
+Hypothetical scenario: In January 2024, a mid-stage fintech startup pushed a routine update to their payment processing service. The deployment succeeded. Five minutes later, their monitoring exploded. The application was crashing on startup, throwing cryptic "exec format error" messages. The previous container image -- the one that worked -- had been overwritten because they were using the `latest` tag with mutable tagging enabled. Their CI pipeline had pushed an ARM64 image over the existing AMD64 image. No versioning. No immutability. No way to roll back except to rebuild from source, which took 22 minutes while their payment pipeline was down. Twenty-two minutes of lost transactions for a fintech company is the kind of thing that ends up in board meeting slides.
 
 Container registries are one of those infrastructure components that seem boring until they break. They sit between your CI pipeline and your runtime environment, holding every version of every service your company runs. A misconfigured registry means you cannot deploy, cannot roll back, and cannot verify that what is running in production is what you think is running. AWS Elastic Container Registry (ECR) is Amazon's managed container registry, deeply integrated with ECS, EKS, Lambda, and the rest of the AWS ecosystem.
 
@@ -237,7 +237,14 @@ With immutability enabled, you are guaranteed that `v1.3.0` always refers to the
 | `latest` only | `latest` | Simple | No versioning, cannot roll back, dangerous |
 | Date-based | `2026-03-24-1432` | Chronological ordering | No semantic meaning |
 
-> **Stop and think**: Your CI pipeline successfully builds and pushes `myapp:latest` to a mutable ECR repository, overwriting the previous image. Five minutes later, the new code triggers a critical bug in production. You try to roll back by updating your ECS service to restart its tasks, hoping it pulls the old image. What will actually happen, and why is this an incident-response nightmare?
+**Pause and predict:** Your CI pipeline successfully builds and pushes `myapp:latest` to a mutable ECR repository, overwriting the previous image. Five minutes later, the new code triggers a critical bug in production. You try to roll back by updating your ECS service to restart its tasks, hoping it pulls the old image. What will actually happen, and why is this an incident-response nightmare?
+
+<details>
+<summary>Check your prediction</summary>
+
+Restarting the ECS service re-pulls the broken new image because `:latest` now points to the newly pushed digest. The previous container digest is untagged and permanently unreachable by tag unless operators still hold its raw SHA256 digest, forcing a slow emergency rebuild from source while the outage continues.
+
+</details>
 
 The recommended approach for production: **tag every image with both the semantic version and the Git SHA.** Use `latest` only as a convenience pointer that also gets applied alongside the versioned tag.
 
@@ -466,7 +473,14 @@ aws ecr put-lifecycle-policy \
   }'
 ```
 
-> **Pause and predict**: You have a policy with two rules. Rule 1 (Priority 1) keeps 5 images with the prefix `prod-`. Rule 2 (Priority 2) expires all untagged images older than 7 days. You push an image with the tag `prod-v2.0` and immediately remove the tag because it was a mistake. 10 days later, will this image be deleted? Consider how ECR evaluates rules against image digests and tags.
+**Pause and predict:** You have a policy with two rules. Rule 1 (Priority 1) keeps 5 images with the prefix `prod-`. Rule 2 (Priority 2) expires all untagged images older than 7 days. You push an image with the tag `prod-v2.0` and immediately remove the tag because it was a mistake. 10 days later, will this image be deleted? Consider how ECR evaluates rules against image digests and tags.
+
+<details>
+<summary>Check your prediction</summary>
+
+Yes, the image is deleted after 10 days. Once the tag is removed, the digest becomes untagged, so Rule 1 no longer evaluates it because Rule 1 only filters for tagged images with the `prod-` prefix. Rule 2 then processes the untagged digest and expires it because its push timestamp exceeds the 7-day retention limit.
+
+</details>
 
 ### Preview Before You Apply
 
@@ -622,9 +636,16 @@ By default, when your ECS tasks, EKS worker nodes, or EC2 instances pull images 
 
 For enhanced security and to reduce NAT Gateway costs, you can configure VPC Endpoints (AWS PrivateLink) for ECR so authentication and layer downloads stay on the AWS backbone instead of traversing the public internet through a NAT gateway. Private ECR access requires **two** interface endpoints in each VPC where tasks pull images: `com.amazonaws.region.ecr.api` for control-plane calls such as `DescribeRepositories`, and `com.amazonaws.region.ecr.dkr` for the Docker registry protocol that actually moves layers during `pull` and `push`.
 
-> **Pause and predict**: You configured both the ECR API and DKR VPC endpoints in your private subnet, routing all ECR traffic locally. However, when your ECS task attempts to start, it authenticates successfully but hangs while downloading the image layers. What crucial network path is missing?
+**Pause and predict:** You configured both the ECR API and DKR VPC endpoints in your private subnet, routing all ECR traffic locally. However, when your ECS task attempts to start, it authenticates successfully but hangs while downloading the image layers. What crucial network path is missing?
 
-Because ECR stores image layers in S3, you **must also create an S3 Gateway Endpoint** (`com.amazonaws.region.s3`) in your VPC routing table. When the Docker daemon pulls an image layer, ECR provides a pre-signed S3 URL, and the actual layer data flows through the S3 Gateway Endpoint.
+<details>
+<summary>Check your prediction</summary>
+
+An S3 Gateway Endpoint (`com.amazonaws.region.s3`) is missing from the subnet route table. Although authentication and manifest lookups route through the interface endpoints, ECR stores actual layer blobs in Amazon S3 buckets; container clients retrieve layers using pre-signed S3 URLs that require either public internet access or an in-VPC S3 Gateway Endpoint to complete downloads.
+
+</details>
+
+Provisioning PrivateLink interface endpoints requires binding dedicated elastic network interfaces directly to isolated subnets. Security groups must explicitly permit inbound HTTPS traffic on port 443 from container compute instances. Each interface endpoint assigns private IP addresses that route Docker daemon control requests across internal network backbones. Platform teams typically automate these endpoint associations with infrastructure code before launching private production workloads.
 
 ```bash
 # Example: Creating the ECR Docker endpoint (requires a security group that allows inbound HTTPS from your compute nodes)
@@ -1129,7 +1150,43 @@ echo "Cleanup complete"
 ```
 </details>
 
-### Success Criteria
+**Card A: Restarting ECS after overwriting `:latest` rolls back to the previous image.** An engineer pushes a faulty application build tagged `latest` to a mutable ECR repository. When the production service immediately starts throwing runtime errors, the engineer initiates an ECS service restart. They assume the container orchestrator automatically pulls the previously running image that served traffic before the update.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding mutable tag pointers and container runtime image resolution. Next action: pin task definition container definitions to immutable semantic version tags or immutable SHA256 digests, and implement an automated rollback strategy that switches task definitions to the previously verified digest rather than relying on moving tags.
+
+</details>
+
+**Card B: Untagging a `prod-` image immediately after push keeps it because Rule 1 already matched.** An engineer pushes an image tagged `prod-v2.0` to a repository. Rule 1 preserves five images with the `prod-` prefix, while Rule 2 expires untagged images after seven days. After deleting the tag, the engineer expects the image to remain protected permanently because Rule 1 evaluated the push.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming lifecycle policy evaluation is an event-driven snapshot rather than an ongoing evaluation of current image states. Next action: recognize that untagged digests immediately fall into the untagged rule category during subsequent lifecycle evaluations, and explicitly apply a long-term archival tag if an unreferenced digest must be preserved.
+
+</details>
+
+**Card C: ECR API and DKR VPC endpoints are enough for private layer downloads.** An architect deploys `ecr.api` and `ecr.dkr` interface endpoints in an isolated subnet lacking internet access. The architect verifies that both PrivateLink endpoints display available status before launching private ECS tasks. They assume compute nodes can retrieve and unpack complete container images without additional endpoints in the VPC.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: overlooking that ECR stores image layer blobs in Amazon S3 rather than inside the interface endpoint infrastructure itself. Next action: provision a free S3 Gateway Endpoint (`com.amazonaws.region.s3`) associated with the subnet route tables so compute instances can retrieve layer data blobs via pre-signed S3 URLs.
+
+</details>
+
+**Card D: Scan-on-push blocks ECS from launching images with HIGH findings.** A security team enables scan-on-push on all ECR repositories to identify container vulnerabilities automatically. Their deployment pipeline pushes images directly to ECR before initiating production service updates in ECS. The team assumes that ECR scanning automatically prevents ECS tasks from launching whenever scans detect HIGH severity findings.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating asynchronous vulnerability reporting with runtime admission control and deployment enforcement. Next action: implement CI/CD deployment gates using AWS CLI scan queries, EventBridge rules, or admission webhooks to inspect scan findings and explicitly reject task deployments that exceed the organization's vulnerability threshold.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] ECR repository created with scan-on-push and immutable tags
 - [ ] Successfully authenticated and pushed a versioned image
