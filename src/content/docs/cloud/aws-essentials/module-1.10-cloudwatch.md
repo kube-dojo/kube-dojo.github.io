@@ -71,9 +71,21 @@ graph TD
     F --> F4[Process-level metrics]
 ```
 
-The biggest gap in EC2 standard metrics is **memory**. AWS cannot see inside your instance's operating system. The hypervisor only sees hardware-level data like CPU cycles, network packets, and instance-store disk I/O. Therefore, memory and EBS disk space metrics require an agent running inside the instance.
+The architectural boundary of standard EC2 telemetry is determined by the hypervisor layer separating virtualization hosts from guest operating systems. The hypervisor directly observes physical hardware metrics, tracking CPU execution cycles, hypervisor-level network packet counts, and instance-store disk storage transactions without inspecting guest kernel data structures. Operating system page allocations, buffer caches, memory maps, and kernel data structures remain strictly isolated within the guest environment where the external hypervisor cannot observe them.
 
-> **Stop and think**: If an EC2 instance exhausts its memory and crashes, which of the standard free metrics might give you a clue that something went wrong, given that `MemoryUtilization` is not tracked? Consider status checks, CPU credit exhaustion on T instances, and network stall patterns — none prove an OOM, which is why agent-based memory metrics remain mandatory for JVM and container-less EC2 workloads.
+**Pause and predict:** If an EC2 instance exhausts its memory and crashes, which of the standard free metrics might hint that something went wrong given that `MemoryUtilization` is not tracked, and why are those clues insufficient?
+
+<details>
+<summary>Check your prediction</summary>
+
+Standard free metrics provide only weak, circumstantial clues that fail to prove memory exhaustion:
+- **Status checks (`StatusCheckFailed_Instance`)**: An out-of-memory kernel panic may eventually cause instance reachability checks to fail, but this indicates only that the operating system is unresponsive without distinguishing an OOM event from driver crashes, disk corruption, or kernel deadlocks.
+- **CPU credit balance**: On burstable T-series instances, memory thrashing and aggressive page swapping immediately before a crash can drive high CPU utilization and exhaust credit balances, but normal batch compute spikes produce identical credit burn.
+- **Network throughput**: A sudden drop in network traffic confirms the application stopped serving traffic, but reveals nothing about whether the root cause was memory exhaustion or a network partition.
+
+Because hypervisor metrics cannot inspect internal guest state, installing the CloudWatch Agent to capture true OS-level memory metrics remains mandatory.
+
+</details>
 
 ### Viewing Standard Metrics
 
@@ -224,7 +236,18 @@ With EMF, you get both a searchable log entry AND a CloudWatch metric from a sin
 
 Teams sometimes publish custom metrics on a one-minute cron from aggregated database tables instead of per-request emission. That batch pattern keeps cardinality flat and API volume low, which is appropriate for daily revenue totals or inventory snapshots. The tradeoff is up to one period of lag before CloudWatch sees a spike; pair batch metrics with real-time log-based filters when you need both cheap aggregates and fast error detection on the same event stream.
 
-> **Pause and predict**: If you use `put-metric-data` synchronously in a Lambda function that processes 10,000 requests per second, what two major bottlenecks or operational issues will you likely encounter?
+**Pause and predict:** If you use `put-metric-data` synchronously in a Lambda function that processes 10,000 requests per second, what two major operational bottlenecks or failures will you encounter?
+
+<details>
+<summary>Check your prediction</summary>
+
+Synchronous `put-metric-data` invocations at 10,000 requests per second introduce two critical operational bottlenecks:
+1. **API rate limiting and throttling**: The CloudWatch `PutMetricData` API enforces regional TPS quotas (typically 500 transactions per second by default). Attempting 10,000 synchronous API calls per second will immediately overwhelm the quota, triggering pervasive HTTP 429 throttling errors and dropping metrics or failing invocations.
+2. **Latency inflation and compute costs**: Each synchronous HTTPS call to CloudWatch adds 10 to 50 milliseconds of network round-trip latency to the Lambda function's critical path. Across 10,000 requests per second, this synchronous wait time significantly inflates billed execution duration and drives up AWS compute charges, while creating severe risk of dimension cardinality explosions if request-level metadata is attached.
+
+The Embedded Metric Format (EMF) solves this entirely by logging metric payloads to stdout asynchronously, allowing the CloudWatch Logs service to extract metrics without synchronous API calls or latency penalties.
+
+</details>
 
 ---
 
@@ -307,7 +330,17 @@ The `TreatMissingData` parameter (CLI: `--treat-missing-data`) determines whethe
 
 The default is `missing`, which is generally safe. But for critical continuous health checks, consider `breaching`—if your application completely stops reporting metrics, silence is itself an emergency worth alerting on.
 
-> **Stop and think**: You have an alarm monitoring a batch job that runs once an hour. If `treat-missing-data` is set to `missing`, what state will the alarm be in for the 59 minutes the job isn't running, and how might that affect your incident response? The alarm often stays in its previous state during gaps, which can hide a complete failure to emit metrics — compare `notBreaching` versus `breaching` explicitly for batch pipelines.
+**Pause and predict:** You have an alarm monitoring a batch job that runs once an hour. If `treat-missing-data` is set to `missing`, what state will the alarm maintain during the 59 minutes the job is not running, and how might that affect your incident response?
+
+<details>
+<summary>Check your prediction</summary>
+
+When `treat-missing-data` is set to `missing`, CloudWatch treats missing periods as neutral and preserves the existing state:
+- **Idle state persistence**: During the 59 minutes between scheduled runs when no metrics are reported, the alarm simply maintains whatever state it held when the last datapoint arrived. If the previous run completed normally and left the alarm in `OK`, it remains `OK` throughout the entire idle window.
+- **Incident response risk**: If a scheduled batch worker completely fails to execute (such as from an EventBridge rule misconfiguration, IAM permission error, or container pull failure) and emits zero metric points, the alarm will never transition to `ALARM`. It remains silently in `OK`, masking a total pipeline blackout.
+- **Recommended batch design**: For sparse batch pipelines, compare `notBreaching` (which resets the alarm to `OK` during expected gaps) against `breaching` paired with an inverted metric or dedicated heartbeat. Alternatively, configure a separate dead-man's-snitch alarm where silence itself breaches the threshold to guarantee that non-executing jobs wake on-call operators.
+
+</details>
 
 ### Composite Alarms
 
@@ -432,7 +465,16 @@ The table below lists the most common Logs Insights query clauses teams combine 
 | `limit` | `limit 50` | Cap result size |
 | `fields` | `fields @timestamp, @message` | Select columns |
 
-> **Pause and predict**: You run a Logs Insights query searching for an error over a 30-day window on a high-traffic API. It costs $15 to run. If you add a `limit 10` clause to the exact same query and run it again, will the cost decrease? Why or why not? Insights bills on data scanned, not rows returned, so `limit` alone does not help unless filters shrink the scanned byte volume or you narrow `@timestamp` bounds.
+**Pause and predict:** You run a Logs Insights query searching for an error over a 30-day window on a high-traffic API, costing $15 to execute. If you add a `limit 10` clause to the exact same query and run it again, will the cost decrease, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+No, the query cost will remain exactly $15. CloudWatch Logs Insights pricing is determined entirely by the volume of data scanned ($0.005 per GB scanned in standard regions), completely independent of the number of log events returned to your console or client.
+- **Scan semantics**: A `limit 10` clause only restricts the number of matching records displayed after the query engine reads and evaluates the target log data. Because the engine must still decompress and scan through the entire 30-day log history to locate matching lines, the scanned byte count remains identical.
+- **Cost reduction strategy**: To reduce query costs, you must decrease the volume of scanned data by narrowing the `@timestamp` range (for example, searching 2 hours instead of 30 days) or scoping the query to specific log streams rather than the entire log group.
+
+</details>
 
 ### Metric Filters: Turning Logs Into Metrics
 
@@ -1285,7 +1327,43 @@ aws iam delete-role --role-name cw-lab-ec2-role
 ```
 </details>
 
-### Success Criteria
+**Card A: Standard EC2 CPU metrics are enough to catch an OOM.** An infrastructure engineer monitors a production EC2 fleet using only the default CloudWatch hypervisor metrics and configures high-priority alerts on `CPUUtilization` at eighty percent. Because the instances host containerized web services that rarely exceed sixty percent processor load during normal operations, the team assumes any impending node failure will inevitably manifest as a sustained processor spike. When service availability degrades without triggering the CPU threshold, the team concludes the underlying virtual machine host must be functioning perfectly and begins debugging upstream network firewalls.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating hypervisor-level compute utilization with internal operating system memory exhaustion. Next action: deploy the CloudWatch Agent to capture in-guest `mem_used_percent` and JVM heap metrics, and establish proactive alarms on memory saturation rather than relying on hypervisor signals.
+
+</details>
+
+**Card B: Synchronous `put-metric-data` in a 10k RPS Lambda is fine.** A developer building an event-driven payment service instruments high-throughput Lambda handlers by calling the `put_metric_data` API synchronously on every processed invoice. Because load testing at moderate concurrency succeeded without reporting errors, the team assumes the regional CloudWatch API endpoint will effortlessly scale to accommodate ten thousand invocations per second. They deploy the instrumentation directly to production and expect real-time metric graphs to mirror incoming transaction velocity without altering function execution duration or reliability.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: ignoring CloudWatch API transaction quotas and introducing synchronous network latency into serverless function invocations. Next action: replace synchronous `PutMetricData` calls with Embedded Metric Format (EMF) written to stdout, allowing asynchronous ingestion without API throttling or duration inflation.
+
+</details>
+
+**Card C: `treat-missing-data=missing` on an hourly batch alarm will page you if the job vanishes.** A site reliability engineer configures an alarm to monitor an hourly data warehouse synchronization pipeline, leaving `treat-missing-data` set to the default `missing` value. Because the job runs periodically rather than continuously, the engineer reasons that keeping the default setting represents the safest configuration for handling scheduled metric gaps. They assume that if an upstream scheduler failure prevents the pipeline worker from launching altogether, the absence of incoming metrics will naturally trigger the alarm and page the on-call engineer.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misunderstanding the `missing` evaluation policy, which preserves the previous state instead of breaching during silence. Next action: configure `treat-missing-data` as `breaching` on an inverted heartbeat metric or implement a dedicated dead-man's-snitch alarm to catch non-executing batch workloads.
+
+</details>
+
+**Card D: Adding `limit 10` makes a 30-day Logs Insights query cheaper.** During an expensive post-incident retrospective, an engineer reviews an ad-hoc CloudWatch Logs Insights query that scanned five terabytes of log data over a thirty-day window. To prevent similar scan costs when running future exploratory searches, the engineer appends a `limit 10` clause to the end of the query string. Believing that capping the returned output to ten records constrains the backend database engine to scan only a tiny fraction of storage, they recommend this clause across the department as a standard cost-reduction practice.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing presentation-tier result limits with storage-tier data scanning volume. Next action: constrain query cost by narrowing the `@timestamp` range or targeting specific log streams, because Logs Insights bills purely on bytes scanned regardless of `limit` clauses.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] CloudWatch Agent installed and running successfully on the provisioned EC2 instance.
 - [ ] Memory metrics (`mem_used_percent`) successfully emitted and visible under the custom `CWAgentLab` namespace.
