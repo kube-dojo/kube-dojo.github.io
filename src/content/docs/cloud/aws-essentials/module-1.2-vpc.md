@@ -6,7 +6,7 @@ sidebar:
 ---
 **Complexity**: `[COMPLEX]` | **Time to Complete**: 3h | **Prerequisites**: [Module 1.1](../module-1.1-iam/), [Linux Networking](/linux/foundations/everyday-use/module-0.5-networking-tools/)
 
-This module is labeled **[COMPLEX]** because VPC networking stacks several independent control planes—CIDR planning, subnet placement, route tables, NAT, security groups, NACLs, and cross-VPC connectivity—into one design surface where a single mistake can silently break production traffic. Budget about three hours if you work through the hands-on CLI exercise and pause on the prediction prompts; you should already be comfortable with [Linux networking fundamentals](/linux/foundations/everyday-use/module-0.5-networking-tools/) and with IAM concepts from [Module 1.1](../module-1.1-iam/), because you will attach policies to VPC endpoints and flow-log delivery roles later in the track.
+This module is labeled **[COMPLEX]** because VPC networking stacks several independent control planes—CIDR planning, subnet placement, route tables, NAT, security groups, NACLs, and cross-VPC connectivity—into one design surface where a single mistake can silently break production traffic. Budget about three hours if you work through the hands-on CLI exercise and pause on the prediction prompts. You should already be comfortable with [Linux networking fundamentals](/linux/foundations/everyday-use/module-0.5-networking-tools/) and with IAM concepts from [Module 1.1](../module-1.1-iam/), because you will attach policies to VPC endpoints and flow-log delivery roles later in the track.
 
 ## What You'll Be Able to Do
 
@@ -21,7 +21,7 @@ When you finish the readings and exercises below, you will be able to:
 
 ## Why This Module Matters
 
-Picture a temporary EC2 instance in a public subnet with SSH open to `0.0.0.0/0`: an attacker who harvests those credentials does not stop at one host, because the instance sits on a routable path into the rest of your VPC. That scenario is not theoretical theater—it is the unforgiving reality of cloud networking, where **Amazon Virtual Private Cloud (VPC)** is the logical isolation boundary for everything you launch. The VPC is your private slice of AWS; without deliberate subnet tiers, route tables, and firewalls, a database can end up one misconfiguration away from the public internet while lateral movement between application tiers stays wide open.
+Hypothetical scenario: Picture a temporary EC2 instance in a public subnet with SSH open to `0.0.0.0/0`: an attacker who harvests those credentials does not stop at one host, because the instance sits on a routable path into the rest of your VPC. That scenario is not theoretical theater—it is the unforgiving reality of cloud networking, where **Amazon Virtual Private Cloud (VPC)** is the logical isolation boundary for everything you launch. The VPC is your private slice of AWS. Without deliberate subnet tiers, route tables, and firewalls, a database can end up one misconfiguration away from the public internet while lateral movement between application tiers stays wide open.
 
 In this module you will design a resilient, multi-AZ topology instead of treating networking as a checkbox after the fact. You will learn why **public versus private** is defined by routes—not by a subnet flag—and how NAT Gateways, Internet Gateways, and VPC Endpoints change outbound and inbound behavior. You will practice defense-in-depth with **Security Groups** and **Network ACLs**, read **VPC Flow Logs** when connectivity fails, and compare **VPC peering** with **Transit Gateway** when environments multiply. Mastering VPC is less about memorizing service names and more about building the moats, walls, and bridges that keep your entire cloud footprint defensible.
 
@@ -29,7 +29,7 @@ In this module you will design a resilient, multi-AZ topology instead of treatin
 
 ## Anatomy of a VPC: CIDR Blocks and Subnets
 
-A VPC is a logically isolated virtual network defined by a primary IPv4 **Classless Inter-Domain Routing (CIDR)** block such as `10.0.0.0/16`. That block is the master address pool: every subnet you carve later must fit inside it, and every ENI you attach ultimately draws from some slice of that space. Think of CIDR notation as choosing how large your plot of land is before you pour foundations—the number after the slash tells you how many bits are fixed for the network portion, and the remaining bits are available for hosts. A `/16` therefore offers far more assignable space than a `/24`, which matters when you plan for three AZs, multiple tiers per AZ, and room for growth without renumbering.
+A VPC is a logically isolated virtual network defined by a primary IPv4 **Classless Inter-Domain Routing (CIDR)** block such as `10.0.0.0/16`. That block is the master address pool: every subnet you carve later must fit inside it, and every ENI you attach ultimately draws from some slice of that space. Think of CIDR notation as choosing how large your plot of land is before you pour foundations. The number after the slash tells you how many bits are fixed for the network portion, and the remaining bits are available for hosts. A `/16` therefore offers far more assignable space than a `/24`, which matters when you plan for three AZs, multiple tiers per AZ, and room for growth without renumbering.
 
 ### Quick CIDR Reference
 
@@ -57,7 +57,7 @@ Shared Services:  10.10.0.0/16
 
 ### Subnets: Slicing the Network
 
-You cannot launch an EC2 instance directly into a VPC; AWS requires a **subnet**, which is a contiguous CIDR slice taken from the VPC range (for example `10.0.1.0/24` inside `10.0.0.0/16`). Subnets are where AZ locality becomes concrete: **[a subnet must reside entirely within one Availability Zone](https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html)** and cannot span AZ boundaries, so high availability always means repeating your tiers—public, private, data—across multiple subnets in different AZs rather than stretching one subnet across the region.
+You cannot launch an EC2 instance directly into a VPC; AWS requires a **subnet**, which is a contiguous CIDR slice taken from the VPC range (for example `10.0.1.0/24` inside `10.0.0.0/16`). Subnets are where AZ locality becomes concrete: **[a subnet must reside entirely within one Availability Zone](https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html)** and cannot span AZ boundaries. High availability always means repeating your tiers—public, private, data—across multiple subnets in different AZs rather than stretching one subnet across the region.
 
 ```mermaid
 graph TD
@@ -86,7 +86,7 @@ graph TD
     VPC --> AZ3
 ```
 
-Production architectures usually separate workloads into **three network tiers** so blast radius stays bounded. **Public subnets** host edge-facing components such as load balancers, bastion hosts, and NAT Gateways; **private subnets** run application servers, containers, and other compute that should never accept arbitrary inbound internet traffic; **data subnets** hold databases (RDS, ElastiCache) and other sensitive storage with the tightest routes. That layering enforces least privilege at the network level—the internet can reach only the public tier, the public tier can initiate toward the private tier, and only the private tier should reach the data tier—so a compromised web instance does not automatically sit next to your primary datastore.
+Production architectures usually separate workloads into **three network tiers** so blast radius stays bounded. **Public subnets** host edge-facing components such as load balancers, bastion hosts, and NAT Gateways. **Private subnets** run application servers, containers, and other compute that should never accept arbitrary inbound internet traffic. **Data subnets** hold databases (RDS, ElastiCache) and other sensitive storage with the tightest routes. That layering enforces least privilege at the network level: the internet can reach only the public tier, and the public tier can initiate toward the private tier. Only the private tier should reach the data tier, so a compromised web instance does not automatically sit next to your primary datastore.
 
 Subnet sizing mistakes show up late: a `/28` looks ample on paper until you account for reserved addresses, a handful of static interfaces, an autoscaling burst, and Lambda ENIs sharing the same slice. When in doubt, standardize on `/24` subnets for workload tiers and reserve `/28` slices only for purpose-built appliances that will never scale horizontally.
 
@@ -104,7 +104,7 @@ Subnet sizing mistakes show up late: a `/28` looks ample on paper until you acco
 
 ## Routing: How Traffic Finds Its Way
 
-Every subnet in a VPC is associated with exactly one **route table**, which is simply an ordered set of routes that tell the VPC router where to send packets. If you never create a custom association, the subnet inherits the VPC **Main Route Table**, which is why "mystery connectivity" often traces back to an unintended main-table association rather than a broken security group.
+Every subnet in a VPC is associated with exactly one **route table**, which is simply an ordered set of routes that tell the VPC router where to send packets. If you never create a custom association, the subnet inherits the VPC **Main Route Table**. This is why "mystery connectivity" often traces back to an unintended main-table association rather than a broken security group.
 
 ### The Default Route Table
 
@@ -116,9 +116,9 @@ When you create a VPC, AWS provisions a Main Route Table that already contains a
 
 ### Public vs. Private Subnets: The Route Table Distinction
 
-Whether a subnet is **public** or **private** is not a subnet attribute you toggle in the console—there is no "make public" checkbox. The label comes entirely from the **route table** bound to that subnet. A **public** subnet is one whose table sends `0.0.0.0/0` to an **Internet Gateway (IGW)**, the highly available edge component that bridges your VPC to the public internet. A **private** subnet lacks a default route to an IGW; instances there should not be directly reachable from the internet even if someone assigns a public IP, because without the IGW route inbound packets never find a return path through the VPC edge.
+Whether a subnet is **public** or **private** is not a subnet attribute you toggle in the console—there is no "make public" checkbox. The label comes entirely from the **route table** bound to that subnet. A **public** subnet is one whose table sends `0.0.0.0/0` to an **Internet Gateway (IGW)**, the highly available edge component that bridges your VPC to the public internet. A **private** subnet lacks a default route to an IGW. Instances there should not be directly reachable from the internet even if someone assigns a public IP, because without the IGW route inbound packets never find a return path through the VPC edge.
 
-Compare the three tier patterns side by side. A **public** table keeps the mandatory `local` route and adds internet egress via the IGW; a **private** table still needs outbound internet for patches and APIs, so it points `0.0.0.0/0` at a NAT Gateway instead; a **data** table intentionally stops at `local` so databases never gain a default path to the internet.
+Compare the three tier patterns side by side. A **public** table keeps the mandatory `local` route and adds internet egress via the IGW. A **private** table still needs outbound internet for patches and APIs, so it points `0.0.0.0/0` at a NAT Gateway instead. A **data** table intentionally stops at `local` so databases never gain a default path to the internet.
 
 | Destination | Target | Tier |
 | :--- | :--- | :--- |
@@ -126,7 +126,7 @@ Compare the three tier patterns side by side. A **public** table keeps the manda
 | `0.0.0.0/0` | `igw-abc123` | Public only |
 | `0.0.0.0/0` | `nat-xyz789` | Private (outbound via NAT) |
 
-For data subnets you typically publish only the `local` row—no IGW, no NAT—so outbound initiation to the public internet is impossible unless you later add an explicit exception, which is exactly the isolation model you want for RDS and similar services.
+For data subnets you typically publish only the `local` row—no IGW, no NAT. Outbound initiation to the public internet is impossible unless you later add an explicit exception, which is exactly the isolation model you want for RDS and similar services.
 
 ### Traffic Flow: Public Subnet
 
@@ -146,7 +146,7 @@ Return traffic walks the same chain in reverse. **Security Groups** are **statef
 
 ### The Internet Gateway (IGW)
 
-The IGW is frequently mistaken for a single hardware appliance, but it behaves like a regional edge service instead. It performs **1:1 NAT** between an instance's private address and its associated public or Elastic IP, and [AWS documents it as horizontally scaled and redundant](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html) without you sizing throughput on the gateway itself—effective bandwidth still follows instance type and path characteristics. Operationally you may attach only **[one IGW per VPC](https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html)**, and creating the object alone changes nothing until you attach it to the VPC **and** add a `0.0.0.0/0 → igw-...` route in the relevant route table.
+The IGW is frequently mistaken for a single hardware appliance, but it behaves like a regional edge service instead. It performs **1:1 NAT** between an instance's private address and its associated public or Elastic IP. Furthermore, [AWS documents it as horizontally scaled and redundant](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html) without you sizing throughput on the gateway itself, while effective bandwidth still follows instance type and path characteristics. Operationally you may attach only **[one IGW per VPC](https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html)**. Creating the object alone changes nothing until you attach it to the VPC **and** add a `0.0.0.0/0 → igw-...` route in the relevant route table.
 
 ---
 
@@ -156,7 +156,7 @@ Private subnets exist precisely so workloads are not directly exposed, yet real 
 
 ### How NAT Gateway Works
 
-Operationally you place the NAT Gateway in a **public subnet** so it can use the IGW, allocate an **Elastic IP** to the NAT resource, and point the **private subnet route table** so `0.0.0.0/0` targets the NAT instead of the IGW. When a private instance opens a connection, the NAT rewrites the source address to its Elastic IP, forwards the packet through the public subnet's IGW route, and on the return path performs the inverse translation so the response lands on the correct private address. AWS documents this pattern as letting [private instances initiate outbound connections while remaining unreachable for inbound connections that originate on the public internet](https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpc-nat-gateway.html). Remember that security groups on the private instances still matter: NAT solves routing to the internet, not authorization of who may call your APIs once traffic is inside the VPC.
+Operationally you place the NAT Gateway in a **public subnet** so it can use the IGW and allocate an **Elastic IP** to the NAT resource. You then point the **private subnet route table** so `0.0.0.0/0` targets the NAT instead of the IGW. When a private instance opens a connection, the NAT rewrites the source address to its Elastic IP and forwards the packet through the public subnet's IGW route. On the return path, it performs the inverse translation so the response lands on the correct private address. AWS documents this pattern as letting [private instances initiate outbound connections while remaining unreachable for inbound connections that originate on the public internet](https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/vpc-nat-gateway.html). Remember that security groups on the private instances still matter: NAT solves routing to the internet, not authorization of who may call your APIs once traffic is inside the VPC.
 
 ### NAT Gateway Traffic Flow
 
@@ -169,9 +169,9 @@ flowchart TD
     IGW --> Internet["Internet<br>api.example.com"]
 ```
 
-The response follows the exact reverse path: the IGW delivers to the NAT Gateway's Elastic IP, the NAT Gateway rewrites the destination back to `10.0.2.50`, and the packet enters the private subnet where NACL and security group rules must still permit the return flow. That asymmetry—outbound initiation allowed, inbound initiation blocked—is the property teams rely on when they place databases and internal APIs in private subnets while still permitting patch and telemetry egress.
+The response follows the exact reverse path: the IGW delivers to the NAT Gateway's Elastic IP, and the NAT Gateway rewrites the destination back to `10.0.2.50`. The packet then enters the private subnet where NACL and security group rules must still permit the return flow. That asymmetry—outbound initiation allowed, inbound initiation blocked—is the property teams rely on when they place databases and internal APIs in private subnets while still permitting patch and telemetry egress.
 
-> **Stop and think**: You have a database in a private subnet and a NAT Gateway in a public subnet. The database needs to download patches from `archive.ubuntu.com`. Which component performs the actual translation of the database's private IP to a public IP that the internet can route back to?
+> **Pause and predict:** You have a database in a private subnet and a NAT Gateway in a public subnet. The database needs to download patches from `archive.ubuntu.com`. Which component performs the actual translation of the database's private IP to a public IP that the internet can route back to?
 >
 > <details>
 > <summary>View Answer</summary>
@@ -199,7 +199,7 @@ flowchart LR
     end
 ```
 
-Each private subnet's route table points to the NAT Gateway in its own AZ, which means each AZ is self-contained for outbound internet access. If `us-east-1a` suffers a power event, only private subnets that depended exclusively on a NAT in that AZ lose egress; subnets in `1b` and `1c` keep working as long as their local NAT and public subnet IGW path remain healthy. AWS also documents [regional NAT Gateways](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html) that expand automatically across AZs—worth evaluating on new designs because they change the "one NAT per AZ" operational recipe while preserving isolation goals.
+Each private subnet's route table points to the NAT Gateway in its own AZ, which means each AZ is self-contained for outbound internet access. If `us-east-1a` suffers a power event, only private subnets that depended exclusively on a NAT in that AZ lose egress. Subnets in `1b` and `1c` keep working as long as their local NAT and public subnet IGW path remain healthy. AWS also documents [regional NAT Gateways](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html) that expand automatically across AZs. They are worth evaluating on new designs because they change the "one NAT per AZ" operational recipe while preserving isolation goals.
 
 > **Pause and predict**: If you delete a NAT Gateway to save costs but forget to update the private subnet's route table, what happens to traffic destined for `0.0.0.0/0`?
 >
@@ -210,7 +210,7 @@ Each private subnet's route table points to the NAT Gateway in its own AZ, which
 
 ### NAT Gateway vs. NAT Instance
 
-Before managed NAT Gateways, teams routinely ran NAT on bespoke EC2 instances with scripts and failover glue. You may still encounter that pattern in long-lived estates, but new designs should default to the managed service unless you have a rare requirement such as attaching security groups directly to the NAT path. The comparison table captures the headline differences; in migration programs the winning argument is usually operational—patch cadence, failover testing, and on-call pages—not raw bandwidth, because modern instance families already exceed what most NAT instances provided.
+Before managed NAT Gateways, teams routinely ran NAT on bespoke EC2 instances with scripts and failover glue. You may still encounter that pattern in long-lived estates, but new designs should default to the managed service unless you have a rare requirement such as attaching security groups directly to the NAT path. The comparison table captures the headline differences. In migration programs the winning argument is usually operational—patch cadence, failover testing, and on-call pages—not raw bandwidth, because modern instance families already exceed what most NAT instances provided.
 
 | Feature | NAT Gateway | NAT Instance |
 | :--- | :--- | :--- |
@@ -224,24 +224,24 @@ Before managed NAT Gateways, teams routinely ran NAT on bespoke EC2 instances wi
 
 ### VPC Endpoints: Bypassing NAT Entirely
 
-For traffic destined to AWS APIs—S3, DynamoDB, SQS, Systems Manager, and dozens of others—you can often skip NAT entirely. **VPC Endpoints** keep packets on the AWS backbone by adding either a gateway route or an interface ENI inside your VPC. A [**Gateway Endpoint** for S3 and DynamoDB is free and injects a prefix-list route into your route table](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html) without placing an ENI in your subnet, whereas an **Interface Endpoint** (PrivateLink) creates ENIs with private DNS names and bills hourly plus data-processing fees. Teams that move large S3 or DynamoDB volumes off NAT frequently report meaningful savings because NAT charges per gigabyte processed in addition to hourly fees.
+For traffic destined to AWS APIs—S3, DynamoDB, SQS, Systems Manager, and dozens of others—you can often skip NAT entirely. **VPC Endpoints** keep packets on the AWS backbone by adding either a gateway route or an interface ENI inside your VPC. A [**Gateway Endpoint** for S3 and DynamoDB is free and injects a prefix-list route into your route table](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html) without placing an ENI in your subnet. In contrast, an **Interface Endpoint** (PrivateLink) creates ENIs with private DNS names and bills hourly plus data-processing fees. Teams that move large S3 or DynamoDB volumes off NAT frequently report meaningful savings because NAT charges per gigabyte processed in addition to hourly fees.
 
 ---
 
 ## Network Security: Security Groups vs. NACLs
 
-AWS provides two complementary firewall layers inside every VPC, and conflating them is one of the fastest ways to waste hours on a connectivity incident. **Security Groups** enforce intent at the ENI; **Network ACLs** enforce coarse policy at the subnet edge. Certification exams love this distinction because it mirrors how you should troubleshoot in production: check routes first, then security groups, then NACLs, then host firewalls.
+AWS provides two complementary firewall layers inside every VPC, and conflating them is one of the fastest ways to waste hours on a connectivity incident. **Security Groups** enforce intent at the ENI. **Network ACLs** enforce coarse policy at the subnet edge. Certification exams love this distinction because it mirrors how you should troubleshoot in production: check routes first, then security groups, then NACLs, then host firewalls.
 
 ### Security Groups (SGs)
 
-**Security Groups** are **stateful** firewalls attached to ENIs—EC2 instances, RDS, Lambda in VPC mode, load balancer nodes, and more. When an instance initiates traffic, return traffic for that flow is automatically permitted inbound even if you never wrote an explicit inbound rule for the ephemeral port, which is why security groups feel "easier" than NACLs day to day. You publish **Allow** rules only; anything unmatched is denied, and there is no deny statement syntax. AWS evaluates the full rule set collectively (order is irrelevant), and critically you can [reference another security group as a source](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html) so a database tier allows `5432` from `sg-app` instead of from a CIDR that goes stale every time autoscaling replaces nodes. Default quotas allow [up to five security groups per ENI with 60 inbound and 60 outbound rules each](https://docs.aws.amazon.com/general/latest/gr/vpc-service.html), which is ample when you chain tiers instead of flattening `0.0.0.0/0`.
+**Security Groups** are **stateful** firewalls attached to ENIs. They protect EC2 instances, RDS databases, Lambda functions in VPC mode, load balancer nodes, and more. When an instance initiates traffic, return traffic for that flow is automatically permitted inbound even if you never wrote an explicit inbound rule for the ephemeral port. This is why security groups feel "easier" than NACLs day to day. You publish **Allow** rules only; anything unmatched is denied, and there is no deny statement syntax. AWS evaluates the full rule set collectively, meaning rule order is irrelevant. Critically, you can [reference another security group as a source](https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html) so a database tier allows `5432` from `sg-app` instead of from a CIDR that goes stale every time autoscaling replaces nodes. Default quotas allow [up to five security groups per ENI with 60 inbound and 60 outbound rules each](https://docs.aws.amazon.com/general/latest/gr/vpc-service.html), which is ample when you chain tiers instead of flattening `0.0.0.0/0`.
 
 > **Pause and predict**: Web Server A needs to communicate with Database B on port 5432. Both are in the same VPC but different subnets. What is the most secure way to configure the Security Group attached to Database B to allow this traffic?
->
-> <details>
-> <summary>View Answer</summary>
-> Add an inbound rule to Database B's Security Group that allows TCP port 5432, with the <strong>source set to the Security Group ID</strong> attached to Web Server A (e.g., <code>sg-0abcd1234</code>). This ensures that only resources possessing Web Server A's Security Group can connect, regardless of what subnet they are in. It automatically scales as Web Servers are added or removed, without ever needing to manage individual IP addresses. Do not use <code>0.0.0.0/0</code> or even the VPC CIDR as the source for database access in normal designs, as this violates the principle of least privilege.
-> </details>
+
+<details>
+<summary>View Answer</summary>
+Add an inbound rule to Database B's Security Group that allows TCP port 5432, with the <strong>source set to the Security Group ID</strong> attached to Web Server A (e.g., <code>sg-0abcd1234</code>). This ensures that only resources possessing Web Server A's Security Group can connect, regardless of what subnet they are in. It automatically scales as Web Servers are added or removed, without ever needing to manage individual IP addresses. Do not use <code>0.0.0.0/0</code> or even the VPC CIDR as the source for database access in normal designs, as this violates the principle of least privilege.
+</details>
 
 The diagram below shows a **chained security group architecture**—each hop trusts only the SG ID immediately upstream:
 
@@ -252,7 +252,7 @@ flowchart TD
     App --> DB["DB Security Group<br>Inbound: 5432 from sg-app"]
 ```
 
-Each layer only trusts the layer directly above it. If an attacker compromises the ALB, they still cannot reach the database directly because the DB security group only allows connections from `sg-app`, not `sg-alb`. When you implement this in Terraform or CloudFormation, encode the dependency order explicitly—create ALB SG, pass its ID into the app SG ingress, pass app SG into db SG—so a drift detection job can prove the chain never reverted to CIDR-based rules during an emergency change.
+Each layer only trusts the layer directly above it. If an attacker compromises the ALB, they still cannot reach the database directly because the DB security group only allows connections from `sg-app`, not `sg-alb`. When you implement this in Terraform or CloudFormation, encode the dependency order explicitly by creating the ALB SG, passing its ID into app SG ingress, and passing app SG into db SG. This ensures a drift detection job can prove the chain never reverted to CIDR-based rules during an emergency change.
 
 ### Network Access Control Lists (NACLs)
 
@@ -273,14 +273,14 @@ Each layer only trusts the layer directly above it. If an attacker compromises t
 | **Rule limit** | 60 inbound + 60 outbound per SG | 20 inbound + 20 outbound (adjustable) |
 | **Typical use** | Primary firewall for every resource | Subnet-wide IP blocking, compliance |
 
-In incident response drills, assign one engineer to security groups and another to NACLs so you do not thrash the same rule set twice. Security group changes propagate quickly and are easy to audit in the API; NACL edits affect every ENI in the subnet and deserve change windows because a misnumbered deny rule can look like an application outage. Document the rule-number plan for custom NACLs the same way you document CIDR allocations.
+In incident response drills, assign one engineer to security groups and another to NACLs so you do not thrash the same rule set twice. Security group changes propagate quickly and are easy to audit in the API. NACL edits affect every ENI in the subnet and deserve change windows because a misnumbered deny rule can look like an application outage. Document the rule-number plan for custom NACLs the same way you document CIDR allocations.
 
-> **Stop and think**: A junior engineer configures a NACL with Rule #100 allowing all traffic from 0.0.0.0/0 and Rule #50 denying all traffic from 10.0.0.5/32. An instance at 10.0.0.5 attempts to send traffic into the subnet. What happens and why?
->
-> <details>
-> <summary>View Answer</summary>
-> The traffic is <strong>denied</strong>. NACL rules are evaluated sequentially starting from the lowest rule number. Rule #50 explicitly denies the traffic from <code>10.0.0.5</code>. Once a matching rule is found, the evaluation stops immediately, so the Allow rule at #100 is never processed for this specific traffic. This is why rule numbering matters — generally place Deny rules at lower numbers than Allow rules when you want them to take precedence.
-> </details>
+> **Pause and predict:** A junior engineer configures a NACL with Rule #100 allowing all traffic from 0.0.0.0/0 and Rule #50 denying all traffic from 10.0.0.5/32. An instance at 10.0.0.5 attempts to send traffic into the subnet. What happens and why?
+
+<details>
+<summary>View Answer</summary>
+The traffic is <strong>denied</strong>. NACL rules are evaluated sequentially starting from the lowest rule number. Rule #50 explicitly denies the traffic from <code>10.0.0.5</code>. Once a matching rule is found, the evaluation stops immediately, so the Allow rule at #100 is never processed for this specific traffic. This is why rule numbering matters — generally place Deny rules at lower numbers than Allow rules when you want them to take precedence.
+</details>
 
 ### Defense in Depth: Both Layers Working Together
 
@@ -296,13 +296,13 @@ flowchart TD
 
 *Operational lesson: Because NACLs are stateless, missing return-path rules for ephemeral ports can break database traffic even when the related Security Groups are correct.*
 
-When you troubleshoot a "security group looks fine" ticket, draw the path on paper: internet to IGW to NACL to SG to instance, then mirror it for return traffic. If the symptom is outbound works but inbound callbacks fail, suspect NACL ephemeral rules first; if neither direction works, verify routes and that the ENI is in the subnet you think it is. Security groups scale with automation because they reference other groups; NACLs scale with emergency blocks because a single deny rule can drop an attacker's `/24` for every resource in the subnet simultaneously.
+When you troubleshoot a "security group looks fine" ticket, draw the path on paper: internet to IGW to NACL to SG to instance, then mirror it for return traffic. If the symptom is outbound works but inbound callbacks fail, suspect NACL ephemeral rules first. If neither direction works, verify routes and confirm that the ENI is in the subnet you expect. Security groups scale with automation because they reference other groups; NACLs scale with emergency blocks because a single deny rule can drop an attacker's `/24` for every resource in the subnet simultaneously.
 
 ---
 
 ## VPC Flow Logs: Seeing Your Traffic
 
-You cannot troubleshoot what you cannot see, and in VPC land that visibility usually starts with **VPC Flow Logs**. Flow logs record metadata about IP traffic to and from ENIs—they do not store packet payloads (use host capture or mirrored traffic for that)—but each record still answers the questions that matter during an outage: source and destination IPs, ports, protocol, packet and byte counts, and whether the traffic was **ACCEPT**ed or **REJECT**ed. An `ACCEPT` tells you the packet passed security-group and NACL evaluation for that direction; `REJECT` means something in the path dropped it before delivery.
+You cannot troubleshoot what you cannot see, and in VPC land that visibility usually starts with **VPC Flow Logs**. Flow logs record metadata about IP traffic to and from ENIs, though they do not store packet payloads (use host capture or mirrored traffic for that). Each record still answers the questions that matter during an outage: source and destination IPs, ports, protocol, packet and byte counts, and whether the traffic was **ACCEPT**ed or **REJECT**ed. An `ACCEPT` tells you the packet passed security-group and NACL evaluation for that direction; `REJECT` means something in the path dropped it before delivery.
 
 Enable flow logs at the scope that matches your investigation: **VPC-wide** for fleet-wide hunts, **subnet** when you suspect a tier-specific NACL change, or **ENI** when one instance misbehaves. Destinations include **CloudWatch Logs** for near-real-time queries, **S3** for cheap long-term retention, or **Kinesis Data Firehose** when you already stream security telemetry elsewhere. Turn them on before you need them—flow logs are not retroactive. In regulated environments, pair flow logs with centralized retention policies so investigators can reconstruct cross-VPC conversations during an incident without begging each service team for exports.
 
@@ -331,7 +331,7 @@ Enable flow logs at the scope that matches your investigation: **VPC-wide** for 
 
 The `Status` field deserves attention during incidents: values other than `OK` can indicate logging configuration problems rather than network drops, so correlate with CloudWatch delivery metrics before you chase phantom packet loss.
 
-If you see `REJECT`, walk security groups and NACLs first, then revisit route tables and whether the target ENI still exists. Flow logs will not replace application logs, but they narrow "packets never arrived" versus "packets arrived and the app refused them," which saves enormous time when someone says they cannot connect to a database on port `5432`.
+If you see `REJECT`, walk security groups and NACLs first, then revisit route tables and whether the target ENI still exists. Flow logs will not replace application logs, but they narrow "packets never arrived" versus "packets arrived and the app refused them." This saves enormous time when someone says they cannot connect to a database on port `5432`.
 
 ---
 
@@ -341,20 +341,20 @@ As organizations mature, a single VPC per environment stops scaling: security bo
 
 ### VPC Peering
 
-[VPC Peering](https://docs.aws.amazon.com/whitepapers/latest/aws-vpc-connectivity-options/vpc-peering.html) is a one-to-one private connection between two VPCs. Traffic stays on the AWS backbone—never hairpinning through the public internet—and peering works **cross-account** and **cross-region** when you accept the operational overhead of managing peering accepters and route propagation in both directions. Two constraints bite every design review: peering is **non-transitive** (if A is peered with B and B is peered with C, A still cannot reach C through B), and **overlapping CIDR blocks cannot peer**, which is why the non-overlapping plan you drafted earlier in this module's CIDR section pays dividends years later.
+[VPC Peering](https://docs.aws.amazon.com/whitepapers/latest/aws-vpc-connectivity-options/vpc-peering.html) is a one-to-one private connection between two VPCs. Traffic stays on the AWS backbone—never hairpinning through the public internet—and peering works **cross-account** and **cross-region** when you accept the operational overhead of managing peering accepters and route propagation in both directions. Critical constraints govern every peering design: inter-VPC routing follows explicit boundary rules rather than automatic forwarding, and **overlapping CIDR blocks cannot peer**, which is why the non-overlapping plan you drafted earlier in this module's CIDR section pays dividends years later.
 
-> **Stop and think**: You have three VPCs: Dev, Test, and Prod. The Dev VPC is peered with the Test VPC, and the Test VPC is peered with the Prod VPC. An engineer tries to ping an EC2 instance in Prod directly from an EC2 instance in Dev. Does the ping succeed? Why or why not?
->
-> <details>
-> <summary>View Answer</summary>
-> <strong>No, the ping will fail.</strong> VPC Peering is strictly non-transitive. The connection from Dev to Test does not carry over or route through to Prod. To allow the Dev VPC to communicate with the Prod VPC, you must establish an explicit, direct peering connection between them. Alternatively, if managing many connections, you could use a Transit Gateway as a central hub, which does support transitive routing between attached VPCs.
-> </details>
+> **Pause and predict:** You have three VPCs: Dev, Test, and Prod. The Dev VPC is peered with the Test VPC, and the Test VPC is peered with the Prod VPC. An engineer tries to ping an EC2 instance in Prod directly from an EC2 instance in Dev. Does the ping succeed? Why or why not?
+
+<details>
+<summary>View Answer</summary>
+<strong>No, the ping will fail.</strong> VPC Peering is strictly non-transitive. The connection from Dev to Test does not carry over or route through to Prod. To allow the Dev VPC to communicate with the Prod VPC, you must establish an explicit, direct peering connection between them. Alternatively, if managing many connections, you could use a Transit Gateway as a central hub, which does support transitive routing between attached VPCs.
+</details>
 
 Count the math before you commit to full mesh peering: with **N** VPCs you need **N×(N−1)/2** peering relationships and you must update route tables in every participant whenever a new VPC joins. Five VPCs means ten peerings; twenty VPCs means 190—fine for a lab, painful at production velocity. Each peering also consumes a unique relationship in your runbooks: who owns accepter workflows, how do you test connectivity after a CIDR expansion, and how do you roll back if a route leak exposes prod to dev? That combinatorics is the inflection point where hub-and-spoke wins, because the hub centralizes those answers instead of multiplying them across every pair.
 
 ### AWS Transit Gateway (TGW)
 
-**AWS Transit Gateway** is the managed hub that replaces full mesh sprawl. You attach VPCs, Site-to-Site VPN, and Direct Connect into a central router with its own route domains, so adding a spoke means one attachment and a controlled route propagation instead of renegotiating dozens of peering relationships. Operations teams get segmentation knobs—separate route tables for prod and nonprod, for example—without rebuilding the underlying VPCs.
+**AWS Transit Gateway** is the managed hub that replaces full mesh sprawl. You attach VPCs, Site-to-Site VPN, and Direct Connect into a central router with its own route domains. Adding a spoke requires only one attachment and controlled route propagation instead of renegotiating dozens of peering relationships. Operations teams get segmentation knobs—separate route tables for prod and nonprod, for example—without rebuilding the underlying VPCs.
 
 ```mermaid
 flowchart TD
@@ -376,13 +376,13 @@ flowchart TD
     end
 ```
 
-At scale, Transit Gateway advertises support for thousands of attachments per gateway, multiple route tables for segmentation (so prod spokes never learn dev routes), inter-region peering between gateways, and high per-attachment bandwidth—details you should verify against current quotas before signing a multi-year network design. When you attach a new VPC, think in terms of **propagation direction**: which TGW route table learns the VPC CIDR, and which VPC route tables learn which summarized prefixes from the hub. Hub-and-spoke only stays simple if those updates are automated; otherwise you recreate the peering mesh problem with extra steps.
+At scale, Transit Gateway advertises support for thousands of attachments per gateway, multiple route tables for segmentation, and inter-region peering between gateways. It provides high per-attachment bandwidth, though you should verify exact details against current quotas before signing a multi-year network design. When you attach a new VPC, think in terms of **propagation direction**: which TGW route table learns the VPC CIDR, and which VPC route tables learn which summarized prefixes from the hub. Hub-and-spoke only stays simple if those updates are automated; otherwise you recreate the peering mesh problem with extra steps.
 
 ---
 
 ## DNS in a VPC: Route 53 Resolver
 
-Every VPC includes [Amazon-provided DNS at the VPC network address plus two—`10.0.0.2` in a `10.0.0.0/16` VPC, for example](https://docs.aws.amazon.com/vpc/latest/userguide/AmazonDNS-concepts.html). With `enableDnsSupport` and `enableDnsHostnames` turned on, that resolver answers public names, private hosted zone records, and the default `ec2.internal` hostnames for instances. Hybrid designs that must resolve on-premises Active Directory names from EC2—or expose private zone records to a data center—use **Route 53 Resolver**: [**inbound endpoints** let corporate DNS query your VPC private zones](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-overview-DSN-queries-to-vpc.html), while **outbound endpoints** forward selected suffixes from the VPC to on-premises resolvers. DNS is easy to overlook during VPC build-out, yet it is the layer that breaks migrations long after routing looks perfect. When hybrid resolver endpoints are in play, test both directions: a VPC instance resolving an on-premises service name, and a laptop on corp Wi-Fi resolving a name in your private hosted zone. Failures there look like application bugs even though TCP routes and security groups are green.
+Every VPC includes [Amazon-provided DNS at the VPC network address plus two—`10.0.0.2` in a `10.0.0.0/16` VPC, for example](https://docs.aws.amazon.com/vpc/latest/userguide/AmazonDNS-concepts.html). With `enableDnsSupport` and `enableDnsHostnames` turned on, that resolver answers public names, private hosted zone records, and the default `ec2.internal` hostnames for instances. Hybrid designs that must resolve on-premises Active Directory names from EC2—or expose private zone records to a data center—use **Route 53 Resolver**. Here, [**inbound endpoints** let corporate DNS query your VPC private zones](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-overview-DSN-queries-to-vpc.html), while **outbound endpoints** forward selected suffixes from the VPC to on-premises resolvers. DNS is easy to overlook during VPC build-out, yet it is the layer that breaks migrations long after routing looks perfect. When hybrid resolver endpoints are in play, test both directions: a VPC instance resolving an on-premises service name, and a laptop on corp Wi-Fi resolving a name in your private hosted zone. Failures there look like application bugs even though TCP routes and security groups are green.
 
 ---
 
@@ -398,7 +398,7 @@ The four bullets below are worth revisiting after the hands-on lab, because they
 
 - **VPC subnet sharing via RAM changes org topology.** You can [share subnets across accounts in an AWS Organization](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-sharing.html) so a central networking account owns the VPC while application teams launch ENIs into delegated subnets—reducing duplicate VPCs and avoiding peering sprawl between sibling teams. Governance teams like the pattern because security baselines and flow logs can be standardized once instead of reimplemented per account.
 
-Together these facts reinforce a single theme: VPC design is as much about cost and operability as it is about drawing boxes on a whiteboard. When you review an architecture diagram, ask where each arrow would show up in a flow log, which route table entry makes that arrow possible, and which security group or NACL rule would be the first to reject it.
+Together these facts reinforce a single theme: VPC design is as much about cost and operability as it is about drawing boxes on a whiteboard. When you review an architecture diagram, ask where each arrow would show up in a flow log and which route table entry makes that arrow possible. Determine which security group or NACL rule would be the first to reject that flow.
 
 ---
 
@@ -1173,7 +1173,43 @@ printf '%s\n' 'Cleanup commands were attempted. Inspect command output and remai
 vpc_lab_cleanup
 ```
 
-### Success Criteria
+**Card A: A private subnet is private because it has no public IP flag.** An engineer provisions a new subnet and disables the `MapPublicIpOnLaunch` attribute, assuming this single configuration flag guarantees the subnet remains isolated from the public internet. They believe that without auto-assigned public IP addresses, instances launched into the subnet cannot establish direct inbound or outbound communication with external networks. Because of this assumption, they attach the main VPC route table pointing `0.0.0.0/0` to an Internet Gateway, expecting the missing public IP flag to prevent any internet routing behavior.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing instance-level public IP auto-assignment with subnet-level routing table topology. Next action: associate the subnet with a dedicated private route table that lacks a default route to an Internet Gateway, routing internet-bound egress through a NAT Gateway instead.
+
+</details>
+
+**Card B: Deleting a NAT Gateway is enough; leftover `0.0.0.0/0` routes are harmless.** A cloud operator deletes an expensive NAT Gateway during an off-peak cost reduction initiative to eliminate idle hourly service charges. Convinced that removing the gateway resource automatically disables outbound traffic attempts, they leave the existing `0.0.0.0/0` target pointing to the deleted NAT Gateway identifier in the private route table. They assume that dangling route targets are harmlessly ignored by the VPC router without impacting downstream instance behavior or operational health checks.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: leaving blackhole routes in route tables after terminating gateway resources. Next action: delete the orphaned `0.0.0.0/0` route entry or update its target to a valid, active NAT Gateway to prevent silent packet drops and diagnostic confusion.
+
+</details>
+
+**Card C: Database security groups should allow the VPC CIDR on 5432.** A database administrator configures an inbound Security Group rule allowing PostgreSQL port 5432 from the entire VPC CIDR block to simplify network administration across internal environments. They reason that because the VPC CIDR encompasses only private internal addresses, every resource within the virtual private cloud can be trusted as a legitimate database consumer. Convinced that broad internal CIDR rules adhere to cloud isolation principles, they bypass granular source restrictions and skip referencing specific application security groups.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: using broad network-layer CIDR ranges instead of microsegmentation and security group chaining. Next action: restrict database inbound rules to explicitly reference the security group ID of authorized application servers on port 5432.
+
+</details>
+
+**Card D: VPC peering is transitive through a middle VPC.** An infrastructure architect connects multiple environments by peering VPC A to a shared services VPC B, and then peering VPC B to an internal production VPC C. They assume that because VPC B maintains active peering connections with both endpoints, network packets from VPC A will automatically traverse VPC B to reach instances residing in VPC C. Convinced that VPC peering supports multi-hop routing similar to an on-premises WAN router, they skip provisioning direct point-to-point connections or deploying a Transit Gateway.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: assuming VPC peering supports transitive routing across intermediate network boundaries. Next action: establish an explicit direct peering connection between VPC A and VPC C, or migrate multi-VPC interconnections to an AWS Transit Gateway hub.
+
+</details>
+
+**Success Criteria**:
 
 **Theory-only pass**: Reading all sections through Task 8 (VPC Flow Logs configuration) is a complete theory-only pass. You do not need to run `vpc_behavior_probe` to finish the conceptual learning. If you skip Task 9, leave the traffic-receipt checkbox unchecked and record `probe not executed` — that is the honest outcome, not a failure.
 
