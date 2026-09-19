@@ -744,7 +744,7 @@ Profiler complements distributed tracing by inspecting internal execution patter
 Reach for Cloud Trace first. A 10-second checkout transaction with low CPU utilization indicates a request-path wait on I/O, database locks, or downstream RPCs. Cloud Trace isolates distributed latency across external hops, whereas Cloud Profiler analyzes hot CPU or memory churn inside a process.
 </details>
 
-The next section covers multi-project monitoring architectures in Google Cloud. We examine how platform teams centralize metrics and alerts across multiple projects.
+The next object is the metrics scope model. After that section, Ops Agent collection on Compute Engine is a different telemetry path.
 
 ---
 
@@ -754,7 +754,7 @@ In a real-world GCP organization, resources are rarely confined to a single proj
 
 ### Metrics Scopes
 
-A **Metrics Scope** allows you to view and manage monitoring data from multiple GCP projects through a single pane of glass. You designate one **scoping project**—often a shared observability or platform project—and attach **monitored projects** whose metrics become visible in that scope. Dashboards in the scoping project can chart resources from any attached project side by side, which gives platform teams cross-project visibility without console switching. Centralized role assignments on the scoping project allow site reliability engineers to inspect fleet health without requiring administrative roles in every workload project.
+A **Metrics Scope** allows you to view and manage monitoring data from multiple GCP projects through a single pane of glass. You designate one **scoping project**—often a shared observability or platform project—and attach **monitored projects** whose metrics become visible in that scope. Dashboards in the scoping project can chart resources from any attached project side by side, which gives platform teams cross-project visibility without console switching. IAM on that project can grant SREs read access to fleet health without Owner on every application project.
 
 **Pause and predict:** If an organization maintains ten separate production microservice projects, how should the operations team organize alerting policies?
 
