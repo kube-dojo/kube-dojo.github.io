@@ -557,8 +557,6 @@ In a hub-and-spoke topology, a central hub network handles all cross-account and
 
 **AWS Transit Gateway** is the hub-and-spoke implementation on AWS. A Transit Gateway in the network hub account acts as a cloud router: every spoke VPC attaches to it, and the Transit Gateway route tables determine which spokes can talk to each other. In a typical Landing Zone, the production OU spokes can route to the shared services hub (for CI/CD, container registry access) and to on-premises via the VPN or Direct Connect attachment, but production spokes cannot route to sandbox OU spokes, enforcing blast-radius isolation at the network layer. Transit Gateway scales to thousands of VPC attachments -- with AWS documenting scaling up to 5,000 VPC attachments per gateway under standard published limits -- but the cost scales linearly. You pay per attachment per hour plus per GB of data processed. A 200-account Landing Zone with two VPCs per account creates 400 attachments, and recurring transit charges can become a major monthly line item before data transfer fees. The cost optimization lever is route table design: default all spoke-to-spoke traffic to blackhole unless a specific route table entry allows it, which also improves security by making east-west traffic opt-in rather than opt-out.
 
-**Azure Virtual WAN** provides the Microsoft-managed hub-and-spoke for Azure Landing Zones. Unlike AWS Transit Gateway, which you configure route tables explicitly, Virtual WAN automates branch-to-branch and spoke-to-spoke connectivity through a Microsoft-managed route propagation model. Spoke VNets connected to a Virtual WAN hub automatically learn routes for all other connected spokes, which simplifies operations but removes the explicit isolation that Transit Gateway route tables provide. For Landing Zones, this means you must use Azure Firewall in the hub to enforce network segmentation policies that Transit Gateway would handle at the route table level. Azure Virtual WAN hubs are regional -- a hub in East US does not automatically route traffic to a hub in West Europe, so multi-region Landing Zones require a hub in each region with inter-hub connectivity configured explicitly. The cost model differs from AWS and separates hub-router capacity from gateway capacity. The virtual hub router scales via Routing Infrastructure Units (RIUs) that you set at hub creation or edit time; Microsoft documents aggregate VNet-to-VNet routing throughput up to about 50 Gbps at maximum RIUs (verify current limits on [learn.microsoft.com](https://learn.microsoft.com/en-us/azure/virtual-wan/hub-settings)). Site-to-site VPN, ExpressRoute, and point-to-site gateways in the same hub scale independently via gateway scale units (~500 Mbps per VPN scale unit, with aggregate VPN throughput up to about 20 Gbps per hub per the Virtual WAN FAQ -- verify current numbers). Virtual WAN billing also includes hub and connection components distinct from per-VNet attachment models on AWS Transit Gateway, so large spoke counts can be more predictable but less granular than TGW per-attachment pricing.
-
 **Pause and predict:** A platform team deploys an Azure Virtual WAN hub to connect spokes. Can default route propagation isolate spoke workloads from one another like an AWS Transit Gateway blackhole route?
 
 <details>
@@ -566,6 +564,10 @@ In a hub-and-spoke topology, a central hub network handles all cross-account and
 
 You cannot rely on default Virtual WAN behavior for spoke isolation. In standard Azure Virtual WAN, the central virtual hub router enables any-to-any VNet-to-VNet transit by default, allowing all connected spoke networks to communicate freely across the hub without manual route entries. Unlike AWS Transit Gateway, where unconfigured routes act as implicit blackholes that isolate spokes by default, Azure Virtual WAN requires explicit security controls to restrict lateral traffic. To achieve tenant isolation, platform teams must deploy an Azure Firewall within the virtual hub, configure routing intent policies to steer spoke-to-spoke traffic through firewall inspection, or associate spokes with custom virtual hub route tables that omit routes to neighboring workloads.
 </details>
+
+The next section is how Azure Virtual WAN runs a managed hub and how spoke routing differs from an explicit transit gateway.
+
+**Azure Virtual WAN** provides the Microsoft-managed hub-and-spoke for Azure Landing Zones. Unlike AWS Transit Gateway, which you configure route tables explicitly, Virtual WAN automates branch-to-branch and spoke-to-spoke connectivity through a Microsoft-managed route propagation model. Spoke VNets connected to a Virtual WAN hub automatically learn routes for all other connected spokes, which simplifies operations but removes the explicit isolation that Transit Gateway route tables provide. For Landing Zones, this means you must use Azure Firewall in the hub to enforce network segmentation policies that Transit Gateway would handle at the route table level. Azure Virtual WAN hubs are regional -- a hub in East US does not automatically route traffic to a hub in West Europe, so multi-region Landing Zones require a hub in each region with inter-hub connectivity configured explicitly. The cost model differs from AWS and separates hub-router capacity from gateway capacity. The virtual hub router scales via Routing Infrastructure Units (RIUs) that you set at hub creation or edit time; Microsoft documents aggregate VNet-to-VNet routing throughput up to about 50 Gbps at maximum RIUs (verify current limits on [learn.microsoft.com](https://learn.microsoft.com/en-us/azure/virtual-wan/hub-settings)). Site-to-site VPN, ExpressRoute, and point-to-site gateways in the same hub scale independently via gateway scale units (~500 Mbps per VPN scale unit, with aggregate VPN throughput up to about 20 Gbps per hub per the Virtual WAN FAQ -- verify current numbers). Virtual WAN billing also includes hub and connection components distinct from per-VNet attachment models on AWS Transit Gateway, so large spoke counts can be more predictable but less granular than TGW per-attachment pricing.
 
 The next section is how Google Cloud avoids transit gateways altogether by attaching multiple service projects directly into a centralized host network.
 
@@ -605,15 +607,6 @@ Backstage, [originally built by Spotify and now a CNCF incubating project](https
 
 ### How Backstage Fits Into Account Vending
 
-```mermaid
-flowchart TD
-    User(["Developer clicks 'New Project' in Backstage"]) --> Wizard[Backstage Template Wizard]
-    Wizard --> Engine[Software Template Engine]
-    Engine --> Repo["Git Repo<br/>(with TF/Crossplane)"]
-    Repo --> Pipeline["CI/CD Pipeline<br/>(AFT / Azure Pipelines)"]
-    Pipeline --> Output["Provisioned Account/Subscription/Project<br/>+ VPC/VNet + EKS/AKS/GKE Cluster<br/>+ GitOps repo + ArgoCD Application<br/>+ Registered in Backstage Catalog"]
-```
-
 **Pause and predict:** A developer submits an automated cluster request through Backstage. Is the workflow complete once the cloud provider reports the Kubernetes API is Ready, and what steps remain before issuing credentials?
 
 <details>
@@ -622,7 +615,16 @@ flowchart TD
 A cluster request is not complete when the cloud provider API reports the control plane is Ready. At that initial stage, the cluster is merely raw, unconfigured compute. The automated provisioning pipeline must first vend or attach the dedicated account, connect spoke networking to the central hub, and deploy the base control plane. Once the API endpoint becomes responsive, the pipeline must configure enterprise identity federation, establish baseline GitOps controllers for continuous delivery, install mandatory telemetry and admission guardrails, and register the resource in the centralized Backstage software catalog. Only after all foundational platform integrations pass health validation should the automation safely generate and issue a kubeconfig or cluster access role to the requesting engineering team.
 </details>
 
-The next section is how a declarative Backstage software template collects developer inputs and dispatches parameters to underlying infrastructure automation pipelines.
+The next section is how a Backstage software template records the cluster request and starts the vending pipeline.
+
+```mermaid
+flowchart TD
+    User(["Developer clicks 'New Project' in Backstage"]) --> Wizard[Backstage Template Wizard]
+    Wizard --> Engine[Software Template Engine]
+    Engine --> Repo["Git Repo<br/>(with TF/Crossplane)"]
+    Repo --> Pipeline["CI/CD Pipeline<br/>(AFT / Azure Pipelines)"]
+    Pipeline --> Output["Provisioned Account/Subscription/Project<br/>+ VPC/VNet + EKS/AKS/GKE Cluster<br/>+ GitOps repo + ArgoCD Application<br/>+ Registered in Backstage Catalog"]
+```
 
 ### Backstage Software Template for K8s Environment
 
