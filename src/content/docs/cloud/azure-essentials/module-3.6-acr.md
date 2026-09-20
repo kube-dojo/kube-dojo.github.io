@@ -87,7 +87,7 @@ Throughput is not a single headline number on the pricing page. Image pull and p
 No. Geo-replication is strictly a Premium SKU capability in Azure Container Registry. Standard and Basic registries are restricted to a single Azure region; enabling automated multi-region replication requires upgrading to the Premium tier.
 </details>
 
-Regional replicas are provisioned using `az acr replication create`, allowing container images pushed to the primary region to [replicate asynchronously to each replica](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-geo-replication). Workloads in each region are automatically steered to their nearest local replica for image pulls, achieving a single-registry multi-region deployment architecture with regional endpoint management. Operating these replicas incurs an additional daily charge per configured replica location in addition to standard registry platform fees (see [Azure Container Registry pricing](https://azure.microsoft.com/en-us/pricing/details/container-registry/)).
+Image pull locality across regions is a topology decision, not only a SKU checkbox. Teams still have to place compute near the layers they pull, watch replica lag after large promotions, and budget storage that is copied rather than shared. Pricing pages list replica days separately from the home-registry SKU so finance can see the multiplier before anyone copies production into three continents.
 
 **Private Link** and **OCI image signing** via the [Notary Project](https://notaryproject.dev/) (`notation` CLI with Azure Key Vault keys) are Premium-aligned supply-chain controls. [Docker Content Trust (DCT) is deprecated](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-content-trust-deprecation)—new DCT enablement ended 2025-03-31 and DCT is fully removed 2028-03-31; use Notary Project signing instead. [Private endpoints](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-private-link) project the registry into your VNet so pulls never traverse the public internet. **Customer-managed keys** for encryption at rest and **retention policies** for untagged manifests are Premium capabilities as well.
 
@@ -431,7 +431,7 @@ By default, Azure Container Registry exposes a public endpoint. While authentica
 The kubelet still resolves the public `*.azurecr.io` fully qualified domain name because the cluster virtual network lacks the private DNS zone link. Because public network access is disabled on the registry, the connection cannot be established, and the pull fails with connection timeouts leading to `ImagePullBackOff` rather than routing across the private IP.
 </details>
 
-Enforcing private network isolation requires coordinating private endpoint allocation, virtual network routing, and regional DNS integration into a unified deployment workflow. When public network ingress is completely blocked, validating network interface configuration ensures traffic remains securely routed over the Microsoft backbone. The following operational commands demonstrate how to disable public ingress, establish a private endpoint, and link the required private DNS zone:
+Enforcing private network isolation requires coordinating private endpoint allocation, virtual network routing, and DNS with the cluster that will pull images. The CLI that follows disables public ingress and creates a private endpoint so you can inspect the resulting NIC and DNS records in your own subscription.
 
 ```bash
 # Disable public access
