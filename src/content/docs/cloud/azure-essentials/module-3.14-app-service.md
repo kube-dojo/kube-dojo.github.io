@@ -32,9 +32,17 @@ The first production surprise is usually the App Service Plan. A plan defines th
 
 The second surprise is that App Service has two different private-networking stories. Virtual Network Integration is outbound from the app into a VNet; it does not make the app privately reachable. Private Endpoint is inbound private access to the app; it does not route the app's outbound calls into the VNet. Hybrid Connections are a narrow outbound bridge to a single TCP host and port. Microsoft documents these boundaries separately for [VNet Integration](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration), [Private Endpoint](https://learn.microsoft.com/en-us/azure/app-service/overview-private-endpoint), and [Hybrid Connections](https://learn.microsoft.com/en-us/azure/app-service/app-service-hybrid-connections), so an incident runbook must always name inbound and outbound paths separately.
 
-The third surprise is release behavior. Deployment slots let you deploy to a nonproduction slot, warm and validate it, swap it into production, and keep the previous production build in the other slot as a rollback target. The official slot guide also documents warm-up, slot-specific settings, swap with preview, and auto-swap caveats, including that auto swap is not supported for Linux web apps or Web App for Containers. [Deployment slots](https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots) are therefore the feature that often makes App Service the correct choice for classic web applications even when Container Apps or AKS can also run the code.
+The third surprise is release behavior. Operational teams frequently debate whether to migrate traditional workloads to microservice runtimes or stay on managed web platforms. Comparing hosting options requires evaluating how routine deployments execute, how long traffic shifts take, and how quickly an operator can revert a problematic build under strict recovery time objectives.
 
-> **Pause and predict:** A public .NET monolith has predictable traffic, Azure SQL, Key Vault references, a custom domain, weekly releases, and a rollback target of under five minutes. App Service, Container Apps, and AKS can all run the workload. Which one is the first candidate, and which release primitive drives that answer?
+**Pause and predict:** A public .NET monolith has predictable traffic, Azure SQL, Key Vault references, a custom domain, weekly releases, and a rollback target of under five minutes. App Service, Container Apps, and AKS can all run the workload. Which one is the first candidate, and which release primitive drives that answer?
+
+<details>
+<summary>Check your prediction</summary>
+
+App Service is the first candidate because it provides native web platform semantics without the infrastructure overhead of managing container clusters or ingress controllers. The primary release primitive is **deployment slots**, which allow staging validation, instant warm-up, and an atomic swap into production. If an unexpected failure occurs after release, swapping the slots again restores the previous production build in under five minutes.
+</details>
+
+Platform teams must treat release velocity and recovery speed as primary architectural constraints rather than secondary operational afterthoughts. Establishing clear boundary definitions between compute hosting, configuration drift, and observability surfaces prevents costly governance disputes when selecting enterprise application foundations.
 
 ## Did You Know
 
@@ -232,7 +240,17 @@ Slot stickiness is the configuration trap. An app setting or connection string t
 
 Warm-up needs a real readiness endpoint. App Service supports `WEBSITE_SWAP_WARMUP_PING_PATH`, and `WEBSITE_SWAP_WARMUP_PING_STATUSES` can stop the warm-up and swap if the response code is not in the allowed list. A shallow `/` check can return before caches, dependency connections, or container initialization are ready, so the readiness path should prove that the app can serve core traffic without doing destructive work. [The app-setting reference](https://learn.microsoft.com/en-us/azure/app-service/reference-app-settings) documents these swap warm-up settings, and [the slot guide](https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots) explains how warm-up fits the swap operation.
 
-Auto swap belongs only in low-risk continuous deployment flows where pre-swap validation is not required, and it is not supported for Linux web apps or Web App for Containers. Swap with preview belongs in higher-risk releases because it applies destination settings to the source slot before completing the swap, letting you validate the would-be production configuration before traffic moves. A disciplined operator chooses normal swap, swap with preview, or no swap based on configuration risk, not on habit. [Auto swap and swap troubleshooting](https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots#configure-auto-swap) define those caveats.
+Automated cutover workflows are frequently evaluated for continuous deployment pipelines that aim to eliminate manual gates during routine application updates. Platform engineers often explore whether staging slots can shift incoming traffic without manual intervention as soon as new application code finishes deploying.
+
+**Pause and predict:** A team running a Linux web app wants to streamline its continuous deployment pipeline by enabling auto swap on the staging slot as the default rollout mechanism. Will this configuration achieve hands-free production traffic cutover?
+
+<details>
+<summary>Check your prediction</summary>
+
+Microsoft Learn explicitly notes that **auto swap isn't supported in web apps on Linux and in Web App for Containers**. Enabling or attempting to rely on auto swap for Linux application workloads will not perform automated production swaps upon deployment. Continuous deployment pipelines for Linux web apps must instead invoke explicit slot swap operations using Azure CLI, PowerShell, or pipeline release tasks after automated health checks pass.
+</details>
+
+Swap with preview applies destination settings to the source slot before completing the swap operation. This allows operators to validate the would-be production configuration before live traffic moves. A disciplined operator chooses normal manual swap, swap with preview, or pipeline-orchestrated cutover based on configuration risk, runtime platform capabilities, and change governance policies rather than habit. [Auto swap and swap troubleshooting](https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots#configure-auto-swap) define those operational trade-offs across deployment workflows.
 
 ## Managed Identity and Secretless Dependencies
 
@@ -257,7 +275,17 @@ az webapp config appsettings set \
   --slot-settings "OrdersDbPassword=@Microsoft.KeyVault(SecretUri=https://kv-orders-prod.vault.azure.net/secrets/orders-db-password/)"
 ```
 
-Key Vault references are useful when the application still needs a secret value, because an app setting can contain an `@Microsoft.KeyVault(...)` reference and the application reads it like any other setting. The reference uses the system-assigned identity by default, can be configured to use a user-assigned identity, and automatically picks up a newer version within 24 hours when the secret URI is versionless; any configuration change restarts the app and forces an immediate refetch. Microsoft also recommends marking most Key Vault references as slot settings because environments usually have separate vaults. [Key Vault references](https://learn.microsoft.com/en-us/azure/app-service/app-service-key-vault-references) document these behaviors and failure modes.
+Key Vault references are useful when an application still requires a secret value, because an app setting can store an `@Microsoft.KeyVault(...)` reference and the runtime reads it like standard configuration. The reference uses the system-assigned identity by default, can be configured with a user-assigned identity, and prevents embedding credentials directly in deployment templates. Microsoft also recommends designating Key Vault references as slot settings because staging and production environments typically connect to isolated vaults.
+
+**Pause and predict:** If an application relies on a versionless Key Vault reference (`SecretUri` without a version GUID) and an engineer rotates the secret in Key Vault, does the running App Service app pick up the rotated secret within seconds?
+
+<details>
+<summary>Check your prediction</summary>
+
+App Service **caches** the value and refetches every **24 hours** on a background polling interval. The running application will not pick up the rotated secret within seconds; however, a configuration change restarts the app and forces an immediate refetch from Key Vault. During an emergency credential rotation, operators must trigger an application restart or update an app setting rather than waiting for background polling.
+</details>
+
+Operational secret management requires engineering teams to balance runtime execution performance with credential lifecycle policies across environments. Verifying reference syntax, managed identity access rights, and network reachability ensures secret resolution functions smoothly throughout normal runtime operations. [Key Vault references](https://learn.microsoft.com/en-us/azure/app-service/app-service-key-vault-references) document these behaviors and operational failure modes.
 
 Prefer direct Entra authentication when the downstream service supports it. For Azure SQL, the app identity must exist, the SQL server needs an Entra administrator, and the database must create a user for the identity and grant only the required roles. For Blob Storage, Azure RBAC data roles such as Storage Blob Data Contributor or Storage Blob Data Reader authorize data-plane access, and the role scope should be the narrowest useful container, account, resource group, or subscription scope. [App Service to Azure SQL with managed identity](https://learn.microsoft.com/en-us/azure/app-service/tutorial-connect-msi-sql-database) and [Blob access with Microsoft Entra ID](https://learn.microsoft.com/en-us/azure/storage/blobs/authorize-access-azure-active-directory) are the operator references.
 
@@ -265,7 +293,17 @@ Identity incidents are usually grant-chain failures, not platform mysteries. Con
 
 ## Networking: Inbound and Outbound Are Separate
 
-An App Service networking design must draw two paths. Inbound traffic is how clients reach the app; outbound traffic is how the app reaches dependencies. Private Endpoint is the usual private inbound pattern for multitenant App Service, access restrictions are front-end allow/deny rules for the public endpoint, VNet Integration sends outbound app traffic into a delegated subnet, and Hybrid Connections bridge outbound calls to a single TCP host and port through Azure Relay. Microsoft documents that VNet Integration is outbound only and that access restrictions or Private Endpoint control inbound access. [VNet Integration](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration), [Private Endpoint](https://learn.microsoft.com/en-us/azure/app-service/overview-private-endpoint), [access restrictions](https://learn.microsoft.com/en-us/azure/app-service/app-service-ip-restrictions), and [Hybrid Connections](https://learn.microsoft.com/en-us/azure/app-service/app-service-hybrid-connections) define the boundaries.
+An App Service networking design must draw two paths: inbound traffic from clients and outbound traffic to dependencies. Multi-tenant hosting environments present distinct networking primitives for connecting workloads across cloud virtual networks, corporate backbones, and software-as-a-service endpoints.
+
+**Pause and predict:** If an engineer enables regional Virtual Network Integration on an App Service app by attaching it to a delegated subnet, does that configuration make the web application privately reachable from virtual machines inside that VNet?
+
+<details>
+<summary>Check your prediction</summary>
+
+VNet Integration is **outbound only** and does not grant inbound private access to the application from the VNet. It enables worker instances to route egress traffic into a delegated subnet to reach private databases, storage accounts, and peered networks. To make an App Service app privately reachable from the VNet for inbound traffic, you must configure a **Private Endpoint**.
+</details>
+
+Network boundary architecture requires platform teams to separate ingress protection mechanisms from egress transport paths. Access restrictions provide priority-ordered front-end allow and deny rules for the public endpoint, while Hybrid Connections bridge outbound TCP calls to specific on-premises host and port targets through Azure Relay. [VNet Integration](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration), [Private Endpoint](https://learn.microsoft.com/en-us/azure/app-service/overview-private-endpoint), [access restrictions](https://learn.microsoft.com/en-us/azure/app-service/app-service-ip-restrictions), and [Hybrid Connections](https://learn.microsoft.com/en-us/azure/app-service/app-service-hybrid-connections) define those operational boundaries.
 
 ```mermaid
 flowchart LR
@@ -485,17 +523,53 @@ Use this design scenario without provisioning paid Azure resources unless you ha
 
 In `decision.md`, compare App Service, Container Apps, and AKS in one paragraph each, then pick the first candidate and name the release primitive that makes rollback credible. In `slots-runbook.md`, choose a plan tier, minimum workers, staging slot name, warm-up path, sticky settings, swap command, rollback command, and stop condition. In `networking.md`, draw inbound and outbound paths separately for the current public model and the private target model. In `autoscale.md`, set minimum, maximum, metric rules, schedule rules, cooldowns, and dependency stop conditions. In `monitoring.kql`, include one 5xx query, one latency-percentile query, and one console-error query adapted from this module. [The App Service plan](https://learn.microsoft.com/en-us/azure/app-service/overview-hosting-plans), [slot](https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots), [networking](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration), [autoscale](https://learn.microsoft.com/en-us/azure/azure-monitor/autoscale/autoscale-overview), and [diagnostics](https://learn.microsoft.com/en-us/azure/app-service/tutorial-troubleshoot-monitor) docs are the source set you should use while writing.
 
-- [ ] Evaluate App Service, Container Apps, and AKS, then write the service decision and the release primitive in `decision.md`.
-- [ ] Design the App Service Plan, staging slot, sticky settings, warm-up path, swap command, and rollback criteria in `slots-runbook.md`.
-- [ ] Design separate inbound and outbound network paths in `networking.md`, including Private Endpoint, VNet Integration, DNS ownership, and access restrictions.
-- [ ] Design metric and schedule autoscale rules in `autoscale.md`, including a dependency condition that stops further web-tier scale-out.
-- [ ] Debug the imagined 503, Key Vault 403, and autoscale storm by writing the evidence query or command you would run first in `monitoring.kql`.
-
 Success means the design can answer the seven operator questions without guessing. A reviewer should be able to see which service hosts the workload, which plan tier and worker count run it, which settings are sticky, how inbound and outbound traffic flow, which logs prove a failed release, which rollback action takes minutes, and which metric would stop web-tier scaling because the bottleneck moved to SQL, Storage, Key Vault, or another dependency. This is also the final alignment check: the Debug outcome maps to the outage evidence, the Design outcome maps to the plan/slot/network/autoscale files, and the Evaluate outcome maps to the service decision.
 
 Treat the practice as an operator handoff, not a classroom worksheet. The strongest submission is one another engineer could use during a change review or a 03:00 incident: it names the plan and slot, states whether the plan is shared, identifies exactly which settings are sticky, draws the private inbound and outbound paths, gives the first three KQL queries, and states the rollback command in full. It should also include one rejected alternative, such as Container Apps for a team that prefers revision traffic splitting or AKS for a platform team that already owns Kubernetes policy and ingress. That rejected alternative keeps the Evaluate outcome honest because it proves the App Service decision was chosen against current Azure service contracts, not by habit. If you add optional provisioning, create only a small nonproduction app and delete it after testing, because App Service plans and dependent resources can accrue cost even when the application itself is stopped. [App Service plan billing](https://learn.microsoft.com/en-us/azure/app-service/overview-hosting-plans), [Container Apps revisions](https://learn.microsoft.com/en-us/azure/container-apps/revisions), [AKS](https://learn.microsoft.com/en-us/azure/aks/what-is-aks), and [diagnostic settings](https://learn.microsoft.com/en-us/azure/app-service/tutorial-troubleshoot-monitor) are the review references.
 
 Before you call the exercise complete, write one "first five minutes" incident note. It should say what you check first for a 503 after swap, what evidence would make you swap back, and what evidence would make you hold traffic in production while fixing a downstream dependency. That note turns the design from a static architecture into an executable Debug runbook, and it forces the plan, slot, identity, network, autoscale, and log sections to agree with each other. [Deployment slots](https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots) and [App Service diagnostics](https://learn.microsoft.com/en-us/azure/app-service/overview-diagnostics) are enough to ground that runbook.
+
+**Card A: Container Apps is the first candidate because revision traffic splitting is the fastest rollback for this weekly .NET monolith.** A migration engineer evaluates hosting options for a legacy .NET monolith and argues that Container Apps provides the fastest recovery mechanism through revision traffic splitting. The engineer prioritizes revision weighting over native web platform semantics, warm-up slot behavior, and direct operational fit.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: hosting platform abstraction and release primitive selection. Next action: designate App Service as the first candidate because deployment slots provide atomic swaps, pre-swap warm-up, and sub-five-minute rollback for traditional web applications without the operational overhead of managing container environments or ingress abstractions.
+</details>
+
+**Card B: Auto swap is supported for Linux web apps and should be the default continuous-deploy path.** An operations team configures continuous deployment for an enterprise Linux web application and enables auto swap on the staging slot to automate production releases. The team assumes the hosting platform executes automated swaps identically across all operating systems without requiring script orchestration.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: operating system feature support and automated deployment constraints. Next action: disable auto swap on Linux web apps because Microsoft Learn documents that auto swap is not supported on Linux and Web App for Containers, and implement explicit slot swap automation or swap with preview in the deployment pipeline.
+</details>
+
+**Card C: VNet Integration makes the App Service app privately reachable from the VNet.** A cloud engineer attaches an App Service web application to a delegated virtual network subnet using regional VNet Integration and assumes internal clients on that network can now access the application securely over private IP addresses. The engineer assumes virtual network integration establishes bidirectional private connectivity.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: network directional traffic boundaries. Next action: configure a Private Endpoint on the web application for inbound private access from the virtual network, while using VNet Integration strictly for routing outbound calls from application workers to backend dependencies.
+</details>
+
+**Card D: A versionless Key Vault reference updates the running App Service app within seconds of secret rotation.** A systems administrator rotates an application database password in Azure Key Vault and expects the App Service application referencing the versionless secret URI to fetch and use the new secret value immediately. The administrator assumes the platform resolves Key Vault references synchronously on every application request.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: secret caching and polling synchronization intervals. Next action: account for the default 24-hour Key Vault reference cache refresh interval, and perform an application restart or trigger an app configuration update to force an immediate secret refetch during credential rotation.
+</details>
+
+**Success Criteria**:
+
+Your design artifacts must clearly demonstrate operational ownership and architectural control decisions across compute, slot, networking, autoscale, and diagnostic boundaries:
+
+- [ ] Evaluate App Service, Container Apps, and AKS, then write the service decision and the release primitive in `decision.md`.
+- [ ] Design the App Service Plan, staging slot, sticky settings, warm-up path, swap command, and rollback criteria in `slots-runbook.md`.
+- [ ] Design separate inbound and outbound network paths in `networking.md`, including Private Endpoint, VNet Integration, DNS ownership, and access restrictions.
+- [ ] Design metric and schedule autoscale rules in `autoscale.md`, including a dependency condition that stops further web-tier scale-out.
+- [ ] Debug the imagined 503, Key Vault 403, and autoscale storm by writing the evidence query or command you would run first in `monitoring.kql`.
 
 ## Sources
 
