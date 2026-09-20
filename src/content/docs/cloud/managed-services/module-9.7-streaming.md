@@ -420,13 +420,13 @@ Advanced teams implement **key-aware autoscaler hints**: if one tenant dominates
 Each partition is assigned to exactly one consumer in a group. Extra members get zero partitions and sit idle while Kubernetes still reports Ready. [Each partition is assigned exclusively within a consumer group](https://kafka.apache.org/intro). The Kafka consumer group coordination protocol allocates the 12 available partitions across 12 pods, leaving the remaining 3 replica pods without any assigned topic partitions. Because these idle pods remain healthy processes that successfully poll the broker cluster and pass HTTP liveness or readiness probes, Kubernetes reports them as fully running and Ready even though they perform zero event processing work.
 </details>
 
-The next section is how consumer group membership protocols and broker partition rebalancing algorithms coordinate workload distribution across a fleet of worker pods.
+The next section is how consumer lag metrics and KEDA scalers tell you when processing cannot keep up with the durable log.
 
 ---
 
 ## Consumer Groups and Lag Monitoring
 
-Consumer groups are the bridge between **durable logs** and **Kubernetes scale**. Whether the broker is MSK, Event Hubs, or a Strimzi cluster inside the cluster, the rule holds: each partition is assigned to at most one consumer instance in a group at a time. Scaling replicas beyond partition count wastes CPU and memory; scaling below partition count leaves throughput on the table. Platform engineers should publish the **partition count as part of the topic contract** alongside schema version and retention, because application teams cannot HPA their way past a three-partition topic.
+Consumer groups are the bridge between **durable logs** and **Kubernetes scale**. Whether the broker is MSK, Event Hubs, or a Strimzi cluster inside the cluster, platform engineers should publish the **partition count as part of the topic contract** alongside schema version and retention, because application teams cannot HPA their way past a three-partition topic.
 
 Lag is the operational heartbeat. For Kafka, exporters surface `kafka_consumergroup_lag`; for Kinesis, **GetRecords.IteratorAgeMilliseconds** indicates how far behind the consumer is; for Pub/Sub, **oldest_unacked_message_age** plays the same role. Alert on lag growth rate, not instantaneous spikes during deploys, and correlate lag with downstream dependency latency (databases, payment APIs) before blaming the broker.
 
@@ -618,7 +618,7 @@ Stream processing pipelines requiring high data integrity must carefully choose 
 Kafka exactly-once is consume→process→produce on Kafka topics. External DB/API sinks still need idempotent writes / cooperation with that system. [Kafka achieves exactly-once semantics (EOS) for read-process-write loops inside the Kafka ecosystem](https://kafka.apache.org/41/design/design/) through idempotent producers, transactions, and consumer offset commits that participate in the same transaction boundary. However, Kafka transactions cannot span external non-Kafka systems like PostgreSQL, Elasticsearch, or third-party HTTP endpoints. Flink and Beam (Dataflow) pursue a different but related guarantee: exactly-once processing relative to checkpoints stored in S3, GCS, or Azure Blob where failures roll back to the last successful checkpoint. Similarly, Pub/Sub's [exactly-once delivery](https://cloud.google.com/pubsub/docs/exactly-once-delivery) narrows duplicate delivery at the subscription layer when enabled, but your GKE handler must still write idempotently to Postgres or call external APIs with safe retries. Kinesis consumers achieve effectively-once by storing checkpoints in DynamoDB or by using Flink with managed checkpoints; there is no single transaction knob like Kafka's `send_offsets_to_transaction`.
 </details>
 
-The next section is how transactional producer IDs and atomic consumer offset commits establish coordinated transactional boundaries across streaming pipelines.
+The next section is how a stream processor keeps local RocksDB state on a pod and what a restart does to that cache.
 
 ### The Transactional Pipeline
 
@@ -664,7 +664,7 @@ if msg:
 Kafka Streams local RocksDB on empty ephemeral disk is gone after restart; restore is changelog replay (slow). PVC/StatefulSet and optional standby replicas cut restore time. When a stream processor keeps local state on ephemeral pod storage, a restarted pod loses that local state and must restore it from the changelog before normal processing resumes. Rebuilding gigabytes of key-value state over the network delays consumer partition readiness and extends rebalance durations. Using a StatefulSet backed by persistent volume claims preserves RocksDB data across pod recreation, allowing the stream processor to resume stateful joins and window aggregations almost immediately.
 </details>
 
-The next section is how persistent volume claims and StatefulSet workload specifications preserve local cache state across scheduled worker pod recreations.
+The next section is how Schema Registry turns event JSON into versioned contracts so producers cannot silently break consumers.
 
 Instead, stream processors with local state should be deployed as a `StatefulSet` with persistent volume claims to avoid expensive remote changelog rebuilds:
 
@@ -852,7 +852,7 @@ Operational tips for GKE/EKS/AKS: run registry behind internal ingress with mTLS
 <details>
 <summary>Check your prediction</summary>
 
-Schema Registry default BACKWARD. Changing a field type Number→String is incompatible; the registry rejects it or you cut over to a new topic. Under BACKWARD compatibility, new schemas must be able to read data written by older schemas. Changing a field type from an integer to a string breaks deserialization because consumers running the new schema cannot parse existing binary payloads where the field was encoded as an integer. Because this violates schema evolution rules, the Schema Registry rejects the registration request with an HTTP 409 or 422 incompatibility response, preventing the producer from emitting malformed events onto the topic.
+Schema Registry default BACKWARD. Changing a field type Number→String is incompatible; the registry rejects it or you cut over to a new topic. Under BACKWARD compatibility, new schemas must be able to read data written by older schemas. Changing a field type from an integer to a string breaks deserialization because consumers running the new schema cannot parse existing binary payloads where the field was encoded as an integer. Because this violates schema evolution rules, the Schema Registry rejects the registration request, preventing the producer from emitting malformed events onto the topic.
 </details>
 
 The next section is how change data capture connectors and analytical stream processors route operational events across streaming and batch boundaries.
@@ -1452,7 +1452,7 @@ Failure layer: Ephemeral container lifecycle, RocksDB cache destruction, and cha
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Schema evolution incompatibility, field type mutation, and registry validation rejection. Next action: realize that under BACKWARD compatibility, consumers running the new schema must be capable of deserializing records written with the previous schema version; changing an existing field's primitive type from integer to string (or renaming `quantity` to `quantity_str` without a default value) breaks backward compatibility because new consumers expecting a string cannot parse binary records serialized as integers; the Schema Registry strictly validates compatibility and rejects the registration request with an HTTP 409 or 422 error, blocking producer initialization; to evolve this contract correctly without breaking consumers, you must either maintain the original field and introduce a new optional string field with a default value, or create a new topic with a fresh schema subject and execute an orderly consumer migration.
+Failure layer: Schema evolution incompatibility, field type mutation, and registry validation rejection. Next action: realize that under BACKWARD compatibility, consumers running the new schema must be capable of deserializing records written with the previous schema version; changing an existing field's primitive type from integer to string (or renaming `quantity` to `quantity_str` without a default value) breaks backward compatibility because new consumers expecting a string cannot parse binary records serialized as integers; the Schema Registry strictly validates compatibility and rejects the registration request, blocking producer initialization; to evolve this contract correctly without breaking consumers, you must either maintain the original field and introduce a new optional string field with a default value, or create a new topic with a fresh schema subject and execute an orderly consumer migration.
 </details>
 
 **Success Criteria**:
