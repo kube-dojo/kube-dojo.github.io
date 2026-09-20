@@ -134,7 +134,15 @@ az network vnet subnet create \
 az network vnet subnet list --resource-group myRG --vnet-name hub-vnet -o table
 ```
 
-> **Stop and think**: You need to deploy an Azure Kubernetes Service (AKS) cluster that will scale up to 50 nodes, with 30 pods per node. If you place it in a /24 subnet, what will happen during scaling? Why does the number of Azure-reserved IPs matter here?
+**Pause and predict:** You plan to deploy an Azure Kubernetes Service cluster configured with Azure CNI that must scale up to 50 nodes with 30 pods per node. If you place this cluster inside a single /24 subnet, what will happen during scale-out, and why do Azure subnet reservation rules cause this deployment to fail?
+
+<details>
+<summary>Check your prediction</summary>
+
+Azure reserves 5 IP addresses in every subnet (network, gateway, two DNS resolvers, and broadcast), leaving only 251 usable IP addresses in a standard /24 prefix. Because Azure CNI assigns an individual private VNet IP address to each pod and node, 50 nodes running 30 pods each require 1,550 distinct IP addresses (50 node IPs plus 1,500 pod IPs). This exceeds the 251 usable addresses, causing IP address exhaustion and preventing node scale-out and pod scheduling.
+</details>
+
+Dedicated subnets such as `GatewaySubnet`, `AzureFirewallSubnet`, and `AzureBastionSubnet` require exact naming syntax. Azure fabric controllers programmatically bind gateway appliances and firewall scale sets to those specific names. Reserving distinct address ranges for these platform services prevents administrative rework during hybrid connectivity expansion.
 
 ---
 
@@ -221,7 +229,15 @@ az network nic list-effective-nsg \
   --name myVM-nic -o table
 ```
 
-> **Pause and predict**: A VM has a NIC-level NSG allowing inbound port 80, but its subnet-level NSG denies inbound port 80. If traffic arrives from the internet on port 80, will it reach the VM? Why or why not?
+**Pause and predict:** A virtual machine has a Network Security Group associated with its network interface that allows inbound port 80, but its enclosing subnet has an NSG with a rule that denies inbound port 80. When web traffic arrives from the public internet targeting port 80 on the virtual machine, will the connection reach the workload?
+
+<details>
+<summary>Check your prediction</summary>
+
+The packets will not reach the virtual machine. For inbound traffic, Azure evaluates the subnet-level Network Security Group first and the NIC-level Network Security Group second, and the traffic must pass both evaluations to reach the destination. Because the subnet NSG denies port 80, the packet is discarded at the subnet perimeter before the NIC NSG allow rule can ever be evaluated.
+</details>
+
+Managing firewall rules across large fleets of virtual machines becomes cumbersome when administrators maintain individual IP addresses inside access control lists. Cloud platform teams streamline perimeter management by defining security policies around operational roles rather than host addresses. This operational pattern ensures that network security posture remains consistent across auto-scaled compute clusters.
 
 ### Application Security Groups (ASGs)
 
@@ -267,7 +283,12 @@ VNet peering creates a direct, high-bandwidth, low-latency connection between tw
 
 ### How Peering Works
 
-[Peering is **non-transitive** by default.](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq) If VNet A is peered with VNet B, and VNet B is peered with VNet C, VNet A **cannot** reach VNet C merely because B sits in the middle; there is no automatic "mesh through B" behavior. Hub-and-spoke designs work around that limitation by placing a router or firewall in the hub and using User-Defined Routes on spokes to send inter-spoke traffic through that appliance, which is why the diagrams below show UDRs and **Allow Forwarded Traffic** as paired requirements rather than optional niceties.
+**Pause and predict:** If VNet A is peered directly with VNet B, and VNet B is peered directly with VNet C, can workloads residing in VNet A communicate with workloads in VNet C across this topology without configuring additional routing components?
+
+<details>
+<summary>Check your prediction</summary>
+
+[Peering is **non-transitive** by default.](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq) If VNet A is peered with VNet B, and VNet B is peered with VNet C, VNet A **cannot** reach VNet C merely because B sits in the middle; there is no automatic "mesh through B" behavior. Spoke-to-spoke communication requires placing a router or firewall in the hub, configuring User-Defined Routes on spokes to steer traffic through that appliance, and enabling the **Allow Forwarded Traffic** flag on both peering links.
 
 ```mermaid
 flowchart LR
@@ -281,6 +302,9 @@ flowchart LR
 * **A can reach B:** YES
 * **B can reach C:** YES
 * **A can reach C:** NO (peering is not transitive)
+</details>
+
+Designing enterprise networks around a central hub enables organizations to inspect and audit data flows at a single administrative boundary. Rather than managing complex point-to-point configurations as the application footprint expands, centralized architectures enforce compliance standards cleanly. This pattern also simplifies traffic engineering and reduces the operational overhead of maintaining spoke networks.
 
 ```mermaid
 flowchart LR
@@ -342,7 +366,15 @@ Each peering link exposes four flags that control whether traffic may flow, whet
 | `--allow-gateway-transit` | Set on the hub---lets spokes use the hub's VPN/ExpressRoute gateway |
 | `--use-remote-gateways` | Set on the spoke---tells it to use the hub's gateway for on-prem connectivity |
 
-**Critical rule**: [Peered VNets **cannot have overlapping address spaces**](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq). If hub-vnet uses `10.0.0.0/16` and spoke1-vnet also uses `10.0.0.0/16`, peering creation will fail. Plan your IP address scheme carefully before you start building.
+**Pause and predict:** Can two virtual networks that both assign the `10.0.0.0/16` address space establish a VNet peering connection if they reside in completely different Azure subscriptions or Entra ID tenants?
+
+<details>
+<summary>Check your prediction</summary>
+
+Peering creation will fail immediately during provisioning. [Peered VNets **cannot have overlapping address spaces**](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq) under any circumstances, even when they reside in separate subscriptions or different Entra ID tenants. Azure software-defined routing requires unambiguous destination IP prefixes to direct network packets across virtual networks.
+</details>
+
+Organizations maintain centralized IP address management registries to coordinate CIDR block allocations across cloud subscriptions and on-premises datacenters. When integrating acquired infrastructure with preexisting address conflicts, network architects implement Private Link connections or network address translation gateways. These mechanisms establish secure connectivity between systems without requiring immediate subnet renumbering.
 
 ---
 
@@ -902,7 +934,39 @@ Delete the lab resource group when you finish so public IPs and VMs do not accru
 az group delete --name "$RG" --yes --no-wait
 ```
 
-### Success Criteria
+**Card A: A /24 subnet is plenty for an AKS cluster of 50 nodes with 30 pods each.** An infrastructure team deploys an Azure Kubernetes Service cluster configured with Azure CNI inside a /24 subnet. The team plans to scale the worker node pool up to 50 nodes with 30 application pods running on each node. They assume that a standard /24 prefix provides sufficient private IP addresses to support their planned container scale without exhaustion.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: container network interface IP address consumption versus subnet allocation limits. Next action: calculate the full IP budget including per-pod allocations and Azure reserved addresses before deployment, and allocate at least a /22 subnet prefix or configure Azure CNI overlay networking.
+</details>
+
+**Card B: A NIC NSG that allows port 80 overrides a subnet NSG that denies port 80.** An application engineer attaches a Network Security Group to a virtual machine network interface with a high-priority rule allowing inbound HTTP traffic on TCP port 80. The enclosing subnet NSG contains a rule denying inbound port 80. The engineer assumes that the more specific network interface rule takes precedence over the broader subnet-level security rule.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: dual-stage network security evaluation versus single-rule precedence. Next action: examine effective security rules using Azure CLI diagnostics, and ensure both the subnet-level and network-interface-level Network Security Groups permit the required inbound traffic flow.
+</details>
+
+**Card C: If Spoke A peers Hub and Hub peers Spoke B, Spoke A can reach Spoke B because peering is transitive.** A systems architect connects two spoke virtual networks to a central hub virtual network through standard VNet peering connections. Workloads in Spoke A are expected to communicate directly with workloads in Spoke B across the shared hub. The architect assumes that VNet peering relationships behave transitively across interconnected virtual network topologies.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: non-transitive peering boundary enforcement versus routed transit. Next action: deploy a network virtual appliance or Azure Firewall within the hub VNet, configure spoke User-Defined Routes pointing inter-spoke traffic to the hub appliance IP, and enable the Allow Forwarded Traffic setting on peering links.
+</details>
+
+**Card D: Two VNets both using `10.0.0.0/16` can peer if they live in different subscriptions.** A cloud engineer attempts to establish a bidirectional VNet peering connection between a development virtual network and a production virtual network that both utilize the private address space `10.0.0.0/16`. The two virtual networks reside in distinct Azure subscriptions under different management groups. The engineer assumes that subscription boundary isolation permits overlapping address spaces to peer successfully.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: software-defined routing address collision versus subscription boundary isolation. Next action: design non-overlapping CIDR address allocations across all corporate virtual networks prior to deployment, or use Azure Private Link and network address translation when interconnecting identical address spaces.
+</details>
+
+**Success Criteria**:
 
 - [ ] Hub VNet created with shared-services and AzureFirewallSubnet
 - [ ] Two spoke VNets created with non-overlapping address spaces
