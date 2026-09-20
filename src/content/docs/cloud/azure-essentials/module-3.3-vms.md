@@ -72,8 +72,15 @@ Right-sizing is an iterative process, not a single decision made at deployment t
 
 5. **Monitor and iterate**: After resizing, continue monitoring because workloads change. A size that was well-matched six months ago may be oversized or undersized today. Azure Advisor provides automated right-sizing recommendations based on observed usage patterns over a rolling 7-day window (configurable up to 90 days).
 
-> **Stop and think**: Your team runs a web application on `Standard_D2s_v5` VMs. Metrics show 92% CPU utilization at peak but only 30% memory consumption. The application latency spikes during peak hours. Would you scale up to `Standard_D4s_v5` or scale out to more `Standard_D2s_v5` instances? What factors beyond raw CPU numbers would influence your choice?
+**Pause and predict:** Your team runs a web application on `Standard_D2s_v5` VMs. Metrics show 92% CPU utilization at peak but only 30% memory consumption. The application latency spikes during peak hours. Would you scale up to `Standard_D4s_v5` or scale out to more `Standard_D2s_v5` instances? What factors beyond raw CPU numbers would influence your choice?
 
+<details>
+<summary>Check your prediction</summary>
+
+A CPU-bound web tier usually scales out behind a load balancer so that an individual instance failure does not disrupt the application. Scaling up to a single larger Standard_D4s_v5 still leaves the workload in a single failure domain. Sizing choices also depend on whether the application is stateful, whether storage throughput requires Premium SSD capability, and whether a newer hardware generation offers better price-performance.
+</details>
+
+Evaluating infrastructure telemetry across production deployments requires analyzing both architectural patterns and individual hardware profiles. Before selecting specific virtual machine SKUs for any application tier, engineers review Azure naming conventions to interpret capability flags and resource dimensions directly from SKU strings.
 
 ### Understanding VM Size Naming
 
@@ -175,7 +182,15 @@ graph TD
     end
 ```
 
-> **Stop and think**: Your company has a strict RPO (Recovery Point Objective) of 0 and an RTO (Recovery Time Objective) of under 5 minutes for a critical financial application. The application is currently running on a single VM. You need to implement high availability. Which Azure HA mechanism would you choose first, and why?
+**Pause and predict:** Your company has a strict RPO (Recovery Point Objective) of 0 and an RTO (Recovery Time Objective) of under 5 minutes for a critical financial application. The application is currently running on a single VM. You need to implement high availability. Which Azure HA mechanism would you choose first, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+A single virtual machine has no high-availability protection against underlying host or facility failures. Availability Sets only cover rack-level and host maintenance events with a 99.95% SLA. Surviving datacenter-level failures with aggressive recovery targets requires deploying across Availability Zones to achieve a 99.99% SLA combined with synchronous replication.
+</details>
+
+Designing resilient cloud architectures requires balancing service recovery expectations against operational complexity, application replication capabilities, and physical infrastructure constraints. Evaluating how compute isolation boundaries map to business continuity requirements helps infrastructure teams select suitable resilience topologies.
 
 ### When to Use Which
 
@@ -339,7 +354,15 @@ Azure provides host-level disk caching that can dramatically improve read and wr
 
 Premium SSD v2 and Ultra Disk do not support host caching, but their inherently lower latency, often sub-millisecond, addresses many of the same performance concerns that host caching solves on Premium SSD. The tradeoff is that you cannot boost read performance through a free cache layer; you must provision the IOPS and throughput your workload needs directly.
 
-> **Pause and predict**: Your PostgreSQL database uses a data disk with a read-heavy workload at roughly 80 percent reads and 20 percent writes, and you have already tuned the `shared_buffers` parameter. Would you enable ReadOnly caching on the data disk, and what risk must you consider before doing so?
+**Pause and predict:** Your PostgreSQL database uses a data disk with a read-heavy workload at roughly 80 percent reads and 20 percent writes, and you have already tuned the `shared_buffers` parameter. Would you enable ReadOnly caching on the data disk, and what risk must you consider before doing so?
+
+<details>
+<summary>Check your prediction</summary>
+
+Host cache None is the default for data disks because PostgreSQL already caches database pages in memory via `shared_buffers`. Enabling ReadOnly double-caches data in host RAM and wastes memory bandwidth. Furthermore, never use ReadWrite caching on database data or transaction log disks, because an ungraceful host failure can lose unflushed writes and corrupt transactional consistency.
+</details>
+
+Storage performance optimization involves coordinating filesystem behaviors with storage controller mechanisms and compute instance characteristics. In addition to tuning storage subsystem caching properties, cloud engineers must verify that underlying host processing limits align with provisioned disk capabilities.
 
 ### The VM IOPS Cap: When the Disk Outruns the VM
 
@@ -652,13 +675,21 @@ az vm create \
   --max-price -1 # -1 means pay current price up to on-demand price
 ```
 
-> **Pause and predict**: Your data science team needs to run daily machine learning training jobs that take several hours. These jobs are fault-tolerant and can resume from checkpoints. The budget is very constrained. What Azure VM offering would you recommend to them, and what's the primary risk they need to be aware of?
+**Pause and predict:** Your data science team needs to run daily machine learning training jobs that take several hours. These jobs are fault-tolerant and can resume from checkpoints. The budget is very constrained. What Azure VM offering would you recommend to them, and what is the primary risk they need to be aware of?
+
+<details>
+<summary>Check your prediction</summary>
+
+Azure Spot VMs configured with an eviction policy of Deallocate provide the deepest compute discounts for interruptible workloads that save progress to checkpoints. The primary operational risk is eviction, which occurs whenever Azure reclaims compute capacity for standard on-demand workloads with only a brief thirty-second notice.
+</details>
+
+Selecting pricing tiers requires balancing operational tolerance for interruption against financial commitments across predictable and bursty resource demands. While opportunistic billing options suit transient tasks, enterprise environments frequently require sustained capacity guarantees for long-term compute baselines.
 
 ### Azure Reserved Virtual Machine Instances (RIs)
 
 [Azure Reserved Instances allow you to commit to a specific VM size and region for a one-year or three-year term in exchange for a significant discount (up to 72% compared to pay-as-you-go). When you purchase a reservation, it applies to any qualifying VM in that region, regardless of the specific VM running.](https://learn.microsoft.com/en-us/azure/cost-management-billing/reservations/save-compute-costs-reservations)
 
-Reserved Instances reward **steady-state** production—databases, always-on web tiers, and other workloads with predictable 24/7 usage—and **long-running projects** where you already know you will need the same compute footprint for a year or more. Reservations include **instance size flexibility** within a family in many cases, but savings depend on **utilization**: unused reservation hours do not roll forward as free compute. You can pay **upfront or monthly** depending on how your finance team prefers to recognize spend. In practice, **Spot VMs** win for interruptible, cost-sensitive burst work, while **Reserved Instances** win when you need guaranteed capacity and a stable unit price for continuously running VMs.
+Reserved Instances reward **steady-state** production—databases, always-on web tiers, and other workloads with predictable 24/7 usage—and **long-running projects** where you already know you will need the same compute footprint for a year or more. Reservations include **instance size flexibility** within a family in many cases, but savings depend on **utilization**: unused reservation hours do not roll forward as free compute. You can pay **upfront or monthly** depending on how your finance team prefers to recognize spend. In practice, commit-based procurement models provide guaranteed capacity and a stable unit price for continuously running virtual machines.
 
 
 ### Azure Savings Plans
@@ -1084,7 +1115,39 @@ You should see responses from different instances across different zones. The In
 az group delete --name "$RG" --yes --no-wait
 ```
 
-### Success Criteria
+**Card A: Scale up to Standard_D4s_v5 is the right fix when a web app hits 92% CPU on D2s_v5.** An engineering team observes that their stateless web application VM experiences 92% CPU utilization and customer-facing latency spikes during peak shopping traffic. The team plans to resize the virtual machine vertically to a Standard_D4s_v5 instance during an emergency maintenance window, assuming that adding raw CPU cores to the existing instance is the most effective way to restore application headroom.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: vertical scaling failure domains versus horizontal tier resiliency. Next action: deploy multiple Standard_D2s_v5 instances across availability zones behind an Azure Load Balancer or VM Scale Set to eliminate single points of failure, allow horizontal auto-scaling, and verify application statefulness before resizing.
+</details>
+
+**Card B: An Availability Set on one remaining VM meets RPO 0 and RTO under 5 minutes for a financial app.** An operations administrator migrates a mission-critical transaction engine to Azure and configures a single virtual machine inside an Availability Set configured with three fault domains. The administrator believes that placing this solitary instance inside an Availability Set guarantees a 99.95% SLA and satisfies strict recovery time objectives under five minutes with zero data loss during infrastructure outages.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: single instance deployment limits versus cluster fault domain distribution. Next action: provision at least two active or replicated virtual machines across multiple Availability Zones with synchronous data replication, because an Availability Set containing only one VM provides zero compute redundancy during host or datacenter failures.
+</details>
+
+**Card C: ReadOnly host caching is always correct for a read-heavy PostgreSQL data disk after tuning shared_buffers.** A database administrator configures storage for a reporting replica running PostgreSQL with an access pattern consisting of 80% read queries and 20% write transactions. Having allocated 25% of system memory to `shared_buffers`, the administrator enables ReadOnly host caching on the attached Premium SSD data disk, assuming that caching reads on host SSDs always provides an unconditioned performance boost for read-intensive database volumes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: database buffer pool duplication versus host caching architecture. Next action: configure host cache None on database data disks to prevent redundant double-caching against PostgreSQL `shared_buffers`, and ensure transaction logs never use ReadWrite caching to preserve transactional durability against host failures.
+</details>
+
+**Card D: Reserved Instances are the cheapest fit for checkpointed, interruptible daily ML jobs.** A machine learning platform engineer purchases a three-year Reserved Instance commitment to execute batch model training runs that execute daily for several hours. Because the custom training framework already includes automated checkpointing and resumes training smoothly following sudden interruptions, the engineer assumes a Reserved Instance provides the lowest possible compute cost for this routine background workload.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: commitment-based pricing overhead versus opportunistic spare capacity. Next action: switch interruptible, checkpointed batch training pipelines to Azure Spot VMs with Deallocate eviction policies to achieve compute discounts of up to 90% without committing to continuous annual reservations for idle periods.
+</details>
+
+**Success Criteria**:
 
 - [ ] VMSS created with 3 instances across Availability Zones 1, 2, and 3
 - [ ] Standard Load Balancer distributing HTTP traffic to VMSS instances
