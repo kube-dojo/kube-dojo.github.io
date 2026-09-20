@@ -92,7 +92,13 @@ classDiagram
 
 The template above follows the canonical ARM shape. `parameters` accept deployment-time values. `variables` hold computed strings. `resources` declare what Azure should create. `outputs` return useful values to callers or pipelines. Every property is explicit JSON, so you can trace exactly what will deploy. The syntax still makes modest templates feel heavy compared with imperative CLI scripts.
 
-> **Stop and think**: If an ARM template dynamically generates a storage account name using `[concat(parameters('env'), uniqueString(resourceGroup().id))]`, and the deployment fails because the name exceeds Azure's 24-character limit, how do you debug this? Since ARM templates do not support `print()` statements and the generation happens server-side, what steps must you take to discover the exact string that the ARM engine attempted to provision?
+**Pause and predict:** An ARM template dynamically computes a storage account name using `[concat(parameters('env'), uniqueString(resourceGroup().id))]`, but deployment fails because the name exceeds Azure's 24-character limit. Because ARM templates lack interactive `print()` debugging statements and expression evaluation occurs server-side, how do you locate the exact evaluated string that the engine attempted to provision?
+
+<details>
+<summary>Check your prediction</summary>
+
+Because ARM template expression evaluation occurs server-side inside Azure Resource Manager, intermediate string expressions cannot be printed during compilation. You inspect the deployment history in the Azure portal or run `az deployment group show` and `az deployment operation group list` to examine the evaluated parameters, operations, and target resource payloads submitted by Resource Manager.
+</details>
 
 ARM templates work, but they carry significant drawbacks that show up quickly on real teams. They are **verbose** (simple deployments require dozens of lines of JSON). They are **hard to read** when nested functions pile up. JSON does not support inline comments, so intent disappears. **Modularization** via linked templates requires externally hosted URIs and extra deployment orchestration. Microsoft introduced Bicep to preserve ARM's deployment engine while removing these ergonomics gaps. You still deploy through Resource Manager. You author in a language designed for infrastructure engineers rather than JSON editors.
 
@@ -375,13 +381,19 @@ output vnetId string = vnet.id
 output subnetIds array = [for subnet in vnet.properties.subnets: subnet.id]
 ```
 
-> **Pause and predict**: You define a resource using `if (environment == 'dev')` and subsequently expose its `id` as a template output. If you deploy this template to the 'prod' environment, the resource is skipped. What exactly happens at runtime when the ARM engine attempts to construct that output? How does Bicep handle conditional outputs when the underlying resource does not exist?
+**Pause and predict:** You declare an Azure resource with a conditional guard `if (environment == 'dev')` and define a template output that directly references its `.id` property without any conditional expression. When you deploy this template to a production environment where the condition evaluates to false, what happens when the ARM engine attempts to evaluate the output block?
+
+<details>
+<summary>Check your prediction</summary>
+
+The ARM deployment engine fails at runtime with an evaluation error because it cannot dereference properties from a resource that was not provisioned. To avoid deployment failure when referencing conditional resources, outputs must use a ternary expression (such as `environment == 'dev' ? devStorage.id : ''`) or separate environment tier configurations so they do not dereference a missing resource.
+</details>
 
 Pay attention to API versions in each `resource` declaration. Pinning `Microsoft.Storage/storageAccounts@2023-01-01` makes upgrades deliberate. Drifting to "latest" during a routine edit can change property schemas and break CI unexpectedly. Secure parameters (`@secure()`) keep secrets out of deployment logs. That matters the moment you parameterize admin passwords or connection strings.
 
 ### Conditional outputs and symbolic references
 
-When a resource is deployed with `if (environment == 'dev')`, outputs that reference it must handle absence in non-dev environments. Patterns include conditional outputs with ternary expressions (`environment == 'dev' ? devStorage.name : ''`) or separate outputs per environment tier. Quiz question 5 in this module probes the failure mode when outputs assume a resource always exists.
+Bicep constructs an internal directed acyclic graph by resolving symbolic references across all resource and module declarations. When a downstream resource refers to `vnet.id` or `appServicePlan.id`, Resource Manager automatically infers the required deployment sequence without requiring manual `dependsOn` declarations. Symbolic identifiers exist exclusively within Bicep source code and do not alter the physical Azure resource names assigned in Resource Manager. Designing clean module boundaries requires keeping outputs targeted and deterministic, providing callers with stable endpoints and resource identifiers that abstract underlying implementation choices.
 
 Symbolic names are case-sensitive and cannot collide with parameter or variable names. Reference resources with their symbolic name (`storageAccount.name`), not the Azure resource name string, so renames propagate automatically.
 
@@ -770,9 +782,13 @@ Incremental mode does not delete portal-created resources missing from the templ
 
 Production Bicep work is not only syntax. It is a pipeline of validate, lint, what-if, and controlled apply. [What-if](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/deploy-what-if) is your safety net before any `az deployment group create` touches shared environments. It predicts create, modify, and delete operations without changing resources. Bicep has no separate state file; what-if is how you see blast radius against live Azure.
 
-> **Pause and predict**: A colleague manually added a test subnet to your VNet via the Azure Portal. Your Bicep template defines the VNet but does not include this new subnet in its `subnets` array property. When you run a `what-if` deployment in Incremental mode, will the manual subnet be marked for deletion (-), modification (~), or ignored completely? What does this reveal about how Azure handles arrays during declarative updates?
+**Pause and predict:** An administrator creates a test subnet directly inside a virtual network using the Azure portal. Your team later runs a what-if operation in Incremental deployment mode with a Bicep template that declares the virtual network but omits this new subnet from the `subnets` array. Will what-if flag the manual subnet for deletion with a minus sign (-)?
 
-Incremental deployments often **do not remove** array elements that exist in Azure but are absent from the template definition. The manual subnet may survive with no delete marker in what-if. That behavior is why drift detection must include periodic template backfill, not only deployment-time previews. Complete mode is the mode that can remove resources not listed in the template; it is also the mode that deletes databases when misused.
+<details>
+<summary>Check your prediction</summary>
+
+Incremental deployments often do not delete omitted array elements from existing parent resources. Because Resource Manager treats nested array properties additively or retains existing unreferenced items in many resource providers, the manual subnet is typically ignored rather than marked with a deletion symbol (-).
+</details>
 
 Array properties are not the only subtle case. Renaming a resource in Bicep usually creates a destroy-and-recreate plan because Azure resource names are often immutable. What-if shows delete plus create. Treat name changes as migration projects with data copy plans, not as casual refactors.
 
@@ -811,7 +827,15 @@ Scope: /subscriptions/xxx/resourceGroups/myRG
   + Microsoft.Web/serverfarms/kubedojo-staging-plan [2023-01-01]
 ```
 
-Running production deployments in [complete mode](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-modes) can delete resources omitted from the template. Incremental mode is the default and recommended path for most workloads. Complete mode exists when the template must represent the entire resource group and prune drift. Always pair complete mode with what-if and an explicit change ticket.
+**Pause and predict:** An operations engineer wants to eliminate manual configuration drift across cloud environments and proposes configuring continuous deployment release pipelines to execute in Complete mode by default. Is Complete mode the recommended safe everyday default for routine application deployments?
+
+<details>
+<summary>Check your prediction</summary>
+
+Incremental mode is the safe everyday default for Azure deployments. Complete mode deletes any existing resources in the target resource group that are omitted from the template, which can inadvertently destroy production databases, shared network links, or unmanaged secrets; complete mode should only be used with explicit what-if validation and formal change tickets.
+</details>
+
+Resource Manager evaluates [complete mode](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-modes) across the entire target resource group scope rather than individual component boundaries. When engineering teams adopt automated deletion semantics for dedicated ephemeral clusters, they isolate stateful assets into separate long-lived resource groups protected by Azure Resource Manager locks. Platform teams combine read-only locks on operational data tiers with strict branch protection rules, ensuring that automated provisioning systems never prune unreferenced resources without explicit multi-stage architecture review.
 
 ### What-if change types and how to read them
 
@@ -1506,7 +1530,41 @@ az group delete --name "$RG" --yes --no-wait
 rm -rf /tmp/bicep-lab
 ```
 
-### Success Criteria
+After completing the lab exercises, confirm that the deployment resource group has been scheduled for deletion and that local template files are removed from the filesystem. Cleaning up lab deployments prevents unwanted billing for App Service plans and storage accounts while keeping developer subscriptions tidy for subsequent certification modules.
+
+**Card A: ARM concat/uniqueString names can be debugged with print() statements in the template.** An engineer troubleshooting a failed ARM deployment attempts to insert logging statements inside the template expression language to print the dynamically evaluated storage account name before provisioning begins. The engineer assumes declarative ARM expressions support standard procedural console output and runtime inspection statements.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: declarative server-side template compilation versus procedural local debugging. Next action: query the Azure deployment operations history via `az deployment operation group list` or review the deployment error details in the Azure portal to inspect the exact evaluated resource payload.
+</details>
+
+**Card B: A skipped conditional resource still emits a valid output id without failing the deployment.** A template author declares a storage account with an `if (environment == 'dev')` condition and references its symbolic identifier in the template outputs without an accompanying conditional check. The author assumes the deployment engine safely provides an empty string or null output when deploying to production environments where the resource is skipped.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: runtime output evaluation of omitted symbolic resource references. Next action: guard conditional outputs with ternary expressions such as `environment == 'dev' ? devStorage.id : ''` or restructure module contracts so outputs do not reference absent resources.
+</details>
+
+**Card C: Incremental what-if marks a portal-added subnet for deletion when the template omits it.** An operations team runs an incremental what-if prediction on a virtual network template that omits a test subnet previously created through the Azure portal. The team expects what-if to flag the undocumented subnet with a delete symbol (-) because the declarative code does not define it in the subnets array.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: incremental array property merging versus full declarative resource reconciliation. Next action: backfill untracked subnets into the Bicep template definition before deployment, or manage subnets as independent child resources (`Microsoft.Network/virtualNetworks/subnets`) rather than embedded array properties.
+</details>
+
+**Card D: Complete mode is the safe everyday default because it cleans up portal drift.** A platform engineer configures CI/CD release pipelines to execute Bicep deployments using Complete mode by default, intending to automatically wipe out any manual configuration changes made outside source control. The engineer assumes Complete mode is a routine cleanup mechanism for daily team deployments.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: destructive resource group reconciliation versus safe additive deployment defaults. Next action: retain Incremental mode as the everyday deployment default, use scheduled what-if pipelines to detect portal drift, and restrict Complete mode to controlled maintenance windows backed by what-if validation and change tickets.
+</details>
+
+**Success Criteria**:
 
 - [ ] Storage module created and compiles successfully
 - [ ] App Service module created and compiles successfully
