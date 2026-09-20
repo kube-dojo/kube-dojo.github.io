@@ -68,9 +68,15 @@ Worked example: a team is moving a vendor application that uses SQL Agent jobs, 
 
 Now you solve it: your team owns a new SaaS API with one database per tenant, modest data size, no SQL Agent, and a requirement to isolate noisy tenants later. Would you start with Azure SQL Database single databases, an elastic pool, Managed Instance, or SQL Server on Azure VM? Write down the unit you want to scale and the unit you want to restore before choosing, because those two answers usually expose the right managed surface.
 
-> **Pause and predict:** If a production incident says "the Azure SQL server is down," what three questions should you ask before any remediation command?
+**Pause and predict:** If a production incident says "the Azure SQL server is down," what three questions should you ask before any remediation command?
 
-The strongest first questions are: which Azure SQL product, which database or instance, and which connection path. "Server" can mean a logical server for Azure SQL Database, a managed instance, or a VM host, and each answer changes the runbook. A firewall rule on a logical server will not fix a VM disk saturation incident, and resizing a VM will not help a serverless Azure SQL Database that is resuming from pause. Clear naming in dashboards, alerts, and runbooks prevents the team from debugging the wrong abstraction.
+<details>
+<summary>Check your prediction</summary>
+
+Ask which Azure SQL **product** (logical server, Managed Instance, or SQL on VM), which database or instance, and which **connection path** before any remediation. An Azure SQL Database logical server is an administrative boundary rather than a virtual machine, whereas Managed Instance provides native VNet integration and SQL on Azure VM is full IaaS. Resizing an IaaS host or altering VM guest settings during a PaaS incident targets the wrong infrastructure abstraction.
+</details>
+
+Clear naming conventions in monitoring dashboards, alert definitions, and operational runbooks prevent engineering teams from misdiagnosing platform abstractions under pressure. Once operators identify the exact managed deployment model and connection route, evaluating compute capacity and storage architecture becomes necessary for diagnosing throughput limits.
 
 ## 2. Compute and Storage Models
 
@@ -80,7 +86,15 @@ DTU is useful when the workload is simple, small, and not worth detailed sizing.
 
 vCore is the operator-friendly model for serious production. General Purpose, Business Critical, and Hyperscale are not just price tiers. They describe different storage architectures, IO ceilings, failover behavior, read-scale options, and maximum database sizes. The service tier is an availability and performance decision as much as a cost decision.
 
-General Purpose is the balanced default for many production systems. It uses remote storage, keeps cost lower, and works well when latency requirements are normal and the app can tolerate the tier's IO limits. Business Critical is for low-latency OLTP and higher transaction rates, with local SSD-backed storage and multiple replicas behind the service tier. Hyperscale separates compute and storage so large databases can grow far beyond the ordinary single-database storage ceiling and can scale compute and replicas differently.
+**Pause and predict:** An operator observes latency spikes on write-heavy OLTP transactions in Azure SQL Database and proposes doubling the vCore count on General Purpose. Will raising vCores alone resolve the underlying IO latency bottleneck, or is a different service tier required?
+
+<details>
+<summary>Check your prediction</summary>
+
+Raising vCores on General Purpose increases CPU and memory allocations, but it does not eliminate the remote storage latency floor. **Business Critical** uses locally attached SSD storage and replica HA to achieve low-latency transaction performance, whereas **General Purpose** relies on **remote storage** where data and log files traverse network-attached storage nodes.
+</details>
+
+Selecting an appropriate database tier requires balancing operational cost constraints against workload concurrency patterns and latency expectations. Production environments frequently face trade-offs between standard remote storage architectures and specialized low-latency database engines. Understanding how physical storage placement interacts with service tiers enables infrastructure teams to select viable configurations before hitting operational throughput ceilings.
 
 | Model | Operator reads it as | Best fit | Watch for |
 |---|---|---|---|
@@ -168,13 +182,29 @@ RPO is the amount of data loss the business can tolerate. RTO is the amount of t
 
 Worked example: a customer-facing API promises a 15 minute RTO and accepts up to 5 seconds of data loss during a regional disaster. PITR alone cannot meet that RTO because a restore creates a new database and requires application reconnection work. Geo-restore is also too slow and too manual for the promise. The operator should design a failover group, test planned failover, verify the read-write listener, keep security settings aligned on the secondary server, and document the expected data-loss window from asynchronous replication.
 
-> **Pause and predict:** A failover group exists, but after failover the app cannot connect from its private subnet in the secondary region. Which resource is most likely missing: the database, the login, the private DNS link, or the backup retention policy?
+**Pause and predict:** A failover group exists, but after failover the app cannot connect from its private subnet in the secondary region. Which resource is most likely missing: the database, the login, the private DNS link, or the backup retention policy?
 
-The most likely missing piece is the network path, especially private DNS and private endpoint alignment in the target region. Authentication and database existence can also fail, but private endpoint designs are regional and DNS-dependent. Good DR runbooks include a secondary server access checklist: Entra admin, contained users, firewall state, private endpoint, private DNS zone links, application connection string, Key Vault access, monitoring, and audit destination. Do not treat failover as only a database command.
+<details>
+<summary>Check your prediction</summary>
+
+The most likely missing piece is the **network path**, specifically the regional private endpoint and private DNS zone link in the secondary region. While failover group read-write listener CNAME records update automatically with a 30-second TTL, private endpoints are regional resources and do not automatically replicate across paired regions. If the secondary virtual network lacks a linked `privatelink.database.windows.net` private DNS zone resolving the secondary server's private endpoint, clients cannot establish TCP connections.
+</details>
+
+Comprehensive disaster recovery runbooks must audit operational dependencies beyond core database engine replication. Verifying external ingress policies, cryptographic key stores, and credential sets guarantees that secondary environments sustain production traffic during emergency incidents. Examining these infrastructure requirements highlights why platform engineers must govern identity boundaries, transit topologies, and administrative controls as unified disciplines.
 
 ## 4. Identity, Networking, and Security
 
-Azure SQL Database access has two planes. The Azure control plane creates servers, databases, private endpoints, firewall rules, identities, diagnostic settings, Defender plans, and backup policies through Azure Resource Manager. The SQL data plane accepts database connections, authenticates users or applications, enforces permissions, runs queries, writes audit events, and exposes DMVs. Operators need both planes because a user can have Azure Contributor permission and still be unable to query a database, or have database permission and still be blocked by networking.
+Azure SQL Database access is structured across distinct management surfaces with separate operational boundaries. The Azure control plane oversees resource provisioning, administrative configurations, firewall parameters, and diagnostic telemetry through Azure Resource Manager. Conversely, the SQL data plane governs client authentication, tabular authorizations, query execution pipelines, and relational database permissions.
+
+**Pause and predict:** A platform engineer is assigned the Azure Contributor role on the resource group containing an Azure SQL logical server and attempts to query a database. Will this role assignment grant sufficient privileges to run SELECT queries, and what authorization steps are required if access fails?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. The Azure Contributor role operates exclusively within the Azure control plane and grants zero permissions inside the SQL data plane. To execute queries, the database requires data-plane authorization. A designated Microsoft Entra administrator must configure access, or an authorized administrator must connect and execute `CREATE USER ... FROM EXTERNAL PROVIDER` followed by granting explicit database roles like `db_datareader`.
+</details>
+
+Decoupling cloud management boundaries from internal database operations establishes an essential security posture for enterprise workloads. Strict separation of responsibilities prevents subscription-level administrators from inadvertently viewing confidential tabular records without audited grants. Implementing directory-backed identities allows security teams to enforce centralized governance policies, lifecycle revocations, and automated credential rotation across distributed application components.
 
 Microsoft Entra authentication is the preferred identity direction for humans and services because it centralizes identity, conditional access, group management, and service principal patterns [configure Microsoft Entra authentication](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-aad-configure?view=azuresql). An Azure SQL logical server can have a Microsoft Entra administrator, and that administrator can create contained database users from external provider identities. Managed identities can connect to Azure SQL using Entra authentication when the database has a corresponding user and permission set [managed identities](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-azure-ad-user-assigned-managed-identity?view=azuresql-db). This is the clean operator pattern for App Service, Functions, AKS workload identity, and automation jobs because it avoids long-lived SQL passwords in application settings.
 
@@ -779,6 +809,50 @@ az group delete \
 - [ ] Any optional private endpoint resources in another resource group were removed or assigned to an owner.
 - [ ] Local files `seed-operator-events.sql`, `load-operator-events.sql`, and `load-worker-*.log` were reviewed or deleted.
 
+Before concluding database operations and tearing down cloud resources, operators must systematically audit architectural assumptions, diagnostic workflows, and service boundary limits across the Azure SQL ecosystem. Reviewing common cognitive fallacies and failure layers ensures that engineering teams respond with precision when triaging production incidents, performance degradations, or disaster recovery failover scenarios.
+
+**Card A: "The Azure SQL server is down" means you should resize the VM first.** An on-call engineer receives an escalated incident alert reporting that the production Azure SQL server is unresponsive and immediately prepares an Azure CLI script to resize the host virtual machine. The engineer assumes that any SQL database error indicating an unavailable server originates from compute exhaustion on an accessible IaaS virtual machine.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Azure SQL service deployment model and abstraction boundary. Next action: determine whether the target is an Azure SQL Database logical server, an Azure SQL Managed Instance, or SQL Server on Azure VM, and inspect the specific database status and network connectivity path rather than attempting VM resizing on a managed PaaS service.
+</details>
+
+**Card B: After failover-group failover from a private subnet, backup retention is the most likely missing piece.** An operations team initiates a planned disaster recovery failover of an Azure SQL Database failover group and finds that application instances residing in a secondary private subnet cannot reach the listener. The team assumes the outage is caused by mismatched point-in-time restore backup policies or long-term retention schedules between paired regions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: regional network transit and private DNS resolution architecture. Next action: verify that the secondary virtual network has an active private endpoint for the secondary logical server and an associated private DNS zone link to `privatelink.database.windows.net`, recognizing that failover group CNAME listener records update rapidly while private endpoints are strictly regional.
+</details>
+
+**Card C: Raising vCores on General Purpose is the right first fix for low-latency OLTP because more vCores add local SSD.** A database administrator troubleshooting slow transaction commit times on an OLTP database running in the General Purpose tier scales the compute allocation from 4 to 16 vCores. The administrator expects the scale-up action to attach local solid-state drives and eliminate write latency for logging operations.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: compute tier storage architecture and IO topology. Next action: transition the database to the Business Critical service tier to leverage locally attached NVMe SSD storage and Always On availability replica caching, rather than scaling vCores on General Purpose where data and log files remain on remote Azure Storage.
+</details>
+
+**Card D: Azure Contributor on the resource group is enough to query Azure SQL Database.** A security engineer assigns an application developer the Azure Contributor role on the resource group and assumes the developer can immediately authenticate to execute queries against customer tables.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Azure Resource Manager control plane versus TDS data plane authorization. Next action: configure a designated Microsoft Entra administrator for the logical server, connect with administrative credentials, and provision an external provider database user with scoped data-plane roles such as `db_datareader` or `db_datawriter`.
+</details>
+
+**Success Criteria**:
+
+- [ ] Resource group, Azure SQL logical server, and General Purpose database provisioned in one region.
+- [ ] Network access secured via client IP firewall rule or Azure Private Endpoint with private DNS.
+- [ ] Database schema seeded and loaded with ten thousand operator event records via `sqlcmd`.
+- [ ] Concurrency workload executed while monitoring CPU percentage, data IO percentage, and log IO percentage.
+- [ ] Compute capacity scaled to a higher service objective and verified in database properties.
+- [ ] Point-in-time restore completed to create a separate verified recovery database.
+- [ ] Lab resources cleaned up to avoid ongoing hourly compute and storage charges.
+
 ## Sources
 
 - [What is Azure SQL?](https://learn.microsoft.com/en-us/azure/azure-sql/azure-sql-iaas-vs-paas-what-is-overview?view=azuresql) — Defines the Azure SQL family and compares SQL Database, Managed Instance, and SQL Server on Azure VM.
@@ -809,4 +883,4 @@ az group delete \
 
 ## Next Module
 
-Continue to [Backup & Site Recovery](../module-3.17-backup-site-recovery/) to make the data and workloads you have deployed resilient to failure.
+Continue to [Backup & Site Recovery](../module-3.17-backup-site-recovery/) to configure comprehensive backup policies and make production cloud workloads resilient to infrastructure failure.
