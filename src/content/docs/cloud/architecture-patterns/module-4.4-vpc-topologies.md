@@ -66,7 +66,7 @@ The example deliberately leaves unused space between subnet groups. That gap is 
 
 ## 2. Plan Kubernetes IP Consumption
 
-**Pause and predict:** If worker nodes report healthy status and autoscaling continues adding compute capacity, why are new Pods still unable to schedule and failing due to address allocation errors?
+**Pause and predict:** If worker nodes report healthy status and autoscaling continues adding compute capacity, why are new Pods still unable to schedule?
 
 <details>
 <summary>Check your prediction</summary>
@@ -114,7 +114,7 @@ GKE and AKS use different implementation details, but the same design discipline
 Overlay Pod IP addresses are allocated from an internal, cluster-managed CIDR block that is encapsulated across node-to-node tunnels (such as VXLAN or Geneve), meaning cloud VPC flow logs capture only the outer node IP addresses rather than discrete Pod identities. Conversely, underlay and VPC-native networking models allocate cloud-routable IP addresses directly to each container interface from VPC or VNet subnets. This direct allocation allows native cloud flow logs, cloud load balancers, and perimeter security groups to observe and filter individual Pod IP traffic directly, though at the expense of accelerated cloud address consumption.
 </details>
 
-Engineering teams evaluating network virtualization must balance perimeter visibility requirements against organizational infrastructure constraints. Deciding between direct routing and packet encapsulation establishes how operational teams inspect inter-service traffic and debug latency anomalies across production fleets.
+Choosing a CNI model is also choosing which troubleshooting tools will be first-class later. Teams should write down how they will debug a slow service-to-service call before they freeze the underlay-versus-overlay decision for production.
 
 Virtualization choices fundamentally alter the division of responsibility between cloud infrastructure and in-cluster networking layers. While underlay topologies bind pod lifecycles tightly to cloud provider fabric constructs, overlay architectures decouple container scheduling from physical network topology, introducing distinct considerations for encapsulation processing overhead and diagnostic tooling.
 
@@ -157,7 +157,7 @@ When a platform chooses underlay networking, packets stay closer to native cloud
 Private worker nodes do not automatically make the Kubernetes control plane private. By default, newly created Amazon EKS clusters have public endpoint access enabled and private endpoint access disabled, meaning `kubectl` commands from the internet communicate directly with the public API server endpoint even when all compute nodes reside in isolated private subnets. When platform teams switch the cluster configuration by turning public access off and private access on, all `kubectl`, Helm, and API client requests must originate from within the VPC or from an attached network via VPN, direct link, transit gateway, or an in-VPC bastion host. If a team disables the public API endpoint before provisioning and validating a dedicated private transit path, human administrators and external CI/CD pipelines are immediately locked out of routine administration, even while worker nodes continue communicating with the private API server endpoint without interruption.
 </details>
 
-Platform architects designing zero-trust administrative boundaries must evaluate how operational workflows interact with decoupled network perimeters. Establishing automated delivery pipelines and maintenance procedures requires aligning credential distribution mechanisms with enterprise transit topologies before modifying cluster access settings.
+Hardening worker placement and hardening who may call the API are separate design reviews. Operators, GitOps controllers, and CI systems each need a documented path that was tested before the cluster's public reachability settings change.
 
 ```mermaid
 flowchart TD
@@ -212,7 +212,7 @@ Outbound requests from private subnets to public cloud service endpoints cross t
 
 Enterprise networking teams auditing cloud consumption must analyze how outbound data paths contribute to total infrastructure expenditure. Evaluating the volumetric flow of application egress allows engineers to structure subnet route tables and security boundaries around actual workload communication patterns.
 
-Cloud provider networking provides specialized constructs to bypass public internet gateways for first-party managed services. VPC endpoints, AWS PrivateLink, Private Google Access, and Azure Private Endpoints route requests directly across provider backbone networks without traversing public IP routing tables. Gateway endpoints for Amazon S3 and DynamoDB operate via route-table prefixes without hourly surcharges, making them immediate architectural requirements for any cluster that pulls container layers from S3 or reads dataset buckets. Interface endpoints attach elastic network interfaces with private IP addresses directly into cluster subnets, providing private DNS resolution for services such as container registries, secret managers, and telemetry collectors.
+Interface and gateway constructs exist for first-party managed APIs, and they have different attachment and billing shapes. Choosing which services get a dedicated private path belongs in the same review as subnet size and NAT placement, not as a later finance surprise after the first large image pull.
 
 ```mermaid
 flowchart LR
