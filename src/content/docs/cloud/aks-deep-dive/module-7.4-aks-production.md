@@ -391,7 +391,7 @@ az monitor log-analytics workspace create \
 
 ## Managed Prometheus and Grafana: Cloud-Native Monitoring
 
-Container Insights is fantastic for log aggregation and infrastructural health, but it struggles with application-specific custom metrics. For application teams, this means you get excellent infrastructure visibility first, then still need a dedicated path for domain metrics such as checkout conversion rate, queue depth, or user session concurrency.
+Observability on AKS is not a single product: logs, inventory, and numeric time series travel through different agents, pricing meters, and query languages. Before you pick a dashboard vendor, you need a clear contract for which plane owns which signal.
 
 **Pause and predict:** If you rely strictly on Container Insights for everything, what happens when your application needs to expose a custom business metric like "active_user_sessions"? Why is Managed Prometheus a better fit for this?
 
@@ -839,10 +839,12 @@ spec:
 <details>
 <summary>Check your prediction</summary>
 
-Azure Spot node pools carry **no SLA**; Azure can and will **evict** Spot virtual machines with only a 30-second preemption notice whenever the cloud provider needs capacity for pay-as-you-go workloads or when Spot prices exceed your configured ceiling. If your entire web frontend runs on Spot, a sudden regional capacity reclamation can evict all replicas simultaneously, resulting in a total application outage. Spot node pools cannot be the cluster's default system pool. AKS automatically taints Spot nodes with `kubernetes.azure.com/scalesetpriority=spot:NoSchedule`. To safely capture Spot cost savings in production, architect workloads with split tiers: deploy your baseline required replicas onto standard Regular (on-demand) node pools, and tolerate the Spot taint only on burst replicas or asynchronous batch workers that can handle sudden evictions without violating user availability SLAs.
+Azure Spot node pools carry **no SLA**; Azure **evicts** Spot virtual machines when it needs capacity for pay-as-you-go workloads or when Spot prices exceed your configured ceiling. Scheduled Events may deliver a best-effort `Preempt` signal on the order of 30 seconds, but eviction can also be immediate, so production frontends must not depend on that window. If your entire web frontend runs on Spot, a sudden regional capacity reclamation can evict all replicas simultaneously, resulting in a total application outage. Spot node pools cannot be the cluster's default system pool. AKS automatically taints Spot nodes with `kubernetes.azure.com/scalesetpriority=spot:NoSchedule`. To safely capture Spot cost savings in production, architect workloads with split tiers: deploy your baseline required replicas onto standard Regular (on-demand) node pools, and tolerate the Spot taint only on burst replicas or asynchronous batch workers that can handle sudden evictions without violating user availability SLAs.
 </details>
 
-Capacity management strategies must incorporate eviction-handling primitives into deployment definitions to survive asynchronous VM terminations. Configuring `spot-max-price` to `-1` prevents evictions driven by price changes while capacity exists, whereas positive price ceilings enforce strict unit economic limits. Pairing `eviction-policy Delete` ensures decommissioned instances release storage attachments cleanly without stranding stopped virtual machine allocations against cloud subscription quotas.
+Price and capacity are independent levers: a pool that survives a price spike can still disappear when Azure needs the SKU for on-demand customers. Production architectures therefore keep a Regular floor for user-facing traffic and treat interruptible capacity as overflow, not as the only place the homepage can run.
+
+Set `spot-max-price` deliberately: `-1` means the instance is not evicted based on price alone (you pay the lower of Spot or standard rate while capacity exists). A positive cap (up to five decimal places in USD) evicts when Spot price exceeds your ceiling — useful for batch fleets with hard unit economics. Pair `eviction-policy Delete` (default) when pods should disappear with the node, or `Deallocate` only when you accept stopped VMs still counting against quota and complicating upgrades.
 
 ### Workload Right-Sizing
 
