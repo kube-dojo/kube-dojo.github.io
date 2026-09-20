@@ -260,7 +260,7 @@ spec:
 Asynchronous Lambda invocations using `InvocationType: Event` place payloads onto an internal AWS-managed invocation queue and return an immediate HTTP 202 Accepted response to the caller. The platform acknowledges message receipt rather than waiting for handler execution. If a Kubernetes Job crashes halfway through a ten-thousand-item fan-out loop, its subsequent pod restart re-queries the object store and dispatches duplicate `Event` invocations for records already queued or processed. AWS Lambda does not inspect payloads to deduplicate incoming events automatically. Application functions must implement explicit idempotency using an item-level unique identifier (such as the S3 object key or an event hash) to detect prior executions, verify existing destination artifacts, or track state in a transactional datastore before performing destructive work.
 </details>
 
-Coordinating asynchronous background tasks represents only one dimension of hybrid architecture, as real-time user-facing traffic requires unified ingress routing across both container clusters and serverless endpoints.
+The next section is how API gateways sit in front of both Kubernetes services and serverless functions as a single entry point for external consumers.
 
 ---
 
@@ -488,7 +488,7 @@ The tradeoff is control. Serverless container platforms eliminate traditional no
 An all-Fargate cluster schedules zero DaemonSet pods. EKS Fargate does not support DaemonSets because the platform provisions dedicated, isolated microVM compute environments for each individual pod rather than maintaining shared worker nodes. Because the Kubernetes DaemonSet controller schedules exactly one pod per eligible node in the cluster, and an all-Fargate cluster manages no conventional EC2 instances, the controller finds no candidate nodes matching the workload specifications. If you must deploy observability agents, security monitoring tools, or log forwarders alongside Fargate workloads, you cannot rely on cluster-wide daemons; you must instead inject the monitoring agent directly into each application pod as a sidecar container or stream telemetry directly to cloud provider logging endpoints.
 </details>
 
-Understanding these structural scheduling constraints is vital when evaluating managed serverless container offerings across major cloud providers, as each platform strikes a different balance between operational automation and Kubernetes specification support.
+The next section is how Fargate, Autopilot, and Virtual Nodes differ on scheduling support without treating every serverless container platform as interchangeable.
 
 ### Comparison
 
@@ -579,7 +579,7 @@ The dominant cost in a cold start varies by runtime. For interpreted languages l
 Idle warm capacity is billed continuously, even when request count is zero. Both AWS Lambda provisioned concurrency and Google Cloud Run min-instances bill for the allocated compute resources (measured in vCPU-seconds and memory GB-seconds) for as long as the capacity remains configured and running. The cloud provider dedicates active virtualization infrastructure to keep the runtimes resident in memory, meaning you pay for reserved capacity whether requests arrive or not. While provisioned concurrency successfully eliminates cold-start latency spikes for baseline traffic, leaving unmanaged warm instances enabled during extended periods of zero traffic converts a purely event-driven serverless cost model into a fixed ongoing infrastructure baseline.
 </details>
 
-Because continuously running idle capacity counteracts the pure pay-per-use economics of serverless architectures, alternative platform optimizations focus on reducing initialization latency directly within the application runtime layer.
+The next section is how snapshot-based restore of an initialized runtime differs from a reserved warm pool of instances.
 
 **SnapStart** (Lambda, for Java 11/17/21, plus Python and .NET) takes a fundamentally different architectural approach to cold-start mitigation. Rather than maintaining permanently provisioned warm microVMs, Lambda executes the function's initialization phase during deployment, takes an encrypted snapshot of the initialized memory and disk state, and caches that snapshot in a multi-tier cache. When subsequent invocations trigger new execution environments, the platform restores the cached snapshot instead of repeating class-loading, dependency injection, and framework initialization cycles from scratch.
 
@@ -591,7 +591,7 @@ Because continuously running idle capacity counteracts the pure pay-per-use econ
 SnapStart restores initialization memory directly from the frozen snapshot, meaning GUIDs, pseudo-random seeds, and cached network connections created during static initialization are identical across all restored execution environments. If multiple concurrent requests restore from the same snapshot, any identifiers or entropy pools instantiated during the initial setup phase will be duplicated unless application code re-executes uniqueness logic after the restore phase. Platforms provide runtime hooks (such as AWS CRaC `afterRestore` callbacks) to safely regenerate seeds, refresh tokens, and re-establish network sockets. Furthermore, SnapStart does not make invocations fully cold-start-free; while it eliminates the heavy JVM bootstrap and class-loading delays, the runtime still experiences residual latency from microVM provisioning, snapshot retrieval from cache, and network interface attachments.
 </details>
 
-Navigating these runtime-level initialization nuances is essential when tuning serverless platforms, particularly when comparing microVM function execution against containerized workloads that face additional container image delivery overhead.
+The next section is how container image pulls change cold-start timing compared with function microVMs that do not fetch a full image.
 
 **The container-serverless cold-start penalty.** Cloud Run and Fargate cold starts are typically longer than Lambda cold starts because the platform must pull a container image from a registry before starting it. Google mitigates this with aggressive caching of frequently used images and layers. AWS Fargate does not cache images across Fargate tasks — every new task pulls the image fresh, which is why Fargate cold starts are 30-60 seconds for typical images. If your container-serverless workload cannot tolerate this latency, you must either keep a minimum instance warm (Cloud Run `min-instances`) or use Kubernetes with pre-scaled pods instead.
 
