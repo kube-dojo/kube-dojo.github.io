@@ -460,7 +460,7 @@ Each routing method encodes a different operations contract. **Priority** is the
 <details>
 <summary>Check your prediction</summary>
 
-United States queries do not automatically route to Frankfurt. Traffic Manager Geographic routing operates as a strict territorial policy map rather than an automatic multi-region Priority failover system. When all endpoints within a mapped geographic scope fail health checks, Traffic Manager returns a negative DNS response (NODATA) unless an explicit fallback endpoint or nested failover profile has been provisioned.
+United States queries do not automatically route to Frankfurt. Geographic routing maps each region to exactly one endpoint and [returns that endpoint whether it is healthy or not](https://learn.microsoft.com/en-us/azure/traffic-manager/traffic-manager-routing-methods). Traffic Manager keeps answering US queries with the Virginia endpoint even after probes mark it unhealthy. NODATA is returned when the mapped endpoint is Stopped or the client region has no mapping, not because a health check failed. Nested child profiles are the supported way to add failover inside a geography.
 </details>
 
 **Performance** routing uses latency measurements between probe vantage points and endpoints to approximate the closest destination for each client geography. It references Microsoft's global internet latency intelligence network rather than calculating real-time round-trip pings for individual users, providing responsive steering for consumer applications across diverse peering links.
@@ -763,7 +763,7 @@ Operational DNS maturity shows up in patterns teams repeat on purpose and anti-p
 | Custom DNS without 168.63.129.16 forwarder | Private Link and VM names fail silently | AD team owns DNS and skips Azure forward | Conditional forward or Private Resolver inbound |
 | Traffic Manager for WAF/TLS needs | No inspection or termination at edge | TM is simpler to demo | Front Door or App Gateway in data path |
 | TTL 3600 on failover profile | Users stay on dead region for minutes | Default TTL looks "normal" | 10–30s TM TTL with measured query cost |
-| Geographic TM without overflow plan | Region outage drops traffic entirely | Compliance interpreted as hard isolation | Nested profiles or explicit fallback endpoints |
+| Geographic TM without nested child profiles | Queries keep going to the unhealthy mapped endpoint | Compliance interpreted as hard isolation | Nested Priority child profiles per geography |
 
 ---
 
@@ -1117,7 +1117,7 @@ Failure layer: guest operating system network configuration versus Azure Resourc
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: geopolitical boundary enforcement policy versus automated high-availability disaster recovery failover. Next action: implement nested Traffic Manager profiles or configure explicit fallback endpoints within the Geographic routing profile if cross-border traffic overflow is legally permitted during regional disruptions.
+Failure layer: geopolitical boundary enforcement policy versus automated high-availability disaster recovery failover. Next action: nest a Priority child profile under each Geographic region so failover stays inside that geography; do not expect probe failure on Virginia to return NODATA or to send US users to Frankfurt.
 </details>
 
 **Card D: Traffic Manager Priority failover is complete as soon as probes mark the primary endpoint down.** An operations engineer monitors a production cutover where Traffic Manager health probes detect a degraded primary endpoint and successfully transition its operational state to unhealthy. The engineer assumes customer traffic immediately transfers to the standby secondary region without lingering client impact.
