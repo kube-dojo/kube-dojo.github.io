@@ -252,7 +252,15 @@ spec:
                   print(f"Dispatched: {obj['Key']}")
 ```
 
-> **Pause and predict**: If the Kubernetes Job fails halfway through fanning out 10,000 Lambda invocations, and the Job restarts, what happens to the items that were already processed? How should you design the Lambda function to handle this?
+**Pause and predict:** If the Kubernetes Job fails halfway through fanning out 10,000 Lambda invocations, and the Job restarts, what happens to the items that were already dispatched? How must the target serverless function be designed to handle this scenario?
+
+<details>
+<summary>Check your prediction</summary>
+
+Asynchronous Lambda invocations using `InvocationType: Event` place payloads onto an internal AWS-managed invocation queue and return an immediate HTTP 202 Accepted response to the caller. The platform acknowledges message receipt rather than waiting for handler execution. If a Kubernetes Job crashes halfway through a ten-thousand-item fan-out loop, its subsequent pod restart re-queries the object store and dispatches duplicate `Event` invocations for records already queued or processed. AWS Lambda does not inspect payloads to deduplicate incoming events automatically. Application functions must implement explicit idempotency using an item-level unique identifier (such as the S3 object key or an event hash) to detect prior executions, verify existing destination artifacts, or track state in a transactional datastore before performing destructive work.
+</details>
+
+Coordinating asynchronous background tasks represents only one dimension of hybrid architecture, as real-time user-facing traffic requires unified ingress routing across both container clusters and serverless endpoints.
 
 ---
 
@@ -470,9 +478,17 @@ Fargate (AWS) and Autopilot (GCP) remove node management entirely. You define po
 
 This abstraction comes with a significant operational shift. On a standard Kubernetes cluster, you think in terms of nodes — how many you need, what instance types, whether to use spot or reserved. On Fargate or Autopilot, you think in terms of pods — how much CPU and memory each pod requests, and how many pods can run concurrently. The pod becomes the billing unit rather than the node. This changes how you reason about cost: instead of paying for a pool of compute that sits partially idle, you pay for exactly the resources each pod consumes, per second.
 
-The tradeoff is control. Fargate does not support privileged containers, host networking, or DaemonSets because those abstractions require node-level access, and Fargate provides no node to access. If your workload needs to mount a hostPath volume, run a log collection DaemonSet, or use a GPU with custom driver configuration, Fargate is not the right choice. Autopilot is more permissive — it supports DaemonSets and GPU workloads — but it still abstracts away the node, meaning you cannot SSH in to debug a kernel panic or inspect a container runtime issue. For teams that have invested in node-level observability and debugging workflows, this loss of visibility is a genuine operational cost that must be weighed against the reduction in node management toil.
+The tradeoff is control. Serverless container platforms eliminate traditional node management by isolating container execution within managed virtualization boundaries rather than exposing shared operating system hosts. Workloads running in these environments surrender access to host-level primitives, direct kernel manipulation, and node-level configurations. Autopilot manages underlying compute instances behind a managed control plane while preserving broad Kubernetes API behavior, whereas Fargate packages every pod into its own isolated compute environment. For teams that have built operational models around node-level observability, kernel tuning, and host filesystem manipulation, this abstraction boundary requires rethinking how system-wide administrative tooling integrates with application workloads.
 
-> **Pause and predict**: If you deploy a DaemonSet to a cluster using EKS Fargate for all its compute capacity, how many pods will the DaemonSet create? How does the Fargate architecture dictate this outcome?
+**Pause and predict:** If you deploy a standard Kubernetes DaemonSet to a cluster configured to run entirely on EKS Fargate compute, how many pods will the DaemonSet create? How does the underlying Fargate execution model determine this scheduling result?
+
+<details>
+<summary>Check your prediction</summary>
+
+An all-Fargate cluster schedules zero DaemonSet pods. EKS Fargate does not support DaemonSets because the platform provisions dedicated, isolated microVM compute environments for each individual pod rather than maintaining shared worker nodes. Because the Kubernetes DaemonSet controller schedules exactly one pod per eligible node in the cluster, and an all-Fargate cluster manages no conventional EC2 instances, the controller finds no candidate nodes matching the workload specifications. If you must deploy observability agents, security monitoring tools, or log forwarders alongside Fargate workloads, you cannot rely on cluster-wide daemons; you must instead inject the monitoring agent directly into each application pod as a sidecar container or stream telemetry directly to cloud provider logging endpoints.
+</details>
+
+Understanding these structural scheduling constraints is vital when evaluating managed serverless container offerings across major cloud providers, as each platform strikes a different balance between operational automation and Kubernetes specification support.
 
 ### Comparison
 
@@ -480,7 +496,7 @@ The tradeoff is control. Fargate does not support privileged containers, host ne
 |---------|-------------|---------------|-------------------|
 | Billing unit | Per pod (vCPU + memory per second) | Per pod (vCPU + memory per second) | Per container group (ACI pricing) |
 | DaemonSets | Not supported | Supported (since 2024) | Not supported |
-| GPUs | Supported (limited) | Supported | Not supported |
+| GPUs | Not currently available | Supported | Not supported |
 | Persistent storage | EFS CSI (static provisioning; EBS not supported on Fargate) | GCE PD | Azure Files |
 | Max pods per node | 1 pod = 1 "node" | Managed by GKE | Burstable |
 | Startup time | 30-60 seconds | Transparent | 15-30 seconds |
@@ -553,9 +569,29 @@ The cold-start problem deserves deeper treatment because it is the single most c
 
 The dominant cost in a cold start varies by runtime. For interpreted languages like Python and Node.js, the runtime bootstrap is fast (typically under 50 ms) and the dominant cost is initialization code — database connection pools, SDK client instantiation, framework setup. For JVM languages like Java and Kotlin, the JVM startup itself adds hundreds of milliseconds to seconds, which is why SnapStart and GraalVM native images are particularly valuable for the Java ecosystem. For Go, the compiled binary starts nearly instantly, so initialization code is again the dominant factor.
 
-**Provisioned concurrency** (Lambda) and **min instances** (Cloud Run) work by pre-allocating execution environments that sit idle, waiting for requests. These warm instances handle the first N concurrent requests without any cold start. The tradeoff is cost: you pay for the idle compute even when no requests arrive. For a latency-sensitive API with predictable baseline traffic, provisioning 2-3 warm instances may cost an extra $20-50 per month and eliminate the P99 latency spike that cold starts cause. For an unpredictable workload with zero traffic most of the time, provisioned concurrency wastes money.
+**Provisioned concurrency** (Lambda) and **min instances** (Cloud Run) address cold starts by pre-allocating execution environments ahead of incoming traffic. Instead of provisioning runtimes on demand when requests trigger invocation events, the platform maintains a configured pool of warm instances ready to process events immediately. These reserved execution environments serve concurrent requests without triggering runtime bootstrap sequences or container image pulls. Platform operators frequently evaluate this technique for latency-critical user-facing endpoints that cannot tolerate sporadic initialization delays.
 
-**SnapStart** (Lambda, for Java 11/17/21, plus Python and .NET) takes a different approach. Instead of keeping instances warm, Lambda snapshots the memory state of your function after initialization completes and persists that snapshot. When a cold start occurs, Lambda restores the snapshot instead of re-running initialization. The restore is fast (typically under 200 ms for JVM functions) because it is essentially a memory copy rather than a full JVM bootstrap and class-loading cycle. SnapStart does not eliminate cold starts entirely — it eliminates the initialization portion, leaving only the microVM provisioning and snapshot restore. It also introduces a constraint: any code that relies on uniqueness (random seeds, GUIDs generated during init, cached network connections) must be re-executed after restore, because the snapshot captures a frozen moment in time.
+**Pause and predict:** If an engineering team configures provisioned concurrency of 5 instances on an AWS Lambda function (or min-instances on Cloud Run) and the application receives zero requests throughout an entire overnight window, what billing charges are incurred for those idle execution environments?
+
+<details>
+<summary>Check your prediction</summary>
+
+Idle warm capacity is billed continuously, even when request count is zero. Both AWS Lambda provisioned concurrency and Google Cloud Run min-instances bill for the allocated compute resources (measured in vCPU-seconds and memory GB-seconds) for as long as the capacity remains configured and running. The cloud provider dedicates active virtualization infrastructure to keep the runtimes resident in memory, meaning you pay for reserved capacity whether requests arrive or not. While provisioned concurrency successfully eliminates cold-start latency spikes for baseline traffic, leaving unmanaged warm instances enabled during extended periods of zero traffic converts a purely event-driven serverless cost model into a fixed ongoing infrastructure baseline.
+</details>
+
+Because continuously running idle capacity counteracts the pure pay-per-use economics of serverless architectures, alternative platform optimizations focus on reducing initialization latency directly within the application runtime layer.
+
+**SnapStart** (Lambda, for Java 11/17/21, plus Python and .NET) takes a fundamentally different architectural approach to cold-start mitigation. Rather than maintaining permanently provisioned warm microVMs, Lambda executes the function's initialization phase during deployment, takes an encrypted snapshot of the initialized memory and disk state, and caches that snapshot in a multi-tier cache. When subsequent invocations trigger new execution environments, the platform restores the cached snapshot instead of repeating class-loading, dependency injection, and framework initialization cycles from scratch.
+
+**Pause and predict:** When an application relying on AWS Lambda SnapStart restores an execution environment from a cached snapshot, what happens to unique identifiers, pseudo-random seed states, or database network sockets initialized during the build phase? Does the restored function execute completely free of cold-start latency?
+
+<details>
+<summary>Check your prediction</summary>
+
+SnapStart restores initialization memory directly from the frozen snapshot, meaning GUIDs, pseudo-random seeds, and cached network connections created during static initialization are identical across all restored execution environments. If multiple concurrent requests restore from the same snapshot, any identifiers or entropy pools instantiated during the initial setup phase will be duplicated unless application code re-executes uniqueness logic after the restore phase. Platforms provide runtime hooks (such as AWS CRaC `afterRestore` callbacks) to safely regenerate seeds, refresh tokens, and re-establish network sockets. Furthermore, SnapStart does not make invocations fully cold-start-free; while it eliminates the heavy JVM bootstrap and class-loading delays, the runtime still experiences residual latency from microVM provisioning, snapshot retrieval from cache, and network interface attachments.
+</details>
+
+Navigating these runtime-level initialization nuances is essential when tuning serverless platforms, particularly when comparing microVM function execution against containerized workloads that face additional container image delivery overhead.
 
 **The container-serverless cold-start penalty.** Cloud Run and Fargate cold starts are typically longer than Lambda cold starts because the platform must pull a container image from a registry before starting it. Google mitigates this with aggressive caching of frequently used images and layers. AWS Fargate does not cache images across Fargate tasks — every new task pulls the image fresh, which is why Fargate cold starts are 30-60 seconds for typical images. If your container-serverless workload cannot tolerate this latency, you must either keep a minimum instance warm (Cloud Run `min-instances`) or use Kubernetes with pre-scaled pods instead.
 
@@ -609,7 +645,7 @@ Serverless costs spike in three predictable scenarios, and each has a mitigation
 
 **Scenario 1: High sustained traffic.** At 100 million invocations per month with the same 500 ms / 1 GB profile, Lambda costs ~$853/month. Three always-on t3.medium nodes with reserved pricing cost ~$90/month and can handle significantly more throughput than a single Lambda instance. Above roughly 20-30 million invocations per month, Kubernetes becomes cheaper for any workload with steady traffic, because you pay for capacity rather than per-invocation. The mitigation is straightforward: identify the crossover point for your workload and move steady-state services to Kubernetes.
 
-**Scenario 2: Provisioned concurrency left on.** Provisioned concurrency eliminates cold starts by keeping instances warm, but you pay for those instances whether they handle requests or not. Five provisioned concurrent instances of a 1 GB Lambda function cost roughly $130/month in idle compute — more than the invocation and duration costs for many workloads. Teams often enable provisioned concurrency during launch, see improved latency, and forget to right-size it. A month later, the serverless bill is 3x the expected amount. The mitigation: use provisioned concurrency only for latency-sensitive paths, monitor the actual concurrent request count, and scale provisioned concurrency up and down with a schedule if traffic is predictable (lower it at night).
+**Scenario 2: Provisioned concurrency left on.** Provisioned concurrency eliminates cold starts by keeping instances warm, but you pay for those instances whether they handle requests or not. Five provisioned concurrent instances of a 1 GB Lambda function incur substantial baseline costs in idle compute — often exceeding one hundred dollars monthly depending on regional rates — which can easily surpass the invocation and duration charges for many workloads. Teams often enable provisioned concurrency during launch, see improved latency, and forget to right-size it. A month later, the serverless bill is 3x the expected amount. The mitigation: use provisioned concurrency only for latency-sensitive paths, monitor the actual concurrent request count, and scale provisioned concurrency up and down with a schedule if traffic is predictable (lower it at night).
 
 **Scenario 3: Function-to-function chaining.** If a Lambda function calls another Lambda function synchronously and waits for the response, you pay for both functions' duration during the wait. A chain of three synchronous Lambda calls, each waiting 2 seconds for the next, bills for 6 seconds of compute per end-to-end request, even though the actual CPU work is minimal. This is the "chatty serverless" anti-pattern. The mitigation: use asynchronous patterns (SQS, EventBridge, Step Functions) for multi-step workflows. Step Functions let you orchestrate Lambda calls without paying for wait time — you pay per state transition (about $0.000025 per step) rather than per waiting second.
 
@@ -961,7 +997,41 @@ k logs -l serving.knative.dev/service=hello --tail=10
 ```
 </details>
 
-### Success Criteria
+Before you close the hands-on lab, audit the four operational claims below. Each open card states a hypothesis that sounds operationally plausible during serverless interoperability and Kubernetes cloud architectures. Treat the claim as a prediction, then open the details only after you have an answer.
+
+**Card A: Restarting a failed Kubernetes Job that already fired 5,000 async Lambda `Event` invokes is safe because Lambda will ignore duplicate payloads automatically.** A data engineering team runs a batch orchestration Job in Kubernetes that processes daily media archives. The Job queries an S3 bucket for new video files and invokes an image processing Lambda function asynchronously using `InvocationType: Event` in a loop. When the Job pod crashes after dispatching five thousand invocations, the Kubernetes Job controller creates a replacement pod that restarts the script from the beginning. The team assumes that because the incoming JSON payloads contain identical object keys, AWS Lambda will detect the duplicate requests in its internal queue and suppress repeated executions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Asynchronous invocation queuing and function idempotency boundaries. Next action: recognize that AWS Lambda asynchronous invocations (`InvocationType: Event`) place incoming payloads onto an internal service queue and return an HTTP 202 Accepted status immediately without inspecting payload contents for duplicates; when a failed Kubernetes Job restarts and re-scans the source bucket, it generates and dispatches duplicate `Event` invocations for files that were already enqueued or completed; Lambda executes every received event independently, resulting in duplicated processing, redundant downstream database writes, and wasted execution costs; design serverless functions to be strictly idempotent by using the source object key or event identifier to check state in a transactional datastore (such as DynamoDB conditional writes or Redis locks) before executing business logic.
+</details>
+
+**Card B: An EKS cluster that runs all compute on Fargate will still schedule your log-agent DaemonSet onto every Fargate node.** A platform operations team configures an Amazon EKS cluster where all application workloads run exclusively on AWS Fargate profiles to eliminate EC2 node management. To ensure uniform security compliance and centralized log forwarding across the fleet, the platform engineers deploy their standard Fluent Bit DaemonSet manifest to the cluster. The team assumes that the Kubernetes DaemonSet controller will automatically detect every active Fargate compute instance running in the cluster and deploy a corresponding log-agent pod alongside the application.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Serverless container node abstraction and DaemonSet scheduling semantics. Next action: understand that EKS Fargate does not support DaemonSets; Fargate executes each Kubernetes pod inside a dedicated, isolated microVM rather than placing pods on a shared operating system host where node daemons can attach; because an all-Fargate cluster maintains no traditional EC2 worker nodes registered in the cluster node pool, the DaemonSet controller evaluates the cluster state and schedules exactly zero pods; to capture application logs and metrics in an all-Fargate environment, platform teams must deploy the logging agent as a sidecar container inside each application pod specification or configure the built-in Fargate Fluent Bit router using a dedicated `aws-observability` ConfigMap.
+</details>
+
+**Card C: Provisioned concurrency of 5 can be left enabled overnight at zero traffic because you only pay when handlers run.** An e-commerce engineering team prepares a mission-critical checkout service powered by AWS Lambda for a high-profile holiday marketing campaign. To guarantee that customer checkouts never experience cold-start latency, the lead architect configures provisioned concurrency with five instances on the production alias. When daily traffic drops to near zero during overnight hours, the team decides to leave provisioned concurrency enabled, assuming that standard serverless billing applies and charges will only accrue when incoming requests actively invoke the function handlers.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Serverless concurrency resource allocation and idle capacity billing models. Next action: recognize that provisioned concurrency on AWS Lambda and min-instances on Google Cloud Run maintain dedicated, pre-warmed execution environments continuously; cloud providers bill for allocated warm capacity per second (evaluating provisioned memory and allocated vCPUs) regardless of whether any requests arrive; leaving five provisioned concurrent instances active overnight with zero incoming traffic accumulates continuous compute charges that undermine serverless pay-per-use economics; configure scheduled Application Auto Scaling policies to reduce provisioned concurrency to zero during known idle windows, or scale warm instances dynamically using CloudWatch metric alarms tracking invocation rates.
+</details>
+
+**Card D: SnapStart makes a Java Lambda fully cold-start-free, so GUIDs generated during init stay unique across restores.** A financial services team migrates a Java-based payment authorization service to AWS Lambda and enables Lambda SnapStart to eliminate JVM initialization and class-loading delays. During static initialization in the function class, the code instantiates a static secure random generator and creates a unique transaction batch GUID used across payment records. The developers assume that SnapStart renders the function completely cold-start-free and that every restored execution environment automatically preserves runtime isolation and unique identifier generation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Memory snapshot restoration semantics and state snapshot uniqueness. Next action: understand that SnapStart snapshots the initialized memory state of the microVM and restores that identical memory image across multiple subsequent execution environments; any random seeds, GUIDs, or network socket connections established during the static initialization phase are frozen into the snapshot and restored identically in parallel instances, causing repeated identifiers and potential cryptographic collisions; teams must implement runtime restore hooks (such as the OpenJDK CRaC `Resource` interface) to refresh random entropy and regenerate unique identifiers `afterRestore`; furthermore, SnapStart does not make invocations fully cold-start-free, as restored functions still incur residual microVM provisioning, snapshot retrieval, and VPC network interface attachment overhead.
+</details>
+
+**Success Criteria**:
 
 - [ ] Knative Service deploys and responds to HTTP requests
 - [ ] Service scales to zero after idle period
@@ -989,7 +1059,7 @@ kind delete cluster --name knative-lab
 - [AWS Lambda runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html) — Supported runtimes, runtime deprecation policy, and custom runtime configuration for Lambda.
 - [AWS Lambda SnapStart](https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html) — SnapStart behavior, supported runtimes (Java 11/17/21, plus Python and .NET), runtime hooks, and pricing implications for JVM cold-start reduction.
 - [Google Cloud Run min instances](https://cloud.google.com/run/docs/configuring/min-instances) — Configuring minimum instances to eliminate cold starts on Cloud Run, including cost implications.
-- [AWS Fargate platform versions](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html) — EKS Fargate capabilities, limitations (DaemonSets, privileged containers), and pod configuration.
+- [AWS Fargate platform versions](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html) — EKS Fargate capabilities, limitations (DaemonSets, lack of GPU support, privileged containers), and pod configuration.
 - [Azure Functions scale and hosting plans](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale) — Consumption, Premium, and Dedicated plan limits, cold-start behavior, and scaling decisions.
 - [KEDA documentation](https://keda.sh/docs/) — Event-driven autoscaling for Kubernetes, including scalers for cloud queue services (AWS SQS, GCP Pub/Sub, Azure Service Bus).
 - [AWS Step Functions pricing](https://aws.amazon.com/step-functions/pricing/) — Per-state-transition pricing model as an alternative to synchronous Lambda chaining.
