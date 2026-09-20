@@ -79,7 +79,7 @@ To combat data gravity, engineers must decouple the applications from the data s
 Application **integrations** usually dominate over raw data volume. While transferring 5TB of data across modern high-speed cloud networks takes only hours over dedicated links, managing 30 microservices that read and write against that database creates immense organizational and operational inertia. Coordinating deployment schedules, verifying backward compatibility for schemas, altering database connection strings across teams, and preventing transaction anomalies during cutover require significantly more engineering effort than transferring the disk blocks themselves. Consequently, attempting an offline dump-and-restore across 30 integrated services carries severe coordination risks; platform teams must instead prioritize change data capture, dual-write patterns, or progressive service decoupling.
 </details>
 
-Recognizing how distributed consumer dependencies govern architectural velocity enables platform teams to structure realistic cutover boundaries before executing data movements. Aligning data migration runbooks with application team schedules establishes the foundational boundaries that dictate business service level objectives.
+Cutover calendars belong to the teams that own the callers, not only to the storage ticket. Write freeze windows, sequence resets, and rollback owners into the same runbook as the data movement so the business RPO conversation is not a surprise at DNS switch time.
 
 ### RPO, RTO, and the Cutover Window
 
@@ -220,7 +220,7 @@ spec:
 Unmatched Ingress paths route directly to the **defaultBackend**. Standard Kubernetes Ingress controllers evaluate incoming HTTP requests against explicit host and path rules; if a client requests an unmapped path, the Ingress controller directs that request to its configured `defaultBackend`. By establishing the legacy monolith or the existing upstream router as this `defaultBackend`, all unmigrated API endpoints and legacy assets continue serving production traffic seamlessly. This ensures that users never encounter broken links or 404 errors as engineering teams progressively extract individual microservices into Kubernetes.
 </details>
 
-Configuring edge fallbacks provides operational safety nets that protect user journeys while modernization initiatives unfold across incremental release cycles. Once traffic routing controls guarantee system continuity, teams can evaluate whether legacy components warrant simple containerization or comprehensive cloud-native restructuring.
+Progressive extraction only works if production traffic still has a defined home while routes are incomplete. After that safety net is in place, teams can decide which leftover components deserve a container lift versus a rebuild, instead of treating every path as a big-bang rewrite.
 
 ## Strategic Approaches: Lift, Platform, or Architect
 
@@ -383,7 +383,7 @@ spec:
 After the snapshot **copy** to `eu-west-1` reaches the completed state, the destination PVC provisions and the pod starts **immediately**. You do **not** need to wait for all 500Gi of block storage data to copy into the new volume before beginning application operations. Amazon EBS volumes created from snapshots pull data blocks lazily from Amazon S3 in the background as requests arrive. However, read operations targeting blocks that have not yet been hydrated from S3 suffer elevated latency due to first-touch I/O penalties; enabling Amazon EBS Fast Snapshot Restore (FSR) on the snapshot or pre-warming the volume ensures baseline I/O performance immediately upon pod start.
 </details>
 
-Operating with lazy storage provisioning allows cluster administrators to achieve aggressive recovery time objectives during disaster recovery rehearsals and regional migrations. Evaluating initial read latencies and storage initialization behaviors across cloud hyperscalers reveals distinct operational trade-offs for enterprise stateful workloads.
+Cross-region volume restores still need a measured first-read budget in the runbook, because attach-ready is not the same as peak IOPS. Compare that budget across AWS, GCP, and Azure snapshot paths before you promise the same RTO on every hyperscaler.
 
 ### GCP and Azure CSI Snapshots
 
@@ -724,7 +724,7 @@ Logical replication and CDC tools can replicate data between different database 
 For a 50TB workload with a 5-second write freeze, prefer **CDC with a durable buffer** over tightly coupled native logical replication across wide-area networks. Native PostgreSQL logical replication couples the source publisher directly to the destination subscriber; cross-region network flakiness, packet loss, or heavy subscriber indexing stalls the replication slot, causing write-ahead log (WAL) accumulation that threatens to exhaust source database disk capacity. In contrast, a CDC pipeline using Debezium streaming into a durable message queue like Apache Kafka decouples the source from the destination. The distributed streaming log safely buffers change events during network blips, prevents source storage exhaustion, and permits rapid final drain within the 5-second cutover constraint.
 </details>
 
-Decoupling transaction log extraction from consumer ingestion prevents production performance degradation and protects upstream storage capacity from subscriber bottlenecks. Adopting asynchronous stream-oriented migration architectures establishes predictable delivery baselines when coordinating high-volume database cutovers.
+Large cutovers fail when the source database is treated as a free buffer for the destination's apply lag. Size the pipeline so a stalled subscriber cannot starve the publisher's disks, then rehearse the last seconds of write freeze against a production-like WAL rate.
 
 ## Patterns & Anti-Patterns
 
