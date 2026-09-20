@@ -619,12 +619,12 @@ Mountpoint exposes mount options through the CSI `volumeAttributes` (see [Mountp
 <details>
 <summary>Check your prediction</summary>
 
-Mountpoint for Amazon S3 translates POSIX file system calls to S3 REST APIs, which introduces strict operational constraints. Mountpoint supports sequential writes to **new** files only; it does not support random writes, in-place appends to existing files, directory renames, or hard links. Furthermore, Mountpoint provides no POSIX file locking (`flock` or `fcntl`), preventing applications that coordinate concurrent writers from running safely. The driver also enforces static provisioning only: administrators must manually create `PersistentVolume` objects referencing existing S3 buckets and IAM roles rather than relying on dynamic provisioning. Additionally, Mountpoint for Amazon S3 is not supported on AWS Fargate pods, Windows worker nodes, or hybrid clusters such as EKS Anywhere.
+Mountpoint for Amazon S3 translates POSIX file system calls to S3 REST APIs, which introduces strict operational constraints. Mountpoint supports sequential writes to **new** files only; it does not support random writes, in-place appends to existing files, directory renames, or hard links. Furthermore, Mountpoint provides no POSIX file locking (`flock` or `fcntl`), preventing applications that coordinate concurrent writers from running safely. The driver also enforces static provisioning only: administrators must manually create `PersistentVolume` objects referencing existing S3 buckets and IAM roles rather than relying on dynamic provisioning. Additionally, Mountpoint for Amazon S3 is not supported on AWS Fargate pods, Windows worker nodes, or Amazon EKS Hybrid Nodes.
 </details>
 
-Understanding object storage abstraction boundaries ensures engineering teams select appropriate storage backends rather than forcing incompatible POSIX semantics onto cloud buckets. Production architectures should strictly isolate Mountpoint to high-throughput batch readers, machine learning datasets, and sequential pipeline stages.
+Object-store mounts belong in a storage catalog with an explicit access-pattern label, not as a default PVC class. Review boards should ask what write shape the application actually issues before a bucket path appears in a Deployment.
 
-Hypothetical scenario: a team mounts a production PostgreSQL data directory on Mountpoint because “S3 is cheaper.” The database issues random 8 KiB writes; queries time out, and backups corrupt. The fix is migrating the hot path back to EBS (RWO) or EFS (RWX) and reserving Mountpoint for immutable training shards and export staging only.
+Hypothetical scenario: a team picks the cheapest AWS storage API for a latency-sensitive database data directory because the bucket already exists. The incident review later shows the I/O profile never matched the driver contract, and the recovery was a backend change rather than a mount-option tweak.
 
 ---
 
