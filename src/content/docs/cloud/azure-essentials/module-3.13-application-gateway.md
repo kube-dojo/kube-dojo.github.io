@@ -673,7 +673,7 @@ This example separates ownership. The platform namespace owns the Gateway, and t
 On a shared AGIC or Kubernetes Ingress gateway lacking admission control, a workload in another namespace can define an Ingress with the same production hostname and hijack incoming production traffic. Application Gateway for Containers mitigates this risk by providing `allowedRoutes` policies on the parent Gateway listener, allowing platform administrators to strictly restrict which namespaces can attach routes to specific hostnames.
 </details>
 
-Multi-tenant cluster architecture requires explicit administrative boundaries between shared networking infrastructure and tenant workload definitions. Enforcing tenant isolation at the ingress layer ensures that team namespaces operate independently without interfering with shared edge routing policies. Establishing verifiable admission boundaries provides predictable and secure traffic segregation across complex enterprise environments.
+Shared-edge change reviews should name who may attach a public hostname before the first Ingress object lands in a new namespace. Platform engineers keep that matrix beside the Gateway or Ingress class so a weekend request does not wait on a hallway conversation. Rollback then means reverting one reviewed object, not rediscovering ownership after users already follow the name.
 
 ## TLS Termination + Key Vault Cert Sync
 
