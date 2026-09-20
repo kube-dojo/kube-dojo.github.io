@@ -139,7 +139,7 @@ az network vnet subnet list --resource-group myRG --vnet-name hub-vnet -o table
 <details>
 <summary>Check your prediction</summary>
 
-Azure reserves 5 IP addresses in every subnet (network, gateway, two DNS resolvers, and broadcast), leaving only 251 usable IP addresses in a standard /24 prefix. Because Azure CNI assigns an individual private VNet IP address to each pod and node, 50 nodes running 30 pods each require 1,550 distinct IP addresses (50 node IPs plus 1,500 pod IPs). This exceeds the 251 usable addresses, causing IP address exhaustion and preventing node scale-out and pod scheduling.
+Azure reserves 5 IP addresses in every subnet (network, gateway, two DNS resolvers, and broadcast), leaving only 251 usable IP addresses in a standard /24 prefix. Flat Azure CNI assigns a VNet IP to each node and each pod. [Microsoft's planning formula also reserves a surge node for rolling upgrades: `(nodes + 1) + ((nodes + 1) × max pods per node)`.](https://learn.microsoft.com/en-us/azure/aks/concepts-network-ip-address-planning) For 50 nodes at 30 pods each that is `(51) + (51 × 30) = 1,581` addresses, which needs a /21 or larger. A /24 cannot cover that budget, so scale-out and pod scheduling fail when the subnet is exhausted.
 </details>
 
 Dedicated subnets such as `GatewaySubnet`, `AzureFirewallSubnet`, and `AzureBastionSubnet` require exact naming syntax. Azure fabric controllers programmatically bind gateway appliances and firewall scale sets to those specific names. Reserving distinct address ranges for these platform services prevents administrative rework during hybrid connectivity expansion.
@@ -939,7 +939,7 @@ az group delete --name "$RG" --yes --no-wait
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: container network interface IP address consumption versus subnet allocation limits. Next action: calculate the full IP budget including per-pod allocations and Azure reserved addresses before deployment, and allocate at least a /22 subnet prefix or configure Azure CNI overlay networking.
+Failure layer: container network interface IP address consumption versus subnet allocation limits. Next action: calculate the full IP budget including per-pod allocations, Azure reserved addresses, and a surge node for upgrades before deployment, and allocate at least a /21 subnet prefix or configure Azure CNI overlay networking.
 </details>
 
 **Card B: A NIC NSG that allows port 80 overrides a subnet NSG that denies port 80.** An application engineer attaches a Network Security Group to a virtual machine network interface with a high-priority rule allowing inbound HTTP traffic on TCP port 80. The enclosing subnet NSG contains a rule denying inbound port 80. The engineer assumes that the more specific network interface rule takes precedence over the broader subnet-level security rule.
