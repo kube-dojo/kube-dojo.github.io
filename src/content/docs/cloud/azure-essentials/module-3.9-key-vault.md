@@ -158,7 +158,7 @@ Software keys (`RSA`, `EC`) are cheaper per operation and sufficient for dev/tes
 Applications use envelope encryption. They generate a random AES data key locally and encrypt the 50 GB payload with AES locally. They wrap only the small data key with Key Vault using RSA-OAEP or AES key wrap. The 50 GB file never hits the Key Vault API.
 </details>
 
-Direct cryptographic operations against Key Vault suit small payloads such as signing hashes or wrapping symmetric keys. Sending large binaries over REST introduces severe network latency and quickly consumes transactional throughput quotas. Client applications should limit direct vault calls to key management operations and credential wrapping.
+The encrypt CLI example below is sized for a short string, not a media file. RSA-OAEP encrypt and decrypt count against the same operations meter as other key calls, and larger HSM keys consume the ten-second GET budget faster. Keep payload size and algorithm choice in the same capacity review as SKU selection.
 
 ```bash
 # Create an RSA key
@@ -218,7 +218,7 @@ Certificate **policies** define issuer (self-signed vs CA partner), key type, ex
 
 ## Automated Secret Rotation
 
-Storing secrets securely is only half the battle; secrets must be rotated regularly to limit the impact of a potential compromise. Rotation has three moving parts: **generate new material**, **update dependents** (databases, partners, apps), and **retire old versions** without breaking decrypt of historical data. Azure Key Vault owns the first and third for keys; secrets usually need your automation for the second.
+Storing secrets securely is only half the battle; secrets must be rotated regularly to limit the impact of a potential compromise. Rotation has three moving parts: **generate new material**, **update dependents** (databases, partners, apps), and **retire old versions** on a documented schedule. Azure Key Vault owns generation and versioning for keys; secrets usually need your automation for the dependent systems.
 
 ### Key Vault Rotation Policies (Keys)
 For cryptographic keys, you can [define an automated rotation policy directly within Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/keys/how-to-configure-key-rotation). This instructs the HSM to generate new key material at a scheduled interval. The policy JSON combines `lifetimeActions` (when to rotate) with `attributes.expiryTime` on the key.
@@ -257,7 +257,7 @@ az keyvault key rotation-policy update \
 Key Vault does not re-encrypt your database or storage disks. Old key versions remain addressable by their specific version identifiers so historical data decrypts without error. Consuming applications and PaaS services such as SQL TDE or Storage CMK must explicitly select the latest key version for new writes.
 </details>
 
-Automated rotation policies establish predictable cryptographic hygiene without interrupting ongoing read operations across running workloads. Platform teams must establish audit alerting to track when rotation events fire successfully across active vaults.
+The policy JSON above combines lifetimeActions with expiryTime so operators can see the next rotate trigger in the vault blade. Wire KeyNearExpiry alongside SecretNearExpiry if the same Function handles both object types, and keep the function idempotent when Event Grid retries overlap.
 
 ### Secret Rotation via Event Grid
 For secrets (like database passwords), Key Vault cannot magically change the password in the target system (e.g., Azure SQL). Instead, Key Vault [emits an Event Grid event 30 days before a secret expires](https://learn.microsoft.com/en-us/azure/event-grid/event-schema-key-vault). This event triggers an Azure Function, which connects to the database, generates a new password, updates the database user, and saves the new version to Key Vault.
@@ -477,7 +477,7 @@ Multi-region architectures require explicit design choices for secret replicatio
 KV-West still serves the old key while KV-East serves the updated version. This mismatch causes split-brain authentication failures across regions. Global secrets need identical values in both vaults alongside automated drift alerts to detect partial sync failures immediately.
 </details>
 
-Disaster recovery runbooks should include automated health checks that query both regional endpoints and verify configuration synchronization. Catching credential discrepancies during automated canary verification prevents partial deployments from degrading production traffic.
+Quarterly failover drills should include recovering a soft-deleted secret and pointing the app at the secondary vault URI. Teams that only fail over compute discover Key Vault write limits when they try to issue a new certificate during the incident.
 
 ---
 
@@ -653,7 +653,7 @@ az network private-endpoint create \
 Network firewalls take precedence over role-based access control. The administrator cannot read secrets from an unapproved home IP address. Azure RBAC does not punch through a denied public IP, and the request is rejected at the network perimeter before identity authentication evaluates.
 </details>
 
-Network perimeter controls enforce transport security boundaries before the data plane examines Microsoft Entra authorization tokens. Security teams must pair least-privilege role assignments with explicit network isolation to prevent unauthorized data access.
+Private Link without cluster DNS updates produces TLS errors that look like an outage. When CSI or workload identity calls the vault, egress comes from the node pool subnets—include those ranges in firewall rules, not only office IPs.
 
 ---
 
