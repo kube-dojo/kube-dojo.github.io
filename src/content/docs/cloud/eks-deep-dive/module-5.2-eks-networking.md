@@ -165,12 +165,20 @@ ENI Slot → 1 IP address                ENI Slot → /28 prefix (16 IPs)
 
 m5.xlarge:                              m5.xlarge:
   4 ENIs x 15 slots = 60 IPs max         4 ENIs x 15 slots x 16 = 960 IPs max
-  Max pods: ~58                           Max pods: 110 (capped by EKS)
+  Secondary IPs: up to 58                Prefix IPs: up to 960 theoretical
 ```
 
-> **Stop and think**: If Prefix Delegation multiplies IP capacity by 16x, why does EKS still cap an m5.xlarge at 110 pods instead of the theoretical 960? (Hint: IP addresses are not the only resource a pod consumes on a node).
+**Pause and predict:** When you enable Prefix Delegation on the Amazon VPC CNI to allocate `/28` IPv4 prefixes across your EC2 instances, does the node immediately schedule hundreds of additional pods up to its theoretical IP ceiling?
 
-Even when prefix delegation makes far more IPs available, Amazon EKS still applies lower practical pod caps; managed node groups without a custom AMI cap nodes under 30 vCPUs at 110 pods and larger nodes at 250.
+<details>
+<summary>Check your prediction</summary>
+
+No. While Prefix Delegation assigns a contiguous `/28` prefix containing 16 IPv4 addresses per available ENI slot, allocating additional IP prefixes does not automatically raise the kubelet's `max-pods` setting. The default maximum pod density on standard Amazon EKS AMIs is 110 pods per node, but this value is a configurable default rather than a hard physical ceiling. While managed node groups configure default caps of 110 (or 250 on larger compute instances), these limits can be tuned using launch template custom user data and kubelet arguments. IP address availability is only one constraint on pod density; system memory, CPU reservation overhead, container runtime namespaces, kernel process table limits, and local ephemeral storage IOPS all place strict operational boundaries on sustainable container density.
+</details>
+
+Configuring high-density worker nodes demands harmonizing IP prefix availability with host kernel resources, ensuring scheduler limits protect compute headroom rather than reflecting unconstrained network interface capacities.
+
+Prefix delegation expands pod density across modern cloud infrastructure, but operational success requires platform engineers to look past pure IP arithmetic. Because container runtimes, system daemons, and operating system kernels all consume memory, file descriptors, and CPU time for every running container, cluster capacity planning must always align network interface capabilities with realistic compute limits.
 
 Enabling Prefix Delegation is a two-step process. First, you configure the VPC CNI:
 
@@ -294,7 +302,7 @@ Once implemented, the architecture physically isolates the node's network traffi
 flowchart TD
     subgraph VPC ["VPC: Primary CIDR 10.0.0.0/16 + Secondary CIDR 100.64.0.0/16"]
         subgraph NodeSubnet ["Node Subnet (10.0.10.0/24)"]
-            NodeENI["Node Primary ENI: 10.0.10.x\n(only node IPs live here)"]
+            NodeENI["Node Primary ENI: 10.0.10.x\n(primary interface in node subnet)"]
         end
         subgraph PodSubnet ["Pod Subnet (100.64.0.0/19)"]
             PodENI["Pod ENIs: 100.64.x.x\n8,192 IPs available for pods!"]
@@ -302,9 +310,17 @@ flowchart TD
     end
 ```
 
-> **Pause and predict**: If we place pod ENIs into a separate subnet from the node's primary ENI, what happens to the ENI slot that the node's primary interface occupies? Can pods still use it?
+**Pause and predict:** When you enable Custom Networking to assign pod IP addresses from dedicated secondary subnets, what happens to the ENI slot occupied by the worker node's primary network interface? Can regular application pods still receive IP addresses from that primary interface?
 
-*Critical Architecture Note*: Because Custom Networking dictates that pod IPs can *only* live on ENIs attached to the Custom Networking subnet, the node's Primary ENI (which lives in the Node Subnet) is entirely removed from the pod scheduling pool. If an instance has 4 ENIs, only 3 are available for pods. This slightly reduces your total pod density per node unless you combine Custom Networking with Prefix Delegation—a combination that represents the gold standard for large-scale EKS clusters.
+<details>
+<summary>Check your prediction</summary>
+
+Regular application pods cannot use the primary ENI under Custom Networking; that entire interface slot leaves the pod IP allocation pool. Because Custom Networking mandates that pod IP addresses originate exclusively from secondary ENIs attached to the subnets defined in your `ENIConfig` custom resources, the primary interface (which resides in the node subnet) is reserved strictly for host-level networking and control plane traffic. However, host-network pods (such as `kube-proxy` or node monitoring agents configured with `hostNetwork: true`) still use the primary ENI directly. Crucially, applying Custom Networking configurations to an active cluster leaves existing worker nodes unaffected; you must systematically drain, terminate, and replace existing nodes with fresh compute instances so the CNI daemon can provision secondary interfaces according to the new subnet layout.
+</details>
+
+Architecting multi-tier network boundaries between physical EC2 host interfaces and ephemeral application containers establishes rigorous blast-radius isolation while necessitating proactive capacity modeling across production availability zones.
+
+Network architects routinely implement secondary VPC CIDRs to isolate pod traffic from restricted corporate data centers while conserving expensive RFC 1918 addresses. When combining secondary CIDR allocations with custom routing tables, each availability zone operates as an independent failure domain with dedicated subnet boundaries, preventing IP exhaustion from cascading into platform-wide deployment outages.
 
 ### Pod CIDR planning before you enable custom networking
 
@@ -316,9 +332,21 @@ Document which security groups attach to pod ENIs in ENIConfig versus the node p
 
 ## Pod-Level Isolation: Security Groups for Pods
 
-Historically, all pods running on a specific EC2 node shared that node's security groups. If a node required access to an RDS database for one specific microservice, every other pod on that node inherited that database access. While Kubernetes Network Policies provide Layer 3/4 isolation inside the cluster, many enterprises mandate zero-trust security enforced by the cloud provider's native firewall layer.
+Kubernetes Network Policies deliver software-defined Layer 3 and Layer 4 packet filtering within the cluster boundary, but enterprise compliance standards often mandate zero-trust isolation enforced by the cloud provider's native firewall layer. When containerized services communicate directly with managed cloud infrastructure such as Amazon RDS databases, OpenSearch clusters, or internal VPC endpoints, platform engineers must establish unambiguous security perimeters.
 
-Security Groups for Pods solves this by integrating directly with the AWS Nitro hypervisor to attach VPC Security Groups dynamically at the individual pod level. It achieves this utilizing [a "Trunk and Branch" ENI architecture](https://docs.aws.amazon.com/eks/latest/best-practices/sgpp.html).
+**Pause and predict:** If a single microservice deployed onto an EC2 worker node requires network access to an external RDS database, which AWS security group governs that pod's traffic when Security Groups for Pods is not enabled?
+
+<details>
+<summary>Check your prediction</summary>
+
+Without Security Groups for Pods (SGPP), every pod running on a given worker node shares that node's EC2 security group. If you modify the node's security group rules to permit ingress or egress traffic to an Amazon RDS database for a single microservice, every other pod co-located on that same instance automatically inherits identical network reachability. To resolve this security exposure, Security Groups for Pods integrates directly with the AWS Nitro hypervisor to attach native AWS security groups to individual pods. The VPC CNI achieves this by attaching a dedicated trunk network interface to the EC2 host and dynamically provisioning lightweight branch ENIs associated with individual pod network namespaces.
+</details>
+
+Enterprise zero-trust architectures demand granular network enforcement that aligns cloud security policies with individual microservice identities rather than broad infrastructure host boundaries.
+
+By decoupling container firewall rules from virtual machine host configurations, platform security teams can enforce least-privilege egress controls directly through AWS CloudWatch Flow Logs and AWS Network Firewall. Workloads that handle sensitive payment tokens or regulated customer data remain cryptographically isolated at the hypervisor boundary, even when co-located on shared compute nodes alongside general-purpose microservices.
+
+Security Groups for Pods achieves this granular boundary by integrating directly with the AWS Nitro hypervisor to attach VPC Security Groups dynamically at the individual pod level. It achieves this utilizing [a "Trunk and Branch" ENI architecture](https://docs.aws.amazon.com/eks/latest/best-practices/sgpp.html).
 
 ```mermaid
 flowchart LR
@@ -497,9 +525,19 @@ The differences between ALB and NLB are distinct and determine your entire edge 
 
 Those hourly figures come from the public [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/) page for US East (N. Virginia); LCU and NLCU usage can dominate at high throughput, so load tests should include both components. Internal-facing LBs still incur hourly and capacity-unit charges even when no public IPv4 is attached, though you avoid the separate public IPv4 line item described in [VPC pricing](https://aws.amazon.com/vpc/pricing/).
 
-For WebSocket-heavy workloads, both ALB and NLB can maintain long-lived TCP connections when health checks and idle timeouts are configured generously. ALB terminates HTTP and understands HTTP/2 features used by some gRPC-over-HTTP stacks; NLB preserves transparent TCP and is often chosen when you need static IPs per Availability Zone or TLS passthrough without ALB inspection. The operational difference during Kubernetes rollouts is target registration speed: IP targets track ready pods directly, so connections drain to healthy endpoints instead of sticking to a NodePort that still passes the load balancer health check while kube-proxy sends traffic to a crashing pod.
+Selecting between Layer 7 and Layer 4 load balancing requires evaluating protocol requirements alongside operational resilience during rolling application updates. Stateful connections and real-time streaming protocols introduce specific challenges when pods scale dynamically across node groups.
 
-> **Pause and predict**: If your application uses WebSockets which require long-lived persistent connections, which load balancer type would provide the most efficient routing without connection drops during scaling events?
+**Pause and predict:** When deploying a WebSocket-based application that maintains long-lived persistent TCP connections, which load balancer configuration prevents dropped client connections and routing errors during rolling pod deployments?
+
+<details>
+<summary>Check your prediction</summary>
+
+Both Application Load Balancers (ALB) and Network Load Balancers (NLB) can reliably maintain long-lived TCP connections when health check intervals, keepalive probes, and idle timeouts are configured generously. ALB terminates HTTP and understands HTTP/2 and WebSocket upgrade handshakes natively, while NLB provides transparent Layer 4 TCP proxying with lower latency and optional static Elastic IPs per Availability Zone. The critical operational trap during Kubernetes rollouts is using **instance** (NodePort) targets. With instance targets, the load balancer evaluates health at the EC2 node level; the node remains healthy according to AWS while local `kube-proxy` iptables or IPVS rules may continue routing client traffic to a terminating or crashing pod. In contrast, **IP targets** register individual Pod IPs directly into the AWS Target Group. When a pod terminates, the AWS Load Balancer Controller deregisters the pod IP and drains active connections in lockstep with Kubernetes pod readiness endpoints.
+</details>
+
+Synchronizing target group registration directly with container lifecycle events protects active client sessions and prevents silent connection drops during continuous delivery deployments.
+
+Modern ingress architectures rely on active coordination between the AWS Load Balancer Controller and Kubernetes service endpoints to manage high-concurrency client streams. By registering container targets dynamically, the ingress controller ensures that scaling actions, node drains, and rolling updates execute without degrading active transport sessions or generating transient HTTP error spikes.
 
 ### TargetGroupBinding and services outside Ingress
 
@@ -1081,7 +1119,41 @@ helm uninstall aws-load-balancer-controller -n kube-system
 # Clean up ALB/NLB if they persist (check the AWS console)
 ```
 
-### Success Criteria
+Before committing an EKS networking architecture to production, platform architects must audit common cognitive traps regarding prefix delegation, custom networking interfaces, pod-level security groups, and load balancer target registration. Auditing these failure layers ensures engineering teams establish resilient data-plane baselines while avoiding dangerous assumptions about address allocation limits, interface availability, and connection stability during rolling updates.
+
+**Card A: Enabling Prefix Delegation automatically raises kubelet `max-pods` to the theoretical 16× ENI count.** A platform team enables `ENABLE_PREFIX_DELEGATION=true` on the `aws-node` DaemonSet to solve IP exhaustion across their `m5.xlarge` worker node fleet. Seeing that each instance interface can now receive a `/28` IPv4 prefix containing 16 addresses, the team prepares to schedule hundreds of lightweight microservices onto each node. They expect the Kubernetes scheduler to automatically pack pods up to the new theoretical 960-IP network interface ceiling.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kubelet configuration boundaries versus CNI network interface address allocation. Next action: understand that allocating `/28` prefixes to EC2 ENIs does not alter the kubelet `--max-pods` parameter, which defaults to 110 on standard EKS AMIs; configure custom user data in your node launch template using the EKS `max-pods-calculator.sh` script to explicitly set a safe `--max-pods` value while verifying system memory and compute reservations.
+</details>
+
+**Card B: Custom networking still assigns regular Pod IPs from the node's primary ENI slot.** An infrastructure team configures Custom Networking with secondary CIDRs to preserve limited primary VPC address space. They create `ENIConfig` resources for secondary pod subnets and launch new worker nodes with 4 available ENIs each. When sizing their node pools, the lead engineer calculates pod density by multiplying all 4 interface slots by their prefix allocations, assuming the primary ENI in the node subnet will still assign IP addresses to regular application containers.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Interface allocation mechanics under AWS VPC CNI Custom Networking. Next action: recognize that Custom Networking restricts regular pod IP assignment exclusively to secondary ENIs attached to subnets defined in `ENIConfig`, removing the primary ENI completely from the pod scheduling pool (though host-network pods still utilize it); budget instance density based on `ENI - 1` interfaces and combine custom networking with prefix delegation to maintain high pod density.
+</details>
+
+**Card C: Without Security Groups for Pods, only the one microservice that needs RDS inherits the node security group.** A development group deploys a multi-tenant payment processing service alongside public marketing web applications on the same EKS node group. To allow the payment worker to query a backend Amazon RDS PostgreSQL instance, an operations engineer modifies the worker node's shared security group to allow outbound traffic to port 5432. The team assumes AWS security group rules evaluate Kubernetes pod labels so that only the designated payment container inherits this database access.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Shared-fate hypervisor security boundaries versus container-level identity isolation. Next action: understand that without Security Groups for Pods (SGPP), all containers running on an EC2 instance share the node's primary security group, allowing any compromised adjacent container to reach the database; deploy `SecurityGroupPolicy` resources on compatible Nitro instances to provision dedicated branch ENIs with pod-specific security groups.
+</details>
+
+**Card D: Instance/NodePort targets keep WebSocket clients on healthy Pods during a rollout because the node still passes the load balancer health check.** A platform team configures an Application Load Balancer using standard instance-mode target groups to expose a real-time WebSocket chat cluster. During a rolling deployment of the chat service, the team monitors the target group and observes that all EC2 worker nodes continuously pass ALB health checks. They assume that because the host nodes remain fully healthy in the target group, connected WebSocket users will transition smoothly without broken connections or 502 Bad Gateway errors.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Load balancer target registration granularity during Kubernetes rolling updates. Next action: recognize that instance-mode targets evaluate node health rather than pod readiness, causing the load balancer to keep routing traffic to a node whose local `kube-proxy` is forwarding packets to a terminating pod; configure `service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip` or Ingress `alb.ingress.kubernetes.io/target-type: ip` so the AWS Load Balancer Controller registers pod IPs directly and drains active sessions cleanly.
+</details>
+
+**Success Criteria**:
 
 - [ ] I enabled Prefix Delegation on the VPC CNI and verified `/28` prefixes on node ENIs.
 - [ ] I updated node max-pods to 110 to take advantage of Prefix Delegation.
