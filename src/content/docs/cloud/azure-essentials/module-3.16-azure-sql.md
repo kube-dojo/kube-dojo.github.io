@@ -76,7 +76,7 @@ Now you solve it: your team owns a new SaaS API with one database per tenant, mo
 Ask which Azure SQL **product** (logical server, Managed Instance, or SQL on VM), which database or instance, and which **connection path** before any remediation. An Azure SQL Database logical server is an administrative boundary rather than a virtual machine, whereas Managed Instance provides native VNet integration and SQL on Azure VM is full IaaS. Resizing an IaaS host or altering VM guest settings during a PaaS incident targets the wrong infrastructure abstraction.
 </details>
 
-Clear naming conventions in monitoring dashboards, alert definitions, and operational runbooks prevent engineering teams from misdiagnosing platform abstractions under pressure. Once operators identify the exact managed deployment model and connection route, evaluating compute capacity and storage architecture becomes necessary for diagnosing throughput limits.
+Clear naming conventions in monitoring dashboards, alert definitions, and operational runbooks prevent engineering teams from misdiagnosing platform abstractions under pressure. Ticket text that treats a host, a resource name, and a listener as interchangeable usually wastes the first ten minutes of an incident.
 
 ## 2. Compute and Storage Models
 
@@ -94,7 +94,7 @@ vCore is the operator-friendly model for serious production. General Purpose, Bu
 Raising vCores on General Purpose increases CPU and memory allocations, but it does not eliminate the remote storage latency floor. **Business Critical** uses locally attached SSD storage and replica HA to achieve low-latency transaction performance, whereas **General Purpose** relies on **remote storage** where data and log files traverse network-attached storage nodes.
 </details>
 
-Selecting an appropriate database tier requires balancing operational cost constraints against workload concurrency patterns and latency expectations. Production environments frequently face trade-offs between standard remote storage architectures and specialized low-latency database engines. Understanding how physical storage placement interacts with service tiers enables infrastructure teams to select viable configurations before hitting operational throughput ceilings.
+Selecting an appropriate database tier requires balancing operational cost constraints against workload concurrency patterns and latency expectations. An architecture review that only asks how many vCores to buy can still miss the storage placement that actually bounds commit time.
 
 | Model | Operator reads it as | Best fit | Watch for |
 |---|---|---|---|
@@ -194,7 +194,7 @@ Comprehensive disaster recovery runbooks must audit operational dependencies bey
 
 ## 4. Identity, Networking, and Security
 
-Azure SQL Database access is structured across distinct management surfaces with separate operational boundaries. The Azure control plane oversees resource provisioning, administrative configurations, firewall parameters, and diagnostic telemetry through Azure Resource Manager. Conversely, the SQL data plane governs client authentication, tabular authorizations, query execution pipelines, and relational database permissions.
+Azure SQL Database access is structured across distinct management surfaces with separate operational boundaries. Operators who treat a subscription-wide Azure role as a complete ticket for querying customer tables often discover the failure only after the first SELECT is refused.
 
 **Pause and predict:** A platform engineer is assigned the Azure Contributor role on the resource group containing an Azure SQL logical server and attempts to query a database. Will this role assignment grant sufficient privileges to run SELECT queries, and what authorization steps are required if access fails?
 
@@ -204,7 +204,7 @@ Azure SQL Database access is structured across distinct management surfaces with
 No. The Azure Contributor role operates exclusively within the Azure control plane and grants zero permissions inside the SQL data plane. To execute queries, the database requires data-plane authorization. A designated Microsoft Entra administrator must configure access, or an authorized administrator must connect and execute `CREATE USER ... FROM EXTERNAL PROVIDER` followed by granting explicit database roles like `db_datareader`.
 </details>
 
-Decoupling cloud management boundaries from internal database operations establishes an essential security posture for enterprise workloads. Strict separation of responsibilities prevents subscription-level administrators from inadvertently viewing confidential tabular records without audited grants. Implementing directory-backed identities allows security teams to enforce centralized governance policies, lifecycle revocations, and automated credential rotation across distributed application components.
+Directory-backed identities and least-privilege database roles still have to be granted where the queries actually run, even after Azure roles look complete on the resource group. That split is why an app can deploy ARM resources all afternoon and still fail the first SELECT.
 
 Microsoft Entra authentication is the preferred identity direction for humans and services because it centralizes identity, conditional access, group management, and service principal patterns [configure Microsoft Entra authentication](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-aad-configure?view=azuresql). An Azure SQL logical server can have a Microsoft Entra administrator, and that administrator can create contained database users from external provider identities. Managed identities can connect to Azure SQL using Entra authentication when the database has a corresponding user and permission set [managed identities](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-azure-ad-user-assigned-managed-identity?view=azuresql-db). This is the clean operator pattern for App Service, Functions, AKS workload identity, and automation jobs because it avoids long-lived SQL passwords in application settings.
 
