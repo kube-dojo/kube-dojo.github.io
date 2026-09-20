@@ -124,11 +124,17 @@ allowVolumeExpansion: true
 
 ### Azure Files: Shared Storage for Multi-Pod Access
 
-> **Pause and predict**: If you have a legacy CMS that writes user uploads to a local filesystem and you want to scale it to 3 replicas across different nodes, which Azure storage solution must you use and why?
+**Pause and predict:** If you have a legacy CMS that writes user uploads to a local filesystem and you want to scale it to 3 replicas across different nodes, which Azure storage solution must you use and why?
 
-Azure Files provides fully managed file shares in the cloud that are accessible via industry-standard SMB or NFS protocols. Because this is file-level storage, it maps to the `ReadWriteMany` (RWX) access mode in Kubernetes. This means multiple pods across entirely different nodes can mount the exact same volume concurrently. 
+<details>
+<summary>Check your prediction</summary>
 
-This is an absolute necessity for workloads like legacy CMS platforms, machine learning training jobs where many GPUs need to read the same dataset, or shared configuration directories.
+You must use **Azure Files** via the Azure Files CSI driver (`file.csi.azure.com`) because it provides fully managed file shares via SMB or NFS supporting the `ReadWriteMany` (RWX) access mode. This allows all three CMS replicas running across distinct nodes to mount and write to the same shared directory concurrently. In contrast, standard **Azure Disks** (`disk.csi.azure.com`) provides block storage supporting only `ReadWriteOnce` (RWO), which restricts attachment to a single node at any given time. Attempting to attach an Azure Disk PVC to multiple pods distributed across different nodes results in volume attachment conflicts and scheduling failures.
+</details>
+
+Decoupling distributed storage protocols from local container runtimes requires balancing network throughput overhead against concurrency guarantees. Shared network storage architectures introduce POSIX locking semantics and network latency profiles that differ significantly from direct block device serialization.
+
+Distributed storage abstractions provide essential persistence for machine learning training pipelines where distributed worker engines consume identical dataset caches, cross-pod report rendering engines, and centralized application configuration directories.
 
 ```mermaid
 graph TD
@@ -312,9 +318,15 @@ az monitor log-analytics query \
 
 ### Cost Control for Container Insights
 
-> **Pause and predict**: You just deployed Container Insights on a busy cluster and your Log Analytics bill spiked by $500 in one day. What is the most likely culprit, and what configuration component will fix it?
+**Pause and predict:** You just deployed Container Insights on a busy cluster and your Log Analytics bill spiked by $500 in one day. What is the most likely culprit, and what configuration component will fix it?
 
-Container Insights can become a massive billing liability if left in its default configuration. By default, it captures standard output from all containers, including very verbose ones. If your ingress controllers or core system pods are extremely verbose, Log Analytics will ingest gigabytes of data every hour. To manage this, you must apply a custom ConfigMap to instruct the agent to drop high-noise logs.
+<details>
+<summary>Check your prediction</summary>
+
+The cost spike is almost always driven by high-volume stdout/stderr streams from noisy application workloads (such as ingress proxies or verbose debug containers) ingesting gigabytes of telemetry into the `ContainerLogV2` table. Live Container Insights defaults already exclude `kube-system` and `gatekeeper-system` from stdout/stderr collection, so platform system pods are rarely the primary ingestion culprit. To stop the cost runaway, you apply the `container-azm-ms-agentconfig` ConfigMap in the `kube-system` namespace and configure `exclude_namespaces` to filter out chatty application namespaces, or disable stdout/stderr for specific namespaces entirely. Remember that this ConfigMap manages container log collection only; infrastructure inventory, Kubernetes events, and node performance tables are controlled separately through the Azure Monitor Data Collection Rule (DCR).
+</details>
+
+Establishing automated ingestion boundaries protects enterprise budgets against unbudgeted log volume expansion during unexpected application traffic surges. Deploying declarative filtering manifests alongside cluster provisioning ensures that logging agents ingest only actionable diagnostics before telemetry crosses network boundaries into paid analytical storage tiers.
 
 ```yaml
 # Save as container-insights-config.yaml
@@ -381,11 +393,17 @@ az monitor log-analytics workspace create \
 
 Container Insights is fantastic for log aggregation and infrastructural health, but it struggles with application-specific custom metrics. For application teams, this means you get excellent infrastructure visibility first, then still need a dedicated path for domain metrics such as checkout conversion rate, queue depth, or user session concurrency.
 
-> **Stop and think**: If you rely strictly on Container Insights for everything, what happens when your application needs to expose a custom business metric like "active_user_sessions"? Why is Managed Prometheus a better fit for this?
+**Pause and predict:** If you rely strictly on Container Insights for everything, what happens when your application needs to expose a custom business metric like "active_user_sessions"? Why is Managed Prometheus a better fit for this?
 
-Prometheus operates on a "pull" model, actively scraping metrics endpoints natively exposed by your microservices. Azure provides a fully managed implementation of Prometheus, completely eliminating the operational burden of managing persistent volumes, remote write configurations, and Thanos/Cortex scaling for long-term retention.
+<details>
+<summary>Check your prediction</summary>
 
-On AKS, enabling Managed Prometheus creates a data collection rule that installs the `ama-metrics` agent in `kube-system` and forwards scraped series into your Azure Monitor workspace. Prebuilt recording rules ship with the service to reduce query cost on dashboards. When you outgrow default scrape configs, customize targets through ConfigMaps documented for the managed service so you do not run a second in-cluster Prometheus HA pair “just for one extra metric” — that pattern duplicates samples and doubles ingestion charges without adding retention value. 
+Container Insights is optimized for log analytics and cluster inventory rather than high-frequency application metrics; attempting to ingest custom domain metrics like `active_user_sessions` as log strings requires parsing text with costly KQL queries, which delays alert evaluation and inflates ingestion expenses. In contrast, **Azure Managed Prometheus** natively scrapes standard `/metrics` endpoints using Prometheus pull semantics and stores numeric time-series directly into an Azure Monitor workspace. On AKS, enabling Managed Prometheus deploys the `ama-metrics` agent via a data collection rule and includes eighteen months of metric retention without additional storage fees. Prebuilt recording rules reduce dashboard query overhead, and scrape targets can be customized using ConfigMaps without the operational burden of maintaining self-hosted Prometheus or Thanos infrastructure.
+</details>
+
+Separating application business telemetry from infrastructure diagnostic pipelines enables independent scaling of metrics collection cadences. Platform engineering teams establish standardized scraping topologies across diverse development clusters without forcing individual microservices to adopt proprietary cloud provider logging SDKs.
+
+Prometheus operates on a standardized pull model that decodes OpenMetrics formats across heterogeneous services. Managed collection infrastructure eliminates the operational overhead of running dedicated persistent volumes, remote write gateways, and distributed storage engines for long-term retention. Consequently, engineering teams can focus on defining actionable service level objectives and alert thresholds.
 
 ### Setting Up Managed Prometheus
 
@@ -816,11 +834,15 @@ spec:
                 - spot
 ```
 
-> **Stop and think**: If your entire web frontend is running on a Spot node pool and Azure experiences a sudden surge in demand for that VM size in your region, what happens to your application? How should you architect a production deployment to utilize Spot savings without risking downtime?
+**Pause and predict:** If your entire web frontend is running on a Spot node pool and Azure experiences a sudden surge in demand for that VM size in your region, what happens to your application? How should you architect a production deployment to utilize Spot savings without risking downtime?
 
-Avoid running primary database tiers or essential API gateways entirely on Spot hardware. The optimal approach is running your baseline required replicas on standard On-Demand instances, and using KEDA to burst onto Spot VMs specifically to process sudden traffic spikes.
+<details>
+<summary>Check your prediction</summary>
 
-Set `spot-max-price` deliberately: `-1` means the instance is not evicted based on price alone (you pay the lower of Spot or standard rate while capacity exists). A positive cap (up to five decimal places in USD) evicts when Spot price exceeds your ceiling — useful for batch fleets with hard unit economics. Pair `eviction-policy Delete` (default) when pods should disappear with the node, or `Deallocate` only when you accept stopped VMs still counting against quota and complicating upgrades. 
+Azure Spot node pools carry **no SLA**; Azure can and will **evict** Spot virtual machines with only a 30-second preemption notice whenever the cloud provider needs capacity for pay-as-you-go workloads or when Spot prices exceed your configured ceiling. If your entire web frontend runs on Spot, a sudden regional capacity reclamation can evict all replicas simultaneously, resulting in a total application outage. Spot node pools cannot be the cluster's default system pool. AKS automatically taints Spot nodes with `kubernetes.azure.com/scalesetpriority=spot:NoSchedule`. To safely capture Spot cost savings in production, architect workloads with split tiers: deploy your baseline required replicas onto standard Regular (on-demand) node pools, and tolerate the Spot taint only on burst replicas or asynchronous batch workers that can handle sudden evictions without violating user availability SLAs.
+</details>
+
+Capacity management strategies must incorporate eviction-handling primitives into deployment definitions to survive asynchronous VM terminations. Configuring `spot-max-price` to `-1` prevents evictions driven by price changes while capacity exists, whereas positive price ceilings enforce strict unit economic limits. Pairing `eviction-policy Delete` ensures decommissioned instances release storage attachments cleanly without stranding stopped virtual machine allocations against cloud subscription quotas.
 
 ### Workload Right-Sizing
 
@@ -987,7 +1009,7 @@ During incident response, walk the framework top to bottom: confirm storage metr
 | :--- | :--- | :--- |
 | Using Premium SSD when IOPS requirement exceeds the disk-size-to-IOPS ratio | Not understanding that Premium SSD IOPS are tied to disk size | Calculate required IOPS first. If you need high IOPS on small storage, use Ultra Disk or Premium SSD v2 |
 | Mounting Azure Disks without `WaitForFirstConsumer` binding mode | Copying StorageClass examples that use `Immediate` binding | Always use `volumeBindingMode: WaitForFirstConsumer` on zone-aware clusters to prevent zone mismatches |
-| Sending all container logs to Log Analytics without filtering | Default Container Insights config collects everything | Use the ConfigMap to exclude noisy namespaces (kube-system, monitoring) and disable env_var collection |
+| Sending all container logs to Log Analytics without filtering | Default Container Insights config scrapes all user namespaces | Use the ConfigMap to exclude noisy application namespaces and disable env_var collection |
 | Setting KEDA minReplicaCount to 0 for latency-sensitive services | Attracted by cost savings of scale-to-zero | Only scale to zero for batch/queue consumers. Latency-sensitive services need minReplicaCount >= 1 to avoid cold start delays |
 | Not configuring PodDisruptionBudgets for KEDA-scaled workloads | PDBs seem unnecessary for "elastic" workloads | KEDA scales pods, but node upgrades drain them. Without PDBs, all replicas can be evicted simultaneously during cluster upgrades |
 | Mounting Azure Files SMB when NFS would perform better | SMB is the default and works on both Windows and Linux | For Linux-only workloads needing high throughput, prefer NFS with the `nconnect` mount option in most cases |
@@ -1031,7 +1053,7 @@ When the messages arrive, the KEDA operator detects the queue depth and quickly 
 <details>
 <summary>6. Scenario: A junior engineer enables Container Insights on a production cluster with default settings to troubleshoot a specific microservice. A week later, the Azure Log Analytics bill arrives at $2,000. Why did this happen by default, and what specific configuration changes in the `container-azm-ms-agentconfig` ConfigMap are required to stop the bleeding while still monitoring the application?</summary>
 
-By default, the Azure Monitor Agent deployed by Container Insights captures stdout and stderr from containers across the cluster, including incredibly noisy system components. This massive ingestion volume is billed per gigabyte by Log Analytics, leading to the rapid cost spike. To fix this, the engineer must deploy a custom ConfigMap named `container-azm-ms-agentconfig` in the `kube-system` namespace. In this configuration, they need to explicitly add `kube-system` and other high-volume namespaces to the `exclude_namespaces` array for stdout and stderr, and disable environment variable collection (`env_var.enabled = false`), ensuring only relevant application logs are ingested and billed.
+The cost spike occurred because Container Insights captures stdout and stderr from all non-system application containers across the cluster into `ContainerLogV2`, where verbose application logging and high request volumes ingest gigabytes of billable data. While Container Insights defaults already exclude `kube-system` and `gatekeeper-system`, all user application namespaces are scraped by default. To remediate this without disabling monitoring for the microservice in question, the engineer must deploy the `container-azm-ms-agentconfig` ConfigMap in the `kube-system` namespace. In this ConfigMap, they must add noisy non-target application namespaces to the `exclude_namespaces` array under both `[log_collection_settings.stdout]` and `[log_collection_settings.stderr]`, and set `env_var.enabled = false`. This restricts log ingestion strictly to the targeted microservice namespace while allowing the Data Collection Rule to continue gathering cluster-wide performance metrics.
 </details>
 
 <details>
@@ -1499,7 +1521,41 @@ echo "az group delete --name rg-aks-prod --yes --no-wait"
 
 </details>
 
-### Success Criteria
+Before deploying enterprise workloads and configuring production infrastructure on AKS, platform architects must audit common operational misconceptions about storage access modes, telemetry ingestion costs, compute spot SLAs, and autoscaling paradigms. Each scenario below states a claim that sounds operationally convenient but masks subtle distributed systems failures. Treat the claim as the hypothesis, then open the details only after you have a prediction.
+
+**Card A: An Azure Disk PVC in ReadWriteOnce can serve a 3-replica CMS across different nodes because the CSI driver will attach the disk to every replica.** An operations team migrates an existing content management system to an AKS cluster spanning three worker nodes. To host uploaded media files, the team creates a PersistentVolumeClaim using an Azure Disk StorageClass with ReadWriteOnce access mode. The team configures the CMS deployment with three replicas to handle incoming web traffic. They expect the Azure Disk CSI driver to attach the underlying managed disk to all three worker nodes simultaneously so each pod can serve uploaded files directly.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Block device attachment constraints versus distributed multi-node filesystem concurrency. Next action: understand that standard Azure Managed Disks are block storage devices supporting strictly `ReadWriteOnce` (RWO) access, meaning an individual disk can attach to only a single virtual machine node at any given moment; when the Kubernetes scheduler distributes the three CMS replica pods across separate worker nodes, the CSI attach/detach controller fails with `Multi-Attach error for volume` on all nodes except the first, leaving the remaining pods stuck in `ContainerCreating`; to share a common filesystem across multiple replicas on distinct nodes, provision an Azure Files PersistentVolumeClaim using the `file.csi.azure.com` driver with `ReadWriteMany` (RWX) access over SMB or NFS.
+</details>
+
+**Card B: Container Insights by default ships kube-system stdout into Log Analytics, so the only cost fix is excluding kube-system.** A platform team observes an unexpected billing increase in their Azure Log Analytics workspace shortly after enabling Azure Monitor Container Insights. An engineer assumes that verbose system components in the `kube-system` namespace are the primary culprit flooding the workspace with stdout logs. The team plans their entire cost-reduction strategy around deploying a ConfigMap to exclude `kube-system`, assuming this single change will remediate their logging cost runaway.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Default telemetry collection profiles versus application log volume attribution. Next action: recognize that the Azure Monitor Agent for Container Insights already excludes `kube-system` and `gatekeeper-system` stdout and stderr collection by default; the primary driver of log ingestion spikes is almost always chatty, unoptimized application namespaces streaming verbose diagnostics into the `ContainerLogV2` table; to effectively control ingestion expenses, inspect table ingestion volume by namespace using KQL queries on `ContainerLogV2`, configure `exclude_namespaces` in the `container-azm-ms-agentconfig` ConfigMap for high-volume application namespaces, and manage performance and inventory data via Azure Monitor Data Collection Rules (DCRs) rather than container logging filters.
+</details>
+
+**Card C: AKS Spot node pools have a financially backed VM SLA, so you can run the entire production frontend on Spot.** A startup infrastructure lead seeks to reduce monthly cloud compute expenses by moving their entire production web frontend to an AKS Spot node pool. The lead assumes that because AKS worker nodes run in an enterprise scale set, Microsoft provides a financially backed service level agreement for VM uptime. The team configures all frontend deployments to schedule exclusively on Spot nodes without provisioning on-demand fallback capacity.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Unbacked spare compute capacity models versus contractual enterprise availability guarantees. Next action: understand that Azure Spot virtual machines carry zero financially backed SLA and can be evicted by Azure at any time with only a 30-second warning whenever the cloud platform requires capacity for regular pay-as-you-go workloads or spot prices exceed bids; running an entire user-facing frontend on Spot exposes the service to complete outages during regional compute surges; maintain your baseline required service capacity on standard on-demand node pools, and utilize Spot node pools only for burst capacity, stateless batch workloads, or asynchronous processing queues that tolerate unexpected pod preemption and node reclamation.
+</details>
+
+**Card D: Horizontal Pod Autoscaler can scale a Deployment to zero replicas the same way KEDA does.** A developer builds an asynchronous batch processing worker that pulls jobs from an Azure Service Bus queue. To avoid paying for idle compute during periods with no incoming messages, the developer configures a native Kubernetes Horizontal Pod Autoscaler resource targeting custom metrics. The developer sets `minReplicas: 0` in the manifest, expecting standard Kubernetes controllers to terminate all pods when the queue is empty. Furthermore, they expect the autoscaler to recreate pods automatically when new messages arrive.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Core Kubernetes autoscaling controller minimum boundaries versus event-driven external activation. Next action: understand that the standard Kubernetes Horizontal Pod Autoscaler (HPA) cannot natively scale workloads down to zero replicas or activate them from zero; the core HPA controller requires active pod metrics to evaluate scaling algorithms and enforces a hard operational floor of at least one replica; to achieve true scale-to-zero capabilities for event-driven workloads, deploy the AKS KEDA add-on; KEDA monitors external event sources like Azure Service Bus queues directly, scales deployments to zero when queues drain, and activates the first replica when new messages appear before handing intermediate scaling back to HPA.
+</details>
+
+**Success Criteria**:
 
 - [ ] Premium SSD v2 zone-aware StorageClass and PVC created
 - [ ] Azure Service Bus namespace and queue created
