@@ -89,7 +89,15 @@ gcloud container clusters describe my-cluster \
 
 ### IP Address Planning
 
-> **Stop and think**: If a VPC-native cluster uses alias IPs directly from the VPC, what happens if your VPC doesn't have [a large enough secondary range for your planned number of nodes and pods at maximum scale](https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr)?
+**Pause and predict:** What occurs when a growing VPC-native GKE cluster exhausts its primary cluster Pod secondary range, and how can administrators provision additional IP capacity without destroying the cluster?
+
+<details>
+<summary>Check your prediction</summary>
+
+The original cluster Pod secondary range prefix size is strictly immutable once assigned at cluster creation; you cannot resize, expand, or enlarge that original secondary range in place. When the cluster secondary range runs out of available `/24` (or configured per-node CIDR) slices, GKE cannot allocate Pod CIDR blocks to newly provisioned nodes. As a result, the Cluster Autoscaler or manual node pool creation fails, leaving nodes in an unschedulable or failed creation state. To remediate or expand IP capacity on an existing cluster without destroying it, Google Cloud provides **discontiguous multi-Pod CIDR**. Administrators create new subnet secondary ranges in the VPC subnetwork and attach them to **new** node pools using `--pod-ipv4-range`. Existing node pools continue drawing from the original range, while newly provisioned node pools allocate Pod CIDRs from the new secondary range.
+</details>
+
+Architecting VPC address allocations requires cross-functional alignment between platform operators, network security engineers, and enterprise cloud architects well before launching initial compute workloads. Establishing disciplined subnet boundaries prevents costly architectural dead ends and ensures infrastructure scaling matches long-term operational roadmaps.
 
 Poor IP planning is the number one networking regret for teams that scale. [You cannot resize secondary ranges after cluster creation](https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr). Treat the worksheet below as a conversation with finance and network architects before the first `gcloud container clusters create` call, because the secondary range is effectively permanent.
 
@@ -219,7 +227,15 @@ graph TD
 
 ### Dataplane V2 Benefits
 
-> **Pause and predict**: If Dataplane V2 uses eBPF hash maps instead of iptables, how might this change the way you troubleshoot dropped packets or connection timeouts compared to legacy clusters?
+**Pause and predict:** When diagnosing dropped packets, connection timeouts, or unexpected network policy enforcement issues on a GKE Dataplane V2 cluster, which tools and observability mechanisms must you use instead of legacy node diagnostics?
+
+<details>
+<summary>Check your prediction</summary>
+
+Because Dataplane V2 replaces legacy iptables packet filtering and `kube-proxy` forwarding chains with Cilium-based eBPF programs, running `iptables-save`, checking raw `iptables` chains, or inspecting `kube-proxy` conntrack tables on worker nodes will not show active policy drops or service forwarding rules. Instead, administrators must inspect the **`anetd`** DaemonSet running in the `kube-system` namespace to evaluate agent health, and enable GKE **network policy logging** to capture detailed allow and deny connection records directly in Google Cloud Logging. Additionally, running custom eBPF agents or unapproved third-party eBPF kernel probes on Dataplane V2 nodes is strictly **unsupported** by Google Cloud because overlapping programs can conflict with GKE's core networking maps, destabilize kernel state, and break packet routing. Administrators must rely on native Google Cloud monitoring and logging pipelines rather than deploying standalone eBPF tooling or custom inspection agents.
+</details>
+
+Modernizing Kubernetes packet forwarding transforms host-level telemetry and changes how infrastructure engineers isolate transient networking failures across large distributed microservice environments. Evaluating the performance and operational tradeoffs of this kernel-level architecture highlights key differences from traditional host-based packet routing.
 
 | Capability | iptables/kube-proxy | Dataplane V2 |
 | :--- | :--- | :--- |
@@ -506,7 +522,15 @@ The Gateway API is a Kubernetes-native evolution of Ingress that provides richer
 
 ### Why Gateway API Over Ingress
 
-> **Pause and predict**: In the Gateway API model, if the infrastructure team modifies the Gateway resource to restrict allowed namespaces, what happens to the existing HTTPRoutes in namespaces that are no longer allowed?
+**Pause and predict:** In the Gateway API architecture, what happens to existing HTTPRoute resources and live customer traffic if platform engineers modify a shared Gateway to restrict its allowed namespaces?
+
+<details>
+<summary>Check your prediction</summary>
+
+Gateway API establishes a strict **bidirectional** contract: the `Gateway` listener specifies which namespaces are permitted to attach routes via `allowedRoutes.namespaces`, and the `HTTPRoute` specifies which Gateway it targets via `parentRefs`. If platform administrators update the Gateway's `allowedRoutes` selector to exclude a previously permitted namespace, the existing `HTTPRoute` objects in that excluded namespace are **not deleted**; they remain intact in etcd. However, the Gateway controller immediately breaks the binding, causing those routes to **unbind** from the Gateway listeners. Consequently, the underlying Google Cloud load balancer removes those routing rules, and traffic destined for those routes immediately stops routing to the corresponding backend pods. Meanwhile, HTTPRoutes in namespaces that remain allowed continue serving traffic without interruption.
+</details>
+
+Decoupling load balancer listener provisioning from application routing declarations establishes a cleaner operational boundary between platform reliability teams and individual microservice developers. Visualizing the contrast between flat legacy ingress definitions and hierarchical multi-tenant routing clarifies how this role separation operates in production environments.
 
 ```mermaid
 graph TD
@@ -787,7 +811,15 @@ graph TD
 
 ### Private Cluster Considerations
 
-> **Stop and think**: If you use Private Service Connect for your GKE control plane and have disabled public IP access, how will your cloud-hosted CI/CD pipeline (e.g., GitHub Actions) authenticate and deploy manifests to the cluster?
+**Pause and predict:** When a GKE cluster uses Private Service Connect (PSC) for private control-plane access with public endpoint access disabled, why can GitHub-hosted CI/CD runners not deploy manifests directly to the cluster, and what network path is required?
+
+<details>
+<summary>Check your prediction</summary>
+
+**GitHub-hosted runners cannot reach a PSC-only private control plane** because GitHub Actions public runner infrastructure executes in external environments without private network routing into your Google Cloud VPC. Even if the runner workflow authenticates to Google Cloud via Workload Identity Federation with project IAM permissions, IAM authentication alone cannot bridge layer-3 network isolation; `kubectl` requires a routable IP path to the cluster's private control plane endpoint. To deploy successfully, organizations must run self-hosted runners or deployment workers on a routed network path—such as inside the customer VPC, across an active Cloud VPN, or over Dedicated Interconnect. Furthermore, integrating Cloud Build private pools with PSC-based GKE clusters is **not transitive-peering**: VPC Network Peering does not transitively route packets to PSC endpoints across peered VPCs. Connecting Cloud Build private pools to a PSC-enabled private control plane requires establishing dedicated routing, such as deploying Cloud VPN tunnels between the worker pool VPC and the cluster VPC.
+</details>
+
+Designing secure deployment pipelines for isolated enterprise infrastructure requires synchronizing identity federation controls with deliberate layer-three connectivity across hybrid and cloud-hosted environments. Systematic evaluation of private control-plane accessibility and egress dependencies ensures platform teams avoid unexpected pipeline deployment outages.
 
 | Consideration | Impact | Solution |
 | :--- | :--- | :--- |
@@ -1475,7 +1507,41 @@ gcloud compute target-http-proxies list --filter="description~net-demo"
 ```
 </details>
 
-### Success Criteria
+Before committing a GKE networking architecture to production, platform architects must audit common cognitive traps across address allocation, dataplane telemetry, route binding lifecycles, and private control-plane access. Auditing these operational boundaries ensures engineering teams establish resilient data-plane baselines while avoiding dangerous assumptions about secondary range flexibility, kernel-level packet inspection, multi-tenant ingress isolation, and CI/CD network routability.
+
+**Card A: You can resize the cluster Pod secondary CIDR later when the autoscaler hits IP exhaustion.** A platform engineering team provisions a VPC-native GKE cluster with a `/20` secondary range allocated for Pod addresses. During a seasonal marketing campaign, rapid microservice autoscaling consumes every available per-node Pod CIDR block across the subnet. Because the team manages VPC resources through Terraform, the lead engineer plans to expand the secondary CIDR block to `/18` in the subnet definition. The team expects `terraform apply` to resize the cluster Pod range in place so the autoscaler can resume provisioning new worker nodes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Immutable subnetwork secondary range allocation versus node pool IP provisioning. Next action: recognize that the cluster Pod secondary range prefix size is strictly immutable after cluster creation, causing in-place expansion attempts to fail or require cluster recreation; use discontiguous multi-Pod CIDR by creating a new secondary IPv4 range in the VPC subnet, provision a new node pool referencing that new range with `--pod-ipv4-range`, migrate application workloads to the new pool, and delete the exhausted pool once evacuated.
+</details>
+
+**Card B: Dataplane V2 incidents are still diagnosed with iptables-save and kube-proxy conntrack like a legacy cluster.** An infrastructure operations team investigates intermittent connection timeouts between frontend microservices and backend database pods on a GKE Dataplane V2 cluster. The on-call engineer SSHes into the underlying worker node to inspect connection tracking entries and routing chain rules. The engineer executes `iptables-save` and checks `kube-proxy` conntrack tables to find which service VIP rules dropped the packets. The team assumes that standard host-level iptables dumps will reveal active packet rejections and endpoint translation rules.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kernel eBPF dataplane architecture versus user-space iptables rule processing. Next action: understand that GKE Dataplane V2 replaces `kube-proxy` and iptables with Cilium-based eBPF programs, rendering `iptables-save` and host conntrack commands useless for troubleshooting Service routing and NetworkPolicy enforcement; inspect the `anetd` DaemonSet in `kube-system` for agent health, enable network policy logging to export allow and deny flow records to Cloud Logging, and remember that installing custom eBPF agents is unsupported and risks breaking node networking.
+</details>
+
+**Card C: HTTPRoutes in a newly excluded namespace keep serving because the Route objects already exist.** A central platform team operates a shared regional external Gateway used by multiple product engineering groups. To prepare for an upcoming security audit, administrators update the Gateway manifest by modifying `allowedRoutes.namespaces` to restrict listener attachment to a specific label selector. An application team in an excluded namespace already deployed their `HTTPRoute` months ago, and their backend pods are actively serving live customer requests. The team assumes that because their existing `HTTPRoute` custom resources remain untouched in the cluster, the external load balancer will continue routing incoming HTTP requests to their service.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Bidirectional Gateway API route attachment contracts versus custom resource persistence. Next action: recognize that Gateway API binding is strictly bidirectional, meaning modifying Gateway listener `allowedRoutes` immediately unbinds HTTPRoutes in newly excluded namespaces even though the route objects remain in etcd; unbinding causes the GKE Gateway controller to strip those forwarding rules from the Google Cloud load balancer, immediately halting incoming traffic for those routes; verify route status conditions (`status.parents[*].conditions`) to identify `Accepted: False` detachment events before altering Gateway namespace selectors.
+</details>
+
+**Card D: GitHub-hosted Actions can kubectl to a PSC-only private control plane because the runner uses your project IAM.** A DevOps organization provisions a private GKE cluster using Private Service Connect (PSC) and disables public endpoint access to satisfy corporate isolation policies. The deployment pipeline runs on standard GitHub-hosted Actions runners and authenticates using Workload Identity Federation against a Google Cloud service account with `roles/container.developer` permissions. Because the pipeline exchanges OpenID Connect tokens successfully and holds full administrative IAM roles on the target cluster, the engineering lead expects `kubectl apply` commands in the GitHub workflow to communicate directly with the control plane.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Layer-three network reachability versus Google Cloud IAM authentication and authorization. Next action: understand that GitHub-hosted runners operate in external environments without private IP routes into your customer VPC, meaning IAM credentials cannot overcome missing network paths to a PSC private endpoint; deploy self-hosted GitHub runners inside your VPC or across a connected Cloud VPN or Interconnect, or leverage Cloud Build private pools connected via dedicated customer VPC tunnels, rather than assuming public CI runners can reach isolated private control planes.
+</details>
+
+**Success Criteria**:
 
 - [ ] Cluster created with Dataplane V2 and Gateway API enabled
 - [ ] Cilium pods running in kube-system namespace
