@@ -407,7 +407,7 @@ def read_user_profile(user_id):
 Session stickiness can keep clients pinned to a **degraded** region until their affinity cookies expire. Because session affinity binds a client's browser or mobile client directly to a specific backend target group or region, client requests continue routing to the impaired endpoint as long as the load balancer considers the target group technically alive. Affinity fundamentally fights automatic failover, forcing operators to wait for cookie expiration or implement manual cache-invalidation interventions during partial regional brownouts.
 </details>
 
-Balancing local state caching against global resilience targets requires intentional design across application edge proxies and client libraries. Platform engineers must evaluate whether session stickiness provides sufficient operational advantages to justify the delayed failover behavior during localized service degradations.
+Local cache hit rates and regional debugging both improve when a user stays on one endpoint, but that choice is a product decision with a failover cost. Write runbooks that say when to drop affinity and how clients get a fresh mapping, instead of treating stickiness as a free default.
 
 Stateless pods are only half the story. Browsers, mobile SDKs, WebSocket gateways, and OAuth session stores introduce **affinity** requirements. If you pin users to a region without planning data placement, you recreate single-region behavior behind a global hostname.
 
