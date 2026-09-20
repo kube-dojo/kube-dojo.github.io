@@ -218,7 +218,15 @@ gcloud projects add-iam-policy-binding OTHER_PROJECT_ID \
   --role="roles/storage.objectViewer"
 ```
 
-> **Stop and think**: If a pod in the `default` namespace does not have a `serviceAccountName` specified in its spec, which Kubernetes ServiceAccount does it use? How does this impact Workload Identity if that ServiceAccount is not annotated?
+**Pause and predict:** Consider a Pod deployed to the `default` namespace whose manifest omits the `spec.serviceAccountName` field entirely on a cluster with Workload Identity enabled. Which Kubernetes ServiceAccount does the Pod assume at runtime, and what happens when the container attempts to authenticate against Google Cloud APIs?
+
+<details>
+<summary>Check your prediction</summary>
+
+When a Pod manifest omits `spec.serviceAccountName`, Kubernetes automatically assigns the namespace's `default` ServiceAccount. On a GKE node pool configured with Workload Identity Federation (`GKE_METADATA`), the GKE metadata server intercepts credential requests from the Pod. Because the `default` Kubernetes ServiceAccount lacks an `iam.gke.io/gcp-service-account` annotation and has no direct IAM role bindings granted via Workload Identity Federation, the metadata server denies token generation, causing Google Cloud API calls to fail immediately with authentication or authorization errors. Administrators must avoid assuming that unannotated Pods silently fall back to the underlying Compute Engine node service account; metadata hiding blocks node credentials to prevent accidental privilege escalation.
+</details>
+
+Default identity fallbacks create deceptive failure states where pods start normally but fail asynchronously during API authorization calls. Auditing active ServiceAccount impersonation policies ensures that workloads receive explicitly bounded identities before entering production traffic paths.
 
 ### Auditing and validating bindings
 
@@ -404,7 +412,15 @@ spec:
 
 Beyond one-time attestations at build time, teams integrate **Artifact Analysis** vulnerability scanning (and optional continuous validation policies) so known-critical CVEs can block deploys even when an image was previously attested. Cloud Build triggers can gate promotion: build → scan → attest → deploy. Keep dry-run logging enabled while tuning `requireAttestationsBy` so you see which digests would fail before switching `defaultAdmissionRule` to enforce mode project-wide.
 
-> **Pause and predict**: You enable Binary Authorization in enforce mode with a policy requiring an attestation from a specific KMS key. A developer deploys an image signed by a different, older KMS key that was recently removed from the attestor. What will happen when the pod starts, and where would you look to verify this?
+**Pause and predict:** Consider a GKE cluster with Binary Authorization configured in `ENFORCED_BLOCK_AND_AUDIT_LOG` mode requiring an attestation from a specific attestor. A developer attempts to deploy an image that carries a cryptographic signature from an older KMS key version that was recently removed from the attestor configuration. Will the Pod start, and where can platform engineers verify the admission outcome?
+
+<details>
+<summary>Check your prediction</summary>
+
+Binary Authorization blocks admission immediately during Kubernetes API validation, meaning the Pod is never scheduled or created. Because the signing KMS key was removed from the attestor's registered public keys, the existing signature no longer satisfies the active `requireAttestationsBy` policy. The GKE admission webhook rejects the deployment request with a `Forbidden` error indicating that no valid attestations were found for the image digest. Administrators can verify this rejection in Cloud Audit Logs under the `k8s_cluster` resource type by querying `protoPayload.status.message` for `VIOLATES_POLICY` or inspecting the Binary Authorization audit decision logs.
+</details>
+
+Admission gate enforcement shifts container provenance validation from an asynchronous reporting metric to an unyielding deployment barrier. Maintaining automated signing pipelines ensures that cryptographic key rotations do not trigger widespread deployment failures across production application releases.
 
 ---
 
@@ -435,7 +451,7 @@ gcloud container clusters update my-cluster \
 
 ### Confidential Nodes
 
-Confidential Nodes go beyond Shielded Nodes by encrypting data **in memory** using AMD SEV (Secure Encrypted Virtualization). Even if an attacker has physical access to the server or can perform a cold-boot attack, they cannot read the node's memory.
+Confidential Nodes go beyond Shielded Nodes by encrypting data **in memory** using hardware memory encryption (such as AMD SEV, AMD SEV-SNP, or Intel TDX). Even if an attacker has physical access to the server or can perform a cold-boot attack, they cannot read the node's memory.
 
 ```bash
 # Create a node pool with Confidential Nodes
@@ -446,24 +462,30 @@ gcloud container node-pools create confidential-pool \
   --num-nodes=1 \
   --enable-confidential-nodes
 
-# Note: Confidential Nodes require N2D, C2D, or C3D (AMD SEV) on Standard mode
-# (GKE Autopilot confidential nodes are currently N2D-only); limited regions
+# Note: Confidential Nodes require supported compute families such as N2D, C2D, C3D (AMD SEV/SEV-SNP)
+# or C3 (Intel TDX) on Standard clusters, as well as supported Autopilot compute classes; limited regions
 ```
 
 | Feature | Shielded Nodes | Confidential Nodes |
 | :--- | :--- | :--- |
 | **Boot integrity** | Yes | Yes |
-| **Memory encryption** | No | Yes (AMD SEV) |
+| **Memory encryption** | No | Yes (AMD SEV, SEV-SNP, Intel TDX) |
 | **Performance impact** | None | ~2-6% overhead |
-| **Machine types** | All | N2D, C2D, or C3D (AMD SEV); Autopilot confidential nodes N2D-only |
+| **Machine types** | All | Supported Confidential VM types (e.g., N2D, C2D, C3D, C3) |
 | **Cost** | No additional cost | ~10% premium |
 | **Use case** | All production clusters | Financial, healthcare, PII |
 
-Shielded GKE Nodes address **boot-time and kernel integrity**: Secure Boot refuses unsigned boot components, vTPM records a measured boot chain, and integrity monitoring alerts when runtime measurements diverge from the baseline. They do not encrypt application memory against a hostile hypervisor or physical attacker with DRAM access. Confidential GKE Nodes add **AMD SEV memory encryption** so guest RAM is encrypted with keys that stay inside the CPU; Google's documentation positions Confidential Nodes for regulated workloads that must protect data **in use**, at the cost of N2D, C2D, or C3D (AMD SEV) machine families on Standard mode (GKE Autopilot confidential nodes are currently N2D-only), regional availability limits, and roughly single-digit percent CPU overhead plus a node pricing premium.
+**Pause and predict:** An enterprise compliance standard mandates that all sensitive customer data in use must be encrypted in memory during execution. A platform architect considers enabling Shielded GKE Nodes across the cluster. Which GKE node technology must the team configure to satisfy this requirement, which hardware technologies provide this capability, and what constraint exists when enabling it cluster-wide?
 
-Operationally, enable Shielded Nodes on every production cluster (default on new clusters) and treat Confidential Nodes as a targeted pool for namespaces that process PCI, PHI, or contractual "encrypted in use" requirements—not as the default for all apps. Pick `n2d`, `c2d`, or `c3d` machine types per region availability before enabling `--enable-confidential-nodes` on Standard pools. Mixing both on the same node is possible when machine type and region support Confidential mode; otherwise run sensitive StatefulSets on a dedicated `confidential-pool` and keep general workloads on standard Shielded pools to avoid paying the Confidential premium everywhere.
+<details>
+<summary>Check your prediction</summary>
 
-> **Stop and think**: Your compliance team requires that data in use (in memory) must be encrypted. Which node type must you choose, and what specific CPU architecture is required to support this feature?
+The team must deploy Confidential GKE Nodes rather than Shielded GKE Nodes. While Shielded GKE Nodes provide Secure Boot, vTPM, and kernel integrity monitoring, they do not encrypt data residing in system RAM. Confidential GKE Nodes enforce inline hardware memory encryption using hardware virtualization extensions—specifically AMD SEV, AMD SEV-SNP, or Intel TDX (Trust Domain Extensions) on supported compute families such as N2D, C2D, C3D, and C3. Furthermore, enabling Confidential GKE Nodes at the cluster level is an irreversible operation that permanently forces all subsequent node pools to utilize supported confidential hardware instances.
+</details>
+
+Shielded GKE Nodes guarantee **boot-time and kernel integrity**: Secure Boot blocks unsigned bootloader components, vTPM measures the operating system initialization sequence, and integrity monitoring alerts operators when runtime states deviate from established baseline signatures. However, Shielded Nodes do not protect memory in use against hypervisor compromise or physical probing. Confidential GKE Nodes address memory security directly by utilizing hardware-based memory encryption powered by AMD SEV, AMD SEV-SNP, or Intel TDX technologies. Hardware-generated cryptographic keys remain isolated within the processor's secure enclave, ensuring that host hypervisors and storage appliances cannot inspect guest memory pages.
+
+Platform architects must recognize that enabling Confidential GKE Nodes at the cluster level is an irreversible configuration decision. Once a cluster is created with cluster-level confidential computing enabled, every node pool in that cluster must use supported Confidential VM machine types across AMD SEV, AMD SEV-SNP, or Intel TDX families. For heterogeneous workloads, teams can preserve flexibility by leaving cluster-level confidential computing disabled and instead provisioning dedicated confidential node pools exclusively for sensitive processing services. This strategy isolates regulated database and cryptographic workloads onto hardware-encrypted instances while running standard utility tiers on general compute pools to control operational costs.
 
 ---
 
@@ -538,7 +560,15 @@ spec:
         memory: 256Mi
 ```
 
-> **Pause and predict**: You apply the `restricted` Pod Security Standard to a namespace in `enforce` mode. A developer tries to deploy a pod with `runAsNonRoot: false`. Will the pod be created? What happens if the namespace was set to `warn` mode instead?
+**Pause and predict:** Consider a namespace configured with the `restricted` Pod Security Standard in `enforce` mode. A developer attempts to apply a Pod manifest that explicitly sets `runAsNonRoot: false`. Will the Kubernetes API server admit and create the Pod, and how does the cluster behavior change if the namespace uses `warn` mode instead?
+
+<details>
+<summary>Check your prediction</summary>
+
+In `enforce` mode, the Kubernetes built-in Pod Security admission controller rejects the Pod creation request immediately, and the Pod is not created. The `restricted` profile mandates that workloads run without root privileges and requires `runAsNonRoot: true` (or an explicit non-root user ID); setting `runAsNonRoot: false` explicitly violates this policy requirement. If the namespace is configured with `warn` mode instead of `enforce`, the API server admits and creates the Pod normally, but returns a warning message directly to the client CLI and logs the policy violation in the audit trail.
+</details>
+
+Configuring admission modes across developmental lifecycles allows platform teams to identify non-compliant container configurations before activating strict enforcement barriers. Organizations typically evaluate workload compliance under warning and audit configurations during staging releases to prevent unexpected scheduling disruptions in production environments.
 
 ---
 
@@ -1184,7 +1214,41 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+Before promoting GKE identity, image admission, and node security policies to production, platform engineers must confront pervasive architectural misconceptions. Investigating these critical failure layers prevents operational blind spots that leave clusters vulnerable to credential leakage, unauthorized container execution, memory inspection, and admission surprises. Reviewing these scenarios establishes rigorous operational discipline across security and compliance boundaries.
+
+**Card A: An unannotated default ServiceAccount still uses the node GSA, so Workload Identity just works.** An application team deploys a new microservice to a GKE cluster with Workload Identity Federation enabled on all node pools. The developer omits the `serviceAccountName` field in the Pod specification, expecting the Pod to inherit ambient credentials automatically. The team assumes that unannotated Kubernetes workloads safely fall back to the underlying Compute Engine node service account when communicating with Google Cloud storage buckets.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Workload Identity metadata emulation versus legacy node metadata fallback. Next action: understand that node pools configured with `GKE_METADATA` deploy a metadata server daemon that intercepts calls to `169.254.169.254` and completely blocks access to the Compute Engine default service account; when a Pod omits `serviceAccountName`, it runs as the namespace's unannotated `default` ServiceAccount, causing all GCP API requests to fail with authentication errors; always create dedicated Kubernetes ServiceAccounts, annotate them with the target Google ServiceAccount email, configure `roles/iam.workloadIdentityUser` bindings in IAM, and specify `serviceAccountName` explicitly in all deployment manifests.
+</details>
+
+**Card B: Binary Authorization enforce will start a pod attested by any historical KMS key that once belonged to the attestor.** A platform security team rotates their container signing keys in Cloud KMS and removes the deprecated public key version from the Binary Authorization attestor configuration. A deployment pipeline subsequently attempts to deploy an immutable image digest that was signed using the decommissioned key. The engineers believe that because the signature was valid when created by an authorized attestor key, Binary Authorization will recognize historical provenance and admit the workload.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Dynamic admission-time signature verification versus historical attestation persistence. Next action: recognize that the Binary Authorization admission controller evaluates container attestations dynamically at Pod creation time against the attestor's currently active public keys; signatures produced by deleted or removed KMS keys fail validation immediately, causing the admission webhook to reject the Pod with a `Forbidden` admission error; maintain coordinated key rotation procedures where new signatures are applied before old verification keys are deregistered, monitor Cloud Audit Logs for `VIOLATES_POLICY` events, and employ breakglass procedures only during emergency remediations.
+</details>
+
+**Card C: Shielded GKE Nodes encrypt data in use, so they satisfy memory-encryption compliance.** An enterprise infrastructure architect prepares an audit submission for a healthcare data processing system requiring hardware-enforced memory encryption. The architect enables Shielded GKE Nodes across all worker node pools and presents the vTPM measured boot configuration as proof of compliance. The team assumes that because Shielded Nodes protect node integrity and block unauthorized hypervisor bootloaders, guest memory contents are cryptographically encrypted against physical and hypervisor inspection.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Boot integrity attestation versus runtime memory encryption architecture. Next action: understand that Shielded GKE Nodes only provide Secure Boot, virtual TPM measurements, and kernel integrity monitoring to prevent bootkits and rootkits; they do not encrypt data residing in memory; satisfying compliance requirements for data-in-use encryption requires Confidential GKE Nodes, which utilize AMD SEV, AMD SEV-SNP, or Intel TDX hardware memory encryption; remember that enabling Confidential Nodes at the cluster level is irreversible, requiring all subsequent node pools to run on supported confidential compute instances.
+</details>
+
+**Card D: restricted Pod Security Standard in warn mode still rejects a pod with runAsNonRoot: false.** A platform operations team prepares to transition a multi-tenant cluster to the `restricted` Pod Security Standard. To test compliance without disrupting active services, the administrators configure namespace labels with `pod-security.kubernetes.io/warn=restricted`. When a developer deploys a legacy container with `runAsNonRoot: false`, the team expects the admission controller to reject the manifest. They assume that explicit security violations block pod creation regardless of whether the namespace operates in enforce or warning mode.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Admission controller enforcement modes versus audit and warning notifications. Next action: recognize that the Pod Security admission controller only blocks resource creation when the profile is set via `pod-security.kubernetes.io/enforce`; under `warn` mode, the API server successfully creates and schedules the Pod while returning a descriptive warning header to the client CLI and recording the violation in audit logs; to prevent insecure pods from starting, configure `pod-security.kubernetes.io/enforce=restricted`, verify that manifests specify `runAsNonRoot: true`, and use `warn` mode exclusively during progressive migration windows.
+</details>
+
+**Success Criteria**:
 
 - [ ] Cluster created with Workload Identity enabled
 - [ ] Pub/Sub topic and subscription created
