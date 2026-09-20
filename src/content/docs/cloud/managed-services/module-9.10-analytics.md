@@ -21,9 +21,15 @@ After completing this module, you will be able to:
 
 Hypothetical scenario: a mobility platform processes millions of trips per day. Its analytics pipeline is a tangle of CronJobs on EKS: Python scripts extract data from PostgreSQL, transform it in memory, and load it into a managed warehouse. Each CronJob runs on a dedicated pod with 16 GB of RAM to handle the largest tables. The pipeline keeps twelve always-on pods even though the daily ETL window lasts only four hours, and a single out-of-memory failure on a growing table can leave analysts staring at empty dashboards hours later because nobody noticed the upstream gap.
 
-> **Stop and think**: If a CronJob is only running for 4 hours a day, why was the company paying for 12 always-on pods? What Kubernetes architectural choice leads to this?
+**Pause and predict:** If an analytics pipeline only processes data for four hours each night, why was the platform paying for twelve always-on pods, and which Kubernetes architectural choice eliminates this idle compute cost?
 
-The data engineering team rebuilt the pipeline with Apache Airflow on Kubernetes. Airflow orchestrated the workflow as a DAG (Directed Acyclic Graph), with each task running as an ephemeral KubernetesPodOperator. Tasks requested only the resources they needed. The BigQuery load step used BigQuery's native LOAD command instead of streaming inserts, cutting costs by 90%. Ephemeral pods meant compute cost dropped to $1,200/month (pods only existed during the 4-hour window). Airflow's built-in retry logic and alerting caught failures within minutes. Same data, 82% less cost, faster incident detection.
+<details>
+<summary>Check your prediction</summary>
+
+The platform was paying for always-on pods because the team deployed the pipeline tasks as long-running Deployment replicas or static worker pools rather than ephemeral Kubernetes Jobs or CronJobs. CronJob and Job pods terminate upon completion, releasing node resources; in contrast, a Deployment of idle ETL pods continuously reserves CPU and memory requests, billing for unused hours throughout the remaining twenty hours of the day. When re-architected with Apache Airflow using the KubernetesPodOperator (or native Kubernetes Jobs), each task spins up an ephemeral pod with exact resource requests and terminates immediately upon success. In typical cloud environments, switching from static worker Deployments to ephemeral batch execution drops compute spending dramatically—such as cutting monthly node costs from several thousand dollars to an estimated $1,200/month in representative setups (approximately an 82% reduction, though actual savings depend on regional compute rates and node instance families)—while moving from row-by-row streaming inserts to native warehouse bulk LOAD commands slashes ingestion overhead by roughly 90%.
+</details>
+
+The next section is how data warehouses, object storage data lakes, and open lakehouse table formats split analytical responsibilities across modern cloud platforms.
 
 Modern analytics is not a single product choice. Teams must decide whether they need a **data warehouse** for curated SQL, a **data lake** for cheap raw storage, or a **lakehouse** that adds ACID tables on object storage. They must choose between **serverless scan pricing** ([Amazon Athena](https://docs.aws.amazon.com/athena/latest/ug/pricing.html), [BigQuery on-demand](https://cloud.google.com/bigquery/pricing)) and **provisioned cluster hours** ([Amazon Redshift](https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-usage-limits.html), [Azure Synapse dedicated pools](https://learn.microsoft.com/en-us/azure/synapse-analytics/sql-data-warehouse/sql-data-warehouse-overview-what-is)). Kubernetes sits in the middle as the orchestration plane: Airflow schedules ephemeral pods, Spark on Kubernetes transforms lake files, and workload identity connects pods to cloud warehouses without long-lived credentials.
 
@@ -50,7 +56,15 @@ Indexed point lookups          Partition pruning + column stats
 Must stay fast for users       Optimized for analyst concurrency
 ```
 
-Pause and predict: if two teams store the same 10 TB dataset — one as newline-delimited JSON in a lake and one as partitioned Parquet in a warehouse — which team pays more for a `SELECT date, SUM(revenue)` query on a single day, and why? The JSON lake scan touches every byte of every record; the partitioned Parquet table reads one day's partition and only the `date` and `revenue` columns.
+**Pause and predict:** If two teams store the same representative 10 TB dataset—one as newline-delimited JSON in an object storage data lake and one as partitioned Parquet in a managed warehouse—which team pays substantially more for a single-day aggregation query such as `SELECT date, SUM(revenue)`, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+The team querying the newline-delimited JSON data lake pays substantially more because newline JSON is a row-oriented format requiring a full-object scan across the entire dataset to parse fields. In contrast, partitioned Parquet organizes data into columnar chunks with directory-based partition paths; the query engine prunes untouched partition directories entirely (reading only the specified single day) and scans only the `date` and `revenue` columns while skipping all unread columns entirely. Because serverless analytical engines bill by scanned bytes, scanning a fraction of the columns within a single partition saves significant compute cost compared to scanning the full multi-terabyte dataset.
+</details>
+
+The next section is how compression codecs, partition path conventions, and object compaction govern physical storage efficiency across analytical data lakes.
 
 ### Compression, Partitioning, and File Layout
 
@@ -240,7 +254,15 @@ Private connectivity matters when compliance requires that traffic never travers
 
 ### BigQuery from GKE
 
-> **Pause and predict**: When using Workload Identity to connect a Kubernetes pod to BigQuery, does the pod need to store a GCP JSON key file? How does the authentication flow work?
+**Pause and predict:** When using GKE Workload Identity to connect a Kubernetes pod to BigQuery, does the pod need to mount a GCP JSON service account key file, and how does the underlying authentication flow operate?
+
+<details>
+<summary>Check your prediction</summary>
+
+The pod does not need to store or mount a GCP JSON service account key file. Under GKE Workload Identity, authentication relies on the GKE metadata server and IAM federation. The node's metadata server intercepts token requests from the Google Cloud SDK inside the pod, validates the pod's short-lived Kubernetes ServiceAccount token, and federates with Google Cloud IAM to issue a temporary OAuth 2.0 access token for the bound GCP service account. This eliminates static credential distribution, key file leakage risks, and secret rotation operational burdens entirely.
+</details>
+
+The next section is how Kubernetes ServiceAccount annotations and IAM role bindings establish the trust relationship between the cluster pod and BigQuery.
 
 ```yaml
 # ServiceAccount with Workload Identity for BigQuery access
@@ -738,7 +760,15 @@ Data governance extends beyond RBAC into **lineage and retention**. [Google Data
 
 Analytics workloads can generate surprise bills quickly. A single bad query on BigQuery can scan petabytes. A misconfigured Redshift cluster can run 24/7 doing nothing. Understanding **which meter moves** — scanned bytes, slot-hours, RPU-hours, node-hours, or egress gigabytes — is the foundation of every cost review.
 
-> **Pause and predict**: If you forget to partition a BigQuery table, what happens to your querying costs as the table grows over several years?
+**Pause and predict:** If an engineering team provisions an unpartitioned BigQuery fact table, what happens to on-demand querying costs as years of telemetry accumulate, and how does table partitioning remediate this failure mode?
+
+<details>
+<summary>Check your prediction</summary>
+
+Query costs grow linearly with total table size over time because unpartitioned BigQuery on-demand queries must scan the entire table, even when the query includes date filters. Adding a qualifying partition filter on a partitioned table allows the query engine to prune unneeded partitions and scan only the relevant date range. Furthermore, an existing unpartitioned table cannot be converted to a partitioned table in place; the team must create a new partitioned destination table and backfill the historical data using a query or export job.
+</details>
+
+The next section is how scan-priced analytical query engines calculate billing meters and enforce client-side query execution byte limits.
 
 ### Scan-Priced Engines: Athena and BigQuery
 
@@ -1367,7 +1397,41 @@ k logs job/manual-test -n data-pipeline
 > Save the CronJob manifest above to `/tmp/cronjob-pipeline.yaml` before applying.
 </details>
 
-### Success Criteria
+Before you close the hands-on lab, audit the four operational claims below. Each open card states an operational hypothesis that sounds plausible during data pipeline design. Treat each claim as a prediction. Open the solution details only after reasoning through the failure mode.
+
+**Card A: Keep twelve always-on ETL Deployments so a four-hour nightly CronJob never waits for pod startup.** A platform team maintains nightly extract pipelines across twelve datasets. Each run lasts four hours every night. To avoid container startup delays, an engineer configures twelve continuous Deployment replicas. The pods run idle containers around the clock. The team assumes reserved idle capacity is negligible compared to scheduling delays.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Workload lifecycle mismatch, resource reservation inefficiency, and idle compute over-provisioning. Next action: recognize that maintaining always-on Deployment replicas for an intermittent nightly batch job forces the Kubernetes cluster to hold static CPU and memory reservations for twenty completely idle hours every day, drastically inflating cloud compute bills; Kubernetes Jobs and CronJobs (or Airflow's KubernetesPodOperator) schedule ephemeral pods on demand that release cluster compute the instant the task reaches completion; to mitigate container startup latency without running always-on workers, pre-pull container images to worker nodes using a DaemonSet, optimize image layer sizes, or configure cluster autoscaler warm pools rather than dedicating static long-running pods to intermittent batch workloads.
+</details>
+
+**Card B: Store the same 10 TB as newline-delimited JSON in the lake — a one-day `SELECT date, SUM(revenue)` will scan about the same bytes as partitioned Parquet.** A data platform team archives ten terabytes of raw transactional telemetry in object storage. Rather than converting data into columnar files, an engineer suggests storing raw newline-delimited JSON. The engineer argues that serverless query engines handle simple aggregations efficiently. The team assumes single-day queries scan roughly the same byte volume in JSON as in partitioned Parquet.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Data layout mismatch, full-scan serialization penalties, and columnar projection ignorance. Next action: understand that newline-delimited JSON is a row-oriented format lacking column indexes, block-level min/max statistics, or byte-skipping capabilities; querying even a single date or column forces the analytical query engine to scan, decompress, and parse every byte of the entire 10 TB dataset across the network; in contrast, partitioned Parquet organizes data into columnar chunks with directory-based partition paths; the query engine prunes untouched partition directories entirely and scans only the specific physical byte streams corresponding to the `date` and `revenue` columns, reducing scanned bytes by up to ninety percent and cutting query latency and scan-based costs by orders of magnitude.
+</details>
+
+**Card C: Mount a GCP JSON service-account key in the pod because Workload Identity still needs a key file for BigQuery.** An operations team configures an ETL pipeline on GKE to export daily metrics to BigQuery. The cluster uses GKE Workload Identity. The Kubernetes ServiceAccount links to a Google IAM service account. However, a developer mounts a downloaded JSON service-account key file into the container. The developer assumes Google client libraries still require a physical credential file on disk.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Authentication antipattern, static credential leakage risk, and metadata federation misunderstanding. Next action: recognize that GKE Workload Identity is specifically designed to eliminate long-lived GCP JSON service account keys from Kubernetes pods; when Workload Identity is configured, the GKE metadata server intercepts credential requests from the Google Cloud client libraries inside the pod and exchanges the pod's short-lived Kubernetes ServiceAccount token for temporary Google Cloud IAM OAuth 2.0 access tokens; mounting a static JSON service-account key file inside a pod bypasses IAM federation, introduces severe credential leakage and rotation risks, violates security compliance policies, and fails to leverage cluster identity federation.
+</details>
+
+**Card D: Leave the BigQuery fact table unpartitioned; on-demand query cost stays flat as years of rows accumulate.** An analytics engineering team builds an event fact table in BigQuery. The table absorbs millions of new records monthly from streaming pods. The developers create the table without a partition column. They reason that queries filtering on recent dates remain fast and cheap. The team expects on-demand query costs to stay flat over years of accumulation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Query engine scan mechanics, unpartitioned table accumulation, and unbounded on-demand billing explosion. Next action: realize that BigQuery on-demand pricing bills directly per TiB scanned during query execution; on an unpartitioned table, every query scanning date fields must perform a full-table scan across all historical data because the engine cannot skip storage blocks based on date predicates; as years of transaction or event logs accumulate, the bytes scanned—and consequently the financial cost—per query scale linearly with cumulative table volume rather than the window of analytical interest; furthermore, BigQuery cannot convert an unpartitioned table to a partitioned table in place; operators must enforce ingestion-time or date/timestamp column partitioning upon table creation and use partition filters (`WHERE date = ...`) to prune data scans and keep query costs flat regardless of historical table growth.
+</details>
+
+**Success Criteria**:
 
 - [ ] Extract Job completes and reads 10 trip records
 - [ ] Transform Job produces regional aggregations
