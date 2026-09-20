@@ -96,7 +96,15 @@ The table above shows durability tiers; the bullets below illustrate how redunda
 
 **Example**: Choosing the cheapest redundancy option can still be a costly mistake if your workload cannot tolerate zonal or datacenter unavailability.
 
-> **Stop and think**: If your primary region suffers a complete outage, how does your application know to read from the secondary region in an RA-GRS setup? (Hint: Azure provides a distinct secondary endpoint URL, appended with `-secondary`, that your application logic must actively switch to during a failover event.)
+**Pause and predict:** If your primary region suffers a complete outage, how does your application know to read from the secondary region in an RA-GRS setup?
+
+<details>
+<summary>Check your prediction</summary>
+
+RA-GRS does not automatically fail over the primary URL. Azure provides a distinct secondary endpoint URL appended with `-secondary` (such as `accountname-secondary.blob.core.windows.net`), and your client application or traffic router must actively target this secondary hostname to service read operations.
+</details>
+
+Evaluating geographic redundancy requires analyzing replication models alongside client connectivity patterns to ensure systems remain resilient during regional cloud incidents.
 
 ### Redundancy in depth: blast radius, durability, and failover
 
@@ -268,7 +276,15 @@ az storage blob set-tier \
 # High priority: typically <1 hour. Standard priority: up to 15 hours.
 ```
 
-> **Pause and predict**: If you upload a 100 GB backup file directly to the Archive tier and then unexpectedly delete it a week later to free up space, what financial penalty will you incur? (Hint: Review the Minimum Retention column in the table above before deleting.)
+**Pause and predict:** If you upload a 100 GB backup file directly to the Archive tier and then unexpectedly delete it a week later to free up space, what financial penalty will you incur?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Archive tier enforces a 180-day minimum retention period. Deleting the 100 GB blob after only seven days incurs a prorated early-deletion fee equal to the storage cost for the remaining 173 days at standard Archive tier rates.
+</details>
+
+Storage cost optimization requires disciplined capacity governance and automated policy enforcement rather than relying on manual operator intervention across expanding enterprise accounts.
 
 ### Lifecycle Management Policies
 
@@ -304,6 +320,8 @@ az storage account management-policy create \
 ```
 
 This JSON policy instructs Azure's background services to evaluate the `logs/` prefix periodically after the policy takes effect. Blobs age smoothly into Cool tier, then Archive, and are ultimately purged from the system after a year---greatly reducing the chance that you end up as the subject of the surprise-bill scenario described in the introduction.
+
+Production lifecycle rule definitions frequently combine multiple action targets within a single policy document to balance storage consumption against operational availability. Beyond moving base blobs across access tiers, lifecycle policies can manage previous blob versions and point-in-time snapshots using dedicated action blocks. When versioning is active, defining separate deletion schedules for noncurrent versions prevents superseded object states from accumulating indefinitely in high-cost tiers. Filter criteria can match exact blob prefixes or leverage index tag matches, allowing automated retention workflows to target specific application domains without restructuring physical container paths.
 
 ### Access tiers and lifecycle in depth
 
@@ -513,7 +531,15 @@ az network private-endpoint create \
   --connection-name "blob-private-connection"
 ```
 
-> **Stop and think**: If you disable public network access and rely exclusively on a Private Endpoint, how will developers working from their local laptops access the storage account to upload test data? (Hint: They will need a VPN connection to the VNet, Azure Bastion, or a carefully configured Storage Firewall exception for their specific IP addresses.)
+**Pause and predict:** If you disable public network access and rely exclusively on a Private Endpoint, how will developers working from their local laptops access the storage account to upload test data?
+
+<details>
+<summary>Check your prediction</summary>
+
+Public network access is blocked, preventing direct internet routing to the storage endpoint. Developers must establish secure network connectivity into the virtual network using a point-to-site VPN, an Azure Bastion jump host, or configure a temporary storage firewall IP exception for their client machines.
+</details>
+
+Network perimeter isolation transforms how engineering teams interact with storage systems during routine maintenance, requiring structured connectivity paths into enterprise cloud environments.
 
 ### Security and access control in depth
 
@@ -523,6 +549,8 @@ Authorization and network isolation work together. **Who** may call the data pla
 
 **SAS types** differ by signing material. **Account SAS** and **service SAS** are signed with storage account keys. **User delegation SAS** is signed with a key obtained through Entra ID. Microsoft recommends user delegation SAS when possible. The signing identity needs a role that includes **Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey**, such as **Storage Blob Data Contributor**. [User delegation keys are valid up to seven days](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-user-delegation-sas-create-cli). Set SAS expiry within that window even if you want a longer calendar lifetime. Revoke compromised delegation keys with `az storage account revoke-delegation-keys`; cache delays may apply before old SAS URLs fail.
 
+Architecturally, user delegation signatures separate the credential issuance authority from the storage account access keys entirely. Because the delegation key is acquired using an Entra ID OAuth 2.0 token, Azure logs every key generation request in Azure Monitor audit trails with the requesting principal identity. Security operations teams can correlate token issuance events directly to specific service principals or user accounts during compliance audits. Furthermore, revoking permissions from the underlying Entra ID principal immediately invalidates subsequent delegation requests, providing centralized administrative governance that static shared account keys cannot deliver.
+
 **Entra ID RBAC on the data plane** assigns roles at subscription, resource group, storage account, container, or blob scope. **Storage Blob Data Reader** covers read and list. **Storage Blob Data Contributor** adds write and delete. **Storage Blob Data Owner** adds ACL management needed for Data Lake Gen2 paths. **Storage Blob Delegator** allows generating user delegation SAS without broad data write rights. Scope assignments narrowly: a CI pipeline that uploads build artifacts needs Contributor on one container, not on the whole account.
 
 **Service endpoints vs private endpoints vs firewall rules** solve different network problems. [Storage firewall rules](https://learn.microsoft.com/en-us/azure/storage/common/storage-network-security) restrict which public IPs and which VNet subnets may reach the **public** storage endpoints. **Service endpoints** route traffic from your subnet to Azure Storage over the Microsoft backbone while the account still has a public endpoint. **Private endpoints** place a private IP in your VNet via Azure Private Link. Blob traffic then stays off the public internet for clients that resolve the private DNS name. Many production accounts combine **default-action Deny** on the firewall with selected subnet rules for PaaS services, plus private endpoints for application tiers inside the VNet. `--public-network-access Disabled` blocks the public endpoint entirely; only private endpoint paths remain.
@@ -530,6 +558,8 @@ Authorization and network isolation work together. **Who** may call the data pla
 **Blob versioning** keeps prior versions when blobs are overwritten or deleted. Each version is a separate billable object until you delete it. Versioning pairs well with lifecycle rules that tier or delete **previous versions** on a schedule. Without lifecycle on versions, overwrite-heavy workloads can grow storage silently.
 
 **Soft delete** for blobs and containers retains deleted objects for **1 to 365 days** before permanent removal. Restore with undelete APIs during the window. Soft delete is cheap insurance against operator mistakes and buggy automation.
+
+Soft delete functions as an application-transparent safety net by retaining deleted blobs and snapshots in a hidden state for the configured retention duration. When a client application issues a delete command, Azure marks the target resource as soft-deleted rather than immediately freeing the underlying storage blocks. During this retention window, administrators can inspect soft-deleted items by listing blobs with deleted entities included and selectively restore them using the undelete API call. Storage capacity is billed at standard active rates throughout the retention period, so teams must balance recovery time objectives against predictable capacity overhead.
 
 **Immutability (WORM)** supports **time-based retention** and **legal holds** on containers. Locked policies prevent overwrite and delete even for administrators until retention expires or legal hold clears. Immutable containers block lifecycle **delete** actions on protected blobs. Plan immutability for audit logs and regulatory archives where tamper evidence matters more than day-to-day agility.
 
@@ -572,6 +602,16 @@ az storage fs directory create \
   --auth-mode login
 ```
 
+**Pause and predict:** If you are deploying an application that exclusively uploads and downloads millions of tiny individual images with no need for directory renaming or big data analytics, should you enable ADLS Gen2?
+
+<details>
+<summary>Check your prediction</summary>
+
+Enabling a hierarchical namespace is unnecessary for simple image ingestion. A standard flat blob namespace is the simpler architectural fit because the workload does not benefit from directory-level transactions or distributed analytics query optimizations.
+</details>
+
+Architectural evaluation between flat object stores and hierarchical file systems hinges on operational characteristics and query patterns rather than storage capacity pricing models.
+
 Choosing between flat Blob Storage and ADLS Gen2 is not about price---both use the same storage meters---but about namespace semantics, rename behavior, and how analytics tools expect to read data:
 
 | Feature | Blob Storage | ADLS Gen2 |
@@ -582,8 +622,6 @@ Choosing between flat Blob Storage and ADLS Gen2 is not about price---both use t
 | **Analytics tools** | Limited integration | Native Spark, Databricks, Synapse support |
 | **Protocol** | Blob REST API (`blob.core.windows.net`) | Blob + DFS REST API (`dfs.core.windows.net`) |
 | **Cost** | Same | [Same (no premium for hierarchical namespace)](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction) |
-
-> **Pause and predict**: If you are deploying an application that exclusively uploads and downloads millions of tiny individual images with no need for complex directory renaming or big data analytics, should you enable ADLS Gen2? (Hint: If you do not need directory semantics or analytics-oriented file-system features, a flat blob namespace may be the simpler fit.)
 
 ---
 
@@ -1035,7 +1073,39 @@ az storage fs file list --file-system "analytics-raw" --account-name "$DL_NAME" 
 az group delete --name "$RG" --yes --no-wait
 ```
 
-### Success Criteria
+**Card A: In RA-GRS, the app keeps using the primary blob URL during a regional outage and Azure transparently serves the secondary.** An operations team deploys an application configured with standard primary blob storage endpoints. They expect Azure DNS to reroute client traffic transparently to the secondary region during an outage without manual endpoint modifications.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: client-side connection routing versus automated DNS failover. Next action: update application connection strings to use the distinct `-secondary` endpoint during outages, or implement automated circuit-breaker logic across primary and secondary storage URIs.
+</details>
+
+**Card B: Deleting a 100 GB Archive blob after one week incurs no extra charge beyond the week of storage.** A storage administrator uploads a large database backup directly into the Archive tier. They delete the file seven days later, expecting storage billing to reflect only that single week of active consumption.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: minimum tier retention requirements versus actual storage duration. Next action: account for the mandatory 180-day Archive retention commitment when designing lifecycle rules, and use Cool or Cold tiers for temporary datasets subject to early deletion.
+</details>
+
+**Card C: With public network access disabled and only a Private Endpoint, any developer laptop can upload with a valid Entra ID token.** A security engineer disables public network access on a storage account to enforce strict compliance. They expect developers on public home internet connections to authenticate and upload blobs successfully using corporate Entra ID tokens alone.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: network perimeter firewall boundaries versus identity authentication tokens. Next action: establish line-of-sight network connectivity to the private endpoint using a point-to-site VPN or Azure Bastion host, or configure firewall IP rules to permit developer source IPs.
+</details>
+
+**Card D: Always enable ADLS Gen2 hierarchical namespace for millions of tiny image blobs.** A software architect enables hierarchical namespaces on every new production storage account. They assume that real directory structures and atomic renames will improve ingestion throughput and query performance for unstructured web assets.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: workload access pattern matching versus file system metadata overhead. Next action: use standard flat blob storage for independent object retrieval workloads, reserving ADLS Gen2 hierarchical namespaces for analytics frameworks requiring directory renames and POSIX access control.
+</details>
+
+**Success Criteria**:
 
 - [ ] Storage account created with TLS 1.2 minimum and public access disabled
 - [ ] Three containers created with test blobs uploaded
