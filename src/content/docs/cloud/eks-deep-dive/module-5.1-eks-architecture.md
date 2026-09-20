@@ -116,7 +116,15 @@ The single most consequential architectural decision you make when creating an E
 
 ### Public Endpoint Only (Default)
 
-When you create an EKS cluster, [the default configuration exposes a public endpoint](https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html). The API server gets a public DNS name (e.g., `https://ABCDEF1234.gr7.us-east-1.eks.amazonaws.com`) that resolves to public IP addresses.
+**Pause and predict:** If an EKS cluster is provisioned with default endpoint settings and worker nodes reside entirely within private subnets, which network route will the nodes traverse to reach the Kubernetes API server?
+
+<details>
+<summary>Check your prediction</summary>
+
+Newly provisioned Amazon EKS clusters enable public endpoint access and disable private endpoint access by default (`endpointPublicAccess=true` and `endpointPrivateAccess=false`). Placing worker nodes inside private subnets does not make the Kubernetes API private: private nodes do not equal a private API endpoint. Because the cluster API server DNS name resolves exclusively to public internet addresses, private worker nodes must hairpin outbound traffic through a VPC NAT Gateway across the public internet to reach the control plane. If private access is not enabled, this hairpinned path incurs recurring NAT Gateway data-processing fees, adds network latency to every control-plane interaction, and creates an operational failure domain where NAT Gateway saturation or degradation directly disrupts kubelet control-plane heartbeats and pod lifecycle updates.
+</details>
+
+Production network architecture requires platform engineers to evaluate the structural distinction between administrative access planes and compute plane reachability. Restricting administrative ingress through network perimeter firewalls or CIDR allowlists safeguards management access. However, perimeter filtering operates independently of worker node transit paths, requiring architects to decouple operational workstation connectivity policies from foundational infrastructure routing topologies.
 
 ```mermaid
 flowchart TD
@@ -145,11 +153,7 @@ flowchart TD
     NAT -- "via Internet" --> PubEndpoint
 ```
 
-**The problem**: Your worker nodes in private subnets must reach the API server through the public endpoint, which sends that traffic out of the VPC. This adds latency, costs money (NAT data processing fees), and creates a dependency on the NAT Gateway. If your NAT Gateway is overwhelmed or fails, your nodes lose contact with the control plane.
-
-When only `endpointPublicAccess` is true, the Kubernetes API DNS name resolves to public addresses from the internet. Nodes in private subnets without a route that prefers the private ENI path will hairpin through NAT to those public IPs — the classic “public-only” footgun. Operators sometimes restrict administrative access with `publicAccessCidrs` while leaving node traffic on the expensive path, which improves security for human `kubectl` but does not fix node-to-API reliability.
-
-You can restrict the public endpoint using CIDR allowlists:
+When platform teams maintain public endpoint accessibility for remote engineering workflows, Amazon EKS allows operators to constrain exposure to known corporate gateway ranges using CIDR allowlists as documented in the [EKS cluster endpoint access guide](https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html):
 
 ```bash
 aws eks update-cluster-config --name my-cluster \
@@ -158,9 +162,19 @@ aws eks update-cluster-config --name my-cluster \
     publicAccessCidrs='["203.0.113.0/24","198.51.100.0/24"]'
 ```
 
+Applying CIDR boundaries to public endpoints ensures that internet-originated traffic is filtered at the AWS edge before reaching the control-plane load balancers. However, allowlists must be continually synchronized with enterprise egress IP pools and automated deployment pipelines to prevent sudden administrative lockouts during maintenance windows. Teams that combine public endpoints with CIDR restrictions often discover that external CI/CD runners fail when runner IP pools rotate without updating cluster configuration.
+
 ### Private Endpoint Only
 
-With a private endpoint, the API server DNS resolves to the private IP addresses of the cross-account ENIs inside your VPC. No public endpoint exists.
+**Pause and predict:** If a cluster administrator disables public endpoint access and enables private endpoint access on an EKS cluster, what happens when an engineer attempts to run `kubectl get nodes` from an internet-connected laptop?
+
+<details>
+<summary>Check your prediction</summary>
+
+When an EKS cluster is configured with private endpoint access only (`endpointPublicAccess=false` and `endpointPrivateAccess=true`), [the API server DNS name resolves exclusively to the private IP addresses of the cross-account ENIs](https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html) inside your VPC subnets. Running `kubectl` commands directly from an internet-connected laptop fails immediately with connection timeouts or host unreachable errors because no public endpoint exists on the internet. To execute administrative tasks, engineers and CI/CD pipelines must connect from within the VPC or across an established network transit path such as an AWS Client VPN, AWS Direct Connect, or an in-VPC bastion host. Meanwhile, worker nodes in your cluster subnets continue communicating with the control plane seamlessly across the private cross-account ENIs without ever traversing the internet or relying on NAT Gateways.
+</details>
+
+Enforcing strict control-plane isolation shifts architectural complexity toward identity federation, deployment pipeline placement, and automated lifecycle tooling. Infrastructure delivery systems, including automated GitOps synchronizers and dedicated CI/CD agent pools, must be co-located within the cluster network fabric. Positioning automation inside the private perimeter maintains continuous delivery without compromising perimeter defense boundaries.
 
 ```mermaid
 flowchart TD
@@ -183,11 +197,7 @@ flowchart TD
     Dev -. "CANNOT REACH\n(unless VPN/Direct Connect)" .-> VPC
 ```
 
-**Advantages**: Node-to-control-plane traffic stays entirely within the VPC. No NAT Gateway dependency for Kubernetes operations. No public attack surface.
-
-**Challenge**: [You cannot run `kubectl` from your laptop unless you are connected to the VPC via VPN, Direct Connect, or a bastion host](https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html). CI/CD pipelines must also run inside the VPC or have network connectivity to it.
-
-Private-only mode is the right choice when regulatory or threat models forbid any internet-reachable Kubernetes API surface. The trade is operational: every actor that calls the API — humans, GitHub Actions runners, Terraform Cloud agents, emergency break-glass tooling — needs a network path into the VPC. Teams often standardize on SSM Session Manager bastions, VPN concentrators, or CI runners in the same account/region so access patterns mirror production traffic rather than bolting on one-off SSH keys.
+Private-only mode is the right choice when regulatory frameworks or corporate threat models forbid any internet-reachable Kubernetes API surface. The primary trade-off is operational ergonomics: every operational actor that interacts with the API requires an authenticated transit path into the VPC. Platform engineering teams routinely standardize on AWS Systems Manager Session Manager bastions or internal VPN concentrators. This approach ensures administrative access patterns mirror production traffic rather than managing one-off SSH keys.
 
 ```bash
 aws eks update-cluster-config --name my-cluster \
@@ -195,6 +205,8 @@ aws eks update-cluster-config --name my-cluster \
     endpointPublicAccess=false,\
     endpointPrivateAccess=true
 ```
+
+Operating in private-only mode also requires provisioning AWS PrivateLink VPC endpoints for supporting cloud services. When worker nodes must pull container images from Amazon ECR or ship logs to Amazon CloudWatch, VPC interface endpoints prevent that traffic from requiring internet transit routes. Designing private subnets with comprehensive endpoint architectures guarantees complete cluster autonomy while fulfilling zero-trust compliance standards.
 
 ### Public + Private (Recommended for Production)
 
@@ -311,7 +323,15 @@ Self-managed nodes still require the same IAM node role and bootstrap contract (
 
 ### AWS Fargate
 
-Fargate provides serverless compute for Kubernetes pods. You define a **Fargate Profile** that specifies which pods (by namespace and labels) should run on Fargate. When a matching pod is scheduled, AWS provisions a dedicated microVM for it.
+**Pause and predict:** When deploying standard Kubernetes observability or security DaemonSets to a namespace governed by an EKS Fargate profile, how does the Fargate runtime schedule and execute those workloads?
+
+<details>
+<summary>Check your prediction</summary>
+
+DaemonSets are fundamentally not supported on AWS Fargate as [documented in the official EKS Fargate guide](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html). Because Fargate provisions exactly one dedicated Firecracker microVM per Pod compute boundary with no shared underlying EC2 host, the DaemonSet controller cannot schedule agent pods onto Fargate nodes. Any operational telemetry, log routing, or security monitoring traditionally performed by node-level DaemonSets must be refactored into application sidecars or retained on EC2 instances. In addition, Fargate enforces several strict boundaries: containers cannot run in privileged mode, GPUs are unavailable, `hostNetwork` and `hostPort` configurations are disallowed, pods must run exclusively within private subnets, and the EC2 Instance Metadata Service (IMDS) is completely unreachable from container processes.
+</details>
+
+Serverless pod execution fundamentally alters application packaging and infrastructure capacity planning across production Kubernetes environments. Platform architects evaluate Fargate primarily for untrusted multi-tenant workloads, intermittent batch workflows, and stateless background consumers. In these operational scenarios, total runtime isolation justifies per-pod resource allocation models and microVM provisioning latencies.
 
 ```bash
 # Create a Fargate profile
@@ -323,15 +343,9 @@ aws eks create-fargate-profile \
   --selectors '[{"namespace":"backend","labels":{"compute":"fargate"}}]'
 ```
 
-Fargate-backed pods trade node operations for per-pod isolation with the following constraints and behaviors that platform teams review before approving Fargate profiles:
+Fargate profiles define compute boundaries declaratively through namespace and label selectors. When the Kubernetes scheduler identifies a pending pod that matches profile selectors, the EKS control plane delegates execution to the AWS Fargate infrastructure provider, instantiating the microVM dynamically without pre-allocated EC2 capacity.
 
-- **No nodes to manage**: No patching, no AMI updates, no SSH access
-- **Per-pod isolation**: Each pod runs in its own Firecracker microVM
-- **Cold start**: Pods on Fargate generally take noticeably longer to become ready than pods scheduled onto already-running EC2 nodes
-- **Limitations**: [No DaemonSets, no privileged containers, no GPUs](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html), no persistent local storage
-- **Cost**: [AWS Fargate bills per vCPU and memory from image pull start until pod termination](https://aws.amazon.com/fargate/pricing/) with a one-minute minimum; EKS does not charge a separate Fargate tax beyond the cluster control plane fee
-
-Fargate schedules one pod per Firecracker microVM, which is excellent for hard multi-tenant isolation but expensive for steady, dense services. It cannot run DaemonSets, so node-level log agents, security sensors, or mesh init containers that depend on host access must move to sidecar patterns or stay on EC2-backed compute. [AWS documents](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html) that only one pod runs on each Fargate task — there is no bin-packing multiple pods onto the same microVM. Cold starts routinely land in the tens of seconds, so bursty batch namespaces benefit more than latency-sensitive synchronous APIs unless you keep warm capacity elsewhere.
+From an operational billing perspective, [AWS Fargate bills per vCPU and memory from image pull start until pod termination](https://aws.amazon.com/fargate/pricing/) with a one-minute minimum duration. Because there are no virtual machines to pack or scale down during idle intervals, Fargate eliminates node-level AMI maintenance overhead. However, it introduces cold-start intervals of thirty to ninety seconds that teams must account for in application readiness probes. Platform engineers frequently combine Fargate with Managed Node Groups, reserving serverless compute for isolated jobs while running latency-sensitive frontend services on warm EC2 pools.
 
 ### Compute Decision Matrix
 
@@ -525,7 +539,15 @@ Access policy ARNs always use the `arn:aws:eks::aws:cluster-access-policy/` pref
 
 ### Authentication Modes
 
-EKS clusters support three authentication modes that define whether `aws-auth`, Access Entries, or both are authoritative during migration.
+**Pause and predict:** If an engineering team encounters authentication failures after updating their EKS cluster to `API` authentication mode, can they switch the cluster back to `CONFIG_MAP` to recover access using the legacy `aws-auth` ConfigMap?
+
+<details>
+<summary>Check your prediction</summary>
+
+[You cannot go backwards: once you switch an EKS cluster's authentication mode to `API`, you cannot re-enable the ConfigMap](https://docs.aws.amazon.com/eks/latest/userguide/setting-up-access-entries.html) or revert to `CONFIG_MAP` mode. Access Entries require `API_AND_CONFIG_MAP` or `API` mode, and AWS permanently blocks any transition back to a configuration that removes the EKS API authentication engine. In legacy architectures, a single syntax error or indentation mistake in the `aws-auth` ConfigMap could lock out every IAM principal from Kubernetes administration except for the original IAM principal that created the cluster. In contrast, Access Entries decouple authentication management from in-cluster ConfigMaps, allowing administrators to restore and modify access policies directly through the AWS EKS API and console even when in-cluster Kubernetes API access is completely unavailable.
+</details>
+
+Modernizing cluster access control requires platform administrators to treat authentication mode transitions as irreversible infrastructure milestones within their deployment pipelines. Decoupling AWS IAM identities from in-cluster Kubernetes object lifecycles establishes clear separation of concerns. This architectural split distinguishes cloud provider infrastructure provisioning from internal cluster role-based authorization boundaries.
 
 ```bash
 # Check current authentication mode
@@ -572,7 +594,7 @@ aws eks update-cluster-config --name my-cluster \
 kubectl delete configmap aws-auth -n kube-system
 ```
 
-> **Important**: [You cannot go backwards. Once you switch from `API_AND_CONFIG_MAP` to `API`, you cannot re-enable the ConfigMap.](https://docs.aws.amazon.com/eks/latest/userguide/setting-up-access-entries.html) Test thoroughly in the transitional mode before making the final switch.
+Migration execution demands rigorous validation between steps, ensuring every human operator, automated pipeline, and service role authenticates reliably under the new API model before initiating final cleanup. Testing permissions comprehensively during the transitional phase eliminates the risk of operational disruptions when disabling legacy configuration maps.
 
 **Reflective checkpoint:** In `API_AND_CONFIG_MAP` mode, deleting `aws-auth` early removes legacy mappings but leaves Access Entries authoritative. Principals with entries and associated policies keep working; everyone else loses API access even if they previously relied on `mapRoles`. That is why migration runbooks duplicate mappings before cleanup and why the final `API` switch is one-way.
 
@@ -1180,7 +1202,41 @@ aws iam delete-role --role-name EKS-Cluster-Role
 # Then clean up VPC resources (NAT GW, subnets, IGW, VPC) as in the VPC module
 ```
 
-### Success Criteria
+Before committing an EKS architecture to production, platform architects must audit common cognitive traps regarding endpoint connectivity, serverless compute constraints, and identity management. Auditing these failure layers ensures engineering teams establish resilient control-plane baselines. This practice prevents dangerous assumptions about network paths, agent compatibility, and authentication recovery mechanics.
+
+**Card A: Private worker nodes mean the Kubernetes API is private, so `kubectl` from an internet laptop still works on the default cluster.** A security architecture team provisions an Amazon EKS cluster with default settings and deploys worker nodes into private subnets. When engineers run `kubectl` commands successfully from home networks, the team assumes private nodes inherently isolate the control plane. They believe external administrative reachability remains functional without requiring a VPN or bastion connection.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Worker node subnet placement versus control plane API endpoint configuration. Next action: recognize that default EKS clusters have public endpoint access enabled and private endpoint access disabled, causing private nodes to route traffic out through a NAT Gateway to reach the public API; enable private endpoint access (`endpointPrivateAccess=true`) and disable public endpoint access (`endpointPublicAccess=false`) once a private transit path (such as AWS Client VPN or an SSM-managed bastion) is established.
+</details>
+
+**Card B: A Fargate profile still runs DaemonSets such as node log agents and security sensors.** A platform engineering group provisions an EKS Fargate profile to run microservices without managing EC2 virtual machines. Because the cluster already maintains cluster-wide DaemonSets for logging and security intrusion detection, the team expects these agents to run everywhere. They assume the Kubernetes scheduler will instantiate agent containers on each Fargate microVM alongside application workloads.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kubernetes DaemonSet scheduling semantics on serverless container runtimes. Next action: understand that Fargate provisions a dedicated single-pod Firecracker microVM without a shared host node, rendering DaemonSets completely unsupported; re-architect logging, tracing, and security sensors into application sidecar containers, or schedule those workloads onto managed node groups.
+</details>
+
+**Card C: A YAML typo in `aws-auth` is recovered the same way as Access Entries, from the EKS console, without Kubernetes API access.** An operations engineer modifies the `aws-auth` ConfigMap in the `kube-system` namespace to register an IAM role. While editing the manifest, the engineer introduces an invalid YAML indentation character that breaks syntax validation. When team members report unauthorized errors, the platform lead attempts to log into the AWS console to fix the mapping without Kubernetes API access.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: In-cluster ConfigMap authentication storage versus out-of-band EKS Access Entries APIs. Next action: recognize that the AWS EKS console cannot view or edit in-cluster ConfigMaps when API connectivity is severed, requiring the original cluster-creator IAM principal to authenticate and fix the syntax error via `kubectl`; migrate authentication to EKS Access Entries so cluster access policies can be managed and restored directly through the AWS EKS API without depending on in-cluster resources.
+</details>
+
+**Card D: If Access Entries go wrong, you can switch `authenticationMode` back to `CONFIG_MAP`.** A platform team prepares to migrate an enterprise EKS cluster from the legacy `aws-auth` ConfigMap to native EKS Access Entries. To guard against potential authorization regressions, the lead architect establishes an emergency rollback procedure. The runbook states that if workloads encounter authentication failures after switching to `API` mode, the team will invoke the AWS CLI to revert back to `CONFIG_MAP`.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Irreversible authentication mode state transitions in the Amazon EKS control plane. Next action: recognize that transitioning an EKS cluster to `API` mode is a permanent, one-way operation that strictly prohibits reverting to `CONFIG_MAP` mode; thoroughly validate all IAM roles, access entries, and policy associations in transitional `API_AND_CONFIG_MAP` mode before executing the final cutover to `API` mode.
+</details>
+
+**Success Criteria**:
 
 - [ ] I created an EKS cluster with the private API endpoint only
 - [ ] I deployed a bastion host with SSM access (no SSH key required)
