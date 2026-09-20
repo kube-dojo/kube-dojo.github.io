@@ -116,7 +116,13 @@ The best allocation systems are built into provisioning paths. Terraform modules
 
 ---
 
-> **Pause and predict**: If three teams share a single Kubernetes node, how can you determine who pays for what? Kubernetes makes cost allocation hard because workloads share nodes, and if three teams run pods on the same node, you still need a fair way to decide who pays for that node.
+**Pause and predict:** If three independent engineering teams run workloads on the same Kubernetes worker node, how should a platform chargeback model split the underlying cloud compute bill? Should cost follow the node's provisioning owner, raw real-time CPU and memory usage, or scheduled resource requests?
+
+<details>
+<summary>Check your prediction</summary>
+
+Allocate shared node compute costs using the **max(request, usage)** model implemented by OpenCost and Kubecost, rather than assigning costs to the node owner or relying strictly on raw usage. Kubernetes makes cost allocation complex because multiple workloads from different tenants share underlying instances. If allocation used only actual resource usage, a workload requesting 8 vCPUs but consuming only 500m would prevent other pods from scheduling onto that node while paying virtually nothing for the reserved capacity. Conversely, if a pod bursts past its request, it consumes actual physical node capacity that other workloads cannot use. Taking the maximum of requested and consumed resources ensures that tenants pay for both the capacity they tie up from the scheduler and any excess capacity they physically consume, while unallocated node capacity is exposed as shared idle cost.
+</details>
 
 ## Pillar 1: Visibility with Kubecost and OpenCost
 
@@ -304,7 +310,13 @@ Chargeback should wait until the allocation model is stable enough to survive di
 
 ---
 
-> **Stop and think**: Why is over-provisioning a pod's requested CPU worse than over-provisioning its limits? The most common waste pattern in Kubernetes is that developers set resource requests based on guesswork and then never revisit them, which leaves schedulers reserving capacity the workload never uses.
+**Pause and predict:** When sizing container resource specifications for a Kubernetes deployment, why does over-provisioning CPU requests inflate cloud infrastructure spend much more severely than over-provisioning CPU limits? What mechanism in the Kubernetes control plane directly drives this cost discrepancy?
+
+<details>
+<summary>Check your prediction</summary>
+
+Over-provisioning **requests** directly inflates cloud bills because the Kubernetes scheduler **reserves** capacity based strictly on requests, not limits. The scheduler subtracts each container's CPU and memory requests from the node's allocatable capacity to decide whether a pod can be placed. If a pod requests 4 vCPUs but consumes only 200m, those 4 vCPUs are permanently locked and cannot be scheduled to any other workload, forcing the cluster autoscaler to provision additional cloud worker nodes to accommodate subsequent pods. In contrast, CPU limits act merely as kernel cgroup throttling caps during runtime and do not reserve node capacity during scheduling. The most common waste pattern in Kubernetes occurs when developers set requests based on speculative peak guesses and never adjust them, stranding expensive node capacity that sits idle yet fully billed.
+</details>
 
 ## Pillar 2: Right-Sizing with VPA and HPA
 
@@ -456,7 +468,13 @@ The cost lever that surprises many teams is architecture. Moving a chatty servic
 
 ---
 
-> **Pause and predict**: If your application traffic doubles every year, is it more cost-effective to buy 3-year Reserved Instances or stick to 1-year commitments?
+**Pause and predict:** If your application traffic and corresponding compute footprint double every year, should you lock in 3-year Reserved Instances to secure the highest headline discount, or stick with 1-year commitments? How does rapid architectural and traffic growth alter the commitment calculation?
+
+<details>
+<summary>Check your prediction</summary>
+
+Prefer **1-year commitments** or a layered 1-year strategy rather than locking your full footprint into 3-year commitments. When an application and its underlying infrastructure double yearly, instance families, container architectures, regions, and baseline node counts evolve rapidly. A 3-year commitment locks the organization into specific instance types, regions, or spend rates that often become suboptimal or wasted as architecture shifts or newer, more cost-effective processor generations launch. Furthermore, buying a 3-year commitment based on future projected growth risks prepaying for unutilized capacity early on, whereas sizing for current load leaves you under-covered in years two and three. Layering 1-year commitments periodically allows the platform team to match changing architectural baselines, preserve flexibility to adopt newer instance generations, and avoid stranded financial liability.
+</details>
 
 ## Pillar 3: Rate Optimization
 
@@ -799,7 +817,13 @@ The operating review should be routine and short. A weekly FinOps review can exa
 
 ---
 
-> **Pause and predict**: When a Kubernetes namespace is deleted, what cloud resources might be left behind? Orphaned resources are cloud resources that are no longer attached to any active workload but continue accruing charges, and they are the silent budget killer.
+**Pause and predict:** When an engineering team deletes a Kubernetes namespace containing services, deployments, and stateful workloads, does deleting the namespace automatically terminate every associated cloud infrastructure charge? Which provider resources are most commonly left behind to accrue silent costs?
+
+<details>
+<summary>Check your prediction</summary>
+
+Deleting a Kubernetes namespace does **not** stop all cloud charges. External cloud resources provisioned via Kubernetes controllers frequently outlive the namespace if lifecycle protections, retention policies, or finalizer interruptions prevent provider cleanup. In particular, PersistentVolumes with a `persistentVolumeReclaimPolicy` set to `Retain` remain provisioned in AWS EBS, Azure Disk, or Google Cloud Persistent Disk after their PersistentVolumeClaims disappear, silently accruing storage and provisioned IOPS charges. Similarly, cloud LoadBalancers created by `LoadBalancer` services or Ingress controllers, static Elastic IPs, orphaned NAT gateways, and unattached snapshot volumes remain active if controllers fail to release them. Orphaned resources are cloud infrastructure components that are no longer attached to any active workload but continue accruing monthly charges, making them a silent budget drain.
+</details>
 
 ## Orphaned Resource Cleanup
 
@@ -1274,7 +1298,41 @@ Potential savings: $421/month ($5,052/year) -- 75% reduction
 kind delete cluster --name cost-lab
 ```
 
-### Success Criteria
+Before you close the lab, audit the four claims below. Each open card states a hypothesis that sounds operationally plausible during cloud financial optimization. Treat the claim as a prediction, then open the details only after you have an answer.
+
+**Card A: If three teams share a node, the node owner's team should pay 100% of that node.** A platform engineering team operates a multi-tenant Kubernetes cluster where three distinct product teams deploy microservices onto shared node groups. To simplify monthly accounting and avoid showback disputes, the FinOps lead decides that whichever team initially provisioned or owns the underlying node pool must absorb the entirety of that node group's cloud invoice. The team assumes that ownership simplifies reporting lines and eliminates the need to measure granular pod consumption across namespaces.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Multi-tenant cost attribution and fair-share resource accounting versus coarse infrastructure ownership. Next action: implement proportional cost allocation using the **max(request, usage)** model supported by OpenCost and Kubecost rather than penalizing the node pool owner; assigning 100% of node costs to the provisioning team creates perverse financial incentives where tenant teams consume unlimited compute without accountability, while the owning team bears an arbitrary budget penalty; allocate compute costs to each tenant namespace based on the higher of their scheduled requests or actual physical consumption, and distribute residual unallocated node capacity transparently as shared cluster idle overhead.
+</details>
+
+**Card B: Over-provisioning CPU limits wastes more money than over-provisioning CPU requests, because limits are what the scheduler reserves.** An infrastructure architect reviews a deployment manifest where a service specifies a CPU request of 250m and a CPU limit of 4000m. The architect flags the high limit as a critical financial waste risk. They assume that setting limits far above baseline needs forces Kubernetes to purchase and reserve excess node capacity. Consequently, the architect recommends slashing limits while leaving generous requests untouched to reduce cloud infrastructure spend.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kubernetes scheduling capacity reservation semantics versus runtime container cgroup enforcement. Next action: recognize that the Kubernetes scheduler reserves node capacity based strictly on resource **requests**, not limits; over-provisioning CPU requests directly causes cluster nodes to fill up and triggers the cluster autoscaler to add expensive cloud instances even when physical utilization remains near zero; in contrast, CPU limits merely establish CFS quota throttling ceilings during runtime without reserving node capacity; right-size requests down to actual baseline utilization to unlock real dollar savings, and set limits prudently to protect co-located workloads from runaway CPU starvation.
+</details>
+
+**Card C: If traffic doubles every year, a 3-year Reserved Instance is always cheaper than 1-year commitments.** A fast-growing software company experiences rapid traffic growth that doubles every calendar year, requiring continuous cluster expansion. Seeking to maximize cloud provider discounts, the procurement manager commits all projected compute capacity to 3-year Reserved Instances and Savings Plans. The manager assumes that because 3-year commitments offer higher headline percentage discounts than 1-year terms, they are mathematically guaranteed to yield lower total expenditures.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Rapid architectural evolution and dynamic demand growth versus long-term fixed capacity lock-in. Next action: avoid locking high-growth workloads into rigid 3-year commitments, and adopt 1-year or rolling layered commitments instead; when workloads double annually, underlying instance families, CPU architectures, container topologies, and cloud pricing structures change dramatically over a three-year horizon; long-term commitments risk stranding capital on deprecated instance types or forcing the organization to pay for unused commitments if architectures pivot to Graviton, modern node auto-provisioning, or serverless; utilize 1-year commitments sized conservatively against stable baseline compute to preserve strategic agility.
+</details>
+
+**Card D: Deleting a Kubernetes namespace always stops every cloud charge for that team's LoadBalancers and disks.** A project team completes an ephemeral development phase and cleans up by issuing a namespace deletion command. The team assumes that removing the Kubernetes namespace immediately and cleanly terminates every associated cloud infrastructure cost. They expect that cloud load balancers, public IP addresses, and underlying storage volumes that supported the environment cease billing instantly once the namespace vanishes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Controller-managed cloud resource lifecycle decoupling and retention policies versus Kubernetes object deletion. Next action: audit external cloud provider resources explicitly after namespace deletion to identify and clean up orphaned infrastructure; PersistentVolumes with a `Retain` reclaim policy remain active as unattached cloud block storage volumes (such as Amazon EBS or Azure Managed Disks) that continue accruing storage and provisioned IOPS fees indefinitely; furthermore, cloud LoadBalancers, unreleased Elastic IPs, and NAT gateways can linger if namespace deletion encounters finalizer deadlocks or provider API race conditions; deploy automated orphaned-resource scanners to terminate abandoned disks and networking components.
+</details>
+
+**Success Criteria**:
 
 - [ ] Over-provisioned workloads deployed and identified
 - [ ] Waste quantified in dollar terms
