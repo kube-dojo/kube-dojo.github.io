@@ -259,7 +259,7 @@ spec:
 The Fleet Hub is the authoritative source of truth for all placed resources. When a local operator deletes or alters a placed object directly on a member cluster, the member-side Fleet agent controller detects the state drift against the active snapshot and automatically **recreates** the Deployment on the member cluster to match the Hub's desired state. Deleting or modifying a placed workload must be performed on the Fleet Hub itself by updating or removing the corresponding manifest or adjusting the `ClusterResourcePlacement` resource.
 </details>
 
-This continuous reconciliation model protects multi-cluster consistency by treating member clusters as downstream projection targets rather than independent configuration authorities. Once the control plane establishes reliable drift enforcement across registered clusters, teams must decide how rapidly updates should propagate across target clusters when a manifest changes.
+Placement is not only "where." It is also "how fast." After the hub has a continuing opinion about which members should receive a namespace, operators still have to choose a rollout window so a bad ConfigMap does not land on every selected cluster in the same minute.
 
 ### Rollout Strategy and Overrides
 
@@ -851,7 +851,7 @@ Failure layer: Member-level state mutation versus continuous centralized GitOps 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Managed cloud infrastructure lifecycles versus heterogenous external Kubernetes distributions. Next action: recognize that while Azure Arc-enabled Kubernetes clusters can participate in multi-cluster workload placement (`ClusterResourcePlacement` is GA across AKS and Arc), update orchestration via `az fleet updaterun` is strictly unsupported for Arc members; Azure Fleet Manager cannot manage control planes, operating systems, or node images on non-AKS infrastructure because it lacks provider-specific hypervisor and bootstrap hooks; maintain separate lifecycle automation (such as Cluster API, Ansible, or vendor-specific upgrade scripts) for Arc-connected environments, and restrict Fleet Update Runs exclusively to native AKS member clusters.
+Failure layer: Managed cloud infrastructure lifecycles versus heterogenous external Kubernetes distributions. Next action: recognize that while Azure Arc-enabled Kubernetes clusters can participate in multi-cluster workload placement (`ClusterResourcePlacement` is GA across AKS and Arc), update orchestration via `az fleet updaterun` is unsupported for Arc members; AKS members receive Kubernetes and node-image updates as GA, and Fleet-managed namespaces are GA for AKS members but unsupported for Arc; keep Arc control-plane and node lifecycle on the cluster distribution's own upgrade process, and restrict Fleet update runs to native AKS members.
 </details>
 
 **Card D: The Fleet hub is a normal Standard-tier AKS cluster, so you should run the production frontend there to save a member.** A startup platform team enables the hub cluster feature on their Fleet Manager resource to support workload placement. Looking at their cloud billing statement, the team notices a line item for an underlying single-node Standard-tier AKS cluster running in a managed resource group. The team decides to optimize resource utilization and avoid provisioning an extra spoke cluster in that primary region. An engineer attempts to deploy the production user-facing frontend pods directly to the hub cluster default namespace alongside the Fleet controllers.
