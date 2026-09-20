@@ -46,7 +46,13 @@ replay from retention                                  no stream replay contract
        Capture, Stream Analytics                 Event Hubs, Service Bus
 ```
 
-> **Pause and predict:** a producer emits one million sensor readings each minute, and a downstream job must replay the last six hours after a bug fix. Would Event Grid or Event Hubs make the operator's recovery easier, and what property drives the answer?
+**Pause and predict:** A producer emits one million sensor readings each minute, and a downstream job must replay the last six hours after a bug fix. Would Event Grid or Event Hubs make the operator's recovery easier, and what property drives the answer?
+
+<details>
+<summary>Check your prediction</summary>
+
+**Event Hubs** is the first candidate because it provides a durable partitioned stream where records are retained across the configured retention window, enabling consumer-controlled replay from past checkpoints. Event Grid is an event router that pushes transient notifications to registered handlers without maintaining a durable commit log or replayable stream offset history.
+</details>
 
 The rest of the module treats Event Hubs and Event Grid side by side. That is deliberate. Operators do not receive tickets that say "please create the correct service". They receive workload requirements, cost constraints, security rules, and incident symptoms. Your job is to translate those signals into the right managed event contract.
 
@@ -54,7 +60,7 @@ The rest of the module treats Event Hubs and Event Grid side by side. That is de
 
 Event-driven architecture is not only about decoupling. It is about choosing where time, order, pressure, and responsibility live. If the producer writes faster than the consumer reads, someone must absorb that pressure. If a handler is offline, someone must decide how long to retry. If a record is malformed, someone must keep enough evidence to debug it. If a consumer deploys a bad version, someone must decide whether replay is available.
 
-Event Hubs and Event Grid answer those questions differently. Event Hubs gives producers a durable append path and gives consumers a pull-based stream. Consumers read from partitions, maintain checkpoints, and can fall behind without forcing the producer to wait. Event Grid gives publishers a routing layer and gives subscribers delivery attempts. Subscribers receive discrete notifications through handlers such as Azure Functions, Logic Apps, webhooks, Event Hubs, Service Bus, Storage Queues, and Hybrid Connections.
+Platform architects must analyze ingest scalability, processing latency expectations, and blast radiuses before provisioning cloud infrastructure. Telemetry flows demand dedicated buffering mechanisms to protect backend data stores during traffic spikes, whereas control-plane workflows require flexible routing policies to broadcast state changes across decoupled services. Evaluating how components handle sustained bursts and intermittent downstream downtime guarantees that system boundaries remain resilient under peak production loads.
 
 The [Azure messaging comparison](https://learn.microsoft.com/en-us/azure/service-bus-messaging/compare-messaging-services) is worth reading because it prevents a common mistake: treating every message-shaped problem as Event Grid. Service Bus exists because enterprise commands need ordering, sessions, transactions, duplicate detection, lock renewal, scheduled delivery, and a first-class dead-letter queue. Storage Queues exist because some workloads need a simple, low-cost queue with huge storage capacity and fewer broker semantics. Event Grid exists because many systems only need a small event to say "something happened over there". Event Hubs exists because streams need ingestion, retention, partitioned reads, replay, and analytics integration.
 
@@ -78,7 +84,15 @@ Eventing is a notification pattern. The event usually says that a resource chang
 
 ### Where Service Bus and Storage Queues Fit
 
-Service Bus is not a footnote. It is the first candidate when the unit is a business command rather than a telemetry record or notification. If a payment command, invoice command, or provisioning command must be processed once with lock renewal, sessions, transaction boundaries, and a dead-letter queue, Service Bus is the safer default. Event Grid can route a notification to Service Bus, but Event Grid should not be asked to become Service Bus by convention.
+**Pause and predict:** An engineering team considers placing invoice processing commands on Event Hubs, where each message requires session-state affinity for customer-level serialization, lock renewal during long-running approvals, and a first-class dead-letter queue for corrupted payloads. Should the team place these commands on Event Hubs?
+
+<details>
+<summary>Check your prediction</summary>
+
+**Service Bus** is the first candidate for this workload. Event Hubs is a high-throughput partitioned data stream optimized for continuous ingestion and append-only reader checkpoints, not a competing-consumer message broker. It lacks message-level lock renewal, session state coordination across worker nodes, and native broker-managed dead-letter queues. Service Bus provides transaction boundaries, peek-lock settlement, duplicate detection, and explicit dead-lettering for poison messages.
+</details>
+
+Enterprise integration patterns require architects to separate asynchronous command dispatching from continuous metric streaming and reactive event routing. Operating reliable command processors requires setting strict queue concurrency controls, monitoring processing latency against business service level agreements, and defining formal escalation playbooks when poisonous payloads stall downstream financial workflows. Establishing distinct messaging topologies prevents transaction processing pipelines from being compromised by high-volume operational noise.
 
 Storage Queues are useful when the message contract is simple and cost or storage capacity matters more than broker features. They are common in low-complexity worker patterns, simple retry loops, or systems that already depend heavily on Azure Storage. They do not replace Event Hubs for replayable streams or Event Grid for native Azure event routing.
 
@@ -184,9 +198,17 @@ Schema Registry also helps when Kafka clients use Event Hubs through the Kafka s
 
 The [Event Hubs Kafka overview](https://learn.microsoft.com/en-us/azure/event-hubs/azure-event-hubs-apache-kafka-overview) explains how Event Hubs exposes an Apache Kafka-compatible endpoint for many Kafka clients. This is useful during migration or when an application already speaks the Kafka protocol. The operational benefit is that teams can use managed Event Hubs without running brokers, ZooKeeper-era components, or broker storage.
 
-Compatibility is not the same as identical behavior. Event Hubs does not become a self-managed Kafka cluster with every broker-side feature, every admin API, every topic configuration knob, or every ecosystem expectation. Operators should test client versions, authentication, partition behavior, offset handling, transactions, idempotent producer requirements, and monitoring assumptions before promising a transparent migration. Kafka compatibility is a bridge, not a reason to ignore managed-service limits.
+Many development organizations standardize on Apache Kafka client libraries to maintain consistency across distributed on-premises and multi-cloud architectures. Running self-hosted Kafka clusters requires continuous administrative maintenance, including broker node patching, storage rebalancing, and complex operational tuning. Managed endpoints eliminate broker infrastructure management tasks while enabling existing application runtimes to stream records directly into cloud environments without rewriting publisher or consumer codebases.
 
-> **Pause and predict:** if a Kafka application depends on broker-level topic configuration and an admin API that Event Hubs does not support, what should the migration plan test before the cutover date?
+**Pause and predict:** A Kafka application depends on broker-level topic configuration and an admin API that Event Hubs does not support. What should the migration plan test before the cutover date?
+
+<details>
+<summary>Check your prediction</summary>
+
+The Event Hubs Kafka surface is protocol-compatible, not identical to a dedicated Apache Kafka cluster. The migration plan must account for unsupported broker-level admin APIs by shifting topic provisioning to Azure Resource Manager templates, Bicep, or the Azure CLI. Operators must explicitly test Kafka client library versions, SASL and OAuth authentication mechanisms, partition and offset tracking semantics, transaction support, and monitoring telemetry before cutover.
+</details>
+
+Bridging stream ingestion into downstream notification workflows marks the boundary where continuous logging yields to event-driven orchestration. While partitioned commit logs excel at buffering millions of high-velocity metrics, distributed systems equally require lightweight notification channels to alert external microservices when critical operational milestones occur. Understanding how streaming platforms hand off state changes to reactive messaging meshes establishes the architectural foundation for building resilient Azure solutions.
 
 ## Event Grid Deep Dive
 
@@ -254,9 +276,17 @@ Use event type filters to subscribe only to events such as `Microsoft.Storage.Bl
 
 ### Delivery Retry and Dead-Lettering
 
-The [Event Grid delivery and retry documentation](https://learn.microsoft.com/en-us/azure/event-grid/delivery-and-retry) is required reading before production. Event Grid retries delivery when a handler fails or times out. Retries are valuable because transient failures should not drop events. Retries are dangerous when the handler is down for a long time, authentication is broken, or the endpoint returns repeated failures. In those cases, the retry policy can amplify traffic against an already unhealthy dependency.
+The [Event Grid delivery and retry documentation](https://learn.microsoft.com/en-us/azure/event-grid/delivery-and-retry) provides essential operational specifications for managing failed deliveries to subscriber endpoints. Production architectures must account for endpoint degradation, downstream timeouts, and permanent subscriber outages without compromising event publishing pipelines.
 
-Dead-lettering sends undeliverable events to Storage after retry policy is exhausted or delivery is impossible. Configure it for production subscriptions unless the event is truly disposable. Dead-letter storage is not only for replay. It is evidence. It tells you what Event Grid tried to deliver, which subscription matched, and what payload the handler failed to process.
+**Pause and predict:** A subscriber webhook goes offline for several hours during an unexpected outage. Does Event Grid maintain a replayable ordered stream of undelivered notifications, and will it automatically protect against data loss by dead-lettering dropped events by default?
+
+<details>
+<summary>Check your prediction</summary>
+
+Event Grid retries delivery using exponential backoff for up to **24 hours** by default, but it provides **no order guarantee** across retries and concurrent deliveries. Crucially, **dead-lettering is off by default**; unrouted events are permanently dropped once retry duration expires unless an explicit Azure Storage container is configured. Furthermore, non-retriable HTTP errors like 400 (Bad Request), 403 (Forbidden), and 413 (Payload Too Large) cause delivery to fail immediately without retry.
+</details>
+
+Production readiness reviews must verify event routing resilience before promoting subscriptions into live environments. Operations teams establish proactive alert rules on delivery metric spikes, track subscription latency in Azure Monitor, and enforce infrastructure policies to ensure storage accounts are designated for dropped payload capture. Maintaining rigorous observability across integration endpoints ensures that subscriber outages never degrade upstream event publishing workflows.
 
 ### Event Grid Namespaces, MQTT, and Pull Delivery
 
@@ -565,7 +595,41 @@ Capture created durable Avro blobs, but the team did not define lifecycle policy
 
 Exercise scenario: you will build a small event pipeline without AKS. The flow is Event Hubs ingestion, Capture to Storage as Avro files, Event Grid notification from the Storage Account, and a webhook test endpoint that receives CloudEvents-shaped blob-created events. Use a non-production subscription or a short-lived resource group. Delete the resource group when you finish.
 
-Success criteria:
+Before executing deployment commands in a cloud environment, engineers must evaluate architectural boundaries, operational contracts, and failure layers across ingestion, routing, and enterprise messaging services. Reviewing common design fallacies ensures operational readiness when diagnosing event pipeline incidents under real production conditions.
+
+**Card A: Event Grid is the first candidate for one million sensor readings per minute that must replay the last six hours.** A solutions architect selects Event Grid to ingest continuous high-volume telemetry from a distributed IoT sensor fleet and plans to replay records after downstream pipeline failures. The architect assumes reactive event routing naturally includes durable stream storage, partition checkpointing, and time-based message replay.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: streaming versus event routing architectural boundaries. Next action: designate Event Hubs as the ingestion service because it provides partitioned commit log durability, configurable data retention windows, and consumer-controlled checkpoint replay for high-throughput continuous streams.
+</details>
+
+**Card B: The Event Hubs Kafka endpoint is a drop-in replacement for every Kafka broker admin API and topic configuration.** An infrastructure engineer migrates an on-premises Kafka cluster to Azure Event Hubs without code changes and assumes automated deployment scripts can manage topic configurations, log compaction, and partition settings via standard Kafka admin APIs. The engineer treats managed protocol compatibility as equivalent to self-hosted broker semantics.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: protocol compatibility versus managed broker administrative capabilities. Next action: validate Kafka client libraries, partition assignments, and authentication against Event Hubs while migrating topic lifecycle management to Azure Resource Manager, Bicep, or the Azure CLI rather than relying on unsupported Kafka admin APIs.
+</details>
+
+**Card C: Event Grid dead-letters undelivered events by default and delivers them in order.** A systems operator deploys an Event Grid subscription to deliver state changes to an external webhook and expects undelivered events to be saved automatically in storage during endpoint downtime without reordering during retry cycles. The operator assumes default subscription provisioning protects against message loss and preserves chronological sequence.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: event delivery retry mechanics and dead-letter configuration defaults. Next action: configure an explicit dead-letter storage container on the event subscription with managed identity permissions, and design downstream consumers to be idempotent to handle out-of-order deliveries and duplicate delivery attempts.
+</details>
+
+**Card D: Event Hubs is the first candidate for invoice commands that need sessions and a first-class dead-letter queue.** A billing developer selects Event Hubs to process customer payment and invoice commands, assuming partitioned streams provide message locking, transaction boundaries, and automated routing of malformed commands to a dead-letter queue. The developer treats a high-throughput stream ingestion service as an enterprise command broker.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: enterprise message broker semantics versus data streaming pipelines. Next action: designate Azure Service Bus as the primary messaging service because it natively provides message sessions for FIFO ordering, peek-lock settlement, message lock renewal, transaction support, and built-in dead-letter queues.
+</details>
+
+**Success Criteria**:
 
 - [ ] Resource group, Storage Account, Event Hubs namespace, and event hub exist in one region.
 - [ ] Event hub has four partitions and Capture enabled with a five-minute window.
