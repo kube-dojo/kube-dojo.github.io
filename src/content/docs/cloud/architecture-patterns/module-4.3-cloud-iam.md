@@ -133,7 +133,7 @@ This architecture brings powerful security properties:
 The cluster issuer signs a projected ServiceAccount JWT; the cloud fetches JWKS from OIDC discovery; it verifies signature, issuer, audience, expiry, and `sub`; then it issues short-lived credentials. IRSA uses STS `AssumeRoleWithWebIdentity`. There is no static password.
 </details>
 
-Kubernetes platform architects evaluate these cryptographic trust relationships to decouple container workloads from persistent cloud credentials and establish reproducible identity boundaries across infrastructure environments. Tracing the mechanics of public-key exchange reveals how identity assertions move securely across decoupled control planes without manual operator intervention.
+Teams that stop mounting long-lived cloud keys still need a repeatable way to grant each workload only the APIs it needs, and to prove later which deployment performed a given cloud call. The rest of this section walks through that contract in the order an incident responder actually traces it.
 
 ### Step 1: The Cluster Publishes Its Public Keys
 
@@ -565,7 +565,7 @@ az role assignment create \
 The pod label `azure.workload.identity/use: "true"` is **required**. Only labeled pods are mutated by the azure-workload-identity webhook. Otherwise participating pods fail after restart (fail-close).
 </details>
 
-Configuring Microsoft Entra federated credentials establishes the external cloud trust contract, but Kubernetes workloads must also satisfy in-cluster admission requirements to receive the appropriate operational configuration. Examining the paired manifests demonstrates how service account metadata and pod deployment specifications align during workload rollout.
+Federated credentials in Microsoft Entra are only half of the rollout. The Kubernetes objects that name the workload still have to carry the metadata the cluster uses when the pod is created, and the two sides must stay in sync as you promote the same service through environments.
 
 ```yaml
 apiVersion: v1
@@ -645,15 +645,6 @@ If the answer to the third question is "everything grows everywhere", you likely
 
 For AWS-heavy platforms, this often means moving high-churn EKS fleets toward Pod Identity while keeping IRSA for workloads that need exact OIDC trust semantics or cross-account patterns that are already stable. For GCP-heavy platforms, it means deciding early whether Kubernetes principals get direct IAM roles or impersonate GSAs, because mixing both without naming rules makes audit trails harder to read. For Azure-heavy platforms, it means managing user-assigned managed identities and federated credentials as first-class objects, not as one-off commands pasted into deployment notes.
 
-Here is the same idea as a compact mapping:
-
-```text
-AWS IRSA            => explicit per-role trust conditions and per-cluster OIDC state
-EKS Pod Identity    => per-cluster association API, centralized at EKS layer
-GCP Workload Identity => provider/namespace mappings in IAM + annotation-driven links
-Azure Workload ID   => ServiceAccount annotation + Entra federated credential objects
-```
-
 **Pause and predict:** In an infrastructure platform running a large Amazon EKS production cluster alongside test clusters on AKS and GKE, should you default to an IRSA pattern everywhere across all environments?
 
 <details>
@@ -662,7 +653,7 @@ Azure Workload ID   => ServiceAccount annotation + Entra federated credential ob
 Use the native mechanism per environment: IRSA or EKS Pod Identity on EKS, GKE Workload Identity on GKE, and Microsoft Entra Workload ID on AKS. One IRSA annotation shape does not bind AKS or GKE. Unique per-service boundaries mean one SA + one cloud identity + one trust object per workload, which sprawls unless a single request path creates them together.
 </details>
 
-Managing heterogeneous cloud identity models across multi-cloud environments forces engineering organizations to balance provider-native fidelity against operational consistency. When cross-cloud service communication expands beyond isolated platform islands, platform architects must determine whether native federation remains sufficient or if a dedicated identity control plane is required.
+Once each provider binding is in place, the next design question is whether workloads must present one identity across clouds and on-prem, or whether staying inside each provider's IAM is enough. That choice is about the security requirement, not about collecting extra identity products.
 
 ## Beyond One Cloud: The SPIFFE/SPIRE Bridge
 
@@ -862,7 +853,7 @@ metadata:
 
 ### Preventing ServiceAccount Token Theft
 
-Securing token-based authentication requires configuring perimeter validation rules in the trust relationship. Attaching explicit network constraints to the IAM role trust policy ensures that credential assumption requests must originate from verified cloud infrastructure paths rather than public networks.
+Incident response still has to assume a compromised pod can copy whatever was mounted. Rotation, short TTL, and least-privilege roles limit how far that copy can go even before extra network conditions are added.
 
 ```json
 {
@@ -1386,7 +1377,7 @@ Failure layer: Cryptographic token validation via OIDC discovery endpoints and a
 Failure layer: Heterogeneous cloud provider workload identity APIs, binding mechanisms, and annotation schemas. Next action: configure cloud-native workload identity mechanisms for each specific platform, using AWS IRSA or EKS Pod Identity associations for EKS, GCP Workload Identity annotations (`iam.gke.io/gcp-service-account`) with Google IAM user bindings for GKE, and Microsoft Entra Workload ID annotations (`azure.workload.identity/client-id`) paired with Entra federated credentials and pod labels for AKS.
 </details>
 
-**Card C: Annotating `azure.workload.identity/client-id` is enough; `azure.workload.identity/use: "true"` is optional cosmetics.** A cloud operations group deploys a data processing microservice onto an Azure Kubernetes Service cluster configured with Microsoft Entra Workload ID. The engineer adds the `azure.workload.identity/client-id` annotation to the application ServiceAccount and creates the corresponding Entra federated identity credential. Believing that pod labels are purely metadata for organization and metric grouping, the engineer omits the `azure.workload.identity/use: "true"` label from the Deployment pod template, expecting the mutating admission webhook to detect the ServiceAccount annotation automatically and inject the federated token projection and environment variables.
+**Card C: Annotating `azure.workload.identity/client-id` is enough; `azure.workload.identity/use: "true"` is optional cosmetics.** A cloud operations group deploys a data processing microservice onto an Azure Kubernetes Service cluster configured with Microsoft Entra Workload ID. The engineer adds the `azure.workload.identity/client-id` annotation to the application ServiceAccount and creates the corresponding Entra federated identity credential. Believing that pod labels are purely metadata for organization and metric grouping, the engineer omits the `azure.workload.identity/use: "true"` label from the Deployment pod template.
 
 <details>
 <summary>Check your prediction</summary>
