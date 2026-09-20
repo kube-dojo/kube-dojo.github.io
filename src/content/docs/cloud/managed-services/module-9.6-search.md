@@ -327,9 +327,29 @@ Before a document is written to the inverted index, its text fields pass through
 
 ### Index
 
-After analysis, the engine writes the document to the transaction log (translog) for durability, then to an in-memory buffer. When the buffer fills or the refresh interval elapses (default: 1 second), the in-memory buffer is flushed to a new Lucene segment on disk, and the document becomes searchable. This is why OpenSearch and Elasticsearch are called near-real-time: there is up to a 1-second lag between indexing and searchability. The refresh interval is a critical tuning knob — set it to 30 seconds during bulk indexing to reduce segment creation overhead, then restore it to the default for normal query workloads. Each refresh creates a new Lucene segment, and having too many small segments degrades query performance; the engine periodically merges segments in the background to keep their count manageable.
+After lexical analysis completes, the search engine writes incoming documents to an append-only transaction log for durability. At the same time, it stages them inside an in-memory indexing buffer. When this memory buffer fills or the refresh timer elapses, the engine flushes buffered data into a new Lucene segment on disk. This periodic flush makes newly indexed documents queryable. Because committing documents occurs periodically rather than instantaneously upon receipt, search engines provide near-real-time searchability with a brief indexing lag.
 
-The index mapping defines the schema: which fields are `keyword` (exact match, aggregatable), which are `text` (full-text search, analyzed), which are `date`, `long`, or `geo_point`. Mappings constrain what queries are possible — you cannot run aggregations on a `text` field, and you cannot run full-text queries on a `keyword` field without a multi-field mapping. Defining explicit mappings before any data enters the index is a best practice because dynamic mapping, while convenient, often guesses wrong (mapping an ID field as `text` instead of `keyword`, for example) and the mapping cannot be changed for existing fields without reindexing.
+**Pause and predict:** A platform team initiates a massive historical log backfill into OpenSearch with the default one-second refresh interval active. How does this default interval affect indexing throughput and segment creation, and what tuning adjustment should administrators apply during bulk operations?
+
+<details>
+<summary>Check your prediction</summary>
+
+The default `refresh_interval` of approximately one second flushes in-memory buffers into tiny Lucene segments every second to deliver near-real-time searchability. During continuous high-volume bulk ingestion, generating thousands of small segments triggers heavy CPU and disk I/O contention because background workers must constantly merge small segments into larger ones. To optimize performance during bulk loading, engineers raise `refresh_interval` to `30s` or disable it completely with `-1`, allowing large batches to accumulate efficiently before restoring the default interval when indexing completes.
+</details>
+
+Buffer flush thresholds and background segment merging cycles govern coordinating node throughput. These mechanics dictate how worker data nodes absorb sustained ingestion pressure.
+
+The index mapping establishes the formal schema contract. It defines which document fields use `keyword` types for exact filtering versus `text` types for analyzed full-text queries. Mappings strictly constrain available query capabilities across your cluster. Search engines construct inverted indexes and columnar doc values differently according to the declared data type. Establishing explicit schema mappings before ingesting production telemetry prevents dynamic type guessing errors that silently misclassify critical operational identifiers.
+
+**Pause and predict:** An engineering team discovers that an active production index requires an altered field data type and an increased primary shard count to absorb unexpected traffic. Can the team modify field mappings or increase the primary shard count directly on the live index?
+
+<details>
+<summary>Check your prediction</summary>
+
+You cannot alter an existing field's data type mapping or modify the `number_of_primary_shards` setting directly on an active index without reindexing. Lucene builds immutable segment structures, and the coordinating node routes incoming documents using a hash of the document routing key modulo the primary shard count; mutating shard counts or field structures in place would break document retrieval and query execution. Updating these attributes requires provisioning a new destination index with adjusted mappings and sizing—hedging primary shards between 10–50 GiB, where log workloads typically target 30–50 GiB—and running the `_reindex` API to backfill records before repointing application aliases.
+</details>
+
+Establishing composable index templates guarantees verified schema configurations across new indices. Rolling alias pointers further ensure that operational transitions remain transparent to client applications.
 
 ### Bulk Indexing
 
@@ -503,16 +523,34 @@ Calculation:
 
 ### Preventing Shard Explosion
 
-A common mistake is using one index per namespace per day. With 50 namespaces and daily rollover:
+A platform engineering team designs a multi-tenant logging architecture across a Kubernetes cluster supporting fifty active namespaces with ninety days of retention. To provide clean isolation between development teams, an engineer proposes provisioning a dedicated search index for each namespace every single day.
+
+**Pause and predict:** An administrator creates a separate OpenSearch index for each Kubernetes namespace every calendar day. What operational consequence does this partitioning strategy have on cluster state and master node memory over time, and what architecture avoids this failure?
+
+<details>
+<summary>Check your prediction</summary>
+
+Creating one index per namespace per day triggers a severe shard explosion that rapidly exhausts master node JVM memory and degrades cluster state synchronization:
 
 ```
 BAD:  50 namespaces * 3 shards * 2 (replicas) * 90 days = 27,000 shards!
 GOOD: 1 index per day * 3 shards * 2 (replicas) * 90 days = 540 shards
 ```
 
-Use a single index with a `namespace` field for filtering. Only create separate indices when access control requires it.
+Every shard consumes heap memory on master and data nodes for cluster state metadata, Lucene segment headers, open file descriptors, and routing tables. Maintaining tens of thousands of underutilized shards leads to master election timeouts and cluster instability. The standard production architecture uses a single daily index paired with a `keyword` mapping on the `namespace` field for filtering, enforcing tenant access boundaries via Document Level Security (DLS) when isolation is required.
+</details>
 
-> **Pause and predict**: You have decided to use a single index per day with a `namespace` field to prevent shard explosion. To ensure your queries filtering by namespace are as fast as possible, what OpenSearch mapping type should the `namespace` field use, and why?
+Consolidating multi-tenant logs into shared indices requires careful attention to schema definitions so that cross-tenant queries remain fast and isolated.
+
+**Pause and predict:** You have decided to use a single index per day with a `namespace` field to prevent shard explosion. To ensure your queries filtering by namespace are as fast as possible, what OpenSearch mapping type should the `namespace` field use, and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+The `namespace` field must be mapped as `keyword` rather than `text` because it contains structured exact identifiers used for filtering, aggregations, and Document Level Security (DLS). The `keyword` data type indexes values verbatim without analysis or stemming, enabling fast exact-match lookups and memory-efficient aggregations through doc values. If mapped as `text`, the value undergoes tokenization and stemming, breaking exact filter matching; furthermore, running terms aggregations on `text` fields fails by default and requires enabling `fielddata`, which consumes massive JVM heap memory and risks out-of-memory crashes.
+</details>
+
+Role definitions and access policies leverage exact metadata attributes to restrict document visibility dynamically without fragmenting underlying physical storage structures.
 
 ---
 
@@ -1028,7 +1066,41 @@ k run check-stats --rm -it --image=curlimages/curl -n search --restart=Never -- 
 ```
 </details>
 
-### Success Criteria
+Before you close the hands-on lab, audit the four operational claims below. Each open card states a hypothesis that sounds operationally plausible during managed search service integration and Kubernetes logging architectures. Treat the claim as an operational prediction, and open the solution details only after you have reasoned through the failure mode.
+
+**Card A: Map `namespace` as `text` so filters can match stemmed variants like `payment` and `payments`.** A platform team configuring index mappings for Kubernetes application logs decides to map `kubernetes.namespace` as a `text` field. The lead developer reasons that full-text analysis will help operations engineers search logs flexibly. They expect partial matches and stemmed variations to work automatically. The team also assumes dashboards and security filters will group log streams by namespace without query errors.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Field analyzer tokenization, term aggregation constraints, and JVM heap saturation. Next action: understand that Kubernetes metadata identifiers such as namespaces, pod names, container names, and trace IDs must always be mapped as `keyword` rather than `text`; the `keyword` data type indexes exact string values into inverted indices and columnar doc values without stemming or tokenization, enabling efficient exact filtering and fast terms aggregations; mapping `namespace` as `text` breaks exact equality filters because the analyzer tokenizes input strings, and running terms aggregations on `text` fields fails unless `fielddata` is explicitly enabled; enabling `fielddata` loads un-inverted data structures directly into JVM heap memory, causing severe garbage collection latency and out-of-memory cluster crashes under moderate query volume; when fuzzy search is needed alongside exact filtering, define a multi-field mapping with both `keyword` and analyzed `text` sub-fields.
+</details>
+
+**Card B: One OpenSearch index per Kubernetes namespace per day is the cleanest isolation and will not hurt cluster state.** An infrastructure architect designing log storage for an enterprise cluster with eighty namespaces implements a naming convention that creates a dedicated index for each namespace every calendar day. The architect argues that physical index separation guarantees strict data isolation between development teams. This separation also seems to simplify index cleanup when decommissioning legacy projects. The team assumes that modern search clusters easily handle thousands of small daily indices without performance loss.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cluster state overhead, master node JVM memory exhaustion, and shard count explosion. Next action: recognize that creating a separate index for every namespace each day multiplies shard counts exponentially (for example, 80 namespaces × 2 primary shards × 2 replicas × 90 days exceeds 28,000 shards), which rapidly overwhelms master node memory; every shard maintains Lucene segment readers, open file handles, and metadata entries within the global cluster state, which the active master must synchronize across all nodes whenever state changes occur; the recommended production architecture stores multi-tenant logs in a unified daily index partitioned by a `keyword` field (such as `kubernetes.namespace`), using OpenSearch Document Level Security (DLS) or index alias filters to enforce secure tenant isolation without fragmenting physical storage into thousands of underutilized shards.
+</details>
+
+**Card C: Leave `refresh_interval` at the default during a multi-hour bulk backfill so every document is searchable within one second.** During a migration of fifty million historical log events into Amazon OpenSearch, an engineer maintains the default `refresh_interval` of one second across the destination index. The engineer insists that maintaining near-real-time searchability throughout the import is vital. Operators must be able to query partially backfilled records immediately. The team expects bulk ingestion throughput to remain steady regardless of the refresh interval setting.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Lucene segment churn, coordinating node write amplification, and merge thread I/O starvation. Next action: realize that leaving `refresh_interval` at its default one-second setting during massive bulk loading forces the engine to flush in-memory buffers into microscopic Lucene segments every second; generating thousands of tiny segments saturates CPU cycles on continuous background segment merges and creates severe write queue backpressure on coordinating nodes; to maximize bulk backfill throughput, engineers must temporarily disable refreshes on the target index by setting `index.refresh_interval: -1` (or relaxing it to `30s` or higher) and setting `number_of_replicas: 0` during the ingest job; once bulk ingestion completes, restore the desired replica count and refresh interval, followed by an explicit refresh or force-merge to consolidate segments before routing user queries.
+</details>
+
+**Card D: When daily volume grows, raise `number_of_shards` on the existing hot index in place — no reindex required.** Following a major promotional marketing campaign, daily log volume doubles unexpectedly, causing write latencies to spike on the active logging index. A site reliability engineer attempts to alleviate shard-level bottlenecking on the active logging index. The engineer issues an index settings update to double `number_of_shards` from three to six. The team expects OpenSearch to redistribute existing documents across the newly allocated shards transparently without service interruption.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: In-place primary shard immutability, document routing hash integrity, and index metadata constraints. Next action: recognize that the `number_of_primary_shards` on an existing index is strictly immutable and cannot be modified dynamically on a live index; OpenSearch determines shard placement using a deterministic routing algorithm (`hash(routing) % primary_shards`), meaning that altering the primary shard divisor would misplace existing documents and make them unsearchable; to expand shard capacity for growing workloads, engineers must hedge shard sizes between 10–50 GiB (targeting 30–50 GiB per primary shard for high-volume logs) and create a new target index with the higher shard count, populate it via the `_reindex` API or wait for daily rollover, and redirect client traffic seamlessly using index aliases.
+</details>
+
+**Success Criteria**:
 
 - [ ] Index template is created with proper field mappings
 - [ ] 500 log entries are ingested into the k8s-logs index
