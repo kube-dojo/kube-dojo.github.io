@@ -135,7 +135,7 @@ az aks create \
 
 For organizations that want the performance and feature set of Azure CNI but cannot afford to burn hundreds of VNet IP addresses, **Azure CNI Overlay** provides the optimal architectural compromise. In an overlay network, nodes receive IP addresses from the Azure VNet subnet, consuming very few addresses. Pods, however, receive IP addresses from a private internal CIDR block (typically `10.244.0.0/16`) that is separate from Azure VNet routing space. This lets teams keep direct node integration while avoiding the direct Pod-per-VNet-address tax.
 
-Unlike Kubenet, which relies on Azure UDRs to route traffic between nodes, CNI Overlay utilizes encapsulation protocols (VXLAN or GENEVE). When a pod on Node A sends a packet to a pod on Node B, the CNI plugin wraps that packet in a tunnel header and sends it directly across the VNet. The receiving node unwraps the packet and delivers it to the destination pod. This means Azure VNet infrastructure remains unaware of overlay pod IPs and only sees standard node-to-node flows while still enabling large pod density.
+Unlike Kubenet, which relies on Azure UDRs to route traffic between nodes, Azure CNI Overlay creates a separate routing domain in the Azure networking stack for the pod CIDR. Microsoft's overlay documentation states that you do not provision custom routes on the cluster subnet and you do not use an encapsulation method such as VXLAN to tunnel pod-to-pod traffic. Pod-to-pod connectivity therefore behaves like VM-to-VM traffic on the Azure fabric, while nodes still consume only node IPs from the VNet subnet.
 
 ```mermaid
 graph TD
@@ -153,9 +153,8 @@ graph TD
                     PodB2["Pod: 10.244.1.9"]
                 end
             end
-            Tunnel["VXLAN/GENEVE tunnel"]
-            OverlayA <-->|Tunnel| OverlayB
-            Note["Pod IPs are NOT routable from outside the cluster<br/>(use Services or Ingress to expose workloads)"]
+            OverlayA -.-> NodeA
+            OverlayB -.-> NodeB
         end
     end
 ```
@@ -170,7 +169,7 @@ Overlay pods are **not directly reachable** from a same-VNet VM. Because pod IP 
 
 Enforcing traffic ingestion through managed cluster entry points establishes clear governance boundaries between enterprise network topologies and ephemeral container workloads. Platform operators gain centralized inspection, rate limiting, and access logging without exposing transient internal pod endpoints across corporate routing tables.
 
-The primary architectural trade-off is isolation. Because pod IPs are encapsulated, an external system (like a database on a peered VNet) cannot initiate a direct connection to a pod's IP address. You must rely entirely on Kubernetes Services, Ingress Controllers, and Load Balancers to bridge the gap between the overlay network and the external VNet. In practice, that is usually the safer operating model because it keeps ingress paths explicit and auditable instead of relying on accidental layer-3 reachability.
+The primary architectural trade-off is isolation. Overlay pod IPs live in a private CIDR that the surrounding Azure VNet does not advertise the way it advertises node addresses, so a database on a peered VNet cannot treat a pod as another VM. You must rely entirely on Kubernetes Services, Ingress Controllers, and Load Balancers to bridge the gap between the overlay network and the external VNet. In practice, that is usually the safer operating model because it keeps ingress paths explicit and auditable instead of relying on accidental layer-3 reachability.
 
 ```bash
 # Create an AKS cluster with CNI Overlay
@@ -195,7 +194,7 @@ If CNI Overlay represents the baseline for IP conservation, **Azure CNI Powered 
 Cilium **replaces kube-proxy** on Linux agent nodes and bypasses `iptables` entirely. Under traditional `kube-proxy` architectures, every inbound packet must be sequentially evaluated against thousands of sequential `iptables` rule entries, creating linear $O(n)$ latency penalties as Service counts expand. Cilium instead loads sandboxed eBPF (Extended Berkeley Packet Filter) programs directly into the Linux kernel and resolves Service destinations using in-kernel BPF hash maps in $O(1)$ constant time. Consequently, eBPF service routing does not walk long iptables chains as services grow 100 → 10,000. Note that this eBPF dataplane acceleration is Linux-only; Windows nodes in AKS do not run eBPF and rely on standard host networking mechanisms.
 </details>
 
-Eliminating sequential rule evaluation ensures that data-plane latency remains flat even as microservice architectures scale to thousands of endpoints. Decoupling routing performance from service inventory size provides predictable connection timing for high-frequency internal RPC traffic.
+Dataplane choice is a reliability decision as much as a performance one: once production traffic is on the cluster, platform teams inherit kernel constraints, mixed-OS pool limits, and observability tooling that cannot be swapped during an incident.
 
 Traditional AKS networking relies on `kube-proxy` using Linux `iptables` to implement Service load balancing and Network Policies. That approach is reliable but optimized for expressiveness, not for constant-scale path efficiency. When `kube-proxy` processes a packet, it must evaluate that packet against a sequential list of rules; at 5,000 services, the kernel can spend meaningful time walking those lists, creating linear O(n) routing overhead.
 
@@ -219,7 +218,7 @@ graph TD
     end
 ```
 
-Beyond raw performance, the eBPF dataplane grants Cilium unprecedented visibility into network flows, allowing for advanced observability, transparent encryption, and Layer 7 network policies that are not practical with standard `iptables` semantics. This shifts networking from “just forwarding packets” to a programmable control plane that can enforce intent and expose rich security signals.
+Beyond raw performance, the eBPF dataplane grants Cilium kernel-level flow visibility. Advanced Container Networking Services is the add-on that unlocks FQDN filtering, Layer 7 network policies, WireGuard, and the extra observability bundle; those features are not included by enabling `--network-dataplane cilium` alone. This shifts networking from “just forwarding packets” to a programmable control plane that can enforce intent and expose rich security signals once the right add-on is in place.
 
 ```bash
 # Create an AKS cluster with CNI Powered by Cilium
@@ -243,8 +242,8 @@ az aks create \
 | **Max pods/node** | 250 | 250 | 250 | 250 |
 | **Network policy engine** | Calico only | Azure NPM, Calico, Cilium | Azure NPM, Calico, Cilium | Cilium (native) |
 | **eBPF dataplane** | No | No | No | Yes |
-| **L7 network policies** | No | No | No | Yes |
-| **Windows nodes** | No | Yes | Yes | Yes (preview) |
+| **L7 network policies** | No | No | No | ACNS |
+| **Windows nodes** | No | Yes | Yes | No |
 | **Direct pod VNet routing** | No (UDR) | Yes | No | No |
 | **Recommended for new clusters** | No | Only if direct VNet routing needed | Good | Best |
 
@@ -636,8 +635,8 @@ Operationally, NAT Gateway and Azure Firewall are complementary rather than mutu
 
 ## Did You Know?
 
-1. **Azure CNI Powered by Cilium replaces kube-proxy entirely.** In a traditional AKS cluster, kube-proxy maintains iptables rules on every node to implement Kubernetes Services. With Cilium, kube-proxy is not deployed at all. Cilium handles service routing using eBPF maps, which provide O(1) lookup performance compared to iptables' O(n) rule traversal. On clusters with over 5,000 services, this difference can reduce service routing latency by more than 60%.
-2. **The maximum number of pods per node in AKS is 250, regardless of CNI plugin.** This is an Azure VMSS limitation, not a Kubernetes one. However, most teams find that 110 (the default for Azure CNI) is optimal. Going higher means more IP addresses consumed per node (with Azure CNI) and more kubelet overhead for pod lifecycle management.
+1. **Azure CNI Powered by Cilium replaces kube-proxy entirely.** In a traditional AKS cluster, kube-proxy maintains iptables rules on every node to implement Kubernetes Services. With Cilium, kube-proxy is not deployed at all. Cilium handles service routing using eBPF maps, which provide O(1) lookup performance compared to iptables' O(n) rule traversal. On clusters with thousands of services, this difference avoids walking long iptables chains rather than promising a specific millisecond or percent improvement.
+2. **The maximum number of pods per node in AKS is 250, regardless of CNI plugin.** This is an Azure VMSS limitation, not a Kubernetes one. Default max-pods depends on the IPAM option: Azure CNI Node Subnet (legacy) defaults to 30, Azure CNI Pod Subnet defaults to 110, kubenet defaults to 110, and Azure CNI Overlay defaults to 250. Going higher on Node Subnet consumes more VNet IPs per node and adds kubelet overhead for pod lifecycle management.
 3. **AKS Private Link costs nothing beyond the standard cluster pricing.** The Private Endpoint for the API server is included in the AKS service at no additional charge. However, the operational cost is significant—you need VPN or ExpressRoute connectivity for developer access, self-hosted CI/CD agents in the VNet, and proper DNS configuration. Many teams underestimate this operational overhead.
 4. **Cilium's eBPF-based network policies are enforced at the kernel level before the packet reaches the application.** This means a compromised application cannot bypass network policies by manipulating its own network stack. Traditional iptables-based policies operate in the same kernel namespace, but eBPF programs are loaded and verified by the kernel itself, providing a stronger isolation boundary.
 
@@ -711,7 +710,7 @@ The default Azure Load Balancer dynamically assigns outbound traffic to a pool o
 <details>
 <summary>7. Six months after deploying a production AKS cluster using Azure NPM, your security team demands you implement DNS-based egress filtering using Cilium Network Policies. You attempt to update the cluster configuration via the Azure CLI to switch the network policy engine to Cilium, but the command is rejected. Why does Azure prevent this change, and what is the required path forward?</summary>
 
-Azure prevents this change because the network policy engine is deeply and irreversibly embedded into the cluster's core networking dataplane at creation time. Azure NPM relies on iptables rules and native OS constructs, whereas Cilium requires completely replacing the kube-proxy component and injecting eBPF programs directly into the Linux kernel. Attempting to rip out one foundational networking stack and hot-swap it with another on a live cluster would cause catastrophic network failure and complete loss of pod-to-pod connectivity. The supported path forward is to perform a blue-green-style migration: you must build a new AKS cluster with Cilium enabled from the start, and then carefully migrate your workloads over to the new environment.
+Azure still rejects a live `--network-policy` plugin swap from Azure NPM to Cilium because that original policy-engine flag is bound at cluster creation. The supported in-place path is a **data-plane** update to Azure CNI Powered by Cilium (`--network-dataplane cilium`), which Microsoft documents as a separate operation from IPAM migration and requires node auto-provisioning to be disabled during the update. FQDN filtering is not included in that dataplane swap; it requires Advanced Container Networking Services on the Cilium cluster. If your cluster cannot take the dataplane update, the remaining path is to build a new Cilium cluster and migrate workloads.
 </details>
 
 ## Hands-On Exercise: CNI Powered by Cilium with L7 Egress Domain Filtering
@@ -1090,7 +1089,7 @@ Failure layer: Pre-allocated pod IP reservations versus dynamic runtime consumpt
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Overlay encapsulation boundaries versus Azure VNet routing fabric. Next action: understand that pod IP addresses in Azure CNI Overlay belong to a private internal CIDR that is completely unrouted and unadvertised within the surrounding Azure Virtual Network; external Virtual Machines cannot route directly to private overlay pod IPs; to establish external connectivity from same-VNet VMs, access the service through an internal Kubernetes Service (such as `type: LoadBalancer` with an internal annotation), an Ingress Controller, or Azure Application Gateway; recognize that overlay pod traffic leaving the cluster is source-NATed to the host node's primary VNet IP.
+Failure layer: Overlay routing-domain isolation versus Azure VNet routing fabric. Next action: understand that pod IP addresses in Azure CNI Overlay belong to a private internal CIDR that is completely unrouted and unadvertised within the surrounding Azure Virtual Network; external Virtual Machines cannot route directly to private overlay pod IPs; to establish external connectivity from same-VNet VMs, access the service through an internal Kubernetes Service (such as `type: LoadBalancer` with an internal annotation), an Ingress Controller, or Azure Application Gateway; recognize that overlay pod traffic leaving the cluster is source-NATed to the host node's primary VNet IP.
 </details>
 
 **Card D: Azure CNI Powered by Cilium still uses kube-proxy iptables, so Service latency grows linearly from 100 to 10,000 services.** A performance engineer benchmarks an AKS cluster configured with Azure CNI Powered by Cilium under high microservice density. The cluster environment scales to host thousands of internal ClusterIP services across multiple namespaces. The engineer assumes Kubernetes always relies on Netfilter iptables chains for service routing. Consequently, the team expects packet forwarding latency to degrade linearly as service inventory expands.
