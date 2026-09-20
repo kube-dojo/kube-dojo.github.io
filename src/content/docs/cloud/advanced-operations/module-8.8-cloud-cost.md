@@ -216,7 +216,7 @@ OpenCost and Kubecost solve a problem that the provider bill cannot solve by its
 
 [OpenCost's Allocation API](https://opencost.io/docs/integrations/api/) reports cost by Kubernetes concepts such as namespace, controller, pod, service, and label. That matters because Kubernetes scheduling is dynamic. A namespace that used 40 percent of one node yesterday might use 10 percent of three different nodes today. A static spreadsheet cannot follow that movement, but a cost model connected to metrics and billing data can attribute cost over time.
 
-The most important OpenCost or Kubecost number is often not the team total. It is idle cost. Idle cost is the portion of cluster spend that exists because capacity was provisioned but not consumed by workloads. Some idle capacity is healthy because clusters need headroom for bursts, rolling deployments, daemonsets, and node failures. Excessive idle capacity is waste because the scheduler is reserving nodes that no team actually uses.
+The most important OpenCost or Kubecost number is often not the team total. It is idle cost. Idle cost is the portion of cluster spend that exists because capacity was provisioned but not consumed by workloads. Some idle capacity is healthy because clusters need headroom for bursts, rolling deployments, daemonsets, and node failures. Excessive idle capacity is waste because billed nodes sit there with no team's workload actually consuming them.
 
 Idle cost should not be hidden inside a platform bucket forever. Early showback reports can place idle under the platform team so the platform group can tune autoscaling and node pool design. Mature reports often split idle proportionally across consuming teams, because over-requested pods and poor bin-packing create idle capacity even when the cluster autoscaler behaves correctly. The policy choice should be explicit because it changes incentives.
 
@@ -226,7 +226,7 @@ A good in-cluster allocation model normally separates three buckets. Direct work
 
 For multi-cluster environments, cluster identity is part of cost allocation. A production EKS cluster in `us-east-1`, a GKE cluster in `europe-west1`, and an AKS cluster in `westeurope` may all run the same product, but their network, logging, control-plane, and discount profiles differ. OpenCost labels should include cluster, provider, region, environment, and ownership so teams can compare like with like.
 
-The final allocation lesson is that cost visibility needs resource requests to be honest. Kubernetes schedules pods based on requested resources, and allocation engines often use requests, usage, or a blend of both. A team that requests 4 CPU for a pod that uses 400 millicores can create real node cost even if the workload looks idle in application metrics. FinOps and reliability share the same baseline data.
+The final allocation lesson is that cost visibility needs resource requests to be honest. Allocation engines often use requests, usage, or a blend of both. A team whose YAML asks for 4 CPU while the process uses 400 millicores can still show up as expensive in the monthly bill even if application dashboards look quiet. FinOps and reliability share the same baseline data.
 
 ### Multi-Tenant Cost Allocation
 
