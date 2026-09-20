@@ -150,9 +150,15 @@ Key Vault keys are special: [for HSM-protected keys, the private key material st
 
 Software keys (`RSA`, `EC`) are cheaper per operation and sufficient for dev/test or low-risk signing. HSM keys (`RSA-HSM`, `EC-HSM`) require **Premium** SKU and bill a monthly **per active key version** charge when used in the prior 30 days, plus per-operation fees ([Azure Key Vault pricing](https://azure.microsoft.com/en-us/pricing/details/key-vault/)). Advanced sizes (3072/4096-bit RSA, non-2048 curves) use a higher operations meter ($0.15 per 10,000 transactions vs $0.03 for 2048-bit software keys on the public pricing page). Throttling also differs: [service limits](https://learn.microsoft.com/en-us/azure/key-vault/general/service-limits) allow fewer GETs per 10 seconds for larger HSM keys because limits are weighted—4096-bit HSM GETs consume the budget eight times faster than 2048-bit HSM GETs.
 
-For bulk data, applications use **envelope encryption**: generate a random AES data key locally, encrypt the payload with AES, then wrap the data key with Key Vault’s RSA-OAEP or AES-KW. Only the small wrapped key transits the network to Key Vault. Azure Disk Encryption, SQL TDE with customer-managed keys, and many PaaS integrations follow this pattern so multi-gigabyte objects never traverse the vault API.
+**Pause and predict:** If the raw key material for a Key Vault key never leaves the HSM, how does an application encrypt a 50 GB video file?
 
-> **Stop and think**: If the raw key material for a Key Vault key never leaves the HSM, how does an application encrypt a 50 GB video file? Sending a 50 GB payload over the network to Key Vault for encryption would be incredibly slow and inefficient. What pattern might be used instead?
+<details>
+<summary>Check your prediction</summary>
+
+Applications use envelope encryption. They generate a random AES data key locally and encrypt the 50 GB payload with AES locally. They wrap only the small data key with Key Vault using RSA-OAEP or AES key wrap. The 50 GB file never hits the Key Vault API.
+</details>
+
+Direct cryptographic operations against Key Vault suit small payloads such as signing hashes or wrapping symmetric keys. Sending large binaries over REST introduces severe network latency and quickly consumes transactional throughput quotas. Client applications should limit direct vault calls to key management operations and credential wrapping.
 
 ```bash
 # Create an RSA key
@@ -215,7 +221,7 @@ Certificate **policies** define issuer (self-signed vs CA partner), key type, ex
 Storing secrets securely is only half the battle; secrets must be rotated regularly to limit the impact of a potential compromise. Rotation has three moving parts: **generate new material**, **update dependents** (databases, partners, apps), and **retire old versions** without breaking decrypt of historical data. Azure Key Vault owns the first and third for keys; secrets usually need your automation for the second.
 
 ### Key Vault Rotation Policies (Keys)
-For cryptographic keys, you can [define an automated rotation policy directly within Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/keys/how-to-configure-key-rotation). This instructs the HSM to generate new key material at a scheduled interval. The policy JSON combines `lifetimeActions` (when to rotate) with `attributes.expiryTime` on the key. After rotation, old versions remain addressable by version ID—encrypted blobs, disks, or database columns written with the prior key still decrypt. Your application or service (SQL TDE, Storage CMK) must be configured to prefer the latest version for new encryption while retaining access to older versions until data is re-encrypted or no longer needed.
+For cryptographic keys, you can [define an automated rotation policy directly within Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/keys/how-to-configure-key-rotation). This instructs the HSM to generate new key material at a scheduled interval. The policy JSON combines `lifetimeActions` (when to rotate) with `attributes.expiryTime` on the key.
 
 ```bash
 # Create a rotation policy for a key (rotate 30 days before expiry)
@@ -243,7 +249,15 @@ az keyvault key rotation-policy update \
   --value @policy.json
 ```
 
-> **Pause and predict**: If Key Vault automatically rotates the key material for `data-encryption-key`, what happens to the data that was encrypted using the *old* key version? Does Key Vault automatically re-encrypt your database?
+**Pause and predict:** If Key Vault automatically rotates the key material for `data-encryption-key`, what happens to the data that was encrypted using the old key version? Does Key Vault automatically re-encrypt your database?
+
+<details>
+<summary>Check your prediction</summary>
+
+Key Vault does not re-encrypt your database or storage disks. Old key versions remain addressable by their specific version identifiers so historical data decrypts without error. Consuming applications and PaaS services such as SQL TDE or Storage CMK must explicitly select the latest key version for new writes.
+</details>
+
+Automated rotation policies establish predictable cryptographic hygiene without interrupting ongoing read operations across running workloads. Platform teams must establish audit alerting to track when rotation events fire successfully across active vaults.
 
 ### Secret Rotation via Event Grid
 For secrets (like database passwords), Key Vault cannot magically change the password in the target system (e.g., Azure SQL). Instead, Key Vault [emits an Event Grid event 30 days before a secret expires](https://learn.microsoft.com/en-us/azure/event-grid/event-schema-key-vault). This event triggers an Azure Function, which connects to the database, generates a new password, updates the database user, and saves the new version to Key Vault.
@@ -430,7 +444,7 @@ Behind the scenes, Azure Key Vault automatically replicates its contents within 
 ### The Active-Active Vault Pattern
 However, if an entire region goes down, the vault in the [paired region enters read-only mode](https://learn.microsoft.com/en-us/azure/reliability/reliability-key-vault). For active-active applications that need to *write* secrets or manage keys during a regional outage, you [must deploy independent Key Vaults in each region](https://learn.microsoft.com/en-us/azure/reliability/reliability-key-vault). Reads may continue from the surviving regional endpoint for many scenarios, but secret rotation, new certificate issuance, or emergency key creation requires a writable vault in the active region.
 
-**Sync discipline:** treat regional vaults like regional databases. Global secrets (Stripe API key, shared HMAC) need identical values in both vaults via CI/CD or an approved sync function with idempotent writes and alerting on drift. Regional secrets (SQL login for `db-east` vs `db-west`) should exist only in the local vault to avoid wrong-region connections. Document which category each secret belongs to in your secret catalog; auditors will ask.
+**Sync discipline:** Treat regional vaults like regional data boundaries. Regional secrets such as SQL logins for `db-east` versus `db-west` should exist only in their local vault to avoid accidental cross-region database traffic. Document secret scope categories in your enterprise secret catalog so compliance auditors can verify data boundaries.
 
 **Failover testing:** quarterly exercises should include revoking a secret version, recovering via soft delete, and failing over application reads to the secondary regional vault URI. Teams that only test compute failover without Key Vault writes discover read-only mode when they attempt to rotate during an incident.
 
@@ -449,13 +463,21 @@ graph TD
     KV_East -.->|Manual/Scripted Sync| KV_West
 ```
 
-When using multiple vaults, your CI/CD pipeline or a dedicated synchronization function must ensure that identical secrets (like a third-party API key) are pushed to both vaults. For regional resources (like a region-specific database password), the local vault stores the local credential.
+Multi-region architectures require explicit design choices for secret replication. Applications running across distinct geographies often depend on shared third-party credentials while maintaining isolated infrastructure credentials.
 
 **Latency budgeting:** cross-region secret reads add tens of milliseconds per call. If each pod startup performs five serial GETs across the continent, startup SLOs suffer before throttling appears. Co-locate vault and compute in the same region whenever possible; use regional vault pairs only for disaster tolerance, not for routine traffic.
 
 **Compliance copies:** some regimes require customer-managed keys in specific geographies. Document vault region, backup geography, and Entra tenant residency together—Key Vault does not override data residency choices made at subscription creation time.
 
-> **Stop and think**: If you use an Active-Active Vault pattern and rely on a CI/CD pipeline to push the same Stripe API key to `KV-East` and `KV-West`, what happens to your application if the pipeline partially fails, updating `KV-East` but failing to update `KV-West`?
+**Pause and predict:** In an active-active architecture distributing a shared Stripe API key to KV-East and KV-West, what happens if the deployment updates KV-East but fails before reaching KV-West?
+
+<details>
+<summary>Check your prediction</summary>
+
+KV-West still serves the old key while KV-East serves the updated version. This mismatch causes split-brain authentication failures across regions. Global secrets need identical values in both vaults alongside automated drift alerts to detect partial sync failures immediately.
+</details>
+
+Disaster recovery runbooks should include automated health checks that query both regional endpoints and verify configuration synchronization. Catching credential discrepancies during automated canary verification prevents partial deployments from degrading production traffic.
 
 ---
 
@@ -623,7 +645,15 @@ az network private-endpoint create \
   --connection-name kv-connection
 ```
 
-> **Pause and predict**: If a user is granted `Key Vault Administrator` at the Subscription level, and a specific Key Vault has an explicit `Deny` network rule for all IP addresses except one, can the administrator still read secrets from their home IP? Which takes precedence: RBAC or Network Firewalls?
+**Pause and predict:** If a user has the Key Vault Administrator role at subscription scope, but a vault firewall denies all IP addresses except one office network, can the administrator read secrets from home? Which control takes precedence?
+
+<details>
+<summary>Check your prediction</summary>
+
+Network firewalls take precedence over role-based access control. The administrator cannot read secrets from an unapproved home IP address. Azure RBAC does not punch through a denied public IP, and the request is rejected at the network perimeter before identity authentication evaluates.
+</details>
+
+Network perimeter controls enforce transport security boundaries before the data plane examines Microsoft Entra authorization tokens. Security teams must pair least-privilege role assignments with explicit network isolation to prevent unauthorized data access.
 
 ---
 
@@ -1007,7 +1037,41 @@ The api-key secret should be restored to its original value after recovery. This
 az group delete --name "$RG" --yes --no-wait
 ```
 
-### Success Criteria
+Deleting the resource group removes the Key Vault, user-assigned managed identity, and Container Apps environment cleanly. Note that Key Vault soft delete retains deleted vaults and secrets according to their retention window unless purge protection is disabled and an explicit purge command is issued.
+
+**Card A: Encrypting a 50 GB video with a Key Vault HSM key means uploading the video to Key Vault.** An engineering team designs a media transcoding pipeline and attempts to upload large video files to the Key Vault REST API for hardware encryption. The team assumes that hardware security module protection requires streaming entire bulk payloads directly into the vault service.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: payload size constraints and envelope encryption versus direct cryptographic transit. Next action: generate a local AES data key, encrypt the 50 GB video locally with AES, and call Key Vault only to wrap the small symmetric data key.
+</details>
+
+**Card B: Key Vault key rotation automatically re-encrypts the database.** A database team configures an automated key rotation policy for transparent data encryption. The team assumes that generating a new key version immediately rewrites existing table spaces on disk with the new key material.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: historical key addressability versus automated storage rewriting. Next action: keep prior key versions active in Key Vault for decrypting existing records, while configuring database engines to use the latest key version for new writes.
+</details>
+
+**Card C: If CI/CD updates KV-East but fails on KV-West, both regions keep serving a consistent Stripe API key.** A platform team deploys an active-active cross-region architecture and runs a pipeline that updates a shared payment key in the primary regional vault. The deployment fails before reaching the secondary regional vault, but the team assumes both regions remain functional.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: partial synchronization failure and split-brain credential drift. Next action: implement transactional deployment automation with drift detection alerts to verify that global secrets match across all regional vaults.
+</details>
+
+**Card D: Key Vault Administrator at subscription scope can still read secrets from a home IP that the vault firewall denies.** An engineer with subscription-level Key Vault Administrator privileges attempts to inspect production secrets from an unapproved remote home network. The engineer assumes that broad administrative RBAC roles bypass network firewall rules.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: network boundary enforcement precedence over identity-plane RBAC permissions. Next action: connect through an authorized corporate VPN or Private Endpoint rather than relying on subscription-level administrative roles to override network perimeter controls.
+</details>
+
+**Success Criteria**:
 
 - [ ] Key Vault created with RBAC authorization
 - [ ] Two secrets stored (db-connection-string and api-key)
