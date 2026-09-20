@@ -327,7 +327,7 @@ aws ec2 wait snapshot-completed \
   --snapshot-ids "$DEST_EBS_SNAPSHOT"
 ```
 
-The copy step above creates an EBS snapshot in `eu-west-1`; it does not automatically create a Kubernetes `VolumeSnapshot` object in the destination cluster. Import the copied provider snapshot first by binding a `VolumeSnapshotContent` to a new destination-cluster `VolumeSnapshot`, then reference that imported snapshot from the PVC. The CSI driver handles the allocation of the disk and the hydration of the block data prior to the pod starting.
+The copy step above creates an EBS snapshot in `eu-west-1`; it does not automatically create a Kubernetes `VolumeSnapshot` object in the destination cluster. Import the copied provider snapshot first by binding a `VolumeSnapshotContent` to a new destination-cluster `VolumeSnapshot`, then reference that imported snapshot from the PVC.
 
 ```yaml
 # Step 2: In the destination cluster, import the copied EBS snapshot
@@ -1296,7 +1296,7 @@ After successfully completing the migration exercise, safely tear down your loca
 kind delete cluster --name migration-lab
 ```
 
-Before executing stateful migrations across distributed Kubernetes environments, platform architects must audit common operational misconceptions regarding data gravity, traffic routing, block storage restoration, and replication pipelines. Common misunderstandings involve assuming raw byte size dominates migration complexity and fearing edge routing 404 failures during phased cutovers. Teams also misinterpret lazy block volume initialization and overestimate the safety of native logical replication across wide-area networks. Each scenario below states a claim that sounds plausible but masks critical distributed systems failures and cloud storage realities. Treat the claim as the hypothesis, then open the details only after you have a prediction.
+Before you close the lab, audit the four claims below. Each open card states a hypothesis that sounds operationally plausible during a stateful cutover. Treat the claim as a prediction, then open the details only after you have an answer.
 
 **Card A: A 5TB database with 30 microservice integrations has high data gravity mainly because of the 5TB size, so dump-and-restore is the obvious path.** A platform engineering team plans to migrate a central PostgreSQL database supporting thirty distinct downstream microservices to an Amazon EKS cluster. Because the total disk footprint is 5TB, the migration lead assumes that the bulk data volume represents the primary operational hurdle. To keep the procedure conceptually simple, the lead schedules an offline database dump and restore over an extended weekend maintenance window. The team expects that once data copying completes, dependent microservices will reconnect without systemic coordination issues.
 
