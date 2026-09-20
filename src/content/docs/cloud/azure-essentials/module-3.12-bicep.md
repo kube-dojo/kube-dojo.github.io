@@ -835,7 +835,7 @@ Scope: /subscriptions/xxx/resourceGroups/myRG
 Incremental mode is the safe everyday default for Azure deployments. Complete mode deletes any existing resources in the target resource group that are omitted from the template, which can inadvertently destroy production databases, shared network links, or unmanaged secrets; complete mode should only be used with explicit what-if validation and formal change tickets.
 </details>
 
-Resource Manager evaluates [complete mode](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-modes) across the entire target resource group scope rather than individual component boundaries. When engineering teams adopt automated deletion semantics for dedicated ephemeral clusters, they isolate stateful assets into separate long-lived resource groups protected by Azure Resource Manager locks. Platform teams combine read-only locks on operational data tiers with strict branch protection rules, ensuring that automated provisioning systems never prune unreferenced resources without explicit multi-stage architecture review.
+Resource group scope still matters when you pick a deployment mode. Isolate stateful data stores from ephemeral app stacks so a provisioning pipeline cannot reach databases in the same group by accident. ARM locks on data-tier groups add a second gate when someone selects the wrong mode in a pipeline variable.
 
 ### What-if change types and how to read them
 
@@ -850,7 +850,7 @@ What-if output uses symbols documented on Learn. Train reviewers to treat `~ Mod
 | `*` | Ignore | Resource not in template or what-if could not expand it |
 | `!` | Deploy | ResourceIdOnly format — redeploy expected; property diff unknown |
 
-Array properties on resources such as subnets deserve extra care. Incremental deployments may not delete portal-added array elements that the template omits. What-if helps surface that class of drift before you assume parity.
+Array properties on resources such as subnets deserve extra care during reviews. Read the property path on every `~ Modify` for networking resources before you treat the plan as a no-op.
 
 ### CI integration: validate, build, what-if, deploy
 
