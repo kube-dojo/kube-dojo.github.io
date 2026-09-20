@@ -76,12 +76,18 @@ Lifecycle engines automate transition and expiration: move `videos/` to IA after
 | Hot class | S3 Standard | Standard | Hot |
 | Infrequent | Standard-IA / One Zone-IA | Nearline | Cool |
 | Archive | Glacier tiers | Coldline / Archive | Cold / Archive |
-| Auto tiering | Intelligent-Tiering (objects ≥128 KB only) | Autoclass (where enabled) | Access tier auto |
+| Auto tiering | Intelligent-Tiering | Autoclass (where enabled) | Access tier auto |
 | Minimum billable days | Per class (verify current) | Per class | Per tier |
 
-> **Pause and predict:** You enable a lifecycle transition to Deep Archive after 90 days on a bucket with billions of 4 KB JSON metadata files. What cost might spike even if storage GB-month later falls?
+**Pause and predict:** You enable a lifecycle transition to Deep Archive after 90 days on a bucket with billions of 4 KB JSON metadata files. What cost might spike even if storage GB-month later falls?
 
-Per-object lifecycle transition charges can dwarf later storage savings when objects are only a few kilobytes each. On a separate track, S3 Intelligent-Tiering skips both the monitoring fee and automatic tier moves for objects smaller than 128 KB—they remain in the tier they were uploaded to.
+<details>
+<summary>Check your prediction</summary>
+
+Default S3 Lifecycle configurations do not transition objects smaller than 128 KB into Glacier storage classes. If an operator overrides this default size threshold, the per-object transition request charges combined with Glacier index metadata overhead (approximately 40 KB of metadata storage billed per object) will substantially exceed the future GB-month savings achieved on four-kilobyte files. On a related operational track, S3 Intelligent-Tiering does not auto-tier objects smaller than 128 KB between access tiers; those small objects remain in the Frequent Access tier without incurring monitoring fees.
+</details>
+
+Evaluating dataset object sizes before deploying automated lifecycle transitions protects infrastructure budgets against unexpected request fees and metadata expansion. Platform teams must balance automated tiering policies against access requirements and durability targets across distributed environments.
 
 ---
 
@@ -422,7 +428,15 @@ sequenceDiagram
     Note over S: Processing pipeline triggers
 ```
 
-> **Pause and predict**: If a user uploads a 5GB video file directly through your Kubernetes API pod instead of using a pre-signed URL, what specific resource bottlenecks might occur in your cluster?
+**Pause and predict:** If a user uploads a 5 GB video file directly through your Kubernetes API pod instead of using a pre-signed URL, what specific resource bottlenecks might occur in your cluster?
+
+<details>
+<summary>Check your prediction</summary>
+
+Streaming a 5 GB client upload through the Kubernetes API pod forces all payload bytes across the pod network interface and worker node interfaces twice: once from the ingress controller to the pod, and once from the pod to the storage endpoint. This data transit saturates node network bandwidth, triggers memory exhaustion if the application buffers chunks in user space, and starves co-located containers of socket connections and network throughput. In contrast, issuing a pre-signed URL or browser POST policy allows the external client to stream bytes directly to the bucket, completely offloading data path ingress and egress from cluster compute instances.
+</details>
+
+Decoupling the control plane from high-bandwidth binary data transfers allows cluster services to maintain stable resource envelopes under unpredictable ingestion traffic. The following code snippets illustrate how application services generate time-limited pre-signed URLs across multiple cloud provider SDKs.
 
 ### Generating Pre-Signed URLs
 
@@ -615,7 +629,17 @@ gcloud storage buckets update gs://video-content-prod \
 
 ### Incomplete Multipart Upload Cleanup
 
-One of the most overlooked cost leaks: incomplete multipart uploads. When a large upload fails midway, [the partial parts sit in S3 forever, incurring storage charges. The lifecycle rule `AbortIncompleteMultipartUpload` cleans these up automatically.](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpu-abort-incomplete-mpu-lifecycle-config.html)
+Multi-gigabyte data ingest pipelines frequently encounter client network disconnections, pod evictions, or node restarts before completing large transfers. Understanding how cloud object storage engines handle partial uploads across distributed sessions is essential for preventing cost anomalies.
+
+**Pause and predict:** When a distributed client initiating a multipart upload disconnects or fails before completing all parts, what happens to the uploaded chunks on your monthly storage bill, and why do standard bucket listings fail to detect them?
+
+<details>
+<summary>Check your prediction</summary>
+
+Incomplete multipart upload chunks remain stored in the bucket and continue to accrue standard storage billing charges until an explicit Complete or Abort API call executes. Because an incomplete multipart upload is not yet a finalized object, ordinary `ListObjects` or `ListObjectsV2` API calls do not display these orphan parts, making them completely invisible in standard console file browsers and listing scripts. To discover active partial uploads, operators must invoke `ListMultipartUploads`, and to eliminate them automatically before charges accumulate, bucket configurations should enforce an `AbortIncompleteMultipartUpload` lifecycle rule.
+</details>
+
+Automating the deletion of abandoned multipart parts provides an essential defense against silent financial drift in high-volume ingestion architectures. S3 and compatible APIs document [automatic cleanup through lifecycle rules such as `AbortIncompleteMultipartUpload`](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpu-abort-incomplete-mpu-lifecycle-config.html), ensuring abandoned fragments purge after a specified duration.
 
 ```bash
 # Check for incomplete multipart uploads
@@ -644,7 +668,15 @@ Disaster recovery and multi-region serving both rely on copying objects automati
 
 ### AWS S3 Cross-Region Replication
 
-> **Pause and predict**: When configuring active-active clusters across two regions with bi-directional bucket replication, what mechanism prevents an infinite replication loop (Region A replicates to Region B, which replicates back to Region A)?
+**Pause and predict:** When configuring active-active clusters across two regions with bi-directional bucket replication, what mechanism prevents an infinite replication loop (Region A replicates to Region B, which replicates back to Region A)?
+
+<details>
+<summary>Check your prediction</summary>
+
+Amazon S3 prevents infinite replication loops by checking the replication status metadata on every object before copying. When an object is replicated from Region A to Region B, S3 tags the destination copy with the metadata header `x-amz-replication-status: REPLICA`. S3 replication rules explicitly skip re-replicating any object that is already marked as a replica, naturally stopping the ping-pong cycle without requiring manual loop brakes. Replica modification sync is an optional configuration that propagates two-way metadata changes (such as tags and ACL modifications) between replicas, but it is not the mechanism that breaks replication loops.
+</details>
+
+Understanding internal replication status tags allows platform engineers to design symmetric cross-region topologies without creating complex external orchestration pipelines. The following operational commands establish the requisite bucket versioning configurations and IAM delegation policies.
 
 ```bash
 # Enable versioning (required for replication)
@@ -1391,7 +1423,41 @@ k logs security-audit -n storage
 ```
 </details>
 
-### Success Criteria
+Before you close the hands-on lab, audit the four operational claims below. Each open card states a hypothesis that sounds operationally plausible during cloud object storage integration and Kubernetes storage architectures. Treat the claim as an operational prediction, and open the solution details only after you have reasoned through the failure mode.
+
+**Card A: Enabling a Deep Archive lifecycle after 90 days on billions of 4 KB JSON files is always cheaper because archive GB-month is lower.** A telemetry platform team stores hundreds of millions of small sensor readings as standalone four-kilobyte JSON documents inside an Amazon S3 bucket. Because monthly raw storage charges grow steadily over time, the lead infrastructure engineer configures an S3 Lifecycle transition rule targeting Glacier Deep Archive after ninety days. The team assumes that moving billions of objects into the lowest-cost storage tier guarantees an immediate reduction in their total cloud storage invoice.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Object storage lifecycle evaluation filters and tier transition metadata overhead. Next action: understand that default S3 Lifecycle configurations do not transition objects smaller than 128 KB into Glacier tiers; if engineers explicitly override that size filter to force transition, the per-object transition request charges combined with Glacier metadata overhead (approximately 40 KB of additional index and tracking capacity billed per object) quickly surpass any nominal GB-month savings achieved on four-kilobyte payloads; similarly, S3 Intelligent-Tiering does not auto-tier objects smaller than 128 KB, keeping them permanently in the Frequent Access tier without monitoring fees; to minimize archive costs for small files, aggregate telemetry payloads into larger archives (such as Parquet batches or compressed tarballs) before uploading them to the object store.
+</details>
+
+**Card B: Proxying 5 GB client uploads through the Kubernetes API pod is safer than pre-signed URLs because the cluster can scan every byte.** A fintech engineering organization builds a customer document portal that allows business users to upload multi-gigabyte financial archives. To enforce continuous data governance and run inline scanning tools, the platform developers route all five-gigabyte upload streams directly through application pods. The team believes this proxy topology provides superior defense-in-depth compared to delegating upload transfers to client-facing pre-signed URLs.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Container network bandwidth saturation, ingress concurrency exhaustion, and pod heap exhaustion. Next action: recognize that streaming five-gigabyte binary payloads through Kubernetes application pods forces massive network traffic across node network interfaces twice, saturating worker node throughput and starving co-located microservices; buffering large payloads in application memory risks catastrophic out-of-memory container terminations when multiple users upload concurrently; rather than routing massive streams through compute pods, issue short-lived pre-signed PUT URLs or browser POST policies directly to the client, allowing uploads to transfer straight into the object store; security and compliance scanning should execute asynchronously using bucket event notifications (such as S3 Event Notifications triggering worker pods or serverless functions) to inspect objects immediately upon arrival.
+</details>
+
+**Card C: Bi-directional CRR will infinite-loop unless you enable Replica Modification Sync as the loop brake.** A disaster recovery architecture team implements an active-active deployment across two cloud regions to achieve near-zero recovery point objectives. The team configures bi-directional Cross-Region Replication between an S3 bucket in the primary region and a paired mirror bucket in the secondary region. Fearing that cross-region traffic will trigger an infinite echo loop, the lead engineer insists that Replica Modification Sync must act as the loop brake.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cross-region replication metadata tracking and cycle suppression mechanics. Next action: understand that Amazon S3 Cross-Region Replication natively prevents infinite loops without requiring external safety brakes; when an object replicates from Region A to Region B, S3 marks the destination object with the system metadata attribute `x-amz-replication-status: REPLICA`; S3 replication rules automatically ignore any object that already carries replica status, terminating the cycle after exactly one hop; Replica Modification Sync is not a loop brake, but rather an optional setting that enables two-way synchronization of metadata changes (such as object tags and ACL modifications) made to existing replicas; active-active architectures can safely enable bi-directional replication rules without risk of infinite replication amplification.
+</details>
+
+**Card D: Incomplete multipart uploads disappear from the bill as soon as the client disconnects, because ListObjects no longer shows the object.** A data processing application in Kubernetes runs high-throughput batch ingestion jobs that write large multi-part analytics dumps to object storage. During network reconfigurations or unexpected worker node preemptions, client connections drop mid-transfer before completing the final upload call. The platform operations team checks the target bucket using standard listing utilities and observes no incomplete files. Consequently, the team concludes that interrupted upload chunks are discarded automatically upon client disconnection and will not generate storage costs.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Multi-part upload chunk lifecycle persistence and standard listing visibility boundaries. Next action: recognize that interrupted or failed multi-part uploads do not disappear when client network sockets disconnect; partial chunks remain persisted in bucket storage and accumulate standard storage fees indefinitely until explicitly completed or aborted; because an unfinished multi-part upload does not constitute an active object key, standard `ListObjects` and `ListObjectsV2` API calls omit these orphan fragments entirely; teams must use `ListMultipartUploads` to identify lingering parts; to eliminate orphaned chunk accumulation permanently, configure an explicit `AbortIncompleteMultipartUpload` lifecycle rule on every bucket to purge incomplete fragments within one to seven days of initiation.
+</details>
+
+**Success Criteria**:
 
 - [ ] S3 client pod creates bucket and uploads 11 files using SDK-style CLI access
 - [ ] Pre-signed URL generator produces valid download and upload URLs with short expiration
