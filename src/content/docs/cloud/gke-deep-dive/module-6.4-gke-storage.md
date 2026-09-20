@@ -96,16 +96,22 @@ allowVolumeExpansion: true
 
 ### Volume Binding Modes
 
-Volume binding mode controls **when** the CSI driver creates the backing disk relative to scheduling, which is a subtle but frequently incident-causing setting in multi-zone clusters:
+Volume binding mode controls **when** the CSI driver creates the backing disk relative to scheduling decisions in multi-zone clusters. Choosing the wrong mode causes persistent scheduling deadlocks across failure domains.
+
+**Pause and predict:** Consider a PersistentVolumeClaim created with `Immediate` binding (or omitting `volumeBindingMode`) in a regional cluster spanning three zones. The storage provisioner creates the Persistent Disk immediately in zone A. What happens if cluster resource constraints later force the Kubernetes scheduler to place your application pod on a worker node in zone B?
+
+<details>
+<summary>Check your prediction</summary>
+
+Configuring `Immediate` binding (or omitting `volumeBindingMode`, which defaults to `Immediate` in custom StorageClasses) provisions the underlying Compute Engine disk immediately in a single zone before the pod is scheduled. When the pod is evaluated, the PersistentVolume's zonal node affinity restricts placement to zone A. If the scheduler places or must place the workload on a node in zone B due to resource pressure or affinity rules, the pod cannot mount the volume and remains stuck in `Pending` due to volume node affinity and zone mismatch conflicts. In regional clusters, platform operators should always configure `volumeBindingMode: WaitForFirstConsumer` (which is the default on GKE's built-in `standard-rwo` StorageClass) so dynamic provisioning evaluates pod scheduling constraints first and creates the disk in the pod's selected zone.
+</details>
+
+Decoupling storage provisioning from pod placement allows the Kubernetes scheduler to evaluate topology constraints and node resource availability concurrently. Platform engineers who standardize on topology-aware binding avoid manual disk relocation tickets when node pools auto-scale across distinct failure domains. The comparison table below contrasts how these binding behaviors influence provisioning workflows across single-zone and multi-zone cluster architectures:
 
 | Mode | Behavior | When to Use |
 | :--- | :--- | :--- |
 | `Immediate` | PV is provisioned as soon as PVC is created | Pre-provisioning, when zone does not matter |
 | `WaitForFirstConsumer` | PV is provisioned when a pod mounts it | Regional clusters (ensures disk is in the same zone as the pod) |
-
-> **Stop and think**: You just created a PVC using a StorageClass with `Immediate` binding in a regional cluster spanning three zones. The disk is provisioned right away in zone A. What happens if the Kubernetes scheduler later decides the only node with enough CPU for your pod is in zone B?
-
-**Hypothetical scenario**: A team used `Immediate` binding mode in a regional cluster. The PD was provisioned in `us-central1-a`, but the pod was scheduled to `us-central1-c`. The pod hung in `Pending` with the error "disk is in zone us-central1-a, which does not match the zone of node us-central1-c." In regional clusters, prefer `WaitForFirstConsumer` so the disk is created in the pod's zone.
 
 ### Reclaim policies, expansion, and snapshots
 
@@ -549,7 +555,17 @@ Operators sometimes ask whether Backup for GKE replaces Velero or legacy etcd ba
 
 ### Architecture
 
-> **Stop and think**: If a developer accidentally deletes a CustomResourceDefinition (CRD) that your database operator relies on, taking down the entire database cluster, would a standard Persistent Disk snapshot help you recover? Why or why not?
+Protecting cloud-native state requires evaluating failure modes that extend beyond raw disk corruption or physical storage loss. Operating complex stateful operators introduces critical dependencies between declarative cluster metadata and underlying storage volumes.
+
+**Pause and predict:** Consider an operational incident where an administrator accidentally deletes the CustomResourceDefinition (CRD) that your production database operator relies on, destroying the database cluster and its custom resources. Would a standard Persistent Disk snapshot or Kubernetes `VolumeSnapshot` be sufficient to recover the running database service?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Standard Persistent Disk volume snapshots and Kubernetes `VolumeSnapshot` objects restore **volume data only**, not CRDs or Kubernetes declarative configurations. If the CRD and operator resources are deleted, restoring the disk leaves you with orphaned storage and no controllers or pods to manage it. In contrast, **Backup for GKE** captures both declarative configuration manifests and volume snapshots together. Even so, Backup for GKE does not back up underlying cluster infrastructure (such as VPCs, subnets, or node pools), container image layers hosted in registries, or non-PD volumes like Cloud Storage FUSE mounts and Filestore shares without custom pre-backup and post-restore hooks.
+</details>
+
+Establishing comprehensive disaster recovery objectives requires platform architects to separate infrastructure provisioning from application state hydration. Enterprise resilience plans treat declarative manifest preservation and underlying block storage protection as synchronized operational dependencies during cluster reconstruction.
 
 ```mermaid
 graph TD
@@ -691,16 +707,33 @@ flowchart TD
 
 ### Hyperdisk vs classic PD for high-IOPS databases
 
+Next-generation storage architectures on Google Cloud decouple performance tuning from underlying disk capacity. Before reviewing how these new storage classes alter cluster provisioning, consider how multi-node attachment modes behave across distributed workloads.
+
+**Pause and predict:** An engineering team plans to deploy an application that requires multiple pods to share a common storage volume with concurrent read and write access. Seeing that Hyperdisk Balanced HA lists support for `ReadWriteMany` (RWX), the team proposes using it instead of Filestore for their shared file directory. Will Hyperdisk Balanced HA provide a shared POSIX filesystem out of the box?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Hyperdisk HA RWX operates as a **raw block multi-writer**, not a shared POSIX filesystem. Standard Linux filesystems such as ext4 or XFS do not coordinate cluster-wide block locks, and mounting them across multiple nodes simultaneously will corrupt the filesystem. Workloads using Hyperdisk HA in RWX mode require specialized multi-writer cluster software or custom database engines designed to manage raw block concurrency directly. For standard applications requiring a shared POSIX directory structure, use Filestore or redesign the application architecture.
+</details>
+
+Decoupling IOPS and throughput from disk capacity allows infrastructure engineers to provision storage performance dynamically based on real-time application demands. This operational model eliminates the necessity of over-provisioning disk storage simply to achieve required database throughput targets. The following comparison highlights key architectural trade-offs between Hyperdisk options and classic Persistent Disks:
+
 | Question | Lean Hyperdisk Balanced / Extreme / HA | Lean pd-ssd / pd-balanced |
 | :--- | :--- | :--- |
 | Need provisioned IOPS independent of GiB? | Yes—provision IOPS/throughput explicitly | No—scale GiB and vCPUs |
 | Machine series | 3rd gen+ for Hyperdisk Balanced HA | Broader (check regional PD limits) |
-| RWX block without NFS? | Hyperdisk HA can expose RWX in raw block mode only (multi-writer, no shared POSIX filesystem)—use Filestore for shared RWX filesystems | Use Filestore or redesign |
 | Cost predictability | Pay for provisioned performance | Pay for allocated GiB |
 
-When the matrix shows Filestore and FUSE both viable (shared read-mostly data), default to **FUSE** if objects are large and immutable; default to **Filestore** if the app requires directory semantics, `chmod`, or mmap behavior FUSE cannot provide.
+**Pause and predict:** You are deploying a highly available legacy Content Management System (CMS). The application requires three replicas of the web tier to share a single directory for user-uploaded media (images, PDFs), which currently totals around 2 TiB. Based on the decision framework above, which GKE storage solution should you choose and why?
 
-> **Pause and predict**: You are deploying a highly available legacy CMS. The application requires three replicas of the web tier to share a single directory for user-uploaded media (images, PDFs), which currently totals around 2 TiB. Based on the decision framework above, which GKE storage solution should you choose and why?
+<details>
+<summary>Check your prediction</summary>
+
+Select **Filestore** for three replicas sharing a POSIX directory. Regional Persistent Disk is not viable because standard filesystem Persistent Disks only support `ReadWriteOnce` (RWO) and cannot be attached to pods running across multiple nodes simultaneously. Cloud Storage FUSE is not recommended as the CMS default because object storage lacks full POSIX filesystem semantics—such as atomic file renames, atomic locking, and directory concurrency—which standard CMS frameworks expect when manipulating media directories.
+</details>
+
+When architectural assessments show Filestore and Cloud Storage FUSE both viable for shared read-mostly datasets, engineers default to Cloud Storage FUSE if objects are large and immutable. Conversely, platform architects standardize on Filestore whenever applications demand native directory structures, POSIX permissions, or memory-mapped file operations that object buckets cannot satisfy. Beyond protocol compatibility, infrastructure teams must evaluate how service pricing floors and multi-zone replication rates impact long-term operational expenditures.
 
 ---
 
@@ -1197,7 +1230,41 @@ echo "Cleanup complete."
 ```
 </details>
 
-### Success Criteria
+Before committing stateful architectures to production on GKE, platform architects must audit common cognitive traps across volume binding, disaster recovery, access modes, and multi-writer storage. Reviewing these failure layers establishes resilient storage operations across distributed cluster topologies. This proactive evaluation prevents dangerous misconceptions regarding zonal disk affinity, CRD recovery boundaries, regional disk concurrency, and raw block access.
+
+**Card A: Immediate binding is fine in a regional cluster because the scheduler will place the pod in the disk's zone.** A platform operations team provisions a stateful microservice on a regional GKE cluster spanning three compute zones. To ensure storage is provisioned ahead of workload deployment, the engineer defines a custom StorageClass with `volumeBindingMode: Immediate`. The engineer assumes the regional control plane tracks all three zones. Therefore, the team expects the scheduler to place the pod in whichever zone the disk was created.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Storage provisioning timing versus topology-aware scheduling constraints. Next action: recognize that Immediate binding provisions the disk in an arbitrary zone before pod scheduling occurs, injecting rigid volume node affinity constraints into the PersistentVolume; if cluster resource contention or affinity rules prevent the pod from running in that specific zone, the pod remains stuck in Pending; configure `volumeBindingMode: WaitForFirstConsumer` on all regional cluster StorageClasses so dynamic disk creation is deferred until pod placement is determined.
+</details>
+
+**Card B: A Persistent Disk snapshot is enough to recover after someone deletes the database operator CRD.** An infrastructure team relies on nightly Compute Engine Persistent Disk volume snapshots to protect their cloud database workloads. During a scheduled maintenance window, an operator accidentally deletes the database CustomResourceDefinition, cascading into the removal of all custom resources and StatefulSet objects. The team prepares to restore service by provisioning a volume from the previous snapshot. They assume block snapshots provide complete recovery for operator workloads.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Block storage volume snapshots versus Kubernetes declarative object metadata. Next action: understand that Persistent Disk volume snapshots and VolumeSnapshot resources capture block-level storage bytes only, completely omitting CustomResourceDefinitions, custom resources, Deployments, and RBAC manifests; adopt Backup for GKE or comprehensive GitOps workflows that capture both Kubernetes control plane configurations and underlying volume snapshots; configure backup plans that include CRDs and secrets to enable full application reconstruction.
+</details>
+
+**Card C: Three web replicas can share a 2 TiB POSIX directory on a Regional Persistent Disk.** A development team migrates a legacy web content management platform to GKE. The application architecture requires three concurrent web replicas to share user media files within a single directory totaling two terabytes. To achieve high availability across zone outages, the lead engineer creates an ext4 Regional Persistent Disk. The engineer configures the deployment to mount the persistent volume claim across all three replica pods simultaneously.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Block storage access modes versus distributed filesystem concurrency. Next action: recognize that Regional Persistent Disks support ReadWriteOnce access for standard filesystem volumes and cannot be mounted simultaneously by pods running across distinct worker nodes; standard filesystems like ext4 lack distributed locking and suffer corruption if mounted concurrently; deploy Filestore using the Filestore CSI driver to obtain true ReadWriteMany (RWX) POSIX-compliant shared file storage across multiple nodes.
+</details>
+
+**Card D: Hyperdisk HA ReadWriteMany gives a shared POSIX filesystem, so you do not need Filestore.** A systems architect evaluates GKE storage options for an internal document processing platform that requires concurrent multi-node directory access. The architect notices that Google Cloud offers Hyperdisk Balanced HA with support for the ReadWriteMany access mode. The team assumes this feature provides a high-performance shared network filesystem without Filestore minimum capacity limits. Consequently, the architect replaces the planned Filestore instance with a Hyperdisk Balanced HA storage class.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Multi-writer raw block device access versus shared network file system protocols. Next action: understand that Hyperdisk Balanced HA exposes ReadWriteMany solely as a raw block multi-writer volume, which requires specialized cluster-aware filesystems or custom database engines to manage distributed block coordination; standard Linux filesystems cannot coordinate multi-writer access safely; utilize Filestore for shared POSIX directory structures or re-architect application components to use object storage via Cloud Storage FUSE.
+</details>
+
+**Success Criteria**:
 
 - [ ] Regional PD StorageClass created with `replication-type: regional-pd`
 - [ ] StatefulSet deployed with data written to PostgreSQL
