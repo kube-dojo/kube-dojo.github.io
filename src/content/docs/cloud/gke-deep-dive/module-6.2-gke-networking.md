@@ -99,7 +99,7 @@ The original cluster Pod secondary range prefix size is strictly immutable once 
 
 Architecting VPC address allocations requires cross-functional alignment between platform operators, network security engineers, and enterprise cloud architects well before launching initial compute workloads. Establishing disciplined subnet boundaries prevents costly architectural dead ends and ensures infrastructure scaling matches long-term operational roadmaps.
 
-Poor IP planning is the number one networking regret for teams that scale. [You cannot resize secondary ranges after cluster creation](https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr). Treat the worksheet below as a conversation with finance and network architects before the first `gcloud container clusters create` call, because the secondary range is effectively permanent.
+Poor IP planning is the number one networking regret for teams that scale. Treat the worksheet below as a conversation with finance and network architects before the first `gcloud container clusters create` call, because later expansion options are narrower than they look in the VPC console. See [flexible Pod CIDR](https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr) when you size the first range.
 
 **Workbook steps (Standard cluster):**
 
@@ -826,7 +826,7 @@ Designing secure deployment pipelines for isolated enterprise infrastructure req
 | Nodes cannot pull from internet | Container images fail | Use Artifact Registry (in same region) or configure Cloud NAT |
 | kubectl from local machine blocked | Cannot manage cluster | Use Cloud Shell, a bastion VM, or VPN/Interconnect |
 | Webhooks from control plane to nodes | Admission webhooks may fail | Ensure firewall allows control plane CIDR to node ports |
-| Cloud Build access | [CI/CD pipelines cannot reach API](https://cloud.google.com/build/docs/private-pools/accessing-private-gke-clusters-with-cloud-build-private-pools) | Use private pools or GKE deploy via Cloud Deploy |
+| Cloud Build access | [CI/CD pipelines cannot reach API](https://cloud.google.com/build/docs/private-pools/accessing-private-gke-clusters-with-cloud-build-private-pools) | Private pools need an explicit routed path to a PSC control plane (peering is not transitive); Cloud Deploy or in-VPC workers are alternatives |
 
 ```bash
 # Set up Cloud NAT for private nodes to pull images
