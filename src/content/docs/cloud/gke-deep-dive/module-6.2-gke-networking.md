@@ -105,7 +105,7 @@ Poor IP planning is the number one networking regret for teams that scale. Treat
 
 1. Estimate peak node count `N` per region (include autoscaling headroom and blue/green pools).
 2. Choose `Q` = max pods per node (110 default, or lower to fit more nodes in the same range).
-3. Read the per-node mask table in Google’s flexible pod CIDR documentation (`/24` at 110 pods, `/26` at 64, and so on).
+3. Read the per-node mask table in Google’s flexible pod CIDR documentation (`/24` at 110 pods, `/25` at 64, and so on).
 4. Compute how many node slices fit in your pod secondary prefix `DS` (for `/21` and `/24` per node, you get eight nodes).
 5. Compare `N` against that fit; if `N` is larger, widen `DS` at creation or plan [discontiguous multi-Pod CIDR](https://cloud.google.com/kubernetes-engine/docs/how-to/multi-pod-cidr) up front.
 6. Allocate a services range (`/20` is common) for ClusterIP growth; services do not consume node slices but still need RFC1918 space.
@@ -139,21 +139,21 @@ gcloud container clusters create large-cluster \
   --default-max-pods-per-node=64
 
 # Reducing max-pods-per-node from 110 to 64 means each node
-# needs a /26 instead of a /24, saving IP space
+# needs a /25 instead of a /24, saving IP space
 ```
 
 ### Secondary ranges, max pods per node, and the node ceiling
 
 VPC-native scheduling is not only about routable pod IPs; it is also a **capacity contract** between three numbers you set at cluster creation: the **pod secondary range prefix length**, the **default or per-pool maximum pods per node**, and the **number of nodes** you intend to run. [GKE allocates each node a pod CIDR slice whose size depends on max pods per node](https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr)—for example, the default of 110 pods per node maps to a `/24` per node (256 addresses, with headroom above the pod limit). You **cannot change max pods per node after a cluster or node pool is created**, so treating “we will lower density later” as a migration path is a planning mistake.
 
-The relationship between pod range size and node count is multiplicative. With a `/21` pod secondary range and 110 max pods per node, each node consumes a `/24`, so the cluster supports roughly **eight nodes** before the secondary range is exhausted (`2^(24-21) = 8` node-sized slices). Lowering max pods per node to 64 shrinks each node’s slice to `/26`, which fits **32 nodes** in the same `/21`—same IP budget, different tradeoff between **pods per node** and **total nodes**. For Standard clusters you can configure up to **256** pods per node; Autopilot picks a value in a supported range based on expected workload density (commonly discussed around 32 in planning examples).
+The relationship between pod range size and node count is multiplicative. With a `/21` pod secondary range and 110 max pods per node, each node consumes a `/24`, so the cluster supports roughly **eight nodes** before the secondary range is exhausted (`2^(24-21) = 8` node-sized slices). Lowering max pods per node to 64 shrinks each node’s slice to `/25` (128 addresses), which fits **16 nodes** in the same `/21` (`2^(25-21) = 16`)—same IP budget, different tradeoff between **pods per node** and **total nodes**. For Standard clusters you can configure up to **512** pods per node (a `/22` slice, 1024 addresses); Autopilot chooses a value between 8 and 256 based on expected density (planning examples often use 32).
 
 | Max pods per node (examples) | Per-node pod CIDR | Addresses per node | Planning lever |
 | :--- | :--- | :--- | :--- |
 | 8 | `/28` | 16 | Maximize node count in a small pod range |
-| 64 | `/26` | 64 | Balance density and node scale |
+| 64 | `/25` | 128 | Balance density and node scale |
 | 110 (default) | `/24` | 256 | Default GKE density |
-| 256 (Standard max) | `/23` | 512 | Highest per-node density; consumes range faster |
+| 512 (Standard max) | `/22` | 1024 | Highest per-node density; consumes range faster |
 
 When creating node pools on an existing cluster, **`--max-pods-per-node` on the pool overrides the cluster default**, which lets you add a “dense” pool and a “wide” pool only if you planned separate ranges up front—secondary range size for the cluster remains immutable.
 
@@ -905,7 +905,7 @@ Production GKE networking succeeds when teams treat IP ranges, load balancers, a
 
 | Anti-pattern | What goes wrong | Why teams fall into it | Better alternative |
 | :--- | :--- | :--- | :--- |
-| **Undersized pod CIDR** | Pending pods, blocked autoscaling, unrecoverable without new range/cluster | “/24 is enough for now” on regional multi-zone clusters | Model max nodes with official formulas; start `/21` or larger when unsure |
+| **Undersized pod CIDR** | Pending pods, blocked autoscaling until you add a range or rebuild | “/24 is enough for now” on regional multi-zone clusters | Model max nodes with official formulas; start `/21` or larger when unsure; add multi-Pod CIDR for new pools if the original range is exhausted |
 | **iptables/kube-proxy at very large Service counts** | Latency climbs with Service count; policy blind spots on legacy dataplane | Older clusters never migrated | New clusters on Dataplane V2; plan blue/green migration |
 | **Public control plane without tight authorized networks** | API server reachable from broad internet | Quick lab clusters promoted to prod | Private endpoint + PSC or narrow authorized CIDRs + Identity-Aware Proxy patterns |
 | **`type: LoadBalancer` per microservice** | One forwarding rule + backend per Service; cost and quota sprawl | Ingress/Gateway learning curve | Consolidate HTTP(S) behind Gateway API; reserve L4 LB for true non-HTTP needs |
@@ -951,7 +951,7 @@ flowchart TD
 
 GKE networking spend often surprises finance teams because **load balancers and egress are billed separately from node pools**. At moderate scale (tens of microservices, multi-zone clusters, one public HTTP surface), watch these levers:
 
-**Application Load Balancers (Ingress/Gateway):** Each external managed Gateway or Ingress front end creates forwarding rules, proxies, and URL maps in your project. Consolidating many HTTPRoutes under one Gateway typically costs less than provisioning a `type: LoadBalancer` Service per Deployment. Those per-Service L4 paths mint discrete forwarding rules. Data processing and rule charges still apply to bytes through L7 load balancers. See [Cloud Load Balancing pricing](https://cloud.google.com/load-balancing/docs/pricing) for current SKUs. Global and regional frontends bill differently.
+**Application Load Balancers (Ingress/Gateway):** Each external managed Gateway or Ingress front end creates forwarding rules, proxies, and URL maps in your project. Consolidating many HTTPRoutes under one Gateway typically costs less than provisioning a `type: LoadBalancer` Service per Deployment. Those per-Service L4 paths mint discrete forwarding rules. Data processing and rule charges still apply to bytes through L7 load balancers. See [Cloud Load Balancing pricing](https://cloud.google.com/load-balancing/pricing) for current SKUs. Global and regional frontends bill differently.
 
 **Cloud NAT:** Private nodes that use NAT for outbound internet pay for NAT gateway processing plus egress on translated traffic. Sudden spikes often trace to verbose logging agents or unbounded image pulls. SNAT port exhaustion can also cause retry storms. Right-size NAT gateways. Prefer private Artifact Registry in the same region to keep pulls off the public internet path.
 
@@ -1017,7 +1017,7 @@ The Gateway API’s role-oriented model is why Google recommends it for new GKE 
 | :--- | :--- | :--- |
 | Creating a routes-based cluster instead of VPC-native | Following outdated tutorials | Use `--enable-ip-alias`; it is the default for new clusters but verify |
 | Assuming NetworkPolicy works automatically | Creating policies without verifying enforcement | Ensure the cluster has a network-policy-capable dataplane or add-on configured; creating `NetworkPolicy` objects alone does not guarantee enforcement |
-| Undersizing the pod CIDR | Not calculating node count x pods per node | Plan for 3-5x your current node count; you cannot expand the range later |
+| Undersizing the pod CIDR | Not calculating node count x pods per node | Plan for 3-5x your current node count; the original pod secondary prefix is immutable, but you can add discontiguous multi-Pod CIDR ranges for new node pools |
 | Forgetting DNS egress in NetworkPolicy | Writing a deny-all egress policy without DNS exception | Usually include a rule allowing [UDP/TCP port 53 to kube-dns pods](https://kubernetes.io/docs/concepts/services-networking/network-policies/) when workloads rely on cluster DNS |
 | Using Ingress annotations for advanced routing | Trying to do canary/header routing with GKE Ingress | Switch to Gateway API which natively supports traffic splitting and header matching |
 | Not enabling Cloud NAT for private clusters | [Private nodes cannot reach the internet](https://cloud.google.com/kubernetes-engine/docs/how-to/legacy/network-isolation) | Configure Cloud NAT on the VPC router before creating private clusters |
@@ -1047,9 +1047,9 @@ The Gateway API uses a three-tier resource model designed specifically for role-
 </details>
 
 <details>
-<summary>4. How do you diagnose IP exhaustion when a regional GKE cluster (three zones, two nodes per zone) uses a `/24` pod secondary range and new pods stay Pending while the cluster autoscaler cannot add nodes?</summary>
+<summary>4. Diagnose IP exhaustion: a teammate proposes a regional cluster (three zones, two nodes per zone) with a `/24` pod secondary range at the default 110 pods per node. Will that six-node layout come up, and if an existing cluster later exhausts its original pod range, is recreation the only fix?</summary>
 
-A /24 CIDR block provides only 256 IP addresses for the entire pod network. In a VPC-native cluster, each node is allocated its own /24 slice by default to support up to 110 pods. Because a regional cluster with 3 zones and 2 nodes per zone requires 6 nodes in total, it would need at least a /21 for the pod range to accommodate them. The cluster creation will initially succeed, but you will hit scheduling failures and autoscaling blocks when the pod CIDR is quickly exhausted and new pods cannot be assigned IPs. This situation is unrecoverable, as secondary ranges cannot be resized, requiring a full cluster recreation.
+No. Default 110 pods per node allocates a `/24` slice **per node**, so a `/24` cluster Pod range yields only one node-sized block (`2^(24-24) = 1`). A six-node regional layout cannot fit and will fail as additional nodes try to claim a slice. If an existing cluster's original pod secondary prefix is exhausted, you cannot enlarge that original range, but you can add **discontiguous multi-Pod CIDR** ranges and create **new** node pools on them; existing pools keep the original range. Recreation is a last resort when you need a larger original prefix for the same pools, not the only path.
 </details>
 
 <details>
@@ -1574,6 +1574,6 @@ Next up: **[Module 6.3: GKE Workload Identity and Security](../module-6.3-gke-id
 - [About Private Service Connect](https://cloud.google.com/kubernetes-engine/docs/concepts/private-service-connect) — Explains PSC-based control plane access and the private-endpoint networking model for modern GKE clusters.
 - [Private clusters](https://cloud.google.com/kubernetes-engine/docs/concepts/private-cluster-concept) — Contrasts private nodes, private endpoints, and control-plane access patterns.
 - [Cloud NAT overview](https://cloud.google.com/nat/docs/overview) — Documents outbound NAT for private instances and nodes without public IPs.
-- [Cloud Load Balancing pricing](https://cloud.google.com/load-balancing/docs/pricing) — Reference for forwarding-rule and data-processing cost components tied to GCLB.
+- [Cloud Load Balancing pricing](https://cloud.google.com/load-balancing/pricing) — Reference for forwarding-rule and data-processing cost components tied to GCLB.
 - [Access private GKE clusters with Cloud Build private pools](https://cloud.google.com/build/docs/private-pools/accessing-private-gke-clusters-with-cloud-build-private-pools) — Shows how private connectivity is required for CI/CD systems that need to reach a private GKE control plane.
 - [Network isolation in GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/legacy/network-isolation) — Describes private-cluster networking behavior, including the lack of external IPs on private nodes and the need for outbound access planning.
