@@ -62,9 +62,15 @@ Load tests should ramp gradually the first time you observe scale-out, because c
 | Existing .NET Framework integration | Dedicated or Premium isolated worker | Legacy runtime support outside in-process model |
 | Internal admin tool, sporadic clicks | Flex Consumption on-demand | Free monthly grant often covers entire monthly usage |
 
-> **Stop and think**: If your company has a strict policy that all database traffic must route through a private VNet, but you want to avoid paying for instances when no traffic is hitting your function at night, which hosting plan is your only viable option?
+**Pause and predict:** If your company has a strict policy that all database traffic must route through a private VNet, but you want to avoid paying for instances when no traffic is hitting your function at night, which hosting plan is your only viable option?
 
-The exercise is to balance private connectivity requirements with cost: Flex Consumption is usually the sweet spot when you need VNet support plus automatic scale-to-zero behavior. If both are mandatory but you also need always-on readiness, Premium may be the practical choice despite its minimum-instance cost.
+<details>
+<summary>Check your prediction</summary>
+
+Flex Consumption combines VNet integration with scale-to-zero behavior. Premium is the alternative if always-on readiness is also mandatory alongside private network connectivity.
+</details>
+
+Subnet delegation rules require dedicated subnets for Function Apps. These subnets cannot host other infrastructure resources simultaneously. Network administrators must allocate a CIDR block that matches peak workload concurrency. Each scaled worker instance consumes an individual IP address from the subnet pool. Sizing subnets too small causes provisioning failures during sudden demand spikes.
 
 ```mermaid
 flowchart TD
@@ -192,7 +198,15 @@ You can configure bindings **declaratively** through attributes in Python v2 pro
 
 For **Python, Node.js, Java, and PowerShell**, the Functions runtime always runs your code in a **language worker process** separate from the host. The host receives trigger events, forwards them to the worker over gRPC, and applies binding extensions on either side depending on the trigger type. This isolation improves security boundaries and lets each language runtime evolve independently.
 
-**.NET** is the special case. The legacy **in-process** model runs your function inside the same process as the Functions host, supports only LTS releases ending with .NET 8, and **does not support Flex Consumption**. Microsoft ends full support for in-process on **November 10, 2026**; new apps should use the **isolated worker** model, where your .NET app is a standalone executable with `Program.cs`, standard dependency injection, middleware, and `Microsoft.Azure.Functions.Worker.Extensions.*` packages. Isolated worker supports current .NET versions, .NET Framework 4.8, Durable Functions, and Flex Consumption—the combination most greenfield .NET teams should standardize on.
+**Pause and predict:** Can a new in-process .NET Function App run on Flex Consumption?
+
+<details>
+<summary>Check your prediction</summary>
+
+The legacy in-process model does not support Flex Consumption; isolated worker architecture is required. Microsoft ends full support for the in-process .NET runtime on 10 November 2026.
+</details>
+
+Enterprise engineering teams building modern .NET serverless workloads standardize on the **isolated worker** architecture. This design mirrors idiomatic ASP.NET Core bootstrapping patterns. The isolated model runs as a standalone console process configured in `Program.cs`. It provides native dependency injection and custom middleware pipelines. Dedicated worker extensions manage trigger serialization independently. This architectural boundary prevents assembly conflicts between user application libraries and the host runtime.
 
 | Aspect | Isolated worker (.NET and other languages) | In-process (.NET legacy) |
 | :--- | :--- | :--- |
@@ -252,9 +266,15 @@ flowchart LR
 **Without bindings:** 50+ lines of SDK setup code
 **With bindings:** 0 lines of SDK code (declarative)
 
-> **Pause and predict**: If you use an output binding to write a document to Cosmos DB, but the Cosmos DB service experiences a brief 2-second network blip while the function runs, do you need to write custom retry logic in your Python code?
+**Pause and predict:** If you use an output binding to write a document to Cosmos DB, but the Cosmos DB service experiences a brief 2-second network blip while the function runs, do you need to write custom retry logic in your Python code?
 
-The key point is that the function runtime and binding layer can absorb many integration concerns, so your handler can stay concise while still remaining resilient. You still design your system for idempotent operations and observability, because retries and eventual consistency are often about system behavior, not only code structure.
+<details>
+<summary>Check your prediction</summary>
+
+The Functions runtime and binding layer automatically retry transient network failures during output binding operations. You do not need to write custom Cosmos DB retry logic in your Python handler for that blip, though you must still design downstream write operations for idempotency and implement observability.
+</details>
+
+Declarative bindings decouple infrastructure connectivity from core business logic across application code. Delegating connection management to the platform runtime keeps function handlers lightweight. This eliminates boilerplate connection code across enterprise microservice fleets. Handlers receive fully instantiated SDK objects or serialized event payloads directly. Developers can swap underlying storage providers without rewriting execution signatures.
 
 ### Imperative Bindings and Connection Settings
 
@@ -621,7 +641,15 @@ az webapp auth microsoft update \
 
 Serverless pricing looks inexpensive until trigger choice and hosting plan interact badly with production traffic. On **legacy Consumption** and **Flex Consumption on-demand** billing, you pay for **executions** plus **GB-seconds**—gigabytes of memory multiplied by seconds of execution time. Azure rounds memory up to the nearest 128 MB (legacy Consumption caps at 1,536 MB per instance) and bills a minimum of **100 ms and 128 MB per execution** even when your handler finishes in milliseconds. Each subscription receives a monthly **free grant** of **1 million executions** and **400,000 GB-seconds** shared across all function apps in that subscription, which covers many labs and low-traffic internal tools entirely.
 
-Flex Consumption adds a second billing mode: **always-ready** instances provision baseline memory continuously to reduce cold starts. Always-ready billing charges GB-seconds for the provisioned baseline **even when no functions execute**, and **does not include the free grant**—teams enable always-ready selectively per trigger type or function rather than blanket-warming entire apps. Premium (Elastic Premium) bills **per vCPU-second and GB-second** for active instances plus the cost of configured minimum instances, which is predictable but never scales to zero. Dedicated plans charge the underlying **App Service Plan** hourly whether functions run or not—the right choice when the same plan already hosts web apps or when you need unlimited duration without Premium SKUs.
+**Pause and predict:** Do Flex Consumption always-ready instances stay inside the monthly free grant when no functions execute?
+
+<details>
+<summary>Check your prediction</summary>
+
+Always-ready instances bill continuous GB-seconds for provisioned baseline memory even with zero executions and do not include the monthly free grant.
+</details>
+
+Alternative hosting models establish different commercial tradeoffs between consumption billing and fixed commitments. Premium plans bill for provisioned vCPU and memory across active instances. They eliminate cold starts without scaling compute to zero. Dedicated hosting plans charge a flat hourly rate for the App Service Plan. Teams use dedicated plans to consolidate event handlers alongside web workloads. This shared resource model lowers hosting expenditure for continuous corporate background services.
 
 Cost spikes usually trace to behavioral causes rather than mysterious platform bugs. A **Timer** trigger that fires every minute across hundreds of environments generates 43,200 executions per month per function before any useful work happens—multiplied across dev, test, and staging copies, that exhausts free grants quickly. **Blob triggers** that poll large containers can invoke functions repeatedly when many blobs exist even if only a few change, which is another reason Event Grid is cheaper at the latency layer when events are sparse but containers are huge. Chatty HTTP APIs on Consumption during sustained 24/7 traffic often exceed Premium baseline cost; model both using the [consumption cost estimation guidance](https://learn.microsoft.com/en-us/azure/azure-functions/functions-consumption-costs) before launch.
 
@@ -1068,7 +1096,41 @@ az group delete --name "$RG" --yes --no-wait
 rm -rf /tmp/functions-lab /tmp/test-data.json /tmp/readme.txt
 ```
 
-### Success Criteria
+Verify that the resource group deletion finishes completely. This prevents lingering database throughput charges from accumulating in your training subscription. Recording deployed storage account names helps audit test runs. It also ensures reproducible automation for future serverless lab exercises.
+
+**Card A: Premium is required if you need VNet access and must scale to zero at night.** An enterprise architect provisions a serverless backend for an internal Azure SQL database. The workload requires outbound virtual network integration. The architect selects the Premium hosting tier to support private subnet routing. The team also expects the infrastructure to scale down to zero compute instances overnight.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: hosting tier feature boundaries versus unnecessary baseline compute commitments. Next action: deploy to the Flex Consumption plan to combine native virtual network injection with automated scale-to-zero compute economics during idle periods.
+</details>
+
+**Card B: A 2-second Cosmos blip during an output binding write requires custom retry logic in the Python handler.** A backend developer notices intermittent network timeouts during database operations. The function writes order records into a Cosmos DB collection using output bindings. The developer adds a custom retry loop inside the Python handler code to catch momentary interruptions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: application-level error handling versus native runtime binding resilience. Next action: rely on the built-in Functions host retry policies and output binding recovery mechanisms, while ensuring data operations remain strictly idempotent.
+</details>
+
+**Card C: A new in-process .NET Function App can run on Flex Consumption.** A software development team initiates a greenfield microservice migration. The team selects the legacy .NET in-process execution model to preserve existing class attributes. They deploy the project to the Flex Consumption tier. They assume the hosting environment supports legacy in-process application binaries.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: legacy runtime constraints versus modern isolated worker prerequisites. Next action: migrate .NET projects to the out-of-process isolated worker model using modern worker extensions, keeping in mind that Microsoft deprecates in-process support entirely on 10 November 2026.
+</details>
+
+**Card D: Flex always-ready instances are covered by the monthly free grant when no functions execute.** A platform administrator configures two always-ready instances on a Flex Consumption plan. The pre-warmed instances eliminate cold-start latencies for occasional webhook triggers. The administrator expects idle compute to stay within the monthly free allowance of four hundred thousand gigabyte-seconds.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: baseline pre-warmed capacity charges versus active on-demand consumption allowances. Next action: restrict always-ready instance configurations to latency-critical production entrypoints, recognizing that always-ready capacity charges gigabyte-seconds continuously without free grant deductions.
+</details>
+
+**Success Criteria**:
 
 - [ ] Storage account with uploads container created
 - [ ] Cosmos DB account with ProcessingDB database and results container created
