@@ -132,7 +132,17 @@ The `--subject` field is critically important. It follows the format [`system:se
 
 **Multi-tenant and cross-subscription federation.** A single managed identity can have up to 20 federated credentials, each with a different subject. This allows you to federate the same Azure identity across multiple service accounts in different namespaces, or even across different AKS clusters, as long as each federated credential specifies the correct issuer URL for its cluster. For organizations with hub-and-spoke Azure topologies where the managed identity lives in a central identity subscription but AKS clusters run in spoke subscriptions, [federated credentials are a cross-subscription resource](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview): the managed identity and its federated credentials should reside in the same subscription, but the cluster and its workloads can be in different subscriptions. The key constraint is that the OIDC issuer URL must be reachable from Entra ID's public endpoints — which AKS OIDC issuers always are by design, since they are hosted on the public `oic.prod-aks.azure.com` domain.
 
-**Token lifetime and caching.** The projected service account token injected by the webhook is short-lived — typically one hour — and Kubernetes automatically rotates it before expiry. The Azure SDK caches the Azure access token it receives from Entra ID for its own validity period (also typically one hour). This means your application pays the full OIDC token exchange only once per hour per pod replica under normal operation. When you delete a federated credential in Entra ID, existing cached Azure tokens remain valid until their natural expiry — the pod does not lose access instantly. Plan for a maximum of one hour of residual access after federation revocation. If you need instant credential revocation, combine federation deletion with a pod restart or a Key Vault access policy change at the Azure control plane.
+**Pause and predict:** A security administrator identifies that an active workload should no longer access Azure resources and deletes its federated identity credential in Microsoft Entra ID. How quickly will the running pod actually lose access to downstream Azure services? Does the next SDK call fail immediately, or does access persist?
+
+<details>
+<summary>Check your prediction</summary>
+
+Deleting a federated identity credential (FIC) is **not immediate**. When the pod starts, Kubernetes projects a signed service account token into the container filesystem with a default expiration of **3600s** (one hour). When the Azure SDK exchanges this projected token against the Microsoft Entra token exchange endpoint, **Microsoft Entra tokens expire 24 hours after they are issued**. The Azure SDK in-memory credential cache preserves the valid Azure access token until its natural expiration. Consequently, the running application maintains residual cached Entra access for up to **24h**, not 1h. Deleting the federated credential only prevents future token exchanges once the current token expires; it does not invalidate tokens that have already been issued and cached in the pod's application process. If an incident response requires immediate access revocation, deleting the federated credential must be accompanied by an immediate pod restart or by revoking data-plane RBAC permissions directly on the target Azure resources.
+</details>
+
+Managing token lifecycles requires coordinating cluster-side service account rotation windows with cloud-side identity revocation procedures to maintain zero-trust boundaries across ephemeral workloads. Platform teams must structure security playbooks around dual-plane revocation so that emergency credential changes take effect immediately across all active application replicas.
+
+Establishing identity federation in the cloud control plane represents only half of the integration workflow. Workloads still require corresponding Kubernetes primitives configured within cluster namespaces to establish the trust handshake before pod scheduling occurs.
 
 ### Step 4: Create the Kubernetes Service Account with Annotations
 
@@ -169,9 +179,19 @@ Your application code uses the Azure SDK's `DefaultAzureCredential`, which autom
 
 **Audience defaults and alternatives.** The default audience for the federated token exchange is `api://AzureADTokenExchange`. This audience is hardcoded into the Azure SDK's workload identity credential and works for all Azure service endpoints. You do not normally need to change it, but the `--audiences` parameter on `az identity federated-credential create` accepts custom values if your token exchange targets a non-Azure OIDC-compliant service. Changing the audience without also configuring the Azure SDK to request a matching audience will cause token exchange failures — the default SDK behavior expects `api://AzureADTokenExchange`.
 
-**What happens when federation breaks.** If the federated credential is deleted, the issuer URL changes (for example, after a cluster rebuild without preserving the original OIDC issuer), or the service account is removed, the token exchange fails with an Entra ID error — typically `AADSTS70021: No matching federated identity record found for presented assertion subject`. The Azure SDK surfaces this as an authentication exception. The pod remains running — it does not crash — but any attempt to acquire a new Azure token fails. Existing tokens in the SDK cache remain valid until expiry, as discussed above. If your application uses `DefaultAzureCredential` with a chained fallback (for example, trying Managed Identity credentials after Workload Identity), the SDK silently moves to the next credential source, which may produce confusing behavior if the fallback succeeds with a different identity than intended. Always explicitly configure the credential chain in production workloads to avoid silent identity switches during federation outages.
+**What happens when federation breaks.** If the federated credential is deleted, the issuer URL changes (for example, after a cluster rebuild without preserving the original OIDC issuer), or the service account is removed, subsequent token exchange requests fail Microsoft Entra ID authentication. The Azure SDK surfaces this as an authentication exception. The pod remains running — it does not crash — but any attempt to acquire a new Azure token fails once cached credentials expire. If your application uses `DefaultAzureCredential` with a chained fallback (for example, trying Managed Identity credentials after Workload Identity), the SDK silently moves to the next credential source, which may produce confusing behavior if the fallback succeeds with a different identity than intended. Always explicitly configure the credential chain in production workloads to avoid silent identity switches during federation outages.
 
-> **Pause and predict**: If you delete the federated credential in Entra ID, how quickly will the pod lose access to Azure services? Will it be immediate, or will it take time based on the token expiration?
+**Pause and predict:** A developer configures an AKS ServiceAccount with the required azure.workload.identity/client-id annotation pointing to an Azure Managed Identity. The developer then deploys a pod that specifies this ServiceAccount. Will the AKS Workload Identity mutating webhook automatically inject the projected token and Azure environment variables into the pod?
+
+<details>
+<summary>Check your prediction</summary>
+
+The AKS Workload Identity mutating admission webhook mutates **only** pods that explicitly include the `azure.workload.identity/use: "true"` label in their pod metadata. Configuring the `azure.workload.identity/client-id` annotation on the ServiceAccount is **not enough**. The mutating webhook operates under strict Fail Close design principles: if the pod template lacks the `use: "true"` label, the webhook completely ignores the pod at admission time. Consequently, the pod starts without the projected service account token volume mount and without injected environment variables (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_FEDERATED_TOKEN_FILE`, `AZURE_AUTHORITY_HOST`). The contrast between labeled and unlabeled pods ensures that cluster operators control exactly which workloads participate in identity federation. The ServiceAccount annotation identifies which Azure Managed Identity to federate, while the pod label explicitly authorizes the webhook mutation on that specific pod workload.
+</details>
+
+Explicit opt-in labeling prevents unintended token projection across batch jobs, sidecar proxies, and third-party containers that share common service accounts within the same namespace. Requiring pod-level activation ensures that security boundaries remain intentional and minimizes admission webhook processing overhead during rapid deployment rollouts.
+
+The deployment manifest below demonstrates the exact configuration syntax, pairing the ServiceAccount reference with the required pod template label:
 
 ```yaml
 apiVersion: apps/v1
@@ -377,7 +397,15 @@ When the pod starts, the file `/mnt/secrets/db-connection-string` will contain t
 
 #### The Rotation Story in Detail
 
-Auto-rotation is enabled cluster-wide when you enable the Secrets Store CSI add-on with `--enable-secret-rotation` (for example, `az aks addon update ... --addon azure-keyvault-secrets-provider --enable-secret-rotation --rotation-poll-interval 2m`). The poll-interval flag only sets cadence after rotation is enabled; it does not turn rotation on by itself. The CSI driver's provider for Azure then periodically queries Key Vault for each `SecretProviderClass` object in the cluster. When it detects a newer version of a secret, it updates the mounted file in the pod's volume **without restarting the pod**. The file contents change in place — the inode remains the same, but the bytes on disk are replaced. This has important implications for application design. If your application reads the secret once at startup and never re-reads the file, it will keep using the old value indefinitely. To benefit from auto-rotation, your application must either re-read the file on each use, watch for filesystem change events (Linux `inotify`), or implement a periodic refresh loop. The CSI driver does not signal the application — it only updates the file. For applications that consume secrets as environment variables via `secretObjects`, the Kubernetes Secret is also updated by the rotation, but pods do not automatically restart to pick up new environment variable values. Environment-variable-based secret consumption and auto-rotation are fundamentally at odds: use mounted files if you need rotation without restarts.
+**Pause and predict:** You configure the Secrets Store CSI Driver with auto-rotation enabled and update a secret value in Azure Key Vault. When the CSI driver detects the new version, does it restart the application pod so runtime memory and environment variables receive the rotated value? What happens to mounted files versus synced Kubernetes Secrets?
+
+<details>
+<summary>Check your prediction</summary>
+
+CSI secret autorotation updates the **mounted file in place without restarting the pod**. Auto-rotation is enabled cluster-wide when you configure the add-on with `--enable-secret-rotation` (for example, `az aks addon update ... --addon azure-keyvault-secrets-provider --enable-secret-rotation --rotation-poll-interval 2m`). The default poll interval is **2m**; specifying `--rotation-poll-interval` only tunes cadence after rotation is enabled and does not enable rotation by itself. When the driver detects a newer secret version in Key Vault, it replaces the bytes on disk while preserving the filesystem inode. Because the pod does not restart, the application must actively **re-read/watch** the file (such as via Linux `inotify` or a periodic refresh loop) to consume the rotated credentials. If the application instead consumes secrets as environment variables from synced Kubernetes Secrets via `secretObjects`, the synced Secret object in etcd is updated, but environment variables in active container processes never update dynamically. Consuming updated values from environment variables **requires pod restart**. Environment-variable consumption and zero-downtime rotation are fundamentally incompatible without workload restarts.
+</details>
+
+Decoupling secret synchronization from pod lifecycle management allows microservices to maintain continuous availability during regular credential rollouts. Platform engineers must ensure software libraries implement dynamic file reload handlers rather than caching static strings at initial boot.
 
 The rotation poll interval is a cluster-wide setting. You cannot set different intervals per `SecretProviderClass`. At scale — say, 200 pods each with 10 secrets — a short poll such as 2m still generates substantial Key Vault read volume (2,000 reads per poll cycle in that example), which can incur significant transaction costs and potentially hit Key Vault service limits. A two-minute or five-minute poll is usually sufficient for most credential rotation policies.
 
@@ -529,8 +557,6 @@ k get pods -n gatekeeper-system
 
 ### Essential Policies for Production AKS
 
-> **Stop and think**: If you apply a new Azure Policy with a "deny" effect, what happens to existing pods that are already running and violate the policy? Will Gatekeeper terminate them?
-
 Azure provides dozens of built-in policies. Here are the critical ones every production cluster should enforce, and they are useful because they encode common defensive defaults without requiring custom policy authoring for every microservice. When you combine policy with webhook enforcement, you keep teams moving fast while still preventing known risky patterns.
 
 | Policy | Effect | Why It Matters |
@@ -565,7 +591,15 @@ When a developer tries to deploy a privileged container, the request is denied b
 
 #### Audit vs Deny: The Safe Rollout Path
 
-Azure Policy for Kubernetes supports two enforcement effects for each policy assignment: `audit` and `deny`. The `audit` effect evaluates every admission request against the policy rules but does not block non-compliant requests — it only reports violations to Azure Policy compliance dashboards. The `deny` effect blocks non-compliant requests at the admission webhook before the resource is persisted to etcd. The critical operational detail is that **existing resources are evaluated for compliance reporting but are not retroactively deleted by switching a policy from audit to deny**. A pod that was admitted before the deny policy existed continues running. The deny effect only applies to new `CREATE` and `UPDATE` operations. If a pod with `privileged: true` is already running and a subsequent rolling update or node drain triggers a pod recreation, that recreation will be denied — causing the deployment to stall until the manifest is fixed.
+**Pause and predict:** A security team assigns a new Azure Policy with a "deny" effect to prevent privileged containers across an active production cluster where several privileged pods are already running. Will Gatekeeper immediately terminate the running non-compliant pods, or what happens to their execution?
+
+<details>
+<summary>Check your prediction</summary>
+
+When an Azure Policy assignment is configured with a "deny" effect, **preexisting non-compliant resources continue to run** without interruption; Gatekeeper does not evict or terminate existing pods. Admission controllers operate strictly as admission webhooks on the Kubernetes API server path, evaluating resources during incoming requests before persistence in etcd. Consequently, the deny effect blocks only new **CREATE** and **reschedule** operations (as well as manifest updates). The non-compliant running pods are flagged in Azure Policy compliance reporting dashboards, but they remain active until terminated by an operator, a rolling deployment, or a node disruption. If a node fails or a deployment rolls out, any attempt to recreate the privileged pod will be rejected at admission, preventing rescheduling and potentially causing application outages if manifests remain uncorrected.
+</details>
+
+Phased policy rollout frameworks prevent unexpected operational downtime by isolating compliance discovery from deployment admission enforcement. Validating cluster telemetry against compliance baselines gives engineering teams sufficient runway to remediate legacy workload configurations prior to hard enforcement.
 
 The safe rollout sequence is: assign policies in `audit` mode, review the compliance dashboard for existing violations, fix all non-compliant manifests, verify the compliance dashboard shows zero violations, then switch to `deny` mode. Skipping the audit phase and going directly to deny is the most common cause of production deployment pipeline failures when introducing Azure Policy to an existing cluster.
 
@@ -1056,7 +1090,41 @@ echo "Security boundary verified: pods without proper service account cannot acc
 
 </details>
 
-### Success Criteria
+Before deploying enterprise workloads and configuring identity federation on AKS, platform architects must audit common operational misconceptions about workload identity, secret rotation, and policy enforcement. Each scenario below states a claim that sounds operationally convenient. Treat the claim as the hypothesis, then open the details only after you have a prediction.
+
+**Card A: Deleting the Entra federated credential immediately revokes the pod's Azure access because the next SDK call has no credential.** An incident response team detects anomalous database queries originating from an application pod that accesses Azure SQL via AKS Workload Identity. A security engineer deletes the corresponding federated identity credential from Microsoft Entra ID to sever access immediately. The team assumes that the next database query from the pod will fail instantly because the trust relationship no longer exists in Entra ID.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: In-memory token caching versus cloud-side federation credential revocation. Next action: understand that deleting a federated identity credential in Entra ID is not immediate because it does not invalidate previously issued Azure access tokens already cached by the Azure SDK inside the running application; while the Kubernetes projected service account token has a default lifetime of 3600 seconds, Microsoft Entra tokens remain valid for up to 24 hours after issuance; the pod retains residual cached access until the active Entra token expires; to achieve instantaneous revocation during an active security incident, combine federation deletion with terminating the pod replicas or revoking Azure data-plane RBAC permissions directly.
+</details>
+
+**Card B: CSI secret autorotation restarts the pod so startup-cached files and environment variables both pick up the new Key Vault value.** A platform team enables auto-rotation on the Azure Key Vault Secrets Store CSI Driver add-on with a two-minute polling interval. A developer updates an existing database password in Azure Key Vault and configures the SecretProviderClass to sync the value into a Kubernetes Secret consumed as an environment variable. The team assumes the CSI driver automatically triggers a rolling restart of the application pod so that both mounted volume files and container environment variables update simultaneously.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: In-place filesystem volume mutation versus container process environment variable persistence. Next action: understand that Secrets Store CSI Driver autorotation updates mounted secret files in place without restarting the application pod; the underlying file contents change on disk while preserving the file inode, requiring application code to actively watch or re-read the file rather than caching it once at startup; although the CSI driver updates the synced Kubernetes Secret in etcd, Kubernetes never dynamically injects modified Secret values into existing container environment variables; to consume rotated secrets via environment variables, workloads must undergo a manual pod restart or deployment rollout.
+</details>
+
+**Card C: Assigning Azure Policy in deny mode terminates existing privileged pods that already run in the cluster.** A compliance audit mandates that no workloads run with container privilege escalation across an AKS production cluster. A cluster administrator assigns the built-in "Do not allow privileged containers" Azure Policy definition scoped to the cluster with the enforcement effect set to "deny". The administrator assumes that Gatekeeper will actively scan the cluster and terminate or evict all non-compliant privileged pods currently executing on worker nodes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Admission controller request interception versus runtime pod eviction lifecycle. Next action: understand that Azure Policy for Kubernetes enforces constraints exclusively at the API server admission webhook layer during CREATE and UPDATE operations; preexisting non-compliant pods continue running indefinitely and are not terminated or evicted by applying a deny-mode policy; Gatekeeper flags existing non-compliant pods in Azure Policy compliance reporting dashboards, but hard enforcement only blocks future admission requests; if a non-compliant pod is restarted, scaled, or evicted by node maintenance, the admission webhook blocks recreation, causing rescheduling to fail until manifests comply.
+</details>
+
+**Card D: The service account `azure.workload.identity/client-id` annotation is enough; the pod does not need `azure.workload.identity/use: "true"`.** A developer configures AKS Workload Identity for a microservice deployment. The developer annotates the Kubernetes ServiceAccount with the Azure Managed Identity client ID and sets the deployment spec to reference that ServiceAccount. The developer assumes the pod automatically receives the projected service account token and Azure environment variables because the identity mapping is fully declared on the ServiceAccount.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Service account metadata annotation versus pod admission mutating webhook selector labels. Next action: recognize that the AKS Workload Identity mutating admission webhook mutates only pods that explicitly define the `azure.workload.identity/use: "true"` label in the pod template metadata; annotating the ServiceAccount is necessary for Entra ID token exchange but is not sufficient for Kubernetes webhook injection; without the pod label, the admission webhook ignores the pod under fail-close semantics, causing the container to start without the projected token volume or Azure environment variables (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_FEDERATED_TOKEN_FILE`), resulting in immediate Azure SDK authentication failures.
+</details>
+
+**Success Criteria**:
 
 - [ ] AKS cluster has OIDC issuer, Workload Identity, and Secrets Store CSI Driver enabled
 - [ ] Key Vault created with RBAC authorization and three test secrets
