@@ -63,7 +63,15 @@ The comparison table is not a scoreboard where one column always wins. Managed g
 
 A common mature design layers both systems. The cloud gateway owns the public hostname, certificates, WAF association, API key enforcement, JWT authorizers, request logging at the edge, and customer-level throttles. The Kubernetes Gateway API owns namespace delegation, service routing, internal canaries, protocol-specific routes, and platform policy attachment. That layering looks more complex on a diagram, but it reduces hidden coupling because edge business policy can change without forcing every application team to rewrite route manifests.
 
-Pause and predict: if a public DNS record points directly at a Kubernetes LoadBalancer service while a separate cloud gateway also exists, which path will an attacker test first, and what log source would prove the bypass happened? The important clue is whether the suspicious request appears in WAF or cloud gateway logs. If it appears only in load balancer or pod logs, the gateway was not the only reachable entrance.
+**Pause and predict:** If a public DNS record points directly at a Kubernetes LoadBalancer service while a separate cloud gateway also exists, which path will an attacker test first, and what log source would prove the bypass happened?
+
+<details>
+<summary>Check your prediction</summary>
+
+An attacker will immediately target the direct Kubernetes LoadBalancer path to bypass edge security inspection entirely. AWS WAF protects only associated resources such as an Application Load Balancer, Amazon API Gateway stage, or Amazon CloudFront distribution; unassociated public IP addresses and standalone cluster load balancers remain completely unprotected. If suspicious requests appear in Kubernetes load balancer access logs or backend ingress pod access logs but never register in AWS WAF or cloud gateway logs, an architecture bypass has occurred. To prevent this bypass, platform engineers must make the Kubernetes ingress load balancer private so it only accepts traffic forwarded from the cloud gateway's managed VPC interface.
+</details>
+
+The next section is how legacy Ingress limitations motivated the Kubernetes Gateway API to separate operational roles across shared clusters.
 
 The historical Ingress API still works for many simple applications, and there is no virtue in migrating stable low-risk workloads purely because a newer API exists. Its limits appear when teams pile policy into annotations: one annotation for header matching, another for rewrite behavior, another for timeouts, another for authentication, and another for a controller-specific canary feature. Those annotations are easy to copy, hard to validate, and usually non-portable across controllers.
 
@@ -363,7 +371,15 @@ spec:
     - port: 8080
 ```
 
-Pause and predict: you deployed a WAF in front of your Kubernetes API, and it blocks a known SQL injection payload, but the same payload succeeds the next day when sent directly to the Ingress controller's public IP address. The likely failure is not a missing signature; it is an architecture bypass where the protected edge and the cluster ingress are both reachable. The fix is to restrict the ingress resource so it only accepts traffic from the intended edge, or to make the backend load balancer private and reachable only through the gateway path.
+**Pause and predict:** You deployed a WAF in front of your Kubernetes API and verified it blocks a known SQL injection payload, but the exact same payload succeeds the next day when sent directly to the Ingress controller's public IP address. Why did the WAF fail to intercept the attack, and what architectural change guarantees filtering?
+
+<details>
+<summary>Check your prediction</summary>
+
+The security failure is an architectural bypass rather than an outdated WAF signature or misconfigured inspection rule. Google Cloud Armor security policies attach directly to the load-balancer backend service; traffic that reaches an unassociated cluster Ingress IP or direct node port never traverses that backend service and is never filtered. Similarly, AWS WAF inspects only requests that flow through its associated Application Load Balancer, CloudFront distribution, or API Gateway stage. To eliminate this vulnerability, platform teams must configure cluster load balancers as internal-only resources reachable exclusively through the gateway path, enforce firewall rules that reject direct external ingress, and terminate public traffic solely at the protected edge.
+</details>
+
+The next section is how multi-tiered rate limiting architectures prevent distributed botnet floods, unauthenticated web scraping, and expensive backend resource exhaustion.
 
 ## Rate Limiting That Actually Works
 
@@ -468,13 +484,31 @@ spec:
 
 The tricky part is not writing a counter configuration; it is choosing descriptors that match the threat model. A checkout endpoint might need a global cap, a per-user cap, and a per-payment-method velocity control. A public search endpoint might need per-IP and per-session throttles, but a customer integration endpoint probably needs per-API-key quotas and burst allowances that match the customer's paid plan.
 
-Stop and think: your e-commerce API sees a spike of 50,000 requests per second to `/api/v1/checkout`, the traffic comes from thousands of residential IP addresses, and each request has a valid user JWT. A per-IP rule is almost irrelevant here because the aggregate attack is intentionally spread out. You need a per-path or global ceiling to protect the checkout dependency, and you also need identity-aware limits that reduce how much each account can consume regardless of IP rotation.
+**Pause and predict:** Your e-commerce API experiences a massive traffic flood to `/api/v1/checkout` originating from thousands of distributed residential IP addresses where each request presents a valid user JWT. Why does a standard per-IP rate limit fail to protect downstream systems, and what throttling strategy should you deploy instead?
+
+<details>
+<summary>Check your prediction</summary>
+
+Per-IP rate limits miss distributed authenticated floods because the abusive traffic is spread across thousands of distinct residential IP addresses, keeping each individual client well below typical connection thresholds. When abuse leverages valid authenticated sessions, perimeter defenses must deploy granular per-path and per-client or per-API-key throttles rather than relying solely on network-layer source IPs. In managed cloud architectures, Amazon API Gateway usage plans and route throttling return HTTP 429 Too Many Requests when client quotas or burst token allowances are exceeded. Platform teams should combine identity-aware token bucket limits with strict concurrency controls on expensive backend dependencies, ensuring that abusive tenants cannot exhaust database pools even when rotating source IPs across residential networks.
+</details>
+
+The next section is how operational teams balance strict capacity thresholds against customer availability during anticipated product launch traffic surges.
 
 There is a hard tradeoff between protection and availability. A global limit that is too low can reject legitimate surge traffic during a product launch, while a limit that is too high may allow the database to collapse before the gateway intervenes. Senior teams tune these limits from capacity tests, SLO budgets, and business priorities, then monitor both allowed and rejected traffic so they can tell the difference between a healthy surge and a harmful one.
 
 ## OAuth2/OIDC Proxying and Gateway Authentication
 
-Authentication at the gateway layer exists because repeating token validation, redirect handling, group extraction, and header normalization in every service creates inconsistent security. A centralized gateway or authentication proxy can validate the user's identity once, attach trusted identity headers, and keep unauthenticated requests away from application pods. The danger is that downstream services must only trust those headers from the gateway, never from arbitrary clients.
+Authentication at the gateway layer centralizes identity verification so individual microservices avoid duplicating token validation, redirect handling, group extraction, and cryptographic parsing across multiple codebases. A centralized gateway or reverse proxy inspects incoming credentials, injects identity metadata into upstream headers, and drops unauthenticated traffic before requests reach application containers.
+
+**Pause and predict:** If an edge proxy validates OIDC tokens and passes authenticated user metadata via headers like `X-Forwarded-User`, what security vulnerability arises if backend microservices are directly accessible, and under what exact architecture condition are these headers safe?
+
+<details>
+<summary>Check your prediction</summary>
+
+Downstream application pods are vulnerable to trivial identity spoofing if an attacker can route requests directly to them without traversing the edge gateway. Identity headers such as `X-Forwarded-User` and `X-Forwarded-Groups` are only safe if the application is reachable solely through the trusted gateway or reverse proxy. If a cluster service is exposed through an unauthenticated internal ingress, an open NodePort, or lateral pod-to-pod network paths without mutual TLS, an attacker can craft arbitrary HTTP requests with forged identity headers to impersonate any user. To prevent identity header spoofing, the edge gateway must sanitize and strip incoming identity headers from external clients before forwarding requests, and platform engineers must enforce Kubernetes NetworkPolicy rules to ensure application pods reject all direct network connections that do not originate from the gateway dataplane.
+</details>
+
+The next section is how OAuth2 Proxy coordinates browser redirects with upstream OpenID Connect identity providers before relaying verified claims to backend workloads.
 
 ```mermaid
 flowchart TD
@@ -1195,7 +1229,41 @@ k run auth-test --rm -i --image=curlimages/curl --restart=Never -- \
 ```
 </details>
 
-### Success Criteria
+Before you close the hands-on lab, audit the four operational claims below. Each open card states a hypothesis that sounds operationally plausible during cloud API gateway design, WAF deployment, and Kubernetes traffic management. Treat each claim as an operational prediction, and open the solution details only after you have reasoned through the failure mode.
+
+**Card A: Point public DNS at both the cloud gateway and the Kubernetes LoadBalancer so either path can serve production traffic.** A platform team is migrating edge traffic from an existing Kubernetes LoadBalancer Service to a newly provisioned cloud API gateway. To facilitate canary validation and provide an emergency rollback path, an engineer creates weighted DNS records pointing equal traffic shares at both endpoints. The team reasons that splitting public DNS allows either ingress path to serve production traffic seamlessly during the transition. They assume this dual-entry architecture provides instant resilience if the managed gateway encounters an unexpected outage.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Architecture bypass, perimeter policy divergence, and uncontrolled security asymmetry. Next action: recognize that pointing public DNS at both the cloud gateway and the raw Kubernetes LoadBalancer creates an immediate security hole because only the cloud gateway path enforces edge policies such as AWS WAF, managed JWT validation, request transformation, and centralized rate limiting; attackers and automated vulnerability scanners will quickly detect and isolate the unprotected LoadBalancer IP address to bypass all edge security inspection, flooding backend pods directly; in addition, application pods will receive divergent request formats, differing client IP headers, and missing identity claims depending on which DNS endpoint answered the client; during migrations, never dual-home public DNS across unequal security boundaries; instead, route all public client DNS exclusively to the cloud gateway and configure the gateway itself to split upstream traffic between the legacy ingress and the new Gateway API backend over private network paths.
+</details>
+
+**Card B: A WAF that blocks SQL injection on the gateway hostname is enough even if the Ingress controller still has a public IP.** A security engineering team deploys a cloud WAF in front of an enterprise API gateway to block SQL injection and cross-site scripting attacks. Because the underlying Kubernetes cluster was originally provisioned with an external NGINX Ingress controller, that ingress controller retains its public IPv4 address assigned by the cloud load balancer. The team assumes that having an active WAF inspecting all traffic arriving at the gateway hostname provides comprehensive protection for backend services. They believe the legacy Ingress public IP address can safely remain active for administrative testing and developer troubleshooting.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Unassociated resource exposure, direct network perimeter bypass, and WAF attachment mechanics. Next action: understand that AWS WAF and Cloud Armor protect only specifically associated cloud resources, such as an Application Load Balancer, CloudFront distribution, or API Gateway stage; unassociated public IP addresses assigned directly to Kubernetes LoadBalancer Services or cluster nodes receive zero WAF inspection; attackers scanning cloud provider IP ranges or inspecting TLS certificates in Certificate Transparency logs will discover the raw Ingress IP address and send SQL injection payloads directly to it with custom HTTP Host headers, completely bypassing the gateway WAF; to secure the cluster, platform operators must eliminate all public IPs from cluster ingress controllers, configure ingress services as internal-only load balancers inside private subnets, and use security groups or VPC firewall rules to ensure ingress pods only accept traffic from the managed gateway's VPC or private link.
+</details>
+
+**Card C: A per-IP rate limit will stop a checkout flood from thousands of residential IPs that present valid user JWTs.** An operations team configures an edge rate limiter on an e-commerce platform, applying a threshold of one hundred requests per minute per client IP address. During a flash sale event, an automated botnet launches a massive distributed checkout flood targeting the primary purchase endpoint. The botnet coordinates requests across tens of thousands of compromised residential proxy IP addresses, and each request presents a valid authenticated user JWT. The team expects that the edge per-IP rate limiting rule will automatically trigger to throttle the flood and keep downstream transaction databases healthy.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Layer 4 vs. Layer 7 abuse models, distributed botnet evasion, and authenticated resource exhaustion. Next action: realize that per-IP rate limiting is completely blind to distributed botnets because thousands of rotating residential proxy IPs each generate only one or two requests every few minutes, remaining well beneath any reasonable per-IP threshold; meanwhile, the aggregate volume of thousands of valid checkout transactions simultaneously exhausts backend database connection pools and locks transaction tables; per-IP throttles must be complemented by granular application-layer controls, including per-user or per-API-key token bucket limits extracted from JWT claims, per-path global concurrency caps on expensive mutation endpoints like `/checkout`, and bot detection signals that analyze behavioral anomalies; in managed gateways like AWS API Gateway, usage plans and client-level throttling return HTTP 429 Too Many Requests to enforce per-consumer quotas regardless of source IP rotation.
+</details>
+
+**Card D: Downstream pods can trust `X-Forwarded-User` from any client because the gateway already validated OIDC.** A platform engineering team offloads user authentication to an edge API gateway running an OpenID Connect proxy. The gateway intercepts public browser requests, validates incoming OIDC tokens against an identity provider, and forwards authenticated requests to backend Kubernetes pods with injected identity headers. Because the gateway guarantees that only requests with valid OIDC tokens pass through with these headers, application developers configure downstream microservices to trust identity headers directly for authorization checks. The team reasons that downstream services do not need to re-verify cryptographic token signatures or validate network transport identity within the internal cluster network.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Flat pod network trust assumptions, header injection, and lateral privilege escalation. Next action: recognize that downstream application pods cannot safely trust identity headers unless the network architecture strictly prevents any other network entity from reaching them directly; if the cluster uses a flat pod network without mutual TLS (mTLS) or ingress network policies, an attacker who compromises an adjacent pod or accesses an internal Service (such as via a port-forward, an SSRF vulnerability, or an internal node port) can send HTTP requests directly to the application pod with arbitrary `X-Forwarded-User: admin@example.com` headers, instantly bypassing all gateway authentication; furthermore, the edge gateway must be explicitly configured to sanitize and overwrite any incoming `X-Forwarded-*` headers from external clients to prevent header spoofing; platform teams must pair gateway authentication with Kubernetes NetworkPolicy rules that restrict pod ingress solely to gateway IP pools or enforce mTLS with cryptographic SPIFFE identities.
+</details>
+
+**Success Criteria**:
 
 - [ ] Gateway is created and programmed
 - [ ] HTTPRoute splits traffic ~80/20 between v1 and v2
