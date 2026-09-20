@@ -382,9 +382,15 @@ spec:
 
 Karpenter evaluates `weight` strictly, so the primary `compute-spot` NodePool with weight 100 is always attempted before the `compute-ondemand` NodePool at weight 10. Only when EC2 returns `InsufficientInstanceCapacity` for the Spot constraints does Karpenter fall through to On-Demand. Weights are not merely documentation—they are ordering semantics for capacity negotiation.
 
-> **Stop and think**: If Karpenter provisions a Spot instance for your workload and AWS reclaims it with a two-minute warning, how does your application ensure zero downtime? (Hint: Think about PodDisruptionBudgets, replicas, and the pod lifecycle.)
+**Pause and predict:** If Karpenter provisions a Spot instance for your workload and AWS issues an interruption warning, what mechanism protects your application from dropped requests before the node shuts down?
 
-During an interruption, the node lifecycle moves through cordon, drain, and terminate phases while Kubernetes schedules replacements elsewhere. Karpenter may launch replacement Spot capacity in another instance type pool if the NodePool allows diversity, which is why operators monitor interruption rates per family rather than per node. Application teams should test SIGTERM handling in CI the same way they test HTTP health checks, because infrastructure can only offer two minutes—not unlimited graceful shutdown—once AWS issues the reclaim notice.
+<details>
+<summary>Check your prediction</summary>
+
+Receiving a two-minute Spot interruption notice (or an earlier EC2 rebalance recommendation signal) provides advanced warning, but notice alone does not create high availability. The underlying instance will terminate unconditionally when the two minutes elapse regardless of running processes. Protecting user traffic requires defense-in-depth across Kubernetes primitives: running multiple replicas distributed across availability zones, configuring `PodDisruptionBudgets` to prevent concurrent evictions, implementing container `preStop` hooks for graceful connection draining, and properly handling operating system `SIGTERM` signals. During an interruption, the node lifecycle transitions through cordon, drain, and terminate phases while Kubernetes reschedules pods onto surviving capacity. Karpenter can launch replacement Spot nodes across alternative instance families if the NodePool defines sufficient instance diversity. Teams should validate graceful termination under simulated terminations in automated test suites because infrastructure can only grant a two-minute warning window before hard termination.
+</details>
+
+Treating compute instances as ephemeral entities shifts operational focus from individual node longevity to holistic capacity management across diverse instance families. When development teams build resilient services that accommodate node recycles, infrastructure engineers can safely adopt aggressive cost models. Automated consolidation policies can then reclaim underutilized capacity without risking customer-facing downtime.
 
 ---
 
@@ -429,7 +435,15 @@ fields @timestamp, verb, requestURI, user.username, sourceIPs.0
 | limit 20
 ```
 
-> **Stop and think**: Control plane logs can be expensive at scale. An active cluster generating 50 GB/day of audit logs costs ~$25/day in CloudWatch ingestion alone. Consider enabling only `audit` and `authenticator` by default, adding the others temporarily for debugging.
+**Pause and predict:** When you provision an Amazon EKS cluster, which control-plane log types stream to CloudWatch Logs by default? Furthermore, how should teams manage ongoing logging expenses?
+
+<details>
+<summary>Check your prediction</summary>
+
+By default, Amazon EKS sends **none** of the control-plane log streams to Amazon CloudWatch Logs; all five log types (`api`, `audit`, `authenticator`, `controllerManager`, and `scheduler`) remain disabled until explicitly activated. Once enabled, AWS delivers the selected log streams directly to a dedicated CloudWatch log group where standard ingestion and storage pricing applies to every gigabyte received. Because active clusters with high controller and reconciliation activity generate massive log volumes, enabling all streams permanently creates unnecessary telemetry expenses. A proven production default is to keep `audit` and `authenticator` enabled continuously to satisfy security governance, compliance mandates, and identity access forensics. The remaining verbose streams—`api`, `controllerManager`, and `scheduler`—are left disabled during routine operations and activated on-demand when actively investigating control-plane degradation, admission webhook stalls, or scheduling failures.
+</details>
+
+Structuring cluster logging around targeted telemetry streams establishes sustainable operational visibility across enterprise fleets. By enforcing disciplined ingestion boundaries, infrastructure teams avoid billing surprises while ensuring critical identity and governance records remain accessible during audits.
 
 ---
 
@@ -464,7 +478,15 @@ Treat the metrics table as an on-call cheat sheet rather than a shopping list of
 
 The `amazon-cloudwatch-observability` EKS add-on bundles the agents needed for Container Insights and can also deploy AWS Distro for OpenTelemetry (ADOT) collectors when you standardize on OpenTelemetry pipelines. You do not have to choose between “CloudWatch only” and “Prometheus only” on day one. Many teams emit infrastructure metrics to Container Insights for baseline dashboards while exporting application traces and custom metrics through ADOT to AMP or a self-managed backend.
 
-> **Pause and predict**: You notice that `kube_pod_container_status_restarts_total` is rapidly increasing for your core API namespace, but `node_cpu_utilization` is completely normal. What might be causing the pods to restart if it isn't node-level resource starvation? (Hint: Think about memory limits, liveness probes, or application-level crashes.)
+**Pause and predict:** You observe that `kube_pod_container_status_restarts_total` is increasing rapidly for your core API namespace, yet `node_cpu_utilization` remains completely normal. What underlying failure modes explain these container recycles?
+
+<details>
+<summary>Check your prediction</summary>
+
+Healthy node CPU utilization does not prove that application workloads are running successfully. Containers frequently restart due to pod-level resource limits or internal application failures rather than host compute starvation. The most common cause is memory limit enforcement: when a container exceeds its configured `resources.limits.memory`, the Linux kernel cgroup out-of-memory killer terminates the process with an `OOMKilled` status (`ExitCode: 137`). Another frequent failure mode is failing liveness probes, where deadlocked threads or saturated event loops cause health checks to time out, triggering kubelet container restarts. In addition, unhandled application exceptions, segmentation faults, database connection pool exhaustion, and missing configuration secrets can cause application processes to exit repeatedly. Responders must run `kubectl describe pod` to inspect termination reasons and exit codes rather than relying solely on host infrastructure metrics.
+</details>
+
+Distinguishing between host hardware saturation and isolated container runtime failures represents a fundamental milestone in site reliability engineering. Relying entirely on host-level health indicators leaves critical visibility blind spots that obscure application-layer instability from site operators during major customer incidents.
 
 ---
 
@@ -676,7 +698,15 @@ Kubernetes issues minor releases routinely, and maintaining operational readines
 
 Document the upgrade sequence in your team wiki with explicit owners: who runs Pluto, who bumps the control plane version, who pins add-on versions, and who monitors Karpenter drains. Managed EKS removes etcd toil, but human coordination errors still cause outages. Application teams may deploy new CRDs mid-upgrade, or node rotation may outrun PDB budgets—either path produces preventable downtime.
 
-> **Stop and think**: Why must you upgrade the EKS control plane *before* upgrading the worker nodes? (Hint: The Kubernetes version skew policy dictates compatibility rules between the kube-apiserver and the kubelet running on nodes.)
+**Pause and predict:** When executing an Amazon EKS cluster version upgrade, why does operational policy mandate upgrading the control plane before upgrading worker nodes and kubelet instances?
+
+<details>
+<summary>Check your prediction</summary>
+
+Under the official Kubernetes version skew policy, worker node kubelets **must not be newer** than the control plane's `kube-apiserver`. A kubelet may be up to **three** minor versions older than the API server (allowing an n-3 skew window for gradual fleet maintenance), but running a kubelet version newer than the control plane is strictly unsupported and can cause schema validation failures, registration rejections, and node communication errors. Therefore, the control plane must always be upgraded first. On Amazon EKS, clusters must be upgraded sequentially one minor version at a time (such as 1.34 to 1.35). AWS includes an automated rollback mechanism that returns the control plane to its prior minor version if the upgrade fails before completion within a 7-day window. Once the managed control plane successfully finishes updating and core add-ons are verified, platform teams can safely proceed with worker node and Karpenter NodePool rotation.
+</details>
+
+Establishing strict lifecycle discipline around cluster version migrations safeguards workloads from unexpected API translation errors and scheduling incompatibilities. Engineering organizations that institutionalize these upgrade runbooks minimize customer disruption during routine platform maintenance while maintaining compliance with upstream Kubernetes support windows.
 
 ---
 
@@ -1201,9 +1231,41 @@ helm uninstall karpenter -n kube-system
 # Karpenter-managed nodes will be terminated automatically when NodePools are deleted
 ```
 
-### Success Checklist
+Before committing an EKS production architecture to production, platform architects must audit common cognitive traps across compute, telemetry, and lifecycle operations. Evaluating these operational boundaries ensures engineering teams establish resilient data-plane baselines while avoiding dangerous assumptions about Spot availability, log ingestion economics, health metrics, and upgrade skew policies.
 
-If every item below is true, you have exercised the full production loop this module describes: provision quickly, observe honestly, and attribute spend precisely.
+**Card A: A two-minute Spot interruption notice plus a PodDisruptionBudget guarantees zero downtime for a single-replica API.** A platform engineering team migrates a critical internal API service to an Amazon EKS cluster running on EC2 Spot instances managed by Karpenter. To guard against unexpected capacity termination, the engineers configure a `PodDisruptionBudget` specifying `minAvailable: 1` for the deployment. Because AWS emits a two-minute interruption notice before reclaiming an instance, the team assumes the Kubernetes scheduler and eviction controllers will respect the disruption budget and prevent downtime for their single-replica workload.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Voluntary eviction constraints versus involuntary infrastructure termination. Next action: recognize that PodDisruptionBudgets only constrain voluntary disruptions like cluster drains or Karpenter consolidation, whereas AWS Spot interruptions are involuntary terminations that execute unconditionally after two minutes regardless of PDB configurations; maintain at least two replicas across distinct availability zones and implement robust `preStop` lifecycle hooks with graceful connection draining so backup pods can absorb traffic before an interrupted node terminates.
+</details>
+
+**Card B: Enabling all five EKS control-plane log types is free because those logs already exist on the control plane.** An infrastructure operations team provisions a production Amazon EKS cluster and enables all five control-plane log streams in the cluster logging configuration. Because Amazon EKS operates the managed control plane, the vendor already generates these diagnostic logs to maintain cluster health. The team therefore assumes that streaming these existing records to Amazon CloudWatch Logs incurs no additional data ingestion or storage charges on their monthly AWS bill.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Control-plane management boundaries versus CloudWatch Logs telemetry ingestion billing. Next action: understand that Amazon EKS control-plane logs are delivered to Amazon CloudWatch Logs, where standard CloudWatch ingestion and storage pricing applies to every ingested gigabyte; keep only `audit` and `authenticator` enabled by default to satisfy compliance and forensics requirements without inflating log expenses, and enable `api`, `scheduler`, or `controllerManager` selectively during active incident troubleshooting.
+</details>
+
+**Card C: If node CPU is normal, rising container restarts mean the Horizontal Pod Autoscaler is broken.** An on-call engineer investigates an incident where container restart counters are climbing rapidly across the core checkout service deployment. The engineer reviews node metrics and observes that host CPU utilization remains steady at twenty-five percent. Consequently, the engineer concludes that the Horizontal Pod Autoscaler failed to launch additional pods to relieve service pressure. Based on this assumption, the responder immediately escalates a ticket to reconfigure autoscaler scaling thresholds.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Application runtime health indicators versus host-level compute utilization. Next action: recognize that normal node CPU utilization does not guarantee container application health, as pods frequently crash due to memory limit enforcement (OOMKilled with exit code 137), failing liveness probes, unhandled application exceptions, or exhausted database connection pools; use `kubectl describe pod` and inspect container termination reasons and exit statuses to identify the exact runtime failure before assuming an autoscaling defect.
+</details>
+
+**Card D: Upgrade worker nodes first so kubelets are never older than the API server.** During a scheduled platform upgrade from Kubernetes 1.34 to 1.35, a cluster administrator updates worker node launch templates and Karpenter NodePool AMIs before touching the EKS control plane. The administrator reasons that running newer kubelet software guarantees worker nodes will recognize all incoming API schemas before the API server starts using them. The team schedules the worker node rollout to finish before initiating the control plane upgrade.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kubernetes version skew policy and control-plane component hierarchy. Next action: recognize that the Kubernetes version skew policy strictly prohibits worker node kubelets from running a newer minor version than the control plane's `kube-apiserver`, though kubelets may be up to three minor versions older; always upgrade the EKS control plane first, verify add-on compatibility, and only then rotate worker nodes and Karpenter NodePools to the new target version.
+</details>
+
+**Success Criteria**:
 
 - [ ] I removed Cluster Autoscaler (if present) before installing Karpenter.
 - [ ] I installed Karpenter and created an EC2NodeClass with IMDSv2 enforcement.
