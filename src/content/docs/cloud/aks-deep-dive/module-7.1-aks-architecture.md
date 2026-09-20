@@ -56,7 +56,7 @@ flowchart TB
     ControlPlane -- kubelet communicates over TLS --> DataPlane
 ```
 
-The SLA numbers matter. [If you deploy AKS across availability zones with the Standard tier, Microsoft guarantees 99.95% uptime for the API server. Without zones, you get 99.9%. On the Free tier, you get zero uptime guarantee](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers)---fine for dev, unacceptable for production. Premium tier is the long-term-support-oriented AKS tier for workloads that need extended version support.
+Architectural separation between the Microsoft-managed control plane and customer-operated agent nodes defines cluster reliability boundaries and operational responsibilities. Before provisioning node pools or deploying services, platform engineers configure cluster-management pricing tiers to align control-plane resilience with production workload availability targets.
 
 ```bash
 # Create a cluster on the Standard tier (required for production SLA)
@@ -75,7 +75,15 @@ az aks show --resource-group rg-aks-prod --name aks-prod-westeurope \
 
 ### Control-plane tiers: Free, Standard, and Premium
 
-Cluster-management pricing is separate from the VMs, disks, and load balancers you pay for in the node pools. [The Free tier charges no cluster-management fee and carries no API server uptime SLA](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers), which makes it appropriate for labs and short-lived test clusters but a poor default for anything customer-facing. The Standard tier enables the financial SLA on the Kubernetes API server: 99.9% when the cluster is regional without zone redundancy for the control plane, and 99.95% when you deploy with availability zones. Premium adds the same SLA envelope but pairs it with Long Term Support (LTS): you must enable `--k8s-support-plan AKSLongTermSupport` when creating or moving to Premium so Microsoft can extend patch support beyond the normal community window.
+**Pause and predict:** An engineering team deploys a mission-critical workload to an AKS cluster created on the default Free tier across three availability zones. During a control-plane degradation, what financial uptime SLA does Microsoft guarantee for the Kubernetes API server endpoint? How does upgrading to the Standard tier change that guarantee?
+
+<details>
+<summary>Check your prediction</summary>
+
+[The Free tier charges no cluster-management fee and carries no API server uptime SLA](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers). Microsoft provides zero financially backed availability guarantee for the API server on Free clusters, regardless of whether agent nodes span multiple availability zones; it represents a best-effort service level objective only. Upgrading to the Standard tier establishes a contractual, financially backed SLA for the Kubernetes API server endpoint: [Microsoft guarantees 99.95% uptime when AKS is deployed across availability zones, and 99.9% uptime for regional clusters deployed without zone redundancy](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers). The Premium tier maintains the identical 99.95% (with zones) and 99.9% (without zones) SLA envelope while adding extended Long Term Support (LTS) for older Kubernetes minor versions. Standard and Premium both provide uptime coverage; Premium is not the only SLA tier.
+</details>
+
+Selecting an appropriate control-plane tier establishes financial accountability between cloud provider commitments and enterprise business requirements. While infrastructure compute charges dominate monthly billing statements, control-plane availability governs access. When unexpected regional disruptions occur, external traffic and deployment automation rely on the API server staying online.
 
 Premium plus LTS is worth the extra cluster-management charge when upgrade cadence is constrained by compliance, when you need more than a year on a given minor version, or when operational teams cannot absorb quarterly minor-version migrations. For teams that can stay on the N-2 GA window and upgrade once or twice a year, Standard is usually sufficient. Treat Premium as a deliberate platform decision, not a default checkbox.
 
@@ -127,9 +135,15 @@ az aks nodepool add \
 
 ### Taints and Tolerations: Enforcing the Boundary
 
-To keep application pods off system pools, add the `CriticalAddonsOnly=true:NoSchedule` taint to a dedicated system node pool. This means your application pods will not be scheduled on system nodes unless they explicitly tolerate this taint. You should generally not add that toleration to your application deployments.
+**Pause and predict:** A developer creates a resource-intensive video processing deployment consisting of forty replica pods but omits node selectors and tolerations. The AKS cluster contains a dedicated System node pool and a general-purpose User node pool. On which node pool will the Kubernetes scheduler place these application pods, and why?
 
-> **Stop and think**: A developer creates a massive video-processing deployment but forgets to specify any node selectors or tolerations. You have a System pool (with the default taint) and a User pool. Which pool will the Kubernetes scheduler place these pods in, and why?
+<details>
+<summary>Check your prediction</summary>
+
+The scheduler places the untolerated application pods exclusively onto the **User** node pool. Dedicated System pools in AKS are automatically configured with the `CriticalAddonsOnly=true:NoSchedule` taint, which instructs the scheduler to reject any pod that lacks an explicit matching toleration. Because the video processing deployment specifies no tolerations, the scheduler filters out all system nodes during the scheduling predicates phase. This isolation guarantees that bursty or misbehaving application workloads cannot starve CoreDNS, the Konnectivity tunnel proxy, or metrics-server. Application manifests should never define tolerations for `CriticalAddonsOnly` unless they provide essential cluster infrastructure.
+</details>
+
+Explicit scheduling constraints protect cluster-critical services from resource starvation while allowing teams to reserve compute capacity for specialized workloads. Once baseline workload separation between system add-ons and business applications is established, operators can introduce custom taints. These taints partition user node pools according to hardware capability or cost profiles.
 
 For user pools, you can add your own taints to create specialized pools such as GPU, Windows, or batch-only capacity:
 
@@ -256,11 +270,15 @@ flowchart TB
 
 Zone-spanning node pools aim to stay balanced across selected zones, typically within one node per zone, but temporary imbalances can still happen during failures or scaling events. Verify actual placement rather than assuming perfect spread.
 
-Another critical detail for stateful services: **persistent volumes backed by zonal Azure Disks are zone-locked and do not follow pods across zones**.
+**Pause and predict:** A stateful application pod runs on a worker node in Zone 1, mounting an Azure Disk PersistentVolume formatted with Locally Redundant Storage (LRS). When a physical server outage in Zone 1 terminates the host, the cluster autoscaler spins up a replacement node in Zone 2. When the Kubernetes scheduler attempts to reschedule the pod in Zone 2, what happens to the volume attachment and pod readiness?
 
-> **Pause and predict**: Imagine you have a stateful application pod running in Zone 1, connected to an Azure Disk PersistentVolume. The physical host running this node experiences a hardware failure, and the node goes offline. The cluster autoscaler spins up a replacement node in Zone 2, and the Kubernetes scheduler attempts to move your pod there. What will happen to your application?
+<details>
+<summary>Check your prediction</summary>
 
-[An Azure Disk created in Zone 1 cannot be attached to a node in Zone 2. If a pod with a PVC backed by an Azure Disk gets rescheduled to a different zone, it will be stuck in `Pending` forever.](https://learn.microsoft.com/en-us/troubleshoot/azure/azure-kubernetes/storage/fail-to-mount-azure-disk-volume) You must use topology-aware scheduling or switch to Azure Files (which are zone-redundant) for workloads that need cross-zone mobility.
+Standard Locally Redundant Storage (LRS) Azure Disks are zone-locked to the availability zone where the storage resource was originally created. An Azure Disk provisioned in Zone 1 cannot attach to a virtual machine in Zone 2. As documented in [Microsoft Azure troubleshooting guidance for disk mount failures](https://learn.microsoft.com/en-us/troubleshoot/azure/azure-kubernetes/storage/fail-to-mount-azure-disk-volume), the volume attachment operation fails with an `AttachVolume.Attach failed` error, preventing the pod from reaching a Ready state. Depending on whether scheduling was topology-aware or bound ahead of time, the pod will remain stuck in `ContainerCreating` during persistent volume mount attempts rather than simply staying in `Pending`. To enable resilient cross-zone mobility, platform engineers must implement topology-aware scheduling with `volumeBindingMode: WaitForFirstConsumer`, configure Zone-Redundant Storage (ZRS) managed disks, or use multi-zone shared storage classes like Azure Files.
+</details>
+
+Designing storage architecture for multi-zone clusters requires treating physical volume boundaries separately from virtual compute placement. Without strict alignment between storage availability and scheduling constraints, automated failover mechanisms can fail. Stateful workloads end up partitioned from their underlying data during zonal outages.
 
 ```yaml
 # Pod topology spread constraint to enforce even zone distribution
@@ -348,17 +366,22 @@ Minor versions cannot be skipped in one hop: moving from 1.33.x to 1.35.x requir
 
 ### How AKS Upgrades Work Under the Hood
 
-When you trigger an upgrade (manually or via an auto-upgrade channel), AKS performs a rolling update of your nodes. The process for each node is:
+**Pause and predict:** A 10-node user pool is running production services at 90% aggregate resource utilization. You initiate a Kubernetes version upgrade on the pool. How does AKS sequence node provisioning, cordoning, and draining to prevent capacity collapse? Does it take down existing nodes before new ones are ready?
 
-1. AKS creates a new node with the target version (using a surge node)
-2. The old node is cordoned (no new pods scheduled)
-3. The old node is drained (existing pods are evicted with respect to PodDisruptionBudgets)
-4. Once the old node is empty, it is deleted
-5. AKS moves to the next node
+<details>
+<summary>Check your prediction</summary>
 
-> **Pause and predict**: You have a 10-node user pool running at 90% utilization. You trigger a Kubernetes version upgrade. If AKS were to take down 3 old nodes simultaneously before provisioning new ones, what would happen to your application performance? How does AKS prevent this?
+AKS **surges first** to protect existing workloads from resource exhaustion. Rather than taking down three out of ten nodes upfront, AKS provisions replacement compute before evicting a single active pod. By default, AKS adds **one** extra surge node running the target Kubernetes version. The upgrade lifecycle for each node batch executes systematically:
+1. AKS creates a new surge node with the target version.
+2. The older node selected for upgrade is cordoned so no additional pods can schedule on it.
+3. The cordoned node is drained, evicting pods while strictly honoring PodDisruptionBudgets (PDBs) so workloads safely migrate to the surge node.
+4. Once the drained node is empty, AKS deletes the underlying virtual machine instance.
+5. The upgrade loop repeats across the node pool until all instances match the target version.
 
-[The **max surge** setting controls how many extra nodes AKS creates during the upgrade. A higher surge means faster upgrades but higher temporary costs. For production clusters, a max surge of 33% is a solid default](https://learn.microsoft.com/en-us/azure/aks/upgrade-aks-node-pools-rolling)---it upgrades one-third of your nodes at a time.
+[The max surge configuration controls how many extra nodes AKS creates concurrently during rolling upgrades; for production environments, configuring a max surge of 33% is standard](https://learn.microsoft.com/en-us/azure/aks/upgrade-aks-node-pools-rolling) because it rolls through one-third of the pool at a time without dropping baseline pool capacity.
+</details>
+
+Controlling node surge behavior protects latency-sensitive applications against cascading capacity shortages while worker machines undergo OS re-imaging and kubelet version updates. Setting explicit surge thresholds balances operational speed against subscription quota limits and downstream network address consumption during rolling maintenance cycles.
 
 ```bash
 # Set max surge for a node pool
@@ -925,7 +948,41 @@ az aks show -g rg-aks-prod -n aks-prod-westeurope \
 
 </details>
 
-### Success Criteria
+Before deploying enterprise workloads and automated node management pipelines to production on AKS, platform architects must audit common operational misconceptions. Each scenario below states a claim that sounds operationally convenient. Treat the claim as the hypothesis, then open the details only after you have a prediction.
+
+**Card A: Untolerated application pods will land on the System pool because that is where AKS runs everything by default.** An operations team provisions an AKS cluster with a default System node pool and an additional User node pool for applications. A developer deploys an internal processing service consisting of twelve high-memory pods without defining any node selectors, node affinity, or tolerations. The team assumes that the System pool is the default destination because it was created during initial cluster setup. They expect the Kubernetes scheduler to place all untolerated application workloads onto the System pool alongside CoreDNS and metrics-server.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Node pool role designations versus admission taints and scheduler evaluation. Next action: understand that AKS automatically configures system node pools with the `CriticalAddonsOnly=true:NoSchedule` taint, which instructs the scheduler to filter out system nodes for any pod lacking an explicit toleration; because the developer's application deployment specifies no tolerations, the scheduler rejects the system nodes and places all pods exclusively onto the untainted User pool; verify that application workloads never define tolerations for `CriticalAddonsOnly`, preserving dedicated compute for CoreDNS, Konnectivity tunnels, and cluster-critical add-ons.
+</details>
+
+**Card B: After the Zone 1 node dies, the Azure Disk PVC will attach to the replacement node in Zone 2 and the pod will resume.** A stateful database deployment runs as a single-replica pod in Zone 1, mounting a PersistentVolume backed by an Azure Managed Disk with Locally Redundant Storage (LRS). An unexpected hardware fault brings down the physical host in Zone 1. The AKS cluster autoscaler detects the unfulfilled pod demand and provisions a new worker node in Zone 2. The database team assumes that the Kubernetes attach/detach controller will unmount the Azure Disk from the failed node. They expect it to attach to the replacement node in Zone 2 so the database pod can resume running.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Physical storage replication scope versus cross-zonal compute scheduling. Next action: recognize that Azure Disks provisioned with standard Locally Redundant Storage (LRS) are physically tied to the specific availability zone where the storage hardware resides and cannot attach to virtual machines in another zone; when the pod is rescheduled to Zone 2, the volume attachment fails with documented `AttachVolume.Attach failed` errors, leaving the pod unable to become Ready and often stuck in `ContainerCreating`; to ensure resilience against zone failures, deploy Zone-Redundant Storage (ZRS) disks, configure topology-aware volume binding (`WaitForFirstConsumer`), or use multi-zone shared storage like Azure Files.
+</details>
+
+**Card C: AKS upgrades a 10-node pool at 90% utilization by taking down three old nodes first, then creating replacements.** A platform team initiates a rolling Kubernetes minor-version upgrade on a 10-node production user pool operating at 90% aggregate CPU and memory utilization. The node pool configuration defines `--max-surge 33%`. The team assumes that AKS accelerates the rolling upgrade by cordoning, draining, and terminating three existing nodes simultaneously. They expect the orchestrator to rely on temporary autoscaling to replace lost compute capacity.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: In-place node termination versus surge-first rolling upgrade mechanics. Next action: understand that AKS rolling upgrades always surge first rather than terminating active compute; with `max-surge 33%`, AKS creates up to three new virtual machine instances running the target Kubernetes version before cordoning or draining any active nodes; only after the new surge nodes reach a Ready status does AKS cordon and drain an equivalent number of older nodes while strictly respecting PodDisruptionBudgets; this surge-first lifecycle guarantees that total cluster capacity never falls below 100% of the pre-upgrade baseline during rolling maintenance.
+</details>
+
+**Card D: Deploying an AKS Free-tier cluster across availability zones gives you a financially backed 99.95% API-server SLA.** A cloud engineering team designs an architecture for an internal analytics platform across three availability zones using the default AKS Free tier to minimize operational control-plane overhead. Worker nodes and underlying VMSS instances are spread evenly across zones 1, 2, and 3. Because of this distribution, the team assumes that Microsoft backs the managed API server with a financially backed 99.95% uptime SLA.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cluster infrastructure availability zones versus control-plane pricing tier contractual commitments. Next action: recognize that the AKS Free tier carries no financially backed uptime SLA under any configuration, regardless of whether worker nodes span multiple availability zones; the Free tier provides only an unbacked service level objective (SLO); to obtain a financially backed 99.95% uptime SLA on the Kubernetes API server, the cluster must be upgraded to the Standard or Premium tier with availability zones enabled (or 99.9% without zones); remember that Premium tier pairs this exact same SLA with extended Long Term Support (LTS), but is not required simply to obtain an API server SLA.
+</details>
+
+**Success Criteria**:
 
 - [ ] Entra ID groups created for admin and developer roles
 - [ ] AKS cluster deployed via Bicep with Standard tier
