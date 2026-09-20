@@ -336,7 +336,7 @@ flowchart TD
     S1 --> GKE2
 ```
 
-The pivotal distinction from AWS is that there is only ONE network boundary to manage. [Resources across all projects communicate via private IPs inherently because they exist within the same routing plane. Firewall rules are administered centrally within the Host Project.](https://cloud.google.com/vpc/docs/shared-vpc)
+The pivotal distinction from AWS is that there is only ONE network boundary to manage. [The host project is where those network objects live](https://cloud.google.com/vpc/docs/shared-vpc), and service projects consume the subnets it shares.
 
 ```bash
 # Enable Shared VPC on the host project
@@ -509,8 +509,6 @@ flowchart TD
     
     TGW -.- Q(("WHERE DOES<br/>10.0.1.50 GO?<br/>(ambiguous!)"))
 ```
-
-Overlapping CIDR blocks prevent straightforward peering or hub-based routing, so you must renumber networks or introduce translation or proxy patterns before interconnecting them.
 
 **Pause and predict:** Following a corporate acquisition, two independent engineering organizations need to connect their production VPCs, but both environments were originally provisioned using `10.0.0.0/16`. If both VPCs attach to the same Transit Gateway, can the gateway route traffic between them, and how can connectivity be established without immediately renumbering workloads?
 
