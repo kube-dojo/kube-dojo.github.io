@@ -119,7 +119,7 @@ Self-managed operators must implement snapshot schedules, test restores quarterl
 Customers **cannot** download provider etcd snapshots on EKS, GKE, or AKS, nor can you open an etcd shell or take ad hoc `etcdctl` snapshots of the provider's datastore. Because the control plane datastore is managed entirely by the cloud provider behind multi-tenant isolation boundaries, backup schedules, compaction, and quorum maintenance are internal platform responsibilities covered by vendor compliance certifications and control plane SLAs. Valid compliance evidence consists of **application-level restore drills** (such as Velero backups of custom resources, secrets, and workload specifications restored into a staging cluster), declarative GitOps drift remediation logs, and vendor SOC 2 or ISO/IEC 27001 audit packages demonstrating control plane high-availability guarantees.
 </details>
 
-Rigorous disaster recovery planning separates infrastructural database preservation from higher-level service restoration across the enterprise. To assess how each cloud provider delivers these operational boundaries and protects control plane integrity, engineering organizations must evaluate the underlying network topology and component segregation implemented across hyperscaler platforms.
+Quarterly drills still need a named restore target, a named identity that can run it, and a network path that works when the production API is busy. That is why the next comparison is how each hyperscaler actually places the API server relative to your VPC, not how the portal labels the SKU.
 
 ---
 
@@ -209,7 +209,7 @@ Understanding **where** the API server runs explains latency, compliance narrati
 
 **AKS** surfaces more adjacent resources in your subscription (VMSS, NSG, load balancers in the `MC_` group), which helps Azure-native operators reason about blast radius but blurs "what is control plane" versus "what is node" in cost allocation dashboards.
 
-Across all three hyperscalers, customer administrative access terminates at the Kubernetes API layer. Platform engineers retain full control over workload definitions and cluster role bindings, but low-level hypervisor parameters, container runtime daemons, and host operating system flags remain completely sealed within provider-managed boundaries.
+Across all three hyperscalers, customer administrative access to the control plane terminates at the Kubernetes API layer. You still choose how much of the worker OS you can see: Standard node pools and managed node groups leave kubelet, runtime, and host agents in your change window, while nodeless modes trade that access for a tighter pod contract.
 
 **Pause and predict:** GKE Autopilot completely abstracts away worker nodes, billing you only for requested pod resources. If your security team mandates a third-party intrusion detection agent that runs as a highly privileged DaemonSet to inspect host-level syscalls, how will Autopilot's architecture conflict with this requirement?
 
@@ -389,7 +389,7 @@ Cross-availability-zone networking charges represent one of the most frequently 
 
 Labor is the line item spreadsheets hide. A conservative model for self-managed production assumes **two senior engineers** spending partial quarters on: reading [Kubernetes release notes](https://kubernetes.io/releases/), running deprecated API discovery, etcd backup/restore drills, certificate rotation, and post-upgrade soak tests. At fully loaded $150–$200/hr, four upgrade cycles plus CVE firefighting easily exceed **$40k/year** before anyone touches application features—matching the labor subtotal in the tables above.
 
-A **botched minor upgrade** costs more than the successful upgrade would have saved. Symptoms include: etcd quorum loss (cluster read-only), API server version skew blocking kubelets after node reboot, or admission webhooks rejecting workloads on new defaults. Recovery often means emergency consultants, weekend war rooms, and revenue loss while Deployments cannot roll forward. Managed providers absorb etcd and API-server choreography, but **you still pay** if worker groups lag and pods crash on deprecated APIs—managed is not immunity, it is narrower blast radius.
+A **botched minor upgrade** costs more than the successful upgrade would have saved. Symptoms include: etcd quorum loss (cluster read-only), a control plane that cannot take the next minor because kubelets already sit at the skew ceiling, or admission webhooks rejecting workloads on new defaults. Recovery often means emergency consultants, weekend war rooms, and revenue loss while Deployments cannot roll forward. Managed providers absorb etcd and API-server choreography, but **you still pay** if worker groups lag and pods crash on deprecated APIs—managed is not immunity, it is narrower blast radius.
 
 Self-managed **control-plane HA** means three (or five) API servers, etcd on low-latency SSD, load balancers, and monitoring—roughly the **$10k+/year infrastructure** slice in the self-managed table. Managed bundles that HA into the per-cluster fee. At **ten clusters**, EKS control-plane fees alone are ~$8,760/year at standard pricing—still often cheaper than one engineer-week per cluster per upgrade.
 
@@ -635,7 +635,7 @@ Multi-cloud programs should harmonize evidence: same OPA/Gatekeeper policy bundl
 |--------------|-----------------|------------------------|-------------------|
 | **Sticker-price TCO** | "EKS is $73/mo" ignores NAT, labor, extended support | Finance asks for infra-only numbers | Model labor + risk + egress; revisit quarterly |
 | **Free-tier AKS in production** | No API SLA; best-effort repairs | Cost cap during POC becomes prod | Standard tier minimum; Premium when LTS required |
-| **Skipping node upgrades after CP upgrade** | Kubelet skew blocks scheduling on reboot | CP upgrade feels "done" at the API | Upgrade node pools in same change; follow [version skew policy](https://kubernetes.io/releases/version-skew-policy) |
+| **Skipping node upgrades after CP upgrade** | Next CP minor is blocked at the kubelet skew ceiling | CP upgrade feels "done" at the API | Upgrade node pools in same change; follow [version skew policy](https://kubernetes.io/releases/version-skew-policy) |
 | **Autopilot + mandatory host agents** | DaemonSets denied or ineffective | Security mandates unreviewed against Autopilot constraints | GKE Standard with hardened node images, or refactor agents to sidecars |
 | **Self-managed "to learn" on customer paths** | CVE debt and key-person risk | Engineers want deep skills | Lab clusters on kind/k3s; production stays managed |
 | **150 clusters all on managed without automation** | Control-plane fees + toil per cluster | Fear of etcd | Dedicated platform team + Cluster API; managed only where SLA fits |
