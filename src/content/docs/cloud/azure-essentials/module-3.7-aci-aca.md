@@ -260,7 +260,7 @@ A continuously running ACI workload should be priced against the current Azure p
 A monolithic web application running 24/7 on ACI incurs continuous per-second charges without providing load balancing, autoscaling, or managed TLS termination. A right-sized virtual machine or Azure Container Apps is usually significantly cheaper for always-on HTTP services, whereas ACI remains cost-effective for sparse, minute-scale batch jobs.
 </details>
 
-Production cloud architectures deliberately separate persistent web workloads from ephemeral batch compute pipelines. Workloads demanding continuous HTTP ingress require platform capabilities such as automated certificate renewal, distributed ingress path routing, and multi-replica health tracking. Engineering teams reserve ACI deployment patterns for finite processing tasks where per-second billing aligns directly with active execution boundaries.
+Ingress design and billing cadence belong to different conversations, even when both sit on Azure. Teams that pick a host for a public website also inherit certificate, routing, and replica-health work that a batch group never needed. Record those operational extras in the architecture review so the compute SKU is not the only line item on the comparison.
 
 ---
 
@@ -366,7 +366,7 @@ Health probes deserve equal attention because KEDA cannot protect users from bro
 Updating a Container App image does not mutate the live revision in place. Each configuration or image update creates a brand new immutable revision, while traffic weights and routing rules move separately at the ingress proxy layer.
 </details>
 
-Deployment strategies in Container Apps depend on the selected revision operating mode documented under [Container Apps revisions](https://learn.microsoft.com/en-us/azure/container-apps/revisions). Single revision mode automates operational cutovers by directing all incoming traffic to the newest snapshot as soon as provisioning succeeds. Multiple revision mode preserves previous versions side by side in the environment, enabling granular canary rollouts, blue-green shifts, and rapid operational rollbacks without rebuilding images.
+The CLI sequence below first switches revision mode, then publishes an image tag with a suffix, then assigns percentage weights. Treat those as three independent operations in a runbook: mode, publish, and traffic. Custom domains and managed certificates still need DNS and renewal ownership in production even when Microsoft issues the cert.
 
 Traffic splitting is an ingress concern. External and internal ingress types (documented under [ingress in Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress)) terminate TLS at the environment edge for external apps, while internal ingress exposes service-to-service routes within the environment VNet boundary. Custom domains and managed certificates reduce toil compared with ACI public IPs, but they also imply DNS and certificate renewal processes you must own in production.
 
@@ -413,7 +413,7 @@ az containerapp revision list -g myRG -n web-api \
 Setting min-replicas to 1 on an idle Consumption queue worker bills active replica rates continuously 24/7, completely erasing the financial savings of scaling to zero.
 </details>
 
-Application teams balance latency tolerances against operational cost profiles when defining baseline replica boundaries. User-facing HTTP microservices frequently establish health warm-up strategies to absorb traffic spikes without encountering cold-start latencies. Conversely, asynchronous queue workers and scheduled batch processors tolerate brief initialization intervals during burst traffic, making genuine scale-to-zero configurations the standard operational baseline for event-driven workflows.
+HTTP APIs and queue processors rarely share the same latency budget, so their replica floors should be set independently. Warm-up and probe settings matter most for user-facing request paths; batch consumers can wait for the first replica to become ready. Capture both the floor and the scaler metric in the same change request so cost and latency are reviewed together.
 
 ```bash
 # Scale based on HTTP concurrent requests
@@ -486,7 +486,7 @@ flowchart TB
     subgraph Flow With Dapr
         direction LR
         App2[App] -- HTTP call --> Sidecar[Dapr sidecar<br/>http://localhost:3500/v1.0/invoke/web-api/method/orders]
-        Sidecar -.-> Magic[Dapr handles service discovery, retries, mTLS, observability]
+        Sidecar -.-> Magic[invoke path on localhost:3500]
         style Magic fill:none,stroke:none
     end
 ```
