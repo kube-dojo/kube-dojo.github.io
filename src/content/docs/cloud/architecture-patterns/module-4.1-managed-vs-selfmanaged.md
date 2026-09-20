@@ -62,7 +62,7 @@ The analogy breaks if you treat "managed" as "no nodes to think about." Unless y
 | Cloud Infra | YOU ** | PROVIDER | PROVIDER |
 | Physical Security | YOU ** | PROVIDER | PROVIDER |
 
-Notice that even with a fully managed Kubernetes cluster, you are still actively responsible for a massive portion of the operational stack. Worker node OS patching, network policies, pod security admission, and ingress controller configuration remain your responsibility regardless of provider. With managed node groups, some node-layer duties shift to the provider; the bare-metal column in the table applies only when you run Kubernetes on premises without a hyperscaler control plane.
+Notice that even with a fully managed Kubernetes cluster, you are still actively responsible for a massive portion of the operational stack. Network policies, pod security admission, and ingress controller configuration remain customer-owned. The bare-metal column in the table applies only when you run Kubernetes on premises without a hyperscaler control plane.
 
 **Pause and predict:** If a critical vulnerability is discovered in the Linux kernel's networking stack, and you are using EKS with managed node groups, who is responsible for initiating the patching process, and why might the cloud provider intentionally wait for you to trigger it rather than auto-updating your nodes immediately?
 
@@ -90,7 +90,7 @@ When you use EKS, GKE, or AKS, the provider runs these complex, stateful compone
 
 ### Patching, CVE response, and node OS ownership
 
-The control-plane boundary is only half the story. Production risk usually concentrates on **nodes and workloads**: kernel CVEs, container runtime updates, kubelet skew, and image supply chain. Each hyperscaler patches the Kubernetes control plane (API server, scheduler, controller-manager, etcd) on its own cadence, but **you** still own when worker nodes reboot and whether workloads tolerate disruption.
+The control-plane boundary is only half the story. Production risk usually concentrates on **nodes and workloads**: kernel CVEs, container runtime updates, kubelet skew, and image supply chain. Each hyperscaler patches the Kubernetes control plane (API server, scheduler, controller-manager, etcd) on its own cadence, but production still has a node change window that must be planned like any other fleet rollout.
 
 **Amazon EKS** patches the managed control plane without customer SSH access. For workers, [Bottlerocket](https://docs.aws.amazon.com/eks/latest/userguide/bottlerocket.html) narrows the node attack surface with an immutable root filesystem designed specifically for hosting containers, replacing standard package managers with transactional image-based updates. Platform teams establish automated staging pipelines to validate image compatibility across representative synthetic workloads before approving rollouts across production clusters.
 
@@ -101,9 +101,9 @@ The control-plane boundary is only half the story. Production risk usually conce
 | Layer | EKS | GKE | AKS | Self-managed |
 |-------|-----|-----|-----|--------------|
 | Control-plane CVEs | AWS patches; you schedule upgrades | Google patches; channels + maintenance windows | Microsoft patches; tier defines SLA | You patch API/etcd/scheduler |
-| Node OS / kubelet | Managed node groups / Bottlerocket; you trigger cycles | Auto-upgrade/repair optional | Node image upgrade + surge settings | You own images and rollouts |
+| Node OS / kubelet | Managed node groups / Bottlerocket; change windows still exist | Auto-upgrade/repair optional | Node image upgrade + surge settings | You own images and rollouts |
 | Workload & image CVEs | You (scanning, admission, rollouts) | You | You | You |
-| etcd backups | Provider-managed; no direct etcd access | Provider-managed; no direct etcd access | Provider-managed; no direct etcd access | You design snapshots & restore drills |
+| etcd backups | Provider-managed HA | Provider-managed HA | Provider-managed HA | You design snapshots & restore drills |
 
 ### etcd backups and the access boundary
 
@@ -536,9 +536,9 @@ Teams chasing "fully managed" often jump to **nodeless** execution models. Compa
 | **GKE Autopilot** | GCP | Node pool YAML for many workloads | Pod requests/limits accuracy, DaemonSet restrictions | Per-pod vCPU/GiB/ephemeral + $0.10/hr management |
 | **Virtual nodes (ACI)** | AKS | VMSS for burst capacity | ACI subnet integration, scale latency | ACI consumption + cluster management tier |
 
-Autopilot and Fargate excel when workloads are stateless, bursty, and free of host-level security agents. They frustrate teams that need GPU bare-metal tuning, custom kernel modules, or forensic DaemonSets—exactly the escape-hatch scenarios in Section 5. Many enterprises run **Standard clusters with managed node pools** for the majority estate and isolate Autopilot/Fargate to greenfield microservices after a checklist review.
+Autopilot and Fargate excel when workloads are stateless, bursty, and free of host-level extras that assume a node you can tune. They frustrate teams that need GPU bare-metal tuning or custom kernel modules—exactly the escape-hatch scenarios in Section 5. Many enterprises run **Standard clusters with managed node pools** for the majority estate and isolate Autopilot/Fargate to greenfield microservices after a checklist review.
 
-**Pause and predict:** Your EKS control plane is automatically upgraded by AWS because the old version reached its end of support. However, you forgot to upgrade your worker node groups, leaving the kubelets three minor versions behind the new control plane. Based on Kubernetes version skew policies, what is the immediate impact on your currently running workloads, and what hidden danger lurks when a node eventually reboots?
+**Pause and predict:** Your EKS control plane is automatically upgraded by AWS because the old version reached its end of support. However, you forgot to upgrade your worker node groups, leaving the kubelets three minor versions behind the new control plane. Based on Kubernetes version skew policies, what is the immediate impact on your currently running workloads, and what operational constraint blocks the next control-plane upgrade?
 
 <details>
 <summary>Check your prediction</summary>
