@@ -149,7 +149,7 @@ When should you run your own broker (like RabbitMQ, Apache Kafka, or NATS) on Ku
 No. Amazon SQS is a regional managed cloud messaging service that runs entirely on AWS multi-tenant infrastructure outside your private datacenter boundary. Sending customer payloads to SQS transmits sensitive data across the external network into cloud provider storage, violating strict on-premises data residency mandates. In strictly regulated or air-gapped environments, platform teams must deploy self-hosted message brokers such as RabbitMQ, NATS, or Apache Kafka directly on on-premises Kubernetes worker nodes.
 </details>
 
-Evaluating tenancy boundaries and compliance requirements leads directly into provider selection, where each hyperscaler offers distinct queueing and streaming primitives designed for specific architectural patterns.
+The next section is how each cloud's queue and stream products map onto different workload shapes without treating every broker as interchangeable.
 
 ### Provider Fit by Workload
 
@@ -497,7 +497,7 @@ KEDA can scale to zero (`minReplicaCount: 0`), which saves costs when queues are
 The transaction encounters an end-to-end cold-start delay rather than immediate execution. Because zero consumer pods are active, the initial message waits while KEDA polls the queue metrics, triggers workload activation, and requests a replica scale-up from Kubernetes. Processing cannot begin until the scheduled pod completes image verification, container startup, and readiness probe initialization. For latency-critical paths, always configure a minimum replica count of at least one to guarantee immediate message pickup.
 </details>
 
-Balancing scale-to-zero cost efficiency against operational responsiveness requires analyzing consumer concurrency models, where queue provisioning parameters dictate real-world system throughput and platform infrastructure expenses.
+The next section is how broker concurrency models and quotas show up as throughput, backpressure, and the monthly bill.
 
 ### Throughput, Backpressure, and Cost Lens
 
@@ -619,7 +619,7 @@ aws sqs start-message-move-task \
 Dumping 5,000 messages simultaneously into the main queue risks generating a catastrophic thundering herd against downstream services. The sudden queue backlog triggers KEDA to rapidly scale consumer pods up to their maximum replica ceiling. Dozens of concurrent worker pods running parallel processing jobs can exhaust database connection pools, saturate cache instances, or trigger severe upstream API rate limiting. When redriving substantial dead-letter volumes, always throttle the redrive rate gradually or temporarily lower maximum replica limits.
 </details>
 
-Managing message lifecycle flows during incident recovery highlights how concurrency boundaries must be coordinated across multiple worker replicas to prevent shared infrastructure saturation.
+The next section is how competing consumers share a queue so each replica does not claim the same message.
 
 ---
 
@@ -751,7 +751,7 @@ while True:
 The consumer fleet enters a state of duplicate processing. Because the visibility timeout expired after 30 seconds while the initial workers were still running, SQS returned all three messages to the visible queue. Three idle consumer pods immediately receive the reappeared messages and start duplicate encoding jobs for the identical videos. This redundant execution wastes cluster CPU capacity and risks data inconsistencies unless downstream writes enforce strict idempotency.
 </details>
 
-Governing message visibility intervals and consumer acknowledgment timing forms the cornerstone of resilient event architecture, laying the groundwork for established design patterns and common operational pitfalls.
+The next section is how producers, brokers, and consumers split ownership so a failed ack does not become a double charge.
 
 ---
 
