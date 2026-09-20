@@ -38,7 +38,7 @@ Historically, infrastructure compliance relied on manual verification. Security 
 A point-in-time audit snapshot captures configuration state only at a single frozen moment in time and does not survive subsequent configuration drift introduced by ongoing Terraform runs, Helm releases, or operator reconciliations. Throughout the operational year, development teams continuously merge pull requests, upgrade base charts, deploy hotfixes, and modify cluster settings, which can introduce unreviewed ingress routes, overly broad RBAC bindings, or exposed endpoints long before the next audit cycle. Relying exclusively on static annual snapshots leaves the platform operating in an unverified state for months between assessments. Continuous compliance addresses this failure mode by replacing manual screenshot gathering with automated, continuous posture evaluation that detects and reports drift across the entire delivery lifecycle as configuration changes occur.
 </details>
 
-The next section is how periodic audit cycles allow unmonitored configuration drift to accumulate across production clusters before the next compliance review.
+The next section is how the annual audit calendar looks when verification is treated as a milestone instead of a continuous state.
 
 ```mermaid
 flowchart LR
@@ -736,7 +736,7 @@ kubectl logs job.batch/kube-bench
 A kube-bench Job operates strictly as a detective assessment tool that inspects cluster component configurations and system files at execution time, exiting immediately once its evaluation finishes. It possesses no continuous enforcement mechanism to block misconfigurations or detect subsequent configuration drift. If an administrator manually modifies node configuration files, disables API server flags, or deploys non-compliant workloads directly via kubectl, the cluster drifts out of CIS alignment without alerting the team. Maintaining a sustained CIS baseline requires pairing detective benchmark scans with preventive admission controls (such as Kyverno or Gatekeeper) and continuous GitOps reconciliation engines (such as ArgoCD or Flux) that automatically restore declared security configurations after the scanning Job exits.
 </details>
 
-The next section is how automated remediation engines and admission controllers prevent configuration drift from persisting across enterprise cluster environments.
+The next section is how CIS findings become admission defaults and Git-backed reconciliation after the benchmark Job completes.
 
 ### Automated Remediation
 
