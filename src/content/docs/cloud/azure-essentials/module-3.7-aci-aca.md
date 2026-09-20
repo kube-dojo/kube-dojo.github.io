@@ -250,11 +250,17 @@ Windows container groups remain viable when legacy .NET Framework or Windows-onl
 | **Pricing (per vCPU/sec)** | See current pricing page | See current pricing page |
 | **Pricing (per GB memory/sec)** | See current pricing page | See current pricing page |
 
-A continuously running ACI workload should be priced against the current Azure pricing page, because the effective hourly and monthly cost depends on the current rates, region, and OS. Worked estimate without pinning a currency to a stale rate: a Linux group at 2 vCPU and 4 GiB memory running continuously for thirty days is roughly 5.18 million vCPU-seconds and 10.4 million GB-seconds per month before rounding nuances. Multiply those seconds by your region's published per-second rates from the pricing page to compare against a B-series VM or against ACA with `min-replicas: 1`. You will often discover that ACI's simplicity does not beat a right-sized VM for flat always-on CPU, while ACI still wins for cumulative runtimes measured in minutes per day.
+A continuously running ACI workload should be priced against the current Azure pricing page, because the effective hourly and monthly cost depends on current rates, region, and OS. Worked estimate without pinning a currency to a stale rate: a Linux group at 2 vCPU and 4 GiB memory running continuously for thirty days is roughly 5.18 million vCPU-seconds and 10.4 million GB-seconds per month before rounding nuances. Multiply those seconds by published regional per-second rates from the pricing page to establish a baseline for infrastructure cost comparisons across hosting platforms.
 
-> **Pause and predict**: If you had a monolithic web application that receives consistent, heavy traffic 24/7, would ACI be a cost-effective hosting choice compared to a standard VM? Why or why not?
+**Pause and predict:** If you deploy a monolithic web application that receives consistent, heavy traffic 24/7, is ACI a cost-effective hosting choice compared to a right-sized virtual machine?
 
-The honest answer is usually no for steady HTTP traffic, because you would pay continuous per-second charges without receiving load balancing, autoscaling, or managed TLS. ACI wins when utilization is sparse and task boundaries are clear.
+<details>
+<summary>Check your prediction</summary>
+
+A monolithic web application running 24/7 on ACI incurs continuous per-second charges without providing load balancing, autoscaling, or managed TLS termination. A right-sized virtual machine or Azure Container Apps is usually significantly cheaper for always-on HTTP services, whereas ACI remains cost-effective for sparse, minute-scale batch jobs.
+</details>
+
+Production cloud architectures deliberately separate persistent web workloads from ephemeral batch compute pipelines. Workloads demanding continuous HTTP ingress require platform capabilities such as automated certificate renewal, distributed ingress path routing, and multi-replica health tracking. Engineering teams reserve ACI deployment patterns for finite processing tasks where per-second billing aligns directly with active execution boundaries.
 
 ---
 
@@ -352,7 +358,15 @@ Health probes deserve equal attention because KEDA cannot protect users from bro
 
 ### Revisions and Traffic Splitting
 
-Every time you update a Container App's configuration or image, [a new **revision** is created. You can control how traffic is split between revisions, enabling canary deployments and blue/green deployments](https://learn.microsoft.com/en-us/azure/container-apps/revisions). Revisions are immutable snapshots of template settings: image digest, environment variables, scale rules, probe configuration, and resource requests. **Single revision mode** simplifies operations by automatically shifting all traffic to the latest revision, which is appropriate for internal tools. **Multiple revision mode** keeps older revisions warm so Envoy can shift weights without rebuilding images.
+**Pause and predict:** Does updating a Container App container image mutate the currently running revision in place within your environment?
+
+<details>
+<summary>Check your prediction</summary>
+
+Updating a Container App image does not mutate the live revision in place. Each configuration or image update creates a brand new immutable revision, while traffic weights and routing rules move separately at the ingress proxy layer.
+</details>
+
+Deployment strategies in Container Apps depend on the selected revision operating mode documented under [Container Apps revisions](https://learn.microsoft.com/en-us/azure/container-apps/revisions). Single revision mode automates operational cutovers by directing all incoming traffic to the newest snapshot as soon as provisioning succeeds. Multiple revision mode preserves previous versions side by side in the environment, enabling granular canary rollouts, blue-green shifts, and rapid operational rollbacks without rebuilding images.
 
 Traffic splitting is an ingress concern. External and internal ingress types (documented under [ingress in Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress)) terminate TLS at the environment edge for external apps, while internal ingress exposes service-to-service routes within the environment VNet boundary. Custom domains and managed certificates reduce toil compared with ACI public IPs, but they also imply DNS and certificate renewal processes you must own in production.
 
@@ -391,7 +405,15 @@ az containerapp revision list -g myRG -n web-api \
 
 [Container Apps uses KEDA (Kubernetes Event-Driven Autoscaling) to scale based on event sources, not just CPU/memory](https://learn.microsoft.com/en-us/azure/container-apps/scale-app). This is the defining feature for event-driven architectures because the scaler observes the backlog or request pressure you care about, not a lagging CPU graph. HTTP rules use concurrent request thresholds; queue rules use depth per replica; cron rules fire scheduled jobs. Each rule still respects `min-replicas` and `max-replicas`, and cool-down timers prevent flapping when messages arrive in bursts.
 
-Scale-to-zero is powerful only when idle truly means zero replicas. Setting `min-replicas` to 1 for a queue worker "to avoid cold start" converts ACA into a small always-on service that bills active rates continuously, which erases much of the Consumption savings described in the billing guide. For user-facing HTTP APIs, measure cold-start latency with realistic images and regional placement before committing to zero; background workers often tolerate tens of seconds of startup while still saving substantially versus always-on VMs.
+**Pause and predict:** Does configuring min-replicas to 1 on an idle Consumption plan queue worker cost nothing extra while waiting for incoming messages?
+
+<details>
+<summary>Check your prediction</summary>
+
+Setting min-replicas to 1 on an idle Consumption queue worker bills active replica rates continuously 24/7, completely erasing the financial savings of scaling to zero.
+</details>
+
+Application teams balance latency tolerances against operational cost profiles when defining baseline replica boundaries. User-facing HTTP microservices frequently establish health warm-up strategies to absorb traffic spikes without encountering cold-start latencies. Conversely, asynchronous queue workers and scheduled batch processors tolerate brief initialization intervals during burst traffic, making genuine scale-to-zero configurations the standard operational baseline for event-driven workflows.
 
 ```bash
 # Scale based on HTTP concurrent requests
@@ -506,9 +528,15 @@ az containerapp env dapr-component set \
   --yaml pubsub.yaml
 ```
 
-**Example pattern**: In a microservice architecture, direct service-to-service HTTP calls can amplify slowdowns and retries into cascading failures. Dapr on Container Apps can reduce custom plumbing by adding service invocation, mTLS, and optional resiliency features such as retries and circuit breakers.
+**Pause and predict:** Does enabling Dapr integration in Azure Container Apps eliminate all custom networking code and application plumbing for inter-service communication?
 
-> **Stop and think**: If your team is migrating a complex microservices architecture to Azure and wants to avoid the operational overhead of managing a full Kubernetes cluster, how does ACA's built-in Dapr integration reduce the custom code you need to write?
+<details>
+<summary>Check your prediction</summary>
+
+Dapr sidecars provide built-in capabilities including service invocation, automatic mutual TLS encryption, retries, and circuit breakers off the shelf. While this dramatically reduces custom networking glue, it does not eliminate application-level code, as developers must still author endpoint handlers, request payloads, and invocation logic.
+</details>
+
+Development teams configure Dapr components through declarative YAML specifications that bind pluggable infrastructure backends directly to their Container Apps environments. Decoupling application endpoints from external broker dependencies simplifies local development and testing workflows. Platform operators can modify state store or pub/sub broker implementations across environments without refactoring core service code.
 
 ---
 
@@ -880,7 +908,41 @@ You should see system logs showing replica creation events as the worker scales 
 az group delete --name "$RG" --yes --no-wait
 ```
 
-### Success Criteria
+After submitting the deletion request, monitor the resource group status until all deployed container environments and queues are fully purged. Leaving unmonitored Container Apps environments or storage resources active in training subscriptions can generate unexpected infrastructure charges. Document resource names and deployment commands to ensure repeatable automation across future sandbox testing sessions.
+
+**Card A: ACI is cheaper than a right-sized VM for a 24/7 heavy web app.** An engineering team deploys a customer-facing monolithic web application receiving steady, high-volume HTTP traffic around the clock directly onto Azure Container Instances. The team assumes that serverless container billing naturally undercuts traditional virtual machine infrastructure regardless of sustained CPU utilization.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: continuous per-second resource billing versus flat reserved VM economics. Next action: deploy always-on HTTP services to right-sized Virtual Machines or Azure Container Apps, reserving ACI primarily for episodic, minute-scale batch workloads.
+</details>
+
+**Card B: Enabling Dapr on ACA means you do not write any service-invocation or retry code.** A distributed systems team enables Dapr sidecars across their Container Apps environment to streamline inter-service communication. Developers assume that the sidecar abstraction handles every aspect of communication automatically, eliminating all application-level HTTP requests, payload structures, and client invocation endpoints.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: infrastructure transport sidecar capabilities versus application-level invocation contracts. Next action: implement standard HTTP or gRPC client calls to local Dapr sidecar ports, relying on Dapr components to handle discovery, mTLS, and resiliency policies.
+</details>
+
+**Card C: Setting min-replicas to 1 on an idle Consumption queue worker costs nothing extra.** A backend developer configures a Container Apps background worker on the serverless Consumption plan with min-replicas set to 1 to eliminate cold-start latency for sporadic message queues. The developer expects Azure to waive compute charges whenever the queue depth remains zero.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: active replica baseline billing versus idle scale-to-zero consumption economics. Next action: set min-replicas to 0 for bursty queue processors to benefit from scale-to-zero billing, reserving min-replicas 1 only where strict cold-start latency constraints justify 24/7 compute charges.
+</details>
+
+**Card D: Updating a Container App image mutates the live revision in place.** A deployment engineer runs an image update command against an existing Container App hosting production traffic, assuming the command modifies the active container in place. The engineer expects existing TCP connections to persist directly within the existing runtime replica.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: immutable revision creation versus mutable container in-place patching. Next action: recognize that configuration and image changes instantiate a new immutable revision, and configure revision modes alongside traffic percentage rules to govern deployment routing.
+</details>
+
+**Success Criteria**:
 
 - [ ] Storage queue created with messages successfully sent
 - [ ] Container Apps environment created with Log Analytics integration
