@@ -92,7 +92,7 @@ Eventing is a notification pattern. The event usually says that a resource chang
 **Service Bus** is the first candidate for this workload. Event Hubs is a high-throughput partitioned data stream optimized for continuous ingestion and append-only reader checkpoints, not a competing-consumer message broker. It lacks message-level lock renewal, session state coordination across worker nodes, and native broker-managed dead-letter queues. Service Bus provides transaction boundaries, peek-lock settlement, duplicate detection, and explicit dead-lettering for poison messages.
 </details>
 
-Enterprise integration patterns require architects to separate asynchronous command dispatching from continuous metric streaming and reactive event routing. Operating reliable command processors requires setting strict queue concurrency controls, monitoring processing latency against business service level agreements, and defining formal escalation playbooks when poisonous payloads stall downstream financial workflows. Establishing distinct messaging topologies prevents transaction processing pipelines from being compromised by high-volume operational noise.
+Teams that run both billing workflows and telemetry pipelines usually keep change tickets separate so a spike in sensor volume cannot steal the same on-call rotation as a stuck invoice. Reviewers ask who owns retry, who owns poison-message handling, and which dashboard proves a command finished, before they argue about SKU names.
 
 Storage Queues are useful when the message contract is simple and cost or storage capacity matters more than broker features. They are common in low-complexity worker patterns, simple retry loops, or systems that already depend heavily on Azure Storage. They do not replace Event Hubs for replayable streams or Event Grid for native Azure event routing.
 
@@ -286,7 +286,7 @@ The [Event Grid delivery and retry documentation](https://learn.microsoft.com/en
 Event Grid retries delivery using exponential backoff for up to **24 hours** by default, but it provides **no order guarantee** across retries and concurrent deliveries. Crucially, **dead-lettering is off by default**; unrouted events are permanently dropped once retry duration expires unless an explicit Azure Storage container is configured. Furthermore, non-retriable HTTP errors like 400 (Bad Request), 403 (Forbidden), and 413 (Payload Too Large) cause delivery to fail immediately without retry.
 </details>
 
-Production readiness reviews must verify event routing resilience before promoting subscriptions into live environments. Operations teams establish proactive alert rules on delivery metric spikes, track subscription latency in Azure Monitor, and enforce infrastructure policies to ensure storage accounts are designated for dropped payload capture. Maintaining rigorous observability across integration endpoints ensures that subscriber outages never degrade upstream event publishing workflows.
+Production readiness reviews must verify event routing resilience before promoting subscriptions into live environments. Operations teams establish proactive alert rules on delivery metric spikes and track subscription latency in Azure Monitor. Maintaining rigorous observability across integration endpoints keeps subscriber outages from becoming silent publisher incidents.
 
 ### Event Grid Namespaces, MQTT, and Pull Delivery
 
