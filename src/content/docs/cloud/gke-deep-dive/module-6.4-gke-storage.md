@@ -106,7 +106,7 @@ Volume binding mode controls **when** the CSI driver creates the backing disk re
 Configuring `Immediate` binding (or omitting `volumeBindingMode`, which defaults to `Immediate` in custom StorageClasses) provisions the underlying Compute Engine disk immediately in a single zone before the pod is scheduled. When the pod is evaluated, the PersistentVolume's zonal node affinity restricts placement to zone A. If the scheduler places or must place the workload on a node in zone B due to resource pressure or affinity rules, the pod cannot mount the volume and remains stuck in `Pending` due to volume node affinity and zone mismatch conflicts. In regional clusters, platform operators should always configure `volumeBindingMode: WaitForFirstConsumer` (which is the default on GKE's built-in `standard-rwo` StorageClass) so dynamic provisioning evaluates pod scheduling constraints first and creates the disk in the pod's selected zone.
 </details>
 
-Decoupling storage provisioning from pod placement allows the Kubernetes scheduler to evaluate topology constraints and node resource availability concurrently. Platform engineers who standardize on topology-aware binding avoid manual disk relocation tickets when node pools auto-scale across distinct failure domains. The comparison table below contrasts how these binding behaviors influence provisioning workflows across single-zone and multi-zone cluster architectures:
+Decoupling storage provisioning from pod placement allows the Kubernetes scheduler to evaluate topology constraints and node resource availability concurrently. Platform engineers who standardize that ordering avoid manual disk relocation tickets when node pools auto-scale across distinct failure domains. The comparison table below contrasts how these binding behaviors influence provisioning workflows across single-zone and multi-zone cluster architectures:
 
 | Mode | Behavior | When to Use |
 | :--- | :--- | :--- |
@@ -675,6 +675,16 @@ A backup plan binds to a cluster and defines schedule (`cron-schedule`), retenti
 
 Choosing storage is choosing **durability scope** (zonal vs regional), **access pattern** (RWO vs RWX), and **consistency model** (POSIX block/file vs object). The flowchart below deepens the earlier matrix—use it in design reviews before anyone copies a dev StorageClass into production.
 
+**Pause and predict:** You are deploying a highly available legacy Content Management System (CMS). The application requires three replicas of the web tier to share a single directory for user-uploaded media (images, PDFs), which currently totals around 2 TiB. Which GKE storage solution should you choose and why?
+
+<details>
+<summary>Check your prediction</summary>
+
+Select **Filestore** for three replicas sharing a POSIX directory. Regional Persistent Disk is not viable because standard filesystem Persistent Disks only support `ReadWriteOnce` (RWO) and cannot be attached to pods running across multiple nodes simultaneously. Cloud Storage FUSE is not recommended as the CMS default because object storage lacks full POSIX filesystem semantics—such as atomic file renames, atomic locking, and directory concurrency—which standard CMS frameworks expect when manipulating media directories.
+</details>
+
+Shared-media platforms force a protocol decision before a SKU decision: directory locking, atomic rename, and multi-writer POSIX semantics are not interchangeable with object-list APIs or with block devices that merely advertise a many-writer access mode. Once that protocol bar is set, cost planning starts with service minimums and replication multipliers rather than the headline per-GiB rate.
+
 ```mermaid
 flowchart TD
     Start["Stateful data on GKE?"] --> Q1{"Single pod writer<br>(database, queue)?"}
@@ -724,16 +734,6 @@ Decoupling IOPS and throughput from disk capacity allows infrastructure engineer
 | Need provisioned IOPS independent of GiB? | Yes—provision IOPS/throughput explicitly | No—scale GiB and vCPUs |
 | Machine series | 3rd gen+ for Hyperdisk Balanced HA | Broader (check regional PD limits) |
 | Cost predictability | Pay for provisioned performance | Pay for allocated GiB |
-
-**Pause and predict:** You are deploying a highly available legacy Content Management System (CMS). The application requires three replicas of the web tier to share a single directory for user-uploaded media (images, PDFs), which currently totals around 2 TiB. Based on the decision framework above, which GKE storage solution should you choose and why?
-
-<details>
-<summary>Check your prediction</summary>
-
-Select **Filestore** for three replicas sharing a POSIX directory. Regional Persistent Disk is not viable because standard filesystem Persistent Disks only support `ReadWriteOnce` (RWO) and cannot be attached to pods running across multiple nodes simultaneously. Cloud Storage FUSE is not recommended as the CMS default because object storage lacks full POSIX filesystem semantics—such as atomic file renames, atomic locking, and directory concurrency—which standard CMS frameworks expect when manipulating media directories.
-</details>
-
-When architectural assessments show Filestore and Cloud Storage FUSE both viable for shared read-mostly datasets, engineers default to Cloud Storage FUSE if objects are large and immutable. Conversely, platform architects standardize on Filestore whenever applications demand native directory structures, POSIX permissions, or memory-mapped file operations that object buckets cannot satisfy. Beyond protocol compatibility, infrastructure teams must evaluate how service pricing floors and multi-zone replication rates impact long-term operational expenditures.
 
 ---
 
@@ -1230,7 +1230,7 @@ echo "Cleanup complete."
 ```
 </details>
 
-Before committing stateful architectures to production on GKE, platform architects must audit common cognitive traps across volume binding, disaster recovery, access modes, and multi-writer storage. Reviewing these failure layers establishes resilient storage operations across distributed cluster topologies. This proactive evaluation prevents dangerous misconceptions regarding zonal disk affinity, CRD recovery boundaries, regional disk concurrency, and raw block access.
+Before committing stateful architectures to production on GKE, platform architects must audit common cognitive traps across volume binding, disaster recovery, access modes, and multi-writer storage. Each scenario below states a claim that sounds operationally convenient. Treat the claim as the hypothesis, then open the details only after you have a prediction.
 
 **Card A: Immediate binding is fine in a regional cluster because the scheduler will place the pod in the disk's zone.** A platform operations team provisions a stateful microservice on a regional GKE cluster spanning three compute zones. To ensure storage is provisioned ahead of workload deployment, the engineer defines a custom StorageClass with `volumeBindingMode: Immediate`. The engineer assumes the regional control plane tracks all three zones. Therefore, the team expects the scheduler to place the pod in whichever zone the disk was created.
 
