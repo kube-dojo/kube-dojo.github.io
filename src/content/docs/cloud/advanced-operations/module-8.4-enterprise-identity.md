@@ -116,8 +116,15 @@ flowchart LR
     CI -- "sts:AssumeRole" --> Role2
 ```
 
-> **Stop and think**: What would happen if the Workload Account role (`EKS-Admin`) omitted the `aws:PrincipalOrgID` condition in its trust policy? If an attacker somehow guessed the role ARN, could they assume it?
-> *Without the `aws:PrincipalOrgID` condition, the role relies only on the principals named in the trust policy; adding the org condition gives you an additional organization-level boundary around who can assume it.*
+**Pause and predict:** What would happen if the Workload Account role (`EKS-Admin`) omitted the `aws:PrincipalOrgID` condition in its trust policy? If an external attacker somehow discovers or guesses the target role ARN, could they assume it directly?
+
+<details>
+<summary>Check your prediction</summary>
+
+Omitting the `aws:PrincipalOrgID` condition does **not** make guessing the role ARN sufficient to assume it. Cross-account role assumption still strictly requires a matching `Principal` block in the role's trust policy, as well as an identity-based policy in the calling account explicitly granting `sts:AssumeRole` on that role ARN. Without the `aws:PrincipalOrgID` condition, the role relies only on the specific principals named in the trust policy; adding the org condition provides an additional organization-level boundary fence around who can assume it to prevent accidental exposure if account identifiers are misconfigured.
+</details>
+
+Establishing defense-in-depth around cross-account delegation prevents unauthorized callers from exploiting ambiguous trust statements across organizational boundaries. Before deploying enterprise access patterns at scale, cloud platform teams must configure the foundational trust policies and identity permissions that govern cross-account assumption.
 
 ### Setting Up Cross-Account Roles
 
@@ -404,8 +411,15 @@ flowchart LR
     KSA -- "Workload Identity binds<br/>K8s SA to GCP SA" --> GSA
 ```
 
-> **Pause and predict**: In the GCP Workload Identity binding below, we specify `serviceAccount:team-a-prod.svc.id.goog[analytics/data-reader]`. What would happen if a developer in the same GKE cluster created a pod in the `default` namespace using a service account also named `data-reader`?
-> *The pod in the `default` namespace would be denied access. [The trust binding explicitly requires the `analytics` namespace.](https://cloud.google.com/iam/docs/workload-identity-federation-with-kubernetes) This namespace-level isolation prevents cross-tenant privilege escalation within a shared cluster.*
+**Pause and predict:** In the GCP Workload Identity binding below, we specify `serviceAccount:team-a-prod.svc.id.goog[analytics/data-reader]`. What happens if a developer in the same GKE cluster deploys a pod in the `default` namespace using a ServiceAccount also named `data-reader`?
+
+<details>
+<summary>Check your prediction</summary>
+
+The pod in the `default` namespace is denied access because GCP Workload Identity bindings are strictly namespace-scoped. The canonical principal identifier format `serviceAccount:PROJECT.svc.id.goog[analytics/data-reader]` requires an exact match on both the namespace and the Kubernetes ServiceAccount name, so `default/data-reader` does **not** match. [The trust binding explicitly requires the `analytics` namespace.](https://cloud.google.com/iam/docs/workload-identity-federation-with-kubernetes) This namespace-level isolation prevents cross-tenant privilege escalation within a shared cluster.
+</details>
+
+Enforcing explicit namespace scoping ensures that multi-tenant Kubernetes clusters can securely share access to centralized cloud services without risking lateral tenant escalation. Applying this binding pattern in production requires orchestrating specific configuration steps across both GKE cluster settings and Google Cloud IAM service account policies.
 
 To implement Workload Identity Federation, you create a direct binding between a specific Kubernetes ServiceAccount and a GCP IAM ServiceAccount.
 
@@ -480,8 +494,15 @@ EOF
 
 Azure utilizes Entra ID (formerly known as Azure Active Directory) as the central identity provider. For Kubernetes workloads running on Azure Kubernetes Service (AKS), [Microsoft provides Workload Identity Federation via OIDC](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview), completely doing away with [the legacy AAD Pod Identity mechanism](https://learn.microsoft.com/en-us/azure/aks/use-azure-ad-pod-identity).
 
-> **Pause and predict**: Why do we specify the audience as `api://AzureADTokenExchange` when creating the federated credential?
-> *[This audience restricts the token usage specifically to the Azure AD token exchange process.](https://learn.microsoft.com/en-us/entra/workload-id/workload-identities-set-up-flexible-federated-identity-credential) If a token were intercepted, it couldn't be used to directly access other Azure APIs like ARM or Key Vault, limiting the impact of token theft to just the identity federation endpoint.*
+**Pause and predict:** When configuring a Federated Identity Credential in Microsoft Entra ID for an AKS workload, why must you specify `api://AzureADTokenExchange` as the token audience rather than leaving it blank or arbitrary?
+
+<details>
+<summary>Check your prediction</summary>
+
+The audience `api://AzureADTokenExchange` is the recommended and required audience value that Microsoft Entra ID verifies during federated token exchange. [This audience restricts the token usage specifically to the Azure AD token exchange process.](https://learn.microsoft.com/en-us/entra/workload-id/workload-identities-set-up-flexible-federated-identity-credential) Microsoft Entra's token service strictly validates that the incoming projected Kubernetes ServiceAccount token declares this exact audience before exchanging it for an Azure access token, ensuring tokens minted for other OIDC relying parties cannot be used for Entra identity federation.
+</details>
+
+Validating token audiences protects the identity exchange boundary by ensuring incoming Kubernetes service account assertions cannot be repurposed across unvetted cloud relying parties. Configuring federated credentials on managed identities allows AKS workloads to authenticate seamlessly against Azure resources without storing static client secrets.
 
 The setup in Azure involves creating a Federated Credential that natively maps an OIDC token issued by the Kubernetes API server directly to an Azure Managed Identity.
 
@@ -716,8 +737,15 @@ gcloud projects add-iam-policy-binding team-a-prod \
   --condition='expression=request.time.getHours("America/New_York") >= 9 && request.time.getHours("America/New_York") <= 17,title=business-hours-only,description=Access only during EST business hours'
 ```
 
-> **Stop and think**: You configure an ABAC policy requiring `aws:ResourceTag/Environment = production` for access. What happens if an engineer with EC2 permissions simply removes the `Environment` tag from a production server?
-> *Without the tag, the resource no longer matches the ABAC condition, potentially locking authorized users out. Conversely, if an attacker can modify tags, they can grant themselves access to resources by changing the tags to match their permissions. You must strictly control the `iam:TagResource` and `ec2:DeleteTags` permissions to protect your ABAC logic.*
+**Pause and predict:** Consider an AWS ABAC policy that grants instance management permissions using `StringEquals aws:ResourceTag/Environment: production`. What happens if an engineer with EC2 permissions removes the `Environment` tag from a production server?
+
+<details>
+<summary>Check your prediction</summary>
+
+Removing the tag causes the authorization policy's `Allow` evaluation to fail to match, resulting in an immediate implicit deny. Removing the `Environment=production` tag does **not** grant unrestricted access; instead, without the tag, the resource no longer satisfies the ABAC condition, locking authorized operators out. Conversely, if an attacker possessed tag modification permissions (`ec2:CreateTags`), they could tag untrusted resources to match their own principal attributes and escalate access. You must strictly control the `iam:TagResource`, `ec2:CreateTags`, and `ec2:DeleteTags` permissions to protect your ABAC logic.
+</details>
+
+Governing resource tagging operations preserves attribute integrity and prevents unauthorized privilege escalation across dynamically authorized cloud resources. Beyond enforcing dynamic authorization policies during live API requests, enterprise security architectures require comprehensive visibility into identity transactions across all connected accounts.
 
 ---
 
@@ -1397,7 +1425,41 @@ roleRef:
 ```
 </details>
 
-### Success Criteria
+Before deploying cross-account trust boundaries and federated workload identity across enterprise cloud environments, platform architects must audit common operational misconceptions about role trust policies, namespace workload isolation, federated token exchange, and attribute-based access controls. Each scenario below states a claim that sounds plausible but masks critical identity vulnerabilities and authorization failures. Treat the claim as the hypothesis, then open the details only after you have a prediction.
+
+**Card A: If an attacker guesses the EKS-Admin role ARN, they can AssumeRole as long as aws:PrincipalOrgID is missing.** A security engineer audits a cross-account IAM role used by CI/CD pipelines to administer Amazon EKS clusters across member accounts. The engineer notices that the trust policy specifies `Principal: {"AWS": "arn:aws:iam::111111111111:root"}` without an `aws:PrincipalOrgID` condition key. The engineer assumes that because the organization condition is absent, any external AWS account can assume the role simply by knowing or brute-forcing the target role ARN.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Trust policy principal delegation and bidirectional STS authorization versus organization condition boundaries. Next action: understand that omitting `aws:PrincipalOrgID` does not allow arbitrary AWS accounts to assume the role; AWS STS cross-account assumption strictly requires bidirectional authorization, where the role's trust policy explicitly trusts the caller's principal or account, and the caller's identity possesses an IAM policy granting `sts:AssumeRole` on the target ARN; knowing or guessing the ARN alone confers zero access; adding `aws:PrincipalOrgID` provides an extra organization fence that prevents cross-account assumption if an administrator accidentally specifies an external account ID or overly permissive principal wildcard.
+</details>
+
+**Card B: A pod in the default namespace using a ServiceAccount also named data-reader inherits the analytics/data-reader Workload Identity binding.** A platform developer deploys a data processing container into the `default` namespace of a multi-tenant Google Kubernetes Engine cluster. To read telemetry datasets stored in Google Cloud BigQuery, the developer creates a local Kubernetes ServiceAccount named `data-reader`. Knowing that Team A already established a GCP Workload Identity binding for `data-reader`, the developer assumes their pod will automatically inherit BigQuery access without needing dedicated IAM bindings.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kubernetes namespace-scoped identity pools versus cluster-wide ServiceAccount credential inheritance. Next action: understand that GKE Workload Identity bindings are strictly namespace-scoped using the canonical subject format `serviceAccount:PROJECT.svc.id.goog[NAMESPACE/KSA_NAME]`; the IAM binding for Team A explicitly binds `analytics/data-reader`, which does not match a pod running with `default/data-reader`; the pod in the `default` namespace will receive a 403 Forbidden error from Google Cloud APIs; to grant access legitimately, provision a dedicated GCP IAM binding for `serviceAccount:PROJECT.svc.id.goog[default/data-reader]` or deploy the pod into the authorized `analytics` namespace.
+</details>
+
+**Card C: api://AzureADTokenExchange is an optional cosmetic field; Entra will exchange any AKS OIDC token regardless of audience.** A cloud architect creates an Azure Entra ID Federated Identity Credential for an Azure Kubernetes Service cluster to allow pods to access Azure Key Vault secrets. While authoring the Terraform configuration, the architect assumes that `api://AzureADTokenExchange` is merely a default descriptive label. Believing that Entra ID validates tokens purely based on issuer URL and subject identifier, the architect replaces the audience value with a custom string.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: OpenID Connect token audience claim validation during Secure Token Service credential exchange. Next action: recognize that `api://AzureADTokenExchange` is the recommended and required audience value that Microsoft Entra ID verifies during federated token exchange; the Entra STS strictly verifies the `aud` claim in incoming projected Kubernetes service account tokens, rejecting any token that does not specify `api://AzureADTokenExchange`; custom audience strings cause token exchange requests to fail immediately with unauthorized client errors; maintain `api://AzureADTokenExchange` in all federated identity credentials to allow Entra ID to securely mint Azure access tokens.
+</details>
+
+**Card D: Removing the Environment=production tag from an EC2 instance grants the engineer unrestricted access because ABAC no longer applies.** A platform administrator implements an AWS Attribute-Based Access Control policy granting engineers management permissions on EC2 worker nodes only when `aws:ResourceTag/Environment` matches their principal tag `production`. An engineer attempting to troubleshoot an untagged legacy instance removes the `Environment=production` tag from a running server. The engineer assumes that eliminating the production tag removes the ABAC restriction and allows standard IAM permissions to manage the host.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Attribute-Based Access Control condition matching and implicit deny evaluation versus control bypass. Next action: understand that in AWS IAM, permissions are evaluated under default implicit deny; when an ABAC policy statement uses `StringEquals aws:ResourceTag/Environment: production` to allow actions, removing the tag causes the condition to evaluate to false; because no Allow statement matches, the authorization engine implicitly denies the request, completely locking the engineer out rather than granting unrestricted access; protect ABAC architectures by strictly restricting tag modification actions like `ec2:CreateTags` and `ec2:DeleteTags` with Service Control Policies and permission boundaries.
+</details>
+
+**Success Criteria**:
 
 - [ ] Trust policy includes organization condition AND MFA requirement
 - [ ] IRSA configuration correctly binds K8s SA to IAM role with namespace+SA conditions
