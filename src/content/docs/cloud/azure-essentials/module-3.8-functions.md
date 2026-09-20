@@ -77,8 +77,8 @@ flowchart TD
     VNet{Does your function need VNet access?}
     VNet -- YES --> Cost{Is cost a primary concern?}
     VNet -- NO --> Duration{Is execution time always under 5 minutes?}
-    Cost -- YES --> Flex[Flex Consumption<br/>scales to zero, VNet support]
-    Cost -- NO --> Premium[Premium EP1<br/>no cold start, VNet, unlimited duration]
+    Cost -- YES --> Flex[Pay-per-execution plan<br/>with private outbound]
+    Cost -- NO --> Premium[Pre-warmed plan<br/>with private outbound]
     Duration -- YES --> Consumption[Consumption<br/>cheapest, simplest]
     Duration -- NO --> PremiumDedicated[Premium or Dedicated]
 ```
@@ -206,7 +206,7 @@ For **Python, Node.js, Java, and PowerShell**, the Functions runtime always runs
 The legacy in-process model does not support Flex Consumption; isolated worker architecture is required. Microsoft ends full support for the in-process .NET runtime on 10 November 2026.
 </details>
 
-Enterprise engineering teams building modern .NET serverless workloads standardize on the **isolated worker** architecture. This design mirrors idiomatic ASP.NET Core bootstrapping patterns. The isolated model runs as a standalone console process configured in `Program.cs`. It provides native dependency injection and custom middleware pipelines. Dedicated worker extensions manage trigger serialization independently. This architectural boundary prevents assembly conflicts between user application libraries and the host runtime.
+.NET apps still boot through a process the host does not own, so `Program.cs` is where dependency injection, middleware, and extension packages get wired. Pin worker extension versions in the lockfile so local `func start` matches Azure, and treat host upgrades as a separate change from application dependency bumps. Record which worker model each app uses in the runbook so on-call knows which process to inspect during a failed invocation.
 
 | Aspect | Isolated worker (.NET and other languages) | In-process (.NET legacy) |
 | :--- | :--- | :--- |
