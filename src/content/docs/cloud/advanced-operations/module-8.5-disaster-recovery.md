@@ -80,7 +80,15 @@ AWS documents four classic patterns in [Disaster Recovery Options in the Cloud](
 
 **Warm standby** runs a meaningful fraction of production capacity in the DR region—often 30–50% of nodes and full application manifests at reduced replicas. You pay for duplicate compute and storage synchronization continuously. Failover is primarily traffic shift and scale-up, not application install from scratch.
 
-> **Pause and predict**: Your database performs asynchronous replication to a DR region with average lag of five minutes. You also take full database snapshots every twelve hours. If the primary region fails and you promote the replica, what is the effective RPO? If the replica is also corrupt and you must restore from snapshot, how does the RPO change? Write both answers before reading the etcd section.
+**Pause and predict:** Your production database performs continuous asynchronous replication to a DR region with an average lag of five minutes, while secondary snapshots occur every twelve hours. If the primary region suffers an unrecoverable hardware failure and you promote the live replica, what is your effective RPO? If the replica is also corrupted and forces a restore from backup snapshot, how does the RPO change?
+
+<details>
+<summary>Check your prediction</summary>
+
+Promoting the surviving asynchronous replica results in an effective RPO of approximately **5 minutes**, bounded strictly by the replication lag at the moment of primary failure. If the replica is also corrupted or unusable and you must perform a snapshot-only restore from object storage, your effective RPO degrades to up to **12 hours** of lost transactional state. Continuous streaming replication guarantees low recovery points for live data, whereas periodic snapshots protect against widespread corruption.
+</details>
+
+Platform teams must define these recovery boundaries with executive stakeholders before committing to formal service level agreements. DR runbooks should include automated pre-promotion sanity checks so operators never inadvertently promote a damaged database replica during a regional failover event.
 
 ---
 
@@ -94,6 +102,16 @@ The first DR design question on Kubernetes is whether you can snapshot etcd your
 | Amazon EKS | AWS managed | Velero and/or [AWS Backup for EKS](https://docs.aws.amazon.com/eks/latest/userguide/integration-backup.html) |
 | Google GKE | Google managed | [Backup for GKE](https://cloud.google.com/kubernetes-engine/docs/add-on/backup-for-gke/concepts/backup-for-gke) and/or Velero |
 | Azure AKS | Microsoft managed | [Azure Backup for AKS](https://learn.microsoft.com/en-us/azure/backup/azure-kubernetes-service-backup-overview) and/or Velero |
+
+**Pause and predict:** An operations engineer wants to configure a Kubernetes CronJob that executes etcdctl snapshot save against the local control plane of an Amazon EKS cluster to capture state backups. Will this backup approach work as intended on a standard EKS deployment?
+
+<details>
+<summary>Check your prediction</summary>
+
+On standard Amazon EKS, you **cannot** execute `etcdctl snapshot save` against managed etcd. AWS operates the control plane, including etcd instances and internal certificates, behind a strict shared-responsibility boundary without exposing SSH access or raw etcd endpoints. To protect cluster state on EKS, you must use Kubernetes API-aware solutions such as Velero or AWS Backup for EKS rather than low-level etcd administrative utilities.
+</details>
+
+Understanding this boundary dictates how platform engineers design resilient disaster recovery architectures across varied cloud infrastructures. Backup tools must interact through authenticated Kubernetes API endpoints rather than assuming access to host-level control plane file systems.
 
 Velero remains the vendor-neutral lingua franca because it speaks the Kubernetes API: Deployments, Services, ConfigMaps, Ingresses, CRDs, and volume data via CSI snapshots or file-level node agents. Managed backup services integrate with cloud IAM, snapshot APIs, and policy engines at the expense of portability. Mature teams often run Velero for portability while enabling the managed service for compliance snapshots and centralized vault retention.
 
@@ -346,7 +364,15 @@ velero restore describe full-restore
 velero restore logs full-restore
 ```
 
-> **Stop and think**: You just ran a Velero restore of a critical namespace to a new cluster. The pods are starting, but they are all stuck in `Pending` state. The persistent volume claims (PVCs) remain unbound. What Kubernetes resource did you likely forget to include in your backup or pre-create in the new cluster, and how would you fix it?
+**Pause and predict:** You just executed a Velero restore of an application namespace into a newly provisioned disaster recovery cluster. While deployments and pods are created, all pods remain stuck in Pending status and their PersistentVolumeClaims remain Unbound. What essential cluster-scoped resource is most likely missing from the target cluster?
+
+<details>
+<summary>Check your prediction</summary>
+
+Unbound PVCs and Pending pods after a namespace restore typically indicate a missing or unusable **StorageClass** in the target cluster. Because Velero does not restore StorageClasses by default during namespace-scoped backups, the target cluster lacks the provisioner configuration needed to bind persistent volumes. If the StorageClass is absent or specifies a CSI provisioner that is not deployed in the DR region, volume creation stalls indefinitely until an administrator pre-provisions the matching StorageClass.
+</details>
+
+Infrastructure automation templates must provision base storage provisioners and custom resource definitions before launching namespace restoration workflows. Verifying CSI driver health across secondary regions ensures that dynamic storage attachments proceed without manual administrator intervention during an outage.
 
 ### Velero data movement: CSI snapshots vs node agent
 
@@ -565,6 +591,16 @@ flowchart LR
 ## DNS Failover Across AWS, GCP, and Azure
 
 DNS is the traffic director in any DR scenario, and it is also the hidden RTO line item teams forget. Health checks may declare the primary unhealthy in under a minute, but resolvers worldwide cache your previous answers until TTL expires. Multi-cloud Kubernetes DR therefore pairs **low TTL on user-facing records** with **health-checked failover or weighted routing** at the provider edge.
+
+**Pause and predict:** An automated Route 53 health check detects a primary region outage and switches DNS routing to the standby cluster within thirty seconds. Will all external client traffic immediately begin arriving at the DR cluster endpoint?
+
+<details>
+<summary>Check your prediction</summary>
+
+No, health-check failover does **not** flush resolver caches across public networks. External recursive resolvers and client operating systems cache earlier DNS query answers until the configured **TTL** expires. Even though the authoritative Route 53 nameserver begins serving the secondary IP immediately, clients with unexpired cached records will continue attempting to connect to the failed primary IP until their local TTL reaches zero.
+</details>
+
+Platform architects must budget for downstream resolver caching when calculating achievable recovery time targets for public endpoints. Establishing low time-to-live thresholds on critical ingress records balances routine resolution overhead against rapid traffic redirection during regional emergencies.
 
 ### Amazon Route 53 (failover and ARC)
 
@@ -1197,7 +1233,41 @@ kind delete cluster --name dr-test
 rm -f /tmp/velero-creds
 ```
 
-### Success Criteria
+Before deploying multi-region disaster recovery runbooks across enterprise cloud environments, platform architects must audit common operational misconceptions. Common misunderstandings involve replica promotion, managed control plane operations, Velero restore dynamics, and DNS failover propagation. Each scenario below states a claim that sounds plausible but masks critical distributed systems failures and recovery bottlenecks. Treat the claim as the hypothesis, then open the details only after you have a prediction.
+
+**Card A: Promoting the replica after a primary failure gives you a 12-hour RPO because that is your snapshot interval.** A platform engineer designs disaster recovery for an e-commerce transactional database by configuring cross-region asynchronous replication alongside full database snapshots taken every twelve hours. When the primary region suffers a complete data center outage, the team initiates failover procedures to promote the surviving replica. The engineer reports that because full snapshots run every twelve hours, the organization has incurred an RPO data loss of twelve hours.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Continuous asynchronous replication stream lag versus periodic snapshot recovery points. Next action: understand that promoting an active asynchronous database replica bounds your Recovery Point Objective to the actual replication lag at failure time, which typically averages five minutes; the twelve-hour snapshot interval applies only when both primary and replica data suffer catastrophic logical corruption requiring a cold restore from backup storage; document the distinct RPO characteristics of streaming replication versus point-in-time snapshots in operational runbooks to ensure accurate incident reporting.
+</details>
+
+**Card B: On Amazon EKS you should CronJob `etcdctl snapshot save` on the control-plane nodes the same way you do on kubeadm.** An infrastructure administrator migrating workloads from a self-managed bare-metal Kubernetes cluster to Amazon EKS plans to implement control-plane backups. Relying on their standard operational playbook, the administrator writes a Kubernetes CronJob to invoke `etcdctl snapshot save` against localhost with certificates mounted from host paths. The administrator assumes that managed cloud control planes allow direct administrative access to etcd instances and underlying node storage.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cloud provider managed control-plane shared responsibility model versus self-managed host administration. Next action: recognize that on Amazon EKS, AWS operates and maintains the control-plane nodes and etcd cluster behind a managed service abstraction; tenant workloads cannot SSH to control-plane instances, access etcd certificates, or execute etcdctl snapshot commands against managed control planes; use Kubernetes API-aware backup tools such as Velero or AWS Backup for EKS to capture cluster resources and persistent storage volumes.
+</details>
+
+**Card C: After a Velero restore, Pending pods and unbound PVCs mean you forgot to restore ConfigMaps.** A site reliability engineer performs a test restoration of an e-commerce namespace into a newly provisioned secondary cluster using Velero. After the restore finishes, the engineer observes that application pods remain stuck in Pending and PersistentVolumeClaims remain in Unbound status. The engineer concludes that pods are failing because environment configurations were missed, and begins searching backup archives for omitted ConfigMaps and Secrets.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cluster-scoped StorageClass provisioning and CSI driver availability versus namespace-scoped configuration resources. Next action: understand that Velero backs up namespace-scoped resources by default and omits cluster-scoped StorageClasses unless configured explicitly; unbound PVCs and Pending pods indicate that the target cluster lacks the matching StorageClass or lacks an appropriate CSI driver capable of fulfilling dynamic volume claims; inspect volume claims using `kubectl describe pvc`, ensure target storage classes are pre-provisioned in the recovery cluster, and configure storage class mappings during restore.
+</details>
+
+**Card D: When the Route 53 health check marks primary unhealthy, every client immediately uses the DR endpoint regardless of TTL.** A cloud network engineer configures Amazon Route 53 DNS failover with automated HTTPS health checks to reroute user traffic to a secondary standby cluster during regional outages. The public DNS record is configured with a standard TTL of 300 seconds. When a primary region incident causes Route 53 health checks to mark the primary endpoint unhealthy after thirty seconds, the engineer assumes that all production user requests immediately cut over to the DR endpoint.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Client-side and recursive resolver DNS caching mechanics versus authoritative nameserver health status. Next action: understand that Route 53 health-check failover only changes the IP address returned to new authoritative DNS queries; intermediate recursive resolvers and client operating systems cache the primary IP until the 300-second TTL expires, continuing to route traffic to the failed cluster; reduce TTL to 60 seconds on failover-critical records and incorporate resolver caching delay into overall application RTO calculations.
+</details>
+
+**Success Criteria**:
 
 - [ ] MinIO deployed as backup storage target
 - [ ] Velero installed and connected to MinIO
