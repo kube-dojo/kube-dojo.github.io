@@ -92,7 +92,7 @@ classDiagram
 
 The template above follows the canonical ARM shape. `parameters` accept deployment-time values. `variables` hold computed strings. `resources` declare what Azure should create. `outputs` return useful values to callers or pipelines. Every property is explicit JSON, so you can trace exactly what will deploy. The syntax still makes modest templates feel heavy compared with imperative CLI scripts.
 
-**Pause and predict:** An ARM template dynamically computes a storage account name using `[concat(parameters('env'), uniqueString(resourceGroup().id))]`, but deployment fails because the name exceeds Azure's 24-character limit. Because ARM templates lack interactive `print()` debugging statements and expression evaluation occurs server-side, how do you locate the exact evaluated string that the engine attempted to provision?
+**Pause and predict:** An ARM template dynamically computes a storage account name using `[concat(parameters('env'), uniqueString(resourceGroup().id))]`, but deployment fails because the name exceeds Azure's 24-character limit. How do you recover the exact evaluated string that Resource Manager attempted to provision?
 
 <details>
 <summary>Check your prediction</summary>
@@ -787,7 +787,7 @@ Production Bicep work is not only syntax. It is a pipeline of validate, lint, wh
 <details>
 <summary>Check your prediction</summary>
 
-Incremental deployments often do not delete omitted array elements from existing parent resources. Because Resource Manager treats nested array properties additively or retains existing unreferenced items in many resource providers, the manual subnet is typically ignored rather than marked with a deletion symbol (-).
+Yes. When the parent virtual network is in the template and the `subnets` array is present but missing the portal subnet, incremental what-if typically shows `-` under `properties.subnets` inside `~ Modify`. That is not resource-level `Delete` (complete mode only) and not `Ignore` (the top-level resource is absent from the template). Omitting the entire `subnets` property can leave existing subnets unchanged; an explicit array is a full collection.
 </details>
 
 Array properties are not the only subtle case. Renaming a resource in Bicep usually creates a destroy-and-recreate plan because Azure resource names are often immutable. What-if shows delete plus create. Treat name changes as migration projects with data copy plans, not as casual refactors.
@@ -807,7 +807,7 @@ What-If Results:
 
 + Create    (new resource will be created)
 ~ Modify    (existing resource properties will change)
-- Delete    (resource will be removed — complete mode or omitted from template)
+- Delete    (resource-level Delete is complete mode only; property-level - can appear inside incremental ~ Modify)
 = NoChange  (resource exists and matches template; may redeploy without property changes)
 * Ignore    (resource exists but is not in the template, or what-if could not expand it)
 ! Deploy    (ResourceIdOnly format — resource will redeploy; property changes unknown)
@@ -959,7 +959,7 @@ Use these matrices when choosing tools and deployment modes. They complement the
 
 | Question | If "yes" → | If "no" → |
 | :--- | :--- | :--- |
-| Template lists every resource that must survive in the RG? | Consider complete with what-if | Stay incremental |
+| Template lists every resource that must survive in the RG? | Use [deployment stacks](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/deployment-stacks) for deletions; Complete mode is not recommended | Stay incremental |
 | Drift from portal must be pruned automatically? | Stack + managed lifecycle, not ad hoc complete | Incremental + backfill Git |
 | Data services exist in the RG? | Avoid complete unless template owns them explicitly | Incremental |
 | Greenfield empty RG? | Either mode works; still run what-if | — |
@@ -1548,12 +1548,12 @@ Failure layer: declarative server-side template compilation versus procedural lo
 Failure layer: runtime output evaluation of omitted symbolic resource references. Next action: guard conditional outputs with ternary expressions such as `environment == 'dev' ? devStorage.id : ''` or restructure module contracts so outputs do not reference absent resources.
 </details>
 
-**Card C: Incremental what-if marks a portal-added subnet for deletion when the template omits it.** An operations team runs an incremental what-if prediction on a virtual network template that omits a test subnet previously created through the Azure portal. The team expects what-if to flag the undocumented subnet with a delete symbol (-) because the declarative code does not define it in the subnets array.
+**Card C: Incremental what-if never uses `-` for a portal subnet omitted from a specified `subnets` array.** An operations team runs an incremental what-if prediction on a virtual network template that omits a test subnet previously created through the Azure portal. The team assumes nested arrays are additive, so the missing subnet cannot appear with a minus sign unless they switch to complete mode.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: incremental array property merging versus full declarative resource reconciliation. Next action: backfill untracked subnets into the Bicep template definition before deployment, or manage subnets as independent child resources (`Microsoft.Network/virtualNetworks/subnets`) rather than embedded array properties.
+Failure layer: treating property-level `-` inside `~ Modify` as complete-mode resource Delete, or assuming a specified `subnets` array is additive. Next action: read `-` under `properties.subnets` as a real subnet removal when the array is specified; prefer child resources (`Microsoft.Network/virtualNetworks/subnets`) when you need independent subnet lifecycle.
 </details>
 
 **Card D: Complete mode is the safe everyday default because it cleans up portal drift.** A platform engineer configures CI/CD release pipelines to execute Bicep deployments using Complete mode by default, intending to automatically wipe out any manual configuration changes made outside source control. The engineer assumes Complete mode is a routine cleanup mechanism for daily team deployments.
