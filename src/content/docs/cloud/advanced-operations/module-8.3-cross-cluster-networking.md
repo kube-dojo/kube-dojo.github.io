@@ -286,7 +286,7 @@ spec:
 Setting `service.cilium.io/affinity: "local"` instructs Cilium to prefer local cluster backends, but it uses **remote endpoints if and only if all local backends are unavailable or unhealthy**. The service does **not** fail closed; instead, Cilium fails over to healthy endpoints in the remote mesh cluster to preserve service availability across the fleet.
 </details>
 
-Cross-cluster failover maintains application uptime across clusters during localized node or availability zone disruptions. Allowing traffic to traverse mesh boundaries automatically introduces critical cross-cluster security and isolation responsibilities. Platform teams must ensure that remote failover paths cannot bypass intended cluster trust perimeters or expose internal service ports.
+Identity-based policies become load-bearing once a service is reachable from more than one cluster. Platform teams must decide which remote identities may talk to which local endpoints, and they must retest those rules after mesh membership changes rather than assuming a shared CNI implies a shared trust perimeter.
 
 ### Network Policies Across Boundaries
 
