@@ -243,9 +243,7 @@ Use [custom role definitions](https://learn.microsoft.com/en-us/azure/role-based
 Each `azure/login` step performs a fresh token exchange at the start of the job that runs it. Re-login before lengthy operations or split work across jobs so each job re-authenticates independently. Azure DevOps service connections refresh tokens per job similarly, ensuring no unattended shell step outlives the short token lifetime.
 </details>
 
-Pipeline architectures that structure continuous integration and deployment into modular stages isolate transient execution state. When individual workflow jobs execute bounded build, packaging, or smoke-testing tasks, temporary security credentials remain constrained to their specific execution context without leaking authentication context across independent runner environments.
-
-In enterprise multi-stage environments, short-lived tokens prevent unattended background processes from hijacking long-running deployments. If an integration test suite pauses for external dependencies, isolating cloud mutations into dedicated downstream jobs ensures that credentials expire safely. This separation prevents expired session credentials from disrupting unattended release steps.
+Federated credentials bind subject claims to a repository, branch, or environment path so Entra ID refuses tokens that do not match a pre-registered credential. Least-privilege still means separate principals per environment even when every job uses OIDC instead of a client secret. Pin `azure/login` and checkout actions by SHA on any job that touches Azure so a retagged action cannot swap the identity mid-flight.
 
 ---
 
@@ -747,9 +745,7 @@ When sizing self-hosted capacity, model peak concurrent jobs rather than average
 The self-hosted runner acts as a privileged foothold on the production network where compromised jobs or third-party dependencies can reach internal private endpoints and access leftover `.azure` credential caches; Microsoft-hosted runners destroy the underlying virtual machine after each job to ensure complete workload isolation.
 </details>
 
-Platform teams often isolate internal runner infrastructure by provisioning dedicated agent subnets constrained by rigorous network security groups that deny lateral traffic toward production data tiers. Employing containerized scaling controllers like Actions Runner Controller ensures runner pods initialize in pristine workspaces without retaining disk volumes across heterogeneous workflow invocations.
-
-Furthermore, zero-trust network segmentation dictates that internal runners should communicate only with required Azure resource management endpoints and artifact storage. Restricting outbound egress traffic through firewalls or user-defined routes prevents compromised build scripts from establishing unauthorized command-and-control tunnels or exfiltrating build artifacts to external destinations.
+Document outbound allow lists with the security team before you scale a runner pool. GitHub and Azure DevOps still need HTTPS to orchestration endpoints even when builds are otherwise internal. Persistent caches between runs can shorten build times, but they also require a documented wipe policy when multiple teams share a pool.
 
 ---
 
