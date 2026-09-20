@@ -524,7 +524,7 @@ Vulnerabilities in container images are a continuous compliance concern. The lif
 <details>
 <summary>Check your prediction</summary>
 
-Scanning container images in continuous integration is strictly a promote-time gate that evaluates artifact security against vulnerability intelligence available at build execution; the answer is that you remain vulnerable without knowing it when new Common Vulnerabilities and Exposures (CVEs) are published against dependencies in running containers. CI pipelines only inspect artifacts during promotion and do not re-evaluate existing pods. A continuous compliance architecture demands continuous, in-cluster scanning through tools like Trivy Operator, which automatically rescans running workloads whenever the threat vulnerability database is updated or cluster workloads change.
+Scanning container images in continuous integration is strictly a promote-time gate that evaluates artifact security against vulnerability intelligence available at build execution. A CVE published after that build does not change the running digest, so CI never re-evaluates existing pods. In-cluster scanning (Trivy Operator) watches Kubernetes state and starts a scan when a workload changes; VulnerabilityReports refresh on a scanner report TTL (Aqua documents a 24-hour default), which is how newly published CVEs show up on already-running images without a new CI job.
 </details>
 
 The next section is how continuous vulnerability management establishes comprehensive defense in depth across build pipelines, artifact registries, running clusters, and runtime behavior.
@@ -535,7 +535,7 @@ An enterprise platform should make this lifecycle visible to application teams. 
 
 ### Trivy Operator for In-Cluster Scanning
 
-By deploying the Trivy Operator inside your cluster, you enable continuous evaluation of running workloads. Whenever the vulnerability database is updated (usually daily), Trivy automatically rescans the active workloads and surfaces newly published CVEs.
+By deploying the Trivy Operator inside your cluster, you enable continuous evaluation of running workloads. The operator watches Kubernetes for workload changes (for example a new Pod) and writes `VulnerabilityReport` objects. Reports expire on a TTL (Aqua documents a 24-hour default) so the same digest is scanned again against later vulnerability intelligence without waiting for a new CI build.
 
 ```bash
 # Install Trivy Operator
