@@ -123,7 +123,7 @@ graph TD
 Full-mesh VPC peering for 30 VPCs requires `N * (N - 1) / 2 = 435` point-to-point peering connections. Because VPC peering is non-transitive, traffic cannot hop through an intermediate VPC, forcing every pair of VPCs to maintain an explicit peering relationship. Each VPC route table requires 29 distinct target entries pointing to respective peering IDs; while the live default quota allows **500** routes per route table (expandable up to a maximum quota of **1000**), managing 435 connections introduces severe operational friction. Onboarding a 31st VPC requires provisioning 30 new peerings and updating 60 route tables simultaneously. A Transit Gateway collapses this combinatorial explosion down to **N attachments** (one per VPC) with centralized routing domains.
 </details>
 
-Scaling beyond point-to-point peering requires decoupling inter-network connectivity from individual VPC route tables through centralized hub-and-spoke routing engines. Understanding how cloud providers implement scalable transit architectures begins with examining the foundational building blocks of regional hub infrastructure.
+Enterprise networks still need a place to hang VPN, Direct Connect, and inspection VPCs beside application VPCs. The following section treats those hang-points as named objects instead of as one-off peering tickets.
 
 ---
 
@@ -300,7 +300,7 @@ resource "aws_route" "firewall_return" {
 The default Transit Gateway route table automatically associates every new attachment and propagates its CIDR block into a single flat routing domain. Under default association and propagation, every connected VPC, VPN, and Direct Connect circuit gains unrestricted bidirectional network reachability to every other attachment. This behavior collapses environment isolation, allowing lower-trust development or sandbox attachments to route directly into mission-critical production VPCs. To establish strict network segmentation, engineers must disable default route table association and propagation during gateway creation, provisioning dedicated, isolated route tables with explicit associations and selective propagations.
 </details>
 
-While AWS relies on discrete route tables to enforce traffic boundaries across separate VPCs, other hyperscalers organize multi-tenant cloud networks around fundamentally different administrative primitives. Exploring alternative cloud architectures highlights how administrative isolation models shift from routing engines to unified project fabrics.
+The next hyperscaler in this module does not start from a regional router object at all. Its intra-org fabric is a shared network owned by a host project, with a different enforcement surface than attachment-to-route-table mapping.
 
 ---
 
@@ -311,7 +311,7 @@ Google Cloud Platform (GCP) approaches transit networking from an entirely diffe
 ### Shared VPC: The GCP Way
 
 In GCP, Shared VPC is the dominant multi-project networking model. Rather than peering dozens of separate VPCs, network administrators create one massive VPC inside a central "Host Project". They then share specific subnets out to "Service Projects" owned by individual teams. 
-In GCP, that governance center is the host project and its centrally managed firewall policy. Teams still require strong ownership boundaries, but the boundaries are represented as subnet and project relationships first, and firewall policy second. This flips the mental model compared to an AWS-centric TGW mindset where the hub object is the dominant anchor; in Shared VPC, the network boundary and shared IAM boundaries are the primary primitives you must get right. As a result, "who can add a subnet" and "who can attach a service account" become as critical as routing choices.
+In GCP, that governance center is the host project. Teams still require strong ownership boundaries, but the boundaries are represented as subnet and project relationships first. This flips the mental model compared to an AWS-centric TGW mindset where the hub object is the dominant anchor. As a result, "who can add a subnet" and "who can attach a service account" become as critical as routing choices.
 
 ```mermaid
 flowchart TD
@@ -321,7 +321,7 @@ flowchart TD
             S1["Subnet: prod<br/>10.0.0.0/20"]
             S2["Subnet: stg<br/>10.1.0.0/20"]
         end
-        FW["Firewall Rules (centrally managed)<br/>Cloud Router + Cloud NAT (centrally managed)"]
+        FW["Host-project network objects<br/>Cloud Router + Cloud NAT"]
     end
 
     subgraph P1["Service Project A (Prod)"]
@@ -388,7 +388,7 @@ gcloud container clusters create team-b-prod \
   --master-ipv4-cidr=172.16.0.16/28
 ```
 
-**Pause and predict:** In GCP Shared VPC, subnets across all service projects share a single global VPC routing table, enabling automatic inter-subnet routing. How do platform teams prevent staging workloads from accessing production databases when both reside within the same Shared VPC?
+**Pause and predict:** Staging and production both live as subnets in one Shared VPC host project. How do platform teams prevent staging workloads from reaching production databases?
 
 <details>
 <summary>Check your prediction</summary>
@@ -396,7 +396,7 @@ gcloud container clusters create team-b-prod \
 Because GCP VPC networks feature global routing where all subnets route to one another by default, route tables cannot be used to isolate environments within a Shared VPC. Instead, network isolation is enforced exclusively through **host-project firewall** policies using network tags or service accounts. Security teams define hierarchical or VPC-level firewall rules in the host project that explicitly deny cross-tier communication between staging and production workloads. They bind ingress and egress restrictions to specific target service accounts attached to compute instances and GKE nodes.
 </details>
 
-Enforcing granular segmentation through centralized firewall policies secures internal project boundaries, but enterprises also require consistent connectivity mechanisms when extending their shared cloud networks to on-premises datacenters and remote branch offices. Managing hybrid wide-area connectivity demands integrating native transport hubs alongside shared project networks.
+Hybrid and branch connectivity still has to land somewhere once the shared network exists. The next object in this module is the one Google positions for on-premises VPNs and Dedicated Interconnects rather than for day-to-day subnet isolation.
 
 ### GCP Network Connectivity Center
 
@@ -520,7 +520,7 @@ Overlapping CIDR blocks prevent straightforward peering or hub-based routing, so
 An AWS Transit Gateway will **not** route between attachments with identical, overlapping CIDRs because the routing engine cannot deterministically resolve the destination attachment for the ambiguous `10.0.0.0/16` prefix. To establish bidirectional communication without undertaking an immediate, disruptive network renumbering project, teams must deploy **Private NAT** gateways or proxy endpoints alongside non-overlapping routable CIDR blocks. Source and destination addresses are translated to non-overlapping routable IPs before packets traverse the transit hub, paired with split-horizon Private DNS zones to resolve service endpoints to translated addresses.
 </details>
 
-Deploying address translation layers provides temporary remediation during mergers and acquisitions, but relying on perpetual NAT topologies introduces operational latency, troubleshooting friction, and ongoing architectural complexity. Implementing proactive governance across all cloud accounts prevents address duplication before infrastructure ever reaches production.
+Merger connectivity is a one-time emergency; the standing control is who is allowed to pick a CIDR at account-vending time. The next section is that allocation plane.
 
 ### Prevention: IP Address Management (IPAM)
 
