@@ -94,15 +94,6 @@ Platform teams must define these recovery boundaries with executive stakeholders
 
 ## Who Owns the Control Plane: etcd on Managed vs Self-Managed Clusters
 
-The first DR design question on Kubernetes is whether you can snapshot etcd yourself. On **Amazon EKS**, **Google GKE**, and **Azure AKS**, the cloud provider operates the Kubernetes control plane, including etcd, API server availability, and control plane upgrades. AWS documents that it manages the etcd database as part of the EKS control plane under the shared responsibility model ([Security in Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/security.html)). GKE and AKS follow the same split: you do not SSH to control plane nodes for etcd snapshots on standard managed offerings.
-
-| Cluster type | etcd access | Primary cluster-state backup approach |
-|---|---|---|
-| Self-managed (kubeadm, kOps, Rancher) | You operate etcd | `etcdctl snapshot save` on control plane nodes |
-| Amazon EKS | AWS managed | Velero and/or [AWS Backup for EKS](https://docs.aws.amazon.com/eks/latest/userguide/integration-backup.html) |
-| Google GKE | Google managed | [Backup for GKE](https://cloud.google.com/kubernetes-engine/docs/add-on/backup-for-gke/concepts/backup-for-gke) and/or Velero |
-| Azure AKS | Microsoft managed | [Azure Backup for AKS](https://learn.microsoft.com/en-us/azure/backup/azure-kubernetes-service-backup-overview) and/or Velero |
-
 **Pause and predict:** An operations engineer wants to configure a Kubernetes CronJob that executes etcdctl snapshot save against the local control plane of an Amazon EKS cluster to capture state backups. Will this backup approach work as intended on a standard EKS deployment?
 
 <details>
@@ -111,7 +102,16 @@ The first DR design question on Kubernetes is whether you can snapshot etcd your
 On standard Amazon EKS, you **cannot** execute `etcdctl snapshot save` against managed etcd. AWS operates the control plane, including etcd instances and internal certificates, behind a strict shared-responsibility boundary without exposing SSH access or raw etcd endpoints. To protect cluster state on EKS, you must use Kubernetes API-aware solutions such as Velero or AWS Backup for EKS rather than low-level etcd administrative utilities.
 </details>
 
-Understanding this boundary dictates how platform engineers design resilient disaster recovery architectures across varied cloud infrastructures. Backup tools must interact through authenticated Kubernetes API endpoints rather than assuming access to host-level control plane file systems.
+DR designs for managed clusters start from the Kubernetes API and the data plane you actually operate. Treat control-plane internals as a provider contract, then inventory every object, volume, and dependency that still lives on your side of that contract.
+
+The first DR design question on Kubernetes is whether you can snapshot etcd yourself. On **Amazon EKS**, **Google GKE**, and **Azure AKS**, the cloud provider operates the Kubernetes control plane, including etcd, API server availability, and control plane upgrades. AWS documents that it manages the etcd database as part of the EKS control plane under the shared responsibility model ([Security in Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/security.html)). GKE and AKS follow the same split: you do not SSH to control plane nodes for etcd snapshots on standard managed offerings.
+
+| Cluster type | etcd access | Primary cluster-state backup approach |
+|---|---|---|
+| Self-managed (kubeadm, kOps, Rancher) | You operate etcd | `etcdctl snapshot save` on control plane nodes |
+| Amazon EKS | AWS managed | Velero and/or [AWS Backup for EKS](https://docs.aws.amazon.com/eks/latest/userguide/integration-backup.html) |
+| Google GKE | Google managed | [Backup for GKE](https://cloud.google.com/kubernetes-engine/docs/add-on/backup-for-gke/concepts/backup-for-gke) and/or Velero |
+| Azure AKS | Microsoft managed | [Azure Backup for AKS](https://learn.microsoft.com/en-us/azure/backup/azure-kubernetes-service-backup-overview) and/or Velero |
 
 Velero remains the vendor-neutral lingua franca because it speaks the Kubernetes API: Deployments, Services, ConfigMaps, Ingresses, CRDs, and volume data via CSI snapshots or file-level node agents. Managed backup services integrate with cloud IAM, snapshot APIs, and policy engines at the expense of portability. Mature teams often run Velero for portability while enabling the managed service for compliance snapshots and centralized vault retention.
 
@@ -372,7 +372,7 @@ velero restore logs full-restore
 Unbound PVCs and Pending pods after a namespace restore typically indicate a missing or unusable **StorageClass** in the target cluster. Because Velero does not restore StorageClasses by default during namespace-scoped backups, the target cluster lacks the provisioner configuration needed to bind persistent volumes. If the StorageClass is absent or specifies a CSI provisioner that is not deployed in the DR region, volume creation stalls indefinitely until an administrator pre-provisions the matching StorageClass.
 </details>
 
-Infrastructure automation templates must provision base storage provisioners and custom resource definitions before launching namespace restoration workflows. Verifying CSI driver health across secondary regions ensures that dynamic storage attachments proceed without manual administrator intervention during an outage.
+A green Velero restore of Deployments is not proof that stateful workloads can schedule. Walk the pending pods and claim events in the DR cluster before you declare the drill a success.
 
 ### Velero data movement: CSI snapshots vs node agent
 
@@ -590,8 +590,6 @@ flowchart LR
 
 ## DNS Failover Across AWS, GCP, and Azure
 
-DNS is the traffic director in any DR scenario, and it is also the hidden RTO line item teams forget. Health checks may declare the primary unhealthy in under a minute, but resolvers worldwide cache your previous answers until TTL expires. Multi-cloud Kubernetes DR therefore pairs **low TTL on user-facing records** with **health-checked failover or weighted routing** at the provider edge.
-
 **Pause and predict:** An automated Route 53 health check detects a primary region outage and switches DNS routing to the standby cluster within thirty seconds. Will all external client traffic immediately begin arriving at the DR cluster endpoint?
 
 <details>
@@ -600,7 +598,9 @@ DNS is the traffic director in any DR scenario, and it is also the hidden RTO li
 No, health-check failover does **not** flush resolver caches across public networks. External recursive resolvers and client operating systems cache earlier DNS query answers until the configured **TTL** expires. Even though the authoritative Route 53 nameserver begins serving the secondary IP immediately, clients with unexpired cached records will continue attempting to connect to the failed primary IP until their local TTL reaches zero.
 </details>
 
-Platform architects must budget for downstream resolver caching when calculating achievable recovery time targets for public endpoints. Establishing low time-to-live thresholds on critical ingress records balances routine resolution overhead against rapid traffic redirection during regional emergencies.
+Public ingress failover has two clocks: when your authoritative zone changes, and when the rest of the internet notices. Record both in the RTO budget instead of assuming the health-check interval is the user-visible cutover time.
+
+DNS is the traffic director in any DR scenario, and it is also the hidden RTO line item teams forget. Multi-cloud Kubernetes DR therefore pairs **low TTL on user-facing records** with **health-checked failover or weighted routing** at the provider edge.
 
 ### Amazon Route 53 (failover and ARC)
 
