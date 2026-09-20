@@ -45,7 +45,7 @@ Kubernetes does not remove those distinctions. A Deployment can poll a queue, su
 
 AWS deliberately offers several products because each shape has a different operational contract. SQS is the simple queue for work distribution; SNS is the fan-out topic; EventBridge is an event bus with filtering, routing, retries, and many AWS service integrations; Amazon MQ is the managed broker for teams that need ActiveMQ or RabbitMQ protocols; MSK is managed Kafka; and Kinesis Data Streams is the AWS-native shard-based stream. Choosing among them is mostly about coupling, protocol, ordering, replay, and cost model.
 
-Google Cloud pushes most general messaging toward Pub/Sub, where a topic plus one subscription behaves like a queue and a topic plus many subscriptions behaves like fan-out. Pub/Sub Lite should now be treated as legacy migration material, not a new design target: Google's own documentation lists Pub/Sub Lite as deprecated with a June 30, 2026 turndown, and recommends migrating to Pub/Sub or Google Cloud Managed Service for Apache Kafka. That matters for architecture reviews because "reserved-capacity Pub/Sub Lite is cheaper" is no longer a safe forward-looking answer.
+Google Cloud pushes most general messaging toward Pub/Sub, where a topic plus one subscription behaves like a queue and a topic plus many subscriptions behaves like fan-out. Pub/Sub Lite should now be treated as legacy migration material, not a new design target: Google's own documentation lists Pub/Sub Lite as deprecated with a January 31, 2027 turndown, and recommends migrating to Pub/Sub or Google Cloud Managed Service for Apache Kafka. That matters for architecture reviews because "reserved-capacity Pub/Sub Lite is cheaper" is no longer a safe forward-looking answer.
 
 Azure splits the same space into Service Bus, Event Grid, and Event Hubs. Service Bus is the enterprise broker for queues, topics, sessions, transactions, duplicate detection, and dead-lettering. Event Grid is the event distribution service for reactive notifications and CloudEvents-style routing. Event Hubs is the streaming ingestion service with partitions, consumer groups, retention, and Kafka-compatible endpoints for many Kafka clients. The names differ, but the design question remains queue, fan-out, or durable log.
 
@@ -120,7 +120,7 @@ def process_payment(message):
 | Feature | AWS SQS/SNS | Google Pub/Sub | Azure Service Bus |
 |---------|-------------|----------------|-------------------|
 | Queue model | SQS = queue, SNS = topic | Topic + Subscription | Queue or Topic + Subscription |
-| Max message size | [256 KB (SQS), 256 KB (SNS)](https://docs.aws.amazon.com/sns/latest/dg/example_sns_PublishLargeMessage_section.html) | [10 MB](https://cloud.google.com/pubsub/quotas) | [256 KB (Standard), 100 MB (Premium)](https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-quotas) |
+| Max message size | [1 MiB (SQS)](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html), [256 KiB (SNS)](https://docs.aws.amazon.com/general/latest/gr/sns.html) | [10 MB](https://cloud.google.com/pubsub/quotas) | [256 KB (Standard), 100 MB (Premium)](https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-quotas) |
 | Retention | 1 min - 14 days | 7 days by default; topic retention up to 31 days | Tier- and entity-dependent; do not assume a universal 14-day cap |
 | Ordering | [FIFO queues (strict per group)](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues-understanding-logic.html) | [Ordering keys](https://cloud.google.com/pubsub/docs/ordering) | [Sessions (strict per session)](https://learn.microsoft.com/en-us/azure/service-bus-messaging/message-sessions) |
 | Throughput | Auto-scales for high request volume | High throughput, subject to quotas and configuration | Depends on tier and workload characteristics |
@@ -448,7 +448,7 @@ spec:
         value: "50"
 ```
 
-KEDA deprecated the older `subscriptionSize` parameter in favor of `mode` + `value`; the GCP Pub/Sub scaler itself is supported. Treat this example as the shape of a scaler, then verify the `mode` and `value` fields against the KEDA version running in your cluster.
+KEDA deprecated the older `subscriptionSize` parameter in favor of `mode` + `value`. The `gcp-pubsub` scaler is still documented, but KEDA marks it deprecated and says it will not receive further modification. Treat this example as the current shape, verify `mode` and `value` against the KEDA version in your cluster, and do not start new production designs on a scaler that is already frozen.
 
 ### KEDA ScaledObject for Azure Service Bus
 
@@ -501,7 +501,7 @@ The next section is how broker concurrency models and quotas show up as throughp
 
 ### Throughput, Backpressure, and Cost Lens
 
-Throughput planning starts with the broker's concurrency model. SQS Standard queues support a very high, nearly unlimited number of API calls per second per action, which makes them forgiving for bursty queue workloads. SQS FIFO queues trade some of that freedom for ordering and deduplication; the default non-high-throughput FIFO limits are commonly taught as 300 API actions per second or 3,000 messages per second with batches of ten. High-throughput FIFO can go higher, but the exact quota is region-specific and should be verified before a design review.
+Throughput planning starts with the broker's concurrency model. SQS Standard queues support a very high, nearly unlimited number of API calls per second per action, which makes them forgiving for bursty queue workloads. SQS FIFO queues trade some of that freedom for ordering and deduplication; the default non-high-throughput FIFO limits are commonly taught as 300 API actions per second per partition, or 3,000 messages per second with batches of ten. High-throughput FIFO can go higher, but the exact quota is region-specific and should be verified before a design review.
 
 Pub/Sub hides more partition math from you, but it does not remove quotas or cost. Publishers and subscribers consume regional quota, message storage grows with retention and unacknowledged backlog, and exactly-once subscriptions add latency and quota considerations. Pub/Sub pricing is based on published, delivered, and stored bytes, with data transfer costs when throughput crosses zone or region boundaries. Batching small messages matters because many pricing and throughput systems have minimum billable units or per-request overhead.
 
@@ -1273,7 +1273,7 @@ kind delete cluster --name event-lab
 
 ## Sources
 
-- [docs.aws.amazon.com: example sns PublishLargeMessage section.html](https://docs.aws.amazon.com/sns/latest/dg/example_sns_PublishLargeMessage_section.html) — AWS documentation explicitly states that 256 KB is the maximum message size in both SNS and SQS.
+- [docs.aws.amazon.com: sns endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/sns.html) — AWS documents the native SNS maximum message size as 262,144 bytes (256 KiB).
 - [cloud.google.com: quotas](https://cloud.google.com/pubsub/quotas) — Google Cloud's quotas page directly lists a 10 MB message size limit for Pub/Sub.
 - [learn.microsoft.com: service bus quotas](https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-quotas) — Microsoft's Service Bus quotas page directly documents the tier-specific message-size limits.
 - [cloud.google.com: ordering](https://cloud.google.com/pubsub/docs/ordering) — Google Cloud's ordering documentation directly explains ordered delivery via ordering keys.
@@ -1287,7 +1287,7 @@ kind delete cluster --name event-lab
 - [docs.aws.amazon.com: using messagegroupid property.html](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagegroupid-property.html) — AWS directly documents that strict ordering requires FIFO queues and that `MessageGroupId` defines ordered groups.
 - [Azure Service Bus queues, topics, and subscriptions](https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-queues-topics-subscriptions) — It gives the cleanest vendor overview of queue vs pub/sub semantics in Azure Service Bus.
 - [KEDA upstream repository](https://github.com/kedacore/keda) — Use this as the allowlisted starting point for KEDA concepts while the primary docs host remains off-list.
-- [Amazon SQS message quotas](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html) — AWS documents Standard queue throughput behavior, FIFO throughput limits, batching effects, and message retention bounds.
+- [Amazon SQS message quotas](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html) — AWS documents the native SQS maximum message size as 1,048,576 bytes (1 MiB), plus Standard and FIFO throughput, batching, and retention bounds.
 - [Amazon SQS long polling best practices](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/best-practices-setting-up-long-polling.html) — AWS explains why long polling reduces empty receives and lists the maximum wait time.
 - [Amazon SQS exactly-once processing for FIFO queues](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues-exactly-once-processing.html) — AWS documents FIFO deduplication behavior and the 5-minute deduplication interval.
 - [Amazon SQS message deduplication ID](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html) — AWS explains how `MessageDeduplicationId` prevents duplicate delivery within the deduplication window.
@@ -1295,7 +1295,7 @@ kind delete cluster --name event-lab
 - [Amazon MSK Developer Guide](https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html) — AWS documents Amazon MSK as managed Apache Kafka and explains broker, producer, consumer, and topic concepts.
 - [Amazon EventBridge retry policy](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-retry-policy.html) — AWS documents EventBridge retry behavior, default retry duration, and DLQ guidance for undelivered events.
 - [Pub/Sub exactly-once delivery](https://cloud.google.com/pubsub/docs/exactly-once-delivery) — Google documents exactly-once delivery semantics, pull-subscription scope, and regional considerations.
-- [Choose Pub/Sub or Pub/Sub Lite](https://cloud.google.com/pubsub/docs/choosing-pubsub-or-lite) — Google documents Pub/Sub Lite deprecation and the June 30, 2026 turndown date.
+- [Choose Pub/Sub or Pub/Sub Lite](https://cloud.google.com/pubsub/docs/choosing-pubsub-or-lite) — Google documents Pub/Sub Lite deprecation and the January 31, 2027 turndown date.
 - [Pub/Sub pricing](https://cloud.google.com/pubsub/pricing) — Google documents throughput, storage, and data-transfer pricing behavior for Pub/Sub and Pub/Sub Lite.
 - [Choose between Azure messaging services](https://learn.microsoft.com/en-us/azure/service-bus-messaging/compare-messaging-services) — Microsoft compares Event Grid, Event Hubs, and Service Bus by messaging scenario.
 - [Azure Event Hubs overview](https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-about) — Microsoft documents Event Hubs as a managed streaming platform with partitions, consumer groups, and Kafka compatibility.
@@ -1303,7 +1303,7 @@ kind delete cluster --name event-lab
 - [Azure Event Hubs Kafka configurations](https://learn.microsoft.com/en-us/azure/event-hubs/apache-kafka-configurations) — Microsoft documents the Kafka-compatible endpoint and configuration differences.
 - [Azure Event Grid delivery and retry](https://learn.microsoft.com/en-us/azure/event-grid/delivery-and-retry) — Microsoft documents Event Grid at-least-once delivery, retry policy, batching, and dead-letter behavior.
 - [KEDA AWS SQS scaler](https://keda.sh/docs/latest/scalers/aws-sqs/) — KEDA documents the `aws-sqs-queue` trigger, queue length target, and in-flight message scaling behavior.
-- [KEDA GCP Pub/Sub scaler](https://keda.sh/docs/latest/scalers/gcp-pub-sub/) — KEDA documents the GCP Pub/Sub scaler, `mode`, `value`, and parameter migration notes.
+- [KEDA GCP Pub/Sub scaler](https://keda.sh/docs/latest/scalers/gcp-pub-sub/) — KEDA documents `mode` and `value` for the GCP Pub/Sub scaler and marks the scaler itself as deprecated.
 - [KEDA Azure Service Bus scaler](https://keda.sh/docs/latest/scalers/azure-service-bus/) — KEDA documents queue and topic scaling for Azure Service Bus using active message count.
 - [KEDA Apache Kafka scaler](https://keda.sh/docs/latest/scalers/apache-kafka/) — KEDA documents Kafka lag scaling and partition-aware replica constraints.
 - [Kubernetes operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) — Kubernetes documents operators as controllers built around custom resources and reconciliation loops.
