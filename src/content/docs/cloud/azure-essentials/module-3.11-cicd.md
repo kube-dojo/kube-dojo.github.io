@@ -233,11 +233,19 @@ Contributor at subscription scope is the most common over-permission in Azure CI
 
 Use [custom role definitions](https://learn.microsoft.com/en-us/azure/role-based-access-control/custom-roles) when built-in roles grant delete permissions your deployer should not have. A deployer that only updates container images rarely needs permission to delete the underlying App Service plan.
 
-#### Answering the OIDC session-length question
+#### Managing OIDC token session lifecycles
 
-> **Stop and think**: If an OIDC token is valid for only 10 minutes, how does a pipeline that takes 45 minutes to run maintain authentication to Azure?
+**Pause and predict:** If an OIDC token issued by Entra ID expires after 10 minutes, how does a continuous delivery workflow requiring 45 minutes of end-to-end execution maintain valid Azure control plane authorization?
 
-Each `azure/login` step performs a fresh token exchange at the start of the job that runs it. Long jobs should call `azure/login` again before lengthy operations if you approach token lifetime limits, or split work across jobs so each job re-authenticates independently. Azure DevOps service connections refresh tokens similarly per job. Design pipelines so no single shell step runs unattended for longer than the token lifetime without an explicit re-login.
+<details>
+<summary>Check your prediction</summary>
+
+Each `azure/login` step performs a fresh token exchange at the start of the job that runs it. Re-login before lengthy operations or split work across jobs so each job re-authenticates independently. Azure DevOps service connections refresh tokens per job similarly, ensuring no unattended shell step outlives the short token lifetime.
+</details>
+
+Pipeline architectures that structure continuous integration and deployment into modular stages isolate transient execution state. When individual workflow jobs execute bounded build, packaging, or smoke-testing tasks, temporary security credentials remain constrained to their specific execution context without leaking authentication context across independent runner environments.
+
+In enterprise multi-stage environments, short-lived tokens prevent unattended background processes from hijacking long-running deployments. If an integration test suite pauses for external dependencies, isolating cloud mutations into dedicated downstream jobs ensures that credentials expire safely. This separation prevents expired session credentials from disrupting unattended release steps.
 
 ---
 
@@ -620,7 +628,17 @@ Example Bicep gate in GitHub Actions:
             --parameters @infra/main.parameters.json
 ```
 
-Run what-if on every pull request. Run apply only from protected branches after approval. Store Terraform state in Azure Storage with blob locking. Never commit state files to Git.
+**Pause and predict:** Should infrastructure automation teams configure Bicep what-if predictions exclusively within post-merge deployment jobs, or should change preview commands run across pre-merge pull requests?
+
+<details>
+<summary>Check your prediction</summary>
+
+Run what-if on every pull request so code reviewers can inspect proposed resource mutations before merging; execute deployment apply steps only from protected branches after approval.
+</details>
+
+Storing Terraform state in Azure Storage with blob lease locking guarantees that parallel execution threads cannot corrupt remote configuration state during concurrent execution runs. Infrastructure engineers must keep remote state files strictly out of source control repositories to prevent the accidental exposure of sensitive resource connection strings, secrets, and generated endpoint identifiers.
+
+Establishing automated drift detection runs on a regular schedule complements pull-request validations by identifying out-of-band modifications before deployments execute. If an operator modifies cloud resources directly through administrative portals during an emergency incident, scheduled pipeline checks report the resulting configuration variance promptly. Platform engineers can then reconcile declarative templates before subsequent deployment cycles begin.
 
 **Terraform on Azure** follows the same preview-then-apply rhythm. Configure the `azurerm` backend to use a storage account container with state locking. In GitHub Actions, run `terraform init`, `terraform plan -out=tfplan`, upload the plan artifact, and require a separate approved job for `terraform apply tfplan`. In Azure DevOps, split plan and apply stages; gate apply with an environment approval on production.
 
@@ -721,9 +739,17 @@ When sizing self-hosted capacity, model peak concurrent jobs rather than average
 
 **Network placement** matters as much as CPU. Runners that deploy to private AKS clusters or pull from ACR via private endpoints must sit on subnets with routing to those endpoints. Document outbound allow lists if your security team restricts runner internet access—GitHub and Azure DevOps still need HTTPS to orchestration endpoints even when builds are otherwise internal.
 
-**Isolation between jobs** on the same runner prevents credential bleed. GitHub-hosted runners solve this by destroying the VM after each job. Self-hosted runners must clean workspaces aggressively, run ephemeral containers where possible, and avoid reusing Docker volumes that might retain `.azure` credential caches between jobs owned by different teams.
+**Pause and predict:** Why might deploying a persistent self-hosted runner inside your production virtual network introduce substantial security risks compared to utilizing Microsoft-hosted runners?
 
-> **Pause and predict**: Why might deploying a self-hosted runner inside your production virtual network introduce new security risks compared to using Microsoft-hosted runners?
+<details>
+<summary>Check your prediction</summary>
+
+The self-hosted runner acts as a privileged foothold on the production network where compromised jobs or third-party dependencies can reach internal private endpoints and access leftover `.azure` credential caches; Microsoft-hosted runners destroy the underlying virtual machine after each job to ensure complete workload isolation.
+</details>
+
+Platform teams often isolate internal runner infrastructure by provisioning dedicated agent subnets constrained by rigorous network security groups that deny lateral traffic toward production data tiers. Employing containerized scaling controllers like Actions Runner Controller ensures runner pods initialize in pristine workspaces without retaining disk volumes across heterogeneous workflow invocations.
+
+Furthermore, zero-trust network segmentation dictates that internal runners should communicate only with required Azure resource management endpoints and artifact storage. Restricting outbound egress traffic through firewalls or user-defined routes prevents compromised build scripts from establishing unauthorized command-and-control tunnels or exfiltrating build artifacts to external destinations.
 
 ---
 
@@ -758,7 +784,7 @@ If a repository can run or merge workflow changes without adequate review and a 
 
 Modern pipelines compose dozens of third-party actions and tasks. Treat each `uses:` reference and each Azure DevOps marketplace task as a dependency with supply-chain risk. Pin GitHub Actions to immutable commit SHAs for anything that touches credentials, production deploy paths, or forked pull-request workflows. Periodically bump SHAs through an automated pull request that runs your test suite before merge.
 
-Restrict **`pull_request_target`** workflows unless you fully understand the security model. That trigger runs in the base repository context with access to base secrets while checking out untrusted fork code—a dangerous combination when misconfigured. Prefer `pull_request` with OIDC subjects scoped to read-only sandbox subscriptions for external contributions.
+Pinning build dependencies and third-party action commits prevents upstream maintainer compromise from injecting malicious execution logic into automated continuous deployment pipelines. Organizations enforce strict workflow governance by requiring mandatory repository status checks and restricting workflow modification rights to trusted administrative teams.
 
 Enable **branch protection** on default branches and on `.github/workflows/**` path rules where GitHub supports it. Require CODEOWNERS review for workflow changes so a single compromised contributor account cannot silently alter production deploy steps. In Azure DevOps, restrict who can edit YAML pipelines and service connections through project-level permissions and audit streaming to Log Analytics or Sentinel.
 
@@ -768,7 +794,17 @@ When a production incident traces to a deployment, you need a fast answer to who
 
 Forward pipeline audit events to your SIEM. Alert on service principal logins from unexpected IP ranges, spikes in failed OIDC token exchanges, or deployment jobs that skip staging environments because someone edited YAML conditions. The goal is not to log every successful build—it is to detect anomalous promotion paths before they repeat.
 
-> **Stop and think**: If you use branch protection rules to require pull request reviews, how could an attacker with Contributor access to the repository still compromise the pipeline without merging a PR?
+**Pause and predict:** If you configure branch protection rules requiring mandatory pull request reviews before merging code to main, how could an attacker possessing repository Contributor access still compromise the deployment pipeline without merging a pull request?
+
+<details>
+<summary>Check your prediction</summary>
+
+Workflows configured with `pull_request_target` execute in the context of the base repository default branch with access to base secrets and federated OIDC credentials while checking out untrusted code from external fork branches.
+</details>
+
+Comprehensive pipeline defense requires defense-in-depth across source control, execution environments, and cloud control planes. Establishing environment approval checks and maintaining separate read-only federated identities for automated test validation ensure that unauthorized repository changes cannot manipulate cloud infrastructure.
+
+Continuous integration systems must also maintain strict cryptographic auditing across every pipeline step. Signing container images and publishing verifiable metadata allow downstream admission controllers in Azure Kubernetes Service to reject unsigned or tampered binaries. This policy enforcement ensures only approved application artifacts deploy onto production worker nodes.
 
 ---
 
@@ -1260,7 +1296,41 @@ az group delete --name "$RG" --yes --no-wait
 az ad app delete --id "$APP_OBJECT_ID"
 ```
 
-### Success Criteria
+Confirm resource group deletion with `az group list --query "[?name=='$RG'].name" -o tsv` to ensure no lingering resources incur subscription charges. Deleting the Entra ID application registration prevents orphaned federated credentials from persisting in your directory after completing the deployment lab.
+
+**Card A: One azure/login at the start of a 45-minute job is enough because the OIDC token lasts the whole job.** A release engineering team designs a monolithic continuous delivery pipeline that runs database migrations, integration tests, and container rollouts over forty-five minutes after invoking azure/login once during initialization. The team assumes the initial federated OpenID Connect session token remains valid indefinitely for all downstream deployment steps.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: short-lived OIDC token expiration versus long-running job execution. Next action: decompose monolithic deployment runs into discrete workflow jobs with independent authentication steps, or invoke azure/login again before executing lengthy deployment commands.
+</details>
+
+**Card B: A self-hosted runner inside the production VNet is strictly safer than Microsoft-hosted runners.** An infrastructure architect configures persistent virtual machine runners inside a private production virtual network to eliminate public internet routing and simplify access to private database endpoints. The architect assumes co-locating build compute inside the protected network perimeter eliminates security exposure compared to hosted cloud runners.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: persistent runner host compromise and lateral network movement versus ephemeral VM isolation. Next action: isolate build runners in dedicated spoke subnets with restrictive network security groups, or deploy ephemeral runner pods using Actions Runner Controller to destroy containers after job completion.
+</details>
+
+**Card C: Branch protection that requires PR reviews fully blocks a Contributor from compromising the pipeline without merging.** A security compliance officer enables strict branch protection requiring two peer reviews and linear history before any commit merges into the main branch. The team assumes that unauthorized developers with repository write permissions cannot trigger privileged cloud deployments without completing the formal pull request review process.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: privileged workflow trigger contexts such as pull_request_target versus source code branch protection. Next action: replace pull_request_target triggers with standard pull_request events, enforce GitHub environment approval gates on production deployments, and audit repository workflow permissions.
+</details>
+
+**Card D: Bicep what-if is only needed on the apply job after merge, not on pull requests.** A platform team optimizes pipeline execution speed by running Bicep what-if validation solely during the production deployment job on the main branch after merge. The engineers assume evaluating infrastructure change impact during pull request code review adds redundant overhead since the final apply stage will display planned resource modifications before execution.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: post-merge failure discovery versus pre-merge architectural review and drift detection. Next action: automate what-if preview generation on all infrastructure pull requests so reviewers can verify resource deltas before merging changes into protected branches.
+</details>
+
+**Success Criteria**:
 
 - [ ] ACR and Container Apps infrastructure created
 - [ ] App registration with OIDC federated credential for GitHub Actions
