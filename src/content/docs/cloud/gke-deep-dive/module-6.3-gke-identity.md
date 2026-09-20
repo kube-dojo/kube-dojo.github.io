@@ -451,6 +451,16 @@ gcloud container clusters update my-cluster \
 
 ### Confidential Nodes
 
+**Pause and predict:** An enterprise compliance standard mandates that all sensitive customer data in use must be encrypted in memory during execution. A platform architect considers enabling Shielded GKE Nodes across the cluster. Which GKE node technology must the team configure to satisfy this requirement, which hardware technologies provide this capability, and what constraint exists when enabling it cluster-wide?
+
+<details>
+<summary>Check your prediction</summary>
+
+The team must deploy Confidential GKE Nodes rather than Shielded GKE Nodes. While Shielded GKE Nodes provide Secure Boot, vTPM, and kernel integrity monitoring, they do not encrypt data residing in system RAM. Confidential GKE Nodes enforce inline hardware memory encryption using hardware virtualization extensions—specifically AMD SEV, AMD SEV-SNP, or Intel TDX (Trust Domain Extensions) on supported compute families such as N2D, C2D, C3D, and C3. Furthermore, enabling Confidential GKE Nodes at the cluster level is an irreversible operation that permanently forces all subsequent node pools to utilize supported confidential hardware instances.
+</details>
+
+Compliance questionnaires that ask for "encryption in use" are a create-time architecture review, not a post-launch checkbox on an existing general-purpose pool. Treat machine-series availability and regional SKU coverage as part of the same decision as CIDR sizing, because a cluster that cannot place a confidential pool in the required region is a delayed audit finding rather than a weekend flag change.
+
 Confidential Nodes go beyond Shielded Nodes by encrypting data **in memory** using hardware memory encryption (such as AMD SEV, AMD SEV-SNP, or Intel TDX). Even if an attacker has physical access to the server or can perform a cold-boot attack, they cannot read the node's memory.
 
 ```bash
@@ -475,17 +485,9 @@ gcloud container node-pools create confidential-pool \
 | **Cost** | No additional cost | ~10% premium |
 | **Use case** | All production clusters | Financial, healthcare, PII |
 
-**Pause and predict:** An enterprise compliance standard mandates that all sensitive customer data in use must be encrypted in memory during execution. A platform architect considers enabling Shielded GKE Nodes across the cluster. Which GKE node technology must the team configure to satisfy this requirement, which hardware technologies provide this capability, and what constraint exists when enabling it cluster-wide?
+Shielded GKE Nodes guarantee **boot-time and kernel integrity**: Secure Boot blocks unsigned bootloader components, vTPM measures the operating system initialization sequence, and integrity monitoring alerts operators when runtime states deviate from established baseline signatures. Confidential GKE Nodes add a different control: hardware-encrypted guest RAM on supported Confidential VM families. For mixed estates, leave cluster-level confidential computing off and place only the regulated StatefulSets on a dedicated confidential pool so utility tiers do not pay the premium.
 
-<details>
-<summary>Check your prediction</summary>
-
-The team must deploy Confidential GKE Nodes rather than Shielded GKE Nodes. While Shielded GKE Nodes provide Secure Boot, vTPM, and kernel integrity monitoring, they do not encrypt data residing in system RAM. Confidential GKE Nodes enforce inline hardware memory encryption using hardware virtualization extensions—specifically AMD SEV, AMD SEV-SNP, or Intel TDX (Trust Domain Extensions) on supported compute families such as N2D, C2D, C3D, and C3. Furthermore, enabling Confidential GKE Nodes at the cluster level is an irreversible operation that permanently forces all subsequent node pools to utilize supported confidential hardware instances.
-</details>
-
-Shielded GKE Nodes guarantee **boot-time and kernel integrity**: Secure Boot blocks unsigned bootloader components, vTPM measures the operating system initialization sequence, and integrity monitoring alerts operators when runtime states deviate from established baseline signatures. However, Shielded Nodes do not protect memory in use against hypervisor compromise or physical probing. Confidential GKE Nodes address memory security directly by utilizing hardware-based memory encryption powered by AMD SEV, AMD SEV-SNP, or Intel TDX technologies. Hardware-generated cryptographic keys remain isolated within the processor's secure enclave, ensuring that host hypervisors and storage appliances cannot inspect guest memory pages.
-
-Platform architects must recognize that enabling Confidential GKE Nodes at the cluster level is an irreversible configuration decision. Once a cluster is created with cluster-level confidential computing enabled, every node pool in that cluster must use supported Confidential VM machine types across AMD SEV, AMD SEV-SNP, or Intel TDX families. For heterogeneous workloads, teams can preserve flexibility by leaving cluster-level confidential computing disabled and instead provisioning dedicated confidential node pools exclusively for sensitive processing services. This strategy isolates regulated database and cryptographic workloads onto hardware-encrypted instances while running standard utility tiers on general compute pools to control operational costs.
+Platform architects who need heterogeneous pools should confirm regional machine-series coverage before the first `gcloud container clusters create`. Once cluster-level confidential computing is on, every subsequent pool is constrained to supported confidential hardware.
 
 ---
 
