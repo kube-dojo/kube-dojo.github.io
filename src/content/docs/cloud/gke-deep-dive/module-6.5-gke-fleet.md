@@ -181,7 +181,7 @@ Google Cloud Managed Service for Prometheus provides a fully managed, Prometheus
 
 | Aspect | Self-Managed Prometheus | Managed Prometheus (GMP) |
 | :--- | :--- | :--- |
-| **Storage** | Local disk (limited retention) | Google Cloud Monarch (unlimited) |
+| **Storage** | Local disk (limited retention) | Google Cloud Monarch (24-month retention) |
 | **High availability** | Manual (Thanos/Cortex) | Built-in |
 | **Retention** | Weeks to months (disk-limited) | 24 months automatic |
 | **Multi-cluster** | Federation or remote write | Native cross-cluster queries |
@@ -700,7 +700,7 @@ GKE provides detailed cost visibility through GKE cost allocation, which breaks 
 
 ### Where Observability Costs Come From
 
-Before you optimize your GKE spending, you need to understand where the money goes, and for most teams running observability on GKE, the largest cost driver is not compute---it is log ingestion. Cloud Logging charges for every gigabyte of log data ingested, stored beyond the default retention period, and read through the Logs Explorer or Log Analytics queries. The ingestion cost alone can exceed the compute cost of your nodes if you are running dozens of microservices logging at DEBUG level to stdout in a large cluster. This is the billing dynamic that surprises teams who migrate from self-managed Elasticsearch or Loki stacks, where storage is the dominant cost and ingestion is effectively free at the application side.
+Before you optimize your GKE spending, you need to understand where the money goes, and for most teams running observability on GKE, the largest cost driver is not compute---it is log-bucket storage. Cloud Logging bills WORKLOAD and DEBUG volume as log-bucket storage at approximately $0.50 per GiB after the 50 GiB per project per month free allotment, plus $0.01 per GiB per month if you retain logs beyond 30 days. Querying in Logs Explorer or Log Analytics is not a Logging charge. Exclusion filters (or lower verbosity) keep noisy DEBUG out of billed buckets; routing the same stream to another bucket does not avoid the charge. That storage line alone can exceed node compute if dozens of microservices log DEBUG to stdout.
 
 The root cause of log-cost blowup is the default behavior. GKE enables logging by default, and most application frameworks emit far more log volume than the team realizes because developers optimize for debuggability during development and rarely revisit log levels in production. A single Java service with a misconfigured logging framework can produce several gigabytes per day of framework-level debug output that no one will ever read, and that volume multiplies across every replica in every namespace. The first intervention you should plan is not a complex pipeline refactor---it is a log exclusion filter that drops log entries below a severity threshold before they are ingested. Cloud Logging exclusion filters use the same query syntax as log queries, so you can be precise: exclude everything with `severity=DEBUG` from the `dev` and `staging` namespaces while keeping all severity levels in `production`.
 
@@ -1308,7 +1308,7 @@ Before deploying observability pipelines and fleet management services to produc
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Log query charges versus log bucket storage and ingestion pricing. Next action: recognize that while querying logs in Logs Explorer carries no additional search fee, enabling WORKLOAD logging streams all container standard output and error logs directly into Cloud Logging log buckets; log-bucket storage costs approximately $0.50 per GiB per month once the project exceeds the 50 GiB free tier; high-volume DEBUG logs at fleet scale generate massive storage costs regardless of whether anyone ever queries them; configure sink exclusion filters or reduce container logging verbosity to discard noisy non-production logs before they are written to billed log buckets.
+Failure layer: Log query charges versus log bucket storage and ingestion pricing. Next action: recognize that while querying logs in Logs Explorer carries no additional search fee, enabling WORKLOAD logging streams all container standard output and error logs directly into Cloud Logging log buckets; log-bucket storage costs approximately $0.50 per GiB after the 50 GiB per project per month free allotment (includes 30 days); high-volume DEBUG logs at fleet scale generate massive storage costs regardless of whether anyone ever queries them; configure sink exclusion filters or reduce container logging verbosity to discard noisy non-production logs before they are written to billed log buckets.
 </details>
 
 **Card B: After you migrate to GMP, that high-cardinality PromQL query will still OOM a Prometheus server in the cluster twice a week.** An infrastructure team runs self-managed Prometheus in a 50-node GKE cluster. An in-cluster Prometheus server pod crashes twice a week with out-of-memory errors due to an unindexed, high-cardinality PromQL query. To solve these crashes, the team enables Google Cloud Managed Service for Prometheus (GMP) and converts their scrapes to PodMonitoring resources. However, the team expects that running the same high-cardinality PromQL query will still exhaust node memory. They assume it will crash the in-cluster monitoring pipeline twice a week.
