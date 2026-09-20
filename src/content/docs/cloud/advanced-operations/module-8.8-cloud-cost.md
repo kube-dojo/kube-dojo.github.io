@@ -124,6 +124,8 @@ The best allocation systems are built into provisioning paths. Terraform modules
 Allocate shared node compute costs using the **max(request, usage)** model implemented by OpenCost and Kubecost, rather than assigning costs to the node owner or relying strictly on raw usage. Kubernetes makes cost allocation complex because multiple workloads from different tenants share underlying instances. If allocation used only actual resource usage, a workload requesting 8 vCPUs but consuming only 500m would prevent other pods from scheduling onto that node while paying virtually nothing for the reserved capacity. Conversely, if a pod bursts past its request, it consumes actual physical node capacity that other workloads cannot use. Taking the maximum of requested and consumed resources ensures that tenants pay for both the capacity they tie up from the scheduler and any excess capacity they physically consume, while unallocated node capacity is exposed as shared idle cost.
 </details>
 
+Chargeback fights usually start when finance receives one node invoice and engineering thinks in namespaces. The next section is how allocation tools join those two views so a team can see idle, shared, and owned spend without arguing about who bought the instance.
+
 ## Pillar 1: Visibility with Kubecost and OpenCost
 
 ### Kubecost Architecture
@@ -318,6 +320,8 @@ Chargeback should wait until the allocation model is stable enough to survive di
 Over-provisioning **requests** directly inflates cloud bills because the Kubernetes scheduler **reserves** capacity based strictly on requests, not limits. The scheduler subtracts each container's CPU and memory requests from the node's allocatable capacity to decide whether a pod can be placed. If a pod requests 4 vCPUs but consumes only 200m, those 4 vCPUs are permanently locked and cannot be scheduled to any other workload, forcing the cluster autoscaler to provision additional cloud worker nodes to accommodate subsequent pods. In contrast, CPU limits act merely as kernel cgroup throttling caps during runtime and do not reserve node capacity during scheduling. The most common waste pattern in Kubernetes occurs when developers set requests based on speculative peak guesses and never adjust them, stranding expensive node capacity that sits idle yet fully billed.
 </details>
 
+Rightsizing is a measurement problem before it is a YAML problem. The next section shows how recommendation controllers observe live consumption so request changes follow evidence instead of peak-guess folklore.
+
 ## Pillar 2: Right-Sizing with VPA and HPA
 
 ### Vertical Pod Autoscaler (VPA) for Right-Sizing
@@ -475,6 +479,8 @@ The cost lever that surprises many teams is architecture. Moving a chatty servic
 
 Prefer **1-year commitments** or a layered 1-year strategy rather than locking your full footprint into 3-year commitments. When an application and its underlying infrastructure double yearly, instance families, container architectures, regions, and baseline node counts evolve rapidly. A 3-year commitment locks the organization into specific instance types, regions, or spend rates that often become suboptimal or wasted as architecture shifts or newer, more cost-effective processor generations launch. Furthermore, buying a 3-year commitment based on future projected growth risks prepaying for unutilized capacity early on, whereas sizing for current load leaves you under-covered in years two and three. Layering 1-year commitments periodically allows the platform team to match changing architectural baselines, preserve flexibility to adopt newer instance generations, and avoid stranded financial liability.
 </details>
+
+Rate shopping only pays off when the committed baseline is something you still expect to run. The next section compares provider commitment instruments so you can cover steady load without treating a headline discount as a strategy.
 
 ## Pillar 3: Rate Optimization
 
@@ -824,6 +830,8 @@ The operating review should be routine and short. A weekly FinOps review can exa
 
 Deleting a Kubernetes namespace does **not** stop all cloud charges. External cloud resources provisioned via Kubernetes controllers frequently outlive the namespace if lifecycle protections, retention policies, or finalizer interruptions prevent provider cleanup. In particular, PersistentVolumes with a `persistentVolumeReclaimPolicy` set to `Retain` remain provisioned in AWS EBS, Azure Disk, or Google Cloud Persistent Disk after their PersistentVolumeClaims disappear, silently accruing storage and provisioned IOPS charges. Similarly, cloud LoadBalancers created by `LoadBalancer` services or Ingress controllers, static Elastic IPs, orphaned NAT gateways, and unattached snapshot volumes remain active if controllers fail to release them. Orphaned resources are cloud infrastructure components that are no longer attached to any active workload but continue accruing monthly charges, making them a silent budget drain.
 </details>
+
+A tenant teardown is finished when the provider console agrees with kubectl. The next section is the operational hunt: which meters to scan, and which cleanup commands to run before the next invoice.
 
 ## Orphaned Resource Cleanup
 
