@@ -244,7 +244,7 @@ sequenceDiagram
 Because the Multi-Cluster Services controller in Cluster B caches the `ServiceImport` resource, DNS resolution for `*.clusterset.local` continues to succeed and may still look completely healthy. However, because the underlying WAN link is down, network packets cannot reach the backend pods in Cluster A, causing client connection attempts to hang and fail with transport timeouts. Successful name resolution does not equal network reachability, making aggressive client timeouts, retry budgets, and circuit breakers strictly required in multi-cluster environments.
 </details>
 
-Relying exclusively on DNS-based discovery mechanisms leaves network failure handling and traffic failover entirely to individual application client implementations. To overcome these limitations and enforce uniform resilience policies, enterprise platform teams frequently adopt dedicated service mesh solutions that decouple routing logic from application code.
+Uniform retry and timeout policies are hard to retrofit into every microservice once the fleet already has three languages in production. That is why many teams next evaluate a mesh that can apply those policies at the sidecar without rewriting every client.
 
 ### Pattern 3: Multi-Cluster Service Mesh (Istio)
 
