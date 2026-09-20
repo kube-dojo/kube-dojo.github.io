@@ -412,7 +412,15 @@ def delivery_report(err, msg):
 
 Advanced teams implement **key-aware autoscaler hints**: if one tenant dominates traffic, observability tags `tenant_id` in metrics and routes that tenant to a dedicated topic rather than overheating a shared partition. On Kinesis, the partition key maps to a hash of the key modulo shard count; on Pub/Sub, ordering keys must be enabled on the subscription and producers must include the key on every publish.
 
-> **Pause and predict**: If you have a topic with 12 partitions and a consumer deployment with 15 replicas, what exactly happens to the last 3 pods? How will Kubernetes metrics report their status compared to their actual utility?
+**Pause and predict:** Consider a Kafka topic configured with 12 partitions and a consumer Deployment with 15 replicas in one consumer group. What happens to the last 3 pods, and how will Kubernetes metrics report their operational health?
+
+<details>
+<summary>Check your prediction</summary>
+
+Each partition is assigned to exactly one consumer in a group. Extra members get zero partitions and sit idle while Kubernetes still reports Ready. [Each partition is assigned exclusively within a consumer group](https://kafka.apache.org/intro). The Kafka consumer group coordination protocol allocates the 12 available partitions across 12 pods, leaving the remaining 3 replica pods without any assigned topic partitions. Because these idle pods remain healthy processes that successfully poll the broker cluster and pass HTTP liveness or readiness probes, Kubernetes reports them as fully running and Ready even though they perform zero event processing work.
+</details>
+
+The next section is how consumer group membership protocols and broker partition rebalancing algorithms coordinate workload distribution across a fleet of worker pods.
 
 ---
 
@@ -449,7 +457,7 @@ graph TD
     P5 --> Pod3
 ```
 
-Each pod gets an equal share of partitions. Adding a 4th pod triggers rebalancing. [A 7th pod would be idle (6 partitions, 7 consumers)](https://kafka.apache.org/intro).
+Each pod gets an equal share of partitions. Adding worker pods triggers partition rebalancing to redistribute partition assignments across active group members.
 
 ### Kubernetes Consumer Deployment
 
@@ -600,9 +608,17 @@ When lag clears, scale down slowly. Aggressive scale-in triggers rebalance storm
 
 ## Exactly-Once Processing and Stateful Consumers
 
-For financial transactions or inventory updates, processing a message more than once (at-least-once semantics) or dropping it (at-most-once) is unacceptable for the business outcome even when the broker delivered correctly. [Kafka achieves exactly-once semantics (EOS) for read-process-write loops inside the Kafka ecosystem](https://kafka.apache.org/41/design/design/) through idempotent producers, transactions, and consumer offset commits that participate in the same transaction boundary. Flink and Beam (Dataflow) pursue a different but related guarantee: **exactly-once processing** relative to checkpoints stored in S3, GCS, or Azure Blob — failures roll back to the last successful checkpoint rather than re-reading unbounded history.
+Stream processing pipelines requiring high data integrity must carefully choose delivery guarantees that match their downstream business consequences. While at-most-once semantics drops lost records and at-least-once introduces duplicate events during retries, financial ledgers and inventory systems demand strict correctness. Guaranteeing robust processing requires understanding how transactional boundaries coordinate across brokers, stateful storage engines, and container runtimes.
 
-Pub/Sub’s [exactly-once delivery](https://cloud.google.com/pubsub/docs/exactly-once-delivery) narrows duplicate delivery at the subscription layer when enabled, but your GKE handler must still write idempotently to Postgres or call external APIs with safe retries. Kinesis consumers achieve effectively-once by storing checkpoints in DynamoDB or by using Flink with managed checkpoints; there is no single “transaction” knob like Kafka’s `send_offsets_to_transaction`.
+**Pause and predict:** An engineering team enables Kafka transactions and idempotent producers to achieve exactly-once processing within their streaming pipeline. Does this configuration guarantee that writes to an external relational database or HTTP API will never be duplicated during pod failures and retries?
+
+<details>
+<summary>Check your prediction</summary>
+
+Kafka exactly-once is consume→process→produce on Kafka topics. External DB/API sinks still need idempotent writes / cooperation with that system. [Kafka achieves exactly-once semantics (EOS) for read-process-write loops inside the Kafka ecosystem](https://kafka.apache.org/41/design/design/) through idempotent producers, transactions, and consumer offset commits that participate in the same transaction boundary. However, Kafka transactions cannot span external non-Kafka systems like PostgreSQL, Elasticsearch, or third-party HTTP endpoints. Flink and Beam (Dataflow) pursue a different but related guarantee: exactly-once processing relative to checkpoints stored in S3, GCS, or Azure Blob where failures roll back to the last successful checkpoint. Similarly, Pub/Sub's [exactly-once delivery](https://cloud.google.com/pubsub/docs/exactly-once-delivery) narrows duplicate delivery at the subscription layer when enabled, but your GKE handler must still write idempotently to Postgres or call external APIs with safe retries. Kinesis consumers achieve effectively-once by storing checkpoints in DynamoDB or by using Flink with managed checkpoints; there is no single transaction knob like Kafka's `send_offsets_to_transaction`.
+</details>
+
+The next section is how transactional producer IDs and atomic consumer offset commits establish coordinated transactional boundaries across streaming pipelines.
 
 ### The Transactional Pipeline
 
@@ -640,11 +656,17 @@ if msg:
 
 ### Why StatefulSets for Kafka Streams?
 
-> **Stop and think**: What happens to a stream processing application's local state (like a RocksDB cache) if it is deployed as a standard Kubernetes Deployment instead of a StatefulSet during a pod restart? How would this affect recovery time?
+**Pause and predict:** Consider a stateful Kafka Streams application that maintains a local RocksDB key-value cache on ephemeral pod disk. What happens to this local cache if the application runs as a standard Deployment and a pod restarts, and how does this affect recovery time?
 
-When a stream processor keeps local state on ephemeral pod storage, a restarted pod loses that local state and must restore it from the changelog before normal processing resumes.
+<details>
+<summary>Check your prediction</summary>
 
-Instead, stream processors with local state should be deployed as a `StatefulSet` with persistent volume claims:
+Kafka Streams local RocksDB on empty ephemeral disk is gone after restart; restore is changelog replay (slow). PVC/StatefulSet and optional standby replicas cut restore time. When a stream processor keeps local state on ephemeral pod storage, a restarted pod loses that local state and must restore it from the changelog before normal processing resumes. Rebuilding gigabytes of key-value state over the network delays consumer partition readiness and extends rebalance durations. Using a StatefulSet backed by persistent volume claims preserves RocksDB data across pod recreation, allowing the stream processor to resume stateful joins and window aggregations almost immediately.
+</details>
+
+The next section is how persistent volume claims and StatefulSet workload specifications preserve local cache state across scheduled worker pod recreations.
+
+Instead, stream processors with local state should be deployed as a `StatefulSet` with persistent volume claims to avoid expensive remote changelog rebuilds:
 
 ```yaml
 apiVersion: apps/v1
@@ -825,7 +847,15 @@ Confluent Schema Registry on Kubernetes (Deployment above) is one implementation
 
 Operational tips for GKE/EKS/AKS: run registry behind internal ingress with mTLS, replicate read caching in consumers, and backup schema subjects before major merges. Pair with CI jobs that register schemas from `main` branches so application deploys cannot outrun contract publication.
 
-> **Stop and think**: Your team decides to deploy a new schema that changes an integer field `quantity` to a string field `quantity_str` to support formats like "1 dozen". If you are using BACKWARD compatibility, what will the schema registry do when the producer tries to register this schema?
+**Pause and predict:** An engineering team plans to update an existing schema by changing an integer field `quantity` to a string field `quantity_str`. If the subject enforces default BACKWARD compatibility, what will the schema registry do when the producer attempts registration?
+
+<details>
+<summary>Check your prediction</summary>
+
+Schema Registry default BACKWARD. Changing a field type Number→String is incompatible; the registry rejects it or you cut over to a new topic. Under BACKWARD compatibility, new schemas must be able to read data written by older schemas. Changing a field type from an integer to a string breaks deserialization because consumers running the new schema cannot parse existing binary payloads where the field was encoded as an integer. Because this violates schema evolution rules, the Schema Registry rejects the registration request with an HTTP 409 or 422 incompatibility response, preventing the producer from emitting malformed events onto the topic.
+</details>
+
+The next section is how change data capture connectors and analytical stream processors route operational events across streaming and batch boundaries.
 
 ---
 
@@ -1391,7 +1421,41 @@ k run partition-check --rm -it --image=quay.io/strimzi/kafka:0.47.0-kafka-4.0.0 
 ```
 </details>
 
-### Success Criteria
+Before you close the hands-on lab, audit the four operational claims below. Each open card states a hypothesis that sounds operationally plausible during managed streaming pipeline architectures and Kubernetes consumer deployments. Treat the claim as an operational prediction, and open the solution details only after you have reasoned through the failure mode.
+
+**Card A: Scale the consumer Deployment to 15 replicas on a 12-partition topic so Kubernetes keeps every pod busy processing events.** An operations team observes consumer lag building on an Apache Kafka topic. The topic is configured with twelve partitions. To accelerate message consumption, the platform engineer scales the consumer Deployment from ten to fifteen replicas. The team reasons that providing extra Kubernetes worker pods will ensure that every single pod actively processes incoming events from the topic. They anticipate that all fifteen pods will share the workload evenly and reduce the lag backlog rapidly.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Partition assignment limits, consumer group rebalance mechanics, and wasted compute resources. Next action: recognize that each partition within a Kafka topic is assigned to at most one consumer instance within a specific consumer group at any time; when you scale a consumer Deployment to 15 replicas on a 12-partition topic, the broker's partition assignor allocates one partition to each of the first 12 pods, while the remaining 3 pods receive zero partition assignments; these 3 surplus pods sit completely idle, polling the cluster without consuming any records while still consuming memory and CPU reservations; to increase processing parallelism beyond 12 workers, you must increase the partition count of the topic itself before scaling the consumer Deployment, or configure consumer instances to process records across multiple internal worker threads per partition.
+</details>
+
+**Card B: Enable Kafka transactions and assume a Postgres/JDBC sink will never double-insert, even without upsert keys.** A data engineering team builds a financial settlement pipeline. The pipeline consumes event records from an upstream Kafka topic and writes ledger entries into an external PostgreSQL relational database. The developers enable Kafka transactions, configure idempotent producers, and set `isolation.level: read_committed` on downstream consumers. The team assumes that enabling Kafka's exactly-once semantics guarantees that the database sink will never insert duplicate rows. Consequently, they conclude that defining database unique constraints or idempotent upsert keys is unnecessary.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Distributed transaction boundaries, external sink side effects, and lack of two-phase commit. Next action: understand that Kafka exactly-once semantics (EOS) operates strictly within the Kafka broker ecosystem across consume-process-produce topic workflows; Kafka transactions coordinate atomic offset commits and topic writes via an internal transaction coordinator, but they do not participate in external two-phase commits with non-Kafka datastores like PostgreSQL; if a consumer crashes or experiences a network partition after writing to PostgreSQL but before committing offsets back to Kafka, the rebalanced consumer will re-read and re-insert the same records; to prevent duplicate data in external sinks, the downstream sink must implement idempotent write logic such as SQL `INSERT ... ON CONFLICT DO UPDATE` (upsert keys) or deterministic deduplication tables.
+</details>
+
+**Card C: Deploy Kafka Streams as a Deployment on empty ephemeral disks so a restarted pod resumes from local RocksDB without changelog replay.** An application architecture team packages a stateful Kafka Streams aggregation service as a standard Kubernetes Deployment using ephemeral local container storage for its RocksDB state stores. The team reasons that running as a stateless Deployment simplifies scaling and that local RocksDB instances will automatically survive container restarts. They expect restarted pods to instantly resume processing windowed aggregations without re-reading historical changelog topics from the managed Kafka cluster.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Ephemeral container lifecycle, RocksDB cache destruction, and changelog network saturation. Next action: recognize that standard Kubernetes Deployments create ephemeral container file systems that are wiped clean whenever a pod is rescheduled, restarted, or updated; when a stateless Kafka Streams pod restarts without persistent storage, its local RocksDB directory is empty, forcing the application to execute a full changelog replay from Kafka topics before it can resume event processing; for large state stores containing gigabytes of state, changelog recovery can take tens of minutes, causing extended rebalance delays and high network I/O; deploy stateful stream processors as a `StatefulSet` with `volumeClaimTemplates` backed by durable block storage, and consider enabling standby replicas (`num.standby.replicas`) so another pod maintains a warm state replica ready for near-instant failover.
+</details>
+
+**Card D: Under BACKWARD compatibility, change `quantity` from int to string `quantity_str` so new consumers can still read old events.** A product engineering team maintains an e-commerce order topic. They decide to modify the order schema to support text-based quantities such as "1 dozen" instead of numeric integers. The team alters the schema subject from an integer field `quantity` to a string field `quantity_str`. They submit the new definition to Confluent Schema Registry configured with default BACKWARD compatibility. The team reasons that since BACKWARD compatibility lets new consumers read old data, the registry will accept the update and allow the migration to proceed safely.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Schema evolution incompatibility, field type mutation, and registry validation rejection. Next action: realize that under BACKWARD compatibility, consumers running the new schema must be capable of deserializing records written with the previous schema version; changing an existing field's primitive type from integer to string (or renaming `quantity` to `quantity_str` without a default value) breaks backward compatibility because new consumers expecting a string cannot parse binary records serialized as integers; the Schema Registry strictly validates compatibility and rejects the registration request with an HTTP 409 or 422 error, blocking producer initialization; to evolve this contract correctly without breaking consumers, you must either maintain the original field and introduce a new optional string field with a default value, or create a new topic with a fresh schema subject and execute an orderly consumer migration.
+</details>
+
+**Success Criteria**:
 
 - [ ] 3-broker Kafka cluster is running and Ready
 - [ ] order-events topic has 6 partitions with replication factor 3
