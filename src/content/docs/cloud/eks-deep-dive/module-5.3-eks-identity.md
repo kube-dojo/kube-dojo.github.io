@@ -50,9 +50,15 @@ flowchart TD
     end
 ```
 
-> **Stop and think**: If Pod A only serves static frontend assets and needs no AWS access whatsoever, why does it pose a critical security risk when scheduled on a node with the `eks-node-role` shown above? Consider the perspective of an attacker who achieves remote code execution inside Pod A.
+**Pause and predict:** If Pod A only serves static frontend assets and needs no AWS access whatsoever, why does scheduling it on this worker node create an immediate vulnerability? Consider what happens if an attacker achieves remote code execution inside that container.
 
-If an attacker exploits a vulnerability in Pod A (which should not need any AWS access at all), they can reach the instance metadata service at `169.254.169.254` and obtain temporary credentials for the node role -- giving them access to DynamoDB, S3, SQS, and Secrets Manager.
+<details>
+<summary>Check your prediction</summary>
+
+If an attacker exploits a vulnerability in Pod A, they can query the instance metadata service at `169.254.169.254` to obtain temporary credentials for the node role, immediately gaining access to DynamoDB, S3, SQS, and Secrets Manager. Configuring EKS Pod Identity or IRSA does not automatically block access to IMDS. Securing the instance metadata boundary requires enforcing IMDSv2 and setting an HTTP response hop limit of 1 in the node launch template, which prevents bridged container network namespaces from querying metadata. Pods configured with `hostNetwork: true` always retain direct access to IMDS regardless of hop limit settings because they share the host network namespace. However, modern AWS SDKs continue to prioritize injected IRSA or Pod Identity credentials when those mechanisms are enabled for the workload.
+</details>
+
+Enforcing granular workload identity transforms multi-tenant container security from a shared node perimeter into cryptographically verifiable boundaries. By isolating credential issuance to explicit Kubernetes service accounts, platform teams eliminate environments where auxiliary microservices inherit broad cloud infrastructure privileges.
 
 Pod-level identity solves this by ensuring that each pod receives only its own credentials. In practice, each workload can be scoped to the permissions required by its role. As a result, a compromise of a logging pod does not automatically grant access to every workload-level permission available on the node.
 
@@ -215,15 +221,15 @@ spec:
 
 ### IRSA Pain Points
 
-> **Pause and predict**: If your organization manages 50 EKS clusters across 10 AWS accounts, and a backend microservice deployed in every cluster needs to read from a single centralized S3 bucket, what operational bottlenecks will you encounter when setting up IRSA for this service?
+**Pause and predict:** If your organization manages 50 EKS clusters across 10 AWS accounts, and a backend microservice deployed in every cluster needs to read from a single centralized S3 bucket, what operational bottlenecks will you encounter when setting up IRSA for this service?
 
-IRSA works, but it has real operational friction: as you scale across multiple clusters and accounts, the trust relationship, role reuse, and policy lifecycle all become harder to operate consistently.
+<details>
+<summary>Check your prediction</summary>
 
-1. **OIDC provider management**: You must create and manage the OIDC provider per cluster, per region
-2. **Trust policy complexity**: Each role's trust policy includes the full OIDC issuer URL, making it cluster-specific and hard to reuse across clusters
-3. **Thumbprint rotation**: The OIDC provider's TLS certificate thumbprint must be updated when certificates rotate
-4. **No native AWS API**: IRSA is configured through Kubernetes annotations, not the AWS API, making it invisible to IAM teams
-5. **Cross-account complexity**: Setting up IRSA across accounts requires OIDC provider federation in the target account
+Under IRSA, you must create and manage an IAM OIDC identity provider per cluster and per region across all ten accounts. Because each role's trust policy explicitly embeds the cluster-specific OIDC issuer URL, you cannot easily reuse a single IAM role across multiple clusters without ballooning trust policy documents toward IAM character quotas. Managing fleet-wide IRSA also requires monitoring TLS certificate thumbprint rotations and federating target accounts to trust multiple foreign cluster issuers. Furthermore, IRSA relationships exist only as Kubernetes ServiceAccount annotations rather than native AWS API resources, hiding workload bindings from central IAM inventory systems. In contrast, EKS Pod Identity replaces cluster-specific issuers with a single unified principal (`pods.eks.amazonaws.com`), allowing a single IAM role to be referenced across multiple clusters and scaling up to 5,000 associations per cluster.
+</details>
+
+Scaling identity management across enterprise multi-cluster environments demands architectural decoupling between compute infrastructure and access governance. When identity bindings rely on complex trust chains across independent control planes, operational maintenance overhead accelerates rapidly and introduces significant configuration drift across deployment environments.
 
 ### IRSA trust policy anatomy (what breaks in production)
 
@@ -426,7 +432,15 @@ At a high level, **IRSA cross-account** usually means: (1) create an OIDC provid
 
 ### Cross-Account with Pod Identity (target role association)
 
-> **Stop and think**: When configuring cross-account access, the trust policy in Account B specifically references the pod's IAM role ARN in Account A (`arn:aws:iam::111111111111:role/OrderServiceRole-PodIdentity`). What would be the security implications if Account B's trust policy simply trusted the entire Account A (`arn:aws:iam::111111111111:root`) instead?
+**Pause and predict:** When configuring cross-account access for an EKS workload, what occurs if the target trust policy in Account B trusts Account A's root principal (`arn:aws:iam::111111111111:root`) without condition blocks? Furthermore, how does the Pod Identity local agent cache govern target role updates?
+
+<details>
+<summary>Check your prediction</summary>
+
+Configuring a trust policy that trusts a naked Account A root principal (`arn:aws:iam::111111111111:root`) without condition keys delegates trust to Account A's IAM administrators, permitting any principal inside Account A that possesses `sts:AssumeRole` permissions to assume the role. While AWS documentation examples often reference the account root principal, they combine it with strict `Condition` blocks such as `ArnEquals` on `aws:PrincipalArn` and session tags (`aws:RequestTag/eks-cluster-arn`) to prevent unauthorized cross-account chaining. Under EKS Pod Identity target role chaining, the source role must always reside in the cluster's AWS account due to `iam:PassRole` authorization constraints, while the target role can reside in a foreign account. The local Pod Identity agent caches credentials for 6 hours when assuming a source role alone, but reduces the cache to 59 minutes when chaining into a target role; modifying an existing association's target role ARN does not immediately revoke active cached tokens, so operators must recreate or restart pods to apply association edits sooner. Furthermore, remember that EKS Pod Identity is supported strictly on Linux Amazon EC2 instances (not Fargate and not Windows EC2), and its trust policies must grant both `sts:AssumeRole` and `sts:TagSession` actions to `pods.eks.amazonaws.com`.
+</details>
+
+Establishing defense-in-depth across multi-account AWS architectures requires platform engineers to treat account boundaries as hard isolation walls. Coordinating sequential role assumption ensures that identity propagation remains auditable across organizational boundaries, preventing lateral privilege escalation while maintaining unified centralized access controls.
 
 ```mermaid
 flowchart LR
@@ -754,7 +768,15 @@ kubectl exec -it $(kubectl get pods -n production -l app=order-service -o name |
 # Should NOT show AWS_WEB_IDENTITY_TOKEN_FILE (IRSA)
 ```
 
-> **Important**: If both IRSA annotation and Pod Identity association exist for the same service account, IRSA keeps winning in the SDK chain while the annotation remains. AWS's recommended migration is: create the association (no effect while IRSA is present) → remove the `eks.amazonaws.com/role-arn` annotation → rolling restart so the chain falls through to Pod Identity.
+**Pause and predict:** If you configure an EKS Pod Identity association for a service account that already has an active IRSA annotation, which credential provider will the AWS SDK select when the application initializes? What exact operational sequence is required to switch traffic over to Pod Identity?
+
+<details>
+<summary>Check your prediction</summary>
+
+Credentials located earlier in the standard AWS SDK default credential provider chain keep winning. In standard AWS SDKs, the `AssumeRoleWithWebIdentity` credential provider (governed by the `AWS_WEB_IDENTITY_TOKEN_FILE` environment variable injected by IRSA) is evaluated before the container credentials provider (governed by `AWS_CONTAINER_CREDENTIALS_FULL_URI` used by EKS Pod Identity). Consequently, creating a Pod Identity association does not switch the credential acquisition path while the IRSA annotation remains on the Kubernetes ServiceAccount. To execute a clean cutover, operators must first create the Pod Identity association, delete the `eks.amazonaws.com/role-arn` annotation from the ServiceAccount, and perform a rolling restart of the deployment so the mutating webhook omits the web identity token projection, allowing the SDK chain to fall through to Pod Identity. Additionally, remember that Pod Identity operates exclusively on Linux Amazon EC2 nodes (and requires both `sts:AssumeRole` and `sts:TagSession` in the trust policy); workloads running on Windows EC2 or EKS Fargate cannot use the local agent and must continue relying on IRSA.
+</details>
+
+Understanding the strict evaluation precedence within client authentication libraries enables zero-downtime migrations across production clusters. By leveraging the deterministic fallback behavior of standard SDK credential providers, platform teams can stage infrastructure associations ahead of time and control workload cutovers through standard Kubernetes deployment rollouts.
 
 ### Fleet migration playbook (platform team view)
 
@@ -1246,7 +1268,41 @@ aws iam delete-role --role-name DojoOrderReader
 aws dynamodb delete-table --table-name dojo-orders
 ```
 
-### Success Criteria
+Before committing an EKS identity architecture to production, platform architects must audit common cognitive traps regarding instance metadata restrictions, credential provider evaluation order, serverless runtime constraints, and association cache invalidation. Auditing these failure layers ensures engineering teams establish resilient workload security baselines while avoiding dangerous assumptions about metadata boundaries, migration cutover semantics, and cross-account credential caching.
+
+**Card A: Installing the Pod Identity Agent automatically blocks pods from reading the node instance profile.** A security engineering team installs the `eks-pod-identity-agent` DaemonSet across all EC2 worker node groups to modernize pod authentication. Because the agent manages link-local credential redirection, the engineers assume host metadata queries are intercepted. They expect containers querying `http://169.254.169.254/latest/meta-data/` to be blocked from retrieving the underlying EC2 host instance profile.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Instance metadata service (IMDS) network reachability versus link-local agent redirection. Next action: recognize that installing the EKS Pod Identity Agent DaemonSet sets up link-local listeners on `169.254.170.23` via iptables but does not alter or block access to the standard EC2 metadata service at `169.254.169.254`; explicitly enforce IMDSv2 and configure an HTTP hop limit of 1 in the EC2 launch template to prevent bridged pod namespaces from querying the host node instance profile.
+</details>
+
+**Card B: Creating a Pod Identity association immediately switches the AWS SDK off IRSA for that service account.** A cloud operations team starts migrating an order processing workload from IRSA. An engineer configures an IAM trust policy for `pods.eks.amazonaws.com` and creates an association for the service account. Seeing the association active in the AWS console, the team assumes running pods immediately fetch credentials from the local agent.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: AWS SDK default credential provider evaluation order and mutable runtime environment variables. Next action: understand that AWS SDKs prioritize `AssumeRoleWithWebIdentity` (IRSA) ahead of container credentials in the default credential chain, so an existing `eks.amazonaws.com/role-arn` annotation keeps winning; delete the IRSA annotation from the ServiceAccount and perform a rolling deployment restart so newly scheduled pods mount without web identity environment variables and fall through to Pod Identity.
+</details>
+
+**Card C: EKS Fargate pods can use Pod Identity because AWS manages the compute.** An enterprise platform architect designs a serverless container architecture utilizing EKS Fargate profiles to eliminate EC2 management. To avoid managing per-cluster OIDC identity providers, the architect plans to bind Fargate microservices to IAM roles using Pod Identity associations. The team expects AWS to manage credential injection natively within the underlying serverless execution environment.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Serverless hypervisor architecture versus host-level DaemonSet agent requirements. Next action: recognize that EKS Pod Identity requires the `eks-pod-identity-agent` DaemonSet listening on link-local address `169.254.170.23` on Linux EC2 instances, which is unsupported on serverless EKS Fargate microVMs and Windows nodes; maintain IRSA (IAM Roles for Service Accounts) with OIDC federation for all Fargate workloads.
+</details>
+
+**Card D: Changing a target-role ARN on an existing association is visible to running pods within a few seconds.** An infrastructure team updates an existing association's `targetRoleArn` parameter. Because the AWS CLI command succeeds immediately, engineers expect running application pods to authenticate against the new target role within several seconds. They assume the control plane update propagates instantaneously to active client containers without restarting workloads.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Local agent credential caching TTLs versus control plane association state updates. Next action: recognize that the EKS Pod Identity Agent caches acquired credentials locally for up to 59 minutes when chaining into target roles (and up to 6 hours for source-only roles), continuing to serve cached tokens until expiration; trigger a rolling rollout (`kubectl rollout restart`) to replace application pods and force immediate credential re-negotiation against the updated target role.
+</details>
+
+**Success Criteria**:
 
 - [ ] I created a DynamoDB table and populated it with test data
 - [ ] I configured IRSA with an OIDC provider, trust policy, and ServiceAccount annotation
