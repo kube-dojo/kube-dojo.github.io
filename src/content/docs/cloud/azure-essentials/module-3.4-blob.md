@@ -104,7 +104,7 @@ The table above shows durability tiers; the bullets below illustrate how redunda
 RA-GRS does not automatically fail over the primary URL. Azure provides a distinct secondary endpoint URL appended with `-secondary` (such as `accountname-secondary.blob.core.windows.net`), and your client application or traffic router must actively target this secondary hostname to service read operations.
 </details>
 
-Evaluating geographic redundancy requires analyzing replication models alongside client connectivity patterns to ensure systems remain resilient during regional cloud incidents.
+Durability planning starts with the failure you can actually survive: a disk, a datacenter, or an entire Azure region. The next subsections walk through those layers in order.
 
 ### Redundancy in depth: blast radius, durability, and failover
 
@@ -539,7 +539,7 @@ az network private-endpoint create \
 Public network access is blocked, preventing direct internet routing to the storage endpoint. Developers must establish secure network connectivity into the virtual network using a point-to-site VPN, an Azure Bastion jump host, or configure a temporary storage firewall IP exception for their client machines.
 </details>
 
-Network perimeter isolation transforms how engineering teams interact with storage systems during routine maintenance, requiring structured connectivity paths into enterprise cloud environments.
+Authorization decisions decide who may call the data plane. The following section separates identity from network origin so teams can tighten both independently.
 
 ### Security and access control in depth
 
@@ -610,7 +610,7 @@ az storage fs directory create \
 Enabling a hierarchical namespace is unnecessary for simple image ingestion. A standard flat blob namespace is the simpler architectural fit because the workload does not benefit from directory-level transactions or distributed analytics query optimizations.
 </details>
 
-Architectural evaluation between flat object stores and hierarchical file systems hinges on operational characteristics and query patterns rather than storage capacity pricing models.
+The feature matrix below compares namespace, rename, ACL, analytics, protocol, and billing attributes so you can match an account kind to the workload.
 
 Choosing between flat Blob Storage and ADLS Gen2 is not about price---both use the same storage meters---but about namespace semantics, rename behavior, and how analytics tools expect to read data:
 
