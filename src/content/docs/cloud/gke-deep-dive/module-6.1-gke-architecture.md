@@ -242,7 +242,7 @@ Standard operators own the full worker stack. Node pool sizing and machine types
 Configure the Spot node pool with the dedicated node taint `cloud.google.com/gke-spot=true:NoSchedule`. Critical cluster components and application control Pods lack matching tolerations, preventing the Kubernetes scheduler from assigning them to preemptible worker instances. When leveraging Node Auto-Provisioning (NAP), auto-created Spot pools receive this taint automatically upon creation. Platform administrators must always maintain at least one non-preemptible standard node pool to host cluster add-ons and `kube-system` workloads. Additionally, keep in mind that PodDisruptionBudgets (PDBs) do not cover Spot reclamation; Google Cloud reclaims preemptible capacity abruptly without honoring eviction budgets.
 </details>
 
-Capacity governance requires platform teams to treat node isolation as an explicit architectural contract. Teams cannot rely on implicit scheduler defaults. Designing dedicated workload pools protects cluster stability during regional compute reallocations. This strategy enables cost-optimized batch execution across distributed fleets.
+Batch jobs that tolerate interruption still share a cluster with add-ons that cannot. Platform teams that separate those two classes of work into independently scaled pools keep invoice pressure from becoming a control-plane incident when a region reclaims surplus capacity overnight.
 
 ---
 
@@ -310,7 +310,19 @@ spec:
 
 ### Autopilot Restrictions
 
-[Autopilot enforces security best practices by restricting certain operations](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security). The table below summarizes the most common migration blockers teams discover when moving from Standard — treat it as an admission-control checklist, not an exhaustive API list:
+[Autopilot enforces security best practices by restricting certain operations](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security). Before treating a Standard-to-Autopilot migration checklist as complete, predict what happens to a host-level telemetry DaemonSet that worked on your previous cluster.
+
+**Pause and predict:** Consider an Autopilot cluster. You deploy a custom DaemonSet that requires privileged access to the host network namespace to monitor traffic. What will happen when you apply the manifest?
+
+<details>
+<summary>Check your prediction</summary>
+
+GKE Autopilot admission controllers immediately reject the manifest during API validation. Autopilot strictly blocks privileged containers and `hostNetwork: true` by default to safeguard shared host boundaries and enforce cluster security baselines. While Google maintains an allowlist for select verified-partner security and observability agents, a generic or custom packet sniffer is not permitted. These restrictions are not arbitrary friction; they encode Google's operational ability to patch, rotate, and bin-pack nodes safely without third-party daemons undermining node security. Teams migrating workloads from Standard clusters should always run `kubectl apply --dry-run=server` on critical DaemonSets and telemetry agents before cutover day.
+</details>
+
+Migration checklists that inventory host-level agents before an Autopilot cutover date give platform teams time to negotiate vendor alternatives without a Friday-night rollback. That inventory belongs in the same architecture review as CIDR sizing and release-channel choice, because discovering an incompatible telemetry agent after DNS cutover is an availability incident rather than a ticket.
+
+The table below summarizes the most common migration blockers teams discover when moving from Standard — treat it as an admission-control checklist, not an exhaustive API list:
 
 | Restriction | Reason | Workaround |
 | :--- | :--- | :--- |
@@ -321,16 +333,6 @@ spec:
 | [No custom node images](https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-architecture) | Consistency guarantee | Use init containers instead |
 | Resource requests strongly influence billing and scheduling | GKE uses or adjusts requests when sizing infrastructure | Explicitly specify requests so Autopilot doesn't rely on defaults or automatic adjustments |
 | Pods per node are pre-configured by GKE | Scheduling density depends on the selected node configuration | You can't directly tune this setting in Autopilot |
-
-**Pause and predict:** Consider an Autopilot cluster. You deploy a custom DaemonSet that requires privileged access to the host network namespace to monitor traffic. What will happen when you apply the manifest?
-
-<details>
-<summary>Check your prediction</summary>
-
-GKE Autopilot admission controllers immediately reject the manifest during API validation. Autopilot strictly blocks privileged containers and `hostNetwork: true` by default to safeguard shared host boundaries and enforce cluster security baselines. While Google maintains an allowlist for select verified-partner security and observability agents, a generic or custom packet sniffer is not permitted. These restrictions are not arbitrary friction; they encode Google's operational ability to patch, rotate, and bin-pack nodes safely without third-party daemons undermining node security. Teams migrating workloads from Standard clusters should always run `kubectl apply --dry-run=server` on critical DaemonSets and telemetry agents before cutover day.
-</details>
-
-Evaluating third-party daemon requirements early in migration planning prevents unexpected deployment failures during production cutovers. Vendor tooling often demands unrestricted node access. In those cases, platform engineers must select supported partner integrations or adapt architectures to sidecar models. Alternatively, teams can preserve dedicated Standard clusters for low-level node telemetry.
 
 ### Workload Identity at cluster creation
 
@@ -570,7 +572,7 @@ gcloud container node-pools describe default-pool \
 Under typical conditions, ordinary auto-upgrades wait for the maintenance window, meaning the cluster will upgrade during the Saturday maintenance slot. When Google issues critical security patches, those fixes are released across all channels simultaneously to ensure broad vulnerability coverage. However, during rare and severe security emergencies involving active zero-day threats, Google can execute emergency auto-upgrades that ignore both release channel delays and maintenance windows. Administrators must avoid assuming that upgrades always occur on Tuesday or that production workloads are strictly immune to updates outside maintenance windows during severe security incidents.
 </details>
 
-Reliable lifecycle management requires infrastructure teams to establish automated canary validation across staging environments. Teams should also enforce deployment soak periods before production rollouts. Treating version upgrades as continuous operational workflows ensures that production clusters absorb routine maintenance and emergency vulnerability mitigations without disrupting critical end-user availability.
+Reliable lifecycle management treats version movement as a standing operational workflow rather than a quarterly project. Staging canaries and soak periods give application owners a chance to catch API deprecations before the production control plane moves, which keeps user-facing availability intact when Google ships a new minor.
 
 ---
 
