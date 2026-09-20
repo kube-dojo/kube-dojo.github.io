@@ -379,9 +379,19 @@ spec:
 The security failure is an architectural bypass rather than an outdated WAF signature or misconfigured inspection rule. Google Cloud Armor security policies attach directly to the load-balancer backend service; traffic that reaches an unassociated cluster Ingress IP or direct node port never traverses that backend service and is never filtered. Similarly, AWS WAF inspects only requests that flow through its associated Application Load Balancer, CloudFront distribution, or API Gateway stage. To eliminate this vulnerability, platform teams must configure cluster load balancers as internal-only resources reachable exclusively through the gateway path, enforce firewall rules that reject direct external ingress, and terminate public traffic solely at the protected edge.
 </details>
 
-The next section is how multi-tiered rate limiting architectures prevent distributed botnet floods, unauthenticated web scraping, and expensive backend resource exhaustion.
+The next section is how operators choose which identity a rate limit counts against when public APIs face mixed traffic.
 
 ## Rate Limiting That Actually Works
+
+**Pause and predict:** Your e-commerce API experiences a massive traffic flood to `/api/v1/checkout` originating from thousands of distributed residential IP addresses where each request presents a valid user JWT. Why does a standard per-IP rate limit fail to protect downstream systems, and what throttling strategy should you deploy instead?
+
+<details>
+<summary>Check your prediction</summary>
+
+Per-IP rate limits miss distributed authenticated floods because the abusive traffic is spread across thousands of distinct residential IP addresses, keeping each individual client well below typical connection thresholds. When abuse leverages valid authenticated sessions, perimeter defenses must deploy granular per-path and per-client or per-API-key throttles rather than relying solely on network-layer source IPs. In managed cloud architectures, Amazon API Gateway usage plans and route throttling return HTTP 429 Too Many Requests when client quotas or burst token allowances are exceeded. Platform teams should combine identity-aware token bucket limits with strict concurrency controls on expensive backend dependencies, ensuring that abusive tenants cannot exhaust database pools even when rotating source IPs across residential networks.
+</details>
+
+The next section is how a shared rate-limit service stores counters and which descriptors a gateway should key on.
 
 Per-IP rate limiting is attractive because it is easy to explain, but it is also the first rate limit attackers learn to evade. A single-source flood is noisy, obvious, and cheap to block, while modern scraping, credential stuffing, checkout abuse, and inventory attacks distribute requests across proxies, devices, accounts, and tokens. If your only policy asks "how many requests came from this IP," it ignores the business identity and endpoint cost that usually matter most.
 
@@ -484,16 +494,6 @@ spec:
 
 The tricky part is not writing a counter configuration; it is choosing descriptors that match the threat model. A checkout endpoint might need a global cap, a per-user cap, and a per-payment-method velocity control. A public search endpoint might need per-IP and per-session throttles, but a customer integration endpoint probably needs per-API-key quotas and burst allowances that match the customer's paid plan.
 
-**Pause and predict:** Your e-commerce API experiences a massive traffic flood to `/api/v1/checkout` originating from thousands of distributed residential IP addresses where each request presents a valid user JWT. Why does a standard per-IP rate limit fail to protect downstream systems, and what throttling strategy should you deploy instead?
-
-<details>
-<summary>Check your prediction</summary>
-
-Per-IP rate limits miss distributed authenticated floods because the abusive traffic is spread across thousands of distinct residential IP addresses, keeping each individual client well below typical connection thresholds. When abuse leverages valid authenticated sessions, perimeter defenses must deploy granular per-path and per-client or per-API-key throttles rather than relying solely on network-layer source IPs. In managed cloud architectures, Amazon API Gateway usage plans and route throttling return HTTP 429 Too Many Requests when client quotas or burst token allowances are exceeded. Platform teams should combine identity-aware token bucket limits with strict concurrency controls on expensive backend dependencies, ensuring that abusive tenants cannot exhaust database pools even when rotating source IPs across residential networks.
-</details>
-
-The next section is how operational teams balance strict capacity thresholds against customer availability during anticipated product launch traffic surges.
-
 There is a hard tradeoff between protection and availability. A global limit that is too low can reject legitimate surge traffic during a product launch, while a limit that is too high may allow the database to collapse before the gateway intervenes. Senior teams tune these limits from capacity tests, SLO budgets, and business priorities, then monitor both allowed and rejected traffic so they can tell the difference between a healthy surge and a harmful one.
 
 ## OAuth2/OIDC Proxying and Gateway Authentication
@@ -516,7 +516,7 @@ flowchart TD
     Proxy -- "X-Forwarded-User: alice@example.com<br>X-Forwarded-Groups: engineering,admin" --> Pod[Application Pod<br>Trusts headers from proxy]
 ```
 
-OAuth2 Proxy is useful when the client is a browser and the application wants an interactive login experience without implementing the full authorization flow. It can redirect unauthenticated users to an identity provider, manage secure cookies, pass selected headers upstream, and keep the application focused on business logic. That simplicity comes with a responsibility: the proxy must be the only route to the application, and applications must reject spoofed identity headers if a direct path exists.
+OAuth2 Proxy is useful when the client is a browser and the application wants an interactive login experience without implementing the full authorization flow. It can redirect unauthenticated users to an identity provider, manage secure cookies, pass selected headers upstream, and keep the application focused on business logic. That simplicity comes with a responsibility: the proxy must be the only route to the application.
 
 ```yaml
 apiVersion: apps/v1
