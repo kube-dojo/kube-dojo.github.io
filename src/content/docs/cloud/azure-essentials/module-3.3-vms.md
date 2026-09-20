@@ -362,7 +362,7 @@ Premium SSD v2 and Ultra Disk do not support host caching, but their inherently 
 Host cache None is the default for data disks because PostgreSQL already caches database pages in memory via `shared_buffers`. Enabling ReadOnly double-caches data in host RAM and wastes memory bandwidth. Furthermore, never use ReadWrite caching on database data or transaction log disks, because an ungraceful host failure can lose unflushed writes and corrupt transactional consistency.
 </details>
 
-Storage performance optimization involves coordinating filesystem behaviors with storage controller mechanisms and compute instance characteristics. In addition to tuning storage subsystem caching properties, cloud engineers must verify that underlying host processing limits align with provisioned disk capabilities.
+Storage performance optimization involves coordinating filesystem behaviors with storage controller mechanisms and compute instance characteristics. Cloud engineers must verify that underlying host processing limits align with provisioned disk capabilities before they attach a faster SKU.
 
 ### The VM IOPS Cap: When the Disk Outruns the VM
 
@@ -683,7 +683,7 @@ az vm create \
 Azure Spot VMs configured with an eviction policy of Deallocate provide the deepest compute discounts for interruptible workloads that save progress to checkpoints. The primary operational risk is eviction, which occurs whenever Azure reclaims compute capacity for standard on-demand workloads with only a brief thirty-second notice.
 </details>
 
-Selecting pricing tiers requires balancing operational tolerance for interruption against financial commitments across predictable and bursty resource demands. While opportunistic billing options suit transient tasks, enterprise environments frequently require sustained capacity guarantees for long-term compute baselines.
+Selecting pricing tiers requires matching commitment length to how steadily the workload runs. Enterprise environments frequently require sustained capacity guarantees for long-term compute baselines, which is the next procurement model.
 
 ### Azure Reserved Virtual Machine Instances (RIs)
 
