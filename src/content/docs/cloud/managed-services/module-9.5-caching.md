@@ -360,7 +360,7 @@ spec:
 When cluster mode is disabled, ElastiCache provides a Primary Endpoint dedicated to write operations and a Reader Endpoint (or individual replica endpoints) that load balances read queries across available read replicas. Replicas operate in read-only mode, meaning any client attempt to execute a `SET` or other mutating command against a replica endpoint will be rejected with a `READONLY You can't write against a read only replica` error. If cluster mode is enabled, the topology partitions keys across multiple shards using hash slots; the client application must be cluster-aware and connect to the Configuration Endpoint, which continuously updates the client's internal hash-slot routing table as shards scale or fail over.
 </details>
 
-The following architectural section examines key trade-offs between self-hosting Redis instances inside Kubernetes clusters versus consuming fully managed caching services across production environments.
+The next section is how running Redis inside Kubernetes differs from a provider-backed managed cache under production failure.
 
 ---
 
@@ -396,7 +396,7 @@ High-concurrency microservice architectures rely heavily on distributed caching 
 The cache itself is not the overloaded component during the initial seconds of a stampede; rather, the underlying database or upstream data store takes the catastrophic hit. When a heavily requested key expires, dozens or hundreds of application pods simultaneously observe a cache miss and execute identical expensive queries to regenerate the missing value. Because Redis operates strictly as a passive data store and does not inherently serialize or coordinate cache rebuilds across external clients, every concurrent worker issues redundant queries to the backend. Mitigating this thundering herd requires client-side techniques such as TTL jittering, probabilistic early refresh, single-flight request coalescing, or distributed mutex locks.
 </details>
 
-The following architectural diagram illustrates the operational contrast between normal cache-aside execution and the cascading query amplification triggered during an unmitigated key expiration event.
+The next section is how platform teams keep a hot key warm without treating every miss as a unique database round trip.
 
 ```mermaid
 flowchart LR
@@ -528,7 +528,7 @@ When dataset volume approaches the configured memory boundary on a caching clust
 Under the `noeviction` policy, once the cache reaches `maxmemory`, Redis refuses all incoming commands that attempt to allocate additional memory (returning an `OOM command not allowed when used memory > 'maxmemory'` error) while continuing to serve read-only queries. For a cache-aside architecture where data can be safely reconstructed from the database, this behavior causes unnecessary application write failures and operational outages. An all-keys policy like `allkeys-lru` (Least Recently Used) or `allkeys-lfu` (Least Frequently Used) is far better suited for reconstructable caches, as it automatically purges older or rarely queried keys to accommodate fresh incoming data without interrupting application writes.
 </details>
 
-The following operational paragraphs examine how distinct eviction algorithms manage memory pressure and how managed cloud platforms expose engine policy controls.
+The next section is how LRU, LFU, and TTL-oriented policies show up in provider parameter groups and live INFO output.
 
 Eviction algorithms determine how Redis or Valkey selects candidate keys when memory exceeds limits. LRU favors recently used keys, which works well when traffic follows the common pattern where a small fraction of keys receive most reads. LFU favors frequently used keys, which can protect long-lived favorites even if they have not been read in the last few seconds. TTL-oriented policies only evict keys that have expiration metadata, which is useful when some keys should be protected but dangerous if developers forget TTLs and the eligible key set becomes too small.
 
@@ -644,7 +644,7 @@ spec:
 Connection exhaustion during a rolling update stems from several compounded factors rather than simple static multiplication. First, Kubernetes rolling updates provision surging replacement pods before terminating old replicas (`maxSurge`), creating a transient window where old and new pods run concurrently and duplicate connection pool allocations. Second, terminating pods often fail to gracefully close active sockets before their containers stop, leaving unreleased TCP connections lingering in `TIME_WAIT` or holding server-side slots until engine keepalive probes expire. Third, in clustered or sharded deployments, the connection ceiling (`maxclients`) applies on a per-node basis rather than cluster-wide; if client pools connect disproportionately to specific primary shards or configuration nodes, individual instances reject incoming handshakes despite aggregate cluster capacity appearing sufficient.
 </details>
 
-The next section examines how infrastructure engineering teams analyze operational expenses, serverless meters, and capacity trade-offs across cloud-managed caching deployments.
+The next section is how cache node hours, serverless meters, and replica count show up on the monthly bill.
 
 ---
 
