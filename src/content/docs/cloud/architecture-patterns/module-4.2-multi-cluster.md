@@ -93,7 +93,7 @@ Evaluating control plane survivability within a single cloud provider demonstrat
 <details>
 <summary>Check your prediction</summary>
 
-The AKS Free tier does not provide a financially backed uptime SLA, whereas the Standard tier includes a financially backed 99.95% uptime SLA (or 99.9% without availability zones) for the control plane. In addition, a default AKS deployment without explicit availability zone configuration provisions a single-zone control plane, leaving it vulnerable to zonal outages. The Free tier is restricted to experimentation and lightweight environments with a recommended maximum of 10 nodes, whereas production enterprise workloads require the Standard or Premium tier with explicit availability zone distribution.
+The AKS Free tier does not provide a financially backed uptime SLA, whereas the Standard tier includes a financially backed 99.95% uptime SLA with availability zones, or 99.9% without availability zones. In a region that supports availability zones, a Standard-tier control plane is automatically distributed across multiple zones even if node pools omit zone settings. In regions without availability zones, or if the cluster is not in that Standard-in-AZ posture, the control plane can remain a single-zone target. The Free tier is for development and test, with a recommended maximum under 10 nodes.
 </details>
 
 Understanding how cloud providers structure their managed control plane guarantees highlights the distinction between physical infrastructure isolation and logical cluster resilience. Even when an infrastructure team deploys worker compute instances across multiple physical failure domains, underlying state storage placement can still dictate the true operational survival of the environment.
@@ -892,7 +892,7 @@ Failure layer: Control plane state consensus and etcd quorum boundaries during p
 Failure layer: Separation of service discovery caching from physical network transit reachability across wide-area networks. Next action: implement application-level client timeouts, retries with exponential backoff, and circuit breakers, while configuring local fallback endpoints or multi-cluster service mesh egress policies that detect transport-level connection failures rather than relying solely on DNS availability.
 </details>
 
-**Card C: A GKE zonal control plane survives a single-zone outage the same way a regional control plane does.** A startup deploying on Google Kubernetes Engine selects zonal clusters to maximize the monthly free-tier billing credit. They assume that Google Cloud's underlying virtualization will automatically keep the Kubernetes API operational during a localized data center incident. When Google Cloud announces an infrastructure degradation affecting their chosen zone, the team is surprised to discover that `kubectl` commands time out and automated scaling events halt across all surviving nodes.
+**Card C: A GKE zonal control plane survives a single-zone outage the same way a regional control plane does.** A startup deploying on Google Kubernetes Engine selects zonal clusters to maximize the monthly free-tier billing credit. They assume that Google Cloud's underlying virtualization will automatically keep the Kubernetes API operational during a localized data center incident.
 
 <details>
 <summary>Check your prediction</summary>
