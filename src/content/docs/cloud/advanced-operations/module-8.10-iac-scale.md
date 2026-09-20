@@ -60,7 +60,7 @@ The local backend locks via system APIs on that machine only (such as file locki
 - Catastrophic state corruption from aborted or concurrent operations.
 </details>
 
-Large-scale cloud architectures require predictable isolation boundaries so that independent engineering teams can provision resources without bottlenecking on global state locks or risking concurrent write conflicts across shared infrastructure components.
+The next concern is how large the graph is, not just who holds the file. The table below is the operational cost of one shared ledger as resource counts grow.
 
 | Resources | State Size | Plan Time | Apply Time | Risk |
 |---|---|---|---|---|
@@ -214,7 +214,7 @@ Local state files committed to source control are a critical security vulnerabil
 Deleting the lock object mid-apply removes mutual exclusion and immediately allows a second writer to acquire a lock and execute modifications against the same infrastructure and state file simultaneously. Even though the original process's terminal was terminated, background cloud provider API operations initiated by the first apply may still be executing or committing changes asynchronously. When the second apply runs, both operations write conflicting state snapshots, corrupting resource tracking and potentially triggering duplicate resource creation or accidental resource deletion. For AWS environments, modern S3 state backends implement native locking via the `use_lockfile` attribute, whereas dedicated DynamoDB locking tables are deprecated. If an execution appears stuck, operators must verify cloud provider API operations have fully ceased before using `terraform force-unlock` with the specific Lock ID rather than deleting backend lock records directly.
 </details>
 
-Coordinating concurrent execution across distributed teams requires understanding how remote backends arbitrate read and write phases during deployment lifecycles. The sequence diagram below traces the interaction between local CLI clients, distributed lock coordinators, and object storage during a typical parallel apply attempt.
+The sequence diagram below traces a typical apply against object storage and a lock coordinator, so you can compare the intended happy path with the failure you just reasoned about.
 
 ```mermaid
 sequenceDiagram
@@ -360,7 +360,7 @@ A 50-variable pass-through module is usually worse than composition or raw resou
 A common failure mode is creating "wrapper modules" that expose every underlying provider parameter and pretend abstraction exists where none is delivered. Such modules provide little architectural value because consumers still need deep platform knowledge to configure them safely. Instead, modules should encode your organization's specific security and compliance policies directly into baseline behavior, so the module can prevent unsafe defaults even when users are in a hurry.
 </details>
 
-Platform engineering organizations achieve scalable velocity when reusable infrastructure components emphasize curated architectural patterns rather than comprehensive parameter passthrough. Module authors establish stability by separating core organizational standards from workload-specific configuration knobs.
+The next section is how versioned, thin root modules make review possible when dozens of environments consume the same cluster contract.
 
 Terraform and OpenTofu modules are software interfaces. HashiCorp describes a [module](https://developer.hashicorp.com/terraform/language/modules) as a collection of resources managed together, and that definition matters because a module should have a cohesive reason to change. OpenTofu follows the same broad IaC workflow of writing configuration, planning changes, and applying approved operations across cloud and on-premises APIs, making it a practical vendor-neutral baseline for teams that need Terraform-compatible patterns while tracking the [OpenTofu](https://opentofu.org/docs/intro/) ecosystem. The point is not to debate brands; the point is to make module contracts explicit enough that either tool can operate safely.
 
@@ -725,7 +725,7 @@ Scheduled `plan -refresh-only` detects objects changed outside of Terraform, mak
 Detecting drift proactively prevents massive "surprise" applies where a benign pull request unexpectedly schedules the destruction of an unmanaged data tier. In a mature process, drift detection belongs next to policy checks and secret scanning, not as an afterthought after production incidents. This is why teams treat it as a guardrail: if the live environment has already moved, every planned change is only meaningful when that gap is made visible and resolved first.
 </details>
 
-Automating this verification pipeline ensures that platform operators receive prompt notifications when live cloud state diverges from declared code. Reconciling divergence early prevents uncoordinated changes from accumulating across complex, multi-account cloud environments.
+The next subsection is the concrete command and the CI schedule so the check is a job, not a slide.
 
 ### Detecting Drift
 
