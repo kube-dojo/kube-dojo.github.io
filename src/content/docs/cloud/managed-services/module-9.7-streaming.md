@@ -618,7 +618,7 @@ Stream processing pipelines requiring high data integrity must carefully choose 
 Kafka exactly-once is consume→process→produce on Kafka topics. External DB/API sinks still need idempotent writes / cooperation with that system. [Kafka achieves exactly-once semantics (EOS) for read-process-write loops inside the Kafka ecosystem](https://kafka.apache.org/41/design/design/) through idempotent producers, transactions, and consumer offset commits that participate in the same transaction boundary. However, Kafka transactions cannot span external non-Kafka systems like PostgreSQL, Elasticsearch, or third-party HTTP endpoints. Flink and Beam (Dataflow) pursue a different but related guarantee: exactly-once processing relative to checkpoints stored in S3, GCS, or Azure Blob where failures roll back to the last successful checkpoint. Similarly, Pub/Sub's [exactly-once delivery](https://cloud.google.com/pubsub/docs/exactly-once-delivery) narrows duplicate delivery at the subscription layer when enabled, but your GKE handler must still write idempotently to Postgres or call external APIs with safe retries. Kinesis consumers achieve effectively-once by storing checkpoints in DynamoDB or by using Flink with managed checkpoints; there is no single transaction knob like Kafka's `send_offsets_to_transaction`.
 </details>
 
-The next section is how a stream processor keeps local RocksDB state on a pod and what a restart does to that cache.
+The next section is how a transactional producer commits consumer offsets and derived events together on Kafka topics.
 
 ### The Transactional Pipeline
 
@@ -661,10 +661,10 @@ if msg:
 <details>
 <summary>Check your prediction</summary>
 
-Kafka Streams local RocksDB on empty ephemeral disk is gone after restart; restore is changelog replay (slow). PVC/StatefulSet and optional standby replicas cut restore time. When a stream processor keeps local state on ephemeral pod storage, a restarted pod loses that local state and must restore it from the changelog before normal processing resumes. Rebuilding gigabytes of key-value state over the network delays consumer partition readiness and extends rebalance durations. Using a StatefulSet backed by persistent volume claims preserves RocksDB data across pod recreation, allowing the stream processor to resume stateful joins and window aggregations almost immediately.
+Kafka Streams local RocksDB on empty ephemeral disk is gone after restart; restore is changelog replay (slow). PVC/StatefulSet and optional standby replicas cut restore time. When a stream processor keeps local state on ephemeral pod storage, a restarted pod loses that local state and must restore it from the changelog before normal processing resumes. Rebuilding gigabytes of key-value state over the network delays consumer partition readiness and extends rebalance durations. A StatefulSet with persistent volume claims keeps RocksDB across pod recreation so restore is a smaller changelog catch-up; standby replicas (`num.standby.replicas`) make failover near-instant.
 </details>
 
-The next section is how Schema Registry turns event JSON into versioned contracts so producers cannot silently break consumers.
+The next section is how streaming workloads on Kubernetes use identity, networking, and disruption budgets without running the brokers.
 
 Instead, stream processors with local state should be deployed as a `StatefulSet` with persistent volume claims to avoid expensive remote changelog rebuilds:
 
@@ -1428,7 +1428,7 @@ Before you close the hands-on lab, audit the four operational claims below. Each
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Partition assignment limits, consumer group rebalance mechanics, and wasted compute resources. Next action: recognize that each partition within a Kafka topic is assigned to at most one consumer instance within a specific consumer group at any time; when you scale a consumer Deployment to 15 replicas on a 12-partition topic, the broker's partition assignor allocates one partition to each of the first 12 pods, while the remaining 3 pods receive zero partition assignments; these 3 surplus pods sit completely idle, polling the cluster without consuming any records while still consuming memory and CPU reservations; to increase processing parallelism beyond 12 workers, you must increase the partition count of the topic itself before scaling the consumer Deployment, or configure consumer instances to process records across multiple internal worker threads per partition.
+Failure layer: Partition assignment limits, consumer group rebalance mechanics, and wasted compute resources. Next action: recognize that a consumer group assigns each partition to at most one member; with 15 replicas on a 12-partition topic, three members receive no partitions and sit idle while Kubernetes still reports those pods Ready; extra application threads on an unassigned member cannot pull more partitions; raise the topic partition count first, then scale replicas up to that count.
 </details>
 
 **Card B: Enable Kafka transactions and assume a Postgres/JDBC sink will never double-insert, even without upsert keys.** A data engineering team builds a financial settlement pipeline. The pipeline consumes event records from an upstream Kafka topic and writes ledger entries into an external PostgreSQL relational database. The developers enable Kafka transactions, configure idempotent producers, and set `isolation.level: read_committed` on downstream consumers. The team assumes that enabling Kafka's exactly-once semantics guarantees that the database sink will never insert duplicate rows. Consequently, they conclude that defining database unique constraints or idempotent upsert keys is unnecessary.

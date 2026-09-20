@@ -653,7 +653,7 @@ Serverless costs spike in three predictable scenarios, and each has a mitigation
 
 All three clouds offer generous free tiers that make experimentation essentially free, but each tier has hard limits that can catch teams off guard. AWS Lambda's free tier provides 1 million requests and 400,000 GB-seconds per month — enough to run a moderate production workload for free if your functions are short and lightweight. Cloud Run's free tier provides 2 million requests and 360,000 vCPU-seconds per month. Azure Functions offers 1 million executions and 400,000 GB-seconds. These tiers apply every month, not just during a trial period.
 
-The trap is that once you exceed the free tier, you pay for *all* usage, not just the excess. A service that runs at 1.1 million Lambda invocations per month pays for 1.1 million, not 100,000. Teams that grow gradually from the free tier into paid usage often miss this detail and are surprised by the first bill.
+The trap is not that crossing the free allotment retroactively bills every request. AWS Lambda subtracts the monthly free requests and GB-seconds first, so 1.1 million invocations bills 100,000 paid requests (plus duration past 400,000 GB-s). Cloud Run is billed only for usage past the free tier. The surprise is still real: the first month you cross the allotment, a paid line item appears and then grows with every extra request; Provisioned Concurrency on Lambda is not covered by the free tier. Treat published rates as dated—re-check the cloud pricing page before you budget.
 
 ---
 
