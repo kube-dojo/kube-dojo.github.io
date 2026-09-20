@@ -134,7 +134,7 @@ az network vnet subnet create \
 az network vnet subnet list --resource-group myRG --vnet-name hub-vnet -o table
 ```
 
-**Pause and predict:** You plan to deploy an Azure Kubernetes Service cluster configured with Azure CNI that must scale up to 50 nodes with 30 pods per node. If you place this cluster inside a single /24 subnet, what will happen during scale-out, and why do Azure subnet reservation rules cause this deployment to fail?
+**Pause and predict:** You plan to deploy an Azure Kubernetes Service cluster configured with Azure CNI that must scale up to 50 nodes with 30 pods per node. If you place this cluster inside a single /24 subnet, what will happen during scale-out?
 
 <details>
 <summary>Check your prediction</summary>
@@ -302,9 +302,6 @@ flowchart LR
 * **A can reach B:** YES
 * **B can reach C:** YES
 * **A can reach C:** NO (peering is not transitive)
-</details>
-
-Designing enterprise networks around a central hub enables organizations to inspect and audit data flows at a single administrative boundary. Rather than managing complex point-to-point configurations as the application footprint expands, centralized architectures enforce compliance standards cleanly. This pattern also simplifies traffic engineering and reduces the operational overhead of maintaining spoke networks.
 
 ```mermaid
 flowchart LR
@@ -317,6 +314,9 @@ flowchart LR
 
 * **A can reach B:** YES (traffic routes through Hub's NVA/Firewall)
 * **Requires:** UDR on spoke subnets + "Allow Forwarded Traffic" on peering
+</details>
+
+Landing-zone teams usually draw the hub as a shared-services VNet that also hosts DNS resolvers, private endpoints, and a VPN or ExpressRoute gateway. The CLI that follows creates two spoke address spaces first so later peering objects have distinct remote IDs to reference.
 
 ```bash
 # Create two VNets
@@ -374,7 +374,7 @@ Each peering link exposes four flags that control whether traffic may flow, whet
 Peering creation will fail immediately during provisioning. [Peered VNets **cannot have overlapping address spaces**](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq) under any circumstances, even when they reside in separate subscriptions or different Entra ID tenants. Azure software-defined routing requires unambiguous destination IP prefixes to direct network packets across virtual networks.
 </details>
 
-Organizations maintain centralized IP address management registries to coordinate CIDR block allocations across cloud subscriptions and on-premises datacenters. When integrating acquired infrastructure with preexisting address conflicts, network architects implement Private Link connections or network address translation gateways. These mechanisms establish secure connectivity between systems without requiring immediate subnet renumbering.
+Organizations maintain centralized IP address management registries to coordinate CIDR block allocations across cloud subscriptions and on-premises datacenters. Platform teams record who owns each prefix, which region it belongs to, and when it was issued, so later expansions do not collide with an undocumented lab range. Those registries also help merger projects compare existing allocations before anyone creates a peering object.
 
 ---
 
