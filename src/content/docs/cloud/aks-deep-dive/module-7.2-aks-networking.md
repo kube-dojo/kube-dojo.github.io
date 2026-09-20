@@ -22,7 +22,7 @@ After completing this module, you will be able to:
 
 However, the reality of production hit them violently three months later. The architecture had expanded to encompass 85 distinct microservices, all chattering constantly with one another. During a high-traffic promotional event, the platform began suffering from intermittent, seemingly inexplicable 5-second delays on inter-service API calls. The delays compounded, cascading into widespread transaction timeouts. The engineering team spent two frantic weeks investigating the application code, optimizing database queries, and scaling up pod replicas, but the latency persisted. Finally, an external network architect uncovered the catastrophic root cause: Kubenet relies on user-defined routes (UDRs) and a local bridge network on each node. Every time a pod communicated with a pod on a different node, the packet had to traverse the Azure route table. With 85 services generating tens of thousands of cross-node requests per second, the Azure UDR update limits and routing overhead became a massive bottleneck, resulting in those mysterious 5-second propagation delays.
 
-The remediation was excruciating. Because the Container Network Interface (CNI) cannot be changed on a running cluster, the organization was forced to execute a complete cluster rebuild using Azure CNI Overlay. The migration consumed three weeks of engineering effort, caused numerous maintenance windows, and resulted in substantial lost revenue and weeks of engineering cost. This incident underscores a brutal truth about Kubernetes: networking is the architectural decision you make earliest and pay for latest. The choice between Kubenet, Azure CNI, CNI Overlay, and CNI Powered by Cilium directly dictates your scaling limitations, your network security posture, and your overall system resilience. In this module, we will dissect every facet of AKS networking, equipping you to make these critical decisions correctly from day one.
+The remediation was still a cluster cutover. The team treated the original CNI as immutable and rebuilt onto Azure CNI Overlay, which consumed three weeks of engineering effort, caused numerous maintenance windows, and resulted in substantial lost revenue. That rebuild was a choice, not a standing platform invariant: Microsoft now documents a forward-only IPAM migration from kubenet to Azure CNI Overlay, and a separate in-place dataplane update to Azure CNI Powered by Cilium with node auto-provisioning disabled during the update. The incident still underscores a brutal truth about Kubernetes: networking is the architectural decision you make earliest and pay for latest. The choice between Kubenet, Azure CNI, CNI Overlay, and CNI Powered by Cilium directly dictates your scaling limitations, your network security posture, and your overall system resilience. In this module, we will dissect every facet of AKS networking, equipping you to make these critical decisions correctly from day one.
 
 Notice what the team in that story did not do: they tested only application correctness before validating platform constraints under realistic scale. A healthy module can run dozens of microservices with near-zero latency, and still fail at enterprise scale because control-plane assumptions never held once node and service counts increased. That pattern is not an application bug; it is a platform architecture bug with predictable symptoms. When you build a networking strategy in AKS, you are choosing the rules that every packet must follow for the life of the cluster, so the strategy should be reviewed before workloads grow and before third-party integrations become coupled to unstable pathways.
 
@@ -75,7 +75,7 @@ Kubenet is exceptionally conservative with IP addresses because only host nodes 
 - **No Direct VNet Connectivity**: Because pods have non-routable private IPs, external Azure resources (like a legacy VM or a service endpoint) cannot reach them directly.
 - **UDR Scaling Limits**: Azure enforces a hard limit of 400 routes per UDR table. In a massive cluster, you can easily collide with this ceiling, causing the cluster to fail to register new nodes.
 - **Routing Latency overhead**: Every packet crossing a node boundary must be processed by the UDR layer, injecting measurable latency at scale.
-- **Platform Limitations**: Kubenet strictly does not support Windows Server nodes.
+- **Platform Limitations**: Kubenet strictly does not support Windows Server nodes. Microsoft retires kubenet networking on **31 March 2028**; migrate to Azure CNI Overlay before that date.
 
 ### Azure CNI: Direct VNet Integration
 
@@ -259,7 +259,7 @@ Finally, tie every choice to operational capacity. Ask who will own subnet plann
 
 By default, Kubernetes implements a flat network topology, so any pod in any namespace can initiate a connection with any other pod. This accelerates early development because teams can move quickly without predefining traffic contracts. In production, however, that default can create catastrophic blast radius: a single compromised container can pivot from frontend to backend and then to internal APIs before detection. Network Policies were designed to reverse that default posture.
 
-Network Policies implement zero-trust segmentation by acting as distributed firewalls. You define permitted ingress and egress explicitly at pod level using label selectors, which makes policies both scalable and explicit. For AKS specifically, this decision is constrained by cluster creation because the policy engine is bound at provisioning time, and changing it later typically requires a destructive rebuild and migration.
+Network Policies implement zero-trust segmentation by acting as distributed firewalls. You define permitted ingress and egress explicitly at pod level using label selectors, which makes policies both scalable and explicit. For AKS specifically, a live `--network-policy` plugin swap is still rejected after cluster creation. The supported in-place path is a **data-plane** update to Azure CNI Powered by Cilium, with node auto-provisioning disabled during the update. FQDN filtering and Layer 7 policies still require Advanced Container Networking Services on that Cilium cluster; they are not included by enabling `--network-dataplane cilium` alone.
 
 A practical way to think about this is: first choose the coarse boundary, then narrow to the service contract. Start by documenting what each namespace is allowed to talk to by default, and then refine with explicit allow-lists for known dependencies. This avoids writing large policy sets that appear correct on day one but accidentally permit dangerous lateral movement the next day as teams deploy additional namespaces.
 
@@ -344,10 +344,11 @@ spec:
 
 Cilium elevates network security from the transport layer to the application layer. Standard Network Policies only comprehend IPs and ports, which is why they are often sufficient for broad segmentation but too coarse for API-driven systems. Cilium, powered by eBPF, understands HTTP paths, gRPC methods, and DNS queries. This allows you to allow a pod to run `HTTP GET /api/v1/read` while simultaneously blocking `HTTP POST /api/v1/write`, so policy aligns with business rules rather than only packet tuples.
 
-Because Cilium works at Layer 7, the policy review process changes. You can now audit security rules by thinking in terms of application behavior, which is much easier for service teams to reason about than raw CIDR and port maps alone. This does add cognitive overhead at first, because rule authors must understand protocol semantics as well as Kubernetes objects, but the tradeoff is often fewer accidental over-permissions and clearer post-incident debugging.
+Because Cilium works at Layer 7, the policy review process changes. You can now audit security rules by thinking in terms of application behavior, which is much easier for service teams to reason about than raw CIDR and port maps alone. This does add cognitive overhead at first, because rule authors must understand protocol semantics as well as Kubernetes objects, but the tradeoff is often fewer accidental over-permissions and clearer post-incident debugging. On AKS, L3/L4 `CiliumNetworkPolicy` works with the Cilium dataplane alone; HTTP/gRPC/Kafka Layer 7 rules and `toFQDNs` require Advanced Container Networking Services (`--enable-acns`). FQDN filtering is enabled by default with ACNS; L7 policies need the extra ACNS L7 option.
 
 ```yaml
 # CiliumNetworkPolicy: allow HTTP GET to /api/v1/products only
+# Requires ACNS with L7 advanced network policies on AKS.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -376,7 +377,7 @@ Crucially, Cilium supports DNS-based egress filtering. In cloud environments, ex
 In practice, DNS-based policies are most useful when your threat model includes dependency drift, because provider infrastructure can change faster than your platform team can update static firewall data. With Cilium, the policy intent remains stable while the resolved destinations adapt, which is especially important for SaaS-heavy applications that depend on multiple CDN-backed endpoints.
 
 ```yaml
-# CiliumNetworkPolicy: DNS-based egress filtering
+# CiliumNetworkPolicy: DNS-based egress filtering (requires ACNS; FQDN is on by default with --enable-acns)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -672,7 +673,7 @@ For ongoing education, treat this module as a baseline standard that each team s
 ## Quiz
 
 <details>
-<summary>1. Your company is deploying a new microservices application to AKS. The networking team has allocated a small /24 subnet (254 IPs) for the cluster. The application requires 150 pods across 5 nodes, but also needs to be accessed by legacy Azure VMs on a peered VNet. Which CNI model (Azure CNI or CNI Overlay) should you choose, and what trade-offs must you manage?</summary>
+<summary>1. Your company is deploying a new microservices application to AKS. The networking team has allocated a small /24 subnet (251 usable IPs after Azure reserves the first four and last addresses) for the cluster. The application requires 150 pods across 5 nodes, but also needs to be accessed by legacy Azure VMs on a peered VNet. Which CNI model (Azure CNI or CNI Overlay) should you choose, and what trade-offs must you manage?</summary>
 
 You would usually choose CNI Overlay because Azure CNI would quickly exhaust or severely constrain the /24 subnet. With Azure CNI's default pre-allocation, 5 nodes would reserve 150 IPs just for pods, leaving little room for node IPs, upgrades, or scaling. CNI Overlay solves this by assigning pod IPs from a private, non-routable address space, consuming only 5 VNet IPs for the nodes. However, the trade-off is that the legacy Azure VMs cannot route directly to the pod IPs; you must expose the application using an internal LoadBalancer Service or an Ingress Controller to bridge the VNet and the overlay network.
 </details>
@@ -715,17 +716,17 @@ Azure still rejects a live `--network-policy` plugin swap from Azure NPM to Cili
 
 ## Hands-On Exercise: CNI Powered by Cilium with L7 Egress Domain Filtering
 
-In this exercise, you will deploy an AKS cluster with CNI Powered by Cilium and implement L7-aware egress policies that restrict pods to specific external domains.
+In this exercise, you will deploy an AKS cluster with CNI Powered by Cilium **and Advanced Container Networking Services**, then implement FQDN egress policies that restrict pods to specific external domains. FQDN filtering and Layer 7 policies are an ACNS feature; `--network-dataplane cilium` alone does not enable them.
 
 ### Prerequisites
 
-- Azure CLI with aks-preview extension (`az extension add --name aks-preview`)
+- Azure CLI 2.48.1 or later (`az --version`)
 - An Azure subscription with Contributor access
 - kubectl and kubelogin installed
 
 ### Task 1: Deploy AKS with CNI Powered by Cilium
 
-Create a cluster with the Cilium dataplane and verify it is operational. This starts with provisioning the environment, then confirming that Cilium components are present and kube-proxy is absent before you apply any policy logic. Establishing a healthy baseline first keeps the rest of the exercise reliable and prevents debugging policy failures as infrastructure issues.
+Create a cluster with the Cilium dataplane and ACNS, then verify it is operational. This starts with provisioning the environment, then confirming that Cilium components are present and kube-proxy is absent before you apply any policy logic. Establishing a healthy baseline first keeps the rest of the exercise reliable and prevents debugging policy failures as infrastructure issues.
 
 <details>
 <summary>Solution</summary>
@@ -734,13 +735,14 @@ Create a cluster with the Cilium dataplane and verify it is operational. This st
 # Create a resource group
 az group create --name rg-aks-cilium --location westeurope
 
-# Create the cluster with Cilium
+# Create the cluster with Cilium + ACNS (FQDN filtering is enabled by default with --enable-acns)
 az aks create \
   --resource-group rg-aks-cilium \
   --name aks-cilium-lab \
   --network-plugin azure \
   --network-plugin-mode overlay \
   --network-dataplane cilium \
+  --enable-acns \
   --pod-cidr 10.244.0.0/16 \
   --node-count 3 \
   --node-vm-size Standard_D4s_v5 \
@@ -758,8 +760,9 @@ kubectl get pods -n kube-system -l k8s-app=cilium -o wide
 kubectl get pods -n kube-system -l component=kube-proxy
 # Expected: No resources found
 
-# Check Cilium status
-kubectl exec -n kube-system -l k8s-app=cilium -- cilium status --brief
+# Check Cilium status (exec takes a pod or TYPE/NAME, not -l)
+CILIUM_POD=$(kubectl get pod -n kube-system -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n kube-system "$CILIUM_POD" -- cilium status --brief
 ```
 
 </details>
@@ -857,32 +860,28 @@ Lock down both namespaces with default-deny policies before adding allowlists. T
 <summary>Solution</summary>
 
 ```yaml
-# Save as default-deny.yaml
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
+# Save as default-deny.yaml (both namespaces in one file)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
   name: default-deny-all
   namespace: backend
 spec:
-  endpointSelector: {}
-  ingress:
-    - {}
-  egress:
-    - {}
-```
-
-```yaml
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
   name: default-deny-all
   namespace: frontend
 spec:
-  endpointSelector: {}
-  ingress:
-    - {}
-  egress:
-    - {}
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
 ```
 
 ```bash
@@ -895,13 +894,13 @@ kubectl exec -n backend "$PAYMENT_POD" -- curl -s --max-time 5 https://httpbin.o
 # Expected: timeout (connection blocked)
 ```
 
-Note: The default-deny policy above uses empty ingress/egress rules, which blocks everything that is not explicitly allowed by another policy. This is the recommended starting point for any production namespace.
+Note: Cilium policy rules are a whitelist. An empty Cilium `ingress: [{}]` / `egress: [{}]` rule matches all traffic and therefore **allows** it. A Kubernetes `NetworkPolicy` with `policyTypes: [Ingress, Egress]` and no allow rules selects the pods and leaves both directions empty, which Cilium enforces as default-deny. Do not copy empty `{}` Cilium rules expecting a lock-down.
 
 </details>
 
-### Task 4: Implement L7 Egress Domain Filtering
+### Task 4: Implement FQDN Egress Domain Filtering
 
-Allow the payment service to reach only specific external domains (Stripe and the cluster's DNS). This step demonstrates why Layer 7 policy matters, because you are no longer writing brittle IP allowlists and are instead tying egress control to business-level identities. In a successful run, the service can reach approved domains and fails all non-approved destinations.
+Allow the payment service to reach only specific external domains (Stripe and the cluster's DNS). This step is an ACNS FQDN policy, not a free gift of the Cilium dataplane. You are no longer writing brittle IP allowlists and are instead tying egress control to business-level identities. In a successful run, the service can reach approved domains and fails all non-approved destinations.
 
 <details>
 <summary>Solution</summary>
@@ -1032,7 +1031,8 @@ kubectl apply -f frontend-to-backend.yaml
 kubectl get ciliumnetworkpolicies -A
 
 # Check Cilium's policy enforcement status
-kubectl exec -n kube-system -l k8s-app=cilium -- cilium endpoint list
+CILIUM_POD=$(kubectl get pod -n kube-system -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n kube-system "$CILIUM_POD" -- cilium endpoint list
 ```
 
 </details>
@@ -1061,7 +1061,8 @@ kubectl exec -n frontend "$FRONTEND_POD" -- curl -s --max-time 5 -o /dev/null -w
 
 echo ""
 echo "=== Test 4: Cilium policy verdict log ==="
-kubectl exec -n kube-system -l k8s-app=cilium -- cilium monitor --type policy-verdict --last 10
+CILIUM_POD=$(kubectl get pod -n kube-system -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n kube-system "$CILIUM_POD" -- cilium monitor --type policy-verdict --last 10
 ```
 
 </details>
@@ -1122,6 +1123,10 @@ Failure layer: Kernel eBPF dataplane replacement versus legacy user-space kube-p
 - [Configure kubenet networking in AKS](https://learn.microsoft.com/en-us/azure/aks/configure-kubenet) — Documents kubenet UDR behavior, max-pod limits, and subnet sizing constraints referenced in the Kubenet section.
 - [Configure Azure CNI in AKS](https://learn.microsoft.com/en-us/azure/aks/configure-azure-cni) — Covers standard Azure CNI dynamic IP allocation, pod subnet decoupling, and capacity planning for direct VNet integration.
 - [Configure Azure CNI Powered by Cilium in AKS](https://learn.microsoft.com/en-us/azure/aks/azure-cni-powered-by-cilium) — Documents current Cilium support boundaries, kube-proxy behavior, and AKS-specific limitations.
+- [Update Azure CNI IPAM and data plane](https://learn.microsoft.com/en-us/azure/aks/update-azure-cni) — Forward-only kubenet/Node Subnet → Overlay IPAM migration and in-place Cilium dataplane update (NAP disabled).
+- [IP address planning for AKS](https://learn.microsoft.com/en-us/azure/aks/concepts-network-ip-address-planning) — Default max-pods by IPAM option (Node Subnet 30, Pod subnet 110, Overlay 250, kubenet 110) and surge-inclusive subnet math.
+- [Use Advanced Container Networking Services](https://learn.microsoft.com/en-us/azure/aks/use-advanced-container-networking-services) — `--enable-acns` enables FQDN filtering by default on Cilium clusters.
+- [Apply FQDN filtering policies](https://learn.microsoft.com/en-us/azure/aks/how-to-apply-fqdn-filtering-policies) — ACNS prerequisite and CiliumNetworkPolicy `toFQDNs` examples used in the lab.
 - [Network policies in AKS](https://learn.microsoft.com/en-us/azure/aks/use-network-policies) — Microsoft guidance on Azure NPM, Calico, and Cilium policy engine selection and the irreversible creation-time decision.
 - [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/) — Upstream API reference for the NetworkPolicy resource used in the east-west traffic control examples.
 - [Cilium Kubernetes network policy](https://docs.cilium.io/en/stable/network/kubernetes/policy/) — Cilium L7 policy, DNS-based egress filtering, and CiliumNetworkPolicy CRD documentation supporting the advanced policy section.
