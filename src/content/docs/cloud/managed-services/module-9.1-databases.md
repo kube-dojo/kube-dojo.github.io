@@ -110,7 +110,7 @@ flowchart LR
 Cross-AZ private traffic is still billed data transfer, whereas same-AZ private IP communication incurs zero inter-zone network fees. Major cloud providers meter and bill inter-zone traffic in both directions whenever packets cross an Availability Zone boundary, even when routing entirely within private VPC subnets. In addition to compounding egress and ingress costs for high-throughput database workloads, inter-zone transit introduces network latency overhead compared to co-located compute and storage.
 </details>
 
-Platform engineers minimize inter-zone network charges and query overhead by aligning compute placements with database primary instances across cluster node groups.
+The next section is how RDS subnet groups and security groups keep the path inside the VPC without treating every subnet as equivalent.
 
 **AWS: RDS with VPC private subnets.** On AWS, your EKS cluster and RDS instance should share the same VPC or use VPC peering. [RDS instances deployed into private subnets are accessible from any resource within the VPC](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html). Security groups are the primary enforcement layer: allow TCP 5432 (or your engine port) only from the EKS node security group or pod security group if you use Security Groups for Pods, rather than opening the entire `10.0.0.0/8` supernet because it was faster during sprint planning.
 
@@ -371,7 +371,7 @@ Session pooling assigns a server connection for the entire client session; rapid
 
 Selecting an appropriate pooling architecture requires balancing client connection volume against the specific session state requirements of the application.
 
-**Pool mode decision matrix.** Transaction mode is the default recommendation for stateless HTTP services, but the matrix below captures why legacy session-oriented applications sometimes require session mode despite weaker multiplexing.
+**Pool mode decision matrix.** The matrix below captures when legacy session-oriented applications still need features that short-lived HTTP clients do not.
 
 | Pool Mode | How It Works | Best For | Watch Out |
 |-----------|-------------|----------|-----------|
@@ -527,7 +527,7 @@ flowchart LR
 Init containers run on every Pod replica during startup rather than once per application rollout. If a Deployment scales from two to ten replicas, ten init containers launch simultaneously and attempt concurrent migrations against the same tables. These parallel executions cause table lock contention, schema deadlocks, and migration failure. Production pipelines should always execute migrations through a dedicated Kubernetes Job that guarantees single-run execution before deploying application pods.
 </details>
 
-Automating schema updates safely within continuous delivery workflows requires isolating database modification tasks from horizontal pod autoscaling and rolling update lifecycles.
+The next YAML is how a delivery pipeline sequences schema work before application pods start.
 
 **Kubernetes Job for migrations.** A dedicated Job guarantees exactly one migration attempt per sync wave regardless of how many replicas your Deployment scales to during a rollout or load spike.
 
