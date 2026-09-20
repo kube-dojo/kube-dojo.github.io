@@ -47,7 +47,7 @@ Cross-subscription visibility does not require moving resources—only correct r
 No. The Activity log only records control-plane management events, such as who created a virtual machine or deleted a resource group. Data-plane query timeouts occur inside the database engine and are recorded in resource logs, which require diagnostic settings to route telemetry into a Log Analytics workspace before alerts can evaluate them.
 </details>
 
-Telemetry separation in Azure establishes distinct administrative boundaries between management actions and internal workload operations. Platform engineers inspect `AzureActivity` to audit administrative role assignments, template deployments, and policy compliance across tenant scopes. In contrast, operational troubleshooting requires configuring diagnostic settings on each target resource to stream execution metrics, HTTP access records, and audit tables into Log Analytics. Establishing separate workspace retention policies for audit logs versus high-volume performance logs keeps query performance predictable during incident triage.
+Control-plane records land in `AzureActivity` when collected to a workspace. Resource IDs and caller object IDs in those rows are what you join during an access review. Tag resources with `environment` and `owner` so KQL can filter `AzureActivity` during change windows.
 
 ```mermaid
 flowchart TD
@@ -96,7 +96,7 @@ flowchart TD
 Metrics (such as Available Memory or container memory working set) fire near-real-time threshold alerts indicating that memory was exhausted, but cannot capture execution context. Logs, traces, and application exceptions stored in Log Analytics record the unhandled exception and call stack required to find the specific line of code.
 </details>
 
-Modern cloud incident response relies on synthesizing numerical signals with rich contextual records across the telemetry pipeline. Observability architectures treat numerical time series and indexed text streams as complementary data planes that serve different stages of incident triage. While continuous numerical streams enable automated auto-scaling and rapid threshold detection, detailed text records preserve transactional state, execution parameters, and error context necessary for forensic engineering analysis.
+The comparison table below lists latency, retention, query language, and cost so capacity and compliance reviews share one grid. Pin those numbers in the runbook next to workspace SKU and Metrics Explorer bookmarks before you add the first dashboard tile.
 
 ### Metrics vs Logs
 
@@ -572,7 +572,7 @@ You have three common instrumentation paths. **Auto-instrumentation** (Azure App
 No. Disabling sampling causes workspace ingestion costs to surge dramatically because full successful telemetry dominates workspace data volume. In contrast, adaptive or fixed sampling drops the vast majority of repetitive successful calls while reliably preserving anomalous errors and slow requests.
 </details>
 
-High-traffic microservice applications generate substantial operational telemetry across distributed container tiers. Engineers implement [adaptive sampling](https://learn.microsoft.com/en-us/azure/azure-monitor/app/sampling) to dynamically regulate telemetry volume based on real-time event rates without modifying application codebases. In addition, fixed-rate sampling enforces an identical percentage filter across client SDKs and backend services to preserve proportional representation across transactions. Configuring daily workspace ingestion caps provides an essential financial safeguard against unexpected logging loops during staging validation or production traffic spikes.
+The sequence diagram below follows one operation ID across gateway, order, and payment services. Live Metrics still streams request rate during a deploy without waiting for full ingestion, and OpenTelemetry export targets the same workspace tables when you outgrow auto-instrumentation.
 
 ```mermaid
 sequenceDiagram
