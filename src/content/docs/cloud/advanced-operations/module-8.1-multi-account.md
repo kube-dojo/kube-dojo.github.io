@@ -95,7 +95,7 @@ The single-account model works perfectly for a solo developer building a low-sta
 Staging-scoped IAM policies in a **single account** do not create a hard blast-radius boundary. Even when IAM explicitly forbids access to production ARN resources, all workloads share identical account-level control plane limits and underlying networking primitives. An attacker possessing staging credentials can exhaust regional API quotas (such as rate limits on EC2, IAM, or CloudFormation Describe and Mutate calls) or saturate shared infrastructure like a single NAT Gateway or VPC peering links. In a single account, shared NAT gateways, API quotas, and the shared control plane can still starve production workloads and trigger cascading operational outages without requiring any production-level IAM grants.
 </details>
 
-Relying on software-defined identity boundaries within a unified billing perimeter frequently obscures foundational resource contention risks across co-located systems. Visualizing the shared foundational infrastructure demonstrates how non-production anomalies propagate across supposedly isolated application environments.
+Teams often treat account membership as an implementation detail until billing, identity, and network objects all share one envelope. The diagram below makes that envelope visible before we name the stronger provider boundary.
 
 ```mermaid
 flowchart TD
@@ -308,7 +308,7 @@ flowchart LR
 Structuring top-level OUs by business unit forces the cloud platform team into an operational dilemma: they must either duplicate identical production SCP guardrails across dozens of nested OU subtrees or attach a broad preventative SCP at the organizational **root**, which then inadvertently breaks lower environments like developer sandboxes. Furthermore, architects must remember two fundamental SCP constraints: SCPs do **not grant** permissions (they only establish the maximum allowable permission boundary for attached accounts), and SCPs do **not apply** to the **management account** (or service-linked roles). Managing policies across business unit hierarchies creates extensive policy drift, multiplies administrative maintenance, and complicates audit validation.
 </details>
 
-Establishing an environment-first hierarchy decouples governance tiers from corporate reorganizations while allowing security teams to enforce immutable baseline controls deterministically. Alongside rigid production and staging guardrails, modern enterprise landing zones must also accommodate rapid iteration through disposable experimental environments.
+Landing-zone OU trees have to survive org-chart churn. Disposable developer accounts then need a different control story than the accounts that hold customer data.
 
 **Workloads OU splits rigorously by environment, not by team**: This is arguably the most critical design decision you will make. If you choose to split your hierarchy by team first (resulting in a structure like Team-A-Prod, Team-A-Staging, Team-A-Dev all residing within the same parent Team-A OU), it becomes much harder to apply environment-wide policies without resorting to complex, error-prone per-account exception lists. By structuring by environment first, you can easily apply a single SCP to the entire Production OU stating "No public S3 buckets allowed anywhere," guaranteeing comprehensive compliance.
 
@@ -532,7 +532,7 @@ The following matrix provides a clear framework for deciding when to share infra
 A Kubernetes NetworkPolicy controls strictly data-plane packet flows between pods and CIDR blocks; a NetworkPolicy does not filter or intercept traffic directed to the Kubernetes API server (`kube-apiserver`). If the compromised pod's mounted service account token possesses cluster-scoped read permissions—or if cluster-wide RBAC bindings permit `get` or `list` operations on `namespaces`, `pods`, `nodes`, or `services`—the attacker can query the control plane directly over HTTPS. By executing cluster-scoped `get` or `list` calls, the attacker can systematically map out PCI namespaces, discover pod IP addresses, enumerate sensitive service endpoints, and identify node architectures despite flawless pod-to-pod NetworkPolicy enforcement.
 </details>
 
-Enforcing isolation exclusively through software network rules within a shared control plane leaves the management plane exposed to tenant exploration and credential misuse. Establishing true workload segregation requires pairing hard tenant infrastructure boundaries with automated control-plane orchestration across independently managed accounts.
+The next section looks at who owns cluster create, upgrade, and teardown once the estate is no longer a single Kubernetes control plane.
 
 Hypothetical scenario: A fintech company runs PCI- and non-PCI-grade workloads in the same Kubernetes cluster, separated only by namespaces and NetworkPolicies. During a compliance audit, the auditor asks a simple question: "Can a pod in the non-PCI namespace discover the existence of the PCI namespace and the pods inside it?"
 
@@ -727,7 +727,7 @@ aws organizations attach-policy \
 While member accounts **cannot modify/delete** an **organization trail**, controlling local compute resources provides several vectors to evade centralized detection without touching CloudTrail configurations. Because organization trails capture management events by default but frequently omit high-volume S3 or Lambda data events to control costs, the attacker can execute exfiltration through untracked data planes. Locally, the attacker can terminate or blind in-guest logging agents (such as Fluent Bit, Falco, or CloudWatch agents), generate massive volumes of benign API calls to drown alerts in noise, or route commands through temporary compute instances that never write telemetry to disk before termination. Administrative SCPs protect trail configuration immutability, but local compute compromise still demands defense-in-depth telemetry collection.
 </details>
 
-Securing management events in AWS Organizations establishes a resilient baseline, but multi-cloud operational footprints demand consistent organizational audit streaming across all public hyperscalers. Centralizing platform audit streams requires adopting provider-native hierarchical mechanisms that guarantee tamper-resistant log aggregation across entire organizational hierarchies.
+AWS is not the only organization-wide audit plane. The same design question appears when the estate includes Google Cloud folders and Azure management groups, each with a native hierarchical export path.
 
 ### GCP: Organization-Level Log Sinks
 
