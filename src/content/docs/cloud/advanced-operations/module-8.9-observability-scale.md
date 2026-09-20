@@ -531,7 +531,7 @@ Loki 3.x ingests logs natively over OTLP (`/otlp`). The contrib `loki` exporter 
 The `memory_limiter` processor refuses **all** telemetry signals equally rather than prioritizing metrics or dropping logs first. The processor enforces a process-wide soft limit based on Go runtime heap checks. When memory usage breaches the soft limit or reaches the hard limit, the processor refuses data across all active pipelines by rejecting calls to `ConsumeLogs`, `ConsumeTraces`, and `ConsumeMetrics` until garbage collection runs and heap usage falls back below the threshold. Because the limiter evaluates overall process memory rather than individual pipeline buffers, an unexpected surge in verbose application logs causes the Collector to reject incoming metrics and traces simultaneously. Production architectures mitigate this shared blast radius by deploying dedicated Collector instances for high-volume log streams.
 </details>
 
-Preventing sudden log volume spikes from starving essential metric and trace pipelines requires decoupling textual log ingestion from core operational telemetry. The next section explores how Loki transforms log aggregation economics by indexing metadata labels instead of building heavy inverted indices on raw text payloads.
+The Collector is only one hop on the write path. The next section is how log backends charge and index once those bytes leave the node, because ingest cost is decided as much by index design as by collector RAM.
 
 
 ---
@@ -790,7 +790,7 @@ Pre-computing aggregated metrics relieves TSDB query pressure and controls cardi
 Without a shared propagator, the trace fractures into disconnected spans because Jaeger and Zipkin default to incompatible HTTP header formats. Zipkin historically relies on B3 propagation (`X-B3-TraceId`, `X-B3-SpanId`), whereas modern OpenTelemetry and Jaeger implementations default to the W3C Trace Context standard (`traceparent`). Even though HTTP carries the request across the cluster boundary, the downstream service cannot locate its expected trace header, treats the request as a brand-new transaction root, and generates a new trace ID. Platform teams resolve cross-boundary trace fracture by standardizing on W3C `traceparent` or configuring dual propagators (`b3multi`, `tracecontext`) across all service runtimes and ingress gateways.
 </details>
 
-Maintaining trace continuity requires strict header contract alignment across service boundaries before telemetry ever leaves an application container. The following operational architecture explores how distributed tracing tracks transactions across independent clusters and why context propagation standards are critical.
+The next section is the operational architecture: how spans from independent clusters land in one store, and what sampling does to the bill when every hop is kept.
 
 As architectures fracture into dozens of microservices deployed across disparate Kubernetes clusters, traditional single-service logging becomes insufficient for diagnosing systemic latency. Distributed tracing tracks the complete lifecycle of a single request as it traverses network boundaries, database calls, and inter-service HTTP requests. 
 
@@ -937,7 +937,7 @@ Hybrid designs are common and valid: scrape and alert locally with Prometheus on
 The CPU threshold alert will remain completely silent because thread-pool exhaustion starves application workers while consuming virtually zero CPU cycles. When worker threads block waiting on an unresponsive database query, downstream deadlock, or saturated connection pool, CPU utilization drops or stays flat even as incoming HTTP requests queue and timeout. Only a symptom-based alert monitoring latency percentiles (such as p99 request duration) or SLO error budget burn rates will fire and wake the on-call engineer during customer-impacting degradation. Alerting on infrastructure causes like CPU usage creates noise during benign spikes and blinds teams during silent application starvation incidents.
 </details>
 
-Reliable alerting structures prioritize customer impact over internal resource metrics to ensure on-call engineers respond to real service degradation. The following operational framework outlines how service level objectives and error budgets establish principled thresholds that distinguish critical customer symptoms from benign infrastructure events.
+The next section is how SLIs, SLOs, and error budgets turn paging into a written policy instead of a pile of infrastructure threshold rules.
 
 Telemetry exists to support decisions, not to fill disks. **Service Level Indicators (SLIs)** are precise measurements (availability, latency, freshness) drawn primarily from metrics, with logs and traces as debugging lenses. **Service Level Objectives (SLOs)** set targets over rolling windows (for example 99.9% of checkout requests faster than 500 ms over thirty days). The **error budget** is the allowed unreliability before the SLO fails; when the budget burns quickly, feature work yields to reliability work.
 
