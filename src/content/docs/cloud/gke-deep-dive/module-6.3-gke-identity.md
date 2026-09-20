@@ -223,7 +223,7 @@ gcloud projects add-iam-policy-binding OTHER_PROJECT_ID \
 <details>
 <summary>Check your prediction</summary>
 
-When a Pod manifest omits `spec.serviceAccountName`, Kubernetes automatically assigns the namespace's `default` ServiceAccount. On a GKE node pool configured with Workload Identity Federation (`GKE_METADATA`), the GKE metadata server intercepts credential requests from the Pod. Because the `default` Kubernetes ServiceAccount lacks an `iam.gke.io/gcp-service-account` annotation and has no direct IAM role bindings granted via Workload Identity Federation, the metadata server denies token generation, causing Google Cloud API calls to fail immediately with authentication or authorization errors. Administrators must avoid assuming that unannotated Pods silently fall back to the underlying Compute Engine node service account; metadata hiding blocks node credentials to prevent accidental privilege escalation.
+When a Pod manifest omits `spec.serviceAccountName`, Kubernetes automatically assigns the namespace's `default` ServiceAccount. On a GKE node pool configured with Workload Identity Federation (`GKE_METADATA`), the GKE metadata server still issues a federated Kubernetes ServiceAccount token. Because that `default` ServiceAccount lacks an `iam.gke.io/gcp-service-account` annotation and has no direct IAM binding (`principal://` or impersonation via `roles/iam.workloadIdentityUser`), Google Cloud API calls fail at IAM authorization. Administrators must avoid assuming that unannotated Pods silently fall back to the underlying Compute Engine node service account; `GKE_METADATA` hides node credentials so workloads cannot borrow the node GSA.
 </details>
 
 Default identity fallbacks create deceptive failure states where pods start normally but fail asynchronously during API authorization calls. Auditing active ServiceAccount impersonation policies ensures that workloads receive explicitly bounded identities before entering production traffic paths.
@@ -369,7 +369,7 @@ kubectl run untrusted --image=nginx:latest
 
 # Check audit logs for denials
 gcloud logging read \
-  'resource.type="k8s_cluster" AND protoPayload.response.reason="BINARY_AUTHORIZATION"' \
+  'resource.type="k8s_cluster" AND protoPayload.response.status="Failure" AND (protoPayload.response.reason="VIOLATES_POLICY" OR protoPayload.response.reason="Forbidden")' \
   --limit=5
 ```
 
@@ -417,7 +417,7 @@ Beyond one-time attestations at build time, teams integrate **Artifact Analysis*
 <details>
 <summary>Check your prediction</summary>
 
-Binary Authorization blocks admission immediately during Kubernetes API validation, meaning the Pod is never scheduled or created. Because the signing KMS key was removed from the attestor's registered public keys, the existing signature no longer satisfies the active `requireAttestationsBy` policy. The GKE admission webhook rejects the deployment request with a `Forbidden` error indicating that no valid attestations were found for the image digest. Administrators can verify this rejection in Cloud Audit Logs under the `k8s_cluster` resource type by querying `protoPayload.status.message` for `VIOLATES_POLICY` or inspecting the Binary Authorization audit decision logs.
+Binary Authorization blocks admission immediately during Kubernetes API validation, meaning the Pod is never scheduled or created. Because the signing KMS key was removed from the attestor's registered public keys, the existing signature no longer satisfies the active `requireAttestationsBy` policy. The GKE admission webhook rejects the deployment request with a `Forbidden` error indicating that no valid attestations were found for the image digest. Administrators can verify this rejection in Cloud Audit Logs on `k8s_cluster` `pods.create` (or `pods.update`) Failure events by filtering `protoPayload.response.reason` for `VIOLATES_POLICY` or `Forbidden`.
 </details>
 
 Admission gate enforcement shifts container provenance validation from an asynchronous reporting metric to an unyielding deployment barrier. Maintaining automated signing pipelines ensures that cryptographic key rotations do not trigger widespread deployment failures across production application releases.
@@ -567,7 +567,7 @@ spec:
 <details>
 <summary>Check your prediction</summary>
 
-In `enforce` mode, the Kubernetes built-in Pod Security admission controller rejects the Pod creation request immediately, and the Pod is not created. The `restricted` profile mandates that workloads run without root privileges and requires `runAsNonRoot: true` (or an explicit non-root user ID); setting `runAsNonRoot: false` explicitly violates this policy requirement. If the namespace is configured with `warn` mode instead of `enforce`, the API server admits and creates the Pod normally, but returns a warning message directly to the client CLI and logs the policy violation in the audit trail.
+In `enforce` mode, the Kubernetes built-in Pod Security admission controller rejects the Pod creation request immediately, and the Pod is not created. The `restricted` profile requires `runAsNonRoot: true` at the pod or container `securityContext`; setting `runAsNonRoot: false` explicitly violates this policy. An explicit non-zero `runAsUser` alone is not a substitute. If the namespace is configured with `warn` mode instead of `enforce`, the API server admits and creates the Pod normally, but returns a warning message directly to the client CLI and logs the policy violation in the audit trail.
 </details>
 
 Configuring admission modes across developmental lifecycles allows platform teams to identify non-compliant container configurations before activating strict enforcement barriers. Organizations typically evaluate workload compliance under warning and audit configurations during staging releases to prevent unexpected scheduling disruptions in production environments.
@@ -724,13 +724,13 @@ flowchart TD
 | :--- | :--- | :--- |
 | Cluster maturity | New policy or new attestor keys | Stable CI signs every production digest |
 | Incident response | Allows hotfix while logging violations | Blocks unsigned images; use breakglass for exceptions |
-| Evidence | `imagepolicywebhook.../dry-run: "true"` labels in audit logs | `BINARY_AUTHORIZATION` denial reasons |
+| Evidence | `imagepolicywebhook.../dry-run: "true"` labels in audit logs | `VIOLATES_POLICY` or `Forbidden` on `pods.create` Failure |
 
 | Threat focus | **Shielded Nodes** | **Confidential Nodes** |
 | :--- | :--- | :--- |
 | Bootkit / unsigned kernel modules | Primary control | Also present |
-| Encrypt data in use in RAM | Not provided | Primary control (AMD SEV) |
-| Cost / ops | No extra node charge | Premium N2D pools; capacity planning per region |
+| Encrypt data in use in RAM | Not provided | Primary control (AMD SEV, AMD SEV-SNP, or Intel TDX) |
+| Cost / ops | No extra node charge | Premium on supported Confidential VM families; capacity planning per region |
 
 ---
 
@@ -800,7 +800,7 @@ Finally, treat Cloud Audit Logs as part of the user interface for these features
 
 2. **Binary Authorization attestations are immutable and tied to the exact image digest (SHA-256), not the tag.** If someone pushes a new image with the tag `v1.0` (overwriting the old one), the attestation on the original image becomes invalid for the new image because the digest changed. This prevents a supply chain attack where an attacker replaces a trusted image with a malicious one while keeping the same tag. Always deploy by digest in production: `image: us-central1-docker.pkg.dev/proj/repo/app@sha256:abc123...`
 
-3. **Confidential GKE Nodes encrypt each node's memory with a unique key that changes on every boot.** The key is generated inside the AMD Secure Processor and is designed not to leave the CPU. Google's hypervisor, host OS, and other VMs on the same physical host cannot read the node's memory. The performance overhead is typically 2-6% for most workloads because the encryption happens in the CPU's memory controller at hardware speed, not in software.
+3. **Confidential GKE Nodes encrypt each node's guest RAM in hardware (AMD SEV, AMD SEV-SNP, or Intel TDX).** For AMD SEV/SEV-SNP the per-boot memory key is generated inside the AMD Secure Processor and is designed not to leave the CPU. Google's hypervisor, host OS, and other VMs on the same physical host cannot read the node's memory. The performance overhead is typically 2-6% for most workloads because the encryption happens in the CPU's memory controller at hardware speed, not in software.
 
 4. **The GKE metadata server that enables Workload Identity intercepts all traffic to 169.254.169.254** (the standard cloud metadata endpoint) from pods. When a pod with Workload Identity configured requests an access token, the GKE metadata server contacts Google's Security Token Service (STS) to exchange the Kubernetes ServiceAccount token for a short-lived GCP access token scoped to the mapped GCP service account. These tokens expire after 1 hour and are automatically refreshed. Pods without Workload Identity receive a "permission denied" response instead of the node's credentials.
 
