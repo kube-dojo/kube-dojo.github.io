@@ -59,7 +59,7 @@ flowchart TB
 Architectural separation between the Microsoft-managed control plane and customer-operated agent nodes defines cluster reliability boundaries and operational responsibilities. Before provisioning node pools or deploying services, platform engineers configure cluster-management pricing tiers to align control-plane resilience with production workload availability targets.
 
 ```bash
-# Create a cluster on the Standard tier (required for production SLA)
+# Create a cluster and set the cluster-management tier
 az aks create \
   --resource-group rg-aks-prod \
   --name aks-prod-westeurope \
@@ -140,7 +140,7 @@ az aks nodepool add \
 <details>
 <summary>Check your prediction</summary>
 
-The scheduler places the untolerated application pods exclusively onto the **User** node pool. Dedicated System pools in AKS are automatically configured with the `CriticalAddonsOnly=true:NoSchedule` taint, which instructs the scheduler to reject any pod that lacks an explicit matching toleration. Because the video processing deployment specifies no tolerations, the scheduler filters out all system nodes during the scheduling predicates phase. This isolation guarantees that bursty or misbehaving application workloads cannot starve CoreDNS, the Konnectivity tunnel proxy, or metrics-server. Application manifests should never define tolerations for `CriticalAddonsOnly` unless they provide essential cluster infrastructure.
+The scheduler places the untolerated application pods exclusively onto the **User** node pool. Dedicated System pools in AKS carry the `CriticalAddonsOnly=true:NoSchedule` taint, which instructs the scheduler to reject any pod that lacks an explicit matching toleration. Because the video processing deployment specifies no tolerations, the scheduler filters out all system nodes during the scheduling predicates phase. This isolation guarantees that bursty or misbehaving application workloads cannot starve CoreDNS, the Konnectivity tunnel proxy, or metrics-server. Application manifests should never define tolerations for `CriticalAddonsOnly` unless they provide essential cluster infrastructure.
 </details>
 
 Explicit scheduling constraints protect cluster-critical services from resource starvation while allowing teams to reserve compute capacity for specialized workloads. Once baseline workload separation between system add-ons and business applications is established, operators can introduce custom taints. These taints partition user node pools according to hardware capability or cost profiles.
@@ -278,7 +278,7 @@ Zone-spanning node pools aim to stay balanced across selected zones, typically w
 Standard Locally Redundant Storage (LRS) Azure Disks are zone-locked to the availability zone where the storage resource was originally created. An Azure Disk provisioned in Zone 1 cannot attach to a virtual machine in Zone 2. As documented in [Microsoft Azure troubleshooting guidance for disk mount failures](https://learn.microsoft.com/en-us/troubleshoot/azure/azure-kubernetes/storage/fail-to-mount-azure-disk-volume), the volume attachment operation fails with an `AttachVolume.Attach failed` error, preventing the pod from reaching a Ready state. Depending on whether scheduling was topology-aware or bound ahead of time, the pod will remain stuck in `ContainerCreating` during persistent volume mount attempts rather than simply staying in `Pending`. To enable resilient cross-zone mobility, platform engineers must implement topology-aware scheduling with `volumeBindingMode: WaitForFirstConsumer`, configure Zone-Redundant Storage (ZRS) managed disks, or use multi-zone shared storage classes like Azure Files.
 </details>
 
-Designing storage architecture for multi-zone clusters requires treating physical volume boundaries separately from virtual compute placement. Without strict alignment between storage availability and scheduling constraints, automated failover mechanisms can fail. Stateful workloads end up partitioned from their underlying data during zonal outages.
+Designing storage architecture for multi-zone clusters requires treating volume placement as a scheduling input, not a follow-on after compute recovers. Without that alignment, automated replacement nodes can come up healthy while stateful pods still cannot start.
 
 ```yaml
 # Pod topology spread constraint to enforce even zone distribution
@@ -955,7 +955,7 @@ Before deploying enterprise workloads and automated node management pipelines to
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Node pool role designations versus admission taints and scheduler evaluation. Next action: understand that AKS automatically configures system node pools with the `CriticalAddonsOnly=true:NoSchedule` taint, which instructs the scheduler to filter out system nodes for any pod lacking an explicit toleration; because the developer's application deployment specifies no tolerations, the scheduler rejects the system nodes and places all pods exclusively onto the untainted User pool; verify that application workloads never define tolerations for `CriticalAddonsOnly`, preserving dedicated compute for CoreDNS, Konnectivity tunnels, and cluster-critical add-ons.
+Failure layer: Node pool role designations versus admission taints and scheduler evaluation. Next action: understand that dedicated AKS system node pools carry the `CriticalAddonsOnly=true:NoSchedule` taint, which instructs the scheduler to filter out system nodes for any pod lacking an explicit toleration; because the developer's application deployment specifies no tolerations, the scheduler rejects the system nodes and places all pods exclusively onto the untainted User pool; verify that application workloads never define tolerations for `CriticalAddonsOnly`, preserving dedicated compute for CoreDNS, Konnectivity tunnels, and cluster-critical add-ons.
 </details>
 
 **Card B: After the Zone 1 node dies, the Azure Disk PVC will attach to the replacement node in Zone 2 and the pod will resume.** A stateful database deployment runs as a single-replica pod in Zone 1, mounting a PersistentVolume backed by an Azure Managed Disk with Locally Redundant Storage (LRS). An unexpected hardware fault brings down the physical host in Zone 1. The AKS cluster autoscaler detects the unfulfilled pod demand and provisions a new worker node in Zone 2. The database team assumes that the Kubernetes attach/detach controller will unmount the Azure Disk from the failed node. They expect it to attach to the replacement node in Zone 2 so the database pod can resume running.
