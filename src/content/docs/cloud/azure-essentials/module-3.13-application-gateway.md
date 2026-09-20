@@ -42,9 +42,15 @@ client
 
 The operator goal is not to memorize every property value. The goal is to know which property answers which question during a design review or an incident, and in practice that means mapping request lifecycle, ownership, and observability together before failure appears.
 
-> **Pause and predict:** If a backend service is healthy at `https://api.internal.example.com/ready` but the gateway probe checks `/` with the wrong host header, what will the application team see, and what will the gateway see?
+**Pause and predict:** If a backend service is healthy at `https://api.internal.example.com/ready` but the gateway probe checks `/` with the wrong host header, what will the application team see, and what will the gateway see?
 
-The point is not to memorize that sequence mechanically, but to be able to trace it with enough precision that an on-call responder can name exactly where the mismatch started. If one person can answer "the probe uses the wrong host header in backend settings" in under 10 seconds, then the team has turned a fragmented incident into a bounded action, because the next steps are known: check backend address contract, confirm DNS path, then adjust listener or route behavior in a controlled change window.
+<details>
+<summary>Check your prediction</summary>
+
+The application team sees pods reporting Ready in Kubernetes because kubelet probes succeed against `/ready`, while Application Gateway marks the backend pool Unhealthy because probes evaluate root path `/` with an unmatched host header configured in backend HTTP settings. Gateway health requires explicit alignment with backend HTTP settings contracts; a health probe mismatch isolates the target backend from client traffic even when container runtimes report successful container health.
+</details>
+
+Production incident triage requires operators to isolate edge routing stages systematically from ingress listener acceptance down to internal transport contracts. Tracing request execution across discrete networking boundaries ensures platform engineers diagnose routing and transport anomalies rapidly without relying on trial-and-error configuration updates during critical service disruptions.
 
 ## When App Gateway, Front Door, or AKS Ingress
 
@@ -529,13 +535,17 @@ Use this sequence when valid traffic is blocked:
 
 The [WAF customization guidance](https://learn.microsoft.com/en-us/azure/web-application-firewall/ag/application-gateway-customize-waf-rules-portal) is useful when translating a portal investigation back into code.
 
-> **Pause and predict:** If a checkout payload trips a SQL injection rule because a product name contains suspicious punctuation, which is safer: disabling the SQLi rule group globally or excluding one selector for one path after log review?
-
 ### WAF Policy Change Loop
 
-A clean policy change loop starts with evidence, not assumptions. Begin by validating what triggered the block in logs, identify the exact matching condition, and confirm whether the path is truly required business behavior. Next, move to scoped testing in a controlled scope; temporary Detection mode can be part of that loop, but only when the control owner has a rollback point and ownership notes in place.
+**Pause and predict:** If a checkout payload trips a SQL injection rule because a product name contains suspicious punctuation, which is safer: disabling the SQLi rule group globally or excluding one selector for one path after log review?
 
-If the false-positive analysis identifies one service path, apply the narrowest change for that path and keep all broader scope changes in the queue for later. This is how teams prevent one-day fixes from becoming one-year exceptions. After change, validate with replay traffic and keep an explicit expiry note so that temporary behavior does not become permanent governance drift.
+<details>
+<summary>Check your prediction</summary>
+
+Applying the narrowest per-rule exclusion—identifying the exact rule ID, match variable, and selector after thorough log review—is strictly safer than disabling the entire SQL injection rule group. In Detection mode, the WAF policy logs transaction telemetry without blocking requests, whereas Prevention mode immediately terminates matching requests with HTTP 403 Forbidden. Disabling the entire rule group removes protection across the application, introducing critical security vulnerabilities.
+</details>
+
+Production WAF policy management requires strict exception governance and automated audit trails to ensure edge security controls remain intact. Platform teams coordinate policy updates through version-controlled pull requests that document operational justification, ticket references, and scheduled re-evaluation dates for every rule exception. This rigorous lifecycle prevents emergency operational adjustments from degrading the organization's defensive posture over time.
 
 The result you want from a policy change is threefold: reduced noise, unchanged protection level for unrelated flows, and clear evidence for the next review. If one of those is missing, revert and rework the approach before the next deployment window.
 
@@ -655,7 +665,15 @@ spec:
 
 This example separates ownership. The platform namespace owns the Gateway, and the app namespace owns the HTTPRoute only if route policy allows it. That is easier to review than a shared Ingress object with many annotations because role boundaries are explicit.
 
-> **Stop and think:** In a shared cluster, what outage can happen if any namespace can claim any hostname on the shared gateway?
+**Pause and predict:** In a shared cluster, what outage can happen if any namespace can claim any hostname on the shared gateway?
+
+<details>
+<summary>Check your prediction</summary>
+
+On a shared AGIC or Kubernetes Ingress gateway lacking admission control, a workload in another namespace can define an Ingress with the same production hostname and hijack incoming production traffic. Application Gateway for Containers mitigates this risk by providing `allowedRoutes` policies on the parent Gateway listener, allowing platform administrators to strictly restrict which namespaces can attach routes to specific hostnames.
+</details>
+
+Multi-tenant cluster architecture requires explicit administrative boundaries between shared networking infrastructure and tenant workload definitions. Enforcing tenant isolation at the ingress layer ensures that team namespaces operate independently without interfering with shared edge routing policies. Establishing verifiable admission boundaries provides predictable and secure traffic segregation across complex enterprise environments.
 
 ## TLS Termination + Key Vault Cert Sync
 
@@ -671,9 +689,15 @@ For teams using automation, this matrix can be validated with simple scripted ch
 
 ### Rotation Gotchas
 
-Certificate rotation has three timelines: issuance, Key Vault version creation, and Application Gateway sync. Those are not the same event, so a renewal event in one system does not mean the gateway is instantly updated. Use versionless secret IDs when automatic rotation is intended, and use versioned IDs only when pinning a specific certificate version is deliberate.
+**Pause and predict:** When an administrator updates a TLS certificate in Azure Key Vault with a newly issued certificate version, will the Application Gateway HTTPS listener update immediately because the gateway automatically binds to the newest secret?
 
-Monitor the certificate served by the listener, not just the certificate stored in Key Vault. A renewed Key Vault object does not help users if the gateway cannot read it or has not picked it up.
+<details>
+<summary>Check your prediction</summary>
+
+No. Microsoft Learn strongly recommends configuring a versionless secret identifier for automated rotation; specifying a versioned secret ID pins the gateway to that specific revision indefinitely. Application Gateway instances do not update instantly; they poll Azure Key Vault periodically every four hours and also synchronize whenever an explicit gateway configuration change occurs. Furthermore, if Key Vault access fails due to expired managed identity credentials or network firewall restrictions, the associated HTTPS listener is automatically disabled to prevent unencrypted or broken TLS handshakes.
+</details>
+
+Production certificate operations require active monitoring of the actual TLS handshake presented at the frontend listener rather than relying solely on Key Vault audit events. Synthetic monitoring agents should establish TLS connections from external endpoints and alert when listener expiry counters drop below thirty days. This operational pattern verifies that rotation pipelines, identity assignments, and networking routes remain fully functional before certificate expiration impacts end users.
 
 ### Chain Order
 
@@ -1093,7 +1117,41 @@ az group delete \
   --yes
 ```
 
-### Success Criteria
+Confirm that the resource group deletion has initiated successfully by querying group state or reviewing the Azure activity log. Removing the lab resource group ensures that provisioned virtual networks, public IP addresses, and gateway instances do not accumulate unexpected infrastructure costs in training subscriptions.
+
+**Card A: If Kubernetes reports Ready, Application Gateway must also mark the backend healthy.** An operations engineer observes that application pods report Ready status in Kubernetes and assumes Application Gateway will automatically route client traffic to those backend instances without health probe errors. The engineer assumes pod readiness probes inside the cluster directly govern gateway health states.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kubernetes container readiness evaluation versus external Application Gateway health probe configuration. Next action: inspect backend health using `az network application-gateway show-backend-health` and verify that backend HTTP settings match the application's actual health endpoint path and host header contract.
+</details>
+
+**Card B: Disabling the whole SQLi managed rule group is the safe first fix for one checkout false positive.** During an e-commerce deployment, valid checkout transactions are blocked by a SQL injection managed rule because product descriptions contain specific punctuation symbols. An on-call engineer proposes disabling the entire SQL injection rule group across the WAF policy to restore checkout functionality immediately.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: global threat protection suppression versus targeted rule exclusion. Next action: review WAF logs in Log Analytics to identify the specific rule ID, match variable, and selector, then configure a scoped exclusion for that precise selector while retaining Prevention mode for all other traffic.
+</details>
+
+**Card C: On a shared AGIC gateway, any namespace can safely claim any hostname.** A development team deploys a new service into a non-production Kubernetes namespace and creates an Ingress resource targeting a shared corporate hostname. The team assumes the shared AGIC controller isolates hostnames across namespaces and prevents unauthorized routing conflicts automatically.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: shared Ingress controller route collision and lack of namespace admission control. Next action: implement Kubernetes admission policies to validate hostname ownership across namespaces, or migrate to Application Gateway for Containers using Gateway API `allowedRoutes` policies to restrict route attachments.
+</details>
+
+**Card D: A renewed Key Vault certificate updates the Application Gateway listener immediately because the gateway always uses the latest version.** A platform administrator uploads a renewed TLS certificate to Azure Key Vault and expects the Application Gateway HTTPS listener to begin serving the new certificate immediately without configuration intervention. The administrator assumes the gateway synchronizes renewed secret versions continuously in real time without operational delay.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Key Vault secret versioning reference and polling synchronization interval. Next action: ensure the gateway configuration references a versionless secret ID, account for the standard four-hour Key Vault polling interval, and trigger an explicit gateway update or review managed identity access policies if immediate rotation is required.
+</details>
+
+**Success Criteria**:
 
 Your success is complete when the design artifacts clearly show ownership and control decisions, not just command output:
 
