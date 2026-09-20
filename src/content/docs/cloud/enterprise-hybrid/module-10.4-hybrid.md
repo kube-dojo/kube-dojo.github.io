@@ -818,10 +818,6 @@ Document which hostnames are **global** versus **environment-local** so applicat
 
 > **Stop and think**: In a Hub-Spoke GitOps architecture, what happens if the network link between the Cloud Hub and the On-Prem Spoke goes down for 4 hours while developers are merging code to the main branch?
 
-### Pattern 1: Hub-Spoke with GitOps
-
-A Hub-Spoke architecture centralizes GitOps operators (like Argo CD) and monitoring aggregators on a primary "Hub" cluster in the cloud. In the core Argo CD model, the hub stores registered remote-cluster credentials and talks directly to each spoke Kubernetes API server; a pull-based spoke-local Flux or Argo CD Agent design is a separate choice for sites that must keep reconciling through long hub partitions.
-
 **Pause and predict:** An enterprise operates a centralized Hub-Spoke GitOps topology where a cloud-hosted Argo CD instance manages edge Kubernetes clusters across a WAN connection. A four-hour network disruption severs connectivity to an on-premises spoke. Developers continue merging code changes into the central Git repository during this outage. What happens to the synchronization status of the on-premises spoke, and how does a pull-based agent model behave differently?
 
 <details>
@@ -831,6 +827,10 @@ In a classic centralized Argo CD hub architecture, the central control plane hol
 </details>
 
 The next section is an architectural diagram illustrating centralized hub-and-spoke GitOps management alongside federated Prometheus metric scraping across cloud and on-premises boundaries.
+
+### Pattern 1: Hub-Spoke with GitOps
+
+A Hub-Spoke architecture centralizes GitOps operators (like Argo CD) and monitoring aggregators on a primary "Hub" cluster in the cloud. In the core Argo CD model, the hub stores registered remote-cluster credentials and talks directly to each spoke Kubernetes API server; a pull-based spoke-local Flux or Argo CD Agent design is a separate choice for sites that must keep reconciling through long hub partitions.
 
 ```mermaid
 flowchart TD
