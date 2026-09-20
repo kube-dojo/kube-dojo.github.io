@@ -345,7 +345,7 @@ data:
         exclude_namespaces = ["kube-system", "gatekeeper-system"]
       [log_collection_settings.stderr]
         enabled = true
-        exclude_namespaces = ["kube-system"]
+        exclude_namespaces = ["kube-system", "gatekeeper-system"]
       [log_collection_settings.env_var]
         enabled = false
   prometheus-data-collection-settings: |
@@ -360,14 +360,14 @@ k apply -f container-insights-config.yaml
 
 ### Container Insights versus Managed Prometheus: who owns which signal
 
-Production AKS observability is intentionally split across two cost models and two query languages. Container Insights is the log-and-inventory plane: it ships container stdout/stderr, Kubernetes events, and selected performance tables into Log Analytics, where you pay primarily for ingestion gigabytes and retention days. Managed Prometheus is the metrics plane: it scrapes Prometheus endpoints (including kube-state and your app `/metrics`) into an Azure Monitor workspace, where you pay for metric samples ingested and PromQL queries executed, with eighteen months of retention included at no separate storage charge.
+Production AKS observability is intentionally split across two cost models and two query languages. Container Insights is the log-and-inventory plane: it ships container stdout/stderr, Kubernetes events, and selected performance tables into Log Analytics, where you pay primarily for ingestion gigabytes and retention days. Managed Prometheus is the metrics plane: it scrapes Prometheus endpoints into an Azure Monitor workspace, where you pay for metric samples ingested and PromQL queries executed, with eighteen months of retention included at no separate storage charge.
 
 Neither replaces the other during an incident. Disk I/O saturation often appears first in Container Insights `InsightsMetrics` or platform metrics, while queue-depth-driven scaling decisions belong in Prometheus or KEDA triggers. Teams that disable Container Insights “because we have Grafana” still lack correlated container logs unless they route logs elsewhere deliberately.
 
 | Layer | Primary store | Best for | Cost spike trigger |
 | :--- | :--- | :--- | :--- |
 | Container Insights | Log Analytics workspace | Log triage, KubeEvents, inventory views | Unfiltered stdout from noisy namespaces |
-| Managed Prometheus | Azure Monitor workspace | SLO metrics, custom app metrics, recording rules | High-cardinality labels on high-frequency scrapes |
+| Managed Prometheus | Azure Monitor workspace | PromQL time series, recording rules, scrape cardinality | High-cardinality labels on high-frequency scrapes |
 | Managed Grafana | Linked to AM workspace | Dashboards combining AM metrics + optional LA queries | Seat/licensing (service) plus underlying data costs |
 | Platform metrics | Azure Monitor metrics DB | Node/pod CPU memory at no extra collection cost | Usually low unless you export everything to LA |
 
@@ -789,7 +789,7 @@ The flexibility of Kubernetes inevitably leads to spiraling cloud compute costs 
 
 ### Spot Node Pools
 
-Azure Spot Virtual Machines offer the ability to consume unutilized Azure data center capacity at discounts approaching 90%. However, Azure can evict these machines with only a 30-second warning (`SIGTERM`) if a full-price customer demands the compute space.
+Azure Spot Virtual Machines let you consume unused Azure capacity at discounts that can approach 90% versus the same SKU at pay-as-you-go rates. The tradeoff is that this capacity is interruptible.
 
 ```bash
 # Add a Spot node pool to an existing cluster
@@ -805,6 +805,16 @@ az aks nodepool add \
   --max-count 10 \
   --node-vm-size Standard_D4s_v5
 ```
+
+**Pause and predict:** If your entire web frontend is running on a Spot node pool and Azure experiences a sudden surge in demand for that VM size in your region, what happens to your application? How should you architect a production deployment to utilize Spot savings without risking downtime?
+
+<details>
+<summary>Check your prediction</summary>
+
+Azure Spot node pools carry **no SLA**; Azure **evicts** Spot virtual machines when it needs capacity for pay-as-you-go workloads or when Spot prices exceed your configured ceiling. Scheduled Events may deliver a best-effort `Preempt` signal on the order of 30 seconds, but eviction can also be immediate, so production frontends must not depend on that window. If your entire web frontend runs on Spot, a sudden regional capacity reclamation can evict all replicas simultaneously, resulting in a total application outage. Spot node pools cannot be the cluster's default system pool. AKS automatically taints Spot nodes with `kubernetes.azure.com/scalesetpriority=spot:NoSchedule`. To safely capture Spot cost savings in production, architect workloads with split tiers: deploy your baseline required replicas onto standard Regular (on-demand) node pools, and tolerate the Spot taint only on burst replicas or asynchronous batch workers that can handle sudden evictions without violating user availability SLAs.
+</details>
+
+Set `spot-max-price` deliberately: `-1` means the instance is not evicted based on price (you pay the lower of the Spot rate or the standard pay-as-you-go rate). A positive cap, specified in USD with up to five decimal places, is the ceiling you will pay per hour for that SKU — useful for batch fleets with hard unit economics. Pair `eviction-policy Delete` (default) when pods should disappear with the node, or `Deallocate` only when you accept stopped VMs still counting against quota and complicating upgrades.
 
 Because of their volatile nature, Spot nodes are deeply integrated with Kubernetes taints and tolerations. AKS will automatically taint Spot nodes so that normal critical workloads are completely shielded from them. You must explicitly configure your deployment to tolerate the `spot` designation.
 
@@ -833,18 +843,6 @@ spec:
                 values:
                 - spot
 ```
-
-**Pause and predict:** If your entire web frontend is running on a Spot node pool and Azure experiences a sudden surge in demand for that VM size in your region, what happens to your application? How should you architect a production deployment to utilize Spot savings without risking downtime?
-
-<details>
-<summary>Check your prediction</summary>
-
-Azure Spot node pools carry **no SLA**; Azure **evicts** Spot virtual machines when it needs capacity for pay-as-you-go workloads or when Spot prices exceed your configured ceiling. Scheduled Events may deliver a best-effort `Preempt` signal on the order of 30 seconds, but eviction can also be immediate, so production frontends must not depend on that window. If your entire web frontend runs on Spot, a sudden regional capacity reclamation can evict all replicas simultaneously, resulting in a total application outage. Spot node pools cannot be the cluster's default system pool. AKS automatically taints Spot nodes with `kubernetes.azure.com/scalesetpriority=spot:NoSchedule`. To safely capture Spot cost savings in production, architect workloads with split tiers: deploy your baseline required replicas onto standard Regular (on-demand) node pools, and tolerate the Spot taint only on burst replicas or asynchronous batch workers that can handle sudden evictions without violating user availability SLAs.
-</details>
-
-Price and capacity are independent levers: a pool that survives a price spike can still disappear when Azure needs the SKU for on-demand customers. Production architectures therefore keep a Regular floor for user-facing traffic and treat interruptible capacity as overflow, not as the only place the homepage can run.
-
-Set `spot-max-price` deliberately: `-1` means the instance is not evicted based on price alone (you pay the lower of Spot or standard rate while capacity exists). A positive cap (up to five decimal places in USD) evicts when Spot price exceeds your ceiling — useful for batch fleets with hard unit economics. Pair `eviction-policy Delete` (default) when pods should disappear with the node, or `Deallocate` only when you accept stopped VMs still counting against quota and complicating upgrades.
 
 ### Workload Right-Sizing
 
@@ -921,7 +919,7 @@ Hypothetical scenario: a platform team budgets $18,000/month for a three-node pr
 
 **Managed Prometheus samples.** Pricing follows ingestion and query volume, not workspace storage (eighteen-month retention is included). High-cardinality labels (`pod`, `url_path`, `user_id`) on metrics scraped every fifteen seconds explode sample counts. Use recording rules to drop cardinality before dashboards and alerts query the data.
 
-**Spot versus on-demand mix.** Spot VMs commonly discount up to roughly ninety percent versus pay-as-you-go for the same SKU, balanced against thirty-second eviction notices. Safe spot candidates: batch workers, KEDA-driven burst consumers with checkpointing, CI jobs. Unsafe: synchronous API gateways without on-demand baseline replicas, StatefulSets without graceful shutdown, or workloads that cannot tolerate `kubernetes.azure.com/scalesetpriority=spot` taints.
+**Spot versus on-demand mix.** Spot VMs commonly discount up to roughly ninety percent versus pay-as-you-go for the same SKU, balanced against interruptible capacity and best-effort Scheduled Events rather than a guaranteed notice window. Safe spot candidates: batch workers, KEDA-driven burst consumers with checkpointing, CI jobs. Unsafe: synchronous API gateways without on-demand baseline replicas, StatefulSets without graceful shutdown, or workloads that cannot tolerate `kubernetes.azure.com/scalesetpriority=spot` taints.
 
 **Over-provisioned requests and idle premium disks.** Cluster Autoscaler provisions nodes to satisfy **requests**, not actual usage. Inflated CPU requests cause extra D8s nodes while metrics show ten percent utilization. KEDA scale-to-zero removes pod compute but not PVCs — verify unused Premium disks monthly.
 
@@ -1546,7 +1544,7 @@ Failure layer: Default telemetry collection profiles versus application log volu
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Unbacked spare compute capacity models versus contractual enterprise availability guarantees. Next action: understand that Azure Spot virtual machines carry zero financially backed SLA and can be evicted by Azure at any time with only a 30-second warning whenever the cloud platform requires capacity for regular pay-as-you-go workloads or spot prices exceed bids; running an entire user-facing frontend on Spot exposes the service to complete outages during regional compute surges; maintain your baseline required service capacity on standard on-demand node pools, and utilize Spot node pools only for burst capacity, stateless batch workloads, or asynchronous processing queues that tolerate unexpected pod preemption and node reclamation.
+Failure layer: Unbacked spare compute capacity models versus contractual enterprise availability guarantees. Next action: understand that Azure Spot virtual machines carry zero financially backed SLA and can be evicted whenever Azure needs the capacity for pay-as-you-go workloads or when Spot prices exceed your configured ceiling; Scheduled Events may deliver a best-effort `Preempt` signal on the order of 30 seconds, but eviction can also be immediate, so production frontends must not depend on that window; running an entire user-facing frontend on Spot exposes the service to complete outages during regional compute surges; maintain your baseline required service capacity on standard on-demand node pools, and utilize Spot node pools only for burst capacity, stateless batch workloads, or asynchronous processing queues that tolerate unexpected pod preemption and node reclamation.
 </details>
 
 **Card D: Horizontal Pod Autoscaler can scale a Deployment to zero replicas the same way KEDA does.** A developer builds an asynchronous batch processing worker that pulls jobs from an Azure Service Bus queue. To avoid paying for idle compute during periods with no incoming messages, the developer configures a native Kubernetes Horizontal Pod Autoscaler resource targeting custom metrics. The developer sets `minReplicas: 0` in the manifest, expecting standard Kubernetes controllers to terminate all pods when the queue is empty. Furthermore, they expect the autoscaler to recreate pods automatically when new messages arrive.
