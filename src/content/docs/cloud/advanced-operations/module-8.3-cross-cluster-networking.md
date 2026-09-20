@@ -121,7 +121,13 @@ Choosing between these topologies is a foundational platform engineering decisio
 | Migration from monolith | Yes (pods need to reach legacy IPs) | No |
 | CNI | AWS VPC CNI, Azure CNI | Calico, Cilium (overlay mode) |
 
-> **Stop and think**: If your company acquires a startup that uses the exact same Pod CIDR (e.g., 10.244.0.0/16) as your main clusters, which networking model will you be forced to use to connect them?
+**Pause and predict:** If your company acquires a startup that uses the exact same Pod CIDR (e.g., `10.244.0.0/16`) as your main clusters, which networking model will you be forced to use to connect them?
+
+<details>
+<summary>Check your prediction</summary>
+
+Overlapping `10.244.0.0/16` pod CIDRs directly block flat, routable inter-cluster networking because the Linux routing table cannot deterministically resolve identical destination subnets across cluster boundaries. You are forced to implement an **island + explicit gateways** architecture where each cluster preserves its isolated networking domain and workloads communicate exclusively through ingress controllers or egress gateway proxies.
+</details>
 
 When this pattern appears during diligence, the highest-value move is to separate integration decisions from migration urgency. If you can define a long-lived network contract first, teams are less likely to make dangerous temporary exceptions just to satisfy timelines. The costliest mistakes usually occur when one team forces flat networking despite overlap constraints and then spends months papering over routing defects with manual service lists. In those cases, the architecture debt compounds because every workaround gets replicated across every future cluster purchase.
 
@@ -272,7 +278,15 @@ spec:
     - port: 6379
 ```
 
-> **Pause and predict**: If you annotate a service with `service.cilium.io/affinity: "local"`, what happens when all local endpoints for that service crash? Will the requests fail, or will they route to the remote cluster?
+**Pause and predict:** If you annotate a service with `service.cilium.io/affinity: "local"`, what happens when all local endpoints for that service crash? Will the requests fail, or will they route to the remote cluster?
+
+<details>
+<summary>Check your prediction</summary>
+
+Setting `service.cilium.io/affinity: "local"` instructs Cilium to prefer local cluster backends, but it uses **remote endpoints if and only if all local backends are unavailable or unhealthy**. The service does **not** fail closed; instead, Cilium fails over to healthy endpoints in the remote mesh cluster to preserve service availability across the fleet.
+</details>
+
+Cross-cluster failover maintains application uptime across clusters during localized node or availability zone disruptions. Allowing traffic to traverse mesh boundaries automatically introduces critical cross-cluster security and isolation responsibilities. Platform teams must ensure that remote failover paths cannot bypass intended cluster trust perimeters or expose internal service ports.
 
 ### Network Policies Across Boundaries
 
@@ -486,7 +500,15 @@ LIMIT 20
 SQL
 ```
 
-> **Stop and think**: Does topology-aware routing guarantee that cross-AZ traffic will never happen? What triggers kube-proxy to spill traffic over to another zone?
+**Pause and predict:** Does topology-aware routing guarantee that cross-AZ traffic will never happen? What triggers kube-proxy to spill traffic over to another zone?
+
+<details>
+<summary>Check your prediction</summary>
+
+Topology-aware routing does **not** guarantee zero cross-AZ traffic. The EndpointSlice controller allocates hints proportionally, but if an Availability Zone lacks sufficient ready endpoints to service its proportional share of traffic, or if endpoint hints cannot be generated, `kube-proxy` **falls back cluster-wide** to distribute requests across all zones to protect workload availability.
+</details>
+
+Internal routing optimizations minimize data transfer overhead between availability zones inside a single geographic region. Enterprises running distributed applications must also route incoming traffic from external clients across global boundaries. The next architectural challenge requires steering internet users across autonomous regional clusters before requests enter internal service fabrics.
 
 ## Global Load Balancing for Multi-Region Deployments
 
@@ -748,7 +770,15 @@ def enter_safe_mode(unreachable_clusters):
         f.write("false")
 ```
 
-> **Pause and predict**: If you use a single-writer, multiple-reader database architecture across two clusters, what happens to write requests during a network partition if the active writer is in the partitioned cluster?
+**Pause and predict:** If you use a single-writer, multiple-reader database architecture across two clusters, what happens to write requests during a network partition if the active writer is in the partitioned cluster?
+
+<details>
+<summary>Check your prediction</summary>
+
+Without automated node fencing or quorum consensus, an isolated writer inside a partitioned cluster can continue accepting mutating transactions while remaining completely cut off from its readers and standby replicas. This condition causes **split-brain** data divergence and silent state corruption; to prevent catastrophic data drift, the isolated cluster must actively fail write readiness probes and switch to safe mode immediately upon losing heartbeat connectivity.
+</details>
+
+Designing resilient multi-cluster systems requires anticipating the complex failure modes that emerge when physical networks degrade under production workloads. Before moving forward into operational implementations, reviewing verified platform behaviors reinforces the technical boundaries that govern multi-cluster architectures.
 
 ## Did You Know?
 
@@ -1073,9 +1103,41 @@ rm cluster-a.yaml cluster-b.yaml
 ```
 </details>
 
-### Exercise Success Criteria Checklist
+Before deploying production multi-cluster meshes and global ingress architectures, platform architects must audit common operational misconceptions about pod addressing, mesh affinity, topology routing guarantees, and cross-cluster state management. Each scenario below states a claim that sounds operationally convenient but masks subtle distributed systems failures. Treat the claim as the hypothesis, then open the details only after you have a prediction.
 
-Review these critical milestones prior to formally closing out your lab session constraints:
+**Card A: Overlapping pod CIDRs (both 10.244.0.0/16) are fine for a flat Cluster Mesh overlay because Cilium will NAT the packets.** A cloud architect connects two legacy Kubernetes clusters into a unified Cilium Cluster Mesh across a corporate private network. Because both clusters were originally provisioned with the default `10.244.0.0/16` pod CIDR, the architect assumes that Cilium automatically translates pod traffic across the mesh boundary. This assumption leads the team to believe that pod-to-pod routing will work seamlessly without renumbering subnets or deploying edge gateways.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Flat mesh overlay addressing collisions versus network address translation and edge proxying. Next action: understand that Cilium Cluster Mesh establishes a flat routing plane that strictly requires non-overlapping, unique pod and node CIDRs across all member clusters; Cilium does not perform transparent NAT on pod IPs across mesh boundaries, meaning overlapping `10.244.0.0/16` allocations will cause immediate IP collisions, dropped packets, and non-deterministic routing failures; to interconnect clusters with identical CIDRs without undertaking an extensive IPAM renumbering project, deploy an island architecture utilizing explicit ingress and egress gateways or layer-7 proxies rather than attempting a flat overlay mesh.
+</details>
+
+**Card B: service.cilium.io/affinity: local fails the request if every local endpoint is down, so traffic never leaves the cluster.** A site reliability engineer configures a multi-cluster Cilium global service for an internal payment API across two cloud regions. To ensure sensitive transaction data never leaves the local cluster, the engineer applies the `service.cilium.io/affinity: "local"` annotation. The engineer assumes that if all local backend pods crash, Cilium will fail closed and drop requests rather than routing data to the remote cluster.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Service affinity preference mechanics versus fail-closed perimeter security boundaries. Next action: recognize that `service.cilium.io/affinity: "local"` acts as a traffic routing preference rather than an isolation enforcement boundary; Cilium directs traffic to local cluster endpoints during normal operations, but if every local backend pod becomes unhealthy or crashes, the eBPF datapath automatically fails over to healthy endpoints in the remote mesh cluster to maintain service availability; if traffic must never leave the local cluster under failure conditions, remove the `service.cilium.io/global: "true"` annotation entirely or enforce strict `CiliumNetworkPolicy` egress rules that deny egress to remote cluster identities.
+</details>
+
+**Card C: Topology-aware routing guarantees kube-proxy will never send Service traffic across AZs.** A platform team seeking to eliminate inter-availability zone data transfer costs enables topology-aware routing across their multi-AZ production clusters. The team sets the traffic distribution policy to prefer close endpoints on their core microservices. They assume that Kubernetes provides an absolute guarantee that requests will never cross availability zones or incur bandwidth fees.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Proportional zone endpoint distribution and fallback mechanics versus rigid zone isolation. Next action: understand that topology-aware routing uses heuristic endpoint hints that do not guarantee zero cross-AZ traffic; if endpoint distribution across availability zones is unbalanced or if an availability zone lacks sufficient endpoints to service its proportional traffic share, the EndpointSlice controller withholds hints or `kube-proxy` falls back cluster-wide to distribute requests across all zones to protect workload availability; to achieve deterministic zone pinning, deploy node-local DaemonSets with `internalTrafficPolicy: Local` or co-locate communicating pods using strict pod topology spread constraints.
+</details>
+
+**Card D: A single-writer database across two clusters is automatically safe during a network partition because the partitioned side cannot accept writes.** A systems engineer designs an active-passive stateful database topology spanning primary and standby Kubernetes clusters across two regions. The engineer assumes that if a network partition severs communication between the regions, the architecture is inherently immune to data corruption. Under this assumption, the isolated standby cluster will remain passive and cannot process conflicting state transitions without explicit operator intervention.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Asymmetric network partitions and split-brain write acceptance versus automated fencing mechanisms. Next action: understand that during an inter-cluster network partition, an isolated cluster containing an active writer can continue accepting writes from local clients if it lacks automated fencing or quorum consensus, causing catastrophic split-brain state divergence; without active partition detection or distributed consensus protocols, applications in the isolated region will diverge irrevocably; implement active partition detection, require majority quorum for failover, and configure health checking probes that immediately trip write readiness probes to fail and enforce read-only safe mode during network isolation.
+</details>
+
+**Success Criteria**:
 - [ ] You have effectively booted two distinctly functioning `kind` clusters utilizing strictly non-overlapping internal pod CIDRs.
 - [ ] The core Cilium agent deployment remains fully stabilized and functionally healthy within both discrete clusters.
 - [ ] The global Cluster Mesh stands formally connected (verified actively via execution of `cilium clustermesh status`).
