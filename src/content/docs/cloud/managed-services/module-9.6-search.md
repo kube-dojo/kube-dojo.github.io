@@ -337,7 +337,7 @@ After lexical analysis completes, the search engine writes incoming documents to
 The default `refresh_interval` of approximately one second flushes in-memory buffers into tiny Lucene segments every second to deliver near-real-time searchability. During continuous high-volume bulk ingestion, generating thousands of small segments triggers heavy CPU and disk I/O contention because background workers must constantly merge small segments into larger ones. To optimize performance during bulk loading, engineers raise `refresh_interval` to `30s` or disable it completely with `-1`, allowing large batches to accumulate efficiently before restoring the default interval when indexing completes.
 </details>
 
-Buffer flush thresholds and background segment merging cycles govern coordinating node throughput. These mechanics dictate how worker data nodes absorb sustained ingestion pressure.
+The next section is how live field types and primary shard counts behave once documents already occupy Lucene segments on disk.
 
 The index mapping establishes the formal schema contract. It defines which document fields use `keyword` types for exact filtering versus `text` types for analyzed full-text queries. Mappings strictly constrain available query capabilities across your cluster. Search engines construct inverted indexes and columnar doc values differently according to the declared data type. Establishing explicit schema mappings before ingesting production telemetry prevents dynamic type guessing errors that silently misclassify critical operational identifiers.
 
@@ -349,7 +349,7 @@ The index mapping establishes the formal schema contract. It defines which docum
 You cannot alter an existing field's data type mapping or modify the `number_of_primary_shards` setting directly on an active index without reindexing. Lucene builds immutable segment structures, and the coordinating node routes incoming documents using a hash of the document routing key modulo the primary shard count; mutating shard counts or field structures in place would break document retrieval and query execution. Updating these attributes requires provisioning a new destination index with adjusted mappings and sizing—hedging primary shards between 10–50 GiB, where log workloads typically target 30–50 GiB—and running the `_reindex` API to backfill records before repointing application aliases.
 </details>
 
-Establishing composable index templates guarantees verified schema configurations across new indices. Rolling alias pointers further ensure that operational transitions remain transparent to client applications.
+The next section is how the bulk API batches documents so ingestion does not pay a network round-trip per log line.
 
 ### Bulk Indexing
 
@@ -540,7 +540,7 @@ GOOD: 1 index per day * 3 shards * 2 (replicas) * 90 days = 540 shards
 Every shard consumes heap memory on master and data nodes for cluster state metadata, Lucene segment headers, open file descriptors, and routing tables. Maintaining tens of thousands of underutilized shards leads to master election timeouts and cluster instability. The standard production architecture uses a single daily index paired with a `keyword` mapping on the `namespace` field for filtering, enforcing tenant access boundaries via Document Level Security (DLS) when isolation is required.
 </details>
 
-Consolidating multi-tenant logs into shared indices requires careful attention to schema definitions so that cross-tenant queries remain fast and isolated.
+The next section is how a shared daily index stays filterable by tenant identity without creating another physical index per team.
 
 **Pause and predict:** You have decided to use a single index per day with a `namespace` field to prevent shard explosion. To ensure your queries filtering by namespace are as fast as possible, what OpenSearch mapping type should the `namespace` field use, and why?
 
@@ -550,7 +550,7 @@ Consolidating multi-tenant logs into shared indices requires careful attention t
 The `namespace` field must be mapped as `keyword` rather than `text` because it contains structured exact identifiers used for filtering, aggregations, and Document Level Security (DLS). The `keyword` data type indexes values verbatim without analysis or stemming, enabling fast exact-match lookups and memory-efficient aggregations through doc values. If mapped as `text`, the value undergoes tokenization and stemming, breaking exact filter matching; furthermore, running terms aggregations on `text` fields fails by default and requires enabling `fielddata`, which consumes massive JVM heap memory and risks out-of-memory crashes.
 </details>
 
-Role definitions and access policies leverage exact metadata attributes to restrict document visibility dynamically without fragmenting underlying physical storage structures.
+The next section is how Document Level Security and Field Level Security map Kubernetes teams onto one shared search cluster.
 
 ---
 
