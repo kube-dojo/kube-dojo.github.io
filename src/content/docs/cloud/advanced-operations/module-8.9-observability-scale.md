@@ -523,7 +523,16 @@ spec:
 
 Loki 3.x ingests logs natively over OTLP (`/otlp`). The contrib `loki` exporter (`lokiexporter`, push to `/loki/api/v1/push`) was deprecated in 2024-07 and removed from current Collector builds—configs that still reference `exporters: loki` fail decode with `unknown type: loki`. Route log pipelines through `otlphttp` (or `otlp`) to the Loki OTLP endpoint instead.
 
-> **Pause and predict**: If you configure the `memory_limiter` processor in the OTel Collector to drop telemetry when it hits 90% memory, and there is a sudden spike in log volume, which signal (metrics, logs, or traces) gets dropped first? Or are they dropped equally?
+**Pause and predict:** If you configure the `memory_limiter` processor in an OpenTelemetry Collector pipeline to reject telemetry when memory consumption reaches ninety percent, and an application triggers a sudden spike in log volume, which signal (metrics, logs, or traces) gets dropped first? Or does the processor drop all signals equally?
+
+<details>
+<summary>Check your prediction</summary>
+
+The `memory_limiter` processor refuses **all** telemetry signals equally rather than prioritizing metrics or dropping logs first. The processor enforces a process-wide soft limit based on Go runtime heap checks. When memory usage breaches the soft limit or reaches the hard limit, the processor refuses data across all active pipelines by rejecting calls to `ConsumeLogs`, `ConsumeTraces`, and `ConsumeMetrics` until garbage collection runs and heap usage falls back below the threshold. Because the limiter evaluates overall process memory rather than individual pipeline buffers, an unexpected surge in verbose application logs causes the Collector to reject incoming metrics and traces simultaneously. Production architectures mitigate this shared blast radius by deploying dedicated Collector instances for high-volume log streams.
+</details>
+
+Preventing sudden log volume spikes from starving essential metric and trace pipelines requires decoupling textual log ingestion from core operational telemetry. The next section explores how Loki transforms log aggregation economics by indexing metadata labels instead of building heavy inverted indices on raw text payloads.
+
 
 ---
 
@@ -759,11 +768,29 @@ count by (pod) (http_requests_total)
 # If this returns 500+ series, "pod" label is too granular
 ```
 
-> **Pause and predict**: If you implement a recording rule to aggregate metrics by deployment, what happens to the historical data stored under the original pod-level metric name?
+**Pause and predict:** If you implement a Prometheus recording rule to aggregate granular per-pod metrics into a deployment-level summary, what happens to the historical data stored under the original pod-level metric name? Does the new recording rule rewrite or recalculate existing historical time series in the TSDB?
+
+<details>
+<summary>Check your prediction</summary>
+
+A recording rule evaluates strictly **at current time** moving forward and records samples into an entirely **new** series without altering historical data. Prometheus recording rules do not backfill past intervals or rewrite existing TSDB blocks on disk. The original pod-level series remain stored in historical blocks exactly as recorded until they reach their retention limit and are purged by the compactor. Dashboards querying the original pod-level metric across historical windows will still see old pod series, but queries spanning both past and present must account for the series name transition. Historical data remains untouched, meaning recording rules reduce storage ingestion rates and query latency only from the moment they are applied.
+</details>
+
+Pre-computing aggregated metrics relieves TSDB query pressure and controls cardinality, but aggregated counters cannot reconstruct the end-to-end journey of an individual transaction across distributed services. The next section examines how distributed tracing preserves transaction context across cluster and cloud boundaries without generating unmanageable storage overhead.
 
 ---
 
 ## Cross-Cloud Distributed Tracing
+
+**Pause and predict:** If the Frontend Service and Payment Service belong to different teams using different tracing instrumentation (such as Jaeger versus Zipkin clients), what happens to the trace context when an HTTP request crosses the cluster boundary? Does the downstream service seamlessly continue the incoming trace, or does the trace break into disconnected fragments?
+
+<details>
+<summary>Check your prediction</summary>
+
+Without a shared propagator, the trace fractures into disconnected spans because Jaeger and Zipkin default to incompatible HTTP header formats. Zipkin historically relies on B3 propagation (`X-B3-TraceId`, `X-B3-SpanId`), whereas modern OpenTelemetry and Jaeger implementations default to the W3C Trace Context standard (`traceparent`). Even though HTTP carries the request across the cluster boundary, the downstream service cannot locate its expected trace header, treats the request as a brand-new transaction root, and generates a new trace ID. Platform teams resolve cross-boundary trace fracture by standardizing on W3C `traceparent` or configuring dual propagators (`b3multi`, `tracecontext`) across all service runtimes and ingress gateways.
+</details>
+
+Maintaining trace continuity requires strict header contract alignment across service boundaries before telemetry ever leaves an application container. The following operational architecture explores how distributed tracing tracks transactions across independent clusters and why context propagation standards are critical.
 
 As architectures fracture into dozens of microservices deployed across disparate Kubernetes clusters, traditional single-service logging becomes insufficient for diagnosing systemic latency. Distributed tracing tracks the complete lifecycle of a single request as it traverses network boundaries, database calls, and inter-service HTTP requests. 
 
@@ -806,8 +833,6 @@ flowchart TD
     OTelA --> Tempo
     OTelB --> Tempo
 ```
-
-> **Pause and predict**: If the Frontend Service and Payment Service belong to different teams using different tracing instrumentation (e.g., Jaeger vs. Zipkin clients), what happens to the trace context when the HTTP request crosses the cluster boundary?
 
 ### Tail-Based Sampling for Traces
 
@@ -904,6 +929,16 @@ Hybrid designs are common and valid: scrape and alert locally with Prometheus on
 
 ## SLOs, Error Budgets, and Symptom-Based Alerting
 
+**Pause and predict:** If you configure an infrastructure alert rule that pages on-call engineers whenever CPU utilization exceeds 80% on any pod, but your customer contract is governed by latency Service Level Objectives, which alert will wake the team during a thread-pool exhaustion incident where checkout requests stall without elevating CPU?
+
+<details>
+<summary>Check your prediction</summary>
+
+The CPU threshold alert will remain completely silent because thread-pool exhaustion starves application workers while consuming virtually zero CPU cycles. When worker threads block waiting on an unresponsive database query, downstream deadlock, or saturated connection pool, CPU utilization drops or stays flat even as incoming HTTP requests queue and timeout. Only a symptom-based alert monitoring latency percentiles (such as p99 request duration) or SLO error budget burn rates will fire and wake the on-call engineer during customer-impacting degradation. Alerting on infrastructure causes like CPU usage creates noise during benign spikes and blinds teams during silent application starvation incidents.
+</details>
+
+Reliable alerting structures prioritize customer impact over internal resource metrics to ensure on-call engineers respond to real service degradation. The following operational framework outlines how service level objectives and error budgets establish principled thresholds that distinguish critical customer symptoms from benign infrastructure events.
+
 Telemetry exists to support decisions, not to fill disks. **Service Level Indicators (SLIs)** are precise measurements (availability, latency, freshness) drawn primarily from metrics, with logs and traces as debugging lenses. **Service Level Objectives (SLOs)** set targets over rolling windows (for example 99.9% of checkout requests faster than 500 ms over thirty days). The **error budget** is the allowed unreliability before the SLO fails; when the budget burns quickly, feature work yields to reliability work.
 
 Symptom-based alerting pages humans on user-visible pain (SLO burn rate, failed synthetic probes, elevated 5xx rates) instead of every infrastructure twitch (single pod restart, node NotReady during drain). Multi-window, multi-burn-rate alerts (popularized in Google SRE practice) reduce false positives while still catching fast burns. Implementations typically use recording rules or Mimir/AMP ruler components to evaluate PromQL, then route through Alertmanager, PagerDuty, or cloud notification channels.
@@ -917,8 +952,6 @@ Recording rules for SLIs should be owned by the service team that owns the SLO, 
 | Symptom | `slo:burn_rate5m > 14` for checkout | Correlates to customer pain |
 | Cause | `KubeNodeNotReady` on one node | Useful after symptom fires |
 | Cardinality guard | `prometheus_tsdb_head_series` growth | Prevents observability outage |
-
-> **Pause and predict**: If you alert on CPU > 80% for every pod, but your SLO is latency-based, which alert will wake on-call during a thread-pool exhaustion incident that throttles checkout without high CPU?
 
 ---
 
@@ -1423,7 +1456,41 @@ Always tear down infrastructure locally to free up resources immediately after l
 kind delete cluster --name obs-lab
 ```
 
-### Success Criteria
+Before you close the lab, audit the four claims below. Each open card states a hypothesis that sounds operationally plausible during large-scale observability and telemetry operations. Treat the claim as a prediction, then open the details only after you have an answer.
+
+**Card A: When log volume spikes, memory_limiter drops logs first and keeps metrics and traces flowing.** A platform team configures a shared OpenTelemetry Collector DaemonSet to ingest metrics, structured container logs, and distributed traces from application nodes. To prevent the Collector process from running out of memory during traffic surges, the team enables the memory_limiter processor across all data pipelines. The team assumes that when an application enters debug logging mode, the processor will selectively throttle or drop the high-volume log pipeline first while allowing low-bandwidth metric scrapes and vital distributed traces to pass through unharmed.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: OpenTelemetry Collector process-level memory management versus pipeline-level prioritization. Next action: understand that `memory_limiter` acts as a blunt, process-wide circuit breaker that rejects **all** telemetry signals once memory limits are breached; the processor tracks total Go runtime heap allocation and refuses `ConsumeLogs`, `ConsumeTraces`, and `ConsumeMetrics` indiscriminately across every pipeline until memory usage drops below the configured soft limit; to prevent runaway logging from starving vital metrics and traces, isolate log collection into dedicated Collector instances or separate deployment tiers with distinct resource allocations.
+</details>
+
+**Card B: A recording rule that aggregates by deployment rewrites historical pod-level series so old dashboards automatically show the new aggregation.** An operations engineer discovers that storing raw per-pod HTTP request rates creates severe time-series cardinality bloat in Prometheus. To fix slow dashboard loading, the engineer deploys a recording rule that calculates the five-minute request rate aggregated strictly by deployment and namespace. The engineer expects that applying this rule will retroactively consolidate historical pod-level series stored in existing TSDB blocks so that historical trend charts seamlessly display the aggregated deployment metric across past months.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Time-series database immutability and append-only evaluation semantics. Next action: recognize that Prometheus recording rules evaluate strictly **at current time** and append into an entirely **new** time series without rewriting or backfilling historical data; existing TSDB blocks remain unchanged until they reach their configured retention boundary and are removed; historical dashboards querying the original pod-level series must continue querying the old metric for past intervals or use PromQL queries that bridge the transition period, while the new recording rule optimizes query performance and storage going forward.
+</details>
+
+**Card C: A Jaeger client talking to a Zipkin client still produces one connected trace because HTTP already carries the request across the cluster boundary.** A payment platform integrates an upstream checkout service instrumented with the Jaeger OpenTelemetry client and a downstream fraud engine instrumented with legacy Zipkin libraries across different Kubernetes clusters. Because all microservice communication takes place over standard HTTP calls that carry headers across network boundaries, the integration lead assumes the two tracing engines will automatically stitch the request hops into a single unified trace waterfall in Grafana Tempo.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Distributed context propagation protocol mismatch across heterogenous tracing implementations. Next action: configure explicit cross-system context propagators because HTTP transport alone does not resolve conflicting header specifications; legacy Zipkin clients inject and extract B3 propagation headers (`X-B3-TraceId`, `X-B3-SpanId`), whereas modern OpenTelemetry and Jaeger implementations default to the W3C Trace Context standard (`traceparent`); without aligning propagators or enabling B3 compatibility on the receiver, downstream services fail to recognize the incoming context and start a brand-new trace root, fracturing the transaction into disconnected fragments.
+</details>
+
+**Card D: CPU > 80% on every pod is the alert that pages during a thread-pool exhaustion incident that throttles checkout without high CPU.** An infrastructure engineering team relies on node and pod CPU saturation alarms to guard application health, configuring high-priority pages whenever container CPU usage sustains above eighty percent. When an upstream database connection stall triggers thread-pool exhaustion that prevents checkout requests from processing, the team expects the pod CPU alert to wake on-call engineers immediately before customers abandon their transactions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cause-based infrastructure utilization alerting versus symptom-based user-impact detection. Next action: replace cause-oriented CPU thresholds with symptom-based alerts targeting Service Level Objectives such as latency percentiles and error budget burn rates; during thread-pool exhaustion or downstream connection blocking, worker threads sit idle waiting on blocked I/O, resulting in flat or plummeting CPU consumption while user-facing latency and error rates spike; page strictly on customer symptoms like elevated p99 latency or burn rates, retaining CPU utilization metrics as secondary debugging signals rather than primary escalation triggers.
+</details>
+
+**Success Criteria**:
 
 - [ ] Prometheus correctly deployed with external labels injected (`cluster`, `region`).
 - [ ] Loki and OpenTelemetry Collector daemonsets deployed and streaming unstructured pod logs without crashing.
