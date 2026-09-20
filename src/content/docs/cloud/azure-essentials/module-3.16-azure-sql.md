@@ -194,7 +194,7 @@ Comprehensive disaster recovery runbooks must audit operational dependencies bey
 
 ## 4. Identity, Networking, and Security
 
-Azure SQL Database access is structured across distinct management surfaces with separate operational boundaries. Operators who treat a subscription-wide Azure role as a complete ticket for querying customer tables often discover the failure only after the first SELECT is refused.
+Azure SQL Database access is structured across distinct management surfaces with separate operational boundaries. A ticket that only names a resource group and a human operator still leaves the connection identity, the database name, and the client network path unspecified.
 
 **Pause and predict:** A platform engineer is assigned the Azure Contributor role on the resource group containing an Azure SQL logical server and attempts to query a database. Will this role assignment grant sufficient privileges to run SELECT queries, and what authorization steps are required if access fails?
 
@@ -204,7 +204,7 @@ Azure SQL Database access is structured across distinct management surfaces with
 No. The Azure Contributor role operates exclusively within the Azure control plane and grants zero permissions inside the SQL data plane. To execute queries, the database requires data-plane authorization. A designated Microsoft Entra administrator must configure access, or an authorized administrator must connect and execute `CREATE USER ... FROM EXTERNAL PROVIDER` followed by granting explicit database roles like `db_datareader`.
 </details>
 
-Directory-backed identities and least-privilege database roles still have to be granted where the queries actually run, even after Azure roles look complete on the resource group. That split is why an app can deploy ARM resources all afternoon and still fail the first SELECT.
+Human and service identities belong in the directory so conditional access, group membership, and rotation live in one place. Long-lived SQL passwords in application settings remain the fallback that incident reviews keep finding in older App Service slots.
 
 Microsoft Entra authentication is the preferred identity direction for humans and services because it centralizes identity, conditional access, group management, and service principal patterns [configure Microsoft Entra authentication](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-aad-configure?view=azuresql). An Azure SQL logical server can have a Microsoft Entra administrator, and that administrator can create contained database users from external provider identities. Managed identities can connect to Azure SQL using Entra authentication when the database has a corresponding user and permission set [managed identities](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-azure-ad-user-assigned-managed-identity?view=azuresql-db). This is the clean operator pattern for App Service, Functions, AKS workload identity, and automation jobs because it avoids long-lived SQL passwords in application settings.
 
