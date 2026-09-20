@@ -79,7 +79,15 @@ Microsoft publishes [SKU features and limits](https://learn.microsoft.com/en-us/
 
 Throughput is not a single headline number on the pricing page. Image pull and push performance depends on [API concurrency, bandwidth, layer reuse, concurrent node pulls, and network path](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-skus). During large AKS scale-out events, many nodes may pull the same image layers simultaneously. If your registry SKU is too small for that burst pattern, clients can see HTTP **429 Too Many Requests** throttling. The documented mitigation is retry with backoff, spacing deployments, or moving to a higher SKU.
 
-**Geo-replication** is Premium-only. You add regional replicas with `az acr replication create`; pushes land on the home region and [replicate asynchronously to each replica](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-geo-replication). Clients are steered to a nearby replica for pulls, which is the single-registry-multi-region model: one logical registry name, many physical storage locations. Billing adds a per-replica daily charge on top of the Premium registry fee (see [Azure Container Registry pricing](https://azure.microsoft.com/en-us/pricing/details/container-registry/)).
+**Pause and predict:** Can an engineering team configure geo-replication on a Standard SKU registry to serve local image pulls across multiple Azure regions?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Geo-replication is strictly a Premium SKU capability in Azure Container Registry. Standard and Basic registries are restricted to a single Azure region; enabling automated multi-region replication requires upgrading to the Premium tier.
+</details>
+
+Regional replicas are provisioned using `az acr replication create`, allowing container images pushed to the primary region to [replicate asynchronously to each replica](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-geo-replication). Workloads in each region are automatically steered to their nearest local replica for image pulls, achieving a single-registry multi-region deployment architecture with regional endpoint management. Operating these replicas incurs an additional daily charge per configured replica location in addition to standard registry platform fees (see [Azure Container Registry pricing](https://azure.microsoft.com/en-us/pricing/details/container-registry/)).
 
 **Private Link** and **OCI image signing** via the [Notary Project](https://notaryproject.dev/) (`notation` CLI with Azure Key Vault keys) are Premium-aligned supply-chain controls. [Docker Content Trust (DCT) is deprecated](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-content-trust-deprecation)—new DCT enablement ended 2025-03-31 and DCT is fully removed 2028-03-31; use Notary Project signing instead. [Private endpoints](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-private-link) project the registry into your VNet so pulls never traverse the public internet. **Customer-managed keys** for encryption at rest and **retention policies** for untagged manifests are Premium capabilities as well.
 
@@ -103,7 +111,17 @@ Securing access to your container images is arguably the most critical operation
 
 ### 1. The Admin Account (Avoid in Production)
 
-When you first create a registry, you have the option to enable an admin account. This generates a static username and a set of passwords. Microsoft documents the admin user as a single shared identity with registry-wide push and pull privileges. Quickstarts use it because it works immediately with `docker login`, but it bypasses Entra audit granularity and cannot express repository-scoped intent. If you enabled admin during a spike, disable it after the spike: `az acr update --name kubedojoacr --admin-enabled false`, then rotate any secret that ever touched the admin password. 
+When creating an Azure Container Registry, the management plane provides an optional administrative toggle that provisions a static username and a pair of access keys for baseline testing.
+
+**Pause and predict:** Can the built-in ACR admin user credentials be scoped down to permit access to only a single repository within the registry?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. The ACR admin user is a monolithic identity that provides shared, registry-wide push and pull privileges. It operates at the top level of the registry resource and cannot be scoped to individual repositories or restricted to granular permissions.
+</details>
+
+Operators frequently encounter the admin account in introductory quickstarts because it enables immediate authentication via standard Docker CLI tools. However, enabling this account bypasses Microsoft Entra audit logging and violates least-privilege security controls. If you enabled the admin user during initial development or testing, disable it immediately using `az acr update --name kubedojoacr --admin-enabled false` and rotate any downstream secrets that previously touched those static keys.
 
 ```bash
 # Enable admin (NOT recommended for production)
@@ -165,9 +183,15 @@ az aks update \
   --attach-acr kubedojoacr
 ```
 
-> **Stop and think**: If a compromised CI/CD pipeline has an ACR admin password, what is the blast radius? How does that compare to a compromised pipeline with an AcrPush service principal limited to a specific repository?
+**Pause and predict:** If an attacker compromises a CI/CD pipeline holding an ACR admin password versus one holding an AcrPush service principal limited to a single repository, how does the blast radius compare?
 
-To help you choose the right authentication model, refer to this architectural decision tree:
+<details>
+<summary>Check your prediction</summary>
+
+The ACR admin password is a shared registry-wide identity granting full push and pull access across every image in the registry. A repository-scoped service principal cannot match that destructive blast radius because its permissions are strictly confined to modifying artifacts within that single designated repository.
+</details>
+
+Evaluating client identity patterns ensures workloads leverage managed identities whenever compute runs inside Azure while reserving scoped credentials for external deployment pipelines. Production architectures should systematically match consumer capabilities to identity controls rather than relying on shared static secrets. The following architectural decision tree summarizes the recommended authentication model across infrastructure resources and deployment pipelines:
 
 ```mermaid
 graph TD
@@ -399,7 +423,15 @@ By default, Azure Container Registry exposes a public endpoint. While authentica
 
 [Azure Private Link allows you to project your ACR directly into your Virtual Network (VNet). The registry receives a private IP address (e.g., `10.0.5.10`), and all traffic between your virtual machines or Kubernetes nodes and the registry never leaves the Microsoft backbone network.](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-private-link)
 
-> **Pause and predict**: If you enable Private Link for an ACR but forget to link the Private DNS Zone to your AKS Virtual Network, what error message will the kubelet throw when trying to pull an image?
+**Pause and predict:** If you configure Private Link with public network access disabled on an ACR, but forget to link the Private DNS Zone to your AKS Virtual Network, what happens when the kubelet attempts to pull an image?
+
+<details>
+<summary>Check your prediction</summary>
+
+The kubelet still resolves the public `*.azurecr.io` fully qualified domain name because the cluster virtual network lacks the private DNS zone link. Because public network access is disabled on the registry, the connection cannot be established, and the pull fails with connection timeouts leading to `ImagePullBackOff` rather than routing across the private IP.
+</details>
+
+Enforcing private network isolation requires coordinating private endpoint allocation, virtual network routing, and regional DNS integration into a unified deployment workflow. When public network ingress is completely blocked, validating network interface configuration ensures traffic remains securely routed over the Microsoft backbone. The following operational commands demonstrate how to disable public ingress, establish a private endpoint, and link the required private DNS zone:
 
 ```bash
 # Disable public access
@@ -890,7 +922,41 @@ az group delete --name "$RG" --yes --no-wait
 rm -rf /tmp/acr-lab
 ```
 
-### Success Criteria Checklist
+Confirm that resource group deletion has completed before closing your session so orphaned registries do not continue accruing daily SKU fees. Review the following scenario prediction cards to test your understanding of registry failure modes and security boundaries before verifying your lab outcomes:
+
+**Card A: An ACR admin password has the same blast radius as a repository-scoped AcrPush service principal.** A deployment engineer shares registry admin credentials across several development teams to streamline CI/CD pipeline automation. The engineer assumes that compromise of the pipeline credentials carries the same operational blast radius as compromising an AcrPush service principal restricted to a single application repository.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: monolithic administrative credentials versus repository-scoped role authorization. Next action: disable registry admin accounts, adopt Microsoft Entra managed identities or repository-scoped tokens bound to explicit scope maps, and enforce least-privilege permissions across all automated deployment pipelines.
+</details>
+
+**Card B: Private Link without a Private DNS Zone link still lets AKS pull via the public ACR FQDN.** A platform operations team establishes an Azure Private Endpoint for their container registry and disables public network access, but omits linking the Private DNS Zone to the cluster virtual network. The team assumes that AKS node kubelets will seamlessly resolve and pull container images over the public registry FQDN.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: virtual network private DNS resolution versus public network endpoint isolation. Next action: create and link the `privatelink.azurecr.io` private DNS zone to the AKS virtual network, verify DNS resolution returns the private endpoint IP, and confirm nodes pull images exclusively over the private link.
+</details>
+
+**Card C: Geo-replication can be enabled on a Standard SKU registry.** An infrastructure engineer deploys a container registry using the Standard tier to support a multi-region container workload. The engineer attempts to provision regional replicas across secondary Azure regions using CLI replication commands, expecting geo-replication to be an operational feature available on all paid tiers.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: SKU feature tier gating versus multi-region replication requirements. Next action: evaluate regional traffic patterns, upgrade the registry to the Premium SKU before provisioning regional replicas, or deploy independent single-region registries with separate build pipelines.
+</details>
+
+**Card D: The ACR admin user can be scoped to a single repository.** A compliance team requests that external CI/CD runners be restricted to pushing images into a single quarantine repository using the built-in registry admin account. The operations team attempts to attach scoping policies and repository restrictions directly to the administrative user credentials.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: administrative root account architecture versus granular data-plane authorization. Next action: keep the registry admin user disabled, issue repository-scoped tokens bound to dedicated repository scope maps, or implement Microsoft Entra ABAC repository permissions for workload identities.
+</details>
+
+**Success Criteria**:
 
 - [ ] ACR successfully provisioned leveraging the Standard SKU architecture.
 - [ ] Container image cleanly built utilizing the remote compute of ACR Tasks (no local Docker dependency).
