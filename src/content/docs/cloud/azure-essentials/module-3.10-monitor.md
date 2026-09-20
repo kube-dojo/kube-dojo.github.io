@@ -39,7 +39,15 @@ Cross-subscription visibility does not require moving resources—only correct r
 
 ### Activity logs versus resource logs
 
-The **Azure Activity log** records control-plane operations (who created a VM, who deleted a resource group). It lands in the `AzureActivity` table when collected to a workspace. **Resource logs** (data plane) describe what happened inside the resource—SQL deadlocks, Key Vault access, App Service HTTP logs. Diagnostic settings control resource log flow. Confusing the two leads to gaps: Activity log alerts catch deletions but not query time-outs; SQL diagnostic logs catch slow queries but not RBAC assignments. Enable both for production data stores.
+**Pause and predict:** If an application database begins failing because queries are timing out under heavy load, will an Azure Monitor alert built on the Activity log detect the outage?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. The Activity log only records control-plane management events, such as who created a virtual machine or deleted a resource group. Data-plane query timeouts occur inside the database engine and are recorded in resource logs, which require diagnostic settings to route telemetry into a Log Analytics workspace before alerts can evaluate them.
+</details>
+
+Telemetry separation in Azure establishes distinct administrative boundaries between management actions and internal workload operations. Platform engineers inspect `AzureActivity` to audit administrative role assignments, template deployments, and policy compliance across tenant scopes. In contrast, operational troubleshooting requires configuring diagnostic settings on each target resource to stream execution metrics, HTTP access records, and audit tables into Log Analytics. Establishing separate workspace retention policies for audit logs versus high-volume performance logs keeps query performance predictable during incident triage.
 
 ```mermaid
 flowchart TD
@@ -80,7 +88,15 @@ flowchart TD
     L --> C4
 ```
 
-> **Stop and think**: If a critical application crashes due to an out-of-memory exception, which monitoring capability (metrics or logs) would alert you that the memory was exhausted, and which would help you find the specific line of code that caused it?
+**Pause and predict:** If a critical application crashes due to an out-of-memory error, which monitoring capability (metrics or logs) alerts that memory was exhausted, and which finds the line of code?
+
+<details>
+<summary>Check your prediction</summary>
+
+Metrics (such as Available Memory or container memory working set) fire near-real-time threshold alerts indicating that memory was exhausted, but cannot capture execution context. Logs, traces, and application exceptions stored in Log Analytics record the unhandled exception and call stack required to find the specific line of code.
+</details>
+
+Modern cloud incident response relies on synthesizing numerical signals with rich contextual records across the telemetry pipeline. Observability architectures treat numerical time series and indexed text streams as complementary data planes that serve different stages of incident triage. While continuous numerical streams enable automated auto-scaling and rapid threshold detection, detailed text records preserve transactional state, execution parameters, and error context necessary for forensic engineering analysis.
 
 ### Metrics vs Logs
 
@@ -400,11 +416,17 @@ AppExceptions
 
 ---
 
-> **Pause and predict**: If you configure an alert to trigger when CPU exceeds 90%, but you do not assign an Action Group to it, what will happen when the CPU hits 100%?
-
 ## Alerts and Action Groups
 
-[Alerts](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview) connect signal detection to response. A durable alert design has four parts: the **signal** (metric, log query, or activity log), the **evaluation logic** (threshold, dynamic band, or KQL aggregation), the **severity** (0–4 in Azure Monitor), and an **action group** that notifies humans or triggers automation. Alerts without action groups are dashboard decorations—they change state in the portal while on-call engineers sleep through the incident.
+**Pause and predict:** If you configure an alert rule to trigger when CPU exceeds 90%, but do not assign an Action Group to it, what will happen when CPU hits 100%?
+
+<details>
+<summary>Check your prediction</summary>
+
+The alert rule fires in the Azure portal and updates its state on the monitoring dashboard, but nobody is paged. Without an action group, triggered alerts remain silent dashboard decorations while on-call engineers sleep through the incident.
+</details>
+
+[Alerts](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-overview) connect signal detection to response. A durable alert design has four parts: the **signal** (metric, log query, or activity log), the **evaluation logic** (threshold, dynamic band, or KQL aggregation), the **severity** (0–4 in Azure Monitor), and an **action group** that notifies humans or triggers automation. Establishing standardized notification policies ensures that on-call engineers receive actionable operational context through appropriate escalation channels during critical production incidents.
 
 ### Alert types and when to use each
 
@@ -542,7 +564,15 @@ You have three common instrumentation paths. **Auto-instrumentation** (Azure App
 
 ### Sampling and noise control
 
-High-traffic applications can generate enormous telemetry volume. [Adaptive sampling](https://learn.microsoft.com/en-us/azure/azure-monitor/app/sampling) reduces ingestion while preserving errors and slow requests. Fixed sampling drops a percentage of successful telemetry. Without sampling, verbose INFO logging plus full dependency tracking on every request can dominate workspace ingestion charges—especially when every pod in a large AKS fleet emits identical successful calls. Tune sampling in staging with realistic load before production cutover.
+**Pause and predict:** If you disable telemetry sampling for a high-traffic microservices application deployed across a large AKS cluster, will Application Insights ingestion expenses remain roughly unchanged?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Disabling sampling causes workspace ingestion costs to surge dramatically because full successful telemetry dominates workspace data volume. In contrast, adaptive or fixed sampling drops the vast majority of repetitive successful calls while reliably preserving anomalous errors and slow requests.
+</details>
+
+High-traffic microservice applications generate substantial operational telemetry across distributed container tiers. Engineers implement [adaptive sampling](https://learn.microsoft.com/en-us/azure/azure-monitor/app/sampling) to dynamically regulate telemetry volume based on real-time event rates without modifying application codebases. In addition, fixed-rate sampling enforces an identical percentage filter across client SDKs and backend services to preserve proportional representation across transactions. Configuring daily workspace ingestion caps provides an essential financial safeguard against unexpected logging loops during staging validation or production traffic spikes.
 
 ```mermaid
 sequenceDiagram
@@ -1157,7 +1187,39 @@ All three queries should return data. If they are empty, wait another 5 minutes 
 az group delete --name "$RG" --yes --no-wait
 ```
 
-### Success Criteria
+**Card A: Metrics alone can show the line of code that caused an OOM crash.** An incident response team detects an out-of-memory container crash through platform memory metrics and expects the time-series graph to identify the offending line of code. The engineers assume numerical memory utilization counters capture runtime stack traces and application-level execution context.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: numerical time-series metrics versus application-level execution traces. Next action: configure Application Insights or enable diagnostic log streaming to Log Analytics so unhandled out-of-memory exceptions and runtime stack traces are captured for code-level debugging.
+</details>
+
+**Card B: An alert without an action group still pages on-call when CPU hits 100%.** A platform administrator configures a critical metric alert rule to detect CPU saturation across backend compute instances but forgets to attach an Action Group. The team assumes that triggering an alert in Azure automatically escalates notifications to subscription owners and on-call personnel.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: alert signal detection versus notification routing decoupled architecture. Next action: attach an Action Group configured with email, SMS, or webhook receivers to the alert rule so on-call engineers receive immediate escalation upon trigger.
+</details>
+
+**Card C: Activity log alerts catch SQL query timeouts.** A database reliability team configures an Azure Monitor Activity log alert expecting to catch execution timeouts and connection failures occurring in Azure SQL Database. The team assumes tenant audit channels automatically capture internal query processing failures occurring inside database engines.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: control-plane audit events versus data-plane execution diagnostics. Next action: enable diagnostic settings on the database to route SQL query errors and deadlock logs to Log Analytics, then configure scheduled query alert rules.
+</details>
+
+**Card D: Turning off sampling on a high-traffic AKS app does not change Application Insights cost.** A microservice development team disables telemetry sampling within their Application Insights configuration to capture every single production HTTP transaction across an enterprise AKS cluster. The developers assume that collecting complete telemetry streams carries no additional billing impact beyond standard base licensing fees.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: volume-based ingestion charges versus unthrottled tracing telemetry. Next action: enable adaptive or fixed-rate sampling in the Application Insights SDK to discard redundant successful requests while preserving anomalous errors and performance bottlenecks.
+</details>
+
+**Success Criteria**:
 
 - [ ] Log Analytics workspace created
 - [ ] VM deployed with Azure Monitor Agent and system-assigned managed identity
