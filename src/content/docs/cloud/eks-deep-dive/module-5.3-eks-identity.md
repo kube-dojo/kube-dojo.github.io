@@ -60,7 +60,7 @@ If an attacker exploits a vulnerability in Pod A, they can query the instance me
 
 Enforcing granular workload identity transforms multi-tenant container security from a shared node perimeter into cryptographically verifiable boundaries. By isolating credential issuance to explicit Kubernetes service accounts, platform teams eliminate environments where auxiliary microservices inherit broad cloud infrastructure privileges.
 
-Pod-level identity solves this by ensuring that each pod receives only its own credentials. In practice, each workload can be scoped to the permissions required by its role. As a result, a compromise of a logging pod does not automatically grant access to every workload-level permission available on the node.
+Node-role sprawl usually arrives as a ticket shortcut, not as an architecture decision. Treat every new AWS API on the instance profile as a production incident waiting for a sidecar exploit, and keep application data-plane permissions off the worker role from day one.
 
 ### Why instance profiles are still dangerous on “locked down” clusters
 
@@ -776,7 +776,7 @@ kubectl exec -it $(kubectl get pods -n production -l app=order-service -o name |
 Credentials located earlier in the standard AWS SDK default credential provider chain keep winning. In standard AWS SDKs, the `AssumeRoleWithWebIdentity` credential provider (governed by the `AWS_WEB_IDENTITY_TOKEN_FILE` environment variable injected by IRSA) is evaluated before the container credentials provider (governed by `AWS_CONTAINER_CREDENTIALS_FULL_URI` used by EKS Pod Identity). Consequently, creating a Pod Identity association does not switch the credential acquisition path while the IRSA annotation remains on the Kubernetes ServiceAccount. To execute a clean cutover, operators must first create the Pod Identity association, delete the `eks.amazonaws.com/role-arn` annotation from the ServiceAccount, and perform a rolling restart of the deployment so the mutating webhook omits the web identity token projection, allowing the SDK chain to fall through to Pod Identity. Additionally, remember that Pod Identity operates exclusively on Linux Amazon EC2 nodes (and requires both `sts:AssumeRole` and `sts:TagSession` in the trust policy); workloads running on Windows EC2 or EKS Fargate cannot use the local agent and must continue relying on IRSA.
 </details>
 
-Understanding the strict evaluation precedence within client authentication libraries enables zero-downtime migrations across production clusters. By leveraging the deterministic fallback behavior of standard SDK credential providers, platform teams can stage infrastructure associations ahead of time and control workload cutovers through standard Kubernetes deployment rollouts.
+Identity cutovers belong in the same change window as application rollouts because credential files and environment variables are captured when the pod starts. A successful AWS API call after the association exists is not proof that the new path is the one serving tokens.
 
 ### Fleet migration playbook (platform team view)
 
