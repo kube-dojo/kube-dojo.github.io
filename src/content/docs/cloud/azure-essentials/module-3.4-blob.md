@@ -536,7 +536,7 @@ az network private-endpoint create \
 <details>
 <summary>Check your prediction</summary>
 
-Public network access is blocked, preventing direct internet routing to the storage endpoint. Developers must establish secure network connectivity into the virtual network using a point-to-site VPN, an Azure Bastion jump host, or configure a temporary storage firewall IP exception for their client machines.
+Public network access is blocked, preventing direct internet routing to the storage endpoint. Developers must reach the private endpoint from inside the virtual network, typically with a point-to-site VPN, ExpressRoute, or an Azure Bastion jump host.
 </details>
 
 Authorization decisions decide who may call the data plane. The following section separates identity from network origin so teams can tighten both independently.
@@ -573,7 +573,7 @@ Azure Data Lake Storage Gen2 (ADLS Gen2) is [not a separate physical service---i
 
 The **DFS endpoint** (`dfs.core.windows.net`) exposes file-system semantics that Spark and Synapse prefer. The **blob endpoint** still exists for tools that speak classic blob APIs. Permissions combine **RBAC** (coarse, Azure control plane aligned) with **POSIX ACLs** on paths (fine-grained for data lake folders). **Storage Blob Data Owner** is required when pipelines set ACLs programmatically. Misaligned ACLs are a common reason jobs can list a path but fail to write parquet files underneath.
 
-[Hierarchical namespace is enabled only at account creation](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-namespace). Upgrading a flat account later is not a casual toggle. If analytics is on the roadmap within 12 months, enabling HNS up front avoids painful migrations. If the workload is only object PUT/GET with no directory renames, flat blob storage remains simpler and fully sufficient.
+[Hierarchical namespace can be enabled at account creation or through a documented one-way upgrade of an existing account.](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-namespace) The upgrade is not reversible, so it is not a casual toggle. If analytics is on the roadmap within 12 months, enabling HNS up front avoids a later migration window.
 
 To utilize these big data features, you must enable the namespace during creation and interact via the file system (`fs`) commands rather than the `blob` commands:
 
@@ -1094,7 +1094,7 @@ Failure layer: minimum tier retention requirements versus actual storage duratio
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: network perimeter firewall boundaries versus identity authentication tokens. Next action: establish line-of-sight network connectivity to the private endpoint using a point-to-site VPN or Azure Bastion host, or configure firewall IP rules to permit developer source IPs.
+Failure layer: network perimeter firewall boundaries versus identity authentication tokens. Next action: establish line-of-sight network connectivity to the private endpoint using a point-to-site VPN, ExpressRoute, or Azure Bastion. Firewall IP rules only affect the public endpoint and do not help once public network access is Disabled.
 </details>
 
 **Card D: Always enable ADLS Gen2 hierarchical namespace for millions of tiny image blobs.** A software architect enables hierarchical namespaces on every new production storage account. They assume that real directory structures and atomic renames will improve ingestion throughput and query performance for unstructured web assets.
