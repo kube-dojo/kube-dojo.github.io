@@ -74,17 +74,17 @@ def test_hermes_router_command_raises() -> None:
     from dispatch_smart import HERMES_RETIRED_MESSAGE, _router_command
 
     with pytest.raises(ValueError, match="retired"):
-        _router_command("hermes", "grok-4.6", "hello")
-    assert "grok-4.6" in HERMES_RETIRED_MESSAGE
+        _router_command("hermes", "grok-4.7", "hello")
+    assert "grok-4.7" in HERMES_RETIRED_MESSAGE
 
 
-def test_grok_default_model_is_grok_46() -> None:
-    """Native grok lane defaults to grok-4.6 (grok-build catalog removed)."""
+def test_grok_default_model_is_grok_47() -> None:
+    """Native grok lane defaults to grok-4.7 (replaces grok-4.6; Fable/Astra tier)."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
     from dispatch_smart import TASK_CLASSES
 
     for task_class, cfg in TASK_CLASSES.items():
-        assert cfg.models["grok"] == "grok-4.6", task_class
+        assert cfg.models["grok"] == "grok-4.7", task_class
         assert "hermes" not in cfg.models
 
 

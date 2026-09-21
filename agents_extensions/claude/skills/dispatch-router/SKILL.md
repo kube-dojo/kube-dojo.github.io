@@ -1,14 +1,16 @@
 ---
 name: dispatch-router
-description: Pick the right KubeDojo agent for a task across ALL activities — write / code / review / research / mechanical, not just review. Activity × lane matrix → agent → model → dispatch command. LIVE roster probed 2026-09-16 (agy gemini-3.8-flash-high, cursor auto, native grok-4.6, deepseek-flash via opencode, kimi-code/k3-256k). Hermes RETIRED. Use before any dispatch. Triggers on "which agent", "dispatch", "route to", "who should do this".
-last_calibrated: 2026-09-16
+description: Pick the right KubeDojo agent for a task across ALL activities — write / code / review / research / mechanical, not just review. Activity × lane matrix → agent → model → dispatch command. LIVE roster probed 2026-09-21 (agy gemini-3.8-flash-high, cursor auto, native grok-4.7, deepseek-flash via opencode, kimi-code/k3-256k). Hermes RETIRED. grok-4.7 replaces grok-4.6 and is frontier tier with Claude Fable and OpenAI Astra. Use before any dispatch. Triggers on "which agent", "dispatch", "route to", "who should do this".
+last_calibrated: 2026-09-21
 ---
 
 # Dispatch Router Skill
 
 Pick the right agent + model + tier for a task before firing a dispatch. This skill is the orchestrator's pre-flight checklist. Caps and **model ids rotate** — never trust memory or dated rows below without a live probe.
 
-**Hermes is RETIRED (2026-09-16).** `--agent hermes` fail-closes. xAI content/CF → `--agent grok --model grok-4.6`. DeepSeek → `--agent deepseek` (opencode `deepseek-direct/*`). Aligns with learn-ukrainian topology + live CodexBar / `grok models` / `opencode models`.
+**Hermes is RETIRED (2026-09-16).** `--agent hermes` fail-closes. xAI content/CF → `--agent grok --model grok-4.7`. DeepSeek → `--agent deepseek` (opencode `deepseek-direct/*`). Aligns with learn-ukrainian topology + live CodexBar / `grok models` / `opencode models`.
+
+**Grok 4.7 replaces Grok 4.6 (probed 2026-09-21).** `grok models` default is `grok-4.7`. `grok-4.6` remains in the CLI catalog; do not route new work to it. **Tier:** `grok-4.7` is frontier judgment, the same class as Claude Fable and OpenAI Astra — quality-critical author and cross-family review, not a cheap offload.
 
 ## LIVE model discovery (do this; do not ask the operator to recite)
 
@@ -18,7 +20,7 @@ Probe CLIs before a wave or when anything looks stale. Canonical defaults also l
 |---|---|---|
 | **agy** (Google) | `agy models` | `gemini-3.8-flash-high` |
 | **cursor** | `agent --list-models` | `auto` (default; not composer-*) |
-| **grok** (xAI) | `grok models` | `grok-4.6` (native grok CLI; **grok-build gone**) |
+| **grok** (xAI) | `grok models` | `grok-4.7` (CLI default; replaces `grok-4.6`; frontier with Fable and Astra) |
 | **deepseek** | `opencode models` \| grep deepseek-direct | `deepseek-flash` via opencode `deepseek-direct/*` (LOCAL only) |
 | **kimi** | `~/.kimi-code/config.toml` `default_model` | `kimi-code/k3-256k` (ACP oneshot; not bare `kimi -p`) |
 | **claude** | task-class / `AB_CLAUDE_MODEL` | sonnet/opus per class (`claude-sonnet-4-6` / `claude-opus-4-8`) |
@@ -37,29 +39,29 @@ Rotate **authors** and **cross-family CF** across these seats so none idle while
 | **codex** | `--agent codex` | task-class default | quality-critical author + CF | habit-route on weekly deficit |
 | **kimi** | `--agent kimi` | `kimi-code/k3-256k` | EN drafts/edits (ACP tools) | UK translation; bare `kimi -p` |
 | **claude** | `--agent claude` | sonnet/opus per class | author + strong CF | pile-on during Anthropic throttle |
-| **grok-4.6** | `--agent grok --model grok-4.6` | `grok-4.6` | EN content CF/draft | `--agent hermes` (retired); inventing `grok-build` |
+| **grok-4.7** | `--agent grok --model grok-4.7` | `grok-4.7` | frontier author + CF (Fable / Astra tier) | `--agent hermes`; routing `grok-4.6`; inventing `grok-build` |
 | **deepseek** | `--agent deepseek` | `deepseek-flash` | cheap CF / volume | China-host from CI; hermes transport |
 
 **Cursor seat:** when dispatching *to* cursor (not when Cursor is the epic driver), use `--model auto`. Driver-on-Cursor → never `--agent cursor`.
 
-**Rotation rule (wave of N packets):** author seats cycle `kimi → agy → claude → grok-4.6 → codex` (skip only on live CodexBar throttle / auth fail). CF seat ≠ author family. Prefer `kimi-code/k3-256k` over `kimi-code/k3` (1M) unless context demands it. Kimi headless writes go through ACP (`KimiAdapter` / `kimi_acp_oneshot.py`), not `-p`.
+**Rotation rule (wave of N packets):** author seats cycle `kimi → agy → claude → grok-4.7 → codex` (skip only on live CodexBar throttle / auth fail). CF seat ≠ author family. `grok-4.7` counts as a frontier seat in that rotation, same judgment class as Fable and Astra. Prefer `kimi-code/k3-256k` over `kimi-code/k3` (1M) unless context demands it. Kimi headless writes go through ACP (`KimiAdapter` / `kimi_acp_oneshot.py`), not `-p`.
 
 ## Activity × lane matrix — route by ACTIVITY (families stable; MODEL IDS in older rows may be stale)
 
-Pick the row for the activity, then the **primary doer**; for any write/author row, send the output to a **cross-family reviewer** (a DIFFERENT model family than the doer). **When a row below names an old model (`grok-4.20-*`, `gemini-3.5-*`, `composer-2.5`, `deepseek-v4-pro`), substitute the LIVE default from the discovery table / `TASK_CLASSES`.**
+Pick the row for the activity, then the **primary doer**; for any write/author row, send the output to a **cross-family reviewer** (a DIFFERENT model family than the doer). **When a row below names an old model (`grok-4.6`, `grok-4.20-*`, `gemini-3.5-*`, `composer-2.5`, `deepseek-v4-pro`), substitute the LIVE default from the discovery table / `TASK_CLASSES`.** `grok-4.6` substitutes to `grok-4.7`.
 
 | Activity | Primary doer | Cross-family reviewer(s) | Off-load / candidates |
 |---|---|---|---|
-| **Curriculum content — WRITE** (prose modules, expand-to-floor) | **cursor** `--model auto` ‖ **codex** gpt-5.5 (quality-critical first pass) | opus(≤1/wave) + agy + deepseek + grok-4.6 — pick ≥1 of a different family than the author | agy (2nd writer), deepseek, grok |
-| **Curriculum content — REVIEW** | — | **opus** (strongest) / **cursor** / **agy** / **deepseek** (cheap) / **grok-4.6** | mix ≥2 families; ≤2 per OAuth; ground-check ALL. ~~gemini-cli~~ RETIRED → use agy. ~~hermes~~ RETIRED → use grok |
+| **Curriculum content — WRITE** (prose modules, expand-to-floor) | **grok-4.7** (frontier, Fable/Astra tier) ‖ **cursor** `--model auto` ‖ **codex** gpt-5.5 (quality-critical first pass) | grok-4.7 or opus (frontier) + agy + deepseek — pick ≥1 of a different family than the author | agy (2nd writer), deepseek |
+| **Curriculum content — REVIEW** | — | **grok-4.7** (frontier, Fable/Astra tier) / **opus** (strongest Claude) / **cursor** / **agy** / **deepseek** (cheap) | mix ≥2 families; ≤2 per OAuth; ground-check ALL. ~~gemini-cli~~ RETIRED → use agy. ~~hermes~~ RETIRED → use grok |
 | **UK translation — TRANSLATE** (EN→uk modules; roster tested 2026-07-04) | **deepseek-flash** (V4.1 Flash via opencode; **LOCAL only**, China-host, never CI) ‖ **opus-4.8** (`--effort xhigh`) for highest-stakes/reference | **opus-4.8 + gpt-5.5** cross-family (≠ DeepSeek): routine→1 (gpt-5.5, cheaper), high-stakes→both | **Russicism/calque = deterministic `scripts/check_uk_changed.py` + `sources` MCP RAG** — NOT the model reviewers. See `feedback_uk_translation_roster_tested_2026_07` |
-| **Code / tooling — WRITE & FIX** (scripts, adapters, pipeline) | **cursor** `--model auto` (strongest fixer) | **codex** (danger+worktree) / **opus** / **grok-4.6** / **deepseek** | codex |
-| **Code / tooling — REVIEW** | — | **codex** (danger+worktree) / **opus** / **grok-4.6** / **deepseek** | feed COMPLETE diffs |
-| **Code-heavy MODULE content** (extending-k8s, tool certs — modules WITH code that must build) | **codex** gpt-5.5 (factual/version/runnability best) | **opus** (route ≥1 here) + **grok-4.6** + **deepseek** | cursor, agy |
-| **Research / gap-analysis / architecture** | **codex** (architect/consult) + **opus** (architect class) | `ab discuss --with claude,codex,agy` for high-leverage ([[.claude/rules/decision-card]]) | deep-research harness; chrome MCP for source fetch |
+| **Code / tooling — WRITE & FIX** (scripts, adapters, pipeline) | **cursor** `--model auto` (strongest fixer) | **grok-4.7** (frontier) / **codex** (danger+worktree) / **opus** / **deepseek** | codex |
+| **Code / tooling — REVIEW** | — | **grok-4.7** (frontier) / **codex** (danger+worktree) / **opus** / **deepseek** | feed COMPLETE diffs |
+| **Code-heavy MODULE content** (extending-k8s, tool certs — modules WITH code that must build) | **codex** gpt-5.5 (factual/version/runnability best) | **grok-4.7** or **opus** (frontier; route ≥1 here) + **deepseek** | cursor, agy |
+| **Research / gap-analysis / architecture** | **grok-4.7** (frontier) + **codex** (architect/consult) + **opus** (architect class) | `ab discuss --with claude,codex,agy` for high-leverage ([[.claude/rules/decision-card]]) | deep-research harness; chrome MCP for source fetch |
 | **Mechanical / deterministic** (gate fixes, link fixes, batched edits, search) | **cursor** or **codex** (cheap tier: spark / mini) | self-verify (`verify_module.py`, build, health) | — |
 
-**Cross-family map** (reviewer ≠ author family): OpenAI = codex · Anthropic = claude/opus · Google = **agy** · DeepSeek = deepseek · **Zhipu = GLM** (via `opencode --model zai-coding-plan/glm-5.2`, #2171 — **LOCAL-ONLY**) · **Cursor Composer = cursor** · xAI = **grok-4.6** (native `--agent grok`). Soft caution: cursor↔grok share org post-merge. **The 4 clean independents: OpenAI / Google / Anthropic / DeepSeek.**
+**Cross-family map** (reviewer ≠ author family): OpenAI = codex (Astra at the frontier) · Anthropic = claude/opus (Fable at the frontier) · Google = **agy** · DeepSeek = deepseek · **Zhipu = GLM** (via `opencode --model zai-coding-plan/glm-5.2`, #2171 — **LOCAL-ONLY**) · **Cursor Composer = cursor** · xAI = **grok-4.7** (native `--agent grok`; frontier with Fable and Astra; do not route `grok-4.6`). Soft caution: cursor↔grok share org post-merge. **The 4 clean independents: OpenAI / Google / Anthropic / DeepSeek.**
 
 **Cost order (use flat-rate first; deepseek is dirt-cheap, not avoided):** cursor · codex · agy · deepseek · grok (xAI sub via native grok CLI). **opus headless is the only genuinely metered lane → ≤1–2 hardest reviews/wave.**
 
@@ -72,7 +74,7 @@ Pick the row for the activity, then the **primary doer**; for any write/author r
 | claude / opus | inline or `--agent claude` | Strongest reviewer | Prefer inline for reviews |
 | agy | `--agent agy --model gemini-3.8-flash-high` | Google content + CF + RAG | Google pool |
 | deepseek-flash | `--agent deepseek` → opencode `deepseek-direct/deepseek-flash` | Dirt-cheap CF / UK volume | **LOCAL only** — never CI; ground-check |
-| **grok-4.6** | `--agent grok --model grok-4.6` | xAI content CF/draft | Native grok CLI only; **NOT hermes** |
+| **grok-4.7** | `--agent grok --model grok-4.7` | Frontier author + CF (Fable / Astra tier). Replaces grok-4.6 | Native grok CLI only; **NOT hermes**; do not route grok-4.6 |
 | ~~hermes~~ | — | — | **RETIRED** — fail-closed redirect to grok / deepseek |
 | qwen (residual) | prefer `--agent opencode --model openrouter/qwen/…`; residual `--agent qwen` still hermes-backed | Metered OpenRouter | Prefer opencode path |
 | GLM | `--agent opencode --model zai-coding-plan/glm-5.2` | Coherence-audit finder | **LOCAL only** — never CI |
@@ -85,7 +87,7 @@ Pick the row for the activity, then the **primary doer**; for any write/author r
 1. **Cheapest first**: `dispatch_smart search --agent codex` (gpt-5.4-mini) OR `claude-haiku` inline.
 2. Do NOT use Opus or gpt-5.5 for search — overkill ([[reference_dispatch_smart]]).
 3. For browser-required source fetch: `mcp__claude-in-chrome__*` ([[feedback_chrome_for_primary_source_fetch]]).
-4. For x.com links: `--agent grok --model grok-4.6` (native; hermes retired).
+4. For x.com links: `--agent grok --model grok-4.7` (native default; hermes retired; do not use grok-4.6).
 
 ### Edit / sweep over many files
 1. `dispatch_smart edit --agent <claude|codex>` (sonnet via subprocess for claude; spark for codex).
@@ -141,9 +143,11 @@ Routing rules on top of the numbers (verified output shape 2026-07-07):
    Check the pool for the MODEL you're dispatching, not just the first line.
 5. **deepseek and grok don't expose Session/Weekly windows** — window rules 2–3
    don't apply to either. deepseek: first-party API balance via opencode /
-   deepseek-direct (a spend check; LOCAL only). grok: native `grok-4.6` on the
-   SuperGrok subscription — treat like other subscription lanes and keep the
-   `grok models` / auth check (`grok-build` is gone from the CLI catalog).
+   deepseek-direct (a spend check; LOCAL only). grok: native `grok-4.7` on the
+   SuperGrok subscription (CLI default; replaces `grok-4.6`) — treat like other
+   subscription lanes and keep the `grok models` / auth check (`grok-build` is
+   gone from the CLI catalog). Frontier tier with Fable and Astra; do not
+   habit-route the retired `grok-4.6` slug.
 6. **Fallback, never a blocker**: if `codexbar` is missing or errors (app not running,
    cookies stale), fall back to the manual pre-flight below and proceed.
 
