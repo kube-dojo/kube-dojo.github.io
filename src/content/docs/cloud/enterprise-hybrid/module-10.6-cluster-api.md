@@ -488,9 +488,15 @@ The table also explains why ClusterClass should usually be provider-specific. A 
 
 ## Declarative Cluster Lifecycle Operations
 
-> **Pause and predict**: If you manually edit a `Machine` object using `kubectl edit` to change its instance type directly, what will the CAPI controllers do during the next reconciliation loop?
+**Pause and predict:** If you manually edit a `Machine` object using `kubectl edit` to change its instance type directly, what will the CAPI controllers do during the next reconciliation loop?
 
-The fundamental promise of CAPI is declarative cluster management. If you imperatively modify a controller-managed resource, later reconciliation often overwrites or nullifies that change unless you also update the intended source of truth. This is why teams usually pair CAPI with GitOps workflows.
+<details>
+<summary>Check your prediction</summary>
+
+A one-off `kubectl edit` of a generated `Machine` object does not modify the declarative template or Git source of truth. The underlying MachineSet or MachineDeployment controller detects the discrepancy between the live object and the declared specification during the next reconciliation loop, reconciling the state back to the declaration. Furthermore, the instance type or VM sizing specification typically resides within the referenced infrastructure machine template (such as `AWSMachineTemplate` or `AzureMachineTemplate`) rather than directly on the core `Machine` resource, making ad-hoc object mutations ineffective.
+</details>
+
+The next section is how declarative cluster lifecycle operations execute version upgrades across control planes and worker pools without imperative drift.
 
 ### Upgrading a Cluster
 
@@ -570,6 +576,18 @@ done
 ### MachineHealthCheck: Auto-Remediation
 
 In a massive fleet, hardware failures, kernel panics, and hypervisor crashes are statistical guarantees. Instead of relying on manual intervention or external cloud provider tools to detect and replace degraded nodes, CAPI provides native auto-remediation via the `MachineHealthCheck` component.
+
+**Pause and predict:** If a worker node in an Amazon EKS cluster becomes permanently NotReady due to an unrecoverable disk failure, will a Cluster API `MachineHealthCheck` automatically replace that node if it belongs to an `AWSManagedMachinePool`?
+
+<details>
+<summary>Check your prediction</summary>
+
+A [`MachineHealthCheck`](https://cluster-api.sigs.k8s.io/tasks/automated-machine-management/healthchecking) controller remediates only `Machine` resources owned by either a `MachineSet` or a `KubeadmControlPlane` (and by extension `MachineDeployment`, which owns a `MachineSet`). It does not remediate or replace worker nodes in an EKS managed node group reconciled by an `AWSManagedMachinePool` because those instances are managed directly by AWS Auto Scaling groups. Verified 2026-09-21: the live Cluster API specification uses `spec.checks` and short-circuit protection via `remediation.triggerIf.unhealthyLessThanOrEqualTo`, where the default value of 100% means short-circuit protection is turned off.
+</details>
+
+The next section is how automated remediation manifests declare timeout thresholds and unhealthy node conditions to trigger automatic machine replacement.
+
+Note that this illustration still uses the older `maxUnhealthy` and `unhealthyConditions` shape rather than the newer `spec.checks` and `remediation.triggerIf` specification structure.
 
 ```yaml
 apiVersion: cluster.x-k8s.io/v1beta1
@@ -736,9 +754,15 @@ The management cluster is the central nervous system of your entire multi-cloud 
 
 ### Management Cluster High Availability
 
-> **Pause and predict**: If the management cluster requires etcd to store all CAPI objects, what happens if etcd corruption occurs and you have no backups?
+**Pause and predict:** If the management cluster requires etcd to store all CAPI objects, what happens to existing workload clusters if management etcd experiences unrecoverable corruption without a functional backup?
 
-If you lose the [management cluster's `etcd` database without a functional backup](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/), the CAPI controllers lose all awareness of the infrastructure they manage. You will be completely unable to safely manage the fleet, potentially forcing you into a catastrophic scenario where you must manually reverse-engineer or reconstruct state. Therefore, the management cluster must be architected with extreme resilience in mind.
+<details>
+<summary>Check your prediction</summary>
+
+Losing the [management cluster's `etcd` database without a functional backup](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/) permanently destroys all Cluster API custom resource state and controller awareness. Platform operators lose the ability to safely provision new clusters, execute rolling upgrades, scale machine pools, or automatically remediate failed nodes until the management state is reconstructed. However, applications already running on the workload clusters keep running without interruption because their local control planes, kubelets, and container runtimes operate independently of the management cluster.
+</details>
+
+The next section is how highly available management cluster topologies distribute control plane nodes and controller replicas across availability zones.
 
 ```mermaid
 flowchart TD
@@ -765,6 +789,16 @@ flowchart TD
 ### Management Cluster Lifecycle: Clusterctl Move
 
 Inevitably, the management cluster itself will require infrastructure upgrades or migration to a more robust hosting environment. The `clusterctl move` command enables seamless transference of the CAPI custom resources and controller states from a source management cluster to a destination management cluster. During the move, the source controllers pause reconciliation, the state is safely transferred to the destination, and the new controllers resume management without the workload clusters ever being impacted.
+
+**Pause and predict:** When executing `clusterctl move` to migrate cluster definitions between management clusters, does this operation upgrade workload cluster Kubernetes versions or restore previous runtime status fields?
+
+<details>
+<summary>Check your prediction</summary>
+
+The [`clusterctl move`](https://cluster-api.sigs.k8s.io/clusterctl/commands/move) command pivots Cluster API objects to a target management cluster that has already executed `clusterctl init` with matching or newer provider versions. During this pivot, the source objects have `Cluster.spec.paused` set to prevent reconciliation conflicts while resources migrate. The operation is strictly an object pivot rather than a [`clusterctl upgrade`](https://cluster-api.sigs.k8s.io/clusterctl/commands/upgrade) or general backup-and-restore mechanism; runtime `.status` subresources are not restored, requiring target controllers to reconstruct status dynamically.
+</details>
+
+The next section is how operational migration commands initialize replacement control planes and pivot custom resource definitions between active clusters.
 
 ```bash
 # Create a new management cluster
@@ -1201,7 +1235,41 @@ kind delete cluster --name capi-workload-2
 rm /tmp/capi-health-check.sh /tmp/capi-export.yaml
 ```
 
-### Success Criteria
+Before concluding the hands-on lab, audit the four operational claims presented below. Each card describes a plausible multi-cloud infrastructure hypothesis frequently encountered in enterprise Cluster API architectures. Analyze each claim against declarative reconciliation, control plane decoupling, remediation boundaries, and lifecycle tooling mechanics before opening the solution details.
+
+**Card A: kubectl edit of a Machine permanently changes its instance type because kubectl is the source of truth.** An infrastructure engineer notices that a database worker node requires additional compute capacity to handle peak seasonal load. The engineer runs `kubectl edit machine` directly against the management cluster and modifies the VM instance type specification on the live object. The engineer assumes that because `kubectl` accepted the edit, the underlying cloud virtual machine will be resized and the modification will permanently persist across future reconciliation cycles.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Declarative reconciliation loop versus imperative object mutation conflation. Next action: understand that in Cluster API, generated `Machine` objects are managed by higher-level controllers like `MachineSet` or `MachineDeployment`; imperatively altering a live `Machine` object via `kubectl edit` does not update the underlying `MachineTemplate` or Git source of truth; during the next reconciliation cycle, the controller detects drift from the declared specification and reverts the change; furthermore, instance sizing parameters reside within the provider-specific infrastructure template (such as `AWSMachineTemplate` or `AzureMachineTemplate`) rather than the generic core `Machine` resource; platform teams must modify the declarative infrastructure template in Git to trigger an immutable rolling machine replacement.
+</details>
+
+**Card B: If management-cluster etcd is corrupted and there is no backup, applications on the workload clusters stop.** A catastrophic storage failure corrupts the single etcd volume backing an enterprise Cluster API management cluster that lacks automated backup snapshots. A site reliability engineer assumes that because the central control plane is completely dead, running application pods across twenty downstream production workload clusters will immediately stop serving user traffic. Under this assumption, the engineer declares a Tier 1 customer-facing production outage.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Management plane lifecycle control versus workload cluster data plane execution conflation. Next action: recognize that Cluster API strictly decouples the management cluster control plane from workload cluster operations; workload clusters maintain their own independent etcd datastores, API servers, kubelets, and networking runtimes; application pods continue executing and serving production network traffic without interruption; the loss of management-cluster etcd destroys Cluster API custom resource records, preventing platform teams from provisioning new clusters, performing rolling upgrades, or auto-remediating nodes until state is manually reconstructed; platform engineers must configure scheduled etcd snapshot backups to cloud object storage rather than treating management failure as an immediate workload data plane outage.
+</details>
+
+**Card C: A MachineHealthCheck replaces unhealthy nodes in an EKS managed node group the same way it replaces MachineDeployment machines.** A platform team configures a `MachineHealthCheck` resource targeting an Amazon EKS cluster deployed via CAPA with managed worker nodes. An EC2 instance within an `AWSManagedMachinePool` enters a NotReady condition due to an unrecoverable kernel panic. The team expects `MachineHealthCheck` to terminate the degraded instance and provision a replacement node identically to how it remediates standard `MachineDeployment` machines.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: CAPI-managed machine controller boundary versus cloud provider managed node group decoupling. Next action: understand that `MachineHealthCheck` triggers remediation only for `Machine` resources owned by a `MachineSet` or a `KubeadmControlPlane` (such as self-managed nodes created by a `MachineDeployment`); worker nodes managed under an `AWSManagedMachinePool` (EKS managed node groups) or `AzureManagedMachinePool` are backed and reconciled directly by cloud provider primitives like AWS Auto Scaling groups; because these nodes lack corresponding CAPI `Machine` owner references, `MachineHealthCheck` cannot remediate them; remediation and replacement for managed node groups must rely on cloud-native health checks and Auto Scaling replacement policies.
+</details>
+
+**Card D: clusterctl move upgrades every workload cluster to the next Kubernetes version.** A platform operator prepares to upgrade thirty production workload clusters to a new Kubernetes minor release. Having provisioned a new management cluster running updated CAPI components, the operator executes `clusterctl move` to migrate cluster definitions from the old management cluster to the new one. The operator assumes that migrating the custom resources automatically initiates sequential rolling Kubernetes version upgrades across all managed workload clusters.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Management cluster migration tooling versus workload cluster version upgrade orchestration conflation. Next action: recognize that `clusterctl move` only pivots Cluster API custom resources from a source management cluster to a destination management cluster; it pauses source reconciliation and transfers declarative state without modifying workload cluster specifications; upgrading workload cluster Kubernetes versions requires either patching `spec.version` on the respective control plane and machine deployment objects or updating the shared `ClusterClass` definition; platform operators must also distinguish `clusterctl move` from `clusterctl upgrade` (which updates provider controller component versions on the management cluster) and from etcd backup and disaster recovery procedures.
+</details>
+
+**Success Criteria**:
 
 - [ ] I actively deployed a simulated management cluster alongside two distinct workload clusters.
 - [ ] I registered the individual workload clusters directly into the management cluster's central inventory.
