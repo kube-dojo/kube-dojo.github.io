@@ -100,7 +100,8 @@ RESPONSE_DIR = PRIMARY_REPO / "logs" / "dispatch_responses"
 MCP_CONFIG_PATH = PRIMARY_REPO / ".mcp.json"
 # gemini-cli RETIRED 2026-07-01 (no gemini-cli; the Google lane is now agy).
 # Hermes RETIRED for dispatch (2026-09-16): deepseek → opencode deepseek-direct;
-# grok-4.6 → native grok CLI. Claude gates MCP on repo .mcp.json. agy loads MCP
+# grok-4.7 → native grok CLI (replaces grok-4.6; frontier tier with
+# Claude Fable and OpenAI Astra). Claude gates MCP on repo .mcp.json. agy loads MCP
 # natively from ~/.gemini/config/mcp_config.json (no --mcp flag). qwen still
 # rides the residual hermes adapter but is NOT advertised as --mcp-capable
 # (#2131) — it lacks the mcp__sources__ → mcp_sources_ prompt rewrite.
@@ -144,8 +145,9 @@ SUPPORTED_AGENTS = (
 
 HERMES_RETIRED_MESSAGE = (
     "[smart] REFUSED: --agent hermes is retired. "
-    "Use --agent grok --model grok-4.6 for xAI content/CF "
-    "(native grok CLI; grok-build is gone). "
+    "Use --agent grok --model grok-4.7 for xAI content/CF "
+    "(native grok CLI; replaces grok-4.6; frontier tier with Fable and Astra; "
+    "grok-build is gone). "
     "Use --agent deepseek for DeepSeek via opencode "
     "(deepseek-direct/deepseek-flash, local-only). "
     "Qwen: --agent opencode --model openrouter/qwen/… or residual --agent qwen."
@@ -165,8 +167,10 @@ class TaskClassConfig:
 # memory: ``agy models``, ``grok models``, ``opencode models``, kimi
 # ``default_model`` in ~/.kimi-code/config.toml. Override per call with `--model`.
 # Unrecognized agy slug falls back to the adapter default.
-# Hermes RETIRED — no hermes keys. Native grok defaults to grok-4.6 (grok-build
-# removed from the grok CLI catalog). DeepSeek = opencode deepseek-direct.
+# Hermes RETIRED — no hermes keys. Native grok defaults to grok-4.7
+# (`grok models` default, 2026-09-21). grok-4.6 stays in the CLI catalog;
+# do not route new work to it. grok-4.7 is frontier judgment, same tier as
+# Claude Fable and OpenAI Astra. DeepSeek = opencode deepseek-direct.
 TASK_CLASSES: dict[str, TaskClassConfig] = {
     "search": TaskClassConfig(
         models={
@@ -174,7 +178,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "claude": "claude-haiku-4-5-20251001",
             "codex": "gpt-5.4-mini",
             "deepseek": "deepseek-flash",  # V4.1 Flash via opencode deepseek-direct
-            "grok": "grok-4.6",
+            "grok": "grok-4.7",
             "cursor": "auto",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.6-flash",
@@ -191,7 +195,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.3-codex-spark",
             "deepseek": "deepseek-flash",
-            "grok": "grok-4.6",
+            "grok": "grok-4.7",
             "cursor": "auto",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
@@ -208,7 +212,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
             "deepseek": "deepseek-flash",
-            "grok": "grok-4.6",
+            "grok": "grok-4.7",
             "cursor": "auto",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
@@ -225,7 +229,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "claude": "claude-sonnet-4-6",
             "codex": "gpt-5.5",
             "deepseek": "deepseek-flash",
-            "grok": "grok-4.6",
+            "grok": "grok-4.7",
             "cursor": "auto",
             "kimi": "kimi-code/k3-256k",
             "opencode": "openrouter/qwen/qwen3.7-max",
@@ -242,7 +246,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
             "claude": "claude-opus-4-8",
             "codex": "gpt-5.5",
             "deepseek": "deepseek-flash",
-            "grok": "grok-4.6",
+            "grok": "grok-4.7",
             "cursor": "auto",
             "kimi": "kimi-code/k3",
             "opencode": "openrouter/anthropic/claude-sonnet-4.5",
