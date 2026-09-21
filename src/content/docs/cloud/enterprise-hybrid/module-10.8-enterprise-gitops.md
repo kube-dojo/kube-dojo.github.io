@@ -257,13 +257,17 @@ When many Applications are created from one ApplicationSet, they often attempt t
 
 [ApplicationSets generate ArgoCD Applications dynamically based on templates and generators.](https://argo-cd.readthedocs.io/en/release-2.14/operator-manual/applicationset/) They are the key to scaling from tens to hundreds of applications because the controller materializes Application objects from rules you declare once, which eliminates copy-paste drift when a new microservice directory appears in Git or when a new cluster label joins the fleet. Generators can walk Git directories, select clusters by label, or combine both in a matrix, so the same Helm chart path can roll to every production cluster that advertises `monitoring: enabled` without maintaining N nearly identical YAML files by hand.
 
-> **Pause and predict**: If you have 100 microservices, writing 100 Application manifests is tedious. How might ArgoCD automate the creation of these manifests, and what happens when a generator’s selector is too broad?
+**Pause and predict:** When managing hundreds of microservices across clusters, how does an ApplicationSet automate child Application creation, and what failure occurs when a generator selector is configured too broadly?
+
+<details>
+<summary>Check your prediction</summary>
+
+[ApplicationSets](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/) generate Application objects dynamically from generators such as Git directories, cluster labels, or list elements. If a generator selector is configured too broadly, the controller creates child Applications you did not intend, potentially applying unreviewed manifests to clusters or overwhelming control planes. Conversely, a selector that is too narrow silently omits new clusters or microservices until configuration labels are updated. Platform teams should test generator expressions in staging environments to verify target scoping before applying them in production.
+</details>
+
+The next section is a set of ApplicationSet declarations demonstrating Git directory, cluster label, and matrix generators for automated multi-cluster application lifecycle management.
 
 The three examples below progress from team-scoped Git discovery to fleet-wide platform services. Template fields like `{{path.basename}}`, `{{name}}`, and `{{server}}` bind each generated Application to a concrete repo path and destination cluster. Sync policies encode retry backoff and server-side apply options you would otherwise copy into every static manifest.
-
-When you adopt ApplicationSets, invest time in generator boundaries. A selector that is too permissive creates Applications you did not intend. A selector that is too narrow silently omits new clusters until someone updates labels. Review generated Application names in a staging controller before enabling automation in production.
-
-The Git generator suits team-owned mono-repos where each service is a top-level directory. The cluster generator suits platform bundles such as monitoring agents that must exist on every labeled cluster. The matrix generator combines both when a platform chart must land on many clusters without maintaining duplicate Application files per cluster.
 
 ```yaml
 # Generator: Create an Application for every directory in a Git repo
@@ -378,6 +382,10 @@ spec:
         server: '{{server}}'
         namespace: '{{service}}-system'
 ```
+
+When you adopt ApplicationSets, invest time in generator boundaries. A selector that is too permissive creates Applications you did not intend. A selector that is too narrow silently omits new clusters until someone updates labels. Review generated Application names in a staging controller before enabling automation in production.
+
+The Git generator suits team-owned mono-repos where each service is a top-level directory. The cluster generator suits platform bundles such as monitoring agents that must exist on every labeled cluster. The matrix generator combines both when a platform chart must land on many clusters without maintaining duplicate Application files per cluster.
 
 ---
 
@@ -496,7 +504,17 @@ RBAC inside Argo CD is expressed twice: AppProject resources declare what is all
 
 ### ArgoCD Project per Team
 
-The payments project example below shows the full shape of a production-ready project: explicit `sourceRepos`, namespaced destinations on multiple clusters, whitelists for namespaced kinds, blacklists for quota objects owned centrally, optional GPG signature enforcement, and sync windows that block automated churn during maintenance hours.
+Enterprise platform designs carefully evaluate how AppProject isolation boundaries limit team blast radius across shared infrastructure. Explicit `sourceRepos`, namespaced destinations on multiple clusters, whitelists for namespaced kinds, blacklists for quota objects owned centrally, optional GPG signature enforcement, and sync windows collectively block automated churn during maintenance hours.
+
+**Pause and predict:** How does deploying a separate Argo CD instance for every development team compare to enforcing multi-tenancy using AppProjects and RBAC on a shared control plane?
+
+<details>
+<summary>Check your prediction</summary>
+
+Deploying a separate Argo CD control plane for each team provides physical process isolation, but it multiplies operational overhead, upgrade maintenance, and compute footprint across clusters. In contrast, managing multi-tenancy through AppProjects and granular RBAC policies on a shared Argo CD instance delivers centralized governance, destination namespace controls, and repository whitelisting without duplicating controller fleets. A separate Argo CD per team is not the same as AppProjects and RBAC on a shared instance, and platform architects select between these models based on organizational compliance boundaries rather than rigid cluster count limits.
+</details>
+
+The next section is an Argo CD AppProject manifest illustrating multi-destination scoping, repository restrictions, and resource allowlists for a payments engineering team.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -620,7 +638,17 @@ The comparison table summarizes operational consequences, not marketing claims: 
 
 ### External Secrets Operator (Recommended for Enterprise)
 
-External Secrets Operator watches `ExternalSecret` objects and materializes native Kubernetes `Secret` resources by calling cloud provider APIs with credentials bound to a `ClusterSecretStore`. The example below uses AWS Secrets Manager with JWT authentication via a Kubernetes service account, which is the same identity pattern many EKS workloads already use for application access. Refresh intervals define how quickly rotated database passwords appear in pods, while `creationPolicy: Owner` makes garbage collection predictable when the ExternalSecret is deleted.
+External Secrets Operator watches `ExternalSecret` objects and materializes native Kubernetes `Secret` resources by calling cloud provider APIs with credentials bound to a `ClusterSecretStore`. This architecture uses AWS Secrets Manager with JWT authentication via a Kubernetes service account, which aligns with identity patterns modern workloads use for cloud API access. Refresh intervals define how quickly rotated database passwords appear in pods, while `creationPolicy: Owner` makes garbage collection predictable when the ExternalSecret is deleted.
+
+**Pause and predict:** Why is hosting Kubernetes manifests in a private Git repository insufficient for securing Secret data, and how does secret management software change this exposure?
+
+<details>
+<summary>Check your prediction</summary>
+
+A private Git repository restricts read access through authentication, but it does not encrypt Secret contents stored within files. Plaintext credentials remain permanently recorded in the Git commit history even if a subsequent commit deletes the manifest or removes the secret values. Storing plaintext secrets in a private repository fails security audits because any engineer or CI agent with repository clone permissions can extract them. Dedicated tooling—such as SOPS encrypting values directly in Git or External Secrets Operator fetching credentials from cloud vaults at runtime—provides cryptographic protection and separation of duty that repository access controls cannot supply.
+</details>
+
+The next section is a set of Kubernetes manifests configuring an External Secrets Operator ClusterSecretStore and ExternalSecret for AWS Secrets Manager integration.
 
 ```yaml
 # Install ESO
@@ -733,11 +761,19 @@ Blue/green and canary are not interchangeable labels. Blue/green swaps traffic b
 
 Argo Rollouts is a Kubernetes controller and set of CRDs that provide advanced deployment capabilities such as blue/green, canary, canary analysis, and experimentation without replacing GitOps entirely. Teams still commit Rollout manifests to Git and let Argo CD sync them. Rollouts then orchestrate ReplicaSet generations and service mesh or ingress weights during the release. That separation keeps “what should run” in Git while “how traffic migrates” lives in the rollout strategy.
 
-> **Pause and predict**: If a bad version of a microservice passes all CI/CD tests but fails under real-world user traffic, how can you minimize the blast radius before rolling back, and who should be paged if analysis is automated?
-
 ### The Rollout Resource
 
-The `Rollout` custom resource [acts as a drop-in replacement for the standard Kubernetes `Deployment`](https://argoproj.github.io/argo-rollouts/features/analysis/). It manages the creation, scaling, and deletion of ReplicaSets based on a defined strategy, which means you can express canary steps as data instead of imperative kubectl scripts. The canary snippet below starts at ten percent traffic for ten minutes, advances to thirty percent, then waits for manual approval before completing — a common enterprise compromise between safety and velocity when automated metrics are not yet wired.
+The `Rollout` custom resource [acts as a drop-in replacement for the standard Kubernetes `Deployment`](https://argoproj.github.io/argo-rollouts/features/analysis/). It manages the creation, scaling, and deletion of ReplicaSets based on a defined strategy, which means you can express canary steps as data instead of imperative kubectl scripts.
+
+**Pause and predict:** If a microservice passes all CI tests but fails under real-world production load, how does progressive delivery limit blast radius, and why is an Argo CD sync distinct from a canary traffic shift?
+
+<details>
+<summary>Check your prediction</summary>
+
+Passing CI tests does not prove production health under live user traffic and network latency. An Argo CD sync merely reconciles desired manifest state with the cluster; it does not progressively shift live traffic. In contrast, an [Argo Rollouts](https://argo-rollouts.readthedocs.io/en/stable/features/analysis/) controller shifts a controlled slice of traffic to canary pods and can roll back automatically when metric analysis fails. Furthermore, canary deployment is not blue/green deployment: canary shifts incremental traffic percentages to validate telemetry, whereas blue/green switches entire environment pools simultaneously.
+</details>
+
+The next section is an Argo Rollouts manifest defining progressive canary traffic weighting with observation pauses before full workload promotion.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -767,6 +803,8 @@ spec:
       - pause: {} # Wait indefinitely for manual approval
       - setWeight: 100
 ```
+
+The canary manifest above starts at ten percent traffic for ten minutes, advances to thirty percent, then waits for manual approval before completing — a common enterprise compromise between safety and velocity when automated metrics are not yet wired.
 
 ### Automated Rollback with AnalysisRuns
 
@@ -1200,7 +1238,41 @@ kind delete cluster --name enterprise-gitops
 rm /tmp/platform-dashboard.sh
 ```
 
-### Success Criteria
+Before concluding the hands-on lab, audit the four operational claims presented below for platform architectures. Each card describes a plausible enterprise GitOps hypothesis frequently encountered in production platform engineering designs. Analyze each claim against declarative generator mechanics, progressive traffic analysis, secret protection boundaries, and multi-tenant access controls. Evaluate controller reconciliation behaviors carefully before inspecting the underlying technical explanations.
+
+**Card A: An ApplicationSet with a broad Git generator only creates the Applications an engineer listed by hand.** A platform engineer configures an ApplicationSet with a Git directory generator using a wildcard path pattern. The engineer assumes that Argo CD reconciles only the microservices explicitly registered by hand in a central deployment catalog. Under this assumption, unexpected subdirectories or experimental branches matching the directory pattern will not trigger automatic child Application generation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Declarative ApplicationSet generator automation versus hand-written Application manifest inventory conflation. Next action: understand that ApplicationSets generate standard child Application objects dynamically from generators rather than requiring manual registration; when a Git generator directory selector or cluster label query is configured too broadly, the controller automatically instantiates Applications for every matching path or cluster target without human confirmation; this behavior can deploy unreviewed manifests, create namespace collisions, or overwhelm control planes; platform engineers must constrain generator search paths, utilize strict directory filters, and preview generated Application resources in pre-production before deploying automated ApplicationSets.
+</details>
+
+**Card B: A canary that passed CI/CD cannot hurt production users, because analysis is optional decoration.** A release engineer prepares a progressive delivery pipeline using Argo Rollouts and determines that automated metric analysis is unnecessary. The engineer assumes that because the container image passed unit, integration, and end-to-end tests in CI pipelines, runtime production behavior is fully guaranteed. Under this assumption, shifting real-world traffic to canary pods without metric gates carries zero customer impact risk.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Continuous integration test validation versus live progressive delivery analysis conflation. Next action: recognize that passing CI tests in simulated environments does not guarantee workload stability under production concurrency, latency, or downstream dependency strain; a Rollout shifts a discrete slice of production traffic to canary pods specifically to observe live behavior; metric analysis via AnalysisTemplates is not optional decoration but the essential safety control that measures error rates and automatically rolls back bad releases before traffic widens; furthermore, canary traffic shifting is not blue/green deployment, and an Argo CD GitOps sync only reconciles manifest state rather than managing real-time ingress traffic shifts.
+</details>
+
+**Card C: A private mono-repo makes plaintext Kubernetes Secrets safe to commit.** A developer commits unencrypted database credentials within a Kubernetes Secret manifest directly to an internal corporate Git repository. The developer assumes that repository privacy settings and employee access restrictions provide sufficient cryptographic security for production secrets. The developer believes that removing the credentials in a later commit effectively eliminates the exposure.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Private repository access permissions versus cryptographic secret protection conflation. Next action: recognize that hosting Git repositories behind private authentication controls does not encrypt the contents of stored files; committing plaintext Kubernetes Secrets exposes sensitive credentials to anyone with repository clone access, CI runners, and backup archives; additionally, Git retains complete commit history, meaning deleted or updated cleartext values persist permanently in the repository object graph; platform teams must implement dedicated secret management mechanisms, such as encrypting YAML payloads in Git with SOPS or synchronizing credentials from external key vaults using External Secrets Operator.
+</details>
+
+**Card D: Giving every team its own Argo CD is the same control as one Argo CD with Projects and RBAC.** An infrastructure team decides to spin up a dedicated Argo CD instance inside each team namespace instead of configuring multi-tenant AppProjects on a central instance. The team assumes that independent controller installations deliver the same governance, security boundary, and operational characteristics as centralized role-based access control. They assume per-team instances simplify long-term fleet administration across enterprise clusters.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Physical controller duplication versus logical multi-tenant AppProject isolation conflation. Next action: understand that deploying separate Argo CD instances for each team creates significant operational maintenance overhead, requiring decentralized upgrades, fragmented credential storage, and duplicated compute resources across clusters; in contrast, a centralized Argo CD instance utilizing AppProjects enforces granular namespace scoping, repository whitelisting, and SSO role mapping through unified RBAC configuration; platform architects choose between shared instances and dedicated control planes based on organizational autonomy requirements and blast radius boundaries, rather than treating instance duplication as an equivalent substitute for project RBAC.
+</details>
+
+**Success Criteria**:
 
 - [ ] I installed ArgoCD with multi-tenant Projects for 3 teams
 - [ ] I deployed applications scoped to team namespaces
