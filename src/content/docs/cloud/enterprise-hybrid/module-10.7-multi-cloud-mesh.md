@@ -37,7 +37,15 @@ Endpoint discovery is the hidden coupling between topologies. In multi-primary m
 
 ### Topology 1: Primary-Remote
 
-In the Primary-Remote model, [one cluster assumes the responsibility of running the full Istio control plane](https://istio.io/latest/docs/setup/install/multicluster/primary-remote/) (the "primary"), while other connected clusters act purely as data planes ("remotes"). The remote clusters do not run an Istiod instance; instead, their Envoy sidecar proxies reach across the network to connect directly to the primary cluster's Istiod for configuration and certificate signing.
+**Pause and predict:** When designing an Istio mesh across cloud providers in a primary-remote topology, which control plane components execute on each cluster? Why do the upstream east-west gateway exposure manifests require modification when the primary cluster runs on AWS EKS?
+
+<details>
+<summary>Check your prediction</summary>
+
+In an Istio [primary-remote multicluster deployment](https://istio.io/latest/docs/setup/install/multicluster/primary-remote/), the primary cluster executes the complete Istiod control plane and manages service registry state. Remote member clusters deploy an externalIstiod remote profile containing only Envoy sidecar proxies that connect across the network to the primary control plane. This centralized architecture is fundamentally different from a multi-primary deployment where each cluster runs a sovereign Istiod instance. Additionally, the upstream primary-remote install guide's east-west exposure steps are not suitable for an AWS EKS primary, because those load balancers are FQDNs and ExternalName expects IP addresses.
+</details>
+
+The next section is an architectural topology diagram illustrating control plane connectivity and remote proxy registration between an AWS primary and a GCP remote cluster.
 
 ```mermaid
 flowchart LR
@@ -61,6 +69,8 @@ flowchart LR
     SvcD -.->|Connects to| Istiod
     SvcE -.->|Connects to| Istiod
 ```
+
+In the Primary-Remote model, [one cluster assumes the responsibility of running the full Istio control plane](https://istio.io/latest/docs/setup/install/multicluster/primary-remote/) (the "primary"), while other connected clusters act purely as data planes ("remotes"). The remote clusters do not run an Istiod instance; instead, their Envoy sidecar proxies reach across the network to connect directly to the primary cluster's Istiod for configuration and certificate signing.
 
 Primary-remote is the lowest operational surface area: one Istiod HA deployment, one place to upgrade Istio revisions, and one set of mesh-wide `WasmPlugin` or telemetry configs. Remote clusters run data-plane proxies only; they dial the primary for xDS configuration and certificate signing. That hub-and-spoke control model fits disaster recovery where the standby cluster is not meant to evolve mesh policy independently, and it fits regulated environments that want a single configuration authority.
 
@@ -116,9 +126,15 @@ Parity becomes the hard problem. If cluster1 enables `STRICT` mTLS and cluster2 
 
 ### Single-Network vs Multi-Network
 
-Istio separates **control-plane topology** (primary-remote vs multi-primary) from **data-plane reachability** (single-network vs multi-network). In a [single-network deployment](https://istio.io/latest/docs/setup/install/multicluster/single-network-models/), pod IP addresses in one cluster are routable from pods in another—common when clusters share a flat VPC, extended VNet peering, or a full-mesh VPN. Endpoint discovery can use direct pod IPs, and you may not need an east-west gateway for every hop.
+**Pause and predict:** How does the placement of Istiod control planes relate to whether pod IP addresses are directly routable across cluster networks?
 
-In a [multi-network deployment](https://istio.io/latest/docs/setup/install/multicluster/multi-network/), clusters sit on networks that do not expose pod CIDRs to each other. Istio assigns each cluster a `topology.istio.io/network` label and routes cross-network traffic through an **east-west gateway** using `AUTO_PASSTHROUGH` so mTLS stays end-to-end. This is the default shape for AWS, GCP, and Azure meshes where only load balancer IPs are reachable between clouds.
+<details>
+<summary>Check your prediction</summary>
+
+The decision of where Istiod runs ([primary-remote versus multi-primary](https://istio.io/latest/docs/setup/install/multicluster/multi-primary/)) is completely decoupled from whether pod IP addresses can route directly between clusters ([single-network versus multi-network](https://istio.io/latest/docs/setup/install/multicluster/multi-network/)). A multi-primary service mesh can still be deployed across a multi-network foundation where cross-cluster pod CIDRs remain isolated and require east-west gateways. Platform teams must treat control plane distribution and network layer reachability as orthogonal architectural dimensions during multi-cloud planning.
+</details>
+
+The next section is a structured architectural comparison table contrasting direct pod-to-pod IP reachability against gateway-mediated multi-network cross-cluster connectivity.
 
 | Dimension | Single-network | Multi-network |
 | :--- | :--- | :--- |
@@ -127,6 +143,10 @@ In a [multi-network deployment](https://istio.io/latest/docs/setup/install/multi
 | **Gateway requirement** | Often optional | East-west gateway per network |
 | **Blast radius of network change** | Routing table mistakes affect pods directly | Misconfigured gateway SNI breaks cross-network only |
 | **Cost sensitivity** | Still pays cross-AZ/region egress | Adds gateway LB + cross-cloud egress on mesh bytes |
+
+Istio separates **control-plane topology** (primary-remote vs multi-primary) from **data-plane reachability** (single-network vs multi-network). In a [single-network deployment](https://istio.io/latest/docs/setup/install/multicluster/single-network-models/), pod IP addresses in one cluster are routable from pods in another—common when clusters share a flat VPC, extended VNet peering, or a full-mesh VPN. Endpoint discovery can use direct pod IPs, and you may not need an east-west gateway for every hop.
+
+In a [multi-network deployment](https://istio.io/latest/docs/setup/install/multicluster/multi-network/), clusters sit on networks that do not expose pod CIDRs to each other. Istio assigns each cluster a `topology.istio.io/network` label and routes cross-network traffic through an **east-west gateway** using `AUTO_PASSTHROUGH` so mTLS stays end-to-end. This is the default shape for AWS, GCP, and Azure meshes where only load balancer IPs are reachable between clouds.
 
 On EKS, GKE, and AKS, single-network is realistic inside one provider when you engineer non-overlapping Pod CIDRs and cloud routing. Multi-network is the safer default when legal, security, or operations teams forbid pod-CIDR leakage across cloud boundaries.
 
@@ -401,11 +421,17 @@ Across all three clouds, label nodes with region and zone so Istio locality keys
 
 The east-west gateway is a specialized ingress controller specifically tuned for cross-cluster mesh traffic. Unlike a standard internet-facing ingress gateway handling north-south traffic, the east-west gateway assumes all incoming traffic is already fully mTLS encrypted by the sending cluster's sidecar.
 
-> **Pause and predict**: Why do we use AUTO_PASSTHROUGH for the east-west gateway's TLS mode instead of SIMPLE or MUTUAL, which are commonly used for standard ingress gateways?
-
-Using [`AUTO_PASSTHROUGH` instructs the Envoy proxy at the gateway edge to evaluate the Server Name Indication (SNI) header on the TLS handshake, select the destination service, and forward ciphertext without terminating workload mTLS](https://istio.io/latest/docs/reference/config/networking/gateway/). The gateway participates in routing but not in application-layer inspection, which preserves end-to-end encryption from source workload to destination workload.
-
 Operators sometimes ask whether east-west gateways should run WAF or HTTP routing. For mesh east-west traffic, HTTP routing belongs in client sidecars or waypoints, not on the gateway, because decrypting at the gateway would break the zero-trust property and double TLS overhead. North-south ingress gateways remain the right place for external client TLS termination and L7 routing policies aimed at Internet clients.
+
+**Pause and predict:** Why do we configure AUTO_PASSTHROUGH for an east-west gateway TLS mode instead of SIMPLE or MUTUAL modes commonly used on ingress gateways?
+
+<details>
+<summary>Check your prediction</summary>
+
+Configuring [`AUTO_PASSTHROUGH` instructs the Envoy gateway edge to evaluate the Server Name Indication header](https://istio.io/latest/docs/reference/config/networking/gateway/). Envoy selects the destination service and forwards ciphertext without terminating workload mTLS. Standard ingress `SIMPLE` and `MUTUAL` modes terminate TLS sessions at the perimeter rather than passing through encrypted workload packets. Using passthrough preserves end-to-end cryptographic mutual authentication between originating client sidecars and destination services across clusters.
+</details>
+
+The next section is a multi-cluster Gateway resource manifest that registers the cross-network gateway on port 15443 using AUTO_PASSTHROUGH TLS mode.
 
 ```bash
 # Expose services through the east-west gateway on both clusters
@@ -437,13 +463,19 @@ done
 
 Connecting clusters is step one; controlling how traffic flows between them prevents latency spikes and avoidable cloud egress charges. Platform SLOs should include **cross-cluster success rate** and **p95 latency by locality** alongside application golden signals.
 
-> **Pause and predict**: If you configure a failover from `us-east-1` to `us-central1`, but forget to define an `outlierDetection` policy in your `DestinationRule`, what behavior will you observe when `us-east-1` endpoints start returning HTTP 500 errors?
-
-If [`outlierDetection` is absent, Istio has no mathematical mechanism to determine that an endpoint is failing](https://istio.io/latest/docs/tasks/traffic-management/locality-load-balancing/failover/). Therefore, the Envoy proxies will relentlessly continue hammering the broken local `us-east-1` endpoints, resulting in prolonged application downtime, completely defeating the purpose of your expensive multi-region architecture.
-
 ### Locality-Aware Load Balancing
 
-Istio's locality-aware load balancing evaluates the [topology labels present on your Kubernetes v1.35 nodes](https://istio.io/latest/docs/tasks/traffic-management/locality-load-balancing/) to prioritize routing traffic to the geographically nearest healthy endpoint. 
+Istio's locality-aware load balancing evaluates the [topology labels present on your Kubernetes v1.35 nodes](https://istio.io/latest/docs/tasks/traffic-management/locality-load-balancing/) to prioritize routing traffic to the geographically nearest healthy endpoint.
+
+**Pause and predict:** You configure a locality failover policy from us-east-1 to us-central1 in a DestinationRule. If you omit the outlierDetection stanza, what behavior occurs when local us-east-1 endpoints return HTTP 500 errors?
+
+<details>
+<summary>Check your prediction</summary>
+
+According to [Istio's locality failover task](https://istio.io/latest/docs/tasks/traffic-management/locality-load-balancing/failover/), outlier detection is required so proxies can tell endpoints are unhealthy. A failover list alone does not eject local HTTP 500 endpoints, because proxies continue considering them valid routing targets. Without consecutive error thresholds and base ejection timers, sidecars continue sending traffic to failing local instances instead of redirecting requests to healthy remote clusters.
+</details>
+
+The next section is a DestinationRule configuration manifest defining outlier detection ejection parameters alongside cross-region locality load balancing failover priorities.
 
 ```yaml
 # DestinationRule with locality failover
@@ -1237,7 +1269,41 @@ docker network rm mesh-net 2>/dev/null || true
 rm /tmp/mesh-service-map.sh /tmp/istio-cluster1.yaml /tmp/istio-cluster2.yaml 2>/dev/null
 ```
 
-### Success Criteria
+Before concluding the hands-on lab, audit the four operational claims presented below. Each card describes a plausible multi-cloud networking hypothesis frequently encountered in enterprise service mesh architectures. Analyze each claim against cryptographic trust models, gateway passthrough mechanics, and locality failover prerequisites. Evaluate control plane topologies carefully before inspecting the underlying technical explanations.
+
+**Card A: AUTO_PASSTHROUGH terminates workload mTLS at the east-west gateway the same way SIMPLE terminates TLS on an ingress gateway.** A network security engineer reviews the Gateway resource for an east-west gateway handling cross-network traffic on port 15443. The engineer assumes that AUTO_PASSTHROUGH terminates incoming mutual TLS sessions at the gateway perimeter. Under this assumption, the engineer expects the gateway to decrypt traffic before creating a second connection to the backend pod.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: East-west gateway TLS passthrough mode versus edge ingress TLS termination mode conflation. Next action: recognize that `AUTO_PASSTHROUGH` does not terminate workload mutual TLS at the gateway edge; instead, Envoy inspects the Server Name Indication (SNI) header to select the target service cluster and forwards raw encrypted ciphertext without decrypting application data; in contrast, standard ingress `SIMPLE` mode terminates incoming TLS using a local certificate, while `MUTUAL` mode terminates and verifies client certificates at the perimeter; terminating workload mTLS at an intermediate gateway would break end-to-end cryptographic SPIFFE identity verification between client and server workloads; platform teams must configure `AUTO_PASSTHROUGH` on port 15443 so mutual authentication remains end-to-end between sidecar proxies.
+</details>
+
+**Card B: A locality failover list from us-east-1 to us-central1 ejects endpoints that return HTTP 500 even when outlierDetection is missing.** A site reliability engineer configures a multi-region DestinationRule with a locality failover policy to divert traffic from us-east-1 to us-central1 during regional disruptions. The engineer configures the failover mapping but omits the outlierDetection stanza. The engineer assumes that Envoy automatically detects application failures and fails over when local pods return persistent HTTP 500 internal server errors.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Locality load balancing priority failover configuration versus statistical outlier detection policy conflation. Next action: understand that defining `localityLbSetting.failover` in a `DestinationRule` only establishes the geographic priority order for traffic routing when local endpoints become unavailable; it does not track application health or monitor HTTP error response codes; without an explicit `outlierDetection` stanza defining consecutive error thresholds and ejection durations, Envoy treats all endpoints that accept TCP connections as completely healthy; when local `us-east-1` endpoints return HTTP 500 errors, Envoy continues routing traffic to them rather than failing over to `us-central1`; platform engineers must configure both `outlierDetection` to eject degraded endpoints and `localityLbSetting` to govern regional failover.
+</details>
+
+**Card C: Primary-remote and multi-primary are the same topology because both clusters run Envoy.** An enterprise architect evaluates cross-cloud infrastructure proposals and concludes that primary-remote and multi-primary service mesh designs have identical operational characteristics. The architect assumes that because workloads in both topologies run standard Envoy sidecar proxies, the two architectures share the same control plane failure domain and management model.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Control plane architectural topology versus data plane proxy uniformity conflation. Next action: understand that while Envoy sidecar proxies execute in workload pods across both architectures, primary-remote and multi-primary represent fundamentally different control plane models; in primary-remote, only the primary cluster runs an Istiod control plane, while remote clusters run an externalIstiod profile whose proxies reach across the network for configuration and certificates; if the primary cluster or interconnect fails, remote clusters cannot rotate certificates or update mesh policy; in multi-primary, each cluster runs an independent sovereign Istiod instance that watches peer Kubernetes API servers for cross-cluster endpoint discovery; furthermore, control-plane topology is completely decoupled from network reachability (single-network versus multi-network), meaning either topology can operate with or without east-west gateways.
+</details>
+
+**Card D: IRSA, GKE Workload Identity, or Entra Workload ID makes cross-cluster mTLS succeed when each cluster has its own self-signed Istio CA.** A cloud architect configures workload identity federation across AWS, GCP, and Azure to allow Kubernetes service accounts to access cloud provider APIs. The architect assumes that because cloud-native identity federation succeeds, cross-cluster service mesh mTLS handshakes will automatically succeed between workloads. Each cluster continues running with its own independent, self-signed Istio root certificate authority.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cloud provider IAM token federation versus service mesh cryptographic mutual TLS trust conflation. Next action: recognize that cloud workload identity mechanisms—such as AWS IAM Roles for Service Accounts (IRSA), Google Cloud GKE Workload Identity Federation, and Microsoft Entra Workload ID—federate Kubernetes service account tokens with cloud provider IAM systems to access cloud platform APIs; they do not issue service mesh certificates or establish cryptographic trust anchors for Envoy data plane proxies; cross-cluster service mesh mTLS requires a common root Certificate Authority, intermediate CAs signed by a shared root, or SPIRE federation exchanging trust bundles so Envoy proxies can validate peer SPIFFE X.509 certificates; cloud IAM federation does not resolve TLS certificate verification failures when clusters use disjoint self-signed roots.
+</details>
+
+**Success Criteria**:
 
 - [ ] Two `kind` clusters exist on a shared Docker network with `backend` deployed in both and `frontend` only in cluster1.
 - [ ] Local `curl` from `frontend` to `backend.production.svc.cluster.local` returns responses from cluster1 only before any mesh install.
