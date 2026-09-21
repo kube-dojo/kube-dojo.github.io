@@ -139,7 +139,7 @@ One of the most powerful capabilities of Azure Arc is the ability to project Azu
 Azure Policy for Kubernetes extends open-source OPA Gatekeeper v3 to enforce guardrails across Arc-connected clusters. Gatekeeper operates strictly as an admission webhook that evaluates Kubernetes API requests during object creation or update operations. A policy assignment with a deny effect intercepts subsequent pod submissions, but it never automatically evicts or terminates workloads that are already running on the cluster. The Azure Policy engine and Gatekeeper audit controller record existing non-compliant pods as audit violations in compliance dashboards. Those workloads continue serving traffic uninterrupted until an operator deletes them or a deployment rollout recreates the pods against the active admission webhook.
 </details>
 
-The next section is an operational walkthrough for governance policies. It demonstrates how to assign policy definitions using the Azure CLI and inspect compliance status across member clusters.
+The next section is how Azure CLI assigns a deny-privileged policy across Arc-connected clusters and how operators read fleet compliance state from those assignments.
 
 ```bash
 # Assign a policy to enforce no privileged containers across ALL Arc clusters
@@ -173,7 +173,7 @@ Azure Arc includes native support for GitOps configuration management, [leveragi
 Azure Arc GitOps relies on the in-cluster `microsoft.flux` extension running Flux v2 controllers rather than an external push-based management plane. When the remote Git repository becomes unreachable, local Flux controllers simply fail their periodic reconciliation loops and log transient fetch errors. The local Kubernetes API server and existing workload pods continue running the last successfully applied desired state without disruption. This pull-based architecture differs fundamentally from an external Argo CD hub that must actively connect to spoke API servers over the network to push manifests. Workloads remain resilient against control plane network partitions because the spoke cluster does not depend on continuous Git access to execute current containers.
 </details>
 
-The next section is a practical guide to GitOps configurations. It demonstrates how to deploy multi-path Kustomizations across fleet clusters with automated pruning enabled.
+The next section is how Azure Arc registers a multi-path Flux Kustomization on connected clusters, including the CLI that points those agents at the Git repository.
 
 ```bash
 # Deploy a GitOps configuration to all Arc clusters with a specific tag
@@ -195,12 +195,6 @@ az k8s-configuration flux create \
 
 ## Google Fleet (GKE Enterprise)
 
-Google Cloud approaches fleet management through the architectural concept of a "Fleet"—a logical, strictly enforced grouping of both GKE and external (non-GKE) Kubernetes clusters that share normalized configurations, identities, and policies. While Azure Arc focuses heavily on projecting individual cloud services down to independent clusters, Google Fleet emphasizes defining a homogenous, unified platform layer that stretches seamlessly across all member clusters.
-
-### GKE Fleet Architecture
-
-In Google Fleet, [a central GCP "Host Project" acts as the authoritative control plane](https://cloud.google.com/kubernetes-engine/docs/fleets-overview). This project houses the Fleet API, enabling cross-cluster features such as Config Sync, Policy Controller, and unified Service Mesh.
-
 **Pause and predict:** An enterprise architect evaluates standardizing multi-cluster governance across Microsoft Azure and Google Cloud. The architecture team evaluates attaching an external cluster to Azure Arc. They ask whether it establishes identical management boundaries to enrolling that cluster into a Google Cloud GKE Fleet. How do the fundamental abstraction models and control plane structures differ between these two fleet management paradigms?
 
 <details>
@@ -209,7 +203,13 @@ In Google Fleet, [a central GCP "Host Project" acts as the authoritative control
 Azure Arc and GKE Fleet use fundamentally distinct architectural models and control plane abstractions. Azure Arc attaches CNCF-certified Kubernetes clusters as individual Azure Resource Manager resources. It projects Azure RBAC, Azure Policy, and management extensions into external clusters without requiring a separate fleet boundary. In contrast, GKE Fleet organizes member clusters into a centralized Google Cloud host project boundary. This fleet membership enables shared platform services like Config Sync for GitOps, Policy Controller for OPA constraints, and fleet-wide Workload Identity Federation. Treating GKE Fleet as merely a Google equivalent of Azure Arc overlooks these foundational structural distinctions. Furthermore, neither platform should be conflated with hyperconverged hardware offerings like AKS on Azure Local or console view tools like AWS EKS Connector.
 </details>
 
-The next section is an architectural topology diagram of Google Fleet. It illustrates how the central Google Cloud host project orchestrates services across member clusters.
+The next section is a topology diagram of a Google Cloud fleet host project and the member clusters that receive Config Sync and Policy Controller.
+
+Google Cloud approaches fleet management through the architectural concept of a "Fleet"—a logical, strictly enforced grouping of both GKE and external (non-GKE) Kubernetes clusters that share normalized configurations, identities, and policies. While Azure Arc focuses heavily on projecting individual cloud services down to independent clusters, Google Fleet emphasizes defining a homogenous, unified platform layer that stretches seamlessly across all member clusters.
+
+### GKE Fleet Architecture
+
+In Google Fleet, [a central GCP "Host Project" acts as the authoritative control plane](https://cloud.google.com/kubernetes-engine/docs/fleets-overview). This project houses the Fleet API, enabling cross-cluster features such as Config Sync, Policy Controller, and unified Service Mesh.
 
 ```mermaid
 flowchart TD
@@ -471,10 +471,6 @@ data:
 
 > **Stop and think**: If your central telemetry hub goes down, what happens to the telemetry data generated by your 50 clusters? How should you configure your OTel Collectors to handle this scenario?
 
-### Fleet Health Dashboard Query Examples
-
-With centralized data appropriately labeled, creating powerful fleet-wide PromQL dashboards becomes straightforward. You can easily visualize cross-cluster performance and isolate localized anomalies.
-
 **Pause and predict:** A platform operations team deploys OpenTelemetry Collectors across fifty clusters to export metrics and traces to a centralized monitoring hub. A storage failure at the central hub causes it to reject incoming OTLP connections for two hours. During this outage, what happens to the metrics generated on the member clusters, and does the outage impair running container workloads?
 
 <details>
@@ -483,7 +479,11 @@ With centralized data appropriately labeled, creating powerful fleet-wide PromQL
 A centralized telemetry hub outage does not impair cluster operations or stop running applications. Member clusters continue processing user workloads normally because monitoring data paths operate completely out-of-band from cluster control planes. However, OpenTelemetry collectors without local storage buffering will quickly exhaust their memory queues and drop incoming metric points. Configuring persistent queues or local file-based exporters enables collectors to buffer telemetry on local node storage during upstream outages and replay data once connectivity recovers. Implementing resilient local buffering is a completely different architectural concern from workload execution continuity.
 </details>
 
-The next section is a set of Prometheus query expressions designed for multi-cloud fleets. These queries monitor cluster health, API server latency, node conditions, and abnormal container restart rates.
+The next section is fleet-wide PromQL examples for API latency, node readiness, and restart rates after collectors are labeled by cluster.
+
+### Fleet Health Dashboard Query Examples
+
+With centralized data appropriately labeled, creating powerful fleet-wide PromQL dashboards becomes straightforward. You can easily visualize cross-cluster performance and isolate localized anomalies.
 
 ```promql
 # Cluster count by provider and status (adjust the job label to your scrape config)
