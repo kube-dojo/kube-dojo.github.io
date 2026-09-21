@@ -421,8 +421,6 @@ Across all three clouds, label nodes with region and zone so Istio locality keys
 
 The east-west gateway is a specialized ingress controller specifically tuned for cross-cluster mesh traffic. Unlike a standard internet-facing ingress gateway handling north-south traffic, the east-west gateway assumes all incoming traffic is already fully mTLS encrypted by the sending cluster's sidecar.
 
-Operators sometimes ask whether east-west gateways should run WAF or HTTP routing. For mesh east-west traffic, HTTP routing belongs in client sidecars or waypoints, not on the gateway, because decrypting at the gateway would break the zero-trust property and double TLS overhead. North-south ingress gateways remain the right place for external client TLS termination and L7 routing policies aimed at Internet clients.
-
 **Pause and predict:** Why do we configure AUTO_PASSTHROUGH for an east-west gateway TLS mode instead of SIMPLE or MUTUAL modes commonly used on ingress gateways?
 
 <details>
@@ -431,7 +429,7 @@ Operators sometimes ask whether east-west gateways should run WAF or HTTP routin
 Configuring [`AUTO_PASSTHROUGH` instructs the Envoy gateway edge to evaluate the Server Name Indication header](https://istio.io/latest/docs/reference/config/networking/gateway/). Envoy selects the destination service and forwards ciphertext without terminating workload mTLS. Standard ingress `SIMPLE` and `MUTUAL` modes terminate TLS sessions at the perimeter rather than passing through encrypted workload packets. Using passthrough preserves end-to-end cryptographic mutual authentication between originating client sidecars and destination services across clusters.
 </details>
 
-The next section is a multi-cluster Gateway resource manifest that registers the cross-network gateway on port 15443 using AUTO_PASSTHROUGH TLS mode.
+The next section is a multi-cluster Gateway resource manifest that registers the cross-network listener on port 15443 in the istio-system namespace on both clusters.
 
 ```bash
 # Expose services through the east-west gateway on both clusters
@@ -456,6 +454,8 @@ spec:
 EOF
 done
 ```
+
+Operators sometimes ask whether east-west gateways should run WAF or HTTP routing. For mesh east-west traffic, HTTP routing belongs in client sidecars or waypoints, not on the gateway, because decrypting at the gateway would break the zero-trust property and double TLS overhead. North-south ingress gateways remain the right place for external client TLS termination and L7 routing policies aimed at Internet clients.
 
 ---
 
