@@ -67,6 +67,16 @@ def test_hermes_agent_is_retired_fail_closed() -> None:
     assert "deepseek" in merged.lower()
 
 
+def test_opencode_and_qwen_are_not_routing_seats() -> None:
+    for agent in ("opencode", "qwen"):
+        result = _run_dispatch_smart(
+            ["review", "--agent", agent, "--dry-run", "x"]
+        )
+        assert result.returncode != 0
+        merged = (result.stdout or "") + (result.stderr or "")
+        assert "not routing seats" in merged.lower()
+
+
 def test_hermes_router_command_raises() -> None:
     """Direct router path also refuse hermes (defense in depth)."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -199,18 +209,26 @@ def test_parse_opencode_json_events_extracts_final_assistant_text() -> None:
     assert _parse_opencode_json_events(ndjson) == "VERDICT: APPROVE"
 
 
-def test_codex_draft_default_is_gpt_5_5() -> None:
+def test_codex_defaults_are_gpt_6_astra() -> None:
     sys.path.insert(0, str(SCRIPTS_DIR))
     from dispatch_smart import TASK_CLASSES
 
-    assert TASK_CLASSES["draft"].models["codex"] == "gpt-5.5"
+    for task_class, cfg in TASK_CLASSES.items():
+        assert cfg.models["codex"] == "gpt-6-astra", task_class
+        assert "opencode" not in cfg.models
+        assert "qwen" not in cfg.models
+        assert cfg.models["cursor"] == "grok-4.7-high"
+        assert cfg.models["deepseek"] == "deepseek-flash"
 
 
-def test_codex_edit_default_unchanged() -> None:
+def test_claude_fable_for_complex_sonnet_for_rest() -> None:
     sys.path.insert(0, str(SCRIPTS_DIR))
     from dispatch_smart import TASK_CLASSES
 
-    assert TASK_CLASSES["edit"].models["codex"] == "gpt-5.3-codex-spark"
+    assert TASK_CLASSES["architect"].models["claude"] == "claude-fable-5-1"
+    assert TASK_CLASSES["review"].models["claude"] == "claude-fable-5-1"
+    for task_class in ("search", "edit", "draft"):
+        assert TASK_CLASSES[task_class].models["claude"] == "claude-sonnet-5"
 
 
 def test_dispatch_smart_codex_forces_danger_mode() -> None:
