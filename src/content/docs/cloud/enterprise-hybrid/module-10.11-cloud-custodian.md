@@ -97,7 +97,7 @@ Custodian lets you make that difference visible in code instead of hiding it in 
 Batch processing workers waiting between scheduled queues, warm disaster recovery standbys, and burstable machines with intermittent activity can be legitimately quiet. Stopping them immediately disrupts valid jobs and failover capacity because low CPU utilization does not prove a machine is unused. The safer pattern is a two-stage mark-then-act lifecycle: mark the resource for review with an owner-facing message, ticket link, and clear deadline, then run a separate policy that stops only unreviewed resources after that deadline expires. Always mark for review before stopping, and remember that stopping an instance is not deleting its storage.
 </details>
 
-The next section is a flowchart diagram illustrating the staged mark-then-act governance cycle from initial inventory scan to owner review and deferred remediation.
+The next section is a flowchart that starts from a cloud inventory and ends at a later policy check.
 
 ```mermaid
 flowchart LR
