@@ -73,7 +73,7 @@ The practical result is that a pod is both a wrapper around containers and a con
 └────────────────────────────────────────────────────────────────┘
 ```
 
-The shared network namespace is the feature that most often surprises new operators. Two containers in the same pod communicate through `localhost`, but they also compete for the same port numbers because they share the pod IP.
+The shared network namespace is the feature that most often surprises new operators. Two containers in the same pod communicate through `localhost`.
 
 **Pause and predict:** two containers in the same pod both try to listen on port `8080`. What do you expect the second container to log, and how would the result differ if those containers were in separate pods? Make the prediction before reading on, because this is the exact mental model that prevents many confusing sidecar failures.
 
@@ -1219,7 +1219,7 @@ Failure layer: Readiness probe traffic filtering versus liveness probe process r
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Ephemeral pod network identity versus stable Service routing abstraction conflation. Next action: understand that pod IP addresses are strictly ephemeral; when a pod crashes, restarts, or reschedules onto another node, Kubernetes assigns it a completely new IP address, instantly breaking any hardcoded client references; always expose workloads behind a Kubernetes Service, which provides a durable virtual IP and DNS name that automatically load-balances requests across current healthy pod replicas.
+Failure layer: treating a pod IP as a durable client address. Next action: use the pod IP only as a short-lived debugging handle. A container restart inside the same pod keeps that IP. Deleting the pod and creating a replacement assigns a new IP. Point clients at a Service.
 
 </details>
 
