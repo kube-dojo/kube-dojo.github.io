@@ -506,7 +506,7 @@ spec:
 
 ## Removing VPNs: The Path to Zero Trust Access
 
-Legacy VPN solutions represent an architectural anti-pattern in modern cloud-native infrastructures because they grant broad network-level tunnel connectivity across shared subnets. The primary migration challenge involves balancing developer velocity against attack surface reduction, requiring operational infrastructure teams to establish replacement controls before disconnecting legacy access routes.
+Legacy VPN solutions represent an architectural anti-pattern in modern cloud-native infrastructures because they grant broad network-level tunnel connectivity across shared subnets.
 
 ### The VPN Replacement Architecture
 
@@ -518,7 +518,7 @@ Legacy VPN solutions represent an architectural anti-pattern in modern cloud-nat
 Deleting the VPN before an identity-aware proxy is running removes the access path entirely, preventing legitimate remote engineers from reaching protected internal services. Furthermore, traditional VPN connectivity grants broad, persistent network access based on initial perimeter authentication, but VPN access is not per-request identity verification; it fails to inspect workload context, device posture, and granular authorization rules on each individual transaction.
 </details>
 
-The next section is an architecture comparison diagram illustrating the workflow transition from legacy perimeter VPN tunneling to per-request identity-aware proxy verification.
+The next section is an architecture comparison diagram of a laptop reaching internal services through a VPN gateway and through a separate access proxy.
 
 ```mermaid
 flowchart LR
@@ -531,7 +531,7 @@ flowchart LR
     end
 ```
 
-The goal is to migrate users from broad network-level access to precise, application-level access mediated by Identity-Aware Proxies. The metric showing eighty-three percent access across internal services in legacy network diagrams serves as an illustrative conceptual example rather than a measured empirical fact. Teams must retain necessary productivity while reducing implicit trust, so a staged rollout with clear monitoring beats a full-day shutdown.
+The goal is to migrate users from broad network-level access to precise, application-level access mediated by Identity-Aware Proxies. The primary migration challenge involves balancing developer velocity against attack surface reduction, requiring operational infrastructure teams to establish replacement controls before disconnecting legacy access routes. The metric showing eighty-three percent access across internal services in legacy network diagrams serves as an illustrative conceptual example rather than a measured empirical fact. Teams must retain necessary productivity while reducing implicit trust, so a staged rollout with clear monitoring beats a full-day shutdown.
 
 ### kubectl Access Without VPN
 
@@ -716,8 +716,6 @@ jobs:
             -n payments
 ```
 
-Signing container images within continuous integration pipelines generates cryptographic attestations, but protecting production environments requires admission control inside the cluster. In hardened cloud architectures, platform teams evaluate container provenance at the API boundary so that signature verification occurs automatically before pods execute.
-
 **Pause and predict:** If a continuous integration job successfully signs release images using cosign sign, what prevents a cluster from running an unsigned or tampered container image?
 
 <details>
@@ -726,7 +724,7 @@ Signing container images within continuous integration pipelines generates crypt
 Running cosign sign in CI attaches cryptographic signatures to the registry, but cosign sign without a verifying admission policy does not reject unsigned images at runtime. The Kubernetes API server accepts any standard pod manifest regardless of signature presence unless a validating admission controller intercepts the request and strictly blocks unsigned artifacts.
 </details>
 
-The next section is a Kyverno ClusterPolicy manifest that enforces cryptographic image signature verification and SLSA provenance checks during pod admission.
+The next section is a Kyverno ClusterPolicy manifest applied at pod admission for images from the company registry.
 
 ```yaml
 # Kyverno policy: only allow signed images from our CI/CD
@@ -758,6 +756,8 @@ spec:
           verifyDigest: true
           required: true
 ```
+
+Signing container images within continuous integration pipelines generates cryptographic attestations, but protecting production environments requires admission control inside the cluster. In hardened cloud architectures, platform teams evaluate container provenance at the API boundary so that signature verification occurs automatically before pods execute.
 
 ---
 
