@@ -41,7 +41,7 @@ PID_DIR = Path(
 CLAUDE_CMD = ["npx", "@anthropic-ai/claude-code@latest"]
 GEMINI_CLI = shutil.which("gemini") or "gemini"
 CODEX_CLI = shutil.which("codex") or "codex"
-CLAUDE_DEFAULT_MODEL = os.environ.get("AB_CLAUDE_MODEL", "claude-opus-4-8")
+CLAUDE_DEFAULT_MODEL = os.environ.get("AB_CLAUDE_MODEL", "claude-opus-5-5")
 PYTHON_CMD = os.environ.get("AB_PYTHON", "")
 if not PYTHON_CMD:
     if virtual_env := os.environ.get("VIRTUAL_ENV"):

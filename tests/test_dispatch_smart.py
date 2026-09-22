@@ -234,12 +234,12 @@ def test_grok_search_argv_sets_low_effort() -> None:
     assert cmd[cmd.index("--reasoning-effort") + 1] == "low"
 
 
-def test_claude_fable_for_complex_sonnet_for_rest() -> None:
+def test_claude_opus_default_fable_advisor_sonnet_routine() -> None:
     sys.path.insert(0, str(SCRIPTS_DIR))
     from dispatch_smart import TASK_CLASSES
 
     assert TASK_CLASSES["architect"].models["claude"] == "claude-fable-5-1"
-    assert TASK_CLASSES["review"].models["claude"] == "claude-fable-5-1"
+    assert TASK_CLASSES["review"].models["claude"] == "claude-opus-5-5"
     for task_class in ("edit", "draft"):
         assert TASK_CLASSES[task_class].models["claude"] == "claude-sonnet-5"
     assert TASK_CLASSES["search"].models["claude"] == "claude-haiku-4-5-20251001"
