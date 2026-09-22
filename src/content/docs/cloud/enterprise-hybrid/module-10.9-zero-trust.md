@@ -255,13 +255,19 @@ data:
 
 ## Micro-Segmentation in Kubernetes
 
-> **Pause and predict**: If an attacker compromises a frontend pod in a default Kubernetes cluster, what prevents them from reaching the database pod directly?
-
-Micro-segmentation applies the Zero Trust principle of "assume breach" directly at the network level. Instead of a flat network where any pod can talk to any other pod across the cluster, micro-segmentation restricts communication to only the explicitly allowed and required paths. This matters because most practical attacks follow an initial service compromise and then escalate through permissive east-west network paths.
-
 ### Defense in Depth with Network Policies
 
 A robust zero trust deployment requires multiple layers of policy enforcement. If one layer fails or is misconfigured, the next layer acts as a safety net. In Kubernetes, think of these as concentric controls: namespace policy, network policy, workload identity, then application-level authorization.
+
+**Pause and predict:** If an attacker compromises a frontend pod in a default Kubernetes cluster, what prevents them from reaching the database pod directly?
+
+<details>
+<summary>Check your prediction</summary>
+
+In a default Kubernetes cluster, nothing prevents that connection because the default networking model allows unrestricted pod-to-pod communication across all namespaces. A NetworkPolicy only stops unauthorized traffic when the underlying Container Network Interface (CNI) plugin actively enforces policy rules; without an enforcing CNI, policy objects are ignored. Micro-segmentation applies the Zero Trust principle of "assume breach" directly at the network level, restricting communication to only explicitly allowed paths so that compromised services cannot escalate laterally through permissive east-west routes.
+</details>
+
+The next section is an architecture diagram illustrating concentric defense-in-depth layers spanning namespace isolation, network policies, mutual TLS encryption, and application-level authorization.
 
 ```mermaid
 flowchart TD
@@ -287,11 +293,19 @@ flowchart TD
 
 ### Comprehensive Network Policy Set
 
-> **Pause and predict**: If you apply a default-deny NetworkPolicy to a namespace, what happens to the DNS resolution for the pods within that namespace?
-
 To build a true zero trust environment in Kubernetes, you must start with a default-deny posture. By explicitly denying all traffic, you ensure that no service can communicate unless a policy explicitly allows it. We separate the comprehensive network policy set into individual definitions to guarantee strict YAML compliance across all parsers and clear ownership of each business flow.
 
 The first step is establishing the default-deny baseline for the namespace. This enforces an explicit trust boundary for each namespace and turns accidental reachability into an exception you must document.
+
+**Pause and predict:** If you apply a default-deny NetworkPolicy to a namespace, what happens to the DNS resolution for the pods within that namespace?
+
+<details>
+<summary>Check your prediction</summary>
+
+Applying a default-deny egress policy to a namespace immediately blocks all outbound network traffic, including DNS resolution queries directed to cluster DNS resolvers. Because Kubernetes does not exempt infrastructure services from network policies, [pods cannot even resolve DNS names until an allow policy explicitly permits egress to the cluster DNS provider](https://kubernetes.io/docs/concepts/services-networking/network-policies/). Default-deny egress blocks DNS until an allow policy permits egress to cluster DNS, making DNS egress a mandatory prerequisite rule for application functionality.
+</details>
+
+The next section is a Kubernetes NetworkPolicy manifest that establishes a default-deny security baseline for all ingress and egress traffic in the namespace.
 
 ```yaml
 # Layer 1: Default deny all ingress and egress in every namespace
@@ -307,7 +321,7 @@ spec:
     - Egress
 ```
 
-Once default-deny is in place, [pods cannot even resolve DNS names. We must explicitly allow egress to the cluster DNS provider.](https://kubernetes.io/docs/concepts/services-networking/network-policies/) DNS is infrastructure plumbing, but it is also a frequent production outage trigger during zero trust rollout, so include it in policy design from day one.
+DNS resolution serves as foundational infrastructure plumbing, but it is also a frequent production outage trigger during zero trust rollout, so platform teams must include an explicit egress permit in policy design from day one.
 
 ```yaml
 # Layer 2: Allow DNS resolution (required for all pods)
@@ -492,11 +506,19 @@ spec:
 
 ## Removing VPNs: The Path to Zero Trust Access
 
-Legacy VPN solutions are widely considered an anti-pattern in modern cloud-native architectures. The goal is to migrate users from broad network-level access to precise, application-level access mediated by Identity-Aware Proxies.
-
-The real migration challenge is behavioral as much as technical. Teams must retain necessary productivity while reducing implicit trust, so a staged rollout with clear monitoring beats a full-day shutdown.
+Legacy VPN solutions represent an architectural anti-pattern in modern cloud-native infrastructures because they grant broad network-level tunnel connectivity across shared subnets. The primary migration challenge involves balancing developer velocity against attack surface reduction, requiring operational infrastructure teams to establish replacement controls before disconnecting legacy access routes.
 
 ### The VPN Replacement Architecture
+
+**Pause and predict:** What operational failure occurs if an enterprise decommissions its VPN gateways before deploying an identity-aware proxy, and why is VPN authentication distinct from zero-trust access?
+
+<details>
+<summary>Check your prediction</summary>
+
+Deleting the VPN before an identity-aware proxy is running removes the access path entirely, preventing legitimate remote engineers from reaching protected internal services. Furthermore, traditional VPN connectivity grants broad, persistent network access based on initial perimeter authentication, but VPN access is not per-request identity verification; it fails to inspect workload context, device posture, and granular authorization rules on each individual transaction.
+</details>
+
+The next section is an architecture comparison diagram illustrating the workflow transition from legacy perimeter VPN tunneling to per-request identity-aware proxy verification.
 
 ```mermaid
 flowchart LR
@@ -508,6 +530,8 @@ flowchart LR
         C["Employee Laptop<br><br>Checks:<br>- Device<br>- Posture<br>- Cert"] -- "Identity-Aware Proxy<br><br>Checks:<br>- Identity<br>- Authorization<br>- Context" --> D["Only the ONE service<br>they need access to<br><br>mTLS, logged per-request"]
     end
 ```
+
+The goal is to migrate users from broad network-level access to precise, application-level access mediated by Identity-Aware Proxies. The metric showing eighty-three percent access across internal services in legacy network diagrams serves as an illustrative conceptual example rather than a measured empirical fact. Teams must retain necessary productivity while reducing implicit trust, so a staged rollout with clear monitoring beats a full-day shutdown.
 
 ### kubectl Access Without VPN
 
@@ -692,9 +716,17 @@ jobs:
             -n payments
 ```
 
-Deploying signed images is only half the battle. You must explicitly configure your cluster to reject images that lack a valid signature. Kyverno is an excellent policy engine that validates image signatures before the pods are allowed to run.
+Signing container images within continuous integration pipelines generates cryptographic attestations, but protecting production environments requires admission control inside the cluster. In hardened cloud architectures, platform teams evaluate container provenance at the API boundary so that signature verification occurs automatically before pods execute.
 
-In hardened environments, this should be treated as a required admission gate, and every cluster that hosts production workloads should enforce the same check.
+**Pause and predict:** If a continuous integration job successfully signs release images using cosign sign, what prevents a cluster from running an unsigned or tampered container image?
+
+<details>
+<summary>Check your prediction</summary>
+
+Running cosign sign in CI attaches cryptographic signatures to the registry, but cosign sign without a verifying admission policy does not reject unsigned images at runtime. The Kubernetes API server accepts any standard pod manifest regardless of signature presence unless a validating admission controller intercepts the request and strictly blocks unsigned artifacts.
+</details>
+
+The next section is a Kyverno ClusterPolicy manifest that enforces cryptographic image signature verification and SLSA provenance checks during pod admission.
 
 ```yaml
 # Kyverno policy: only allow signed images from our CI/CD
@@ -1283,7 +1315,39 @@ kind delete cluster --name zero-trust-lab
 rm /tmp/zero-trust-cluster.yaml
 ```
 
-### Success Criteria
+**Card A: A default Kubernetes cluster stops a compromised frontend pod from connecting to the database pod.** A security engineer assumes that Kubernetes automatically isolates workloads running in separate application tiers or namespaces. When deploying a frontend web service and a backend database inside the cluster, the engineer leaves network policies unconfigured under the belief that platform defaults prevent cross-tier lateral movement. Under this assumption, a compromised frontend container cannot initiate arbitrary TCP connections to the private database pod.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Default pod network reachability versus enforced NetworkPolicy isolation conflation. Next action: understand that standard Kubernetes networking is completely flat and non-isolated by default, allowing any pod to establish network connections to any other pod across namespaces; a NetworkPolicy manifest only restricts traffic when the underlying Container Network Interface (CNI) plugin actively evaluates and enforces policy rules; platform engineers must deploy an enforcing CNI plugin, establish default-deny baselines, and configure explicit ingress rules permitting only designated service tiers to reach database ports; additionally, remember that service mesh mTLS encrypts transport between sidecar proxies but does not eliminate plaintext communication on the localhost loopback inside the pod container itself.
+</details>
+
+**Card B: Default-deny still allows cluster DNS, because DNS is infrastructure and is exempt.** A cluster administrator deploys an egress default-deny NetworkPolicy targeting an application namespace to enforce a strict zero-trust network baseline. The administrator assumes that core infrastructure services, such as CoreDNS or kube-dns resolvers running in kube-system, are automatically exempt from policy restrictions. Under this assumption, application pods in the namespace can resolve internal service domain names without additional egress configuration.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Cluster infrastructure dependency assumptions versus explicit default-deny egress rule enforcement conflation. Next action: recognize that Kubernetes NetworkPolicy specifications do not include implicit exemptions for cluster infrastructure or DNS traffic; applying an egress default-deny rule immediately blocks outbound traffic on UDP and TCP port 53, causing all pod DNS resolution queries to fail; platform administrators must pair every default-deny policy with an explicit egress allowance rule targeting the cluster DNS service or CoreDNS pods in the kube-system namespace; default-deny means all egress is blocked until explicitly allowed, and DNS is never automatically exempt.
+</details>
+
+**Card C: Deleting the VPN finishes the zero-trust migration, because users can reach the same internal apps from the public internet.** An infrastructure team seeks to modernize enterprise access by decommissioning legacy corporate VPN gateways and pointing internal application hostnames to public load balancers. The team assumes that eliminating the VPN boundary instantly delivers a zero-trust architecture because remote employees no longer connect through a privileged internal network tunnel. Under this assumption, exposing internal dashboards directly to the internet completes the organization's zero-trust access transition.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Legacy network perimeter removal versus identity-aware proxy and contextual access control conflation. Next action: understand that simply terminating a corporate VPN without deploying an Identity-Aware Proxy (IAP) or zero-trust access gateway such as Teleport either severs employee connectivity or dangerously exposes unprotected internal endpoints to the public internet; a VPN grants broad network-level tunnel access after initial login, but VPN access is not per-request identity verification; conversely, a true zero-trust access architecture evaluates identity, device posture, and granular authorization policies on every individual HTTP or TCP request; platform teams must deploy reverse proxies with single sign-on and short-lived credentials before decommissioning legacy VPN gateways.
+</details>
+
+**Card D: A CI job that runs cosign sign makes the cluster reject unsigned images.** A DevOps engineer adds a step to the continuous integration pipeline that executes `cosign sign` to generate cryptographic signatures for newly built container images. The engineer assumes that signing images in CI guarantees that Kubernetes will reject any unsigned, altered, or legacy images from running across production clusters. Under this assumption, the cluster automatically blocks deployment of unsigned images without requiring additional admission control configuration.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: CI build artifact cryptographic signing versus Kubernetes admission control verification conflation. Next action: understand that executing cosign sign in a CI pipeline merely attaches cryptographic signatures and SLSA provenance attestations to container registries, but cosign sign without a verifying admission policy does not reject unsigned images; the Kubernetes kube-apiserver has no native awareness of signature attestations and will accept and run any accessible container image; platform teams must deploy an admission policy controller such as Kyverno or validating admission webhooks configured with ClusterPolicy rules to actively verify signatures against trusted cryptographic keys or Rekor logs before allowing pods to be scheduled.
+</details>
+
+**Success Criteria**:
 
 - [ ] I deployed a multi-tier application in a flat network and verified unrestricted access
 - [ ] I applied default-deny Network Policies to enforce Zero Trust
