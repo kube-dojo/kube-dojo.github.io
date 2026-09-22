@@ -47,10 +47,10 @@ Skill auto-loading:
 
 Task classes — model mapping per agent:
 
-    class       claude                 codex           cursor
-    -------     --------------------   -------------   --------------
-    search      claude-sonnet-5        gpt-6-astra     grok-4.7-high
-    edit        claude-sonnet-5        gpt-6-astra     grok-4.7-high
+    class       claude                       codex            cursor
+    -------     --------------------------   --------------   --------------
+    search      claude-haiku-4-5-20251001    gpt-5.6-luna     composer-2.5
+    edit        claude-sonnet-5              gpt-6-astra      grok-4.7-high
     draft       claude-sonnet-5        gpt-6-astra     grok-4.7-high
     review      claude-fable-5-1       gpt-6-astra     grok-4.7-high
     architect   claude-fable-5-1       gpt-6-astra     grok-4.7-high
@@ -168,6 +168,7 @@ class TaskClassConfig:
     default_timeout_s: int
     description: str
     codex_search: bool = False  # opt-in per class
+    grok_reasoning_effort: str | None = None  # native grok --reasoning-effort
 
 
 # Model slugs below are LIVE defaults as of 2026-09-22. Re-probe before trusting
@@ -182,17 +183,18 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     "search": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
-            "claude": "claude-sonnet-5",
-            "codex": "gpt-6-astra",
+            "claude": "claude-haiku-4-5-20251001",
+            "codex": "gpt-5.6-luna",
             "deepseek": "deepseek-flash",  # V4.1 Flash, first-party, local-only
             "grok": "grok-4.7",
-            "cursor": "grok-4.7-high",
+            "cursor": "composer-2.5",
             "kimi": "kimi-code/k3-256k",
         },
         default_mode="read-only",
         default_timeout_s=600,
         description="cheap codebase scans, file lookups, factual Q&A",
         codex_search=False,
+        grok_reasoning_effort="low",
     ),
     "edit": TaskClassConfig(
         models={
@@ -707,7 +709,13 @@ def _hermes_cli_model(model: str) -> str:
     return model
 
 
-def _router_command(agent: str, model: str, prompt: str) -> list[str]:
+def _router_command(
+    agent: str,
+    model: str,
+    prompt: str,
+    *,
+    grok_effort: str | None = None,
+) -> list[str]:
     """Build the subprocess command for direct router CLIs."""
     if agent == "opencode":
         # ``--format json`` emits NDJSON events instead of ANSI TUI output.
@@ -733,7 +741,10 @@ def _router_command(agent: str, model: str, prompt: str) -> list[str]:
             prompt,
         ]
     if agent == "grok":
-        return [_grok_binary(), "-p", prompt, "-m", model, "--output-format", "plain"]
+        cmd = [_grok_binary(), "-p", prompt, "-m", model, "--output-format", "plain"]
+        if grok_effort:
+            cmd.extend(["--reasoning-effort", grok_effort])
+        return cmd
     if agent == "hermes":
         raise ValueError(HERMES_RETIRED_MESSAGE)
     raise ValueError(f"unsupported direct router agent: {agent}")
@@ -756,9 +767,10 @@ def _run_router_agent(
     model: str,
     cwd: Path,
     timeout_s: int,
+    grok_effort: str | None = None,
 ) -> tuple[bool, str, str]:
     """Invoke a session-less router CLI and return (ok, stdout, stderr)."""
-    cmd = _router_command(agent, model, prompt)
+    cmd = _router_command(agent, model, prompt, grok_effort=grok_effort)
     stdin_payload = prompt if agent == "opencode" else ""
     if agent == "cursor":
         stdin_payload = ""
@@ -833,6 +845,7 @@ def fire(
                 model=model,
                 cwd=worktree or Path.cwd(),
                 timeout_s=timeout_s,
+                grok_effort=TASK_CLASSES[task_class].grok_reasoning_effort,
             )
             session_id = None
         else:

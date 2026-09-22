@@ -10,7 +10,7 @@ Pick the right agent + model + tier for a task before firing a dispatch. This sk
 
 **Hermes is RETIRED (2026-09-16).** `--agent hermes` fail-closes. xAI content/CF → `--agent grok --model grok-4.7`. DeepSeek V4.1 Flash → `--agent deepseek --model deepseek-flash` (first-party, local-only). **OpenCode and Qwen are not routing seats** (`--agent opencode` and `--agent qwen` fail closed).
 
-**Operator topology (2026-09-22):** Cursor dispatches use `grok-4.7-high` (Cursor catalog id for Grok 4.7 High; there is no bare `grok-4.7` slug). Codex uses `gpt-6-astra` (installed Codex model; there is no `gpt-6.0` slug). Claude uses `claude-fable-5-1` (Fable 5.1) for architect and review, and `claude-sonnet-5` (Sonnet 5) for search, edit, and draft. Native grok stays `grok-4.7`. DeepSeek stays `deepseek-flash` (V4.1 Flash).
+**Operator topology (2026-09-22):** Cursor dispatches use `grok-4.7-high` except search, which uses `composer-2.5`. Codex uses `gpt-6-astra` except search, which uses `gpt-5.6-luna`. Claude uses `claude-fable-5-1` for architect and review, `claude-sonnet-5` for edit and draft, and `claude-haiku-4-5-20251001` for search. Native grok stays `grok-4.7`, with `--reasoning-effort low` on search. DeepSeek stays `deepseek-flash` (V4.1 Flash).
 
 ## LIVE model discovery (do this; do not ask the operator to recite)
 
@@ -19,12 +19,12 @@ Probe CLIs before a wave or when anything looks stale. Canonical defaults also l
 | Lane | Probe | Current default (2026-09-22) |
 |---|---|---|
 | **agy** (Google) | `agy models` | `gemini-3.8-flash-high` |
-| **cursor** | `agent --list-models` | `grok-4.7-high` (Grok 4.7 High) |
-| **grok** (xAI) | `grok models` | `grok-4.7` (CLI default) |
+| **claude** | Claude catalog | `claude-haiku-4-5-20251001` for search; `claude-sonnet-5` for edit/draft; `claude-fable-5-1` for review and architect |
+| **codex** | `~/.codex/config.toml` `model` | `gpt-6-astra`; search uses `gpt-5.6-luna` |
+| **cursor** | `agent --list-models` | `grok-4.7-high`; search uses `composer-2.5` |
+| **grok** (xAI) | `grok models` | `grok-4.7`; search adds `--reasoning-effort low` (no Composer slug) |
 | **deepseek** | first-party catalog | `deepseek-flash` (V4.1 Flash, local-only) |
 | **kimi** | `~/.kimi-code/config.toml` `default_model` | `kimi-code/k3-256k` (ACP oneshot; not bare `kimi -p`) |
-| **claude** | Claude catalog | `claude-sonnet-5` for search/edit/draft; `claude-fable-5-1` for review and architect |
-| **codex** | `~/.codex/config.toml` `model` | `gpt-6-astra` |
 | ~~hermes~~ | — | **RETIRED** — do not route |
 | ~~opencode~~ / ~~qwen~~ | — | **Not routing seats** |
 
@@ -86,7 +86,7 @@ Pick the row for the activity, then the **primary doer**; for any write/author r
 > The **Activity × lane matrix above is the authoritative router** — use it first. The command-level detail below is reference for each `dispatch_smart` task class.
 
 ### Search / read-only research
-1. **Search**: `dispatch_smart search --agent claude` (`claude-sonnet-5`) or `--agent cursor --model grok-4.7-high`.
+1. **Search**: `dispatch_smart search --agent claude` (`claude-haiku-4-5-20251001`), `--agent codex` (`gpt-5.6-luna`), or `--agent cursor --model composer-2.5`. Native grok search is `grok-4.7` with `--reasoning-effort low`.
 2. Do not spend `claude-fable-5-1` or `gpt-6-astra` on a file lookup.
 3. For browser-required source fetch: `mcp__claude-in-chrome__*` ([[feedback_chrome_for_primary_source_fetch]]).
 4. For x.com links: `--agent grok --model grok-4.7`.
