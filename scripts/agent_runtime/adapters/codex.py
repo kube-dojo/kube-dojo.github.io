@@ -116,7 +116,7 @@ class CodexAdapter:
     """Adapter for ``codex exec`` (OpenAI ChatGPT Codex CLI)."""
 
     name: str = "codex"
-    default_model: str = "gpt-5.5"
+    default_model: str = "gpt-6-sol"
     supported_modes: frozenset[str] = frozenset({"danger"})
 
     def build_invocation(
@@ -179,6 +179,9 @@ class CodexAdapter:
         else:
             use_search = os.environ.get("KUBEDOJO_CODEX_SEARCH", "0") == "1"
         cmd: list[str] = [codex_bin]
+        effort = os.environ.get("KUBEDOJO_CODEX_EFFORT", "").strip()
+        if effort:
+            cmd.extend(["-c", f'model_reasoning_effort="{effort}"'])
         if session_id:
             if use_search:
                 cmd.append("--search")

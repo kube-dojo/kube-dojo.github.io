@@ -50,10 +50,10 @@ Task classes — model mapping per agent:
 
     class       claude                       codex            cursor
     -------     --------------------------   --------------   --------------
-    search      claude-haiku-4-5-20251001    gpt-5.6-luna     composer-2.5
-    edit        claude-sonnet-5              gpt-6-astra      grok-4.7-high
-    draft       claude-sonnet-5        gpt-6-astra     grok-4.7-high
-    review      claude-opus-5-5        gpt-6-astra     grok-4.7-high
+    search      claude-haiku-4-5-20251001    gpt-6-luna       composer-2.5
+    edit        claude-sonnet-5              gpt-6-luna       grok-4.7-high
+    draft       claude-sonnet-5        gpt-6-sol       grok-4.7-high
+    review      claude-opus-5-5        gpt-6-sol       grok-4.7-high
     architect   claude-fable-5-1       gpt-6-astra     grok-4.7-high
 
 Each dispatch is recorded to ``logs/smart_dispatch.jsonl`` for usage
@@ -169,6 +169,9 @@ class TaskClassConfig:
     default_timeout_s: int
     description: str
     codex_search: bool = False  # opt-in per class
+    # Codex reasoning effort. High is the default for Sol, Luna, and Astra.
+    # Luna max is only for an unusually hard scout; do not set it here.
+    codex_reasoning_effort: str = "high"
     grok_reasoning_effort: str | None = None  # native grok --reasoning-effort
 
 
@@ -177,7 +180,13 @@ class TaskClassConfig:
 # Claude catalog: review default = claude-opus-5-5 (Opus 5.5);
 # architect/advisor = claude-fable-5-1 (Fable 5.1);
 # edit/draft = claude-sonnet-5 (Sonnet 5); search = claude-haiku-4-5-20251001.
-# Codex is gpt-6-astra except search, which is gpt-5.6-luna.
+# Codex (probed 2026-09-22, `codex debug models`): gpt-6-sol @ high is the
+# orchestrator, advanced-work seat, and formal reviewer (draft + review).
+# gpt-6-luna @ high scouts and does bounded repeatable work (search + edit);
+# it is not a reviewer. gpt-6-astra @ high stays advisory (architect).
+# gpt-5.6-sol, gpt-5.6-terra, and gpt-5.6-luna are fallback only.
+# Luna is about 20x cheaper than Sol ($0.10/$0.50 vs $2/$10 per million).
+# Do not treat Luna max as a match for Sol low. Default scout effort is high.
 # Cursor is grok-4.7-high except search, which is composer-2.5.
 # Native grok search stays grok-4.7 with --reasoning-effort low.
 # DeepSeek V4.1 Flash is deepseek-flash (first-party). OpenCode and Qwen are
@@ -187,7 +196,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-haiku-4-5-20251001",
-            "codex": "gpt-5.6-luna",
+            "codex": "gpt-6-luna",
             "deepseek": "deepseek-flash",  # V4.1 Flash, first-party, local-only
             "grok": "grok-4.7",
             "cursor": "composer-2.5",
@@ -203,7 +212,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6-astra",
+            "codex": "gpt-6-luna",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -218,7 +227,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6-astra",
+            "codex": "gpt-6-sol",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -233,7 +242,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-opus-5-5",
-            "codex": "gpt-6-astra",
+            "codex": "gpt-6-sol",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -831,13 +840,16 @@ def fire(
 
     started = time.time()
     previous_search: str | None = None
+    previous_effort: str | None = None
     previous_dispatched: str | None = None
     try:
         previous_search = os.environ.get("KUBEDOJO_CODEX_SEARCH")
+        previous_effort = os.environ.get("KUBEDOJO_CODEX_EFFORT")
         previous_dispatched = os.environ.get("KUBEDOJO_DISPATCHED")
         if agent == "codex":
             cfg = TASK_CLASSES[task_class]
             os.environ["KUBEDOJO_CODEX_SEARCH"] = "1" if cfg.codex_search else "0"
+            os.environ["KUBEDOJO_CODEX_EFFORT"] = cfg.codex_reasoning_effort
         env = os.environ.copy()
         env["KUBEDOJO_DISPATCHED"] = "1"
         os.environ.update(env)
@@ -911,6 +923,10 @@ def fire(
                 os.environ.pop("KUBEDOJO_CODEX_SEARCH", None)
             else:
                 os.environ["KUBEDOJO_CODEX_SEARCH"] = previous_search
+            if previous_effort is None:
+                os.environ.pop("KUBEDOJO_CODEX_EFFORT", None)
+            else:
+                os.environ["KUBEDOJO_CODEX_EFFORT"] = previous_effort
         if previous_dispatched is None:
             os.environ.pop("KUBEDOJO_DISPATCHED", None)
         else:
@@ -1189,9 +1205,14 @@ def main() -> int:
         return 2
 
     if args.dry_run:
+        effort_note = ""
+        if args.agent == "codex":
+            effort_note = (
+                f" codex_effort={TASK_CLASSES[args.task_class].codex_reasoning_effort}"
+            )
         print(
             f"[dry-run] agent={args.agent} task_class={args.task_class} "
-            f"model={model} mode={mode} timeout={timeout_s}s"
+            f"model={model} mode={mode} timeout={timeout_s}s{effort_note}"
         )
         _wt_label = worktree or f"(none — {mode})"
         print(f"[dry-run] worktree={_wt_label}")

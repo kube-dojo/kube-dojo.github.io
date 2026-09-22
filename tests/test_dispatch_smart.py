@@ -209,7 +209,7 @@ def test_parse_opencode_json_events_extracts_final_assistant_text() -> None:
     assert _parse_opencode_json_events(ndjson) == "VERDICT: APPROVE"
 
 
-def test_codex_defaults_are_gpt_6_astra() -> None:
+def test_codex_defaults_are_gpt_6_sol_luna_astra() -> None:
     sys.path.insert(0, str(SCRIPTS_DIR))
     from dispatch_smart import TASK_CLASSES
 
@@ -217,11 +217,17 @@ def test_codex_defaults_are_gpt_6_astra() -> None:
         assert "opencode" not in cfg.models
         assert "qwen" not in cfg.models
         assert cfg.models["deepseek"] == "deepseek-flash"
+        assert cfg.codex_reasoning_effort == "high", task_class
+        assert not cfg.models["codex"].startswith("gpt-5.6"), task_class
+        if task_class in {"search", "edit"}:
+            assert cfg.models["codex"] == "gpt-6-luna", task_class
+        elif task_class in {"draft", "review"}:
+            assert cfg.models["codex"] == "gpt-6-sol", task_class
+        elif task_class == "architect":
+            assert cfg.models["codex"] == "gpt-6-astra"
         if task_class == "search":
-            assert cfg.models["codex"] == "gpt-5.6-luna"
             assert cfg.models["cursor"] == "composer-2.5"
         else:
-            assert cfg.models["codex"] == "gpt-6-astra", task_class
             assert cfg.models["cursor"] == "grok-4.7-high"
 
 
@@ -243,7 +249,7 @@ def test_claude_opus_default_fable_advisor_sonnet_routine() -> None:
     for task_class in ("edit", "draft"):
         assert TASK_CLASSES[task_class].models["claude"] == "claude-sonnet-5"
     assert TASK_CLASSES["search"].models["claude"] == "claude-haiku-4-5-20251001"
-    assert TASK_CLASSES["search"].models["codex"] == "gpt-5.6-luna"
+    assert TASK_CLASSES["search"].models["codex"] == "gpt-6-luna"
     assert TASK_CLASSES["search"].models["cursor"] == "composer-2.5"
     assert TASK_CLASSES["search"].models["grok"] == "grok-4.7"
     assert TASK_CLASSES["search"].grok_reasoning_effort == "low"
