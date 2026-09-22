@@ -1,6 +1,6 @@
 ---
 name: dispatch-router
-description: Pick the right KubeDojo agent for a task across ALL activities — write / code / review / research / mechanical, not just review. Activity × lane matrix → agent → model → dispatch command. LIVE roster probed 2026-09-22 (agy gemini-3.8-flash-high, cursor grok-4.7-high, native grok-4.7, codex gpt-6-astra, claude-opus-5-5 default / claude-fable-5-1 advisor / claude-sonnet-5 routine, deepseek-flash V4.1, kimi-code/k3-256k). OpenCode and Qwen are not routing seats. Hermes RETIRED. Use before any dispatch. Triggers on "which agent", "dispatch", "route to", "who should do this".
+description: Pick the right KubeDojo agent for a task across ALL activities — write / code / review / research / mechanical, not just review. Activity × lane matrix → agent → model → dispatch command. LIVE roster probed 2026-09-22 (agy gemini-3.8-flash-high, cursor grok-4.7-high, native grok-4.7, codex gpt-6-sol / gpt-6-luna / gpt-6-astra, claude-opus-5-5 default / claude-fable-5-1 advisor / claude-sonnet-5 routine, deepseek-flash V4.1, kimi-code/k3-256k). OpenCode and Qwen are not routing seats. Hermes RETIRED. Use before any dispatch. Triggers on "which agent", "dispatch", "route to", "who should do this".
 last_calibrated: 2026-09-22
 ---
 
@@ -10,7 +10,7 @@ Pick the right agent + model + tier for a task before firing a dispatch. This sk
 
 **Hermes is RETIRED (2026-09-16).** `--agent hermes` fail-closes. xAI content/CF → `--agent grok --model grok-4.7`. DeepSeek V4.1 Flash → `--agent deepseek --model deepseek-flash` (first-party, local-only). **OpenCode and Qwen are not routing seats** (`--agent opencode` and `--agent qwen` fail closed).
 
-**Operator topology (2026-09-22):** Cursor dispatches use `grok-4.7-high` except search, which uses `composer-2.5`. Codex uses `gpt-6-astra` except search, which uses `gpt-5.6-luna`. Claude default is `claude-opus-5-5` (review). `claude-fable-5-1` stays the advisor (architect). `claude-sonnet-5` is fast routine work (edit and draft). Search stays `claude-haiku-4-5-20251001`. Native grok stays `grok-4.7`, with `--reasoning-effort low` on search. DeepSeek stays `deepseek-flash` (V4.1 Flash).
+**Operator topology (2026-09-22):** Cursor dispatches use `grok-4.7-high` except search, which uses `composer-2.5`. Codex routing stays with the Sol orchestrator: `gpt-6-sol` at high is advanced work (draft) and the formal review seat. `gpt-6-luna` at high scouts and does bounded repeatable work (search and edit); Luna is not the orchestrator and not a reviewer. `gpt-6-astra` at high stays advisory (architect). OpenAI still ranks Astra as the strongest model in the family. Sol at its top effort can beat Astra at low effort on some tests, and Sol does not replace Astra for advisory. `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` are fallback only; new work does not pick them. Luna's token price is 20 times below Sol (`$0.10` / `$0.50` versus `$2` / `$10` per million), not one fifth. OpenAI did not publish a result that Luna max matches Sol low. Default scouting effort is high; reserve Luna max for an unusually hard scout. Claude default is `claude-opus-5-5` (review). `claude-fable-5-1` stays the advisor (architect). `claude-sonnet-5` is fast routine work (edit and draft). Search stays `claude-haiku-4-5-20251001`. Native grok stays `grok-4.7`, with `--reasoning-effort low` on search. DeepSeek stays `deepseek-flash` (V4.1 Flash).
 
 ## LIVE model discovery (do this; do not ask the operator to recite)
 
@@ -20,7 +20,7 @@ Probe CLIs before a wave or when anything looks stale. Canonical defaults also l
 |---|---|---|
 | **agy** (Google) | `agy models` | `gemini-3.8-flash-high` |
 | **claude** | Claude catalog | `claude-opus-5-5` default (review); `claude-fable-5-1` advisor (architect); `claude-sonnet-5` fast routine (edit/draft); `claude-haiku-4-5-20251001` for search |
-| **codex** | `~/.codex/config.toml` `model` | `gpt-6-astra`; search uses `gpt-5.6-luna` |
+| **codex** | `codex debug models` | `gpt-6-sol` @ high orchestrator / advanced / review; `gpt-6-luna` @ high scout and bounded work; `gpt-6-astra` @ high advisory. Do not pick `gpt-5.6-*` |
 | **cursor** | `agent --list-models` | `grok-4.7-high`; search uses `composer-2.5` |
 | **grok** (xAI) | `grok models` | `grok-4.7`; search adds `--reasoning-effort low` (no Composer slug) |
 | **deepseek** | first-party catalog | `deepseek-flash` (V4.1 Flash, local-only) |
@@ -37,7 +37,7 @@ Rotate **authors** and **cross-family CF** across these seats so none idle while
 | Seat | Dispatch | Default model | Prefer for | Never |
 |---|---|---|---|---|
 | **agy** | `--agent agy` | `gemini-3.8-flash-high` | EN content drafts / CF | habit-only author lane; stale `gemini-3.5-*` |
-| **codex** | `--agent codex` | `gpt-6-astra` | quality-critical author + CF | habit-route on weekly deficit |
+| **codex** | `--agent codex` | `gpt-6-sol` @ high | advanced author + formal CF; Luna scouts; Astra advises | habit-route on weekly deficit |
 | **kimi** | `--agent kimi` | `kimi-code/k3-256k` | EN drafts/edits (ACP tools) | UK translation; bare `kimi -p` |
 | **claude** | `--agent claude` | `claude-opus-5-5` | opus default for review; fable for architect; sonnet for edit/draft | pile-on during Anthropic throttle |
 | **cursor** | `--agent cursor --model grok-4.7-high` | `grok-4.7-high` | when a worker seat is Cursor | this driver dispatching `--agent cursor` to itself |
@@ -47,7 +47,7 @@ Rotate **authors** and **cross-family CF** across these seats so none idle while
 
 **Cursor seat:** dispatch *to* cursor with `--model grok-4.7-high`. Driver-on-Cursor → never `--agent cursor` (that would contend with this seat).
 
-**Rotation rule (wave of N packets):** author seats cycle `kimi → agy → claude → grok-4.7 → codex` (skip only on live CodexBar throttle / auth fail). CF seat ≠ author family. Codex model is `gpt-6-astra`. Claude review uses `claude-opus-5-5`. Claude architect stays `claude-fable-5-1`. Claude edit and draft use `claude-sonnet-5`; search uses Haiku. Prefer `kimi-code/k3-256k` over `kimi-code/k3` (1M) unless context demands it. Kimi headless writes go through ACP (`KimiAdapter` / `kimi_acp_oneshot.py`), not `-p`. Do not route OpenCode or Qwen.
+**Rotation rule (wave of N packets):** author seats cycle `kimi → agy → claude → grok-4.7 → codex` (skip only on live CodexBar throttle / auth fail). CF seat ≠ author family. Codex advanced work and formal review use `gpt-6-sol` at high. Codex scouting and bounded edits use `gpt-6-luna` at high. Codex advisory uses `gpt-6-astra` at high. Claude review uses `claude-opus-5-5`. Claude architect stays `claude-fable-5-1`. Claude edit and draft use `claude-sonnet-5`; search uses Haiku. Prefer `kimi-code/k3-256k` over `kimi-code/k3` (1M) unless context demands it. Kimi headless writes go through ACP (`KimiAdapter` / `kimi_acp_oneshot.py`), not `-p`. Do not route OpenCode or Qwen.
 
 ## Activity × lane matrix — route by ACTIVITY (families stable; MODEL IDS in older rows may be stale)
 
@@ -55,16 +55,16 @@ Pick the row for the activity, then the **primary doer**; for any write/author r
 
 | Activity | Primary doer | Cross-family reviewer(s) | Off-load / candidates |
 |---|---|---|---|
-| **Curriculum content — WRITE** (prose modules, expand-to-floor) | **cursor** `--model grok-4.7-high` ‖ **codex** `gpt-6-astra` ‖ **claude** `claude-sonnet-5` | `claude-opus-5-5` or native `grok-4.7`, family ≠ author | agy, deepseek-flash |
-| **Curriculum content — REVIEW** | — | **claude-opus-5-5** / **grok-4.7** / **codex** `gpt-6-astra` / **cursor** `grok-4.7-high` / **deepseek-flash** | family ≠ author. Do not use Gemini Flash as the code reviewer. |
-| **UK translation — TRANSLATE** (EN→uk modules; roster tested 2026-07-04) | **deepseek-flash** (V4.1, local only, never CI) ‖ **claude-opus-5-5** for highest-stakes/reference | **claude-opus-5-5 + gpt-6-astra** (≠ DeepSeek) | Russicism/calque stays deterministic (`scripts/check_uk_changed.py`), not the model reviewers |
-| **Code / tooling — WRITE & FIX** (scripts, adapters, pipeline) | **cursor** `grok-4.7-high` | **codex** `gpt-6-astra` / **claude-opus-5-5** / **grok-4.7** / **deepseek-flash** | — |
-| **Code / tooling — REVIEW** | — | **codex** `gpt-6-astra` / **claude-opus-5-5** / **grok-4.7** / **deepseek-flash** | feed COMPLETE diffs |
-| **Code-heavy MODULE content** (extending-k8s, tool certs — modules WITH code that must build) | **codex** `gpt-6-astra` | **claude-opus-5-5** or **grok-4.7** | cursor, agy |
+| **Curriculum content — WRITE** (prose modules, expand-to-floor) | **cursor** `--model grok-4.7-high` ‖ **codex** `gpt-6-sol` ‖ **claude** `claude-sonnet-5` | `claude-opus-5-5` or native `grok-4.7`, family ≠ author | agy, deepseek-flash |
+| **Curriculum content — REVIEW** | — | **claude-opus-5-5** / **grok-4.7** / **codex** `gpt-6-sol` / **cursor** `grok-4.7-high` / **deepseek-flash** | family ≠ author. Do not use Gemini Flash as the code reviewer. |
+| **UK translation — TRANSLATE** (EN→uk modules; roster tested 2026-07-04) | **deepseek-flash** (V4.1, local only, never CI) ‖ **claude-opus-5-5** for highest-stakes/reference | **claude-opus-5-5 + gpt-6-sol** (≠ DeepSeek) | Russicism/calque stays deterministic (`scripts/check_uk_changed.py`), not the model reviewers |
+| **Code / tooling — WRITE & FIX** (scripts, adapters, pipeline) | **cursor** `grok-4.7-high` | **codex** `gpt-6-sol` / **claude-opus-5-5** / **grok-4.7** / **deepseek-flash** | — |
+| **Code / tooling — REVIEW** | — | **codex** `gpt-6-sol` / **claude-opus-5-5** / **grok-4.7** / **deepseek-flash** | feed COMPLETE diffs |
+| **Code-heavy MODULE content** (extending-k8s, tool certs — modules WITH code that must build) | **codex** `gpt-6-sol` | **claude-opus-5-5** or **grok-4.7** | cursor, agy |
 | **Research / gap-analysis / architecture** | **claude-fable-5-1** + **codex** `gpt-6-astra` + native **grok-4.7** | `ab discuss --with claude,codex,agy` for high-leverage ([[.claude/rules/decision-card]]) | — |
 | **Mechanical / deterministic** (gate fixes, link fixes, batched edits, search) | **cursor** `grok-4.7-high` or **claude-sonnet-5** | self-verify (`verify_module.py`, build, health) | — |
 
-**Cross-family map** (reviewer ≠ author family): OpenAI = codex `gpt-6-astra` · Anthropic = claude (`claude-opus-5-5` default for review, `claude-fable-5-1` for architect, `claude-sonnet-5` for edit and draft) · Google = **agy** · DeepSeek = `deepseek-flash` · **Cursor** = `grok-4.7-high` · xAI native = **grok-4.7**. OpenCode and Qwen are not routing seats. Soft caution: cursor↔grok share a model family when Cursor is pinned to grok-4.7, so a Cursor-authored change needs a non-xAI reviewer.
+**Cross-family map** (reviewer ≠ author family): OpenAI = codex (`gpt-6-sol` @ high for formal review, `gpt-6-luna` @ high for scouting, `gpt-6-astra` @ high for advisory) · Anthropic = claude (`claude-opus-5-5` default for review, `claude-fable-5-1` for architect, `claude-sonnet-5` for edit and draft) · Google = **agy** · DeepSeek = `deepseek-flash` · **Cursor** = `grok-4.7-high` · xAI native = **grok-4.7**. OpenCode and Qwen are not routing seats. Soft caution: cursor↔grok share a model family when Cursor is pinned to grok-4.7, so a Cursor-authored change needs a non-xAI reviewer.
 
 **Cost order (use flat-rate first; deepseek is dirt-cheap, not avoided):** cursor · codex · agy · deepseek · grok (xAI sub via native grok CLI). **opus headless is the only genuinely metered lane → ≤1–2 hardest reviews/wave.**
 
@@ -73,7 +73,7 @@ Pick the row for the activity, then the **primary doer**; for any write/author r
 | Agent | Access path | Strength | Constraint |
 |---|---|---|---|
 | cursor | `dispatch_smart --agent cursor --model grok-4.7-high` | Grok 4.7 High on the Cursor seat | Do not dispatch cursor from a Cursor driver session |
-| codex | `dispatch_smart --agent codex` | `gpt-6-astra` | Weekly cap; review always danger |
+| codex | `dispatch_smart --agent codex` | `gpt-6-sol` @ high review/draft; `gpt-6-luna` @ high search/edit; `gpt-6-astra` @ high architect | Weekly cap; review always danger |
 | claude | inline or `--agent claude` | `claude-opus-5-5` default for review; `claude-fable-5-1` for architect; `claude-sonnet-5` for edit/draft; Haiku for search | Headless binary must be installed |
 | agy | `--agent agy --model gemini-3.8-flash-high` | Google content drafts | Do not use Flash as the code reviewer |
 | deepseek-flash | `--agent deepseek` | V4.1 Flash, first-party, local only | Never CI |
@@ -86,8 +86,8 @@ Pick the row for the activity, then the **primary doer**; for any write/author r
 > The **Activity × lane matrix above is the authoritative router** — use it first. The command-level detail below is reference for each `dispatch_smart` task class.
 
 ### Search / read-only research
-1. **Search**: `dispatch_smart search --agent claude` (`claude-haiku-4-5-20251001`), `--agent codex` (`gpt-5.6-luna`), or `--agent cursor --model composer-2.5`. Native grok search is `grok-4.7` with `--reasoning-effort low`.
-2. Do not spend `claude-opus-5-5`, `claude-fable-5-1`, or `gpt-6-astra` on a file lookup.
+1. **Search**: `dispatch_smart search --agent claude` (`claude-haiku-4-5-20251001`), `--agent codex` (`gpt-6-luna` at high), or `--agent cursor --model composer-2.5`. Native grok search is `grok-4.7` with `--reasoning-effort low`.
+2. Do not spend `claude-opus-5-5`, `claude-fable-5-1`, `gpt-6-sol`, or `gpt-6-astra` on a file lookup. Do not pick `gpt-5.6-luna`.
 3. For browser-required source fetch: `mcp__claude-in-chrome__*` ([[feedback_chrome_for_primary_source_fetch]]).
 4. For x.com links: `--agent grok --model grok-4.7`.
 
@@ -99,7 +99,7 @@ Pick the row for the activity, then the **primary doer**; for any write/author r
 
 T0 author primary is **codex-or-cursor** depending on codex weekly-cap state — quality-best lane per [[feedback_quality_over_budget_in_role_allocation]]:
 
-1. **Codex** → `.venv/bin/python scripts/dispatch_smart.py draft --agent codex --mode danger --worktree X`. Default model is `gpt-6-astra`. Skip this lane when CodexBar shows a weekly pace deficit.
+1. **Codex** → `.venv/bin/python scripts/dispatch_smart.py draft --agent codex --mode danger --worktree X`. Default model is `gpt-6-sol` at high. Skip this lane when CodexBar shows a weekly pace deficit.
 2. **Cursor** → `.venv/bin/python scripts/dispatch_smart.py draft --agent cursor --model grok-4.7-high`. Do not use `auto`. Do not dispatch cursor from a Cursor driver session.
 3. **Claude draft** → `claude-sonnet-5`. Review uses `claude-opus-5-5`. Architect uses `claude-fable-5-1`.
 4. **Off-load** → `dispatch_smart draft --agent deepseek` (`deepseek-flash`, local only). Spread parallel-cap per [[feedback_parallel_rewrite_cap_three]].
@@ -111,7 +111,7 @@ T0 author primary is **codex-or-cursor** depending on codex weekly-cap state —
 3. Always `--mode danger --worktree X` for codex review ([[feedback_codex_review_danger_mode]]).
 
 ### Architect / consult / decision
-1. `dispatch_smart architect --agent claude` (`claude-fable-5-1`) or `--agent codex` (`gpt-6-astra`).
+1. `dispatch_smart architect --agent claude` (`claude-fable-5-1`) or `--agent codex` (`gpt-6-astra` at high). Sol does not take the advisory seat.
 2. For high-leverage decisions: `scripts/ab discuss --with claude,codex,agy` ([[.claude/rules/decision-card]]).
 3. Consult codex on non-trivial scope decisions ([[feedback_consult_codex_on_decisions]]).
 

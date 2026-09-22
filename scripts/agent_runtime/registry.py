@@ -55,7 +55,7 @@ AGENTS: dict[str, AgentEntry] = {
     },
     "codex": {
         "adapter": "scripts.agent_runtime.adapters.codex:CodexAdapter",
-        "default_model": os.environ.get("AB_CODEX_MODEL", "gpt-5.5"),
+        "default_model": os.environ.get("AB_CODEX_MODEL", "gpt-6-sol"),
         "cost_tier": "medium",
         "capabilities": frozenset({
             "code_writing",

@@ -134,11 +134,13 @@ def _codex_invocation_plan(
     adapter = adapter_module.CodexAdapter()
 
     old = os.environ.get("KUBEDOJO_CODEX_SEARCH")
+    old_effort = os.environ.get("KUBEDOJO_CODEX_EFFORT")
     try:
         if search_env is None:
             os.environ.pop("KUBEDOJO_CODEX_SEARCH", None)
         else:
             os.environ["KUBEDOJO_CODEX_SEARCH"] = search_env
+        os.environ.pop("KUBEDOJO_CODEX_EFFORT", None)
         return adapter.build_invocation(
             prompt=prompt,
             mode="danger",
@@ -153,6 +155,10 @@ def _codex_invocation_plan(
             os.environ.pop("KUBEDOJO_CODEX_SEARCH", None)
         else:
             os.environ["KUBEDOJO_CODEX_SEARCH"] = old
+        if old_effort is None:
+            os.environ.pop("KUBEDOJO_CODEX_EFFORT", None)
+        else:
+            os.environ["KUBEDOJO_CODEX_EFFORT"] = old_effort
 
 
 def test_codex_adapter_rejects_workspace_write_mode():
@@ -268,6 +274,34 @@ def test_codex_adapter_resume_uses_stdin_for_prompt():
     )
     assert plan.cmd[-1] == "-"
     assert plan.stdin_payload == "x"
+
+
+def test_codex_adapter_effort_is_config_override_before_exec():
+    import os
+
+    adapter_module = _load_codex_adapter()
+    adapter = adapter_module.CodexAdapter()
+    old = os.environ.get("KUBEDOJO_CODEX_EFFORT")
+    try:
+        os.environ["KUBEDOJO_CODEX_EFFORT"] = "high"
+        plan = adapter.build_invocation(
+            prompt="x",
+            mode="danger",
+            cwd=REPO_ROOT,
+            model="gpt-6-luna",
+            task_id=None,
+            session_id=None,
+            tool_config=None,
+        )
+    finally:
+        if old is None:
+            os.environ.pop("KUBEDOJO_CODEX_EFFORT", None)
+        else:
+            os.environ["KUBEDOJO_CODEX_EFFORT"] = old
+    cmd = plan.cmd
+    assert cmd[1:3] == ["-c", 'model_reasoning_effort="high"']
+    assert cmd.index("-c") < cmd.index("exec")
+    assert cmd[cmd.index("-m") + 1] == "gpt-6-luna"
 
 
 def test_codex_adapter_resume_search_flag_order():
