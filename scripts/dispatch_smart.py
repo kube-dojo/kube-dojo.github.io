@@ -47,13 +47,13 @@ Skill auto-loading:
 
 Task classes — model mapping per agent:
 
-    class       claude                       codex
-    -------     -------------------------    ----------------------
-    search      claude-haiku-4-5-20251001    gpt-5.4-mini
-    edit        claude-sonnet-4-6            gpt-5.3-codex-spark
-    draft       claude-sonnet-4-6            gpt-5.5
-    review      claude-sonnet-4-6            gpt-5.5
-    architect   claude-opus-4-8              gpt-5.5
+    class       claude                 codex           cursor
+    -------     --------------------   -------------   --------------
+    search      claude-sonnet-5        gpt-6-astra     grok-4.7-high
+    edit        claude-sonnet-5        gpt-6-astra     grok-4.7-high
+    draft       claude-sonnet-5        gpt-6-astra     grok-4.7-high
+    review      claude-fable-5-1       gpt-6-astra     grok-4.7-high
+    architect   claude-fable-5-1       gpt-6-astra     grok-4.7-high
 
 Each dispatch is recorded to ``logs/smart_dispatch.jsonl`` for usage
 auditing. The FULL response body is also persisted to
@@ -148,9 +148,16 @@ HERMES_RETIRED_MESSAGE = (
     "Use --agent grok --model grok-4.7 for xAI content/CF "
     "(native grok CLI; replaces grok-4.6; frontier tier with Fable and Astra; "
     "grok-build is gone). "
-    "Use --agent deepseek for DeepSeek via opencode "
-    "(deepseek-direct/deepseek-flash, local-only). "
-    "Qwen: --agent opencode --model openrouter/qwen/… or residual --agent qwen."
+    "Use --agent deepseek --model deepseek-flash for DeepSeek V4.1 Flash "
+    "(first-party, local-only). "
+    "OpenCode and Qwen are not routing seats."
+)
+
+OPENCODE_QWEN_RETIRED_MESSAGE = (
+    "[smart] REFUSED: --agent opencode and --agent qwen are not routing seats. "
+    "DeepSeek V4.1 Flash is --agent deepseek --model deepseek-flash "
+    "(local-only). Cursor is --agent cursor --model grok-4.7-high. "
+    "Do not route Qwen or OpenCode."
 )
 
 
@@ -163,26 +170,24 @@ class TaskClassConfig:
     codex_search: bool = False  # opt-in per class
 
 
-# Model slugs below are LIVE defaults as of 2026-09-16. Re-probe before trusting
-# memory: ``agy models``, ``grok models``, ``opencode models``, kimi
-# ``default_model`` in ~/.kimi-code/config.toml. Override per call with `--model`.
-# Unrecognized agy slug falls back to the adapter default.
-# Hermes RETIRED — no hermes keys. Native grok defaults to grok-4.7
-# (`grok models` default, 2026-09-21). grok-4.6 stays in the CLI catalog;
-# do not route new work to it. grok-4.7 is frontier judgment, same tier as
-# Claude Fable and OpenAI Astra. DeepSeek = opencode deepseek-direct.
+# Model slugs below are LIVE defaults as of 2026-09-22. Re-probe before trusting
+# memory. Override per call with `--model`.
+# Claude catalog: architect/review = claude-fable-5-1 (Fable 5.1);
+# search/edit/draft = claude-sonnet-5 (Sonnet 5).
+# Codex config model is gpt-6-astra (the GPT-6 seat; there is no gpt-6.0 slug).
+# Cursor catalog has no bare grok-4.7; Grok 4.7 High is grok-4.7-high.
+# DeepSeek V4.1 Flash is deepseek-flash (first-party). OpenCode and Qwen are
+# not routing seats. Native grok remains grok-4.7.
 TASK_CLASSES: dict[str, TaskClassConfig] = {
     "search": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
-            "claude": "claude-haiku-4-5-20251001",
-            "codex": "gpt-5.4-mini",
-            "deepseek": "deepseek-flash",  # V4.1 Flash via opencode deepseek-direct
+            "claude": "claude-sonnet-5",
+            "codex": "gpt-6-astra",
+            "deepseek": "deepseek-flash",  # V4.1 Flash, first-party, local-only
             "grok": "grok-4.7",
-            "cursor": "auto",
+            "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3-256k",
-            "opencode": "openrouter/qwen/qwen3.6-flash",
-            "qwen": "qwen/qwen3.6-flash",
         },
         default_mode="read-only",
         default_timeout_s=600,
@@ -192,14 +197,12 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     "edit": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
-            "claude": "claude-sonnet-4-6",
-            "codex": "gpt-5.3-codex-spark",
+            "claude": "claude-sonnet-5",
+            "codex": "gpt-6-astra",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
-            "cursor": "auto",
+            "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3-256k",
-            "opencode": "openrouter/qwen/qwen3.7-max",
-            "qwen": "qwen/qwen3.6-plus",
         },
         default_mode="workspace-write",
         default_timeout_s=1800,
@@ -209,14 +212,12 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     "draft": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
-            "claude": "claude-sonnet-4-6",
-            "codex": "gpt-5.5",
+            "claude": "claude-sonnet-5",
+            "codex": "gpt-6-astra",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
-            "cursor": "auto",
+            "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3-256k",
-            "opencode": "openrouter/qwen/qwen3.7-max",
-            "qwen": "qwen/qwen3.6-plus",
         },
         default_mode="workspace-write",
         default_timeout_s=3600,
@@ -226,14 +227,12 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     "review": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
-            "claude": "claude-sonnet-4-6",
-            "codex": "gpt-5.5",
+            "claude": "claude-fable-5-1",
+            "codex": "gpt-6-astra",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
-            "cursor": "auto",
+            "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3-256k",
-            "opencode": "openrouter/qwen/qwen3.7-max",
-            "qwen": "qwen/qwen3.6-plus",
         },
         default_mode="read-only",
         default_timeout_s=1800,
@@ -243,14 +242,12 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     "architect": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
-            "claude": "claude-opus-4-8",
-            "codex": "gpt-5.5",
+            "claude": "claude-fable-5-1",
+            "codex": "gpt-6-astra",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
-            "cursor": "auto",
+            "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3",
-            "opencode": "openrouter/anthropic/claude-sonnet-4.5",
-            "qwen": "qwen/qwen3.6-plus",
         },
         default_mode="workspace-write",
         default_timeout_s=3600,
@@ -1019,6 +1016,8 @@ def main() -> int:
 
     if args.agent == "hermes":
         raise SystemExit(HERMES_RETIRED_MESSAGE)
+    if args.agent in {"opencode", "qwen"}:
+        raise SystemExit(OPENCODE_QWEN_RETIRED_MESSAGE)
 
     cfg = TASK_CLASSES[args.task_class]
     model = args.model or cfg.models[args.agent]
