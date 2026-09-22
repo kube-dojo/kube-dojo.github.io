@@ -214,11 +214,24 @@ def test_codex_defaults_are_gpt_6_astra() -> None:
     from dispatch_smart import TASK_CLASSES
 
     for task_class, cfg in TASK_CLASSES.items():
-        assert cfg.models["codex"] == "gpt-6-astra", task_class
         assert "opencode" not in cfg.models
         assert "qwen" not in cfg.models
-        assert cfg.models["cursor"] == "grok-4.7-high"
         assert cfg.models["deepseek"] == "deepseek-flash"
+        if task_class == "search":
+            assert cfg.models["codex"] == "gpt-5.6-luna"
+            assert cfg.models["cursor"] == "composer-2.5"
+        else:
+            assert cfg.models["codex"] == "gpt-6-astra", task_class
+            assert cfg.models["cursor"] == "grok-4.7-high"
+
+
+def test_grok_search_argv_sets_low_effort() -> None:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    from dispatch_smart import _router_command
+
+    cmd = _router_command("grok", "grok-4.7", "hello", grok_effort="low")
+    assert cmd[cmd.index("-m") + 1] == "grok-4.7"
+    assert cmd[cmd.index("--reasoning-effort") + 1] == "low"
 
 
 def test_claude_fable_for_complex_sonnet_for_rest() -> None:
@@ -227,8 +240,14 @@ def test_claude_fable_for_complex_sonnet_for_rest() -> None:
 
     assert TASK_CLASSES["architect"].models["claude"] == "claude-fable-5-1"
     assert TASK_CLASSES["review"].models["claude"] == "claude-fable-5-1"
-    for task_class in ("search", "edit", "draft"):
+    for task_class in ("edit", "draft"):
         assert TASK_CLASSES[task_class].models["claude"] == "claude-sonnet-5"
+    assert TASK_CLASSES["search"].models["claude"] == "claude-haiku-4-5-20251001"
+    assert TASK_CLASSES["search"].models["codex"] == "gpt-5.6-luna"
+    assert TASK_CLASSES["search"].models["cursor"] == "composer-2.5"
+    assert TASK_CLASSES["search"].models["grok"] == "grok-4.7"
+    assert TASK_CLASSES["search"].grok_reasoning_effort == "low"
+    assert TASK_CLASSES["draft"].grok_reasoning_effort is None
 
 
 def test_dispatch_smart_codex_forces_danger_mode() -> None:
