@@ -89,12 +89,15 @@ On Azure, the signal might be Azure Monitor `Percentage CPU` on `azure.vm`.
 The governance intent is the same, but the metric names, identity model, and stop behavior differ.
 Custodian lets you make that difference visible in code instead of hiding it in one generic script.
 
-> **Pause and predict:** If you immediately stop every VM below 5% CPU, which legitimate workloads are most likely to be harmed? Name at least two before reading on.
+**Pause and predict:** If you immediately stop every VM below 5% CPU, which legitimate workloads are most likely to be harmed? Name at least two before reading on.
 
-The safer pattern is usually a two-stage action.
-First, mark the resource for review with a deadline, owner-facing message, and ticket context.
-Second, run a separate policy that acts only on resources whose deadline has passed and whose exception signal is absent.
-That two-stage shape is how you turn automation from a surprise into a visible governance process.
+<details>
+<summary>Check your prediction</summary>
+
+Batch processing workers waiting between scheduled queues, warm disaster recovery standbys, and burstable machines with intermittent activity can be legitimately quiet. Stopping them immediately disrupts valid jobs and failover capacity because low CPU utilization does not prove a machine is unused. The safer pattern is a two-stage mark-then-act lifecycle: mark the resource for review with an owner-facing message, ticket link, and clear deadline, then run a separate policy that stops only unreviewed resources after that deadline expires. Always mark for review before stopping, and remember that stopping an instance is not deleting its storage.
+</details>
+
+The next section is a flowchart diagram illustrating the staged mark-then-act governance cycle from initial inventory scan to owner review and deferred remediation.
 
 ```mermaid
 flowchart LR
@@ -245,12 +248,15 @@ The snippet above reacts when instances launch without an owner tag.
 It does not stop anything.
 It makes drift visible quickly while a separate pull-mode policy handles idle compute with metric evidence and review windows.
 
-> **Pause and predict:** Which part of a policy should change most often: the resource type, the filters, or the actions? Why?
+**Pause and predict:** Which part of a policy should change most often: the resource type, the filters, or the actions? Why?
 
-In healthy programs, filters change more often than resource types and actions.
-The governance intent tends to stay stable: "idle compute is reviewed", "public buckets are blocked", "owner tags are required".
-What changes is the evidence threshold, exception tag, allowed teams, or review window.
-If actions change constantly, the organization probably has not agreed on the operating model yet.
+<details>
+<summary>Check your prediction</summary>
+
+Filters change more often than resource types or actions. The high-level governance intent tends to stay stable across organizations: require owner tags, secure storage buckets, or review idle compute. What evolves continuously is the evidence threshold: metric lookback windows, allowed exception tags, account canaries, and grace periods. If a policy matches too many resources or captures unexpected workloads, that is a filter problem rather than an action problem, and teams should refine filter logic rather than hastily swapping actions.
+</details>
+
+The next section is a policy anatomy table detailing the engineering responsibilities, design questions, failure modes, and production habits across core schema elements.
 
 ### Policy anatomy by responsibility
 
@@ -778,11 +784,15 @@ Cloud provider policy can deny public load balancer creation at the cloud API.
 Cloud Custodian can scan existing load balancers and tag or delete ones that escaped older controls.
 The best production answer may use all three, but each has a distinct job.
 
-> **Pause and predict:** If a Kyverno policy and a Custodian policy both try to fix the same problem, what symptoms tell you the boundary is wrong?
+**Pause and predict:** If a Kyverno policy and a Custodian policy both try to fix the same problem, what symptoms tell you the boundary is wrong?
 
-Look for repeated remediations, noisy alerts, and resources flipping between states.
-If Custodian keeps deleting objects that admission control could have blocked, move the rule earlier.
-If admission control blocks resources because it lacks context from cloud metrics or ownership systems, move that decision to a detective workflow with review.
+<details>
+<summary>Check your prediction</summary>
+
+Overlapping remediations are a boundary bug that produces flapping resources, alert storms, and redundant automated operations. Admission controllers such as Kyverno or OPA Gatekeeper block invalid Kubernetes objects synchronously before they persist into the cluster datastore. In contrast, Cloud Custodian scans asynchronous cloud state and evaluates live resources, making it the proper tool to mark resources, notify teams, or execute deferred remediation. If Custodian repeatedly deletes infrastructure that admission could have prevented, or if admission lacks cloud context, the governance boundary is misaligned.
+</details>
+
+The next section is an operational guide exploring execution modes, authentication architectures, alerting pipelines, and multi-account rollout practices for production fleets.
 
 ---
 
@@ -1010,6 +1020,16 @@ At moderate scale, the cost is usually from cloud API calls, function invocation
 The software license is not the bill.
 The control-plane activity is the bill.
 
+**Pause and predict:** Which is more likely to create surprise cost: a stop action on ten EC2 instances, or a read-only S3 policy that scans thousands of buckets across every account every hour? Explain your reasoning.
+
+<details>
+<summary>Check your prediction</summary>
+
+The wide read-only scan is far more likely to create an unexpected cloud bill. Read-only does not mean free; querying thousands of S3 buckets across multiple accounts on a recurring hourly cadence generates massive volumes of API requests, log events, and metric ingestion charges. That wide multi-account scan can easily cost more in API calls, logs, and metrics than stopping ten virtual machine instances. Production governance programs must inspect selection frequency and query volume as rigorously as mutating actions.
+</details>
+
+The next section is a structured cost checklist highlighting resource drivers, reduction techniques, spike triggers, and operational verification before policy promotion.
+
 Use this checklist before promoting a policy:
 
 - [ ] **What costs at moderate scale?** Provider API calls, CloudWatch or Azure Monitor metric queries, Lambda or container runtime, log ingestion, output storage, notification delivery, and reviewer time.
@@ -1017,13 +1037,6 @@ Use this checklist before promoting a policy:
 - [ ] **What makes cost spike?** Running broad policies across all accounts and regions, scanning high-cardinality resources every few minutes, fetching unnecessary S3 subdocuments, emitting every zero-value metric, retrying after IAM failures, and sending one notification per resource instead of batching.
 - [ ] **What is the business value?** Estimate idle resource savings, reduced audit-prep time, avoided policy drift, and fewer custom scripts before adding another recurring scan.
 - [ ] **What is the rollback plan?** Keep output artifacts, use reversible first actions, and define who can remove review tags or pause a policy.
-
-> **Pause and predict:** Which is more likely to create surprise cost: a stop action on ten EC2 instances, or a read-only S3 policy that scans thousands of buckets across every account every hour? Explain your reasoning.
-
-The answer is often the read-only scan.
-Read-only does not mean free.
-Broad inventory scans can generate many API calls, logs, metrics, and retries.
-That is why production Custodian programs review selection cost as seriously as action risk.
 
 ---
 
@@ -1420,7 +1433,39 @@ Write one sentence explaining each choice.
 
 </details>
 
-### Success Criteria
+**Card A: Stopping every VM under 5% CPU is safe, because low CPU means the machine is unused.** An infrastructure administrator deploys an automated Cloud Custodian policy across all development and production subscriptions. The policy executes daily, filtering for any virtual machine instance reporting average CPU utilization below five percent over seven days. When an instance matches this threshold, the policy triggers an immediate stop action to eliminate compute waste. The engineering team assumes that sustained low CPU utilization definitively proves an instance is abandoned. Under this assumption, aggressive shutdown policies safely reduce cloud expenditure without risking operational continuity.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Resource utilization telemetry versus workload lifecycle state conflation. Next action: understand that low CPU does not mean a machine is unused, because batch processing workers, standby disaster recovery nodes, and burstable workloads legitimately experience prolonged quiet intervals; stopping an instance immediately disrupts production jobs and failover capacity without confirming organizational ownership; a safe governance policy enforces a two-stage mark-then-act lifecycle that tags resources for review, alerts owners, and records an explicit deadline; understand that mark is not stop and stop is not delete, so instances should only stop after review periods expire without exception tags.
+</details>
+
+**Card B: When a policy matches too many resources, change the action first. The filters should stay fixed.** A governance engineer executes a dry run of a new cleanup policy designed to identify unattached storage volumes across enterprise accounts. The execution report reveals thousands of active production volumes flagged for remediation, far exceeding the anticipated scope. To prevent accidental disruption, the engineer modifies the policy action from delete to notify, leaving the match filters completely unchanged. The team assumes that softening the remediation action resolves the risk of over-broad resource matching. Under this assumption, keeping filters fixed while tuning actions is the proper way to manage policy blast radius.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Policy selection criteria versus remediation action blast radius conflation. Next action: understand that filters change more often than resource types or actions, and matching too many resources is fundamentally a filter precision problem rather than an action problem; changing an action to notify masks inaccurate query logic while generating alert fatigue across engineering teams; platform engineers must refine resource filters by adding age thresholds, tag checks, and specific attribute filters to isolate truly orphaned infrastructure; verify filter queries through report mode and dry runs against canary accounts before finalizing remediation actions.
+</details>
+
+**Card C: If Kyverno and Custodian both delete the same object, the control is safer because it runs twice.** A platform architect configures both a Kubernetes Kyverno policy and an asynchronous Cloud Custodian scan to remove non-compliant cloud resources created by cluster workloads. Both systems monitor for the same tagging violation and trigger independent deletion routines. The architect assumes that running duplicate remediations across multiple governance tools creates defense in depth. Under this assumption, overlapping enforcement mechanisms strengthen cloud compliance by ensuring that resources missed by one tool are caught by the other.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Kubernetes admission boundary versus asynchronous cloud state governance conflation. Next action: understand that overlapping remediations across Kyverno and Cloud Custodian represent a boundary bug that produces flapping resources, race conditions, and duplicated alerts; Kyverno and OPA Gatekeeper operate synchronously at the admission control layer to reject invalid Kubernetes manifests before objects persist to storage; Cloud Custodian operates asynchronously against cloud provider APIs to scan inventory, evaluate historical telemetry, and execute staged review workflows; use admission controls or Azure Policy deny rules for hard preventive guardrails, and use Custodian for detective auditing and deferred remediation.
+</details>
+
+**Card D: A read-only Custodian policy cannot create surprise cost, because it does not change resources.** A cloud platform team authors an extensive suite of read-only Cloud Custodian audit policies to monitor S3 bucket configurations across hundreds of enterprise accounts. Because the policies execute only read operations and take no mutating actions, the team schedules them to scan the entire multi-cloud fleet every fifteen minutes. The team assumes that audit-only policies cannot impact the monthly cloud invoice because they never modify or provision infrastructure. Under this assumption, high-frequency read scans are functionally free to run at enterprise scale.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Read-only inventory inspection versus cloud control-plane operational expense conflation. Next action: understand that read-only is not free, because scanning thousands of resources across accounts generates massive volumes of API requests, log ingestion records, and monitoring metrics; broad hourly scans across high-cardinality resources like S3 buckets or CloudWatch metrics can cost thousands of dollars monthly in control-plane charges, exceeding the cost of running the workloads themselves; platform teams must optimize audit policies by narrowing resource filters, increasing scan intervals, using provider query filters, and enabling metric suppression like ignore_zero.
+</details>
+
+**Success Criteria**:
 
 - [ ] I wrote an AWS policy that finds EC2 instances with CPU below 5% for seven days and marks them for review.
 - [ ] I extended the AWS workflow so instances stop only after the review marker expires.
