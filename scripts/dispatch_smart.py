@@ -4,8 +4,9 @@ Single CLI for dispatching work to a headless agent that picks an
 appropriate model based on the task class — instead of always burning
 the top-tier model from the orchestrator session.
 
-Why: the orchestrator runs on claude-opus-4-8. Routine search/edit work
-shouldn't burn opus (or gpt-5.5) when a smaller model would do fine.
+Why: the default Claude model is claude-opus-5-5. Architect stays on
+claude-fable-5-1. Fast routine edit/draft stays on claude-sonnet-5.
+Search stays on Haiku. Don't burn Opus or Fable on a file lookup.
 This wrapper lets the orchestrator say "do this kind of work, pick the
 right model" without manually choosing model + mode + worktree every
 time. Mirrors the economical multi-agent policy in AGENTS.md (PR #870)
@@ -52,7 +53,7 @@ Task classes — model mapping per agent:
     search      claude-haiku-4-5-20251001    gpt-5.6-luna     composer-2.5
     edit        claude-sonnet-5              gpt-6-astra      grok-4.7-high
     draft       claude-sonnet-5        gpt-6-astra     grok-4.7-high
-    review      claude-fable-5-1       gpt-6-astra     grok-4.7-high
+    review      claude-opus-5-5        gpt-6-astra     grok-4.7-high
     architect   claude-fable-5-1       gpt-6-astra     grok-4.7-high
 
 Each dispatch is recorded to ``logs/smart_dispatch.jsonl`` for usage
@@ -173,7 +174,8 @@ class TaskClassConfig:
 
 # Model slugs below are LIVE defaults as of 2026-09-22. Re-probe before trusting
 # memory. Override per call with `--model`.
-# Claude catalog: architect/review = claude-fable-5-1 (Fable 5.1);
+# Claude catalog: review default = claude-opus-5-5 (Opus 5.5);
+# architect/advisor = claude-fable-5-1 (Fable 5.1);
 # edit/draft = claude-sonnet-5 (Sonnet 5); search = claude-haiku-4-5-20251001.
 # Codex is gpt-6-astra except search, which is gpt-5.6-luna.
 # Cursor is grok-4.7-high except search, which is composer-2.5.
@@ -230,7 +232,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     "review": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
-            "claude": "claude-fable-5-1",
+            "claude": "claude-opus-5-5",
             "codex": "gpt-6-astra",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",

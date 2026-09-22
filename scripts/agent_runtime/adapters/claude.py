@@ -78,7 +78,7 @@ class ClaudeAdapter:
     """Adapter for ``npx @anthropic-ai/claude-code@latest`` print mode."""
 
     name: str = "claude"
-    default_model: str = os.environ.get("AB_CLAUDE_MODEL", "claude-opus-4-8")
+    default_model: str = os.environ.get("AB_CLAUDE_MODEL", "claude-opus-5-5")
     supported_modes: frozenset[str] = frozenset({"read-only", "workspace-write", "danger"})
 
     def build_invocation(

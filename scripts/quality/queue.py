@@ -46,7 +46,7 @@ from .state import (
 # display slug, dispatched via the `agy` subcommand in scripts/dispatch.py.
 PRIMARY_BEGINNER = "gemini-3.1-pro-high"
 PRIMARY_ADVANCED = "gemini-3.1-pro-high"
-TERTIARY = "claude-opus-4-8"
+TERTIARY = "claude-opus-5-5"
 
 # Map writer-model identifiers (returned by route_writer / stored in the
 # queue doc) onto the (agent, model) tuple that ``dispatchers.dispatch``
@@ -56,6 +56,8 @@ TERTIARY = "claude-opus-4-8"
 _MODEL_TO_AGENT: dict[str, tuple[str, str]] = {
     PRIMARY_BEGINNER: ("agy", PRIMARY_BEGINNER),
     TERTIARY: ("claude", TERTIARY),
+    # Queue rows recorded before Opus 5.5 became the default still resolve.
+    "claude-opus-4-8": ("claude", TERTIARY),
 }
 
 
@@ -117,7 +119,7 @@ def _beginner_writer() -> str:
     fallback.
     """
     fallback = os.environ.get("KUBEDOJO_BEGINNER_FALLBACK", "").lower().strip()
-    if fallback in {"claude", "claude-opus", "claude-opus-4-7", "claude-opus-4-8"}:
+    if fallback in {"claude", "claude-opus", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5-5"}:
         return TERTIARY
     return PRIMARY_BEGINNER
 
