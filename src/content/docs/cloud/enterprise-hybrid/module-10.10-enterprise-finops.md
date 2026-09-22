@@ -581,7 +581,7 @@ At **Run** maturity, gate merges with estimated cost delta: tools that diff mani
 Compute and storage invoices are not the full cost of operating a second cloud environment. A small secondary cloud footprint maintained purely for negotiating leverage often costs far more than any discount it secures from the primary provider. Operating multiple clouds introduces duplicate tooling, distinct identity management systems, and specialized platform engineering headcount. Furthermore, splitting organizational workload spend weakens volume tiering and commitment discounts across both providers without creating credible migration leverage.
 </details>
 
-The next section is an architecture diagram illustrating the balance between visible infrastructure line items and hidden organizational expenses across multi-cloud environments.
+The next section is an architecture diagram of a multi-cloud cost model with separate boxes for infrastructure invoices and for other operating costs.
 
 ### Multi-Cloud Cost Model
 
