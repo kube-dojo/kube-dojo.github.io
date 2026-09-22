@@ -60,7 +60,7 @@ flowchart TD
     end
 ```
 
-The practical consequence is that each layer has a different kind of truth. The Deployment tells you whether the rollout is progressing and how many replicas should exist. The ReplicaSet tells you whether a specific Pod template hash is being scaled up or down. The Pod tells you whether containers are actually scheduled, pulled, started, restarted, and marked Ready. Pause and predict: if a Deployment image changes twice, what should happen to the old ReplicaSets, and why would Kubernetes keep them with zero replicas instead of deleting them immediately?
+The practical consequence is that each layer has a different kind of truth. The Deployment tells you whether the rollout is progressing and how many replicas should exist. The ReplicaSet tells you whether a specific Pod template hash is being scaled up or down. The Pod tells you whether containers are actually scheduled, pulled, started, restarted, and marked Ready.
 
 | Feature | ReplicaSet | Deployment |
 |---------|------------|------------|
@@ -196,7 +196,16 @@ nginx-5d5dd5d5fb
 +-- Deployment name
 ```
 
-The hash is what allows Kubernetes to keep multiple rollout revisions side by side without confusing their Pods. During a rolling update, the old ReplicaSet might still have some ready Pods while the new ReplicaSet is gradually scaled up. During a rollback, Kubernetes does not rebuild the old Pod template from your memory; it scales a retained old ReplicaSet back up and scales the failed one down. If revision history is pruned too aggressively, that recovery path becomes less useful.
+**Pause and predict:** if a Deployment image changes twice, what should happen to the old ReplicaSets, and why would Kubernetes keep them with zero replicas instead of deleting them immediately?
+
+<details>
+<summary>Check your prediction</summary>
+
+The hash is what allows Kubernetes to keep multiple rollout revisions side by side without confusing their Pods. After a successful rollout, old ReplicaSets stay at zero replicas so rollback can scale a retained ReplicaSet back up immediately. During a rolling update, the old ReplicaSet might still have some ready Pods while the new ReplicaSet is gradually scaled up. During a rollback, Kubernetes does not rebuild the old Pod template from your memory; it scales a retained old ReplicaSet back up and scales the failed one down. If revision history is pruned too aggressively, that recovery path becomes less useful.
+
+</details>
+
+The next section is examining why cluster operators manage Deployment objects directly rather than mutating child ReplicaSets during routine workload administration.
 
 ```bash
 # Don't do this - let Deployment manage ReplicaSets
@@ -253,9 +262,18 @@ When checking a scale operation, compare the Deployment summary to the Pods rath
 
 ## Rolling Updates and Rollbacks
 
-A rolling update changes the Pod template and lets Kubernetes replace old Pods gradually. The default Deployment strategy is RollingUpdate, and the two knobs that shape its behavior are `maxSurge` and `maxUnavailable`. `maxSurge` allows extra Pods above the desired replica count during the rollout, while `maxUnavailable` allows some desired replicas to be unavailable during the rollout. With four replicas, `maxSurge: 1`, and `maxUnavailable: 0`, Kubernetes can briefly run five Pods so that it does not intentionally reduce available capacity.
+A rolling update changes the Pod template and lets Kubernetes replace old Pods gradually. The default Deployment strategy is RollingUpdate, and the two knobs that shape its behavior are `maxSurge` and `maxUnavailable`. `maxSurge` allows extra Pods above the desired replica count during the rollout, while `maxUnavailable` allows some desired replicas to be unavailable during the rollout.
 
-Pause and predict: you have a Deployment with four replicas, `maxSurge: 1`, and `maxUnavailable: 0`. During a rolling update, what is the maximum number of Pods running at any point, and what happens if the new version never becomes Ready? The maximum is five Pods, and the controller should stop progressing rather than delete the remaining ready old Pods. That behavior is why a broken update often produces a mixed fleet instead of a total outage.
+**Pause and predict:** you have a Deployment with four replicas, `maxSurge: 1`, and `maxUnavailable: 0`. During a rolling update, what is the maximum number of Pods running at any point, and what happens if the new version never becomes Ready?
+
+<details>
+<summary>Check your prediction</summary>
+
+With four replicas, `maxSurge: 1`, and `maxUnavailable: 0`, Kubernetes can briefly run five Pods so that it does not intentionally reduce available capacity. The maximum is five Pods, and the controller should stop progressing rather than delete the remaining ready old Pods. That behavior is why a broken update often produces a mixed fleet instead of a total outage.
+
+</details>
+
+The next section is examining a declarative manifest that configures rolling update strategy parameters for an active production workload.
 
 ```yaml
 apiVersion: apps/v1
@@ -1003,7 +1021,43 @@ kubectl delete deployment lifecycle-test
 
 </details>
 
-Success criteria:
+**Card A: Kubernetes deletes old ReplicaSets as soon as the new image is rolled out, because a zero-replica object is waste.** An operator inspects the cluster following a completed rollout and expects Kubernetes to automatically purge the previous ReplicaSet objects to avoid cluttering namespace controller inventory.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: retaining zero-replica ReplicaSet history versus deleted object confusion. Next action: understand that Kubernetes preserves old ReplicaSets with zero replicas precisely to maintain rollout history and enable fast rollbacks; deleting old ReplicaSets removes the cached Pod templates and prevents instant reversion to earlier revisions; leave zero-replica ReplicaSets under Deployment supervision unless pruning through `revisionHistoryLimit`.
+
+</details>
+
+**Card B: With four replicas, maxSurge 1, and maxUnavailable 0, a bad new image still replaces every old Pod.** An administrator triggers an update with an invalid container image and expects the controller to terminate all existing healthy Pods while attempting to roll out the new version.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: zero-unavailable rollout guarantees versus uncontrolled replacement conflation. Next action: recognize that `maxUnavailable: 0` prevents the Deployment from deleting any ready Pods before replacement Pods pass readiness probes; when new Pods fail startup or crash, the rollout stalls at one surge Pod and leaves the remaining four ready Pods serving live traffic; inspect Pod events and rollout status rather than expecting total workload termination.
+
+</details>
+
+**Card C: The right way to change a Deployment's replica count is to scale its child ReplicaSet.** A developer runs `kubectl scale rs` on the active child ReplicaSet during an unexpected traffic spike to handle incoming user requests immediately.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: child ReplicaSet scaling versus parent Deployment intent ownership. Next action: scale the parent Deployment object with `kubectl scale deployment` so the declarative specification records the desired replica count; scaling the child ReplicaSet directly causes the parent Deployment controller to reconcile and overwrite the child replica count back to the parent spec; always mutate the owning workload resource.
+
+</details>
+
+**Card D: `kubectl rollout undo` restores the database and the external config, not only the Pod template.** A team initiates an emergency rollback after a breaking release and expects the cluster to restore external ConfigMaps, database schemas, and external service state automatically.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: workload Pod template rollback versus external state restoration. Next action: understand that `kubectl rollout undo` reverts only the Deployment's `.spec.template` to the selected historical revision; it cannot undo database migrations, restore external storage snapshots, or revert separately managed ConfigMaps and Secrets; coordinate application-level schema rollbacks independently of workload controller commands.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Implement a Deployment from imperative command output and from YAML.
 - [ ] Diagnose the Deployment -> ReplicaSet -> Pod ownership chain from command output.
