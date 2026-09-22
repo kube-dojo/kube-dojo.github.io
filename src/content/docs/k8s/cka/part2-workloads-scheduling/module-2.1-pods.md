@@ -1210,7 +1210,7 @@ Failure layer: Pod restart policy semantics versus process exit code evaluation 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Readiness probe traffic filtering versus liveness probe process remediation conflation. Next action: understand that a failing readiness probe never causes kubelet to restart the container; the pod remains in `Running` status with its `READY` column decremented (such as `0/1`), and the endpoint controller removes the pod IP from matching Service endpoints so it stops receiving client requests; kubelet restarts a container only when a liveness probe or startup probe fails; use readiness probes to isolate temporarily overwhelmed or disconnected workloads, and reserve liveness probes for unrecoverable deadlocks.
+Failure layer: confusing a readiness failure with a container restart. Next action: a failing readiness probe does not restart the container. STATUS stays `Running` and READY is not full, such as `0/1`, while the endpoint controller drops the pod from Service endpoints. A liveness or startup failure can kill the container. Whether it starts again still follows `restartPolicy`, and `Never` does not restart.
 
 </details>
 
