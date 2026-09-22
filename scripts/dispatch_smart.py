@@ -174,9 +174,10 @@ class TaskClassConfig:
 # Model slugs below are LIVE defaults as of 2026-09-22. Re-probe before trusting
 # memory. Override per call with `--model`.
 # Claude catalog: architect/review = claude-fable-5-1 (Fable 5.1);
-# search/edit/draft = claude-sonnet-5 (Sonnet 5).
-# Codex config model is gpt-6-astra (the GPT-6 seat; there is no gpt-6.0 slug).
-# Cursor catalog has no bare grok-4.7; Grok 4.7 High is grok-4.7-high.
+# edit/draft = claude-sonnet-5 (Sonnet 5); search = claude-haiku-4-5-20251001.
+# Codex is gpt-6-astra except search, which is gpt-5.6-luna.
+# Cursor is grok-4.7-high except search, which is composer-2.5.
+# Native grok search stays grok-4.7 with --reasoning-effort low.
 # DeepSeek V4.1 Flash is deepseek-flash (first-party). OpenCode and Qwen are
 # not routing seats. Native grok remains grok-4.7.
 TASK_CLASSES: dict[str, TaskClassConfig] = {
