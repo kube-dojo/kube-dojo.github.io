@@ -73,7 +73,18 @@ The practical result is that a pod is both a wrapper around containers and a con
 └────────────────────────────────────────────────────────────────┘
 ```
 
-The shared network namespace is the feature that most often surprises new operators. Two containers in the same pod communicate through `localhost`, but they also compete for the same port numbers because they share the pod IP. If a main application listens on `8080`, a helper container in that same pod must use another port, while another pod on the same node can also listen on `8080` because it receives a different pod IP.
+The shared network namespace is the feature that most often surprises new operators. Two containers in the same pod communicate through `localhost`, but they also compete for the same port numbers because they share the pod IP.
+
+**Pause and predict:** two containers in the same pod both try to listen on port `8080`. What do you expect the second container to log, and how would the result differ if those containers were in separate pods? Make the prediction before reading on, because this is the exact mental model that prevents many confusing sidecar failures.
+
+<details>
+<summary>Check your prediction</summary>
+
+All containers in a single pod share one network namespace and one pod IP. If a main application listens on port `8080`, the second container in that same pod fails to bind port `8080` (logging `address already in use`), so a helper in that same pod must use another port. Conversely, two separate pods receive different pod IP addresses, which means another pod can safely bind port `8080` without any port conflict.
+
+</details>
+
+The next section is comparing container and pod boundaries to clarify how shared runtime resources shape day-to-day operational responsibilities across nodes.
 
 | Aspect | Container | Pod |
 |--------|-----------|-----|
@@ -82,8 +93,6 @@ The shared network namespace is the feature that most often surprises new operat
 | IP Address | None (uses pod's) | One per pod |
 | Storage | Own filesystem | Can share volumes |
 | Lifecycle | Managed by pod | Managed by Kubernetes |
-
-Pause and predict: two containers in the same pod both try to listen on port `8080`. What do you expect the second container to log, and how would the result differ if those containers were in separate pods? Make the prediction before reading on, because this is the exact mental model that prevents many confusing sidecar failures.
 
 Pods exist because some containers are too tightly coupled to run as separate workloads. A log shipper that tails files from the main application, a service-mesh proxy that must sit beside the application, and an init container that prepares configuration before startup are all examples where scheduling and lifecycle coupling are useful. The tradeoff is that coupling also removes independent scaling, so a helper that needs its own rollout cadence or replica count should usually become a separate workload.
 
@@ -291,13 +300,24 @@ spec:
     command: ["sh", "-c", "exit 1"]  # Will be restarted
 ```
 
-Restart policy controls what kubelet does after a container terminates, and it should match the workload shape. `Always` is the default for long-running services, `OnFailure` fits run-to-completion work that should retry non-zero exits, and `Never` is useful when you want the failure preserved for inspection. For managed workloads, remember that controllers may create replacement pods even when an individual pod has a policy that does not restart a completed container.
+**Pause and predict:** a pod with `restartPolicy: Always` has a container that exits with code `0`, while another pod with `restartPolicy: OnFailure` exits with the same code. Which one restarts, and what would you expect to see in `RESTARTS` after a few minutes? Answering this correctly shows that you are reading policy, exit code, and workload intent together.
+
+<details>
+<summary>Check your prediction</summary>
+
+Restart policy controls what kubelet does after a container terminates, and it should match the workload shape. A pod configured with `restartPolicy: Always` restarts on exit `0` because it treats any container termination as an interruption. Conversely, `restartPolicy: OnFailure` does not restart on exit `0` because exit code `0` signals successful completion. Over time, `RESTARTS` climbs only for the `Always` pod, while the `OnFailure` pod remains stopped in `Completed` status with zero restarts.
 
 | Policy | Behavior | Use Case |
 |--------|----------|----------|
 | `Always` (default) | Restart on any termination | Long-running services |
 | `OnFailure` | Restart only on non-zero exit | Jobs that should retry on failure |
 | `Never` | Never restart | One-time scripts, debugging |
+
+For managed workloads, remember that controllers may create replacement pods even when an individual pod has a policy that does not restart a completed container.
+
+</details>
+
+The next section is inspecting container restart counts and termination states through kubectl commands to observe how kubelet records process exit history.
 
 ```bash
 # Check restart count
@@ -308,8 +328,6 @@ kubectl get pods
 # Describe shows restart details
 kubectl describe pod nginx | grep -A5 "Last State"
 ```
-
-Pause and predict: a pod with `restartPolicy: Always` has a container that exits with code `0`, while another pod with `restartPolicy: OnFailure` exits with the same code. Which one restarts, and what would you expect to see in `RESTARTS` after a few minutes? Answering this correctly shows that you are reading policy, exit code, and workload intent together.
 
 Lifecycle diagnosis becomes easier when you distinguish "the pod object exists" from "the workload is serving." A pod can exist in the API before it has a node, be assigned to a node before its image is available, start a container before the app has loaded configuration, and report `Running` before readiness allows traffic. Each stage has a different owner: scheduler, kubelet, container runtime, image registry, application process, and probe configuration all leave evidence in different places.
 
@@ -582,7 +600,16 @@ spec:
       periodSeconds: 10
 ```
 
-Pause and predict: if a pod's liveness probe passes but its readiness probe fails, what will `kubectl get pods` show in the `READY` and `STATUS` columns, and will the pod be restarted? The expected result is a pod that remains `Running` but not fully ready, such as `0/1`, and kubelet should not restart it merely because readiness failed.
+**Pause and predict:** if a pod's liveness probe passes but its readiness probe fails, what will `kubectl get pods` show in the `READY` and `STATUS` columns, and will the pod be restarted? Make your prediction before checking the result below.
+
+<details>
+<summary>Check your prediction</summary>
+
+STATUS stays `Running`, READY is not full (for example `0/1`), and a readiness failure does not restart the container. When readiness fails, kubelet leaves the container running while the endpoint controller removes the pod IP address from matching Service endpoints until health probes succeed again.
+
+</details>
+
+The next section is balancing probe timeouts and thresholds so health checks protect application traffic without triggering unnecessary container restart loops.
 
 Probe configuration is a balancing act, not a checkbox. Timeouts that are too short can restart healthy but temporarily slow applications, while thresholds that are too lenient can leave dead pods receiving traffic or stuck containers running too long. When debugging a probe issue, read the endpoint behavior, the timeout, the failure threshold, and the period together because those four values define the real failure budget.
 
@@ -1160,7 +1187,43 @@ kubectl get pod webapp -o jsonpath='{.status.containerStatuses[*].restartCount}'
 kubectl describe pod webapp | grep -A8 "Last State"
 ```
 
-### Success Criteria
+**Card A: Two containers in one pod can both bind port 8080, because each container has its own IP.** An engineer places two web services inside the same pod manifest and configures both processes to listen on port 8080. The team assumes each container receives an independent network namespace and unique IP address, allowing identical ports to coexist without socket collisions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Pod network namespace boundary versus independent container networking conflation. Next action: understand that containers in the same pod share a single network namespace and one pod IP, so they communicate over localhost and cannot bind the same port; the second container fails with a bind error such as `address already in use`; two different pods can both listen on port 8080 because each pod receives its own distinct IP address; configure co-located containers in the same pod to use distinct port numbers, or separate the workloads into distinct pods if they must each bind port 8080.
+
+</details>
+
+**Card B: `restartPolicy: OnFailure` restarts a container that exits 0, because the pod is supposed to keep running.** An operator writes a batch processing pod with `restartPolicy: OnFailure` and notices that the worker process exits cleanly after completing its calculation. The engineer expects kubelet to restart the container immediately to keep the pod running continuously alongside long-lived services.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Pod restart policy semantics versus process exit code evaluation conflation. Next action: understand that exit code 0 indicates clean, successful completion, so `restartPolicy: OnFailure` leaves the container stopped and transitions the pod to `Completed` without incrementing `RESTARTS`; kubelet restarts containers on exit code 0 only when `restartPolicy: Always` is configured; `OnFailure` restarts containers only on non-zero exit codes; choose `restartPolicy: Always` for long-running daemons that must continuously run, and use `OnFailure` or `Never` for run-to-completion batch tasks.
+
+</details>
+
+**Card C: A failing readiness probe restarts the container, because the pod is not ready.** A developer observes that an application pod fails its readiness check when an external database connection temporarily drops. The developer assumes that kubelet will kill and recreate the unhealthy container to restore normal serving capacity across the cluster.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Readiness probe traffic filtering versus liveness probe process remediation conflation. Next action: understand that a failing readiness probe never causes kubelet to restart the container; the pod remains in `Running` status with its `READY` column decremented (such as `0/1`), and the endpoint controller removes the pod IP from matching Service endpoints so it stops receiving client requests; kubelet restarts a container only when a liveness probe or startup probe fails; use readiness probes to isolate temporarily overwhelmed or disconnected workloads, and reserve liveness probes for unrecoverable deadlocks.
+
+</details>
+
+**Card D: A pod IP is a stable address, so other applications should call it directly.** A platform team discovers that backend microservices can reach each other directly using internal pod IP addresses. They hardcode these specific IP values into upstream client configuration files to bypass service discovery abstractions and avoid extra routing hops.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Ephemeral pod network identity versus stable Service routing abstraction conflation. Next action: understand that pod IP addresses are strictly ephemeral; when a pod crashes, restarts, or reschedules onto another node, Kubernetes assigns it a completely new IP address, instantly breaking any hardcoded client references; always expose workloads behind a Kubernetes Service, which provides a durable virtual IP and DNS name that automatically load-balances requests across current healthy pod replicas.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Can create pods with imperative commands
 - [ ] Can generate YAML with `--dry-run=client -o yaml`
