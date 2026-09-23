@@ -51,10 +51,12 @@ The operator records it at
 checkout. Exact fields: `schema_version` (`operator-reset-reserve.v1`),
 `provider` (`codex`), positive integer `remaining_resets`, and UTC ISO-8601
 `confirmed_at` / `expires_at`. Expiry is after confirmation and at most 24
-hours later. Dispatch worktrees read the same file through
-`scripts.fleet.reset_reserve`. Missing, malformed, expired, or extra fields
-leave the reserve unavailable. Routing never decrements the count. No agent
-infers the count from usage data.
+hours later. `dispatch_smart` does not apply the reserve. A driver who wants to use it
+calls `load_reset_reserve` and `codex_reset_reserve_eligible` from
+`scripts.fleet.reset_reserve` and records the result on the routing card.
+Passing a worktree path still reads the primary checkout's file. Missing,
+malformed, expired, or extra fields leave the reserve unavailable. The helper
+never decrements the count. No agent infers the count from usage data.
 
 ## Routing card
 
