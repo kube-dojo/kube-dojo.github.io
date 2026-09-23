@@ -111,9 +111,21 @@ def _eligible_codex() -> dict:
     }
 
 
+def _open_reserve() -> dict:
+    return {
+        "available": True,
+        "remaining_resets": 1,
+        "confirmed_at": "2026-09-23T10:00:00Z",
+        "expires_at": "2026-09-24T10:00:00Z",
+    }
+
+
+_NOW = datetime(2026, 9, 23, 12, tzinfo=UTC)
+
+
 def test_eligibility_requires_provider_runtime_and_health_headroom():
-    reserve = {"available": True, "remaining_resets": 1}
-    assert codex_reset_reserve_eligible(reserve, _eligible_codex())
+    reserve = _open_reserve()
+    assert codex_reset_reserve_eligible(reserve, _eligible_codex(), now=_NOW)
     for mutate in (
         lambda info: info["runtime"].update(headroom_blocked=True),
         lambda info: info["runtime"].update(rate_limited=1),
@@ -147,7 +159,7 @@ def test_eligibility_requires_provider_runtime_and_health_headroom():
     ):
         info = _eligible_codex()
         mutate(info)
-        assert not codex_reset_reserve_eligible(reserve, info)
+        assert not codex_reset_reserve_eligible(reserve, info, now=_NOW)
 
 
 def test_fresh_notebook_weekly_report_can_supply_missing_codexbar_weekly_window():
@@ -160,12 +172,32 @@ def test_fresh_notebook_weekly_report_can_supply_missing_codexbar_weekly_window(
         "weekly_used_pct": 40,
         "weekly_remaining_pct": 60,
     }
-    assert codex_reset_reserve_eligible({"available": True, "remaining_resets": 1}, info)
+    assert codex_reset_reserve_eligible(_open_reserve(), info, now=_NOW)
 
 
 def test_stale_routing_snapshot_cannot_use_reserve():
     assert not codex_reset_reserve_eligible(
-        {"available": True, "remaining_resets": 1},
+        _open_reserve(),
         _eligible_codex(),
+        now=_NOW,
         snapshot_stale=True,
     )
+
+
+def test_expired_reserve_is_not_eligible_even_if_loaded_earlier():
+    reserve = _open_reserve()
+    reserve["expires_at"] = "2026-09-23T11:00:00Z"
+    assert not codex_reset_reserve_eligible(reserve, _eligible_codex(), now=_NOW)
+
+
+def test_stale_codexbar_is_not_hidden_by_a_fresh_snapshot():
+    info = _eligible_codex()
+    info["codexbar"]["freshness"] = "stale_last_good"
+    info["codexbar"]["age_s"] = 901
+    assert not codex_reset_reserve_eligible(_open_reserve(), info, now=_NOW)
+
+
+def test_missing_eligible_flag_fails_closed():
+    info = _eligible_codex()
+    del info["eligible"]
+    assert not codex_reset_reserve_eligible(_open_reserve(), info, now=_NOW)

@@ -118,6 +118,41 @@ def load_reset_reserve(repo_root: Path, *, now: datetime | None = None) -> dict[
     }
 
 
+def _reserve_window_open(reserve: dict[str, Any], now: datetime | None) -> bool:
+    """Re-check assertion timestamps at eligibility time. Missing times fail closed."""
+    confirmed_at = _utc_datetime(reserve.get("confirmed_at"))
+    expires_at = _utc_datetime(reserve.get("expires_at"))
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    if confirmed_at is None or expires_at is None:
+        return False
+    lifetime = (expires_at - confirmed_at).total_seconds()
+    return 0 < lifetime <= MAX_RESERVE_AGE_SECONDS and confirmed_at <= current < expires_at
+
+
+def _layer_is_fresh(layer: dict[str, Any]) -> bool | None:
+    """None when this layer carries no freshness signal."""
+    if "freshness" not in layer and "age_s" not in layer and "stale" not in layer:
+        return None
+    if layer.get("stale") is True or layer.get("freshness") != "fresh":
+        return False
+    age = layer.get("age_s")
+    return (
+        not isinstance(age, bool)
+        and isinstance(age, (int, float))
+        and math.isfinite(age)
+        and 0 <= age < MAX_PROVIDER_AGE_SECONDS
+    )
+
+
+def _usage_is_fresh(info: dict[str, Any], codexbar: dict[str, Any]) -> bool:
+    """A fresh enclosing snapshot must not hide stale CodexBar usage."""
+    top = _layer_is_fresh(info)
+    provider = _layer_is_fresh(codexbar)
+    if top is False or provider is False:
+        return False
+    return top is True or provider is True
+
+
 def codex_reset_reserve_eligible(
     reserve: dict[str, Any],
     codex_info: dict[str, Any] | None,
@@ -132,8 +167,9 @@ def codex_reset_reserve_eligible(
     headroom diagnostics. Unknown or missing signals fail closed. A reserve
     never overrides an exhausted or unknown weekly allotment.
     """
-    del now
     if snapshot_stale or not isinstance(reserve, dict) or reserve.get("available") is not True:
+        return False
+    if not _reserve_window_open(reserve, now):
         return False
     remaining_resets = reserve.get("remaining_resets")
     if isinstance(remaining_resets, bool) or not isinstance(remaining_resets, int) or remaining_resets <= 0:
@@ -142,7 +178,7 @@ def codex_reset_reserve_eligible(
     health = info.get("health")
     if not isinstance(health, dict) or health.get("healthy") is not True:
         return False
-    if info.get("eligible") is False:
+    if info.get("eligible") is not True:
         return False
 
     cb = info.get("codexbar") if isinstance(info.get("codexbar"), dict) else {}
@@ -151,16 +187,7 @@ def codex_reset_reserve_eligible(
         for value in (info.get("login_state"), cb.get("login_state"), info.get("probe_state"), cb.get("probe_state"))
     ):
         return False
-    freshness = info.get("freshness", cb.get("freshness"))
-    age = info.get("age_s", cb.get("age_s"))
-    if (
-        freshness != "fresh"
-        or isinstance(age, bool)
-        or not isinstance(age, (int, float))
-        or not math.isfinite(age)
-        or not 0 <= age < MAX_PROVIDER_AGE_SECONDS
-        or cb.get("stale") is True
-    ):
+    if not _usage_is_fresh(info, cb):
         return False
     probe_state = str(info.get("probe_state", cb.get("probe_state", ""))).upper()
     if probe_state in {"NEED_LOGIN", "NEED_PROBE", "ERROR", "UNAVAILABLE"}:
