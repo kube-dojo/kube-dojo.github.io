@@ -118,8 +118,6 @@ The `hostPath` volume in this example is not decorative; it explains why a Daemo
 kubectl apply -f fluentd-daemonset.yaml
 ```
 
-Pause and predict: you have a five-node cluster and create this DaemonSet. Then a sixth node joins the cluster with labels and taints compatible with the pod template. Before reading further, decide how many fluentd pods should exist and whether you would need to edit a replica field. Now compare that with a Deployment set to five replicas and ask what would happen when the sixth node joins.
-
 ```bash
 # List DaemonSets
 kubectl get daemonsets
@@ -143,6 +141,13 @@ kubectl delete ds fluentd
 
 The `-o wide` view matters more for DaemonSets than it does for many stateless Deployments because the node column tells you whether coverage matches expectation. If the DaemonSet says desired pods are fewer than the cluster node count, that is not automatically a bug. It may mean selectors excluded some nodes, taints repelled the pod, or the cluster has unschedulable nodes. A good DaemonSet diagnosis reads the controller status together with node labels, taints, and pod scheduling events.
 
+**Pause and predict:** A five-node cluster runs this fluentd DaemonSet, and a sixth node joins with labels and taints compatible with its pod template. How many fluentd pods should you expect, and would you edit a replica field? Compare that outcome with a Deployment configured for five replicas when the same node joins.
+
+<details>
+<summary>Check your prediction</summary>
+
+The DaemonSet adds a fluentd pod on the eligible sixth node, taking its pod count from five to six without a replica-field edit. The Deployment remains at five replicas because adding a node does not change its desired replica count; the new node only offers another possible placement for those replicas.
+
 | Aspect | DaemonSet | Deployment |
 |--------|-----------|------------|
 | Pod count | One per node (automatic) | Specified replicas |
@@ -150,7 +155,9 @@ The `-o wide` view matters more for DaemonSets than it does for many stateless D
 | Node addition | Auto-creates pod | No automatic action |
 | Use case | Node-level services | Application workloads |
 
-The table captures the exam-level contrast, but production decisions need the deeper version. If the workload provides service capacity to users and any healthy pod can handle any request, a Deployment is usually simpler and more flexible. If the workload provides node-level functionality and missing a single eligible node is a correctness problem, a DaemonSet is the safer expression. If the workload requires stable identity or per-replica storage, neither table column is enough, and you move toward StatefulSet reasoning.
+</details>
+
+The next section is a closer look at scheduling constraints and controller choice, so use the comparison to decide which observations you would verify in a live cluster. If the workload provides service capacity to users and any healthy pod can handle any request, a Deployment is usually simpler and more flexible. If the workload provides node-level functionality and missing a single eligible node is a correctness problem, a DaemonSet is the safer expression. If the workload requires stable identity or per-replica storage, neither table column is enough, and you move toward StatefulSet reasoning.
 
 There is one more subtle difference that matters during maintenance windows. A Deployment can move capacity away from an unhealthy node if the scheduler finds a better place for a replacement pod, which is exactly what you want for stateless services. A DaemonSet does not try to move node responsibility elsewhere because the local work cannot be delegated cleanly. If the node is unhealthy, the node-local agent may also be unhealthy, and that absence is a signal about that node rather than a capacity problem elsewhere in the cluster.
 
@@ -377,7 +384,12 @@ curl web-0.nginx
 curl web-1.nginx
 ```
 
-Pause and predict: if you delete pod `web-1` from a StatefulSet, what name should the replacement pod have, and which PVC should it mount? Your answer should connect identity and storage together. If you answer only "the pod comes back," you are thinking like a Deployment operator. If you answer "`web-1` comes back and reuses the storage for `web-1`," you are thinking like a StatefulSet operator.
+**Pause and predict:** If you delete StatefulSet pod `web-1` from the example above, what name should its replacement have, and which PVC should it mount? Derive both names from the controller and volume claim template instead of assuming that the pod is an interchangeable Deployment replica.
+
+<details>
+<summary>Check your prediction</summary>
+
+The replacement pod is named `web-1` and mounts `data-web-1`: the volumeClaimTemplate name `data` is prefixed to the pod name. The StatefulSet restores that ordinal and its existing claim rather than creating a Deployment-style interchangeable pod, a new ordinal, or an empty claim.
 
 ```bash
 # Each pod gets its own PVC named:
@@ -392,9 +404,13 @@ data-web-2
 # Data persists across pod restarts
 ```
 
-PVC retention is intentionally conservative because accidental data deletion is harder to recover from than an extra cleanup step. By default, deleting a StatefulSet does not automatically delete the PVCs created from its `volumeClaimTemplates`. Newer Kubernetes versions support configurable persistent volume claim retention policies, but the safety principle remains the same: know whether you are deleting compute, identity, storage claims, or the underlying data. Many expensive storage surprises come from deleting only the controller and leaving claims behind.
-
 The storage pairing also changes how you think about node failure. If `web-1` moves to a different node, the important question is not whether the new pod has the same IP address; it usually will not. The important question is whether the logical member `web-1` can reattach the correct claim and rejoin peers under the same DNS identity. StatefulSet identity is therefore logical identity, not physical node identity. The pod may move, but the member name and storage relationship remain stable.
+
+</details>
+
+The next section is an operations check on retained storage and node failure, where you will trace which resources still exist before choosing a recovery action.
+
+PVC retention is intentionally conservative because accidental data deletion is harder to recover from than an extra cleanup step. By default, deleting a StatefulSet does not automatically delete the PVCs created from its `volumeClaimTemplates`. Newer Kubernetes versions support configurable persistent volume claim retention policies, but the safety principle remains the same: know whether you are deleting compute, identity, storage claims, or the underlying data. Many expensive storage surprises come from deleting only the controller and leaving claims behind.
 
 Do not confuse a StatefulSet with a backup strategy. A retained PVC protects against accidental pod deletion, but it does not protect against corrupted data, application-level mistakes, region failure, or a storage backend problem. StatefulSets make it easier to run systems that expect named members; they do not remove the need for snapshots, restores, replication testing, and upgrade runbooks. On real platforms, the StatefulSet manifest should be only one part of a larger operational design.
 
@@ -1142,7 +1158,43 @@ For a web application with five interchangeable replicas, choose a Deployment. F
 
 </details>
 
-### Success Criteria
+**Card A: A DaemonSet created on a five-node cluster stays at five pods when a compatible sixth node joins, until someone edits a replica field.** An operator watches a newly joined node become eligible for the logging agent and expects the existing pod count to remain fixed.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing eligible-node coverage with a fixed replica count. Next action: inspect the new node's labels, taints, and DaemonSet pod placement; a compatible sixth node receives a pod, raising the count from five to six without any replica field.
+
+</details>
+
+**Card B: A DaemonSet ignores taints, so its pod appears on every node, including control-plane nodes.** An operator finds no logging pod on a control-plane node and assumes the controller has failed despite that node's scheduling restrictions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating DaemonSet coverage as unconditional placement. Next action: compare the pod template's node selectors and tolerations with the node's labels and taints; add a matching toleration only when that node actually needs the agent.
+
+</details>
+
+**Card C: Deleting StatefulSet pod `web-1` creates the next ordinal and a fresh empty PVC, because members are interchangeable.** An operator deletes the middle database member during recovery and predicts that the controller will allocate a replacement identity and new storage.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: applying Deployment-style interchangeable identity to a StatefulSet. Next action: verify that the controller recreates ordinal `web-1` and mounts the existing claim `data-web-1`, then inspect that claim and its events if storage attachment stalls.
+
+</details>
+
+**Card D: Deleting the StatefulSet deletes the PVCs created from its volumeClaimTemplates, so no storage cleanup remains.** An operator removes the controller after a test and assumes its associated claims and stored data have also disappeared automatically.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing controller deletion with persistent claim deletion. Next action: list the PVCs and check the StatefulSet's retention policy; by default the generated claims remain, so plan and verify any intentional storage cleanup separately.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Deploy DaemonSets across diverse node topologies and verify pod placement with `kubectl get pods -o wide`.
 - [ ] Compare one-pod-per-node DaemonSet behavior with replica-count Deployment behavior during node changes.
