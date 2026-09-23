@@ -715,7 +715,16 @@ Use the following matrix as a quick design check before you write the Pod spec. 
 | Private registry credential | Kubelet pull config | Secret | `imagePullSecrets` | Used on image pull |
 | One replacement NGINX file | Exact file path | ConfigMap | `subPath` mount | Yes |
 
-Pause and predict: if a Deployment uses a mutable ConfigMap through `envFrom`, you patch the ConfigMap, and then you scale the Deployment from three replicas to five, which Pods see the old value and which Pods see the new value? The existing three Pods keep their old process environment, while the two new Pods start with the patched value. That mixed state is one reason versioned names and rollouts are easier to reason about for production changes.
+**Pause and predict:** if a Deployment uses a mutable ConfigMap through `envFrom`, you patch the ConfigMap, and then you scale the Deployment from three replicas to five, which Pods see the old value and which Pods see the new value?
+
+<details>
+<summary>Check your prediction</summary>
+
+The existing three Pods keep the environment copied at process start, and the two new Pods start with the patched value. That mixed state is one reason versioned names and rollouts are easier to reason about for production changes.
+
+</details>
+
+The next section is establishing practical verification routines to inspect container runtime state and confirm how configuration changes reach your workloads.
 
 Before you choose an approach, also decide how you will prove it worked. For env vars, the proof is usually `kubectl exec <pod> -- env` plus a restart or rollout check. For mounted files, the proof is `kubectl exec <pod> -- ls -l <path>` and reading the file path the application uses. For Secret bytes, the proof may be a controlled decode with `cat -e` or `xxd`, but only in a lab or approved debugging session. A good design includes the verification command in the runbook, because the difference between a working object and a working runtime view is exactly where configuration incidents hide.
 
@@ -1039,7 +1048,43 @@ kubectl get secret good-db-creds -n config-demo \
   -o jsonpath='{.data.password}' | base64 -d | cat -e
 ```
 
-### Success Criteria
+**Card A: Patching a ConfigMap used through `envFrom` rewrites the environment of Pods that are already running.** An operator modifies a ConfigMap key and expects existing containers to see the updated environment variables immediately without a restart.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: environment variable immutability inside running container processes versus dynamic configuration delivery. Next action: recognize that environment variables are copied into the container process table at process start and never mutate dynamically; trigger a rolling restart of the owning Deployment with `kubectl rollout restart` or introduce versioned ConfigMap names so replacement Pods pick up the new configuration.
+
+</details>
+
+**Card B: A Secret's base64 `data` field means the value is encrypted at rest.** A developer stores sensitive database credentials in a Kubernetes Secret object and assumes the base64 encoding provides cryptographic confidentiality against unauthorized cluster storage access.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: base64 encoding representation versus cryptographic encryption at rest. Next action: understand that base64 is an encoding scheme designed for arbitrary byte transport, not encryption; configure an EncryptionConfiguration provider on the API server to achieve genuine encryption at rest in etcd, and restrict API access to Secret objects using granular RBAC policies.
+
+</details>
+
+**Card C: A `subPath` mount updates the file in the container when the ConfigMap is patched.** An administrator overrides an individual configuration file using a `subPath` volume mount and expects kubelet to propagate upstream ConfigMap edits into the mounted container path automatically.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: single-file `subPath` volume mounting versus atomic directory symlink updates. Next action: recognize that a `subPath` mount isolates an individual file without symlink projection, causing the mounted file to stay stale until the Pod is recreated; use a full ConfigMap volume mount if automatic file updates are required, or delete and recreate the Pod to consume updated file contents.
+
+</details>
+
+**Card D: `envFrom` and a full ConfigMap volume mount refresh a running process the same way.** A platform engineer assumes that injecting configuration through environment variables or through a full volume mount offers equivalent runtime update semantics for containerized applications.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: process environment immutability versus filesystem projection and application reload semantics. Next action: understand that environment variables never change in a running process, whereas a full volume mount can update files on disk via atomic symlink updates; even when files update on disk, the application process must actively reread or reload configuration files to use the updated values.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] You created a namespace, ConfigMap literals, a ConfigMap file, and a generic Secret without using hardcoded production credentials.
 - [ ] The `webapp` Pod reached `Ready` and showed `APP_` environment variables from the ConfigMap.
