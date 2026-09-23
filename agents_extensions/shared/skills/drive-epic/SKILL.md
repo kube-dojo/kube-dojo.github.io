@@ -231,6 +231,12 @@ Rules:
 
 1. Prefer cool + idle + fit. Do **not** habit-route to Codex while
    `Pace: … deficit` / `will not last to reset` and a cooler seat exists.
+   A valid operator reset reserve
+   (`batch_state/routing_budget/operator_reset_reserve.json`, read by
+   `scripts.fleet.reset_reserve`) may admit Codex Sol despite a hot or
+   near-cap pace signal. It never overrides an exhausted or unknown weekly
+   allotment, stale usage, or an unhealthy route. Missing or malformed
+   input fails closed. Do not infer the reserve from CodexBar.
 2. **This driver session is a seat.** If you are Cursor, do **not**
    `dispatch_smart --agent cursor` (deadlock / quota contention). Same for
    any seat you occupy.
@@ -257,8 +263,15 @@ capacity: (quoted CodexBar + avoid list)
 parallel_free_seats: …
 ```
 
-Default pattern: **advisor/driver briefs → heap/practical worker**. Do not
-spend frontier models on lockfiles, pointer publishes, or smoke jobs.
+Default pattern: **qualified worker, no advisor seat**. Luna at high does
+routine bounded Codex work. Sol at high does accountable coding and formal
+review. Opus 5.5 reviews. Sonnet 5, AGY, and native Grok do ordinary
+implement and content work. Do not dispatch Fable or Astra unless the
+problem is really tough (contested architecture, a split review, or a
+judgment the working seats cannot settle). A normal packet does not get an
+advisor brief first. Do not spend Sol, Astra, or Fable on lockfiles, pointer
+publishes, or smoke jobs. Role boundaries:
+`.claude/rules/fleet-driver-routing.md`.
 
 After ≥3 implement dispatches this session, require ≥2 agents **and** ≥2
 task-classes/tiers, or a written `NOTE: fleet_breadth` with tool-backed
