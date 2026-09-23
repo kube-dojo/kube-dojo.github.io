@@ -96,7 +96,16 @@ spec:
     kubernetes.io/os: linux
 ```
 
-Pause and predict: if a pod uses `nodeSelector` with both `kubernetes.io/os: linux` and `disk: ssd`, what happens when the cluster has Linux nodes and SSD nodes, but no single node has both labels? The scheduler does not merge partial matches across nodes. It filters for nodes that satisfy every selector key, finds none, and leaves the pod Pending with a FailedScheduling event that points at node selector mismatch.
+**Pause and predict:** a pod selects both `kubernetes.io/os: linux` and `disk: ssd`. The cluster has Linux nodes and SSD nodes, but no node carries both labels. What happens when the scheduler tries to place this pod, and what evidence would you check?
+
+<details>
+<summary>Check your prediction</summary>
+
+The scheduler requires every `nodeSelector` key to match on the same node; it cannot combine a Linux match from one node with an SSD match from another. It finds no eligible node, so the pod stays Pending. A `FailedScheduling` event points to the node selector mismatch.
+
+</details>
+
+The next section is node affinity, which gives you more ways to describe placement requirements and preferences when a simple selector is too restrictive.
 
 That behavior is why selectors should describe required facts, not vague preferences. If SSD placement improves performance but ordinary disks are acceptable during a capacity crunch, a hard selector is too strict. If Linux is required because the container image or workload cannot run on Windows, a selector is appropriate. The CKA mindset is to convert the sentence in the task into a scheduling contract: "must run on" means hard filtering, while "should prefer" means scoring.
 
@@ -434,7 +443,16 @@ The `labelSelector` usually matches the pod template labels of the same Deployme
 
 Topology spread still has failure modes. If one zone has no eligible nodes because of labels, taints, or resource pressure, a hard spread constraint may block scheduling in the other zones once the skew would become too large. `ScheduleAnyway` can be a better fit for user-facing services where running slightly imbalanced is better than not running. `DoNotSchedule` is appropriate when the availability requirement is stronger than the desire to complete the rollout immediately.
 
-Pause and predict: you have a three-replica Deployment with required pod anti-affinity on `kubernetes.io/hostname`, but the cluster has only two nodes. The third replica cannot schedule because every feasible node already has a matching pod. If the actual goal is "spread as evenly as possible," topology spread with a soft or carefully chosen hard rule expresses that goal more accurately than required anti-affinity.
+**Pause and predict:** a three-replica Deployment uses required pod anti-affinity on `kubernetes.io/hostname` in a cluster with two nodes. What happens to its third replica, and which constraint better expresses a goal to "spread as evenly as possible"?
+
+<details>
+<summary>Check your prediction</summary>
+
+The third replica cannot schedule: required hostname anti-affinity excludes both nodes because each already runs a matching pod. For a goal of spreading as evenly as possible, a topology spread constraint with `ScheduleAnyway` or a carefully chosen `DoNotSchedule` rule expresses the distribution goal more accurately than required anti-affinity.
+
+</details>
+
+The next section is the cost and traffic tradeoff of distributing workloads across failure domains, which belongs in the same placement decision.
 
 There is also a cost dimension. Spreading across zones improves fault tolerance, but some cloud environments charge for cross-zone data transfer or make cross-zone traffic slower than same-zone traffic. That does not mean you should avoid zone spreading; it means you should choose it for stateless front ends, replicated services, and workloads designed for zone failure, while being more deliberate with chatty storage systems. Scheduling is always reliability, cost, and performance negotiated in YAML.
 
@@ -740,7 +758,43 @@ kubectl get pods -l app=spread -o wide
 kubectl delete deployment spread-deploy
 ```
 
-### Success Criteria
+**Card A: A nodeSelector with `kubernetes.io/os: linux` and `disk: ssd` is satisfied when some nodes are Linux and other nodes have SSDs.** An operator applies both keys to a pod while the cluster inventory splits those labels across separate machines.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: node selector conjunction versus cluster-wide label inventory. Next action: inspect labels on individual nodes and find one node carrying both values, or change the placement requirement; the scheduler cannot assemble a match from separate nodes.
+
+</details>
+
+**Card B: Removing the `disk=ssd` label from a node evicts pods that scheduled there because of required node affinity.** An operator removes the label after a pod has already been bound to that node.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: scheduling-time affinity versus runtime eviction. Next action: recognize that `requiredDuringSchedulingIgnoredDuringExecution` does not evict the already-bound pod when the label disappears; inspect the pod's node assignment, then use an appropriate drain or eviction workflow if relocation is required.
+
+</details>
+
+**Card C: Required pod anti-affinity on `kubernetes.io/hostname` still places all three replicas when the cluster has only two nodes.** A team expects every replica of its Deployment to start while also forbidding matching pods from sharing a hostname.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: strict one-per-host separation versus available topology domains. Next action: expect the third replica to remain unschedulable because both nodes already host a matching pod; add an eligible node or use a suitable topology spread constraint when balanced placement permits sharing.
+
+</details>
+
+**Card D: A toleration for a GPU taint forces the pod to run on GPU nodes.** An operator adds a matching toleration and assumes it also selects the GPU pool.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: taint permission versus node attraction. Next action: use node affinity or a node selector alongside the toleration when the pod must run on GPU nodes; the toleration only permits scheduling onto nodes with that taint.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Design a nodeSelector-based placement rule and verify the selected node.
 - [ ] Implement a taint and a matching toleration, then remove both cleanly.
