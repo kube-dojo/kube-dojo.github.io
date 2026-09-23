@@ -66,19 +66,19 @@ spec:
         cpu: "500m"
 ```
 
-| Aspect | Requests | Limits |
-|--------|----------|--------|
-| Purpose | Scheduling guarantee | Hard cap |
-| When used | Scheduler deciding placement | Container runtime enforcement |
-| Underutilized | Other pods can use slack | N/A |
-| Exceeded | N/A | Container killed for memory or throttled for CPU |
-
 **Pause and predict:** Suppose a pod requests `100m` CPU and `128Mi` memory alongside a `256Mi` memory limit without setting any CPU limit. Which value governs node scheduling, which threshold triggers process termination, and which compute resource can burst above its initial reservation?
 
 <details>
 <summary>Check your prediction</summary>
 
 Requests are what the scheduler uses for placement decisions, calculating whether the candidate node has sufficient allocatable capacity. The memory limit is what can OOMKill the container when resident memory usage crosses that specified ceiling. CPU with no limit can still burst above its request whenever excess host cycles exist, while the memory limit cannot be crossed safely without triggering process termination.
+
+| Aspect | Requests | Limits |
+|--------|----------|--------|
+| Purpose | Scheduling guarantee | Hard cap |
+| When used | Scheduler deciding placement | Container runtime enforcement |
+| Underutilized | Other pods can use slack | N/A |
+| Exceeded | N/A | Container killed for memory or throttled for CPU |
 
 The diagram below captures the most important operational distinction. Memory and CPU both have requests and limits, but they do not fail in the same way when a container crosses the limit. Memory is not compressible in the same way CPU time is, so a container that crosses its memory limit can be killed with an OOMKilled reason. CPU can be sliced over time, so a container that crosses its CPU limit is throttled and continues running more slowly.
 
@@ -110,7 +110,7 @@ The diagram below captures the most important operational distinction. Memory an
 
 The next section is parsing core syntax units and millicores across manifests, where subtle notation choices create unexpected production surprises.
 
-CPU units are easy to misread under exam pressure. Kubernetes lets you write CPU in whole cores or millicores, where `1000m` means one core and `100m` means one tenth of a core. A request of `100m` does not mean the process can only ever use one tenth of a core unless you also set a low CPU limit; it means the scheduler reserves that much capacity for placement and the runtime can enforce the limit if one exists.
+CPU units are easy to misread under exam pressure. Kubernetes lets you write CPU in whole cores or millicores, where `1000m` means one core and `100m` means one tenth of a core. A value written as `100m` is one tenth of a core, and a value written as `1` is one whole core, so dropping or keeping the `m` suffix changes the number by a factor of one thousand.
 
 | Value | Meaning |
 |-------|---------|
