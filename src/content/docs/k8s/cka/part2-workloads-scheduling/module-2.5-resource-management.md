@@ -73,6 +73,13 @@ spec:
 | Underutilized | Other pods can use slack | N/A |
 | Exceeded | N/A | Container killed for memory or throttled for CPU |
 
+**Pause and predict:** Suppose a pod requests `100m` CPU and `128Mi` memory alongside a `256Mi` memory limit without setting any CPU limit. Which value governs node scheduling, which threshold triggers process termination, and which compute resource can burst above its initial reservation?
+
+<details>
+<summary>Check your prediction</summary>
+
+Requests are what the scheduler uses for placement decisions, calculating whether the candidate node has sufficient allocatable capacity. The memory limit is what can OOMKill the container when resident memory usage crosses that specified ceiling. CPU with no limit can still burst above its request whenever excess host cycles exist, while the memory limit cannot be crossed safely without triggering process termination.
+
 The diagram below captures the most important operational distinction. Memory and CPU both have requests and limits, but they do not fail in the same way when a container crosses the limit. Memory is not compressible in the same way CPU time is, so a container that crosses its memory limit can be killed with an OOMKilled reason. CPU can be sliced over time, so a container that crosses its CPU limit is throttled and continues running more slowly.
 
 ```text
@@ -99,6 +106,10 @@ The diagram below captures the most important operational distinction. Memory an
 └────────────────────────────────────────────────────────────────┘
 ```
 
+</details>
+
+The next section is parsing core syntax units and millicores across manifests, where subtle notation choices create unexpected production surprises.
+
 CPU units are easy to misread under exam pressure. Kubernetes lets you write CPU in whole cores or millicores, where `1000m` means one core and `100m` means one tenth of a core. A request of `100m` does not mean the process can only ever use one tenth of a core unless you also set a low CPU limit; it means the scheduler reserves that much capacity for placement and the runtime can enforce the limit if one exists.
 
 | Value | Meaning |
@@ -117,8 +128,6 @@ Requests and limits also interact with multi-container pods. Kubernetes schedule
 | `128Mi` | 128 mebibytes, or 128 times 1024 squared bytes |
 | `1Gi` | 1 gibibyte |
 | `256M` | 256 megabytes, or 256 times 1000 squared bytes |
-
-Pause and predict: if a pod requests `100m` CPU and `128Mi` memory but has no CPU limit and a `256Mi` memory limit, which value affects scheduling, which value affects OOMKilled behavior, and which resource can still burst above its request? Write your answer before reading the next section, because that distinction is the center of almost every troubleshooting path in this module.
 
 ## Scheduling, Pending Pods, and Node Pressure
 
@@ -328,7 +337,16 @@ Eviction Order (first to last):
 4. Guaranteed pods (last resort)
 ```
 
-Pause and predict: a pod has `requests: {cpu: 100m, memory: 128Mi}` and `limits: {memory: 256Mi}` with no CPU limit. It is not BestEffort because it has resource settings, and it is not Guaranteed because CPU is incomplete and memory request does not equal memory limit. That makes it Burstable, and if it tries to use `300Mi` of memory, the memory limit can still kill it even though the QoS class is not Guaranteed.
+**Pause and predict:** Consider a pod configured with requests of `100m` CPU and `128Mi` memory, alongside a memory limit of `256Mi` and no CPU limit. Which Quality of Service tier does Kubernetes assign to this pod, and what happens if the container attempts to allocate `300Mi` of memory during operation?
+
+<details>
+<summary>Check your prediction</summary>
+
+The pod is Burstable because CPU has no limit and the memory request does not equal the memory limit, failing the strict requirements for Guaranteed status. If the process attempts to consume `300Mi` of memory, the `256Mi` memory limit can still kill it because the Linux kernel cgroup controller enforces hard memory limits regardless of whether the pod belongs to the Guaranteed class.
+
+</details>
+
+The next section is managing cluster consumption through administrative admission controls, establishing structural guardrails across shared organizational platform namespaces.
 
 ## Namespace Governance with LimitRanges and ResourceQuotas
 
@@ -790,7 +808,43 @@ kubectl delete pod resource-test guaranteed besteffort
 kubectl delete namespace limits-test
 ```
 
-### Success Criteria
+**Card A: The scheduler places a pod by watching live CPU and memory usage, so a quiet node in `kubectl top` can always take another pod.** An administrator observes low instantaneous utilization on a worker node and expects the scheduler to bind incoming workloads there regardless of existing pod resource reservations.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing instantaneous node utilization with declarative resource allocation accounting. Next action: understand that scheduling uses requests against allocatable, not live usage; run `kubectl describe node` to inspect committed resource requests, because a node with low live usage in `kubectl top` will still reject additional pods once total requested reservations reach allocatable capacity.
+
+</details>
+
+**Card B: A memory request prevents OOMKilled. Only a missing memory limit can kill the container.** A developer configures memory requests for an application and assumes the container cannot be terminated as long as the cluster has free memory available on the host.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: mistaking scheduling reservations for runtime container memory boundary protection. Next action: understand that a memory request does not stop a memory limit from killing the container; the Linux cgroup controller terminates the process immediately with an OOMKilled status whenever consumption breaches the configured memory limit regardless of request sizing.
+
+</details>
+
+**Card C: With no CPU limit, the container is killed when it uses more CPU than its request.** A platform engineer worries that an unconstrained process consuming surplus processor cycles beyond its configured CPU request during traffic spikes will be terminated by the runtime.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: conflating compressible compute scheduling mechanisms with terminal memory enforcement actions. Next action: understand that CPU without a limit is throttled only if a limit exists, and no limit means it can burst into unused node compute capacity without termination; exceeding a CPU request never triggers container termination.
+
+</details>
+
+**Card D: A pod with a memory limit and no CPU limit is Guaranteed because a limit is set.** An operator defines a memory limit on a container and assumes Kubernetes grants top eviction protection because an explicit upper constraint exists.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: misjudging Quality of Service classification rules and resource boundary completeness. Next action: understand that Guaranteed requires CPU and memory requests equal to limits on every container in the pod; omitting a CPU limit or leaving requests unequal to limits classifies the pod as Burstable, leaving it vulnerable to eviction during node memory pressure.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Configure CPU and memory requests and limits on a pod, then verify the admitted resource spec.
 - [ ] Diagnose why a pod is Burstable, Guaranteed, or BestEffort from its resource fields.
