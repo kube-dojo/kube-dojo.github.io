@@ -10,7 +10,7 @@ Pick the right agent + model + tier for a task before firing a dispatch. This sk
 
 **Hermes is RETIRED (2026-09-16).** `--agent hermes` fail-closes. xAI content/CF → `--agent grok --model grok-4.7`. DeepSeek V4.1 Flash → `--agent deepseek --model deepseek-flash` (first-party, local-only). **OpenCode and Qwen are not routing seats** (`--agent opencode` and `--agent qwen` fail closed).
 
-**Operator topology (2026-09-22):** Cursor dispatches use `grok-4.7-high` except search, which uses `composer-2.5`. Codex routing stays with the Sol orchestrator: `gpt-6-sol` at high is advanced work (draft) and the formal review seat. `gpt-6-luna` at high scouts and does bounded repeatable work (search and edit); Luna is not the orchestrator and not a reviewer. `gpt-6-astra` at high stays advisory (architect). OpenAI still ranks Astra as the strongest model in the family. Sol at its top effort can beat Astra at low effort on some tests, and Sol does not replace Astra for advisory. `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` are fallback only; new work does not pick them. Luna's token price is 20 times below Sol (`$0.10` / `$0.50` versus `$2` / `$10` per million), not one fifth. OpenAI did not publish a result that Luna max matches Sol low. Default scouting effort is high; reserve Luna max for an unusually hard scout. Claude default is `claude-opus-5-5` (review). `claude-fable-5-1` stays the advisor (architect). `claude-sonnet-5` is fast routine work (edit and draft). Search stays `claude-haiku-4-5-20251001`. Native grok stays `grok-4.7`, with `--reasoning-effort low` on search. DeepSeek stays `deepseek-flash` (V4.1 Flash).
+**Operator topology (2026-09-23, aligned with the learn-ukrainian fleet):** Codex work goes through GPT-6 roles. `gpt-6-sol` at high is accountable coding and formal review. `gpt-6-luna` at high is bounded work and scouting (search and edit); Luna is not a reviewer and not the orchestrator. `gpt-6-astra` at high is reserved for a really tough problem, not ordinary advice. Do not route ordinary implementation or routine review to Astra. `gpt-5.6-*` is retired for new work. Luna's token price is about 20 times below Sol. Default scout effort is high; Luna max is only for an unusually hard scout. Cursor implement pins use `grok-4.7-high`. Do not pass `auto`, Fast, `grok-4.6`, or `grok-4.5`. Search on the Cursor seat still uses `composer-2.5`; do not send Composer for implement or review. Claude review is `claude-opus-5-5`. `claude-fable-5-1` is reserved for a really tough problem, same as Astra. `claude-sonnet-5` is routine edit and draft. Claude search stays Haiku. Native grok stays `grok-4.7`, with `--reasoning-effort low` on search. DeepSeek stays `deepseek-flash`. Role card: `.claude/rules/fleet-driver-routing.md`. Codex reset reserve is fail-closed (`scripts.fleet.reset_reserve`). Do not dispatch `claude-fable-5-1` or `gpt-6-astra` unless the problem is really tough. Ordinary packets use Sol, Luna, Opus 5.5, Sonnet 5, AGY, or native Grok.
 
 ## LIVE model discovery (do this; do not ask the operator to recite)
 
@@ -37,7 +37,7 @@ Rotate **authors** and **cross-family CF** across these seats so none idle while
 | Seat | Dispatch | Default model | Prefer for | Never |
 |---|---|---|---|---|
 | **agy** | `--agent agy` | `gemini-3.8-flash-high` | EN content drafts / CF | habit-only author lane; stale `gemini-3.5-*` |
-| **codex** | `--agent codex` | `gpt-6-sol` @ high | advanced author + formal CF; Luna scouts; Astra advises | habit-route on weekly deficit |
+| **codex** | `--agent codex` | `gpt-6-sol` @ high | advanced author + formal CF; Luna scouts; Astra only for a really tough problem | habit-route on weekly deficit |
 | **kimi** | `--agent kimi` | `kimi-code/k3-256k` | EN drafts/edits (ACP tools) | UK translation; bare `kimi -p` |
 | **claude** | `--agent claude` | `claude-opus-5-5` | opus default for review; fable for architect; sonnet for edit/draft | pile-on during Anthropic throttle |
 | **cursor** | `--agent cursor --model grok-4.7-high` | `grok-4.7-high` | when a worker seat is Cursor | this driver dispatching `--agent cursor` to itself |
@@ -111,6 +111,7 @@ T0 author primary is **codex-or-cursor** depending on codex weekly-cap state —
 3. Always `--mode danger --worktree X` for codex review ([[feedback_codex_review_danger_mode]]).
 
 ### Architect / consult / decision
+Use this only for a really tough problem. A normal packet does not get an architect dispatch.
 1. `dispatch_smart architect --agent claude` (`claude-fable-5-1`) or `--agent codex` (`gpt-6-astra` at high). Sol does not take the advisory seat.
 2. For high-leverage decisions: `scripts/ab discuss --with claude,codex,agy` ([[.claude/rules/decision-card]]).
 3. Consult codex on non-trivial scope decisions ([[feedback_consult_codex_on_decisions]]).
