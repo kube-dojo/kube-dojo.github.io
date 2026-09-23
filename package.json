@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.3.1",
-    "@astrojs/starlight": "^0.42.0",
+    "@astrojs/starlight": "^0.42.1",
     "astro": "^7.3.2",
     "mermaid": "^11.17.2",
     "sharp": "^0.35.1"
@@ -38,10 +38,10 @@
     "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.57.2",
     "eslint": "^10.10.0",
-    "happy-dom": "^20.14.0",
+    "happy-dom": "^20.14.5",
     "katex": "^0.18.7",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.1"
   }
 }
