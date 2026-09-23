@@ -157,7 +157,7 @@ The DaemonSet adds a fluentd pod on the eligible sixth node, taking its pod coun
 
 </details>
 
-The next section is a closer look at scheduling constraints and controller choice, so use the comparison to decide which observations you would verify in a live cluster. If the workload provides service capacity to users and any healthy pod can handle any request, a Deployment is usually simpler and more flexible. If the workload provides node-level functionality and missing a single eligible node is a correctness problem, a DaemonSet is the safer expression. If the workload requires stable identity or per-replica storage, neither table column is enough, and you move toward StatefulSet reasoning.
+The next section is a closer look at scheduling constraints and which controller should own the workload, so name the observation you would check on a live node before you read further. If the workload provides service capacity to users and any healthy pod can handle any request, a Deployment is usually simpler and more flexible. If the workload provides node-level functionality and missing a single eligible node is a correctness problem, a DaemonSet is the safer expression. If the workload requires stable identity or per-replica storage, a controller aimed only at request capacity or only at a node-local agent is not a complete fit, and you move toward StatefulSet reasoning.
 
 There is one more subtle difference that matters during maintenance windows. A Deployment can move capacity away from an unhealthy node if the scheduler finds a better place for a replacement pod, which is exactly what you want for stateless services. A DaemonSet does not try to move node responsibility elsewhere because the local work cannot be delegated cleanly. If the node is unhealthy, the node-local agent may also be unhealthy, and that absence is a signal about that node rather than a capacity problem elsewhere in the cluster.
 
@@ -408,7 +408,7 @@ The storage pairing also changes how you think about node failure. If `web-1` mo
 
 </details>
 
-The next section is an operations check on retained storage and node failure, where you will trace which resources still exist before choosing a recovery action.
+The next section is how claims behave after the controller is removed, where you will trace which resources still exist before choosing a recovery action.
 
 PVC retention is intentionally conservative because accidental data deletion is harder to recover from than an extra cleanup step. By default, deleting a StatefulSet does not automatically delete the PVCs created from its `volumeClaimTemplates`. Newer Kubernetes versions support configurable persistent volume claim retention policies, but the safety principle remains the same: know whether you are deleting compute, identity, storage claims, or the underlying data. Many expensive storage surprises come from deleting only the controller and leaving claims behind.
 
