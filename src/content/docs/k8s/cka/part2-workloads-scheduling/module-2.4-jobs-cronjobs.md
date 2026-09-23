@@ -118,9 +118,12 @@ kubectl logs job/pi-calculation
 kubectl delete job pi-calculation
 ```
 
-Pause and predict: A Job has `restartPolicy: Never` and `backoffLimit: 4`. The container fails on every attempt. Before reading further, what do you expect to see in `kubectl get pods` after the Job gives up, and how would that differ from `restartPolicy: OnFailure`?
+**Pause and predict:** A Job has `restartPolicy: Never` and `backoffLimit: 4`. The container fails on every attempt. Before reading further, what do you expect to see in `kubectl get pods` after the Job gives up, and how would that differ from `restartPolicy: OnFailure`?
 
-The answer depends on where the retry happens. With `Never`, Kubernetes normally creates a fresh pod for each failed attempt, so the original failed pod remains visible and additional failed pods appear until the Job reaches its limit. With `OnFailure`, the kubelet restarts the container inside the same pod, so the evidence is concentrated in the pod's restart count and previous logs. Both policies can be correct, but `Never` is often easier to teach and inspect because each attempt is a separate object.
+<details>
+<summary>Check your prediction</summary>
+
+The answer depends on where the retry happens. With `Never`, Kubernetes creates a fresh pod for each failed attempt and the failed pods remain visible until the Job hits `backoffLimit`. With `OnFailure`, the kubelet restarts the container inside the same pod, so the evidence is concentrated in the pod's restart count and previous logs. Both policies can be correct, but `Never` is often easier to teach and inspect because each attempt is a separate object.
 
 ```yaml
 spec:
@@ -134,6 +137,10 @@ spec:
 |--------|----------|
 | `Never` | Usually create a new pod after failure |
 | `OnFailure` | Restart container in same pod on failure |
+
+</details>
+
+The next section is examining how controller retry configurations interact with pod failure observations during troubleshooting and workload lifecycle debugging.
 
 The most common beginner mistake is treating `backoffLimit` as a guarantee about exactly how many pods will exist. It is safer to treat it as controller policy, then inspect status and events to see what actually happened. Pod replacement, container restart behavior, deadlines, and controller timing can all affect what you observe at a specific moment. For the exam, the practical lesson is simpler: set an intentional retry budget, know which restart policy you chose, and use pod logs plus Job conditions to confirm the result.
 
@@ -272,9 +279,16 @@ spec:
 
 Deadlines are especially important for CronJobs because scheduled work can pile up conceptually even when objects are not overlapping. A daily task that normally takes ten minutes but suddenly runs for hours may still be active when the next operational window begins. A deadline forces the task to declare failure instead of silently consuming time. Pair it with useful logs and alerts, because a deadline without evidence only tells you that time ran out, not why the task could not finish.
 
-Pause and predict: A Job with `activeDeadlineSeconds: 60` and `backoffLimit: 10` runs a container that takes fifteen seconds per attempt and always fails. Which guardrail should you expect to matter first, and what extra delay might make the exact number of pods different from a simple arithmetic estimate?
+**Pause and predict:** A Job with `activeDeadlineSeconds: 60` and `backoffLimit: 10` runs a container that takes fifteen seconds per attempt and always fails. Which guardrail should you expect to matter first, and what extra delay might make the exact number of pods different from a simple arithmetic estimate?
 
-The right prediction starts with the deadline, not the retry count. Four fifteen-second attempts already consume the whole minute before you account for scheduling time, image startup, backoff delay, and controller reconciliation. In a real cluster you should not promise an exact pod count from the manifest alone. You should inspect the Job condition, list pods by `job-name`, and read events to confirm whether the controller stopped because it hit the deadline, the backoff limit, or another failure mode.
+<details>
+<summary>Check your prediction</summary>
+
+The right prediction starts with the deadline, not the retry count. The deadline matters first, because four fifteen-second failures already consume the sixty-second deadline before `backoffLimit: 10` is exhausted, and scheduling, image startup, backoff delay, and controller reconciliation can make the observed pod count differ from that arithmetic. In a real cluster you should not promise an exact pod count from the manifest alone. You should inspect the Job condition, list pods by `job-name`, and read events to confirm whether the controller stopped because it hit the deadline, the backoff limit, or another failure mode.
+
+</details>
+
+The next section is examining command-line verification techniques for inspecting terminating Job conditions, controller events, and active workload failures.
 
 ```bash
 # Job status
@@ -887,6 +901,42 @@ kubectl logs job/broken
 # Cleanup
 kubectl delete job broken
 ```
+
+**Card A: With `restartPolicy: Never` and `backoffLimit: 4`, an always-failing container leaves one pod whose restart count is 4.** An administrator reviews a failed batch run and expects the kubelet to restart the single container in place until the backoff limit is exhausted.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: container in-place restart versus separate pod allocation per failure. Next action: recognize that `restartPolicy: Never` directs the Job controller to create a distinct replacement pod for each failed attempt while leaving terminated pods for log inspection; contrast this with `restartPolicy: OnFailure`, where the kubelet restarts the container inside the existing pod and increments its restart counter; inspect the pod list with `kubectl get pods -l job-name=<name>` to review each separate attempt.
+
+</details>
+
+**Card B: `backoffLimit: 10` produces more attempts than `activeDeadlineSeconds: 60` when every attempt fails in fifteen seconds.** An engineer configures a high retry threshold alongside a one-minute timeout and expects all ten retries to execute before the Job halts.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: retry budget exhaustion versus wall-clock deadline termination. Next action: understand that `activeDeadlineSeconds` enforces an absolute real-time ceiling on the entire Job lifecycle; because four fifteen-second attempts consume the full sixty seconds before controller backoff delay is factored in, the deadline halts the Job before reaching the retry limit; verify terminating Job conditions with `kubectl describe job` to distinguish deadline expiration from backoff exhaustion.
+
+</details>
+
+**Card C: Raising `parallelism` lowers the number of successful completions the Job requires.** An operator increases concurrency on a batch migration task hoping that running extra concurrent pods reduces the total workload units needed for completion.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: concurrent execution concurrency versus total required successful completions. Next action: recognize that `completions` specifies the total number of successful pod completions required to finish the Job, whereas `parallelism` determines how many pods execute concurrently; increasing `parallelism` processes available units faster across parallel workers but does not change the completion target; configure both fields intentionally when balancing throughput against cluster capacity.
+
+</details>
+
+**Card D: `kubectl delete job` removes only the Job object and leaves its pods so you can still read their logs.** A developer cleans up a failed batch run with `kubectl delete job` and expects the completed pods to remain available in the namespace for post-mortem debugging.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: parent Job cascade deletion versus child pod retention expectations. Next action: understand that deleting a Job resource cascades by default through owner references and deletes all managed child pods; collect logs and diagnostic events before deleting the Job, or specify `--cascade=orphan` if you explicitly intend to keep pods alive; use `ttlSecondsAfterFinished` for automated post-completion cleanup while preserving pods during immediate triage.
+
+</details>
 
 **Success Criteria**:
 - [ ] Can create Jobs imperatively and declaratively
