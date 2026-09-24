@@ -96,7 +96,16 @@ NodePort and LoadBalancer are still useful, but they solve a lower-level exposur
 | Backend Services | Target services | Developer |
 | TLS Secret | HTTPS certificates | Developer/cert-manager |
 
-Pause and predict: if you apply a valid Ingress manifest to a cluster with no Ingress controller installed, which Kubernetes object accepts the manifest, and which visible field will usually remain empty? The API server accepts the object because the schema is valid, but the controller-owned status is not updated because no controller is reconciling the resource.
+**Pause and predict:** if you apply a valid Ingress manifest to a cluster with no Ingress controller installed, which Kubernetes object accepts the manifest, and which visible field will usually remain empty? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The API server accepts the object because the schema is valid, but the controller-owned status is not updated because no controller is reconciling the resource.
+
+</details>
+
+The next section is an operational guide to class definitions and routing engines; review how implementation choices fulfill these declarative manifests.
 
 ## Controllers, IngressClass, and the Post-Retirement Landscape
 
@@ -227,7 +236,16 @@ spec:
 
 `Prefix` is usually the CKA-friendly choice because it covers both the base path and child paths. `Exact` is valuable when one endpoint must be isolated from nearby paths, such as `/healthz` or a callback route that should not match `/healthz/debug`. `ImplementationSpecific` can unlock controller-specific behavior, including regex-like matches in some controllers, but it trades portability for power and should be used only when you know which controller will process the resource.
 
-Pause and predict: you have two Ingress path rules, `/api` with `pathType: Prefix` and `/api/v1` with `pathType: Exact`. A request arrives for `/api/v1/users`, and a second request arrives for `/api/v1`; which rule handles each request? The longer exact path handles only `/api/v1`, while `/api/v1/users` falls back to the `/api` prefix, which is the only prefix that matches `/api/v1/users` in this example.
+**Pause and predict:** you have two Ingress path rules, `/api` with `pathType: Prefix` and `/api/v1` with `pathType: Exact`. A request arrives for `/api/v1/users`, and a second request arrives for `/api/v1`; which rule handles each request? Predict the matching behavior before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The longer exact path handles only `/api/v1`, while `/api/v1/users` falls back to the `/api` prefix, which is the only prefix that matches `/api/v1/users` in this example.
+
+</details>
+
+The next section is an introduction to domain routing and virtual host dispatching across distinct backend services sharing one public IP.
 
 Host-based routing, also called virtual hosting, uses the HTTP `Host` header to choose a backend. This is the same idea that lets one web server host several websites on one IP address. In Kubernetes, it lets one controller Service accept traffic for `api.example.com` and `web.example.com` while sending each hostname to a different internal Service.
 
@@ -921,7 +939,43 @@ kubectl delete secret example-tls
 rm tls.key tls.crt
 ```
 
-Success criteria:
+**Card A: A valid Ingress manifest publishes an address even when no Ingress controller is installed.** A learner creates an Ingress resource in a fresh cluster and expects external routing to function immediately without any controller running.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: control loop reconciliation versus declarative API schema. Next action: inspect the Ingress with `kubectl get ingress` and verify whether an Ingress controller is installed and running; the API server accepts the valid resource schema, but without an active controller reconciling the class, the address field remains unpopulated and external traffic cannot be routed.
+
+</details>
+
+**Card B: A request for /api/v1/users matches the Exact rule on /api/v1 when /api is Prefix.** An operator assumes an Exact match on a shorter path will automatically match all subpath requests before checking broader Prefix rules.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: path matching specification and precedence. Next action: review the path rules in the Ingress resource; an Exact rule on `/api/v1` matches only identical request paths, meaning a request for `/api/v1/users` will evaluate against other matching rules and fall back to the `/api` Prefix rule.
+
+</details>
+
+**Card C: An Ingress TLS Secret in another namespace is selected by name alone.** An administrator stores TLS certificates in a shared system namespace and references the Secret name inside an application Ingress deployed in a different namespace.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: namespace isolation and certificate reference boundaries. Next action: verify the Secret location with `kubectl get secrets -n <namespace>`; the Kubernetes Ingress specification requires TLS Secrets to reside in the exact same namespace as the Ingress resource itself to prevent cross-tenant credential access.
+
+</details>
+
+**Card D: The Ingress object itself proxies packets to the backend Pods.** A newcomer views an Ingress manifest as an active network proxy component rather than a declarative routing specification consumed by a controller.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: control plane resource specification versus data plane packet forwarding. Next action: inspect the controller Pods and backing Services; the Ingress resource is merely configuration metadata stored in etcd, while the separate Ingress controller data plane receives network traffic and forwards connections to backend endpoints.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Design path-based and host-based Ingress routing for two backend Services.
 - [ ] Configure TLS termination with a Kubernetes TLS Secret in the correct namespace.
