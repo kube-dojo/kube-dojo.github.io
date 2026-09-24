@@ -966,12 +966,12 @@ Failure layer: namespace isolation and certificate reference boundaries. Next ac
 
 </details>
 
-**Card D: The Ingress object itself proxies packets to the backend Pods.** A newcomer views an Ingress manifest as an active network proxy component rather than a declarative routing specification consumed by a controller.
+**Card D: The Ingress object itself proxies packets to the backend Pods.** A newcomer views an Ingress manifest as an active network proxy component.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: control plane resource specification versus data plane packet forwarding. Next action: inspect the controller Pods and backing Services; the Ingress resource is merely configuration metadata stored in etcd, while the separate Ingress controller data plane receives network traffic and forwards connections to backend endpoints.
+Failure layer: control plane resource specification versus data plane packet forwarding. Next action: inspect the controller Pods and backing Services; the Ingress resource is merely a declarative routing specification stored in etcd and consumed by a controller rather than an active proxy component, while the separate Ingress controller data plane receives network traffic and forwards connections to backend endpoints.
 
 </details>
 
