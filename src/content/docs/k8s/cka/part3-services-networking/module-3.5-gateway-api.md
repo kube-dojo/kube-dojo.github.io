@@ -81,7 +81,16 @@ graph TD
     GR --> S3
 ```
 
-Pause and predict: if a large organization lets platform teams manage infrastructure and application teams manage routes, what breaks when both groups edit one shared Ingress object? Think about review ownership, rollback responsibility, and the blast radius of a bad annotation before you read the role table below.
+**Pause and predict:** platform and application teams both edit one shared Ingress object. What could go wrong when each team ships a change, and how would you separate their work? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+A shared Ingress blurs review ownership and rollback responsibility: reverting one team's change can remove another team's rules, while a bad annotation on the shared object can affect every attached application. Gateway API separates infrastructure configuration on Gateway from application routing on HTTPRoute, giving each team a smaller change surface and blast radius.
+
+</details>
+
+Use the role table to map each edit to the resource a reviewer would inspect before allowing the change into a shared cluster.
 
 | Role | Resources | Responsibilities |
 |------|-----------|-----------------|
@@ -330,7 +339,16 @@ Header-based routing is valuable when the client can intentionally select a vers
 
 For canary and experiment traffic, header routing and weighted routing solve different problems. Header routing is deterministic for clients that carry the header, which makes it good for internal testers, partner integrations, or explicit opt-in flows. Weighted routing is probabilistic across a broader request stream, which makes it good for progressive rollout. Many teams use both: a header match for forced testing and a weighted default rule for gradual exposure.
 
-Pause and predict: you want to roll out a new API version to a small share of users. With Deployments alone, you might adjust replica counts, but that couples capacity and routing. What changes when the HTTPRoute owns the traffic percentage while each Deployment scales independently?
+**Pause and predict:** you want to send a small share of requests to a new API version while preserving enough capacity for both versions. Which resource would you change to control the request split? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Set backend weights on the HTTPRoute to control the traffic percentage. Each Deployment can scale independently to meet its own capacity needs; changing replica counts is not the route's request-splitting control. This keeps rollout exposure separate from the number of Pods available to serve each backend.
+
+</details>
+
+Read the backend weights in the manifest, then compare what the route expresses with the capacity choices available to each workload.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -499,7 +517,16 @@ Protocol-specific resources also help avoid false assumptions about what the Gat
 
 Cross-namespace references are where Gateway API's security model becomes concrete. A route in one namespace may attach to a Gateway in another namespace if the Gateway listener allows that route kind and namespace. A route may also want to send traffic to a Service in another namespace, but that backend reference requires consent from the namespace that owns the Service. Gateway API makes that consent explicit through ReferenceGrant.
 
-Pause and predict: an HTTPRoute in namespace `team-a` references a Service in namespace `team-b`, but no ReferenceGrant exists in `team-b`. Should the route silently work, route somewhere else, or report an unresolved reference in status? The secure answer is that the target namespace must grant permission, and the route should report a reference-resolution problem instead of guessing.
+**Pause and predict:** an HTTPRoute in one namespace points to a Service in another namespace, but the Service's namespace has granted no permission. What status and traffic behavior would you expect? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Without a ReferenceGrant in the target namespace, the cross-namespace backend reference remains unresolved and the route reports a reference-resolution problem, commonly through its `ResolvedRefs` condition. The target namespace must grant consent before the controller may use that Service; the route must not silently substitute another backend.
+
+</details>
+
+Inspect the following manifest as the receiving namespace's declaration of consent, then compare its from and to fields with the route.
 
 ```yaml
 # In the target namespace (where the service lives)
@@ -942,7 +969,43 @@ EOF
 curl -i http://$GW_IP/
 ```
 
-### Success Criteria
+**Card A: Platform and application teams can safely edit one shared Ingress object.** What failure would this assumption hide during review or rollback? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: shared configuration ownership and change isolation. Next action: assign the platform team the Gateway and the application team its HTTPRoute, then review and roll back their changes separately; a shared Ingress can couple both teams' edits and widen the impact of a mistake.
+
+</details>
+
+**Card B: A canary percentage has to be implemented by changing Deployment replica counts.** What would you inspect before changing workload capacity? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: request routing versus workload capacity. Next action: inspect and change the HTTPRoute backend weights for the desired request split, then scale each Deployment according to its capacity needs; Pod counts do not directly set the route's percentage.
+
+</details>
+
+**Card C: An HTTPRoute can reference a Service in another namespace without a ReferenceGrant.** What evidence would you seek before trusting that backend? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: cross-namespace backend authorization. Next action: check the route's `ResolvedRefs` status and create a matching ReferenceGrant in the Service's namespace with consent from that namespace's owner; without it, the backend reference remains unresolved.
+
+</details>
+
+**Card D: An HTTPRoute with no parentRef still programs the Gateway.** Which attachment evidence would you check before testing traffic? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: route attachment to a Gateway. Next action: add a valid `parentRefs` entry and inspect the HTTPRoute parent status for acceptance; without a parent reference, this route cannot affect Gateway traffic, even if the Gateway itself is already programmed.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Explain the Gateway API resource hierarchy from GatewayClass to Route to Service.
 - [ ] Create Gateway and HTTPRoute resources with valid Kubernetes 1.35-compatible manifests.
