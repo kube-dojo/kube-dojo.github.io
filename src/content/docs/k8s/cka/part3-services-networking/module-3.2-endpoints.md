@@ -91,7 +91,16 @@ flowchart LR
 
 The legacy Endpoints object stores addresses in `subsets`, which group a set of IPs with a set of ports. That shape matters when you debug older tools because the object does not simply say "three pods"; it says "these addresses are ready for these ports, and these other addresses are not ready." A selector-based Service normally receives this object automatically, so manually editing it is usually a sign that you are fighting the controller rather than fixing the workload.
 
-Pause and predict: if a Deployment has three Pods, but only two pass readiness, how many Pod IPs should be usable through the Service and where would you expect to find the excluded address? The correct answer is not "all Running pods." Kubernetes separates liveness, scheduling state, and readiness so that an alive container can be protected from user traffic while it starts, warms caches, or waits for a dependency.
+**Pause and predict:** if a Deployment has three Pods, but only two pass readiness, how many Pod IPs should be usable through the Service and where would you expect to find the excluded address? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+Only two Pod IPs are usable through the Service, while the excluded address is placed in the `notReadyAddresses` list of the legacy Endpoints object or marked with `ready: false` in the EndpointSlice. The correct answer is not all Running pods. Kubernetes intentionally separates container lifecycle and scheduling state from network readiness so that an active process is shielded from incoming client requests until health probes pass.
+
+</details>
+
+The next section is an operational look at the Endpoint Controller reconciliation cycle; follow how control plane loops track matching Pods and synchronize discovery data.
 
 ### 1.2 Endpoint Lifecycle
 
@@ -205,9 +214,16 @@ subsets:
 
 When you read this object, do not stop at the address list. Ask whether the backend port matches the container port the application actually listens on, whether the endpoint is ready or not ready, and whether the Pod reference still exists. A stale-looking reference usually points to a reconciliation lag or a race you should recheck, while a stable not-ready entry points toward application health, probe configuration, or dependency readiness.
 
-> **Pause and predict**: You have a Service with 3 endpoints. You add a readiness probe to the deployment that checks `/healthz`, but the endpoint on your app returns 500 for that path. What happens to the Service's endpoints, and can clients still reach the app?
+**Pause and predict:** you have a Service backed by three endpoints and introduce a readiness probe that encounters failing HTTP status codes on every single replica. What happens to the Service endpoints, and can clients still reach the application? Decide before opening the explanation.
 
-The key is that readiness is an admission control signal for Service traffic, not a statement about whether the process exists. If all replicas fail the probe, clients can resolve the Service name but receive no normal backend through the Service. That behavior is protective, because sending users to a Pod that says it is not ready is usually worse than surfacing a clean failure that pushes the operator toward the probe or dependency problem.
+<details>
+<summary>Check your prediction</summary>
+
+All endpoints are removed from the ready address list or marked unready in EndpointSlices, leaving the Service with no usable backends. Clients can still resolve the Service DNS name and connect to its ClusterIP, but their connection attempts will fail or time out because the data plane has no valid destinations. The key is that readiness is an admission control signal for Service traffic, not a statement about whether the process exists; omitting unready instances is protective because routing callers to broken instances causes degraded user experiences.
+
+</details>
+
+The next section is an architectural overview of EndpointSlices; examine how Kubernetes addresses scalability limits by dividing large endpoint sets into sharded resources.
 
 ---
 
@@ -876,6 +892,42 @@ kubectl run test --rm -i --image=busybox:1.36 --restart=Never -- \
 kubectl delete deployment web
 kubectl delete svc broken-service headless-web
 ```
+
+**Card A: Every Running Pod that matches the Service selector is a usable endpoint.** A troubleshooter inspects matching labels on three running containers and assumes the Service distributes incoming connections across all of them without checking health conditions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Pod lifecycle phase versus Service endpoint readiness. Next action: inspect the Pod's Ready condition and the conditions block in the EndpointSlice; a Pod in the Running phase is only added to active traffic routing when its readiness probes pass.
+
+</details>
+
+**Card B: A failing readiness probe deletes the Pod.** An operator observes a health check threshold breach and expects kubelet to terminate or restart the container immediately rather than adjusting network routing.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: readiness probe isolation versus liveness container restarts. Next action: verify the probe type in the Pod specification; readiness failures isolate endpoints from Service traffic while leaving containers running, whereas liveness failures trigger container restarts.
+
+</details>
+
+**Card C: EndpointSlices replaced Endpoints, so kubectl get endpoints no longer lists backends.** An engineer notices modern cluster defaults and expects legacy Endpoints queries to return empty results or deprecation errors when checking active services.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: dual-API resource mirroring versus backward compatibility. Next action: run `kubectl get endpoints` alongside `kubectl get endpointslices`; the control plane continues reconciling legacy Endpoints objects for backward compatibility alongside modern EndpointSlice resources.
+
+</details>
+
+**Card D: Addresses listed as not ready still receive new Service traffic.** A developer assumes that appearing inside an endpoint resource guarantees traffic delivery regardless of whether the address is categorized under ready or not-ready conditions.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: unready endpoint tracking versus active proxy data plane programming. Next action: inspect `kube-proxy` rules or EndpointSlice conditions; proxy implementations only route client requests to addresses marked ready, ignoring not-ready addresses until probes pass.
+
+</details>
 
 **Success Criteria**: Mark each item only when you can explain the evidence behind it. For example, "endpoints exist" should mean you can name the command that showed them, the selector that produced them, and the Pod labels that made the match valid.
 - [ ] Can identify missing endpoints.
