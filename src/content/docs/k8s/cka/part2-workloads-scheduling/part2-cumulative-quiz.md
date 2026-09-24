@@ -41,7 +41,7 @@ Senior infrastructure practitioners treat Kubernetes workloads as self-healing c
 
 ## Core Content: Pod Lifecycle and Resilient Multi-Container Patterns
 
-The Pod represents the atomic unit of deployment and scheduling in Kubernetes, encapsulating one or more tightly coupled containers that share network namespaces, storage volumes, and process boundaries. When a pod is submitted to the API server, it enters the Pending phase while the kube-scheduler identifies a suitable worker host. Once scheduled, the local kubelet invokes the container runtime to pull required container images, construct the network sandbox, execute init containers sequentially to completion, and concurrently launch the primary application containers. The pod transitions to Running once at least one primary container starts successfully, remaining in this phase until all containers complete or terminate.
+The Pod represents the atomic unit of deployment and scheduling in Kubernetes, encapsulating one or more tightly coupled containers that share a network namespace and can share storage volumes. Process namespaces are shared only when configured. When a pod is submitted to the API server, it enters the Pending phase while the kube-scheduler identifies a suitable node. Once scheduled, the kubelet pulls images and starts regular init containers sequentially to completion before application containers. A sidecar defined in `initContainers` with `restartPolicy: Always` stays running; the kubelet starts subsequent containers once that sidecar has started. The pod transitions to Running once at least one application container starts successfully, remaining in this phase until all containers complete or terminate.
 
 Multi-container pod architectures enable modular separation of concerns by co-locating supporting helper processes alongside the primary application engine. Common design patterns include sidecars that forward application logs or manage proxy communication, ambassador containers that abstract remote service endpoints, and adapter containers that normalize heterogeneous metrics into standardized formats. Co-located containers communicate over localhost using standard inter-process communication or TCP/UDP sockets, and share filesystem data through mounted emptyDir or persistent volumes. Enabling shared process namespaces allows auxiliary containers to inspect neighboring process tables, simplifying diagnostic sidecar implementations.
 
@@ -49,9 +49,9 @@ Container lifecycle health management relies on three distinct probe mechanisms 
 
 When application containers encounter repeated runtime failures, the kubelet enforces an exponential restart backoff delay to protect worker nodes from continuous process thrashing. The restart delay begins at ten seconds and doubles progressively through twenty, forty, eighty, and one hundred sixty seconds until reaching an upper ceiling of three hundred seconds. During this delayed period, the pod status reports CrashLoopBackOff within kubectl command output, signalling to operators that container exit codes, termination logs, and historical events must be analyzed to identify root causes.
 
-Troubleshooting complex multi-container pods often requires inspecting active processes without restarting existing containers or mutating production manifest specifications. Administrators execute ephemeral debug containers using the kubectl debug command, attaching an interactive troubleshooting container directly into the existing pod network and process namespaces. This capability proves indispensable when examining distroless or hardened container images that deliberately omit shell binaries, package managers, and core system diagnostic utilities.
+Troubleshooting complex multi-container pods often requires inspecting active processes without restarting existing containers or mutating production manifest specifications. Administrators can add an ephemeral container with `kubectl debug` to join the pod network namespace. It sees other containers' processes only if the pod enables `shareProcessNamespace` or the debug command requests process sharing with a target container, subject to runtime support. This capability helps examine distroless or hardened images that omit shells and diagnostic utilities.
 
-Graceful container termination protects in-flight transactions and preserves data integrity when workloads scale down or undergo scheduled maintenance. When the API server receives a pod deletion request, it marks the pod as Terminating, updates active endpoint controllers to halt traffic routing, and signals kubelet to begin shutdown routines. The kubelet executes any registered preStop lifecycle hooks inside the target container, followed immediately by sending a SIGTERM signal to the root container process. If application processes fail to exit before the expiration of terminationGracePeriodSeconds, kubelet dispatches an unconditional SIGKILL signal to forcibly terminate all container processes.
+Graceful container termination protects in-flight transactions and preserves data integrity when workloads scale down or undergo scheduled maintenance. When the API server accepts a pod deletion, it sets `deletionTimestamp` and starts the termination grace period. The kubelet begins shutdown by running any `preStop` hook before sending SIGTERM to the container process. EndpointSlice updates happen concurrently with shutdown, so the application must handle traffic that can still arrive during the hook or after SIGTERM. If processes remain after the grace period, kubelet sends SIGKILL.
 
 ---
 
@@ -78,7 +78,7 @@ Deployment controllers enforce a rollout timeout boundary through the progressDe
 
 Pausing and resuming rollouts provides granular administrative control during complex multi-step deployments or canary verifications. Executing kubectl rollout pause suspends the active rollout loop, allowing engineers to apply multiple configuration adjustments, such as updating resource limits and environment variables simultaneously, without triggering unnecessary intermediate ReplicaSet transitions. Once all modifications are declared, running kubectl rollout resume instructs the controller to evaluate the accumulated differences and initiate a single, consolidated rolling update sequence.
 
-Declarative canary releases can also be achieved by managing two independent Deployments that share a common Service label selector across worker nodes. By adjusting the relative replica counts between the stable production Deployment and the canary Deployment, operators direct a controlled percentage of user requests to the new software release. This methodology preserves native Kubernetes primitives without requiring specialized service mesh routing rules during preliminary validation exercises.
+Declarative canary releases can also use two Deployments behind one Service. Give the stable and canary pod templates a shared label that the Service selects, plus distinct version labels that make each Deployment's own selector narrower. Identical Deployment selectors can cause their ReplicaSets to compete over the same pods. Changing the two replica counts adjusts the approximate share of ready endpoints, although it does not guarantee an exact traffic percentage.
 
 ---
 
@@ -88,13 +88,14 @@ Stateful applications require operational guarantees that stateless Deployments 
 
 Network identity for StatefulSet pods is established through a mandatory governing headless Service configured with clusterIP set to None. CoreDNS utilizes this headless Service declaration to generate individual, discoverable DNS A-records and SRV records for every ordinal pod within the cluster domain. Each replica receives a fully qualified domain name structured as pod-name dot service-name dot namespace dot svc dot cluster dot local, ensuring that peer replicas can reliably locate one another regardless of pod restarts or IP address reassignments. Without a governing headless Service, StatefulSet instances lose direct DNS discoverability.
 
-Persistent storage in StatefulSets is automated through volumeClaimTemplates, which instruct the controller to dynamically generate a dedicated PersistentVolumeClaim for each ordinal pod. When pod web-0 initializes, the controller provisions a claim named data-web-0, binding it to a matching PersistentVolume that remains attached across pod rescheduling events. Crucially, when an administrator scales down a StatefulSet or deletes an individual replica, the associated PVCs and underlying PV storage assets are intentionally preserved rather than deleted. This safety safeguard protects persistent state from accidental loss during routine maintenance or automated scaling operations.
+Persistent storage in StatefulSets is automated through `volumeClaimTemplates`, which create a dedicated PersistentVolumeClaim for each ordinal pod. A claim's name follows `{volumeClaimTemplate.metadata.name}-{pod-name}`: a template named `data` produces `data-web-0` for pod `web-0`. A bound claim provides stable storage across pod rescheduling. By default, claims are retained when the StatefulSet scales down or is deleted; an explicit PVC retention policy can change that behavior.
 
 ```text
 +-------------------------------------------------------------------------+
 |                  StatefulSet Identity and Storage Topology              |
 |                                                                         |
-|  StatefulSet: "database" (replicas: 2, serviceName: "db-headless")      |
+|  StatefulSet: "database" (replicas: 2, claim template: "data")           |
+|  Governing Service: "db-headless"                                        |
 |                                                                         |
 |  +--------------------------------+   +-------------------------------+ |
 |  | Pod: database-0                |   | Pod: database-1               | |
@@ -157,7 +158,7 @@ CPU and memory resources exhibit fundamentally different behavioral characterist
 
 Kubernetes automatically categorizes every pod into one of three Quality of Service classes based upon the relationship between container requests and limits:
 
-- **Guaranteed**: Every container in the pod explicitly declares both CPU and memory requests and limits, with requests matching limits exactly for every specified resource. Guaranteed workloads receive top priority during node resource starvation, remaining immune from eviction until BestEffort and Burstable workloads have been eliminated.
+- **Guaranteed**: Every container in the pod has CPU and memory requests and limits that match for each resource after admission defaulting. A missing request can be defaulted from its corresponding limit, so the request need not be written explicitly. Guaranteed pods are generally evicted after lower QoS classes under node resource pressure, but they are not immune to eviction.
 - **Burstable**: At least one container in the pod specifies a CPU or memory request or limit, but requests and limits do not match across all resources. Burstable workloads can consume surplus host capacity when available, but face eviction if the host encounters severe memory pressure.
 - **BestEffort**: No container in the pod defines any CPU or memory requests or limits. BestEffort workloads operate on scavenged node capacity, and the kubelet evicts them first whenever host resources become constrained.
 
@@ -196,7 +197,7 @@ Topology spread constraints provide fine-grained control over workload distribut
 
 Modern scheduling architectures support combining topology spread constraints with matchLabelKeys to maintain balanced distributions during rolling updates. When a new Deployment revision rolls out, matchLabelKeys instructs the scheduler to evaluate skew calculations using the pod-template-hash label, ensuring that incoming pods spread evenly without being blocked by legacy replicas awaiting termination. This refinement prevents rollout deadlocks in tightly constrained multi-zone environments.
 
-Taints and tolerations establish node repulsion boundaries, allowing specific worker nodes to reject unauthorized workloads. Administrators apply taints to nodes using kubectl taint nodes, specifying a key, value, and one of three taint effects: NoSchedule, PreferNoSchedule, or NoExecute. The NoSchedule effect prevents untolerated pods from scheduling onto the host while leaving existing pods undisturbed. The PreferNoSchedule effect guides the scheduler away from the host as a soft preference. The NoExecute effect rejects unscheduled workloads and immediately evicts any running pods on the node that lack a matching toleration, unless those pods specify a tolerationSeconds grace window.
+Taints and tolerations establish node repulsion boundaries, allowing specific nodes to reject workloads. Administrators apply taints with `kubectl taint nodes`, specifying a key, value, and effect: `NoSchedule`, `PreferNoSchedule`, or `NoExecute`. `NoSchedule` prevents untolerated pods from scheduling while leaving existing pods undisturbed. `PreferNoSchedule` is a soft scheduling preference. `NoExecute` also evicts running pods without a matching toleration. A matching toleration without `tolerationSeconds` keeps the pod bound indefinitely; setting `tolerationSeconds` limits how long that matching toleration delays eviction.
 
 Node maintenance procedures frequently leverage the built-in unschedulable node condition alongside administrative taints. Executing kubectl cordon applies the node.kubernetes.io/unschedulable taint with effect NoSchedule, preventing the scheduler from placing newly created pods on the machine while leaving running workloads completely unaffected. When preparing a node for hardware replacement or kernel upgrades, administrators follow cordoning with kubectl drain, which invokes the Eviction API to evict existing pods gracefully while respecting PodDisruptionBudgets.
 
@@ -225,13 +226,13 @@ When mounting configuration files into existing directories that already contain
 
 Enterprise architectures frequently streamline configuration volume declarations by utilizing projected volumes. A projected volume maps multiple heterogeneous sources, including ConfigMaps, Secrets, downward API metadata, and projected service account tokens, into a unified directory structure inside the container filesystem. This unified projection simplifies container configuration logic while enforcing least-privilege credential injection through time-bound, audience-scoped service account tokens.
 
-Immutable ConfigMaps and Secrets enhance cluster stability and API server performance in high-density production environments. By adding immutable set to true in the metadata specification, administrators prevent accidental configuration tampering by users or automated scripts. Marking resources as immutable signals the kube-apiserver and kubelet daemons that they can safely cease polling and watching these objects for changes, drastically reducing control plane CPU consumption and network overhead across large-scale worker clusters.
+Immutable ConfigMaps and Secrets protect configuration data from accidental changes. Set `immutable: true` as a top-level field beside `metadata` and `data`, not inside `metadata`. Immutable objects cannot have their data changed in place; Kubernetes can also close watches for them, reducing API server load in clusters with many mounted configuration objects.
 
 ---
 
 ## Did You Know?
 
-- **Fact 1**: [Init containers execute sequentially and must run to completion](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) before any application containers start, meaning a failing init container halts pod startup and triggers kubelet restart according to the pod restartPolicy.
+- **Fact 1**: [Regular init containers run sequentially to completion](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/) before application containers start. An init container with `restartPolicy: Always` is a sidecar that remains running while subsequent containers start.
 - **Fact 2**: [StatefulSets require a headless Service](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with clusterIP None to establish direct DNS A-records for individual ordinal pods, enabling predictable peer-to-peer discovery for distributed databases without clusterIP load balancing.
 - **Fact 3**: [Linux kernel Control Groups enforce memory limits strictly](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) through the Out-Of-Memory killer which immediately terminates containers exceeding their memory ceiling with exit code 137, while CPU limits merely trigger process throttling without container termination.
 - **Fact 4**: [Marking ConfigMaps and Secrets as immutable](https://kubernetes.io/docs/concepts/configuration/configmap/) by setting immutable to true protects critical application configurations from accidental drift while substantially reducing API server memory and CPU overhead by terminating watch connections.
@@ -247,7 +248,7 @@ Immutable ConfigMaps and Secrets enhance cluster stability and API server perfor
 | Omitting memory requests when defining memory limits | Kubernetes automatically assigns requests equal to limits, potentially escalating the pod into an unintended QoS class or causing node scheduling failures | Explicitly specify both resource requests and limits based on observed profiling data |
 | Expecting ConfigMap changes in `envFrom` to update running containers | Container process environment variables are immutable at runtime and never reload without process recreation | Trigger a rolling rollout restart (`kubectl rollout restart deployment <name>`) or use volume mounts for reloadable configs |
 | Using `restartPolicy: Always` in batch Job specifications | The Job controller rejects the manifest because batch workloads require run-to-completion semantics | Specify `restartPolicy: OnFailure` or `restartPolicy: Never` for all Job and CronJob manifests |
-| Tainting a node with `NoExecute` without configuring `tolerationSeconds` on critical pods | Existing pods on the node are immediately evicted without grace period, causing unexpected service disruptions | Include `tolerationSeconds` in pod tolerations or use `NoSchedule` for planned operational maintenance |
+| Tainting a node with `NoExecute` when critical pods lack a matching toleration | Untolerated running pods are evicted; `tolerationSeconds` cannot delay eviction without a matching toleration | Add a matching `NoExecute` toleration without `tolerationSeconds` to remain bound, or set a duration when delayed eviction is intended |
 | Mounting ConfigMaps via `subPath` and expecting automated live updates | The kubelet atomic volume update mechanism does not propagate modifications to individual files mounted using `subPath` | Mount the entire ConfigMap directory or design an external reload container to watch and signal updates |
 | Encoding Secrets with `echo "secret" \| base64` instead of `echo -n` | A trailing newline character (`\n`) is encoded into the payload, causing subtle authentication failures in application containers | Always use `echo -n "secret" \| base64` to avoid injecting unwanted newline bytes into credential values |
 
@@ -436,6 +437,7 @@ EOF
 kubectl apply -f /tmp/multi-pod.yaml
 kubectl wait --for=condition=Ready pod/multi-app --timeout=30s
 kubectl describe pod multi-app | grep -E '(Ready:|ContainersReady:)'
+kubectl delete pod multi-app
 rm -f /tmp/multi-pod.yaml
 ```
 
@@ -497,7 +499,12 @@ EOF
 
 kubectl apply -f /tmp/stateful-drill.yaml
 kubectl rollout status statefulset/stateful-drill
-kubectl get pods -l app=stateful-drill
+test "$(kubectl get service stateful-svc -o jsonpath='{.spec.clusterIP}')" = None
+kubectl get pods -l app=stateful-drill -o custom-columns=NAME:.metadata.name,HOSTNAME:.spec.hostname,SUBDOMAIN:.spec.subdomain
+kubectl run dns-check --image=busybox:1.36 --restart=Never --command -- sh -c 'nslookup stateful-drill-0.stateful-svc && nslookup stateful-drill-1.stateful-svc'
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/dns-check --timeout=60s
+kubectl logs dns-check
+kubectl delete pod dns-check
 kubectl delete -f /tmp/stateful-drill.yaml
 rm -f /tmp/stateful-drill.yaml
 ```
@@ -535,27 +542,67 @@ EOF
 kubectl apply -f /tmp/batch-job.yaml
 kubectl wait --for=condition=Complete job/batch-drill --timeout=60s
 kubectl get job batch-drill
+kubectl get job batch-drill -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 kubectl delete -f /tmp/batch-job.yaml
 rm -f /tmp/batch-job.yaml
 ```
 
 ### Step 5: Node Taints, Tolerations, and ConfigMap Injection
 
-Create a ConfigMap, apply a node taint, and launch a pod that tolerates the taint and injects configuration variables through the envFrom directive:
+Create a ConfigMap and taint a Ready node, including a control-plane node in a single-node sandbox. Constrain two pods to that node through scheduler-evaluated node affinity: one lacks the new taint's toleration and must remain Pending, while the other tolerates it and reads the ConfigMap through `envFrom`. The control-plane tolerations handle common sandbox taints on both pods, so the maintenance taint is the difference under test:
 
 ```bash
 kubectl create configmap app-cfg --from-literal=ENVIRONMENT=staging --from-literal=LOG_LEVEL=info
-TARGET_NODE=$(kubectl get nodes --no-headers | grep -v 'control-plane' | head -n 1 | awk '{print $1}')
-kubectl taint nodes $TARGET_NODE maintenance=true:NoSchedule --overwrite
+TARGET_NODE=$(kubectl get nodes --no-headers | awk '$2 == "Ready" {print $1; exit}')
+test -n "$TARGET_NODE"
+kubectl taint node "$TARGET_NODE" maintenance=true:NoSchedule --overwrite
 
 cat <<EOF > /tmp/taint-pod.yaml
 apiVersion: v1
 kind: Pod
 metadata:
+  name: untolerated-pod
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchFields:
+          - key: metadata.name
+            operator: In
+            values: ["$TARGET_NODE"]
+  tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  containers:
+  - name: test-app
+    image: busybox:1.36
+    command: ["/bin/sh", "-c", "sleep 3600"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
   name: config-taint-pod
 spec:
-  nodeName: $TARGET_NODE
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchFields:
+          - key: metadata.name
+            operator: In
+            values: ["$TARGET_NODE"]
   tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
   - key: "maintenance"
     operator: "Equal"
     value: "true"
@@ -570,10 +617,15 @@ spec:
 EOF
 
 kubectl apply -f /tmp/taint-pod.yaml
+kubectl wait --for=condition=PodScheduled=False pod/untolerated-pod --timeout=30s
+test "$(kubectl get pod untolerated-pod -o jsonpath='{.status.phase}')" = Pending
+test "$(kubectl get pod untolerated-pod -o jsonpath='{.status.conditions[?(@.type=="PodScheduled")].reason}')" = Unschedulable
 kubectl wait --for=condition=Ready pod/config-taint-pod --timeout=30s
-kubectl logs config-taint-pod | grep -E '(ENVIRONMENT|LOG_LEVEL)'
-kubectl delete pod config-taint-pod
-kubectl taint nodes $TARGET_NODE maintenance=true:NoSchedule-
+test "$(kubectl get pod config-taint-pod -o jsonpath='{.spec.nodeName}')" = "$TARGET_NODE"
+test "$(kubectl exec config-taint-pod -- printenv ENVIRONMENT)" = staging
+test "$(kubectl exec config-taint-pod -- printenv LOG_LEVEL)" = info
+kubectl delete -f /tmp/taint-pod.yaml
+kubectl taint node "$TARGET_NODE" maintenance=true:NoSchedule-
 kubectl delete configmap app-cfg
 rm -f /tmp/taint-pod.yaml
 ```
@@ -601,7 +653,7 @@ Failure layer: assuming StatefulSet controllers generate network DNS records wit
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: misunderstanding default request inheritance and container runtime cgroup memory enforcement. Next action: understand that Kubernetes automatically sets the memory request equal to the memory limit if the request is omitted, assigning the workload to the Guaranteed class if CPU matches or Burstable otherwise, and that the Linux kernel cgroup OOM killer terminates containers immediately when limits are exceeded.
+Failure layer: misunderstanding default request inheritance and container runtime cgroup memory enforcement. Next action: understand that Kubernetes defaults an omitted memory request from its limit. The Pod is Guaranteed only if every container also has equal CPU requests and limits after defaulting; otherwise it is Burstable. A memory limit remains enforceable, so exceeding it can lead to an OOM kill.
 
 </details>
 
@@ -617,13 +669,12 @@ Failure layer: conflating dynamic filesystem mounts with static container proces
 **Success Criteria**:
 
 - [ ] You evaluated multi-container pod architectures and verified probe status using `kubectl describe pod`.
-- [ ] You managed declarative application rollouts and performed zero-downtime rollbacks using `kubectl rollout undo`.
-- [ ] You configured a StatefulSet with a headless Service and inspected ordinal pod identities and volume claims.
+- [ ] You inspected a Deployment rollout, ran `kubectl rollout undo`, and waited for the rollback to complete.
+- [ ] You configured a StatefulSet with a headless Service and resolved both ordinal pod DNS names.
 - [ ] You created a batch workload using a Job with explicit completion and parallelism constraints and monitored task lifecycle.
-- [ ] You established node taints and applied matching tolerations to control workload scheduling placement.
-- [ ] You differentiated between Guaranteed, Burstable, and BestEffort Quality of Service classes under resource pressure.
-- [ ] You injected decoupled application configurations using ConfigMaps and Secrets via environment variables and volumes.
-- [ ] You explained why ConfigMap updates in `envFrom` require a rollout restart to propagate to running application containers.
+- [ ] You confirmed an untolerated pod remains unschedulable and a matching toleration allows the second pod onto the tainted node.
+- [ ] You checked the Job's declared resource requests and limits in its manifest.
+- [ ] You confirmed the tolerated pod received both ConfigMap values through environment variables.
 
 ---
 
