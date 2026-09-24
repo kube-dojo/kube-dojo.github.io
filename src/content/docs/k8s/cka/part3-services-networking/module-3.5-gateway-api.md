@@ -348,7 +348,7 @@ Set backend weights on the HTTPRoute to control the traffic percentage. Each Dep
 
 </details>
 
-Read the backend weights in the manifest, then compare what the route expresses with the capacity choices available to each workload.
+The next section is a chance to examine how the route configuration shapes incoming traffic and what evidence would help you evaluate its behavior.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
