@@ -106,7 +106,16 @@ flowchart TD
 
 Read the diagram from left to right as an operational timeline. The top half shows why direct Pod addressing fails: the address that was correct yesterday may point to nothing after a rollout. The bottom half shows the Service contract: the Service IP and DNS name stay stable while EndpointSlices update the current Pod IPs. The important CKA habit is to ask whether the problem is with the stable front door, the backend membership list, or the application listening behind that membership list.
 
-Pause and predict: if a Service selector matches three running Pods, and one Pod becomes unready because its readiness probe fails, should a new client request still be sent to that unready Pod? Before reading on, decide whether the answer should depend on the Service, the Deployment, or the readiness condition. The reason matters because Service debugging often starts with a healthy-looking Pod list but an endpoint list that tells a more precise truth.
+**Pause and predict:** if a Service selector matches three running Pods, and one Pod becomes unready because its readiness probe fails, should a new client request still be sent to that unready Pod? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+No. A new client request is not sent to the unready Pod because the ready endpoints used for Service traffic omit Pods whose readiness probe fails, even when their labels still match the selector.
+
+</details>
+
+The next section is a map of the Service fields and the backend addresses they describe; use it to separate client-facing configuration from the evidence you inspect during a failure.
 
 The main parts of a normal Service are compact, but each one answers a different question. `ClusterIP` is the stable internal virtual IP. `selector` tells Kubernetes which Pods are eligible backends. `port` is what clients connect to on the Service. `targetPort` is where traffic lands on the selected Pods. Endpoints and EndpointSlices are the resolved backend addresses that Kubernetes derives from the selector and Pod readiness.
 
@@ -654,7 +663,16 @@ spec:
 | `PreferSameNode` | [Prefer endpoints on the same node, fall back to remote (GA in 1.35)](https://kubernetes.io/docs/concepts/services-networking/service/) |
 | `PreferSameZone` | Prefer endpoints topologically close — same zone when using topology-aware routing |
 
-Pause and predict: if you set `externalTrafficPolicy: Local` for a NodePort Service and send traffic to a node with no local backend Pod, what should you check before blaming DNS? The DNS name may be resolving correctly, and the NodePort may be open, but the policy intentionally refuses to forward to remote endpoints. The right evidence is node placement, EndpointSlice hints, Service policy fields, and whether the receiving node has a local ready endpoint.
+**Pause and predict:** if you set `externalTrafficPolicy: Local` for a NodePort Service and send traffic to a node with no local backend Pod, what should you check before blaming DNS? Predict the result before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The DNS name may resolve correctly and the NodePort may be open, but `externalTrafficPolicy: Local` refuses to forward external traffic to remote endpoints. Check node placement, EndpointSlice endpoint conditions and node names, Service policy fields, and whether the receiving node has a local ready endpoint.
+
+</details>
+
+The next section is a closer look at node forwarding rules; compare those rules with the Service specification before deciding which part of the request path needs investigation.
 
 When endpoint state looks correct and clients still fail, kube-proxy inspection becomes useful. In iptables mode, rules in `KUBE-SERVICES`, `KUBE-SVC-*`, and `KUBE-SEP-*` chains show how the virtual Service IP is translated to backend Pod IPs. In nftables mode, the same idea appears in the nft ruleset. In deprecated IPVS mode, `ipvsadm` shows virtual servers and real servers. This is advanced evidence, but it can separate a broken data plane from a broken application.
 
@@ -1305,7 +1323,43 @@ kubectl delete svc challenge-app
 
 </details>
 
-### Success Criteria
+**Card A: An unready Pod that still matches the Service selector stays in the ready endpoints.** A learner sees three matching Pod labels and assumes the Service will continue sending requests to all three after one probe fails.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: selector match versus endpoint readiness. Next action: inspect the Pod's Ready condition and the Service's EndpointSlices; the failed probe makes that Pod's endpoint unready, so normal Service routing does not select it for new requests despite its matching labels.
+
+</details>
+
+**Card B: externalTrafficPolicy Local forwards to a Pod on another node when this node has no local ready endpoint.** A client reaches this node's NodePort while the only ready backend runs elsewhere and expects automatic cross-node fallback.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: strict external traffic policy versus topology preference. Next action: inspect `externalTrafficPolicy`, EndpointSlice node names and conditions, and Pod placement; with `Local`, kube-proxy does not forward external traffic from a node without a local ready endpoint to a remote Pod.
+
+</details>
+
+**Card C: The Service ClusterIP is one of the selected Pod IPs.** An operator compares `kubectl get svc` with `kubectl get pods -o wide` and expects the stable front door to appear in both columns.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: virtual Service address versus backend Pod addresses. Next action: compare the Service's `.spec.clusterIP` with the addresses in its EndpointSlices; the ClusterIP comes from the Service IP range, while the endpoint addresses identify selected Pods that receive forwarded traffic.
+
+</details>
+
+**Card D: Changing which Pods are ready changes the Service DNS name.** A rollout replaces two ready Pods, and a client expects to discover a new Service hostname before sending its next request.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: stable Service discovery name versus changing backend membership. Next action: resolve the same Service name and inspect its EndpointSlices separately; for a normal ClusterIP Service, the DNS name continues to identify the Service while ready Pod membership changes behind it.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] You can create ClusterIP and NodePort Services and explain why each type fits its caller.
 - [ ] You can map Service `port` to Pod `targetPort` without guessing which socket receives traffic.
