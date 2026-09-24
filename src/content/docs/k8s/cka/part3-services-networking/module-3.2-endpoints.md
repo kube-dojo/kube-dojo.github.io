@@ -898,16 +898,16 @@ kubectl delete svc broken-service headless-web
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Pod lifecycle phase versus Service endpoint readiness. Next action: inspect the Pod's Ready condition and the conditions block in the EndpointSlice; a Pod in the Running phase is only added to active traffic routing when its readiness probes pass.
+Failure layer: Pod lifecycle phase versus Service endpoint readiness. Next action: inspect the Pod's Ready condition and the conditions block in the EndpointSlice; a Pod in the Running phase is added to active traffic routing when its Ready condition is true, rather than relying solely on the container Running phase.
 
 </details>
 
-**Card B: A failing readiness probe deletes the Pod.** An operator observes a health check threshold breach and expects kubelet to terminate or restart the container immediately rather than adjusting network routing.
+**Card B: A failing readiness probe deletes the Pod.** An operator observes a health check threshold breach and expects kubelet to terminate or restart the container immediately.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: readiness probe isolation versus liveness container restarts. Next action: verify the probe type in the Pod specification; readiness failures isolate endpoints from Service traffic while leaving containers running, whereas liveness failures trigger container restarts.
+Failure layer: readiness probe isolation versus liveness container restarts. Next action: verify the probe type in the Pod specification; readiness failures adjust network routing to isolate endpoints from Service traffic while leaving containers running, whereas liveness failures trigger container restarts.
 
 </details>
 
@@ -925,7 +925,7 @@ Failure layer: dual-API resource mirroring versus backward compatibility. Next a
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: unready endpoint tracking versus active proxy data plane programming. Next action: inspect `kube-proxy` rules or EndpointSlice conditions; proxy implementations only route client requests to addresses marked ready, ignoring not-ready addresses until probes pass.
+Failure layer: unready endpoint tracking versus active proxy data plane programming. Next action: inspect EndpointSlice conditions and proxy rules; new connections go to ready:true addresses, while proxies ignore unready endpoints unless using the serving-plus-terminating fallback when all backends are terminating.
 
 </details>
 
