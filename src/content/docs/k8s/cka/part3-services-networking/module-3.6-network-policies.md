@@ -84,9 +84,16 @@ spec:
   - Ingress            # Only ingress is affected
 ```
 
-Pause and predict: you create a NetworkPolicy that selects pods with label `app: web`, includes `policyTypes: [Ingress]`, and has no ingress rules. Can anything reach those pods? Now change only one line so the policy contains `ingress: [{}]`. Before reading on, decide whether that single pair of braces creates a narrower rule, an identical deny, or a wildcard allow.
+**Pause and predict:** you create a NetworkPolicy that selects pods with label `app: web`, includes `policyTypes: [Ingress]`, and has no ingress rules. Can anything reach those pods? Now change only one line so the policy contains `ingress: [{}]`. Before you open the explanation, decide what that single pair of braces changes for inbound traffic to the selected pods.
+
+<details>
+<summary>Check your prediction</summary>
 
 The answer turns on the difference between an empty list and an empty rule object. A selected pod with `policyTypes: [Ingress]` and no ingress rules is ingress-isolated with no allowed sources, so inbound traffic is denied by default. A rule entry of `{}` is different: it is an allow rule with no source or port restrictions, so it allows all ingress for the selected pods. In other words, `ingress: []` means "allow nothing," while `ingress: [{}]` means "allow everything for this direction."
+
+</details>
+
+The next section turns this prediction into the baseline pattern, so hold both YAML shapes in mind while you follow how a namespace-wide object and a later exception are written side by side.
 
 ## Default-Deny and Allow Rules
 
@@ -273,9 +280,16 @@ spec:
       port: 443
 ```
 
-Pause and predict: if the policy above changed `from` to an empty `from: []`, would it allow HTTP from every pod, no pod, or the same namespace only? Then compare that answer with `from: - podSelector: {}`. This is the kind of tiny YAML difference that shows up in real reviews because both versions look short and both seem plausible at a glance.
+**Pause and predict:** if the policy above changed `from` to `from: []`, what peer set would that HTTP rule describe? Then compare that answer with `from: - podSelector: {}`. This is the kind of tiny YAML difference that shows up in real reviews because both versions look short and both seem plausible at a glance. Decide before you open the explanation.
+
+<details>
+<summary>Check your prediction</summary>
 
 The reveal: `from: []` (an empty list) means allow from **any** source — any namespace and external IPs (`kubectl describe` shows `From: <any>`). By contrast, `from: - podSelector: {}` allows only pods in the **policy's own namespace**. The CKA trap is the cross-namespace gap: an empty list is a wildcard, while an empty pod selector is same-namespace only.
+
+</details>
+
+The next section turns this prediction into selector structure, so settle the peer-field contrast before you read how indentation and separate list markers change a match.
 
 ## AND, OR, and Multi-Rule Evaluation
 
@@ -961,7 +975,43 @@ NetworkPolicies are namespace-scoped and additive, so leftover policies can conf
 
 </details>
 
-### Success Criteria
+**Card A: A NetworkPolicy with policyTypes Ingress and no ingress rules allows all ingress.** A learner selects web pods, sets policyTypes to Ingress only, omits any ingress field, and expects clients to keep reaching those pods.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating a listed direction with no rules as an open path. Next action: read a policyTypes entry of Ingress with no ingress rules as isolation that permits no inbound peers, then compare a later rule before you assume clients can still connect.
+
+</details>
+
+**Card B: `ingress: [{}]` is a deny-all rule.** A learner inserts one pair of braces under ingress while tightening a baseline and expects that object to block every inbound client.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: reading an empty rule object as a block-everything rule. Next action: treat `ingress: [{}]` as one rule with no peer or port limits, which permits inbound traffic for the selected pods, and use a missing ingress list when the goal is isolation without a matching rule.
+
+</details>
+
+**Card C: `from: []` allows pods in the same namespace only.** A learner clears the peer list on an HTTP rule and expects that form to admit only workloads that share the policy namespace.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: confusing an empty peer list with a same-namespace pod selector. Next action: read a missing or empty `from` field as a match for all sources, which `kubectl describe` shows as `From: <any>`, and use an explicit pod selector when the peer set should be narrower than that.
+
+</details>
+
+**Card D: `from: podSelector: {}` selects only pods that have no labels.** A learner sees a selector with no matchLabels under from and expects it to match only workloads created without labels.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: reading an empty selector as a filter for unlabeled pods. Next action: treat `podSelector: {}` as a selector with no label constraints, which selects every pod in the policy namespace, and confirm that peer set with `kubectl describe` before you ship the manifest.
+
+</details>
+
+**Success Criteria**: Check each item only after the command output and a negative connectivity test agree with the manifest you applied.
 
 - [ ] You verified default-allow behavior before applying any policy.
 - [ ] You implemented a namespace-wide deny-all ingress baseline with `podSelector: {}`.
