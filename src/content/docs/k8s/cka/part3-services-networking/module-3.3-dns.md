@@ -110,7 +110,16 @@ options ndots:5
 
 The `ndots:5` setting surprises people because a name like `api.example.com` has dots, but not enough dots to be tried as absolute first by many resolvers. The resolver may first query `api.example.com.default.svc.cluster.local`, then `api.example.com.svc.cluster.local`, then `api.example.com.cluster.local`, and only afterward try `api.example.com` itself. That behavior improves short-name ergonomics inside the cluster, but it can add latency for external names if the application performs many fresh DNS lookups.
 
-Pause and predict: if a Pod can resolve `kubernetes.default.svc.cluster.local` but cannot resolve `example.com`, which part of the DNS path is already proven healthy, and which part still needs investigation? The Kubernetes plugin path is working for at least one in-cluster Service, so your next checks should move toward the `forward` plugin, upstream resolver availability, network policy or firewall rules from CoreDNS to upstream DNS, and any CoreDNS log entries for external queries.
+**Pause and predict:** if a Pod can resolve `kubernetes.default.svc.cluster.local` but cannot resolve `example.com`, which part of the DNS path is already proven healthy, and which part still needs investigation? Decide where you would collect evidence before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The Kubernetes plugin path is working for at least one in-cluster Service, so your next checks should move toward the `forward` plugin, upstream resolver availability, network policy or firewall rules from CoreDNS to upstream DNS, and any CoreDNS log entries for external queries.
+
+</details>
+
+The next section is a troubleshooting path that turns this prediction into a sequence of checks, starting with the Pod resolver configuration and then comparing the DNS Service with its backing Pods.
 
 For CKA troubleshooting, start by respecting the layers. A failed HTTP request by name may be a DNS failure, a Service selector failure, an endpoint readiness failure, a NetworkPolicy denial, an application port mismatch, or a timeout after resolution. DNS debugging is powerful because it can quickly remove the first layer from suspicion, but it does not prove the whole service path is healthy.
 
@@ -187,7 +196,16 @@ The first cross-namespace command above is deliberately suspicious: `curl api` d
 └────────────────────────────────────────────────────────────────┘
 ```
 
-Pause and predict: a Pod in namespace `staging` runs `curl api-service`, and the cluster has an `api-service` in both `staging` and `production`. Which one does the Pod reach, and why? The Pod reaches `api-service.staging.svc.cluster.local` because its namespace-specific search domain is tried first. That is useful isolation when teams own their own namespaces, but it becomes a risk when application configuration relies on ambiguous Service names.
+**Pause and predict:** a Pod in namespace `staging` runs `curl api-service`, and the cluster has an `api-service` in both `staging` and `production`. Which one does the Pod reach, and why? Decide before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+The Pod reaches `api-service.staging.svc.cluster.local` because its namespace-specific search domain is tried first. That is useful isolation when teams own their own namespaces, but it becomes a risk when application configuration relies on ambiguous Service names.
+
+</details>
+
+The next section is a closer look at records for individual Pods and stable identities, which helps explain when a short Service name is useful and when a more explicit name matters.
 
 Pod DNS records also exist, although Services should remain the normal stable target for most applications. A Pod IP such as `10.244.1.5` can be represented as `10-244-1-5.default.pod.cluster.local`, and StatefulSet Pods gain predictable DNS identities when paired with a headless Service. These forms are useful for systems that need stable peer identities, but they also couple clients more tightly to individual Pods than a ClusterIP Service does.
 
@@ -961,7 +979,43 @@ kubectl delete svc web
 kubectl delete namespace other
 ```
 
-### Success Criteria
+**Card A: Resolving `kubernetes.default.svc.cluster.local` proves that `example.com` will resolve.** A learner sees one successful cluster lookup and assumes every external name must follow the same working DNS path.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: cluster name resolution versus external forwarding. Next action: test the external name separately, then inspect CoreDNS forwarding configuration, upstream resolver reachability, and relevant logs; a working Kubernetes Service lookup proves only that part of the path.
+
+</details>
+
+**Card B: From namespace `staging`, `curl api-service` reaches the `production` Service when both exist.** A learner expects the shared short name to select the production endpoint despite a same-named local Service.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: short-name expansion in the caller's namespace. Next action: inspect the Pod's `/etc/resolv.conf` and resolve the namespace-qualified names separately; the local `api-service.staging.svc.cluster.local` is selected first when both Services exist.
+
+</details>
+
+**Card C: Under `ndots:5`, `api.example.com` is queried as an absolute name first.** A learner sees dots in the name and assumes the resolver skips the configured suffixes.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: resolver search order versus the name's dot count. Next action: inspect `/etc/resolv.conf` and compare the expanded queries with a trailing-dot absolute lookup; with fewer than five dots, the resolver normally tries search suffixes first.
+
+</details>
+
+**Card D: `dnsPolicy: Default` still sends Service names to CoreDNS.** A learner changes the policy and assumes the Pod retains cluster DNS even when the node uses another resolver.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: Pod DNS policy versus resolver destination. Next action: read the Pod's `/etc/resolv.conf` and compare it with the node resolver settings; `Default` inherits the node configuration and does not guarantee queries reach CoreDNS.
+
+</details>
+
+**Success Criteria**:
 
 - [ ] Resolve service and pod DNS names using short names, namespace-qualified names, FQDNs, headless Service answers, and SRV-style record reasoning.
 - [ ] Diagnose DNS failures by comparing CoreDNS Pods, `kube-dns` endpoints, CoreDNS logs, Pod `/etc/resolv.conf`, Service objects, and EndpointSlices.
