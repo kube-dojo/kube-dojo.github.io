@@ -104,9 +104,16 @@ After the destination is rewritten to a backend pod IP, the node performs a norm
 
 Conntrack is the piece that prevents the reply from surprising the client. Pod B replies to Pod A because Pod B saw Pod A as the source, not the Service IP. When the reply returns, conntrack recognizes it as part of the existing NATed flow and reverses the translation, so Pod A's socket still sees a response associated with the Service connection it opened.
 
-> **Pause and predict**: If Pod A connects to `10.96.0.50:80`, but Pod B sees the packet as destined for `10.244.2.8:80`, what would break if conntrack forgot the mapping before the reply returned? Write down whether the client would see a clean refusal, a timeout, or an unexpected source address before you read further.
+**Pause and predict:** If Pod A connects to `10.96.0.50:80`, but Pod B sees the packet as destined for `10.244.2.8:80`, what would break if conntrack forgot the mapping before the reply returned? Write down whether the client would see a clean refusal, a timeout, or an unexpected source address before you read further.
+
+<details>
+<summary>Check your prediction</summary>
 
 The most useful answer is that the symptom depends on exactly which state disappeared and how the stack handles the returning packet. In practice, stale or missing conntrack state often appears as a hang, a reset, or asymmetric traffic that makes one side believe the connection exists while the other cannot complete the flow. That is why conntrack belongs in the troubleshooting model rather than in a footnote.
+
+</details>
+
+Record the client symptom you expect, then compare that note with the backend view the next section describes. Keep the program that writes node rules separate from the kernel path that forwards each individual packet.
 
 ### 1.1 What kube-proxy Actually Does
 
@@ -981,6 +988,42 @@ kubectl delete pod trace-client --force --grace-period=0
 kubectl delete deployment trace-backend
 kubectl delete svc trace-svc
 ```
+
+**Card A: kube-proxy userspace-proxies every Service packet.** A learner sees the process name on the node and assumes every Service packet is copied into that process before a backend Pod can receive it. They restart the process and skip the programmed rules that actually select an endpoint.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: treating the control program as a userspace relay for every Service packet. Next action: inspect the configured mode and the node rules, because the usual path keeps the data packet in the kernel while that process watches Services and EndpointSlices.
+
+</details>
+
+**Card B: If conntrack drops the mapping, the client always receives a clean refusal.** A learner removes the return mapping in a lab and expects the client socket to fail immediately with connection refused. They treat any other client symptom as proof that a different layer must be responsible.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: expecting one clean refusal whenever the return mapping disappears. Next action: compare the client symptom with the backend view of the same flow, because the visible result depends on which state disappeared and can look like a stall, a reset, or traffic that only one side can complete.
+
+</details>
+
+**Card C: The Pod CIDR and the Service CIDR are the same address pool.** A learner sees a Pod address and a ClusterIP in the same packet walk and treats both numbers as members of one allocatable pool. They then search for the virtual Service address on a Pod interface, where that address is not assigned.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: collapsing the Pod address range and the virtual Service range into one pool. Next action: compare the ClusterIP from the Service with the Pod IP on the chosen endpoint, and keep those ranges distinct when you read routes and translation rules.
+
+</details>
+
+**Card D: A DNS failure means the CNI plugin is down.** A learner sees a name lookup time out and restarts the CNI agent before testing the DNS Service path. They skip the resolver file, CoreDNS, and DNS policy because they treat every name failure as a plugin outage.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: collapsing a name lookup failure into a CNI plugin outage. Next action: test a known Service name from the client, then a direct Pod IP, so you can separate a resolver or DNS Service problem from a path that never needed a name.
+
+</details>
 
 **Success Criteria**:
 - [ ] You can identify the Service ClusterIP returned by DNS and explain why DNS success does not prove HTTP success.
