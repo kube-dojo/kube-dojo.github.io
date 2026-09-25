@@ -122,7 +122,15 @@ The important detail is that Filter evaluates requested resources, not live usag
 Pod topology spread constraints.
 ```
 
-Pause and predict: if the event says two nodes have insufficient CPU and one node has an untolerated taint, would lowering the pod's memory request help? It would not address the CPU or taint failures, so the pod would remain Pending unless another constraint also mentioned memory. This habit of matching the fix to the failed filter reason keeps exam troubleshooting precise.
+**Pause and predict:** A pod stays Pending after an event reports insufficient CPU on two nodes and an untolerated taint on another. Would lowering its memory request make placement possible? Name the evidence you would inspect before editing the manifest.
+
+<details>
+<summary>Check the filter diagnosis</summary>
+
+No. Lowering the memory request addresses neither insufficient CPU nor the untolerated taint. Read the full scheduling event and compare the pod's requests and tolerations with each candidate node before choosing a change.
+</details>
+
+When several event clauses appear together, write them as separate checks against candidate nodes, then verify the effect of any change with a fresh event stream.
 
 Score begins only after at least one node survives Filter. Each scoring plugin gives feasible nodes a score, usually in the zero-to-one-hundred range, and the scheduler combines those scores with plugin weights. Scoring preferences can spread workloads, improve topology balance, favor nodes with cached images, or prefer nodes that better satisfy soft affinity. Those preferences are useful, but they never make an infeasible node legal.
 
@@ -135,7 +143,7 @@ Score begins only after at least one node survives Filter. Each scoring plugin g
 | `TaintToleration` | Nodes whose taints the pod tolerates, preferring fewer un-tolerated or surplus taints |
 | `PodTopologySpread` | Nodes that improve topology balance |
 
-The resource scoring strategy is configured through `KubeSchedulerConfiguration.pluginConfig` for `NodeResourcesFit`, using `scoringStrategy.type: LeastAllocated`, `MostAllocated`, or `RequestedToCapacityRatio`.
+The resource scoring strategy is configured through `KubeSchedulerConfiguration.pluginConfig` for `NodeResourcesFit` in the scheduler configuration, using `scoringStrategy.type: LeastAllocated`, `MostAllocated`, or `RequestedToCapacityRatio`.
 
 Ties are intentionally not a placement contract. If two feasible nodes receive the same total score, the scheduler may break the tie randomly to avoid concentrating otherwise identical work on one node. If you require exact placement, use a hard mechanism such as node affinity, a node selector, taints and tolerations, or explicit `spec.nodeName` for special cases; do not reverse-engineer a scoring tie and depend on it.
 
@@ -145,7 +153,15 @@ Bind is the handoff from scheduler decision to node execution. The scheduler wri
 
 Priority tells Kubernetes which pending pods deserve scheduling attention first and which running pods may be displaced when a higher-priority pod cannot fit. This is a powerful reliability tool, but it is also a sharp edge because the cluster can remove healthy lower-priority pods to make room. A good priority design therefore names business intent, separates critical workloads from batch work, and avoids making every application "critical" just because it has users.
 
-Pause and predict: a high-priority pod with priority `1000000` is Pending because no node has enough free CPU, while low-priority batch pods are already running. Kubernetes can preempt lower-priority pods if the incoming pod's PriorityClass allows it, but it will first evaluate which node could host the pending pod after removing victims. The scheduler tries to minimize disruption, but it is optimizing for the higher-priority pod's placement, not for keeping every lower-priority workload alive.
+**Pause and predict:** A pod with priority `1000000` is Pending because no node has enough available CPU, while lower-priority batch pods are running. What must the scheduler establish before changing any running workload, and which workload's placement drives that decision?
+
+<details>
+<summary>Check the placement decision</summary>
+
+If preemption is allowed, the scheduler looks for a node where removing lower-priority pods would make the high-priority pod feasible. It chooses victims to make room for that incoming pod while trying to limit disruption; it does not preserve every lower-priority pod.
+</details>
+
+A nominated node is only a checkpoint in the placement sequence; inspect subsequent events and the eventual binding before declaring the workload recovered.
 
 ```yaml
 apiVersion: scheduling.k8s.io/v1
@@ -568,7 +584,15 @@ spec:
 kubectl drain node-2 --ignore-daemonsets --delete-emptydir-data --timeout=300s
 ```
 
-Pause and predict: a three-replica Deployment has a PDB with `minAvailable: 3`, and one of its replicas is on a node you want to drain. The drain blocks because evicting that pod would reduce available replicas below the PDB requirement. If the node crashes instead, the PDB cannot stop the involuntary loss; the controller must create a replacement, and the cluster must have capacity to run it.
+**Pause and predict:** A three-replica Deployment has a PDB with `minAvailable: 3`, and one replica runs on a node scheduled for maintenance. What happens during a planned eviction, and what changes if the node fails unexpectedly?
+
+<details>
+<summary>Check the disruption boundary</summary>
+
+The drain blocks because evicting a replica would leave fewer than three available pods. A node crash is involuntary, so the PDB cannot prevent that loss; the controller needs to create a replacement, and the cluster needs capacity to run it.
+</details>
+
+Availability planning also needs replacement capacity and sufficient spread; examine those conditions before interpreting a budget value as an end-to-end uptime guarantee.
 
 | Type | Examples | Honors PDB? |
 |---|---|---|
@@ -963,7 +987,43 @@ kubectl delete priorityclass high-priority low-priority
 ```
 </details>
 
-### Success Checklist
+### Frozen Diagnostic Cards
+
+For each statement, commit to true or false before opening its explanation. Then identify the component enforcing the relevant constraint and the first observation that would justify your next action.
+
+**Card A — True or false?** Lowering the memory request fixes a Pending pod whose events name insufficient CPU and an untolerated taint.
+
+<details>
+<summary>Check Card A</summary>
+
+**False. Failure layer:** Scheduler Filter rejects the candidate nodes for CPU fit and taint tolerance; changing memory does not remove either blocker. **Next action:** Read the complete pod events and compare CPU requests and taint policy with the nodes the workload is allowed to use.
+</details>
+
+**Card B — True or false?** A high-priority Pending pod preempts lower-priority pods on every node. Which scheduler evidence would you inspect to evaluate this claim?
+
+<details>
+<summary>Check Card B</summary>
+
+**False. Failure layer:** Scheduler preemption considers nodes where removing lower-priority pods could make the incoming pod feasible; it does not clear every node. **Next action:** Inspect the scheduling event and hard constraints, then check whether a candidate node can fit the pod after potential victims leave.
+</details>
+
+**Card C — True or false?** A PDB with `minAvailable` equal to the replica count stops a node crash from removing a pod.
+
+<details>
+<summary>Check Card C</summary>
+
+**False. Failure layer:** A node crash is an involuntary disruption that a PDB cannot prevent, although the lost replica counts against the budget. **Next action:** Verify replacement pod creation, scheduling capacity, and remaining replica availability before attempting another voluntary disruption.
+</details>
+
+**Card D — True or false?** The scheduler preempts so that every lower-priority pod keeps running. Which event would you inspect to test this claim?
+
+<details>
+<summary>Check Card D</summary>
+
+**False. Failure layer:** Scheduler preemption makes placement possible for the higher-priority pod and may remove lower-priority victims. **Next action:** Inspect nominated node and victim events, then confirm whether the incoming pod eventually binds and replacement controllers restore any displaced work.
+</details>
+
+### Success Criteria
 
 - [ ] Diagnose Pending scheduler filter failures by comparing pod requests, taints, affinity, and events.
 - [ ] Design PriorityClass preemption behavior that protects critical workloads while limiting disruption.
