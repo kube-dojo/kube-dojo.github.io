@@ -51,7 +51,7 @@ flowchart LR
     ContainerA -- Restart = Data Loss --> ContainerB
 ```
 
-Kubernetes volumes solve this by decoupling selected directories from the individual container lifecycle. A pod declares a volume under `spec.volumes`, and each container that needs it declares a `volumeMount` with a mount path. The kubelet prepares the volume on the node before starting the container, then asks the container runtime to mount that prepared directory or file into the container namespace. The important boundary is that most basic volumes are tied to the pod, not to one container, so a restarted container sees the same mounted directory while the pod still exists.
+Kubernetes volumes solve this by decoupling selected directories from the individual container lifecycle. A pod declares a volume under `spec.volumes`, and each container that needs it declares a `volumeMount` with a mount path. The kubelet prepares the volume on the node before starting the container, then asks the container runtime to mount that prepared directory or file into the container namespace. The important boundary is that most basic volumes are tied to the pod, not to one container, so the partner container's view is a prediction you should make before you treat the directory as scratch space or as a durable disk.
 
 ```mermaid
 flowchart TD
@@ -60,18 +60,29 @@ flowchart TD
             A[/app] --> B[config.yml]
             A --> C[data/]
         end
-        subgraph ContainerB[Container B after restart]
+        subgraph ContainerB[Container B]
             E[/app] --> F[config.yml]
             E --> G[data/]
         end
         V[(Volume shared)]
         C --> V
         G --> V
-        V --> cache[cache still here!]
+        V --> files[shared files]
     end
 ```
 
-That pod boundary is powerful, but it is easy to overread. If one container in a pod crashes and restarts, an `emptyDir` volume remains. If the pod is deleted, evicted, or rescheduled onto another node, the `emptyDir` disappears because the old pod instance is gone. If your design needs to survive pod replacement, use a PersistentVolumeClaim or an external service instead of hoping that a pod-scoped volume behaves like a durable disk. Pause and predict: if a writer container stores 200Mi of cache in a shared `emptyDir`, then only that container restarts, what should the reader container see, and why?
+That pod boundary is powerful, but it is easy to overread. The shared directory can look like a small durable disk, yet its owner is the pod schedule rather than either container process. Name the event that should still leave the reader's files available before you choose a PersistentVolumeClaim or an external service.
+
+**Pause and predict:** if a writer container stores 200Mi of cache in a shared `emptyDir`, then only that container restarts, what should the reader container see, and why?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+The reader should still see the stored files. An emptyDir survives a container restart because the volume belongs to the pod, and that same directory disappears when the pod is deleted, evicted, or replaced on another node.
+
+</details>
+
+Write down your prediction before opening the explanation, then compare it with the lifecycle boundary you will use when you choose durable storage for this workload.
 
 Kubernetes offers many volume types because "storage" covers several different jobs. Some volumes provide scratch space, some inject configuration, some expose node files for system agents, and some connect pods to durable storage. The table below is a practical first-pass map, not a substitute for reading the exact lifecycle rules before you deploy a workload.
 
@@ -474,16 +485,27 @@ flowchart LR
     subgraph Caveats[Warnings]
         direction TB
         C[Uses atomic symlink swap]
-        D[subPath mounts do NOT auto-update]
+        D[Single-file mounts need their own check]
         E[Application must detect and reload]
         F[kubelet sync period affects delay]
     end
     B -.-> Caveats
 ```
 
-The `subPath` feature is a precise tool for mounting one file from a volume into an existing directory without hiding the rest of that directory. It is useful when an image already contains a directory full of defaults and you only want to replace one file. Its major trap is update behavior: a `subPath` bind mount does not follow the kubelet's atomic symlink swap, so a ConfigMap or Secret update will not appear in the mounted file. Pause and predict: if `/etc/config/app.conf` is a full ConfigMap directory mount, then you update the ConfigMap and wait for the kubelet sync period, what should `cat` show; now what changes if that file was mounted through `subPath`?
+The `subPath` feature is a precise tool for mounting one file from a volume into an existing directory without hiding the rest of that directory. It is useful when an image already contains a directory full of defaults and you only want to replace one file. Treat the reload contract as a separate decision from the placement decision, and predict the file the process will read after the source object changes.
 
-The tradeoff makes `subPath` neither good nor bad by itself. It is good when the file should be fixed for the life of the pod, when replacing an entire directory would hide image content, or when a rollout restart is the intended reload mechanism. It is bad when operators expect a live configuration pipeline and never document that pod recreation is required. A mature module template or Helm chart should make that reload contract visible so future maintainers do not infer the wrong behavior from the filename.
+**Pause and predict:** if `/etc/config/app.conf` is a full ConfigMap directory mount, then you update the ConfigMap and wait for the kubelet sync period, what should `cat` show; now what changes if that file was mounted through `subPath`?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+After the sync period, `cat` on the full directory mount should show the new content because the kubelet swaps the symlink atomically. A subPath mount does not pick up a ConfigMap update, so the bind-mounted file stays at the old content until the pod is recreated.
+
+</details>
+
+Record the two file contents you expect before you expand the note, then use that contrast to decide which mount shape belongs in the rollout plan.
+
+The tradeoff makes `subPath` neither good nor bad by itself. It is good when the file should sit among image defaults and replacing an entire directory would hide other files the image already provides. Keep the reload contract next to the manifest so future maintainers do not infer process behavior from the filename alone. A mature module template or Helm chart should make that contract visible in the same place the mount is declared.
 
 ```yaml
 volumeMounts:
@@ -779,7 +801,43 @@ The host IP tells you which node currently owns the pod-scoped volume. The path 
 
 </details>
 
-### Success Criteria
+### Card A — Restarting one container deletes the pod's emptyDir.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** a container restart is not pod replacement, so the pod-scoped directory remains for every container in that same pod. **Next action:** confirm the pod UID is unchanged, then read the shared path from the container that stayed up.
+
+</details>
+
+### Card B — A subPath ConfigMap mount updates when the ConfigMap is patched.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** a subPath bind mount does not follow the kubelet symlink swap, so the mounted file stays at the old content. **Next action:** use a directory mount when the file must change in place, or recreate the pod after the patch.
+
+</details>
+
+### Card C — An emptyDir survives when the pod is rescheduled onto another node.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** rescheduling replaces the pod instance, and the directory belonged to the old instance on the old node. **Next action:** put data that must outlive that move on a PersistentVolumeClaim.
+
+</details>
+
+### Card D — Two containers that mount the same emptyDir each get a private copy.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** one pod volume is one directory, so both mounts see the same files. **Next action:** write from one container and read that path from the other before you assume isolation.
+
+</details>
+
+**Success Criteria**: Confirm the running pod, the shared files both containers can read, and the lifecycle observation this exercise asked you to make.
 
 - [ ] Pod is currently running with both containers active and healthy.
 - [ ] Writer is successfully creating log entries every 5 seconds.
