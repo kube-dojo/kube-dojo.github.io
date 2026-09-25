@@ -124,7 +124,16 @@ The namespace boundary also explains why commands must be run from the right vie
 └────────────────────────────────────────────────────────────────┘
 ```
 
-Pause and predict: if kubelet can start a sandbox but the CNI `ADD` call fails before an IP address is assigned, which fields would you expect to be missing from `kubectl get pod -o wide`, and which component's logs would you inspect first? The useful answer is not just "check the pod"; it is to predict whether the pod has a `PodIP`, whether kubelet events mention the network plugin, and whether the CNI node agent is healthy on the same node. That prediction turns a large networking problem into a small sequence of checks.
+**Pause and predict:** if kubelet can start a sandbox but the CNI `ADD` call fails before an IP address is assigned, what would `kubectl get pod -o wide` show, and which events and logs would you inspect first?
+
+<details>
+<summary>Reveal the prediction and first checks</summary>
+
+The pod should lack a `PodIP` because network attachment did not complete. Check pod events for kubelet messages about the network plugin, then inspect the CNI agent on the same node and its logs. This sequence separates attachment failure from later traffic failures.
+
+</details>
+
+Write down your prediction before expanding the explanation, then compare the observations with the creation sequence to choose a focused first diagnostic command. Record the observed event text so each follow-up check remains grounded in evidence.
 
 The first inspection step is to discover which plugin is installed and whether kubelet can see a CNI configuration file. On many clusters, `/opt/cni/bin/` holds the executable plugins and `/etc/cni/net.d/` holds the ordered configuration or conflist files that the container runtime uses. These are node-level files, so `kubectl` can tell you which DaemonSet should be present, while direct node access tells you what kubelet actually has available.
 
@@ -428,7 +437,16 @@ spec:
       hostPort: 80           # Node's port 80 → container 8080
 ```
 
-Pause and predict: you set `hostNetwork: true` on a pod running nginx on port 80, and there is already another host-networked pod listening on port 80 on the same node. The scheduler may try to avoid impossible host port placement when ports are declared, but if a process conflict still occurs at runtime, the container cannot bind the address and the failure will look like an application start problem. The network lesson is that host networking changes the unit of port ownership from "pod" to "node."
+**Pause and predict:** you set `hostNetwork: true` on a pod running nginx on port 80, and another host-networked pod already listens there on the same node. What failure do you expect, and where would you look for evidence?
+
+<details>
+<summary>Reveal the failure and its owner</summary>
+
+Host networking makes both processes compete for the node's listening port rather than giving each pod an isolated port. The scheduler may avoid an impossible placement when ports are declared, but a runtime conflict prevents the container from binding its address and appears as an application start failure. Inspect container status and logs before changing the network configuration.
+
+</details>
+
+Before expanding the explanation, decide whether the observed failure belongs to placement or process startup; that distinction determines which evidence you collect first.
 
 ---
 
@@ -975,7 +993,43 @@ kubectl delete deployment web --ignore-not-found
 kubectl delete svc web --ignore-not-found
 ```
 
-Success criteria:
+### Card A — A pod whose CNI ADD fails still shows a PodIP.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** CNI attachment failed before the pod received an address. **Next action:** Inspect pod events and the CNI agent logs on the affected node before testing traffic.
+
+</details>
+
+### Card B — Two hostNetwork pods can both listen on port 80 on the same node.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** Both processes share the node network namespace, so one cannot bind an address and port already in use. **Next action:** Inspect container status and logs, then change placement or the listening port.
+
+</details>
+
+### Card C — kube-proxy assigns Pod IPs.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** Pod address allocation belongs to the CNI and its IPAM path; kube-proxy handles Service traffic. **Next action:** Inspect pod events, CNI configuration, and IPAM evidence for the affected node.
+
+</details>
+
+### Card D — A NetworkPolicy is enforced even when the installed CNI does not implement it.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** The API can accept the policy while the dataplane provides no enforcement. **Next action:** Identify the installed CNI and verify policy support before relying on isolation or changing selectors.
+
+</details>
+
+**Success Criteria**:
 - [ ] Can identify the installed CNI plugin and whether it runs as a DaemonSet.
 - [ ] Can read pod CIDR, service CIDR, and node pod CIDR evidence without mixing their roles.
 - [ ] Can verify pod-to-pod connectivity before testing service DNS.
