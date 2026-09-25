@@ -592,16 +592,16 @@ If `kubectl get hpa challenge-web` reports `<unknown>`, confirm metrics-server f
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: metric selection and saturation domain mismatch. Next action: inspect custom application metrics or queue length adapters rather than CPU metrics when requests spend their time blocked on external database pools.
+Failure layer: metric selection and saturation domain mismatch. A CPU-only HPA does not scale out when the database is saturated and CPU stays low because the horizontal controller only evaluates processor usage against declared resource requests. When application worker threads spend their time blocked waiting on database connections or lock acquisition, processor usage remains low, so the autoscaler sees no reason to add pods. Do not recommend a queue-length scaler as the next action here, because adding more replicas against an already saturated database will create additional connections and intensify backend exhaustion. Next action: diagnose the database limit, pool contention, or slow queries before choosing a scaling metric or backpressure policy.
 
 </details>
 
-**Card B: The HPA applies the raw replica formula immediately, with no stabilization window.** An administrator expects replica counts to change at the exact moment a traffic spike shifts the calculated target ratio.
+**Card B: The HPA applies the raw replica formula immediately during a traffic spike.** An administrator expects replica counts to change at the exact moment a traffic spike shifts the calculated target ratio.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: autoscaler rate limiting and stabilization algorithms. Next action: verify the configured behavior policies and stabilization windows with `kubectl describe hpa` to confirm how velocity limits pace replica adjustments.
+Failure layer: autoscaler control loop timing and scale-up constraints. A traffic-spike delay is not a stabilization window. On Kubernetes 1.35 there is no default scale-up stabilization window (it defaults to 0 seconds). The default scale-down stabilization window is 300 seconds to prevent flapping after traffic subsides. During a traffic spike, the raw formula is instead delayed by controller sync intervals (default 15 seconds), metrics lag from metrics-server, the 10 percent metric tolerance band, min and max replica bounds, and configured scale-up behavior policies. Next action: inspect `kubectl describe hpa` to evaluate controller sync timestamps, current metric scrape values, and scale-up velocity rate limits rather than expecting an instantaneous scale-up reaction.
 
 </details>
 
