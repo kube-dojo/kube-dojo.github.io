@@ -21,7 +21,7 @@ sidebar:
 - **Diagnose** CoreDNS resolution pipelines, ndots search path traversal, stub domains, and upstream forwarders for pod and Service fully qualified domain names.
 - **Implement** declarative L7 traffic management using Ingress controllers and Gateway API resources including GatewayClass, Gateway, and HTTPRoute for path routing and TLS termination.
 - **Enforce** pod network isolation and microsegmentation using NetworkPolicy specifications with podSelector, namespaceSelector, ipBlock, and explicit policyTypes for ingress and egress.
-- **Troubleshoot** cluster networking data paths, container network interface (CNI) plugin IPAM and routing models, overlay encapsulations, and host iptables or IPVS packet flows.
+- **Troubleshoot** cluster networking data paths, container network interface (CNI) plugin IPAM and routing models, overlay encapsulations, and host iptables, nftables, or deprecated IPVS packet flows.
 
 ---
 
@@ -72,15 +72,15 @@ Historically, the Kubernetes control plane tracked backend pod addresses using a
 
 Kubernetes resolved this critical scaling bottleneck by introducing EndpointSlices, which partition backend endpoints into scalable chunks. By default, each EndpointSlice holds up to one hundred endpoints, ensuring that cluster scaling operations modify only a single slice rather than a monolithic object. When a Service exceeds one hundred endpoints, the EndpointSlice controller automatically provisions additional slice objects, keeping update payloads small and predictable. EndpointSlices also store rich metadata alongside endpoint addresses, including conditions indicating whether a pod is ready, serving, or terminating, as well as topology and zone hints used by modern traffic routing mechanisms.
 
-The EndpointSlice mirroring controller maintains backward compatibility for legacy controllers and monitoring tools that still query the v1 Endpoints API. When modern EndpointSlices are created by custom ingress controllers or operators, the mirroring controller synchronizes their data into corresponding Endpoints objects. Similarly, standard core services continue to generate both EndpointSlices and Endpoints concurrently. Cluster administrators must understand that while both objects exist simultaneously, modern kube-proxy implementations rely strictly on EndpointSlices as their authoritative source of truth for programming data-plane routing rules.
+The EndpointSlice mirroring controller copies user-created Endpoints into EndpointSlices for selectorless Services. That copy keeps those backends visible to kube-proxy when an older client still writes the Endpoints API. The controller does not copy EndpointSlices back into Endpoints objects. It skips an Endpoints object that sets the skip-mirror label, carries the control-plane leader annotation, has no Service, or belongs to a Service with a selector. Kubernetes has deprecated this mirror since version 1.33, so a new selectorless Service should create EndpointSlices directly. Selector-based Services still receive both objects, because the Endpoints controller and the EndpointSlice controller each write from Pod state. A normal Service therefore still appears when you run kubectl get endpoints. kube-proxy programs node forwarding rules from EndpointSlices.
 
 On every worker node, the kube-proxy daemon translates Service virtual IPs and ports into actual pod backend addresses by programming host kernel networking rules. The operational performance and scalability of cluster networking depend heavily upon the active kube-proxy proxy mode. In earlier Kubernetes versions, kube-proxy operated in userspace mode, proxying connections through a user-space daemon process; this introduced severe context-switching overhead between user space and kernel space, leading to low throughput and high latency.
 
 The standard iptables proxy mode replaces userspace proxying by programming Linux Netfilter chains directly inside the host kernel. When a client sends a packet to a Service ClusterIP, the kernel traverses custom iptables chains in the PREROUTING and OUTPUT tables, using probabilistic random matching rules to balance traffic across matching pod endpoints. While iptables mode operates entirely in kernel space with high packet processing speed, its sequential rule evaluation architecture scales poorly in clusters containing thousands of Services, because adding or removing a Service requires sequential rule rebuilding and table-wide mutex locks.
 
-The IPVS (IP Virtual Server) proxy mode addresses the scalability limitations of iptables by implementing transport-layer load balancing inside the Linux kernel using hash tables. Rather than evaluating sequential packet filtering rules linearly, IPVS achieves constant-time O(1) packet matching regardless of cluster size, dramatically reducing packet processing latency in clusters with tens of thousands of services. Furthermore, IPVS supports advanced load-balancing algorithms beyond simple random selection, including round-robin, least connections, destination hashing, source hashing, and weighted shortest expected delay.
+The IPVS (IP Virtual Server) proxy mode was built to address iptables scale limits by load balancing inside the Linux kernel with hash tables. A hash lookup stays close to constant time as the number of services grows, and IPVS offers algorithms beyond random selection, including round-robin, least connections, destination hashing, source hashing, and weighted shortest expected delay. On Kubernetes 1.35 this mode is deprecated. kube-proxy logs a warning when it starts in ipvs mode, and the project directs operators to nftables.
 
-Modern Kubernetes releases also provide an experimental nftables proxy mode designed to supersede iptables by leveraging the Linux kernel's modern nftables packet classification subsystem. The nftables architecture combines the flexibility of iptables with the performance advantages of kernel hash sets, providing atomic rule updates and reduced memory footprints without the legacy baggage of iptables table locking. Regardless of proxy mode, kube-proxy continuously watches Service and EndpointSlice objects, synchronizing kernel state asynchronously to reflect workload scaling events.
+The nftables proxy mode is stable on Kubernetes 1.35. It graduated to general availability in 1.33 and programs the kernel nftables API, which requires Linux 5.13 or newer. When proxy mode is left unset, Linux kube-proxy still selects iptables, so an upgrade does not change the data plane unexpectedly. nftables updates Service rules without rebuilding one large iptables table, which is why the 1.35 IPVS deprecation notice names nftables as the mode to use instead. In every mode, kube-proxy watches Service and EndpointSlice objects and refreshes node forwarding rules from that watch.
 
 Service session affinity allows cluster operators to direct repeated connections from a specific client to the identical backend pod. When sessionAffinity is configured as ClientIP within the Service specification, kube-proxy tracks client source IP addresses and establishes persistent affinity mapping for a configurable duration. This mechanism provides sticky session routing for stateful legacy protocols that require session persistence, though cloud-native architectures generally prefer stateless backend tiers or application-layer session management.
 
@@ -119,7 +119,7 @@ Tuning client search paths and recognizing query amplification helps platform ar
 
 This default resolver behavior can trigger severe query amplification and latency degradation in clusters executing high volumes of external API calls. When a container attempts to resolve api.example.com, the resolver sends four consecutive queries to CoreDNS: api.example.com.production.svc.cluster.local, api.example.com.svc.cluster.local, api.example.com.cluster.local, and finally the bare name api.example.com. Each of the first three queries forces CoreDNS to evaluate its kubernetes plugin and return an NXDOMAIN response, consuming cluster network bandwidth and saturating CoreDNS CPU capacity.
 
-Platform engineers employ multiple remediation strategies to mitigate ndots query amplification across production environments. The most immediate application-level solution is appending a trailing dot to external domain names in application configuration files, such as writing api.example.com.. The trailing dot explicitly signals to the Linux resolver that the name is fully qualified and absolute, instructing it to bypass search path evaluation completely and query CoreDNS for the bare name immediately.
+Platform engineers employ multiple remediation strategies to mitigate ndots query amplification across production environments. The most immediate application-level solution is appending a trailing dot to external domain names in application configuration files, such as writing `api.example.com.`. The trailing dot explicitly signals to the Linux resolver that the name is fully qualified and absolute, instructing it to bypass search path evaluation completely and query CoreDNS for the bare name immediately.
 
 At the pod specification level, engineers can customize resolver settings using the dnsConfig field under spec. By defining options with a lower ndots value, such as name: ndots and value: '2', any hostname containing two or more dots is queried as an absolute name first. However, lowering ndots requires caution: if an application queries an in-cluster service using a partial name like redis.backend (which contains one dot), setting ndots to 1 causes the resolver to query redis.backend externally first, failing resolution unless the full five-part name is used.
 
@@ -187,7 +187,7 @@ The Infrastructure Provider manages the GatewayClass resource, which defines the
 
 The Application Developer defines routing rules using route resources such as HTTPRoute, GRPCRoute, TCPRoute, and TLSRoute. An HTTPRoute declares path matching rules, header filtering, request redirects, URL rewrites, and traffic weighting across backend Services, attaching to parent Gateways through parentRefs. Because HTTPRoutes exist independently of Gateways, development teams can safely manage application routing in their own namespaces without possessing permissions to modify core Gateway infrastructure or view shared TLS certificates.
 
-Cross-namespace routing in Gateway API is governed securely through ReferenceGrant resources. In traditional Ingress, referencing a Secret or Service across namespace boundaries was either impossible or introduced severe security vulnerabilities, allowing rogue tenants to hijack certificates or route traffic into private namespaces. Gateway API mandates that whenever a Gateway or Route references a resource located in a different namespace, the owner of that target namespace must deploy a ReferenceGrant explicitly authorizing references from the source namespace and resource kind, establishing a cryptographically auditable trust boundary.
+An HTTPRoute attaches to a Gateway in another namespace only when that Gateway listener allows the attachment through allowedRoutes. If allowedRoutes is omitted, the listener accepts routes from the same namespace as the Gateway. The cluster operator sets allowedRoutes.namespaces.from to All, or to Selector with a namespace label, when teams in other namespaces should attach. ReferenceGrant does not make that attachment decision. A ReferenceGrant lives in the namespace that owns the target object, and it permits a route in another namespace to reference a backend Service there. A Gateway that reads a TLS Secret from another namespace also needs a ReferenceGrant in the Secret namespace. Explaining a rejected parentRef as a missing ReferenceGrant hides the listener policy that accepts or rejects the route.
 
 Gateway API also introduces native support for sophisticated traffic splitting and canary deployments directly within the core specification. Using the weight field under backendRefs in an HTTPRoute, developers specify integer percentages to distribute traffic between stable and canary application deployments without requiring custom annotations or service mesh sidecars. The underlying gateway implementation programs its data plane to enforce the configured traffic distribution deterministically.
 
@@ -218,9 +218,9 @@ Incoming network traffic is completely blocked. When policyTypes includes Ingres
 
 Establishing a strict baseline zero-trust posture guarantees that sensitive microservices remain protected against unintended lateral movement until explicit, audited ingress and egress allow rules are systematically introduced into cluster environments. Security teams use this default isolation mechanism to comply with rigorous multi-tenant data protection standards.
 
-Ingress rules specify allowed traffic sources within the from block, while egress rules specify allowed traffic destinations within the to block. NetworkPolicy rules operate as a pure allow-list: there are no explicit deny rules in standard Kubernetes NetworkPolicies. Any packet arriving at an isolated pod is evaluated against all active allow rules; if at least one rule permits the traffic, the packet is accepted, whereas packets failing to match any rule are dropped silently.
+Ingress rules specify allowed traffic sources within the from block, while egress rules specify allowed traffic destinations within the to block. NetworkPolicy rules operate as a pure allow-list: there are no explicit deny rules in standard Kubernetes NetworkPolicies. Any packet arriving at an isolated pod is evaluated against all active allow rules; if at least one rule permits the traffic, the packet is accepted, whereas packets failing to match any rule are dropped silently. An empty from list is a different form from an empty ingress array. On a rule, a missing or empty from field matches every source, including other namespaces and addresses outside the cluster. The default-deny form is an empty ingress array, written as ingress: [], which selects no allow rules.
 
-Understanding the boolean logic of selector combinations within from and to blocks is essential for writing accurate policies. When multiple selectors are defined inside a single array element, they are evaluated as a logical AND condition. For example, declaring namespaceSelector and podSelector within the same list item restricts traffic strictly to pods that have the specified pod label AND reside within a namespace that has the specified namespace label. Conversely, defining selectors across separate array items creates a logical OR condition, permitting traffic from any pod matching the pod selector anywhere, OR any pod residing inside matching namespaces.
+Understanding the boolean logic of selector combinations within from and to blocks is essential for writing accurate policies. When multiple selectors are defined inside a single array element, they are evaluated as a logical AND condition. For example, declaring namespaceSelector and podSelector within the same list item restricts traffic strictly to pods that have the specified pod label AND reside within a namespace that has the specified namespace label. Conversely, defining selectors across separate array items creates a logical OR condition. A podSelector inside from, with no namespaceSelector beside it, selects pods in the policy's own namespace only. A separate namespaceSelector item permits pods in namespaces that carry the namespace label. The two items together allow either of those peer sets. They do not select the labeled pods in every namespace.
 
 ```text
 +-------------------------------------------------------------------------+
@@ -234,7 +234,7 @@ Understanding the boolean logic of selector combinations within from and to bloc
 |  [ Logical OR: Multiple List Elements ]                                 |
 |  - namespaceSelector: { matchLabels: { team: engineering } }            |
 |  - podSelector:       { matchLabels: { app: web } }                     |
-|    --> Traffic allowed if EITHER namespace matches OR pod matches.      |
+|    --> OR: namespace match, or a pod in this policy namespace.          |
 +-------------------------------------------------------------------------+
 ```
 
@@ -350,17 +350,17 @@ Option 1 is correct because an Ingress resource is merely a declarative configur
 
 ### 5. Gateway API Resource Hierarchy and Cross-Namespace Routing
 
-An organization migrates from traditional Ingress to the Gateway API. The platform infrastructure team creates a `Gateway` named `prod-gateway` in the `infra` namespace. An application team deploys an `HTTPRoute` in the `apps` namespace attempting to attach to `prod-gateway`. When applying the route, the HTTPRoute status reports that the parent reference is not accepted due to cross-namespace routing restrictions. Which resource must be configured to permit this attachment?
+An organization migrates from traditional Ingress to the Gateway API. The platform infrastructure team creates a `Gateway` named `prod-gateway` in the `infra` namespace. An application team deploys an `HTTPRoute` in the `apps` namespace attempting to attach to `prod-gateway`. When applying the route, the HTTPRoute status reports that the parent reference is not accepted due to cross-namespace routing restrictions. Which configuration permits this attachment?
 
-1. A `ReferenceGrant` created in the `infra` namespace granting permission for HTTPRoutes from namespace `apps` to reference the Gateway.
-2. A `ClusterRoleBinding` granting the application team's service account admin rights over the `infra` namespace.
+1. Set `allowedRoutes` on the `prod-gateway` listener so HTTPRoutes from the `apps` namespace may attach, for example `namespaces.from: All` or a namespace selector that matches `apps`.
+2. Create a `ReferenceGrant` in the `infra` namespace that permits HTTPRoutes from `apps` to reference the Gateway.
 3. An `IngressClass` resource configured with `is-default-class: "true"` in the `apps` namespace.
 4. A `NetworkPolicy` in namespace `infra` allowing ingress traffic from pods in namespace `apps`.
 
 <details>
 <summary>Answer</summary>
 
-Option 1 is correct because Gateway API enforces cross-namespace boundaries through `ReferenceGrant` resources; the owner of the referenced resource (in namespace `infra`) must create a ReferenceGrant explicitly permitting HTTPRoutes from the referencing namespace (`apps`) to bind to it. Option 2 is wrong because RBAC permissions govern API server user authorization and do not alter Gateway API declarative routing trust boundaries. Option 3 is incorrect because IngressClass is part of the legacy Ingress API and has no role in Gateway API parent-route attachment validation. Option 4 is not correct because NetworkPolicies govern layer 3/4 packet forwarding between pods and do not control Gateway API route attachment acceptance.
+Option 1 is correct because an HTTPRoute attaches to a Gateway in another namespace only when that Gateway listener's `allowedRoutes` permits the route namespace. Omitting `allowedRoutes` leaves the listener limited to the Gateway namespace, so the `apps` route stays unaccepted until the listener allows it. Option 2 is wrong because a `ReferenceGrant` authorizes a cross-namespace reference to a backend Service, and it belongs in the Service namespace. It does not accept a parent Gateway attachment. Option 3 is incorrect because IngressClass is part of the legacy Ingress API and has no role in Gateway API parent-route attachment validation. Option 4 is not correct because NetworkPolicies govern layer 3/4 packet forwarding between pods and do not control Gateway API route attachment acceptance.
 
 </details>
 
@@ -376,7 +376,7 @@ A security engineer needs to secure a sensitive database pod with label `role: d
 <details>
 <summary>Answer</summary>
 
-Option 1 is correct because placing both `namespaceSelector` and `podSelector` inside the same element of the `from` array creates a logical AND condition, restricting traffic strictly to pods matching `app: web` inside namespaces labeled `team: engineering`. Option 2 is wrong because defining them as separate items in the `from` list creates a logical OR condition, permitting traffic from any pod in `team: engineering` namespaces OR any pod with `app: web` across all namespaces. Option 3 is incorrect because an empty ingress block creates a default-deny rule that drops all incoming traffic without permitting the required frontend connections. Option 4 is not correct because `from: []` matches an empty set of sources, blocking all traffic rather than allowing the specified frontend pods.
+Option 1 is correct because placing both `namespaceSelector` and `podSelector` inside the same element of the `from` array creates a logical AND condition, restricting traffic strictly to pods matching `app: web` inside namespaces labeled `team: engineering`. Option 2 is wrong because separate `from` items are a logical OR: every pod in a `team: engineering` namespace, or any pod labeled `app: web` in the policy's own namespace. That podSelector does not reach other namespaces. Option 3 is incorrect because an empty ingress block creates a default-deny rule that drops all incoming traffic without permitting the required frontend connections. Option 4 is not correct because an empty `from` list matches every source, so port 5432 would be open to all pods and to clients outside the cluster. An empty `ingress` list denies traffic. An empty `from` list does not.
 
 </details>
 
@@ -416,7 +416,7 @@ Option 1 is correct because VXLAN encapsulation wraps inner Ethernet and IP fram
 
 ## Hands-On Exercise
 
-**Task**: Execute a comprehensive services and networking verification drill across your local practice cluster. You will configure ClusterIP Services and inspect EndpointSlice objects, analyze CoreDNS resolution behavior under ndots search path traversal, deploy Ingress routing manifests and verify controller reconciliation requirements, enforce NetworkPolicy ingress default-deny isolation, and implement secure egress filtering with explicit DNS allow rules.
+**Task**: Execute a comprehensive services and networking verification drill across your local practice cluster. You will configure a ClusterIP Service and inspect its EndpointSlice objects, read the resolver file and look up one cluster name plus one external name with a single trailing dot, apply an Ingress manifest and inspect it, apply one ingress NetworkPolicy that allows TCP port 80 from same-namespace pods labeled role=frontend, and apply one egress NetworkPolicy whose only rule allows UDP and TCP port 53 to every destination.
 
 Use an existing disposable local Kubernetes cluster such as kind, minikube, or a multi-node kubeadm sandbox. Do not run these destructive operations against a shared production environment. All commands use standard kubectl syntax without shell aliases. All workloads and network resources in this drill represent synthetic practice fixtures designed to demonstrate core networking primitives.
 
@@ -471,7 +471,7 @@ rm -f /tmp/svc-drill.yaml
 
 ### Step 2: CoreDNS Search Path and ndots Resolution Verification
 
-Inspect the container resolver configuration in a diagnostic pod. Verify search path order and compare name resolution latency between unqualified names and fully qualified domain names ending with a trailing dot:
+Inspect the container resolver configuration in a diagnostic pod, then resolve one in-cluster fully qualified name and the external name `example.com.` written with a single trailing dot. The commands print resolv.conf and those two lookups. They do not time the queries or walk an unqualified search path.
 
 ```bash
 kubectl run dns-tester --image=busybox:1.36 --restart=Never -- sleep 3600
@@ -484,7 +484,7 @@ kubectl delete pod dns-tester
 
 ### Step 3: Ingress Manifest Creation and Controller Reconciliation Verification
 
-Create an Ingress resource defining host-based routing for a service. Verify that the API server accepts the object, inspect the unpopulated status address in the absence of an Ingress controller, and confirm resource details:
+Create an Ingress resource defining host-based routing for a service. Confirm that the API server accepts the object, then read the ADDRESS column and the describe output. Those fields stay empty when no Ingress controller is reconciling the resource. The commands do not install or remove a controller.
 
 ```bash
 cat <<'EOF' > /tmp/ingress-drill.yaml
@@ -513,9 +513,9 @@ kubectl delete -f /tmp/ingress-drill.yaml
 rm -f /tmp/ingress-drill.yaml
 ```
 
-### Step 4: NetworkPolicy Ingress Default-Deny and Targeted Allow
+### Step 4: NetworkPolicy Ingress Allow from Labeled Pods
 
-Create a dedicated namespace with two pods. Apply a NetworkPolicy that isolates the target pod with a default-deny ingress rule, verify connection failure, and then apply an allow rule permitting access exclusively from the client pod:
+Create a dedicated namespace with two pods. Apply one NetworkPolicy that selects the target pod and allows TCP port 80 only from pods labeled role=frontend in that same namespace, then describe the policy. The manifest does not use an empty ingress list, and the commands do not probe connectivity before or after the apply.
 
 ```bash
 kubectl create namespace net-drill
@@ -552,9 +552,9 @@ kubectl delete namespace net-drill
 rm -f /tmp/netpol-ingress.yaml
 ```
 
-### Step 5: NetworkPolicy Egress Isolation and DNS Allow Enforcement
+### Step 5: NetworkPolicy Egress Port Allow
 
-Deploy an application pod and enforce strict egress filtering. Demonstrate that isolating egress without a DNS rule breaks resolution, then apply an egress rule explicitly permitting CoreDNS on port 53 UDP and TCP:
+Deploy an application pod and apply an egress policy whose only rule allows UDP and TCP port 53 to every destination. That rule is a port-only allow. It does not select the kube-dns pods or the kube-system namespace. The commands describe the policy. They do not show a DNS failure before the allow, and they do not prove that other ports are blocked.
 
 ```bash
 kubectl create namespace egress-drill
@@ -605,12 +605,12 @@ Failure layer: failing to recognize that the default resolver ndots threshold re
 
 </details>
 
-**Card C: from: [] allows only pods in the same namespace.** A security administrator attempts to restrict incoming traffic to workloads in a multi-tenant namespace by configuring an ingress rule with an empty from list (`from: []`), assuming that omitting selectors safely defaults to allowing all pods within the same namespace while blocking external callers. When all traffic between pods in the same namespace is suddenly dropped, the administrator assumes the CNI network plugin has failed to read pod metadata.
+**Card C: from: [] allows only pods in the same namespace.** A security administrator tries to limit a database to same-namespace callers by putting an empty from list on an ingress rule, expecting that omitted selectors mean local pods only. External clients continue to connect, and the administrator blames the CNI for ignoring pod metadata instead of reading the empty peer list.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: assuming an empty selector array functions as a namespace-scoped allow list rather than an empty set of permitted sources that matches nothing. Next action: define an explicit `podSelector: {}` under from to allow traffic from all pods within the current namespace, or configure `{}` to allow traffic from any source.
+Failure layer: confusing an empty peer list with a same-namespace pod selector. An empty or missing `from` field matches all sources, which `kubectl describe` shows as `From: <any>`, including pods in other namespaces and clients outside the cluster. It does not block traffic. The form that denies every inbound peer is an empty `ingress` list. Next action: use an explicit `podSelector` when the peer set should be pods in the policy namespace only.
 
 </details>
 
@@ -619,25 +619,24 @@ Failure layer: assuming an empty selector array functions as a namespace-scoped 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: misunderstanding the dual-reconciliation and backward-compatibility mirroring architecture maintained between Endpoints and EndpointSlices. Next action: recognize that the EndpointSlice mirroring controller continues synchronizing Endpoints objects for backward compatibility with legacy tools, while treating EndpointSlices as the authoritative source of truth for modern kube-proxy routing.
+Failure layer: reversing the EndpointSlice mirror and treating the still-served Endpoints API as removed. Selector-based Services still receive Endpoints objects from the Endpoints controller, so kubectl get endpoints is not empty. The mirroring controller copies user-created Endpoints for selectorless Services into EndpointSlices. It does not copy EndpointSlices back into Endpoints. Next action: read both objects, and create EndpointSlices directly when a selectorless Service needs custom backends, because that mirror has been deprecated since Kubernetes 1.33.
 
 </details>
 
 **Success Criteria**:
 
-- [ ] You evaluated Service routing and inspected EndpointSlice objects using kubectl get endpointslices.
-- [ ] You inspected CoreDNS search paths in /etc/resolv.conf and verified ndots query traversal.
-- [ ] You deployed an Ingress resource and confirmed that status address allocation requires an active controller.
-- [ ] You implemented NetworkPolicy ingress isolation and verified traffic blocking across unselected pods.
-- [ ] You configured an egress NetworkPolicy allowing CoreDNS port 53 traffic while restricting outbound connections.
-- [ ] You analyzed kube-proxy iptables and IPVS data paths and identified packet routing mechanisms.
-- [ ] You contrasted Ingress and Gateway API resource models across GatewayClass, Gateway, and HTTPRoute.
+- [ ] You inspected the web-service EndpointSlice with kubectl get endpointslices and described the ClusterIP Service.
+- [ ] You printed /etc/resolv.conf and resolved kubernetes.default.svc.cluster.local plus example.com. with one trailing dot.
+- [ ] You applied test-ingress and inspected it with kubectl get ingress and kubectl describe ingress.
+- [ ] You applied isolate-target, which allows TCP port 80 from pods labeled role=frontend, and described that policy.
+- [ ] You applied secure-egress, whose only rule allows UDP and TCP port 53 to every destination, and described that policy.
 
 ---
 
 ## Sources
 
 - https://kubernetes.io/docs/concepts/services-networking/service/
+- https://kubernetes.io/docs/reference/networking/virtual-ips/
 - https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/
 - https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
 - https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/
@@ -645,6 +644,8 @@ Failure layer: misunderstanding the dual-reconciliation and backward-compatibili
 - https://kubernetes.io/docs/concepts/services-networking/ingress/
 - https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/
 - https://kubernetes.io/docs/concepts/services-networking/gateway/
+- https://gateway-api.sigs.k8s.io/guides/user-guides/multiple-ns/
+- https://gateway-api.sigs.k8s.io/reference/api-types/referencegrant/
 - https://kubernetes.io/docs/concepts/services-networking/network-policies/
 - https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/
 - https://kubernetes.io/docs/concepts/cluster-administration/networking/
