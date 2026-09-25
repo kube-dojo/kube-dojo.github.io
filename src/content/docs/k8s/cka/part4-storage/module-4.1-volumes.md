@@ -494,12 +494,12 @@ flowchart LR
 
 The `subPath` feature is a precise tool for mounting one file from a volume into an existing directory without hiding the rest of that directory. It is useful when an image already contains a directory full of defaults and you only want to replace one file. Treat the reload contract as a separate decision from the placement decision, and predict the file the process will read after the source object changes.
 
-**Pause and predict:** if `/etc/config/app.conf` is a full ConfigMap directory mount, then you update the ConfigMap and wait for the kubelet sync period, what should `cat` show; now what changes if that file was mounted through `subPath`?
+**Pause and predict:** if `/etc/config/app.conf` is a full ConfigMap directory mount, then you update the ConfigMap and wait through the kubelet sync period and any cache propagation delay, what should `cat` eventually show; now what changes if that file was mounted through `subPath`?
 
 <details>
 <summary>Reveal the prediction</summary>
 
-After the sync period, `cat` on the full directory mount should show the new content because the kubelet swaps the symlink atomically. A subPath mount does not pick up a ConfigMap update, so the bind-mounted file stays at the old content until the pod is recreated.
+After the kubelet sync period plus any cache propagation delay, `cat` on the full directory mount eventually shows the new content because the kubelet swaps the symlink atomically. A subPath mount does not pick up a ConfigMap update, so the bind-mounted file stays at the old content until the pod is recreated.
 
 </details>
 
