@@ -78,7 +78,16 @@ The CKA usually focuses on HPA because it is part of day-to-day workload adminis
 
 Before you configure autoscaling, write down the saturation signal you actually trust. CPU utilization is common because it is built into the resource metrics pipeline, but it is not always the earliest or most accurate demand signal. Request rate, queue depth, outstanding work items, or packets per second can be better for some systems, but those custom metrics require an adapter that exposes the Kubernetes custom metrics or external metrics API.
 
-Pause and predict: if an API is slow because every request waits on a saturated database connection pool, what do you expect an HPA based only on CPU to do? The honest answer is that it may do very little if CPU stays low, or it may add pods that create even more database pressure. Good autoscaling starts with a metric that represents useful work, not merely a metric that happens to be easy to collect.
+**Pause and predict:** if an API is slow because every request waits on a saturated database connection pool, what do you expect an HPA based only on CPU to do? Formulate your operational prediction before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+A CPU-only HPA may do very little if CPU stays low, or it may add pods that create even more database pressure. Good autoscaling starts with a metric that represents useful work, not merely a metric that happens to be easy to collect.
+
+</details>
+
+Write down which saturation signals reflect genuine user latency before you inspect how the horizontal controller reconciles resource consumption against declared targets.
 
 ## Part 2: Horizontal Pod Autoscaler Mechanics
 
@@ -106,7 +115,16 @@ Scale-down is deliberately conservative because removing pods too soon can creat
 
 Custom metrics follow the same high-level idea but use a different metrics API. Instead of asking metrics-server for CPU or memory usage, HPA asks an adapter that serves `custom.metrics.k8s.io` or `external.metrics.k8s.io`. Prometheus Adapter is a common example because it can translate Prometheus queries into Kubernetes metrics API responses, but the important concept is the API boundary, not the brand of monitoring stack.
 
-Pause and predict: you set `minReplicas: 2`, `maxReplicas: 10`, and an average CPU target of fifty percent. If four pods are averaging twenty-five percent CPU after a traffic drop, what raw replica count does the formula suggest, and why might the observed scale-down happen later than the math suggests? You should expect a raw recommendation of two, followed by controller behavior that may wait because stabilization is designed to avoid rapid downscaling.
+**Pause and predict:** you set `minReplicas: 2`, `maxReplicas: 10`, and an average CPU target of fifty percent. If four pods are averaging twenty-five percent CPU after a traffic drop, what raw replica count does the formula suggest, and why might the observed adjustment happen later than the math suggests? Formulate your prediction before opening the explanation.
+
+<details>
+<summary>Check your prediction</summary>
+
+You should expect a raw recommendation of two, followed by controller behavior that may wait because stabilization is designed to avoid rapid downscaling.
+
+</details>
+
+Review how the control loop handles transient metric dips before you configure manifests and test reconciliation against live cluster metrics.
 
 ## Part 3: Creating an HPA Safely
 
@@ -567,6 +585,42 @@ kubectl delete hpa challenge-web
 <summary>Solution guidance</summary>
 
 If `kubectl get hpa challenge-web` reports `<unknown>`, confirm metrics-server first with `kubectl top pods`, then confirm that `challenge-web` pods have CPU requests. If metrics are visible but replicas do not increase, the load may not be CPU-heavy enough for nginx in your cluster, so focus on describing the HPA and interpreting the conditions. If replicas increase but new pods stay Pending, describe those pods and look for scheduling, quota, or node-capacity messages. Cleanup matters because leftover HPAs can keep changing Deployments during later exercises.
+</details>
+
+**Card A: A CPU-only HPA scales out when the database pool is saturated and CPU stays low.** An operator expects replicas to multiply when backend connection queues fill up, even though thread contention keeps processor utilization well below the target threshold.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: metric selection and saturation domain mismatch. Next action: inspect custom application metrics or queue length adapters rather than CPU metrics when requests spend their time blocked on external database pools.
+
+</details>
+
+**Card B: The HPA applies the raw replica formula immediately, with no stabilization window.** An administrator expects replica counts to change at the exact moment a traffic spike shifts the calculated target ratio.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: autoscaler rate limiting and stabilization algorithms. Next action: verify the configured behavior policies and stabilization windows with `kubectl describe hpa` to confirm how velocity limits pace replica adjustments.
+
+</details>
+
+**Card C: minReplicas is ignored once current CPU is under the target.** A developer assumes a completely idle service can scale down to zero pods even when minReplicas is set to two.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: declarative floor constraints in autoscaling contracts. Next action: check the `minReplicas` field in the HPA specification; the controller clamps desired replicas to this lower bound regardless of how low utilization drops.
+
+</details>
+
+**Card D: Scale-down completes in the same minute the formula drops.** An engineer terminates synthetic traffic and expects the deployment to contract immediately during the very same sync cycle.
+
+<details>
+<summary>Check your prediction</summary>
+
+Failure layer: scale-down stabilization and flapping prevention timers. Next action: inspect `kubectl describe hpa` events and wait for the stabilization window to elapse before assuming the controller failed to scale down.
+
 </details>
 
 **Success Criteria:**
