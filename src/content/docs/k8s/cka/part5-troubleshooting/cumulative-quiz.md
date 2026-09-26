@@ -584,15 +584,15 @@ The exam does not require perfect production incident management, but it does re
 Your team deploys `reports-api` with three replicas. The Deployment exists, but every Pod is `Pending`, and the application team asks you for container logs. You need to choose the fastest useful first check and explain what you would do with the result.
 
 A) Run `kubectl logs` on each Pod, because the application team needs container output to explain why startup is blocked.
-B) Run `kubectl describe pod` on one Pod and read its Events, because a `Pending` Pod has not been scheduled or started yet.
+B) Run `kubectl describe pod` and read its Events, because they show whether `Pending` is a scheduling block or a later setup failure such as an image pull.
 C) Restart the CoreDNS Pods, because new Pods often stay `Pending` when the cluster cannot resolve Service names during startup.
 D) Delete the three Pods so the ReplicaSet recreates them, because a fresh scheduling attempt usually clears a `Pending` state.
 <details>
 <summary>Answer</summary>
 
-B is correct because `Pending` means scheduling has not completed, so the Events from `kubectl describe pod` are where Kubernetes explains what blocked placement. A is wrong because the container has not started, so there are usually no application logs to read. C is wrong because the usual `Pending` causes are resources, taints, selectors, affinity, PVC binding, or the scheduler itself, and cluster DNS is not part of that placement decision. D is wrong because the ReplicaSet recreates Pods from the same template, so the replacements hit the same scheduling constraint.
+B is correct because the Events from `kubectl describe pod` distinguish a scheduling failure from setup work such as an image pull or volume mount, so they tell you which stage is holding the Pod. A is wrong because the container has not started, so there are usually no application logs to read. C is wrong because the usual `Pending` causes are resources, taints, selectors, affinity, PVC binding, or the scheduler itself, and cluster DNS is not part of that placement decision. D is wrong because the ReplicaSet recreates Pods from the same template, so the replacements hit the same scheduling constraint.
 
-Start with `kubectl describe pod <pod-name>` and read the Events section because `Pending` means the Pod has not been scheduled or cannot complete scheduling-related prerequisites. Container logs are unlikely to exist because the container has not started.
+Start with `kubectl describe pod <pod-name>` and read the Events section, because a `Pending` Pod may still be waiting for a node, or it may already be scheduled and waiting on an image download or a volume. Container logs are unlikely to exist while the Pod is still in that stage.
 
 If Events show insufficient CPU or memory, reduce the request if appropriate or add capacity in a real cluster. If Events show an untolerated taint, add the correct toleration only if the workload should run there. If Events show node selector or affinity mismatch, correct the Deployment template. If Events show PVC binding problems, inspect the PVC and StorageClass. The verification is `kubectl get pods -o wide` showing assigned nodes and then readiness progressing.
 
@@ -628,7 +628,7 @@ D) Delete and recreate the Service, because a new ClusterIP forces the dataplane
 <details>
 <summary>Answer</summary>
 
-A is correct because name resolution already works, so the next layers on the packet path are Service routing, endpoints, readiness, and ports. B is wrong because the name resolved, which means CoreDNS has already done its part of the request. C is wrong because the client used the fully qualified name, so the resolver search path is not involved in this lookup. D is wrong because recreating the Service from the same definition brings back the same selector and `targetPort`, so it is a broad change that does not test any specific cause.
+A is correct because name resolution already works, so the next layers on the packet path are Service routing, endpoints, readiness, and ports. B is wrong because the name resolved, which means CoreDNS has already done its part of the request. C is wrong because name resolution already succeeded, so rewriting `/etc/resolv.conf` does not explain a timeout that happens after the lookup. The name has no trailing dot, so with `ndots:5` the resolver can still try the search list first, but that only affects the lookup, and the lookup already returned an answer. D is wrong because recreating the Service from the same definition brings back the same selector and `targetPort`, so it is a broad change that does not test any specific cause.
 
 Because DNS resolution works, move to Service routing evidence. Check the Service and EndpointSlices:
 
