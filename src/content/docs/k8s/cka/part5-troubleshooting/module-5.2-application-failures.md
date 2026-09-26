@@ -373,11 +373,11 @@ That boundary is the reason configuration problems can produce different visible
 <details>
 <summary>Check your prediction</summary>
 
-The usual sign is a container-creation failure whose Events say the Secret could not be found, because kubelet cannot materialize the environment or mounted volume promised by the Pod spec. The exact phase still depends on how the Secret is consumed.
+The usual sign is a container-creation failure whose Events say the Secret could not be found, because kubelet cannot materialize the environment or mounted volume promised by the Pod spec. The STATUS column depends on how the Secret is consumed. A required env reference shows CreateContainerConfigError. A volume mount shows ContainerCreating with a FailedMount event. The Pod phase stays Pending either way.
 
 </details>
 
-Hold the status you expect while you read how declared inputs are checked in the same namespace. The commands that follow list those objects, and the paragraphs after them explain why two similar configuration mistakes can surface in different phases.
+Hold the status you expect while you read how declared inputs are checked in the same namespace. The commands that follow list those objects, and the paragraphs after them explain why two similar configuration mistakes can surface in different visible states.
 
 The diagnosis begins by reading the Pod spec for declared inputs and then checking whether those objects exist in the same namespace. For mounted ConfigMaps and Secrets, the failure may appear as a volume setup error. For environment variables sourced through `valueFrom`, Kubernetes may block startup if a required key reference cannot be resolved unless the reference is optional.
 
@@ -1200,16 +1200,16 @@ The verifier requires the exact allocation marker, then compares Pod UID, contai
 <details>
 <summary>Reveal the failure layer and next action</summary>
 
-**False.** Failure layer: a missing Secret does not always leave the pod Running with empty environment variables. The usual sign is a container-creation failure whose Events say the Secret could not be found, because kubelet cannot materialize the environment or mounted volume promised by the Pod spec. Next action: confirm the named object exists in the same namespace before you change the application.
+**False.** Failure layer: a missing Secret does not always leave the pod Running with empty environment variables. The usual sign is a container-creation failure whose Events say the Secret could not be found, because kubelet cannot materialize the environment or mounted volume promised by the Pod spec. The STATUS column is CreateContainerConfigError for a required env reference and ContainerCreating with FailedMount for a volume mount. Next action: confirm the named object exists in the same namespace before you change the application.
 
 </details>
 
-### Card D: A ConfigMap that exists but has the wrong key leaves the pod stuck in ContainerCreating the same way a missing ConfigMap does.
+### Card D: A ConfigMap that exists, but has a key the application reads and the Pod spec does not name, leaves the pod stuck in ContainerCreating the same way a missing ConfigMap does.
 
 <details>
 <summary>Reveal the failure layer and next action</summary>
 
-**False.** Failure layer: a ConfigMap that exists but has the wrong key does not leave the pod stuck in ContainerCreating the way a missing ConfigMap does. The object is present, so the container can start, and the application may then exit because it rejects the input. Next action: compare the keys the pod expects with the keys that exist, then recreate the pod if the process reads those values only at startup.
+**False.** Failure layer: when the Pod spec does not name the key, a present ConfigMap lets the container start, and the application may then exit because it rejects the input. A missing ConfigMap is different, and so is a required key the spec does name: kubelet blocks startup. Next action: if the spec names the key, read the events for that missing key; if only the application expects it, compare the input the process reads.
 
 </details>
 
