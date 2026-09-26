@@ -281,7 +281,7 @@ Controllers are especially useful for distinguishing a one-pod symptom from a de
 <details>
 <summary>Answer</summary>
 
-DNS only proves the service name resolves to the service virtual IP. It does not prove that Kubernetes has any ready backend pods selected for that service. Empty endpoints point toward selector mismatch, readiness probe failure, or pods not matching the service's namespace and labels rather than CoreDNS, so the next checks should compare service selectors against pod labels and readiness conditions.
+For a ClusterIP Service, DNS only proves the service name resolves to the service virtual IP; a headless or ExternalName Service does not resolve that way. It does not prove that Kubernetes has any ready backend pods selected for that service. Empty endpoints point toward selector mismatch, readiness probe failure, or pods not matching the service's namespace and labels rather than CoreDNS, so the next checks should compare service selectors against pod labels and readiness conditions.
 
 </details>
 
@@ -1341,12 +1341,12 @@ After cleanup, write a brief troubleshooting note for yourself. It should includ
 
 </details>
 
-### Card B: A successful DNS lookup for a Service proves the backend pods are ready.
+### Card B: A successful DNS lookup for a ClusterIP Service proves the backend pods are ready.
 
 <details>
 <summary>Reveal the failure layer and next action</summary>
 
-**False.** Failure layer: service discovery abstraction versus endpoint slice population and pod readiness. Cluster DNS resolution confirms only that the service name maps to the assigned ClusterIP virtual address; it does not check whether any backend workloads match the selector or pass readiness probes. Next action: verify backend readiness by running `kubectl get endpointslices -n <namespace> -l kubernetes.io/service-name=<svc>` or `kubectl get endpoints <svc> -n <namespace>`, and compare service selectors against pod labels using `kubectl get svc <svc> -n <namespace> -o yaml`.
+**False.** Failure layer: service discovery abstraction versus endpoint slice population and pod readiness. Cluster DNS resolution confirms only that the service name maps to the assigned ClusterIP virtual address (the ClusterIP claim does not apply to a headless Service or an ExternalName Service); it does not check whether any backend workloads match the selector or pass readiness probes. Next action: verify backend readiness by running `kubectl get endpointslices -n <namespace> -l kubernetes.io/service-name=<svc>` or `kubectl get endpoints <svc> -n <namespace>`, and compare service selectors against pod labels using `kubectl get svc <svc> -n <namespace> -o yaml`.
 
 </details>
 
