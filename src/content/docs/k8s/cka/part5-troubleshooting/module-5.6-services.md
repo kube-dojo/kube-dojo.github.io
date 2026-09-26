@@ -97,7 +97,16 @@ A Service object describes intention, but it does not by itself prove that traff
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Pause and predict: if `kube-proxy` crashes on a single node, what do you expect to happen to pods on that node when they access a ClusterIP Service, and why might pods on other nodes continue working? This question matters because kube-proxy programs local node rules, so a node-scoped failure can look like an application failure only when the client pod lands on the affected node. During an exam, that distinction tells you to compare the same curl test from two different client pods on two different nodes before changing the Service manifest.
+**Pause and predict:** If `kube-proxy` crashes on a single node, which client pods do you expect to lose access to a ClusterIP Service, and what comparison would confirm that scope before you edit the Service manifest?
+
+<details>
+<summary>Check your prediction</summary>
+
+Only clients on that node should lose ClusterIP access, because kube-proxy programs Service rules locally on each node, and a crashed agent leaves that node's rules missing or stale while other nodes keep translating traffic. Confirm the scope by sending the same request from client pods on two different nodes before you change the Service manifest.
+
+</details>
+
+Write down the exact request, the client pod name, and the observed error before any change, so each later test compares like with like.
 
 Service troubleshooting is easiest when you separate the control plane description from the data plane reality. The control plane has the Service object, selector, EndpointSlices, Ingress object, and events. The data plane has DNS resolution, kube-proxy rules, node ports, load balancer listeners, network policy enforcement, and a process listening inside a container. A good diagnostic path moves from the cheapest control plane checks toward the more invasive data plane checks only when the earlier evidence supports that direction.
 
@@ -272,7 +281,16 @@ kubectl get pods -l <selector> -o wide
 # Only those node IPs will respond to NodePort
 ```
 
-Pause and predict: if you set `externalTrafficPolicy: Local` on a NodePort Service, but a specific node has no pods for that Service, what happens when an external client hits that node IP on the NodePort? The expected answer is that traffic to that node should fail or be dropped for that Service, while traffic to a node with a local ready endpoint can succeed. That prediction is exactly why a useful NodePort test loops through all node IPs instead of testing only the first IP you copied from `kubectl get nodes -o wide`.
+**Pause and predict:** If you set `externalTrafficPolicy: Local` on a NodePort Service, but a specific node has no pods for that Service, what happens when an external client hits that node IP on the NodePort?
+
+<details>
+<summary>Check your prediction</summary>
+
+Traffic to that node should fail or be dropped for that Service, because the node has no local ready endpoint and the `Local` policy does not forward external traffic to other nodes. A node with a local ready endpoint can still succeed, so a useful NodePort test loops through all node IPs instead of testing only the first IP you copied from `kubectl get nodes -o wide`.
+
+</details>
+
+The next consideration is what the backend sees as the client address, which matters whenever access controls or logs depend on the original source.
 
 NodePort is also where source address assumptions can mislead you. In `Cluster` policy, the packet may be forwarded from the receiving node to another node, and source address behavior depends on the proxying path and implementation details. In `Local` policy, source preservation is easier to reason about, but reachability depends on local endpoints. When teams choose between these modes, they are choosing between broad node reachability and tighter source-address behavior. Troubleshooting becomes easier when that tradeoff is written down beside the Service instead of rediscovered during an outage.
 
@@ -905,7 +923,43 @@ kubectl -n kube-system logs -l k8s-app=kube-proxy --tail=20
 curl -H "Host: <hostname>" http://<ingress-ip>
 ```
 
-### Success Criteria
+### Card A: A kube-proxy crash on one node breaks ClusterIP for every pod in the cluster.
+
+<details>
+<summary>Reveal Card A</summary>
+
+**False.** kube-proxy programs Service rules on each node separately, so a crash on one node affects clients scheduled there. Pods on other nodes keep their own rules, so compare the same request from client pods on two different nodes.
+
+</details>
+
+### Card B: externalTrafficPolicy Local forwards NodePort traffic to pods on other nodes.
+
+<details>
+<summary>Reveal Card B</summary>
+
+**False.** With `Local`, a node sends external traffic only to ready endpoints on that same node. A node without one fails or drops the request, while the `Cluster` policy may forward traffic across nodes.
+
+</details>
+
+### Card C: Empty endpoints mean the targetPort is wrong.
+
+<details>
+<summary>Reveal Card C</summary>
+
+**False.** A wrong numeric `targetPort` still leaves endpoints populated, as Task 4 shows; traffic simply reaches a port where nothing listens. Empty endpoints usually point to a selector that matches no pods or to pods that are not Ready.
+
+</details>
+
+### Card D: kube-proxy logs are the first check for a selector mismatch.
+
+<details>
+<summary>Reveal Card D</summary>
+
+**False.** A selector mismatch shows up in the API as a Service with no endpoints, so compare the Service selector with the pod labels first. Inspect kube-proxy later, when endpoints exist but traffic fails differently depending on the client's node.
+
+</details>
+
+**Success Criteria**: Confirm the Service name, the selector match, the node-port evidence, and why a wrong targetPort is not an empty endpoint list.
 
 - [ ] Created and tested a ClusterIP Service by name and EndpointSlice list.
 - [ ] Identified and fixed a selector mismatch by comparing Service selectors to pod labels.
