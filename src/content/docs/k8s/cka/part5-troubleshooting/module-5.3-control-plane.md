@@ -142,7 +142,16 @@ Run this Bash block from your diagnostic workstation with an explicitly identifi
 )
 ```
 
-Pause and predict: if `kubectl -n kube-system get pods` hangs, but `crictl ps` on the control plane node shows the API server container repeatedly restarting, which layer are you actually observing? You are no longer testing workload scheduling or controller reconciliation; you are testing whether the local kubelet can keep a static pod alive from its manifest and dependencies.
+**Pause and predict:** if `kubectl -n kube-system get pods` hangs, but `crictl ps` on the control plane node shows the API server container repeatedly restarting, which layer are you actually observing?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+You are no longer testing workload scheduling or controller reconciliation; you are testing whether the local kubelet can keep a static pod alive from its manifest and dependencies.
+
+</details>
+
+Compare your prediction with the evidence sources that still answer during that outage, and note which ones merely repeat the symptom before you pick the next command.
 
 ## Diagnosing API Server and Certificate Failures
 
@@ -613,7 +622,16 @@ sequenceDiagram
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Pause and predict: if you edit a mirrored static pod through `kubectl edit pod kube-apiserver-master -n kube-system`, what happens after the node restarts? The kubelet recreates the pod from the file on disk, so the API-side edit disappears because the manifest, not the mirrored object, is the durable source of truth.
+**Pause and predict:** if you edit a mirrored static pod through `kubectl edit pod kube-apiserver-master -n kube-system`, what happens after the node restarts?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+The kubelet recreates the pod from the file on disk, so the API-side edit disappears because the manifest, not the mirrored object, is the durable source of truth.
+
+</details>
+
+Keep that prediction in mind for the related puzzle below, where a change that looks correct produces no visible effect on the running component.
 
 If a manifest sits in the watch directory and nothing changes, inspect the kubelet itself. The kubelet may be watching a different `staticPodPath`, rejecting the YAML before it reaches the runtime, lacking permission to read a mounted host path, or failing because the container runtime is unhealthy. This is why control plane recovery crosses Kubernetes, Linux service management, and container runtime inspection rather than staying inside `kubectl`.
 
@@ -925,11 +943,10 @@ wait_scheduler() {
   done
   return 1
 }
-k() { kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s "$@"; }
-api_ready() { k get --raw=/readyz >/dev/null; }
+api_ready() { kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s get --raw=/readyz >/dev/null; }
 create_probe_pod() {
   local name=$1
-  k create -f - >/dev/null <<EOF
+  kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s create -f - >/dev/null <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
@@ -953,7 +970,7 @@ cleanup() {
     exit 1
   fi
   if [[ "$NAMESPACE_ATTEMPTED" -eq 1 ]]; then
-    if ! k delete namespace "$NAMESPACE" --wait=true --timeout=30s >/dev/null; then
+    if ! kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s delete namespace "$NAMESPACE" --wait=true --timeout=30s >/dev/null; then
       printf 'Cleanup failed for owned namespace %s; preserving the named cluster/config boundary.\n' "$NAMESPACE" >&2
       cleanup_rc=1
       namespace_cleanup_ok=0
@@ -1005,31 +1022,31 @@ nodes="$(docker ps --filter "label=io.x-k8s.kind.cluster=$CLUSTER" --format '{{.
 CONTROL_PLANE="$(printf '%s\n' "$nodes" | sed -n '1p')"
 [[ "$(docker inspect --format '{{ index .Config.Labels "io.x-k8s.kind.cluster" }}' "$CONTROL_PLANE")" == "$CLUSTER" ]] || die 'control-plane cluster label mismatch'
 [[ "$(docker inspect --format '{{ index .Config.Labels "io.x-k8s.kind.role" }}' "$CONTROL_PLANE")" == control-plane ]] || die 'control-plane role label mismatch'
-k config current-context | grep -Fxq "kind-$CLUSTER" || die 'private kubeconfig context mismatch'
+kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s config current-context | grep -Fxq "kind-$CLUSTER" || die 'private kubeconfig context mismatch'
 docker exec "$CONTROL_PLANE" sh -c 'command -v crictl >/dev/null && test -f /etc/kubernetes/manifests/kube-scheduler.yaml' || die 'fixture lacks crictl or scheduler manifest'
 docker exec "$CONTROL_PLANE" sh -c 'mkdir -p "$1" && test ! -e "$2"' sh "$HOLD_DIR" "$HOLD" || die 'owned hold path is not clean'
 [[ "$(file_state)" == present ]] || die 'scheduler manifest state is not unambiguous'
 scheduler_present || die 'scheduler presence is unknown before the experiment'
-NAMESPACE_ATTEMPTED=1; k create namespace "$NAMESPACE" >/dev/null
+NAMESPACE_ATTEMPTED=1; kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s create namespace "$NAMESPACE" >/dev/null
 create_probe_pod "$BASE_POD"
 api_ready || die 'API readiness failed before scheduler test'
-k wait -n "$NAMESPACE" --for=condition=PodScheduled "pod/$BASE_POD" --timeout=30s >/dev/null
+kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s wait -n "$NAMESPACE" --for=condition=PodScheduled "pod/$BASE_POD" --timeout=30s >/dev/null
 MANIFEST_MOVE_ATTEMPTED=1; docker exec "$CONTROL_PLANE" sh -c 'manifest=$1; hold=$2; test -f "$manifest" && test ! -e "$hold" && mv "$manifest" "$hold"' sh "$MANIFEST" "$HOLD"
 wait_scheduler absent || die 'scheduler absence was not proven by valid empty crictl JSON'
 create_probe_pod "$BLOCKED_POD"
 api_pending=0
 for _ in {1..30}; do
-  phase="$(k get pod "$BLOCKED_POD" -n "$NAMESPACE" -o jsonpath='{.status.phase}')" || die 'could not read blocked Pod'
-  node="$(k get pod "$BLOCKED_POD" -n "$NAMESPACE" -o jsonpath='{.spec.nodeName}')" || die 'could not read Pod assignment'
+  phase="$(kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s get pod "$BLOCKED_POD" -n "$NAMESPACE" -o jsonpath='{.status.phase}')" || die 'could not read blocked Pod'
+  node="$(kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s get pod "$BLOCKED_POD" -n "$NAMESPACE" -o jsonpath='{.spec.nodeName}')" || die 'could not read Pod assignment'
   if api_ready && [[ "$phase" == Pending && -z "$node" ]]; then api_pending=1; break; fi
   sleep 1
 done
 [[ "$api_pending" -eq 1 ]] || die 'blocked Pod did not demonstrate an API-ready unassigned Pending state'
-k describe pod "$BLOCKED_POD" -n "$NAMESPACE"
+kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s describe pod "$BLOCKED_POD" -n "$NAMESPACE"
 restore_manifest || die 'scheduler manifest restoration failed'
 wait_scheduler present || die 'scheduler recovery was not proven by valid crictl JSON'
-k wait -n "$NAMESPACE" --for=condition=PodScheduled "pod/$BLOCKED_POD" --timeout=60s >/dev/null
-node="$(k get pod "$BLOCKED_POD" -n "$NAMESPACE" -o jsonpath='{.spec.nodeName}')" || die 'could not verify recovered Pod assignment'
+kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s wait -n "$NAMESPACE" --for=condition=PodScheduled "pod/$BLOCKED_POD" --timeout=60s >/dev/null
+node="$(kubectl --kubeconfig "$KUBECONFIG_PATH" --request-timeout=10s get pod "$BLOCKED_POD" -n "$NAMESPACE" -o jsonpath='{.spec.nodeName}')" || die 'could not verify recovered Pod assignment'
 [[ -n "$node" ]] || die 'scheduler recovered without a node assignment'
 printf 'Scheduler failure/recovery observation complete in owned cluster %s; cleanup follows on exit.\n' "$CLUSTER"
 ```
@@ -1118,7 +1135,43 @@ Use the reusable API-server container-selection block above. Explain why empty r
 Use the explicit-kubeconfig/context API baseline above. Record liveness and readiness separately, and distinguish an HTTP health response from inability to reach or authenticate to the API. Do not replace certificate verification with an insecure loopback request.
 </details>
 
-### Success Criteria
+### Card A — A hanging kubectl get pods while the API server container restarts means the scheduler is the failing layer.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** a hanging request plus a restarting API server container points at the API server static pod and its dependencies, such as flags, certificates, or etcd reachability. The scheduler only becomes a suspect once the API answers and new pods stay `Pending`. **Next action:** from the control plane node's root shell, list the kube-apiserver containers with `crictl`, read the selected attempt's logs, and check the kubelet journal before changing anything.
+
+</details>
+
+### Card B — kubectl edit on a static-pod mirror survives a node restart because the API object is the source of truth.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** the mirror pod is the kubelet's report of a node-local manifest, not the configuration itself. After a restart the kubelet recreates the pod from the file under `/etc/kubernetes/manifests`, so an API-side edit does not persist. **Next action:** preserve a backup copy, make the change in the node-local manifest, then confirm the recreated container with `crictl` and the updated mirror pod through the API.
+
+</details>
+
+### Card C — A healthy etcd endpoint after restore is enough to accept recovery.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** endpoint health shows that the queried endpoint answered. It does not show that the intended Kubernetes contents came back, that membership matches the intended topology, or that controllers behave correctly after the revision change. **Next action:** confirm the snapshot-era marker is readable again through the API, run member list and endpoint status across the full endpoint set, and verify that a fresh controller operation reconciles.
+
+</details>
+
+### Card D — The scheduler exercise proves certificate renewal and etcd restore.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** Task 4 moves only the scheduler manifest inside an owned kind fixture. It checks API readiness, runtime presence, and `PodScheduled`, and never touches certificates or etcd data. **Next action:** treat certificate and etcd recovery as separate owned experiments. One must prove a changed certificate identity plus consumer reload; the other must prove a restored marker is readable through the API.
+
+</details>
+
+**Success Criteria**: Confirm the static-pod manifest, the mirrored API server, the certificate evidence you actually inspected, and why a healthy etcd endpoint is not a restored cluster.
 
 - [ ] Diagnose API server and static pod state by listing manifests and comparing mirrored control plane pods.
 - [ ] Record actual certificate inspection results or missing evidence, and justify a recovery plan without claiming renewal or expiry recovery.
