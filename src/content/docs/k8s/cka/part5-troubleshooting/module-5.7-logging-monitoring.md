@@ -96,7 +96,7 @@ kubectl logs <pod> --tail=100 --timestamps -f
 <details>
 <summary>Reveal the container boundary</summary>
 
-Logs belong to containers, not the pod as a merged unit. kubectl returns only the default container's logs, chosen by the kubectl.kubernetes.io/default-container annotation or else the first container in the spec, and it prints a Defaulted container notice. The other container's evidence stays absent until you name it or request every container.
+Logs belong to containers, not the pod as a merged unit. kubectl returns only the default container's logs, chosen by the kubectl.kubernetes.io/default-container annotation when that annotation names a container; otherwise it uses the first container in the spec and prints a Defaulted container notice. The other container's evidence stays absent until you name it or request every container.
 
 </details>
 
@@ -1038,7 +1038,7 @@ kubectl top pods -A --sort-by=memory | head
 <details>
 <summary>Reveal Card A</summary>
 
-**False.** kubectl returns only the default container's logs, using the kubectl.kubernetes.io/default-container annotation or else the first container in the spec, and it prints a Defaulted container notice. The other container's logs stay absent until you name that container or request every container.
+**False.** kubectl returns only the default container's logs, using the kubectl.kubernetes.io/default-container annotation when that annotation names a container; otherwise it uses the first container in the spec and prints a Defaulted container notice. The other container's logs stay absent until you name that container or request every container.
 
 </details>
 
