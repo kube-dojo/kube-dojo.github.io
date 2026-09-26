@@ -21,7 +21,7 @@ lab:
 
 ## What You'll Be Able to Do
 
-After this module, you will be able to:
+After this module, you will be able to make and verify the following storage decisions in a cluster:
 
 - **Design** StorageClasses for dynamic provisioning across local, AWS, GCP, and Azure-style clusters.
 - **Configure** default behavior, explicit opt-out behavior, reclaim policies, binding modes, parameters, and expansion settings.
@@ -104,9 +104,16 @@ Each field has a different blast radius. `parameters` affect how the backend dis
 
 This table is useful for recognition, but it is not a substitute for checking the cluster. The CKA exam environment may use a local provisioner, while production clusters usually have a cloud or storage-vendor CSI driver. Always inspect `kubectl get storageclass` and the CSI controller pods before assuming a provisioner name. A single character mismatch in the `provisioner` field is enough to leave every matching PVC waiting forever.
 
-Pause and predict: if a PVC requests `storageClassName: fast-ssd`, but no running provisioner watches the string `ebs.csi.aws.com`, what event do you expect on the PVC? Before you read the answer later, decide whether Kubernetes can create a disk by itself or whether it must wait for the external controller.
+**Pause and predict:** a PVC requests `storageClassName: fast-ssd`, but no running component watches `ebs.csi.aws.com`. What status and event category should you expect, and what must happen before a PV appears?
 
-The answer is that Kubernetes records provisioning events, but the controller has to do the backend work. If no matching provisioner is installed, the PVC stays `Pending` and events usually mention external provisioning or a missing provisioner. That is why StorageClass troubleshooting starts with both the object and the controller. You need the class, the PVC, the provisioner deployment, and the events to line up.
+<details>
+<summary>Reveal the prediction</summary>
+
+The PVC stays `Pending`, and its events typically report that it is waiting for external provisioning. Kubernetes records the request but cannot create the cloud disk itself; a matching external provisioner must perform the backend work. Inspect the class, PVC events, and provisioner deployment to find the missing link.
+
+</details>
+
+Compare your prediction with the claim status and event category, then trace each observation to the object that can confirm it during an exam.
 
 ---
 
@@ -337,7 +344,16 @@ Node: us-east-1a          Node: us-east-1b
 | Immediate | NFS, distributed storage, zone-less storage |
 | WaitForFirstConsumer | Zone-specific storage (EBS, GCE PD, Azure Disk), local storage |
 
-Pause and predict: you have a StorageClass with `volumeBindingMode: Immediate` for AWS EBS. A developer creates a PVC, and a PV is immediately provisioned in `us-east-1a`. The scheduler then places the pod on a node in `us-east-1b`. Decide what error category you would investigate first, then explain how changing the binding mode prevents the mismatch.
+**Pause and predict:** a StorageClass uses `volumeBindingMode: Immediate` for AWS EBS, while the consuming pod requires a node in `us-east-1b`. Predict the PVC and pod states, then choose the first evidence you would inspect if the pod cannot start.
+
+<details>
+<summary>Reveal the prediction</summary>
+
+Immediate binding can provision a zonal volume before the scheduler knows where the pod must run. The PVC may be `Bound` to a PV in another zone while the pod remains `Pending` because its required node cannot use that PV. Compare the PV node affinity with the pod's node constraints and events. `WaitForFirstConsumer` coordinates placement for future claims; changing the class later does not relocate an existing volume.
+
+</details>
+
+Compare the predicted claim and pod states with the events you would inspect, and decide which observation would justify changing the class for future requests.
 
 One more defaulting detail is worth memorizing for the exam. The `reclaimPolicy` on a StorageClass is copied to dynamically created PVs at creation time. Changing or recreating the StorageClass later does not rewrite existing PVs. If a production class accidentally used `Delete`, fixing the class only protects future volumes; existing PVs need direct review and, if appropriate, a direct PV reclaim-policy patch.
 
@@ -904,7 +920,43 @@ The PVC should show `fast` as its storage class after defaulting. If it does not
 
 </details>
 
-### Success Criteria
+### Card A — Kubernetes creates the cloud disk itself when no provisioner is running.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** the API records the claim, but an external provisioner must create the backing disk; without one, the PVC remains pending. **Next action:** describe the PVC and check that its StorageClass provisioner matches a running CSI controller.
+
+</details>
+
+### Card B — volumeBindingMode Immediate is safe for a zonal disk because the scheduler can move the volume later.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** Immediate provisioning can select a zone before the pod's placement is known, and the scheduler cannot move an existing disk between zones. **Next action:** compare PV node affinity with pod constraints and use `WaitForFirstConsumer` for future zonal claims.
+
+</details>
+
+### Card C — A missing provisioner means the API server rejected the PVC.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** an accepted PVC can remain `Pending` because no matching external provisioner completes the storage request. **Next action:** inspect PVC events, the StorageClass provisioner string, and the corresponding controller pods.
+
+</details>
+
+### Card D — Changing the binding mode after the volume exists moves it to the pod's zone.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** a StorageClass change does not relocate a previously provisioned PV or rewrite its node affinity. **Next action:** place the pod where the volume can attach, or create a suitable new volume and migrate the data deliberately.
+
+</details>
+
+**Success Criteria**: Confirm each result with cluster state before considering the exercise complete, especially the transition from a pending claim to usable storage.
 
 - [ ] StorageClass created successfully.
 - [ ] PVC stays pending until pod creation when `WaitForFirstConsumer` is active.
@@ -997,7 +1049,7 @@ kubectl get storageclass standard -o jsonpath='{.volumeBindingMode}{"\n"}'
 
 > Volume expansion is primarily a cloud-CSI feature; on `rancher.io/local-path` installs the field may be accepted but silently ignored.
 
-Why should you verify expansion behavior on your cluster instead of trusting `allowVolumeExpansion: true` alone?
+Why should you verify expansion behavior on your cluster instead of trusting `allowVolumeExpansion: true` alone? Which observable result confirms that the backend volume and filesystem actually grew?
 
 ## Next Module
 
