@@ -107,11 +107,16 @@ The output of these commands gives you a rough map. If every namespace shows pod
 
 A precise symptom is more valuable than a dramatic symptom. "The app is down" is too broad to test. "Requests to `checkout.default.svc.cluster.local:8080` time out from the frontend pod, while direct requests to the checkout pod IP succeed" is specific enough to separate service routing from application health.
 
-### 1.2 Active Learning Prompt: Choose the First Read-Only Command
+> **Pause and predict:** A teammate suggests immediately removing a failing workload instance so the controller recreates it from scratch. Decide what specific diagnostic evidence premature removal would destroy, and determine which first read-only command you should run for a pod in CrashLoopBackOff versus a Service that receives no traffic.
 
-A teammate says, "The new pod is broken, just delete it and let Kubernetes recreate it." Before you accept that advice, decide what evidence deletion would destroy. If the pod is stuck because of an image pull error, deleting it will create another pod with the same event. If it is crashing, deleting it may remove previous container logs and restart-count history that would explain the failure.
+<details>
+<summary>Answer</summary>
 
-Write down the first read-only command you would run for each symptom before reading the answers. For `CrashLoopBackOff`, the strongest first command is usually `kubectl describe pod <pod> -n <namespace>` because Events and container state tell you whether the crash is actually an application exit, a probe failure, or a config problem. For `Service has no traffic`, the strongest first command is usually `kubectl get endpointslices` or `kubectl get endpoints` for the service, because a service without endpoints cannot route even if the service object exists.
+Prematurely terminating the pod destroys previous container logs and restart-count history that would explain the failure. If the pod was stuck in an image pull failure, recreation simply generates another identical failure event. For `CrashLoopBackOff`, the strongest first read-only command is `kubectl describe pod <pod> -n <namespace>` because Events and container state show whether the failure stems from an application exit, probe failure, or missing configuration. For a Service with no traffic, the strongest first command is `kubectl get endpointslices -n <namespace> -l kubernetes.io/service-name=<svc>` or `kubectl get endpoints <svc> -n <namespace>` because a Service without backend endpoints cannot route incoming packets even when the Service object itself exists.
+
+</details>
+
+Disciplined operators gather non-mutating cluster observations before modifying any live objects, preserving valuable runtime context and establishing verified factual baselines that guide every subsequent troubleshooting choice.
 
 ### 1.3 Isolate by Layer, Not by Guess
 
@@ -271,11 +276,16 @@ kubectl describe job <name> -n <namespace>
 
 Controllers are especially useful for distinguishing a one-pod symptom from a desired-state problem. If one pod is unhealthy but the ReplicaSet has created replacements, Kubernetes may be recovering. If the deployment cannot create new ReplicaSets or the rollout deadline has been exceeded, the controller is telling you the workload as a whole is not converging.
 
-### 2.4 Active Learning Prompt: Follow the Ownership Boundary
+> **Pause and predict:** Imagine a service named `checkout` exists, cluster name resolution successfully resolves `checkout.default.svc.cluster.local`, but requests hang until they time out. The backend pods show a `Running` status, yet `kubectl get endpoints checkout` returns no addresses. Before checking CoreDNS logs, explain why the empty backend list is stronger evidence than the successful name lookup.
 
-Imagine a service named `checkout` exists, DNS resolves `checkout.default.svc.cluster.local`, but requests hang until they time out. The backend pods are `Running`, yet `kubectl get endpoints checkout` returns no addresses. Before checking CoreDNS logs, explain why the empty endpoint object is stronger evidence than the successful DNS lookup.
+<details>
+<summary>Answer</summary>
 
-The answer is that DNS only proves the service name resolves to the service virtual IP. It does not prove that Kubernetes has any ready backend pods selected for that service. Empty endpoints point toward selector mismatch, readiness probe failure, or pods not matching the service's namespace and labels, so the next checks should compare service selectors against pod labels and readiness conditions.
+DNS only proves the service name resolves to the service virtual IP. It does not prove that Kubernetes has any ready backend pods selected for that service. Empty endpoints point toward selector mismatch, readiness probe failure, or pods not matching the service's namespace and labels rather than CoreDNS, so the next checks should compare service selectors against pod labels and readiness conditions.
+
+</details>
+
+Separating name resolution from actual workload readiness prevents wild investigations into healthy infrastructure layers, keeping practitioner attention anchored strictly on verified boundaries between cluster abstraction objects and application runtime states.
 
 ---
 
@@ -1321,6 +1331,44 @@ There is no automatic EXIT cleanup: interrupting diagnosis must not silently del
 ### Exercise Reflection
 
 After cleanup, write a brief troubleshooting note for yourself. It should include the initial symptom, the first failing layer, the evidence command that proved it, the repair, and the validation command. This reflection is not busywork; it builds the same concise reasoning you will need during the CKA and during real incident handoffs.
+
+### Card A: The first command for a CrashLoopBackOff pod is to delete it so Kubernetes recreates a clean pod.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: container startup and process execution lifecycle. Deleting the pod destroys previous container logs and restart history needed to understand why the container failed, and a controller will only create an identical replacement that encounters the same startup defect. Next action: inspect container state, termination exit codes, and lifecycle events using `kubectl describe pod <pod> -n <namespace>`, then retrieve logs from the failed process using `kubectl logs <pod> -n <namespace> --previous`.
+
+</details>
+
+### Card B: A successful DNS lookup for a Service proves the backend pods are ready.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: service discovery abstraction versus endpoint slice population and pod readiness. Cluster DNS resolution confirms only that the service name maps to the assigned ClusterIP virtual address; it does not check whether any backend workloads match the selector or pass readiness probes. Next action: verify backend readiness by running `kubectl get endpointslices -n <namespace> -l kubernetes.io/service-name=<svc>` or `kubectl get endpoints <svc> -n <namespace>`, and compare service selectors against pod labels using `kubectl get svc <svc> -n <namespace> -o yaml`.
+
+</details>
+
+### Card C: kubectl top is the first command for an OOMKilled pod, before kubectl describe pod.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: metrics server observability versus historical container termination metadata. The metrics pipeline provides only point-in-time resource consumption for currently running containers and cannot capture the exact memory threshold at the instant of process termination. Next action: run `kubectl describe pod <pod> -n <namespace>` to examine the `Last State` block for an `OOMKilled` termination reason, exit code `137`, and the container memory limit, then evaluate resource allocation with `kubectl get pod <pod> -n <namespace> -o yaml`.
+
+</details>
+
+### Card D: Empty endpoints mean CoreDNS is down, so read CoreDNS logs before the Service selector.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: workload label matching and controller reconciliation versus cluster DNS infrastructure. The EndpointSlice and Endpoints controllers populate backend addresses by matching the Service selector against labeled pods in the same namespace, which is completely independent of CoreDNS daemon operations. Next action: inspect the Service selector using `kubectl get svc <svc> -n <namespace> -o yaml`, list matching pod labels with `kubectl get pods -n <namespace> --show-labels`, and confirm container readiness conditions before investigating DNS infrastructure.
+
+</details>
+
+**Success Criteria**: Verify each troubleshooting resolution using cluster events, workload lifecycle states, and verified network reachability before concluding your practice, ensuring disciplined evidence collection across every diagnostic layer.
 
 - [ ] Recorded the first symptom without exaggerating it.
 - [ ] Named the first failing layer for each broken object.
