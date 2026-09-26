@@ -53,6 +53,8 @@ Kubernetes separates the volume source from the place where a container sees tha
 
 A Pod can have several volumes, and each container can mount different subsets of those volumes at different paths. This is powerful because a sidecar can share a scratch directory with the main container, while a Secret can be mounted only into the container that needs credentials. It also means you must reason at container scope, not just Pod scope, when debugging file visibility.
 
+The volume `name` is the key that joins the two lists. Kubernetes matches each `volumeMounts` entry to a `spec.volumes` entry by that name, not by position or by path. The API server rejects a mount whose name matches no volume, so that typo fails at apply time. The reverse mistake is quieter. A volume that no container mounts is valid, and it simply never appears in any container's filesystem.
+
 ```text
 +--------------------------------------------------------------------------------+
 | Pod: report-runner                                                             |
@@ -70,7 +72,11 @@ A Pod can have several volumes, and each container can mount different subsets o
 +--------------------------------------------------------------------------------+
 ```
 
+Read the diagram from the bottom up. The Pod declares two sources, `scratch` and `app-config`. The generator mounts both of them, while the web container mounts only `scratch`. The web container therefore cannot read the configuration files, even though they exist in the same Pod. That asymmetry is deliberate, and it keeps each container's view of the filesystem as small as its job requires.
+
 The first design question is not "Which YAML field do I need?" but "What lifecycle should this data have?" Data that can be recomputed after a Pod replacement usually belongs in `emptyDir` or the container filesystem. Data that must survive Pod replacement belongs behind a PersistentVolumeClaim. Configuration and credentials are not application state, so they normally come from ConfigMap, Secret, or projected volumes.
+
+It helps to name three separate lifetimes before you choose a source. Files in the container filesystem last until the container restarts, because the kubelet starts the new container with a clean state. Files in a Pod volume such as `emptyDir` last until the Pod leaves its node. Files on a claim outlive both of those events. Most storage bugs come from attaching data to the wrong one of these lifetimes.
 
 | Design Question | If the Answer Is Yes | Likely Volume Pattern | Why This Choice Fits |
 |---|---|---|---|
@@ -85,6 +91,8 @@ The first design question is not "Which YAML field do I need?" but "What lifecyc
 The second design question is "Who needs to see this data?" A volume mounted into one container is invisible to the other containers unless they also mount it, so you must reason at container level. That behavior is intentional and enables fine-grained access control inside one Pod. You can grant sidecar access to a shared directory without exposing database credentials to it, or mount a read-only ConfigMap into the application while leaving a writable scratch volume at a different path.
 
 The third design question is "What existing files are at the mount path?" Mounting a volume at a directory path hides the image's original files at that path for the lifetime of the container. That is not a merge operation, and many teams discover this only after moving from local Docker workflows to Kubernetes. If the image has useful defaults under `/etc/app` and you mount a ConfigMap at `/etc/app`, the ConfigMap view replaces the directory contents visible to the process.
+
+A practical way to apply these questions is to write a one-line contract for each path before you write YAML. For example, `/work` holds Pod-lifetime scratch shared by two containers, while `/config` holds read-only settings from one ConfigMap. Once the contracts exist, every volume and mount field should trace back to one of them. A field that traces back to nothing is worth a second look.
 
 ### 2. Use `emptyDir` for Pod-Lifetime Scratch and Sharing
 
@@ -484,6 +492,10 @@ k exec secret-demo -- ls -l /secrets
 
 Volume troubleshooting is easier when you separate Kubernetes object state from container runtime symptoms. First, confirm the referenced objects exist. Second, confirm the Pod events show successful scheduling and mounting. Third, inspect the container filesystem. Fourth, evaluate permissions and user IDs.
 
+The order matters because each layer depends on the one before it. The kubelet cannot mount a ConfigMap that does not exist, and a process cannot read a file that was never mounted. Checking permissions first wastes time when the real problem is a missing object. Work from the API objects inward toward the process, and stop at the first layer that shows a failure.
+
+Each layer also has its own evidence source. Object existence is visible from the API. Scheduling and mount outcomes appear in Pod events and Pod status. Filesystem contents are only visible from inside the running container. Permissions depend on both the file mode and the process identity, so collect evidence from both sides before you change a security field.
+
 ```bash
 k get pod
 k describe pod myapp
@@ -495,6 +507,10 @@ k get secret db-creds
 
 The Pod event stream is usually the fastest source of truth for mount failures. A typo in a ConfigMap name, a missing Secret, or an unbound PVC appears before the application process even has a chance to run. If events are clean but the application fails, move inside the container and inspect the actual path, because Kubernetes can successfully satisfy scheduling and mount logic while still delivering a runtime path mismatch.
 
+Namespace scope is a quiet source of confusion at this step. A Pod can only reference a ConfigMap, Secret, or PersistentVolumeClaim in its own namespace. An object with the correct name in another namespace does not satisfy the reference, so the Pod still reports it as missing. Confirm which namespace your current context targets before you decide that the object exists.
+
+Watch the Pod status while you read events. An unbound claim usually keeps the Pod in `Pending`, as the worked PVC example later shows. A missing ConfigMap or Secret usually lets the Pod schedule, but its containers stay in `ContainerCreating` while the kubelet retries the mount. That status tells you the failure sits in mount setup, not in application code.
+
 | Symptom | Most Likely Cause | What to Check First | Practical Fix |
 |---|---|---|---|
 | Pod stays `Pending` and references storage in events. | PVC is missing, unbound, or waiting for provisioning. | `k get pvc` and `k describe pvc <name>`. | Create the correct claim, fix the claim name, or adjust requested storage. |
@@ -503,6 +519,8 @@ The Pod event stream is usually the fastest source of truth for mount failures. 
 | Application reports permission denied. | File mode, owner, `runAsUser`, or group access is wrong. | `k exec <pod> -- id` and `ls -l` on the mounted files. | Set `defaultMode`, `runAsUser`, or `fsGroup` to match the process. |
 | ConfigMap update does not appear in the container. | The file was mounted with `subPath`, or the app cached the old value. | Inspect the volume mount pattern and application reload behavior. | Restart the Pod or avoid `subPath` for live-updated config. |
 | Files disappear after rollout or manual Pod deletion. | Data was stored in container filesystem or `emptyDir`. | Check whether a PVC backs the path. | Move durable data to a PersistentVolumeClaim. |
+
+Three runtime symptoms look alike but point to different layers. A missing file usually means the mount path or key name is wrong. A directory that lacks the image's own files often means a volume is mounted over that path. A file with old content points to `subPath` snapshot behavior or to application caching. Naming the symptom precisely narrows the next check to one field.
 
 A common permission fix is to run the process with a known user and grant group ownership to mounted volume files through Pod security context. This is especially useful for writable persistent volumes where the application process should not run as root. Always check the image's expected user model before changing security context fields, because a user mismatch can mask an unrelated bug as a permission failure.
 
@@ -531,6 +549,8 @@ spec:
 ```
 
 Do not blindly add `fsGroup` to every Pod. [It can change ownership behavior for supported volume types and may add startup overhead for large volumes](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/security-context/). Use it when the symptom points to group access or when the application image is intentionally non-root and needs write access to a mounted filesystem, and then re-validate both startup time and file permissions together.
+
+Change one field per attempt when you fix a volume problem. If you rename the claim, move the mount path, and add `fsGroup` in one edit, you cannot tell which change helped. You also cannot tell whether another edit created a new problem. After each change, repeat the same check that exposed the failure and confirm that the evidence has moved.
 
 ### 9. Worked Example: Share Generated Content Between Containers
 
@@ -680,6 +700,10 @@ k exec single-config-file -- cat /etc/app/config.yaml
 
 When a CKAD task mentions files, pause long enough to classify the file before writing YAML. The storage choice is usually clear once you identify lifecycle, visibility, mutability, and security. This short design pass prevents most false starts.
 
+Lifecycle is the first filter because it removes the most options. If the data must survive Pod deletion and follow the workload across nodes, a PersistentVolumeClaim is the fit in this module. If the data may vanish with the Pod, `emptyDir` or the container filesystem are both candidates. Visibility then narrows the choice, because only a Pod volume can be shared between containers.
+
+Mutability and security come next. Ask whether the process writes to the path or only reads from it. Configuration and credentials are read-only inputs, so mount them with `readOnly: true` and keep writable data on a separate path. Then ask which containers truly need each input. A Secret mounted into a sidecar that never reads it widens exposure without adding value.
+
 | File Need | Strong Default | Reasoning Shortcut | Red Flag |
 |---|---|---|---|
 | Temporary scratch data for one Pod | `emptyDir` | Data can disappear with the Pod. | Requirement says data must survive replacement. |
@@ -690,6 +714,10 @@ When a CKAD task mentions files, pause long enough to classify the file before w
 | Node filesystem inspection | `hostPath` | The node path itself is the target. | Used as a shortcut for normal application persistence. |
 
 This checklist also keeps assessment aligned with real work. A senior developer does not memorize volume types in isolation; they map failure modes to lifecycle contracts by asking what happens first when something disappears. If the consequence of losing the file is harmless, do not over-engineer. If the consequence is data loss, do not hide behind a restartable Pod abstraction.
+
+Use the checklist in both directions. When you write a manifest, it tells you which source fits each path. When you review a manifest someone else wrote, it tells you which red flag to look for first. An `emptyDir` holding user uploads, or a writable Secret mount, is a design smell even when the Pod runs cleanly today.
+
+Under exam time pressure, this pass should take seconds rather than minutes. Read the task sentence that describes the file and note its lifecycle words, such as temporary, shared, survive, or restart. Those words usually decide the source before you open an editor. Spend the time you save on names and paths, because those fields cause most failures in the debug table.
 
 ---
 
@@ -960,3 +988,7 @@ Continue to the [Part 1 Cumulative Quiz](../part1-cumulative-quiz/) to practice 
 - [v1-35.docs.kubernetes.io: persistent volumes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/persistent-volumes/) — The Persistent Volumes concept page directly defines PVCs as storage requests and documents PVCs and Pods as separate resources with separate lifecycles.
 - [kubernetes.io: persistent volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) — The Persistent Volumes concept page directly says unmatched claims remain unbound and documents dynamic provisioning as the alternative when a matching static volume does not exist.
 - [v1-35.docs.kubernetes.io: security context](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/security-context/) — The Kubernetes security-context task page directly states that `fsGroup` changes ownership and permissions on supported volumes and that this can slow startup for large volumes.
+- [kubernetes.io: secrets](https://kubernetes.io/docs/concepts/configuration/secret/) — The Secret concept page defines a Secret as a small amount of sensitive data and warns that Secrets are stored unencrypted in etcd by default, which supports the module's point that a Secret volume is only one layer of a secrets strategy.
+- [v1-35.docs.kubernetes.io: volumes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/volumes/) — The v1.35 volumes concept page states that `emptyDir` data is safe across container crashes but deleted permanently when the Pod is removed from its node, and that a crashed container restarts with a clean state.
+- [v1-35.docs.kubernetes.io: projected volumes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/projected-volumes/) — The v1.35 projected volumes page lists ConfigMap, Secret, Downward API, and service account token among the projectable sources, and states that a projected source mounted with `subPath` does not receive updates.
+- [kubernetes.io: downward API volume task](https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/) — The Downward API volume task page shows a `fieldRef` with `fieldPath: metadata.labels` writing Pod labels to a file, which is the mechanism the projected example uses for `pod/labels`.
