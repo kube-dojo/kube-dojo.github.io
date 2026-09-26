@@ -590,7 +590,7 @@ D) Delete the three Pods so the ReplicaSet recreates them, because a fresh sched
 <details>
 <summary>Answer</summary>
 
-B is correct because the Events from `kubectl describe pod` distinguish a scheduling failure from setup work such as an image pull or volume mount, so they tell you which stage is holding the Pod. A is wrong because the container has not started, so there are usually no application logs to read. C is wrong because the usual `Pending` causes are resources, taints, selectors, affinity, PVC binding, or the scheduler itself, and cluster DNS is not part of that placement decision. D is wrong because the ReplicaSet recreates Pods from the same template, so the replacements hit the same scheduling constraint.
+B is correct because the Events from `kubectl describe pod` distinguish a scheduling failure from setup work such as an image pull or volume mount, so they tell you which stage is holding the Pod. A is wrong because the container has not started, so there are usually no application logs to read. C is wrong because the usual `Pending` causes are resources, taints, selectors, affinity, PVC binding, or the scheduler itself, and cluster DNS is not part of that placement decision. D is wrong because the ReplicaSet recreates Pods from the same template, so the replacements meet the same failure, and Events should identify whether that failure is scheduling or a later setup step such as an image pull.
 
 Start with `kubectl describe pod <pod-name>` and read the Events section, because a `Pending` Pod may still be waiting for a node, or it may already be scheduled and waiting on an image download or a volume. Container logs are unlikely to exist while the Pod is still in that stage.
 
