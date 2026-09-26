@@ -90,7 +90,16 @@ The resource chain is easiest to debug when you keep the objects in order. A Sto
 +-------------------+      +-------------------+
 ```
 
-Pause and predict: if a PVC is created in the `frontend` namespace and a Pod in the `backend` namespace uses the same claim name, what object lookup does the kubelet attempt? The PV is cluster-scoped, but the Pod never mounts a PV directly. It references a PVC in its own namespace, so the namespace boundary remains part of the storage contract even after a cluster-scoped PV has been bound.
+**Pause and predict:** if a PVC is created in the `frontend` namespace and a Pod in the `backend` namespace uses the same claim name, what object lookup does the kubelet attempt?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+The kubelet attempts to find a claim matching that name inside the Pod's local namespace. The PV is cluster-scoped, but the Pod never mounts a PV directly. It references a PVC in its own namespace, so the namespace boundary remains part of the storage contract even after a cluster-scoped PV has been bound.
+
+</details>
+
+Write down your diagnostic expectation before revealing the explanation, then consider how workload declarations resolve storage dependencies within their own isolated administrative boundaries and prevent cross-project resource borrowing.
 
 ## Defining Volumes, Claims, and Binding Rules
 
@@ -406,7 +415,16 @@ volumes:
     readOnly: true                     # Mount as read-only
 ```
 
-Pause and predict: you create a Deployment with three replicas, each mounting the same PVC with access mode `ReadWriteOnce`. Replica one starts on `node-1`. What happens when replica two is scheduled to `node-2`, and would `ReadWriteOncePod` make the sharing problem better or worse? RWO permits one node, while RWOP intentionally narrows the writer to one Pod, so RWOP is stricter and does not make a shared multi-replica writer design work.
+**Pause and predict:** you create a Deployment with three replicas, each mounting the same PVC with access mode `ReadWriteOnce`. Replica one starts on `node-1`. What happens when replica two is scheduled to `node-2`, and would `ReadWriteOncePod` make the sharing problem better or worse?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+Replica two cannot attach or mount the storage while replica one is running on a different machine. RWO permits one node, while RWOP intentionally narrows the writer to one Pod, so RWOP is stricter and does not make a shared multi-replica writer design work.
+
+</details>
+
+Record your operational reasoning before expanding the solution, then evaluate how access mode flags constrain multi-replica application architectures across distributed hosting infrastructure.
 
 Selectors make static binding more deliberate. A PVC selector is not a scheduling selector and does not choose a node; it chooses eligible PV objects by label. This is useful when an administrator publishes several manual PVs with different performance or environment labels. The claim can then request `type: ssd` and `speed: fast` without hard-coding the PV name, preserving some flexibility while avoiding accidental binding to cheaper storage.
 
@@ -842,7 +860,43 @@ kubectl get pv lab-pv
 # STATUS should be "Available"
 ```
 
-### Success Criteria
+### Card A — A Pod in another namespace can mount a PVC by using the same claim name.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** PersistentVolumeClaims are namespaced objects; a Pod can only mount a claim residing in its own namespace. **Next action:** create or reference a PVC in the same namespace as the consuming Pod, or deploy the Pod into the namespace containing the target claim.
+
+</details>
+
+### Card B — ReadWriteOnce lets every replica mount the volume on a different node.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** ReadWriteOnce permits volume mounting as read-write by only a single node at a time. **Next action:** verify node placement for replicas or migrate to a ReadWriteMany volume when multiple nodes must mount the same storage simultaneously.
+
+</details>
+
+### Card C — ReadWriteOncePod is how three replicas share one volume.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** ReadWriteOncePod restricts read-write access to a single Pod across the entire cluster, preventing sharing among multiple replicas. **Next action:** use ReadWriteMany if replicas require shared access, or supply each replica with its own distinct PersistentVolumeClaim.
+
+</details>
+
+### Card D — The Pod mounts the PersistentVolume directly, so the claim namespace does not matter.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** Pods cannot reference cluster-scoped PersistentVolumes directly in their volume specifications; they must reference a namespaced PersistentVolumeClaim. **Next action:** define a PersistentVolumeClaim in the Pod's namespace that binds to the PersistentVolume, then reference that claim by name in the Pod spec.
+
+</details>
+
+**Success Criteria**: Confirm the persistent volume creation, claim binding, pod data persistence, and retained volume lifecycle demonstrated in this lab. Verify that each checklist step below matches your observed cluster state.
 
 - [ ] PV created and shows `Available`.
 - [ ] PVC created in `pv-lab` and binds to `lab-pv`.
