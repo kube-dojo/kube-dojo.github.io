@@ -99,7 +99,7 @@ The kubelet attempts to find a claim matching that name inside the Pod's local n
 
 </details>
 
-Write down your diagnostic expectation before revealing the explanation, then consider how workload declarations resolve storage dependencies within their own isolated administrative boundaries and prevent cross-project resource borrowing.
+The next section is dedicated to volume specifications, access modes, capacity allocations, and the declarative reconciliation rules that govern cluster storage.
 
 ## Defining Volumes, Claims, and Binding Rules
 
