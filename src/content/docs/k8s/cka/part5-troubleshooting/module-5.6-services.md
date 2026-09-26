@@ -102,7 +102,7 @@ A Service object describes intention, but it does not by itself prove that traff
 <details>
 <summary>Check your prediction</summary>
 
-Only clients on that node should lose ClusterIP access, because kube-proxy programs Service rules locally on each node, and a crashed agent leaves that node's rules missing or stale while other nodes keep translating traffic. Confirm the scope by sending the same request from client pods on two different nodes before you change the Service manifest.
+Clients on that node may lose ClusterIP access, but kernel Service rules already installed can keep forwarding until they become stale. kube-proxy programs those rules locally, so other nodes can keep translating. Confirm the scope by sending the same request from client pods on two different nodes before you change the Service manifest.
 
 </details>
 
@@ -928,7 +928,7 @@ curl -H "Host: <hostname>" http://<ingress-ip>
 <details>
 <summary>Reveal Card A</summary>
 
-**False.** kube-proxy programs Service rules on each node separately, so a crash on one node affects clients scheduled there. Pods on other nodes keep their own rules, so compare the same request from client pods on two different nodes.
+**False.** kube-proxy programs Service rules on each node separately. A crash on one node can affect clients scheduled there, but rules already installed can keep forwarding until they become stale. Compare the same request from client pods on two different nodes instead of assuming every client failed.
 
 </details>
 
@@ -959,7 +959,7 @@ curl -H "Host: <hostname>" http://<ingress-ip>
 
 </details>
 
-**Success Criteria**: Confirm the Service name, the selector match, the node-port evidence, and why a wrong targetPort is not an empty endpoint list.
+**Success Criteria**: Confirm the Service name, the selector match, the node-port evidence, and why a wrong numeric targetPort is not an empty endpoint list.
 
 - [ ] Created and tested a ClusterIP Service by name and EndpointSlice list.
 - [ ] Identified and fixed a selector mismatch by comparing Service selectors to pod labels.
