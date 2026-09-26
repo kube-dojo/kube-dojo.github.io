@@ -88,7 +88,16 @@ kubectl get crd | grep snapshot
 kubectl get pods -n kube-system | grep snapshot
 ```
 
-Pause and predict: if `kubectl get crd | grep snapshot` returns nothing, will creating a `VolumeSnapshot` fail at admission time, or will it create an object that never becomes ready? The answer depends on how far the request gets. Without the CRDs, the API server does not recognize the kind at all. With CRDs present but no controller or driver support, the object may exist while status never reaches `readyToUse: true`.
+**Pause and predict:** if `kubectl get crd | grep snapshot` returns nothing, will creating a `VolumeSnapshot` fail at admission time, or will it create an object that never becomes ready?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+Without the snapshot CRDs, the API server does not recognize the kind, so the object is not created. With the CRDs present but no controller, the object can be stored and stays unready because nothing reconciles it.
+
+</details>
+
+Write down which of those two outcomes you expect before you open the note, then carry that distinction into the class and driver contracts in the next section.
 
 The snapshot controller is responsible for the Kubernetes lifecycle, but it is not the storage backend. The CSI snapshotter sidecar talks to the CSI driver, and the driver talks to the storage system. When a snapshot fails, separate these layers in your head: API recognition, controller reconciliation, driver capability, backend permissions, and source volume state. That layered model prevents random edits and gives you a short diagnostic path during the CKA exam.
 
@@ -225,7 +234,16 @@ status:
   error:                                  # If failed, error message here
 ```
 
-Pause and predict: you take a snapshot of a `50Gi` PVC that only has `2Gi` of data written. When you restore from this snapshot, must the new PVC request `50Gi`, or can it request just `2Gi`? The operational clue is `restoreSize`, not the amount of application data you believe exists. Storage systems restore volume shape as well as files, so the destination claim must satisfy the snapshot's required size.
+**Pause and predict:** you take a snapshot of a `50Gi` PVC that only has `2Gi` of data written. When you restore from this snapshot, must the new PVC request `50Gi`, or can it request just `2Gi`?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+The new PVC must satisfy `restoreSize`, not the amount of application data written in the volume. Storage systems restore the volume shape as well as the files, so a claim that only covers the written data can be rejected.
+
+</details>
+
+Decide which request you would submit before you open the note, then use that choice when you read the restore manifest and the pending claim events that follow.
 
 Snapshot timing deserves the same care as status reading. For a simple file workload, a crash-consistent snapshot may be adequate because the filesystem can replay metadata and the application can tolerate the state. For a database, message queue, or object store, a snapshot taken while writes are in flight may require recovery, lose acknowledged-but-unflushed data, or fail application checks after restore. The Kubernetes object gives you a point in time; your workload procedures decide whether that point is safe.
 
@@ -837,7 +855,43 @@ The reader pod should print the original `Important data created at` line, not `
 
 </details>
 
-### Success Criteria
+### Card A — Without snapshot CRDs, a VolumeSnapshot object is created and stays unready.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** missing snapshot CRDs mean the API server does not recognize the kind, so the object is not created and cannot stay unready. An unready object appears only after the kind is accepted and no controller finishes it. **Next action:** if apply reports an unknown kind, install the snapshot CRDs; if the object already exists, inspect the snapshot controller and the CSI driver.
+
+</details>
+
+### Card B — A 50Gi snapshot that holds 2Gi of data can be restored into a 2Gi PVC.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** the written application data is not the restore requirement. The new PVC must satisfy `restoreSize`, which reports the volume that was snapshotted, so a 2Gi claim does not satisfy a 50Gi snapshot. **Next action:** read `.status.restoreSize` and request at least that much storage on the new claim.
+
+</details>
+
+### Card C — restoreSize is the amount of application data written in the volume.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** `restoreSize` is the capacity the restored volume must request, not the number of bytes the application wrote. **Next action:** read `.status.restoreSize` and size the new PVC to that value rather than to filesystem usage.
+
+</details>
+
+### Card D — Installing the snapshot CRDs is enough for readyToUse to become true.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** installing the snapshot CRDs only lets the API server store the object. `readyToUse` becomes true only after a snapshot controller and a capable CSI driver finish the snapshot. **Next action:** confirm the controller is running and the VolumeSnapshotClass driver matches the source volume, then describe the snapshot.
+
+</details>
+
+**Success Criteria**: Confirm the snapshot class, the usable snapshot, the bound restore claim, the original file, and why a clone would not repair this corruption.
 
 - [ ] VolumeSnapshotClass created or confirmed with the correct CSI driver.
 - [ ] VolumeSnapshot shows `readyToUse: true`.
