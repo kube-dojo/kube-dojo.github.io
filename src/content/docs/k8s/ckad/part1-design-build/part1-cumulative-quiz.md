@@ -61,7 +61,7 @@ The process can fail after the pull succeeds. Dockerfile `ENTRYPOINT` provides t
 
 This distinction matters during time-boxed work because both image and command mistakes may leave a Pod unready, yet their evidence differs. If events show the image never arrived, editing `args` cannot help. If the image pulled and the container exited with an executable error, changing registry credentials cannot help. Read the stage, then change the field that controls that stage. A correct diagnosis is a narrower, faster edit than a broad manifest rewrite.
 
-**Pause and predict:** A Pod names a valid image whose Dockerfile starts `python worker.py`. Its Kubernetes spec changes only `command` to `["check.py"]`, and the container exits with an executable error. Which field would you edit to keep Python as the executable while running `check.py`?
+**Pause and predict:** A Pod names a valid image with `ENTRYPOINT ["python"]` and `CMD ["worker.py"]` in its Dockerfile. Its Kubernetes spec changes only `command` to `["check.py"]`, and the container exits with an executable error. Which field would you edit to keep Python as the executable while running `check.py`?
 
 <details>
 <summary>Prediction answer</summary>
@@ -160,7 +160,7 @@ kubectl exec report-web -c web -- cat /usr/share/nginx/html/report.txt
 
 A directory mount hides files the image already had at that path. That behavior matters when an image includes default configuration or web assets. Mounting a ConfigMap at `/etc/app` does not merge new keys with image files already under `/etc/app`; the mounted directory becomes the view the process sees. If one configuration file must appear alongside image defaults, choose a precise file mount and accept the update tradeoff. Module 1.4 explains that a ConfigMap or Secret mounted through `subPath` does not receive live updates the way an ordinary projected directory mount does.
 
-ConfigMap and Secret volumes both expose key-value data as files, but their intended contents differ. A ConfigMap holds ordinary configuration, while a Secret holds sensitive values such as credentials. In either case, a missing referenced object can leave the container in `ContainerCreating`; inspect Pod events for the missing name before editing the image. A present object with an incorrect key or mount path can instead let the container start with the wrong files, so check both the resource and the filesystem view. Do not assume “Pod has a volume” means “the right container sees the right key.”
+ConfigMap and Secret volumes both expose key-value data as files, but their intended contents differ. A ConfigMap holds ordinary configuration, while a Secret holds sensitive values such as credentials. In either case, a missing referenced object can leave the container in `ContainerCreating`; inspect Pod events for the missing name before editing the image. If a volume's `items` lists a key absent from the object, and its reference is not `optional: true`, the mount also fails: the container stays `ContainerCreating`, and an event names the missing key. When the whole object is mounted as a directory instead, an app may expect a key that the object lacks; the container can start without that file. Check both Pod events and the container's filesystem view to distinguish these cases. Do not assume “Pod has a volume” means “the right container sees the right key.”
 
 A PVC introduces another failure point before the container can start. If no matching volume or provisioner binds the claim, the PVC remains `Pending` and a Pod using it remains blocked. Check `kubectl get pvc` and `kubectl describe pvc` alongside Pod events. Changing the web container's command cannot bind the claim. Likewise, changing an `emptyDir` mount cannot make a PVC's data appear. Identify whether the problem is the requested source, the claim binding, or the container mount before modifying the manifest.
 
@@ -223,13 +223,13 @@ A Pod intended to use `registry.example.test/team/report:v2` is in `ImagePullBac
 
 A) Inspect the Pod image field and registry event, then correct the required tag to one confirmed available in that registry.
 B) Set Kubernetes `args` to the script name so the image's entrypoint can run after the next restart.
-C) Increase the Job's `backoffLimit` so the node keeps trying to pull the same missing tag.
+C) Set `imagePullPolicy: Always` so each attempt pulls the same missing tag from the registry again.
 D) Mount an `emptyDir` at the application's output directory so the image can start writing files.
 
 <details>
 <summary>Answer and reasoning</summary>
 
-**Correct: A.** The image has not arrived, so its reference and the pull event are the relevant evidence because resolution failed before startup. B) changes process arguments only after a pull succeeds. C) changes Job retry behavior without making a missing registry tag exist. D) changes file storage after startup and cannot repair image resolution. Confirm the available required version before editing; `latest` is not an evidence-based substitute.
+**Correct: A.** The image has not arrived, so its reference and the pull event are the relevant evidence because resolution failed before startup. B) changes process arguments only after a pull succeeds. C) requests another pull but cannot make a missing registry tag exist. D) changes file storage after startup and cannot repair image resolution. Confirm the available required version before editing; `latest` is not an evidence-based substitute.
 
 </details>
 
@@ -240,12 +240,12 @@ An image declares `ENTRYPOINT ["python"]` and `CMD ["worker.py"]`. A Pod should 
 A) Set `command: ["check.py"]` and leave `args` unset so Kubernetes keeps the image's Python entrypoint.
 B) Set `args: ["check.py"]` and leave `command` unset so Kubernetes keeps the image's Python entrypoint.
 C) Set `image: python:latest` and leave both process fields unset so the registry chooses the script.
-D) Set `backoffLimit: 2` on the Pod so the old `worker.py` command eventually changes.
+D) Set `command: ["python"]` and leave `args` unset, relying on the image's default arguments.
 
 <details>
 <summary>Answer and reasoning</summary>
 
-**Correct: B.** Kubernetes `args` overrides the image's `CMD` while preserving its `ENTRYPOINT`. A) is wrong because `command` overrides `ENTRYPOINT` and attempts to execute `check.py` directly. C) changes the image, not the script argument, and its `latest` tag carries no guarantee about this application. D) is a Job-level retry concept and cannot change a Pod process definition.
+**Correct: B.** Kubernetes `args` overrides the image's `CMD` while preserving its `ENTRYPOINT`. A) is wrong because `command` overrides `ENTRYPOINT` and attempts to execute `check.py` directly. C) changes the image, not the script argument, and its `latest` tag carries no guarantee about this application. D) keeps the default `worker.py` script instead of selecting `check.py`.
 
 </details>
 
@@ -317,7 +317,7 @@ D) The forwarding helper is a Job, and the metric translator is a CronJob becaus
 
 A web image includes several default files under `/usr/share/nginx/html`. A developer mounts a ConfigMap at that entire directory to add one file, and the defaults disappear. The added file rarely changes. Which correction best preserves the defaults?
 
-A) Keep the directory mount and raise the Pod's `backoffLimit` so the hidden files reappear after retries.
+A) Keep the directory mount but make it read-only so the image defaults stay visible beside the ConfigMap file.
 B) Replace the ConfigMap with an `emptyDir` at the same directory, because it merges image files with volume files.
 C) Use a precise `subPath` file mount for the added key, and accept that the mounted file will not receive ordinary live ConfigMap updates.
 D) Use a `ReadWriteOnce` PVC at the same directory, because node-scoped mounting restores the hidden image files.
@@ -325,7 +325,7 @@ D) Use a `ReadWriteOnce` PVC at the same directory, because node-scoped mounting
 <details>
 <summary>Answer and reasoning</summary>
 
-**Correct: C.** A directory mount hides existing image files, while a precise file mount can preserve neighboring paths because it targets only the added file. A) changes an unrelated Job retry field and leaves the overlay unchanged. B) and D) still mount over the directory and do not merge image defaults. The `subPath` tradeoff matters: choose it only when preserving the directory is worth losing ordinary live projected updates for that file.
+**Correct: C.** A directory mount hides existing image files, while a precise file mount can preserve neighboring paths because it targets only the added file. A) makes the volume read-only but still hides the image defaults. B) and D) also mount over the directory and do not merge image defaults. The `subPath` tradeoff matters: choose it only when preserving the directory is worth losing ordinary live projected updates for that file.
 
 </details>
 
@@ -333,15 +333,15 @@ D) Use a `ReadWriteOnce` PVC at the same directory, because node-scoped mounting
 
 A Pod references a PVC and a Secret volume. The PVC is `Pending`, and the Pod has not started. A teammate claims `ReadWriteOnce` will lock the file after startup. Which response best follows the evidence?
 
-A) Change the image tag to `latest`, because a newer image can bind an existing PVC and lock its files.
-B) Change the Secret mount to `subPath`, because it automatically provisions storage for an unbound PVC.
-C) Increase the Job's `backoffLimit`, because retries can turn `ReadWriteOnce` into exclusive file locking.
+A) Fix the Secret volume first, because a Secret mount is the likely reason this Pod has not started.
+B) Delete and recreate the Pod so a fresh Pod can retry binding the same pending PVC.
+C) Switch the claim to `ReadWriteMany` to settle the concern about concurrent writers and file locking.
 D) Inspect PVC status and events for the binding failure; treat `ReadWriteOnce` as node mounting, not a file lock.
 
 <details>
 <summary>Answer and reasoning</summary>
 
-**Correct: D.** The unbound PVC blocks the Pod, so claim status and events are the first evidence to inspect because storage binding precedes container startup. `ReadWriteOnce` describes node mounting rather than process-level file locking. A) changes an image without addressing binding. B) changes how a Secret file is mounted, not whether a PVC binds. C) concerns Job retries and cannot alter a claim's access semantics.
+**Correct: D.** The unbound PVC blocks the Pod, so claim status and events are the first evidence to inspect because storage binding precedes container startup. `ReadWriteOnce` describes node mounting rather than process-level file locking. A) investigates the Secret before the known pending claim. B) recreates the Pod without diagnosing why that claim cannot bind. C) changes the requested access mode without proving the storage supports it, and `ReadWriteMany` does not provide a file lock either.
 
 </details>
 
