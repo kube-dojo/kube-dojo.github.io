@@ -57,7 +57,7 @@ kubectl describe pod report-web
 kubectl get pod report-web -o jsonpath='{.spec.containers[0].image}'
 ```
 
-The process can fail after the pull succeeds. Dockerfile `ENTRYPOINT` provides the executable, and `CMD` provides its default arguments in the model taught by Module 1.1. Kubernetes `command` overrides the image `ENTRYPOINT`, while Kubernetes `args` overrides the image `CMD`. Suppose an image declares `ENTRYPOINT ["python"]` and `CMD ["worker.py"]`. To run a different script with the same Python executable, set `args: ["check.py"]`; setting `command: ["check.py"]` asks the runtime to execute that file directly.
+The process can fail after the pull succeeds. Dockerfile `ENTRYPOINT` provides the executable, and `CMD` provides its default arguments in the model taught by Module 1.1. Kubernetes `command` overrides the image `ENTRYPOINT`, while Kubernetes `args` overrides the image `CMD`. Setting `command` without `args` also discards the image `CMD`. Suppose an image declares `ENTRYPOINT ["python"]` and `CMD ["worker.py"]`. To run a different script with the same Python executable, set `args: ["check.py"]`; setting `command: ["check.py"]` asks the runtime to execute that file directly.
 
 This distinction matters during time-boxed work because both image and command mistakes may leave a Pod unready, yet their evidence differs. If events show the image never arrived, editing `args` cannot help. If the image pulled and the container exited with an executable error, changing registry credentials cannot help. Read the stage, then change the field that controls that stage. A correct diagnosis is a narrower, faster edit than a broad manifest rewrite.
 
@@ -245,7 +245,7 @@ D) Set `command: ["python"]` and leave `args` unset, relying on the image's defa
 <details>
 <summary>Answer and reasoning</summary>
 
-**Correct: B.** Kubernetes `args` overrides the image's `CMD` while preserving its `ENTRYPOINT`. A) is wrong because `command` overrides `ENTRYPOINT` and attempts to execute `check.py` directly. C) changes the image, not the script argument, and its `latest` tag carries no guarantee about this application. D) keeps the default `worker.py` script instead of selecting `check.py`.
+**Correct: B.** Kubernetes `args` overrides the image's `CMD` while preserving its `ENTRYPOINT`. A) is wrong because `command` overrides `ENTRYPOINT` and attempts to execute `check.py` directly. C) changes the image, not the script argument, and its `latest` tag carries no guarantee about this application. D) is wrong because setting `command: ["python"]` without `args` discards the image's `CMD` as well as its `ENTRYPOINT`, starting bare Python with neither `worker.py` nor `check.py`.
 
 </details>
 
