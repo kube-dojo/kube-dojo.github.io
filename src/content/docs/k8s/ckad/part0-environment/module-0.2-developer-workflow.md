@@ -1066,7 +1066,7 @@ Success criteria for Part 4:
 
 **Part 5: Extract exact fields with JSONPath**
 
-Use JSONPath for answer-file style tasks. This part trains precision. Do not copy values manually from `describe`.
+Use JSONPath for answer-file style tasks. This part trains precision. Do not copy values manually from `describe`, because hand-copied output can pick up extra spacing, a neighboring field, or another container's value, which is exactly the mistake a name-based filter prevents.
 
 ```bash
 k get pod webapp -o jsonpath="{.spec.containers[?(@.name=='logger')].image}" > /tmp/logger-image.txt
@@ -1090,7 +1090,7 @@ Create a ConfigMap and a Pod that consumes it as environment variables. This par
 k create cm app-config --from-literal=MODE=prod --from-literal=LOG_LEVEL=debug
 ```
 
-Create `env-demo.yaml` with the following content.
+Create `env-demo.yaml` with the following content. Notice that `envFrom` sits inside the `app` container entry rather than beside `containers`, because environment variables are injected into one container process, not into the Pod as a whole.
 
 ```yaml
 apiVersion: v1
@@ -1107,7 +1107,7 @@ spec:
         name: app-config
 ```
 
-Apply and verify from inside the running container.
+Apply and verify from inside the running container. A ConfigMap that exists and a Pod that reaches Ready still do not prove the variables were injected; only `printenv` inside the container shows what the process actually received.
 
 ```bash
 k apply --dry-run=server -f env-demo.yaml
@@ -1140,7 +1140,7 @@ Success criteria for Part 7:
 - [ ] Job `report` exists and reaches `Complete`.
 - [ ] `k logs job/report` prints `daily report complete`.
 - [ ] You can explain why a Job is different from a plain Pod running the same command.
-- [ ] You know which command to use if the Job fails and you need to inspect the created Pod.
+- [ ] You can explain how you would debug a failed Job: find its Pods with `k get pods -l job-name=report`, then read the failure from `k describe pods -l job-name=report` events and `k logs job/report`.
 
 **Part 8: Clean up deliberately**
 
@@ -1234,7 +1234,7 @@ k config set-context --current --namespace=multi-drill
 k run multi --image=nginx $kdr > /tmp/multi.yaml
 ```
 
-Edit `/tmp/multi.yaml` so it contains a second container.
+Edit `/tmp/multi.yaml` so it contains a second container. Copy the existing container block and change its name, image, and command, so the new `- name:` line aligns with the first container instead of being retyped from memory.
 
 ```yaml
 apiVersion: v1
@@ -1252,7 +1252,7 @@ spec:
     command: ["sleep", "3600"]
 ```
 
-Apply and verify.
+Apply and verify. Server dry-run checks the edited manifest before anything is created, the JSONPath query proves both container names reached the API server, and `k exec -c sidecar` confirms you can target the second container by name.
 
 ```bash
 k apply --dry-run=server -f /tmp/multi.yaml
@@ -1285,7 +1285,7 @@ k get svc api
 k get endpointslices -l kubernetes.io/service-name=api
 ```
 
-Now repair the selector and verify traffic.
+Now repair the selector and verify traffic. Patching the selector back to `app: api` should make the EndpointSlice list the Deployment's Pod address again, and that backend evidence is what makes the in-cluster `wget` worth running.
 
 ```bash
 k patch svc api -p '{"spec":{"selector":{"app":"api"}}}'
@@ -1332,7 +1332,7 @@ Success criteria:
 
 ### Drill 7: Complete Developer Workflow (Target: 10 minutes)
 
-Simulate a compact CKAD task from start to finish. Create a namespace, build a Deployment, expose it, mount ConfigMap data into a separate Pod, extract an answer file, and clean up only after verification.
+Simulate a compact CKAD task from start to finish. Create a namespace, build a Deployment, expose it, load ConfigMap data into a separate Pod as environment variables, extract an answer file, and clean up only after verification.
 
 ```bash
 k create ns full-drill
@@ -1346,7 +1346,7 @@ k get endpointslices -l kubernetes.io/service-name=site
 k create cm site-config --from-literal=SITE_MODE=practice
 ```
 
-Create `site-env.yaml`.
+Create `site-env.yaml`. Its `envFrom` block loads every key from `site-config` into the `checker` container, so `SITE_MODE` becomes an environment variable you can check from inside that container.
 
 ```yaml
 apiVersion: v1
@@ -1363,7 +1363,7 @@ spec:
         name: site-config
 ```
 
-Apply, verify, and extract.
+Apply, verify, and extract. Each command proves a different claim from the task: `printenv` shows the ConfigMap value reached the container, the BusyBox Pod proves in-cluster HTTP through the Service, and JSONPath writes the exact image to the answer file.
 
 ```bash
 k apply --dry-run=server -f site-env.yaml
