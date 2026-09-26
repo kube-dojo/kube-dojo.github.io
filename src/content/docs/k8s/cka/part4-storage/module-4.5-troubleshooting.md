@@ -459,7 +459,7 @@ kubectl describe node <node-name> | grep -A8 Conditions
 <details>
 <summary>Reveal the prediction</summary>
 
-You must prove the old pod and node state before performing any force-deletion, confirming whether the previous host is partitioned, drained, or powered down so two writers never access the disk concurrently. After the workload recovers, run an application-level integrity check or database consistency scan to verify that no corruption or half-written records occurred during the disruption.
+You must prove the old writer has stopped before any force-deletion. A host that is only partitioned or unreachable can still have the filesystem open, and a Ready node is the dangerous case. Proceed only when the process has terminated, or the node is NotReady and has been fenced or powered down. After the workload recovers, run an application-level integrity check to verify that no half-written records remain.
 </details>
 
 Consider how you would defend this cautious operational sequence during an escalation before reading the next section on storage quotas.
