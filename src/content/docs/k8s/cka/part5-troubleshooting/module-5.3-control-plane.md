@@ -1149,7 +1149,7 @@ Use the explicit-kubeconfig/context API baseline above. Record liveness and read
 <details>
 <summary>Reveal the failure layer and next action</summary>
 
-**False. Failure layer:** the mirror pod is the kubelet's report of a node-local manifest, not the configuration itself. After a restart the kubelet recreates the pod from the file under `/etc/kubernetes/manifests`, so an API-side edit does not persist. **Next action:** preserve a backup copy, make the change in the node-local manifest, then confirm the recreated container with `crictl` and the updated mirror pod through the API.
+**False. Failure layer:** the mirror pod is the kubelet's report of a node-local manifest, not the configuration itself. After a restart the kubelet recreates the pod from the file under `/etc/kubernetes/manifests`, so an API-side edit does not persist. **Next action:** treat the node-local manifest as the durable source, and do not edit it until a separate recovery contract covers protection and reversal. Confirm any later recreation with `crictl` and the updated mirror through the API.
 
 </details>
 
