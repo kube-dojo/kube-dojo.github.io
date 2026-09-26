@@ -141,7 +141,15 @@ kubectl get csinode
 
 CSI logs are powerful, but they are not the first stop for every issue. Go there when events mention external provisioning, driver names, attach failures, or backend API errors. In managed clusters, the CSI controller and node plugin may be installed outside your application namespace, so the namespace and container name matter when you fetch logs.
 
-Pause and predict: if a pod is stuck in `ContainerCreating`, but the referenced PVC is already `Bound`, which two stages of the pipeline have probably completed, and which stage should you inspect next?
+**Pause and predict:** if a pod is stuck in `ContainerCreating`, but the referenced PVC is already `Bound`, which two stages of the pipeline have probably completed, and which stage should you inspect next?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+Volume provisioning and claim binding have already succeeded, which confirms that the control plane satisfied the storage request. The next stage to investigate is the node level, specifically volume attachment to the host and filesystem mounting into the container runtime directory.
+</details>
+
+Commit your expected sequence to paper before expanding the explanation, then compare your diagnostic thinking with the step-by-step verification commands below.
 
 Exercise scenario: a learner reports that `kubectl get pvc` shows `Pending` and immediately asks whether the CSI driver is down. Before checking driver logs, first ask whether a pod is already consuming the claim and whether the StorageClass uses delayed binding. That one question can separate a real provisioning failure from the intended `WaitForFirstConsumer` design.
 
@@ -446,7 +454,15 @@ kubectl logs -n kube-system <csi-controller-pod> -c csi-provisioner
 kubectl describe node <node-name> | grep -A8 Conditions
 ```
 
-Stop and think: a pod is stuck in `ContainerCreating` and the event says `Multi-Attach error`. You know the volume is `ReadWriteOnce`. Before force-deleting the old pod, what evidence would convince you that the old writer is gone, and what application-level check should run after recovery?
+**Stop and think:** a pod is stuck in `ContainerCreating` and the event says `Multi-Attach error`. You know the volume is `ReadWriteOnce`. Before force-deleting the old pod, what evidence would convince you that the old writer is gone, and what application-level check should run after recovery?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+You must prove the old pod and node state before performing any force-deletion, confirming whether the previous host is partitioned, drained, or powered down so two writers never access the disk concurrently. After the workload recovers, run an application-level integrity check or database consistency scan to verify that no corruption or half-written records occurred during the disruption.
+</details>
+
+Consider how you would defend this cautious operational sequence during an escalation before reading the next section on storage quotas.
 
 ---
 
@@ -601,7 +617,15 @@ kubectl describe pvc my-pvc
 kubectl logs -n kube-system <csi-controller-pod> -c <driver-container>
 ```
 
-Pause and predict: a CSI controller pod is in `CrashLoopBackOff`, and logs say it failed to assume an IAM role. The StorageClass and PVC YAML did not change. Which Kubernetes object would you inspect first, and which external configuration would you verify after that?
+**Pause and predict:** a CSI controller pod is in `CrashLoopBackOff`, and logs say it failed to assume an IAM role. The StorageClass and PVC YAML did not change. Which Kubernetes object would you inspect first, and which external configuration would you verify after that?
+
+<details>
+<summary>Reveal the prediction</summary>
+
+You should inspect the driver controller's ServiceAccount first to verify that its identity metadata and workload identity annotations are intact. After validating the cluster configuration, check the external cloud IAM role, trust policy, and attached permission policies to confirm that credential issuance and trust relationships remain valid.
+</details>
+
+Reflect on how cloud authentication connects cluster identity to provider infrastructure permissions before proceeding to the error classification table below.
 
 ---
 
@@ -1142,7 +1166,43 @@ Use this checklist as the final artifact from the lab. It is intentionally writt
 □ Capacity issue? → Check quotas and storage backend
 ```
 
-### Success Criteria
+### Card A — A Bound PVC with the pod in ContainerCreating means provisioning has not started, so recreate the StorageClass.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** a `Bound` PVC proves provisioning and control-plane binding have already finished; the issue is downstream during node attachment or container volume mounting. Recreating the StorageClass cannot alter a claim that has already bound. **Next action:** describe the pod to inspect attach and mount events, and verify whether the volume is already attached elsewhere or waiting on the node plugin.
+
+</details>
+
+### Card B — A ReadWriteOnce Multi-Attach error is fixed by immediately force-deleting the old pod.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** force-deleting a pod does not detach the underlying disk from the original node, creating severe risk of simultaneous multi-node writes and filesystem corruption if that host is merely partitioned. **Next action:** check the old node and pod state, confirm the writer process has terminated, gracefully drain or detach through normal control-plane reconciliation, and verify data consistency after recovery.
+
+</details>
+
+### Card C — An IAM assume-role crash is diagnosed by editing the StorageClass, because that YAML must have changed.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** an IAM assume-role crash affects the CSI controller's identity and cloud credentials, not the StorageClass schema or parameters. Modifying the StorageClass cannot resolve driver authentication or permission failures. **Next action:** inspect the CSI controller's ServiceAccount annotations and verify the external cloud IAM role trust relationships and permission policies.
+
+</details>
+
+### Card D — CSI controller logs are the first stop for every storage failure, including a Pending PVC.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False. Failure layer:** checking driver logs first skips fundamental Kubernetes state and events, such as normal `WaitForFirstConsumer` delayed binding, namespace quotas, or mistyped claim parameters. **Next action:** describe the PVC and pod first to read the emitted events and status reasons; proceed to CSI controller logs only when events indicate external provisioner or driver communication errors.
+
+</details>
+
+**Success Criteria**: Verify each troubleshooting resolution using cluster events and state observations before concluding your exercise, ensuring you understand the diagnostic path across every storage layer.
 
 - [ ] Identified a StorageClass error from PVC events and corrected the claim to use a valid class for your cluster.
 - [ ] Identified a wrong PVC name from pod events and corrected the pod volume reference.
