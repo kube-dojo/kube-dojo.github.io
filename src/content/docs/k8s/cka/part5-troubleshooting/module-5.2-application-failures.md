@@ -127,7 +127,16 @@ kubectl --kubeconfig <kubeconfig> --context <context> get nodes --show-labels
 
 Kubelet preparation failures are often caused by dependencies that look small in YAML but are mandatory at runtime. A single misspelled Secret name can prevent an otherwise perfect image from starting. A PVC that is not bound can block the volume mount. A private image without a usable pull Secret can stop the process before your application code exists. The YAML may be syntactically valid while still describing a workload that cannot be materialized on the node.
 
-Pause and predict: if a Pod is stuck in `ContainerCreating` for several minutes and the application logs are empty, which external dependency is most likely blocking the transition from Pod specification to runnable container? Your answer should point to something kubelet must prepare before the process can exist, such as an image pull, a volume mount, a missing Secret, a missing ConfigMap, or a network setup failure.
+**Pause and predict:** if a Pod is stuck in `ContainerCreating` for several minutes and the application logs are empty, which external dependency is most likely blocking the transition from Pod specification to runnable container?
+
+<details>
+<summary>Check your prediction</summary>
+
+Kubelet is still preparing an image pull, a volume mount, a Secret, a ConfigMap, or network setup, so the process has not started. Empty application logs follow from that timing, because the main process does not exist yet and therefore has nothing to write.
+
+</details>
+
+Use the next command to test the prediction you just made, then match the message you find against the rows in the table that follows. A useful pause is one you can check against a concrete status line before you change the workload.
 
 ```bash
 # Always check Events first
@@ -193,7 +202,16 @@ The practical sequence is status, Events, current state, previous logs, and exit
 
 The order matters because each command answers a narrower question than the one before it. `kubectl get pod` tells you that a restart loop exists, but it does not prove why. `kubectl describe pod` tells you whether Kubernetes observed OOM, probe, or scheduling evidence. Previous logs tell you whether the application reported its own reason before exiting. Exit code then helps classify that reason without replacing the logs. Skipping directly to the last command produces brittle conclusions.
 
-Pause and predict: if a Pod has restarted many times but currently shows `Running`, where would you look for the failure that caused the earlier restart? The current logs may only show the newest process instance, so the stronger answer is previous logs plus the container's `lastState.terminated` details, with `-c` used when the Pod has multiple containers.
+**Pause and predict:** if a Pod has restarted many times but currently shows `Running`, where would you look for the failure that caused the earlier restart?
+
+<details>
+<summary>Check your prediction</summary>
+
+The failure is in previous logs and in `lastState.terminated`. The current process view can show only the newest instance, so the earlier exit is not what that view is displaying. Pass `-c` when the Pod has multiple containers so the command reads the container that actually exited.
+
+</details>
+
+Keep the place you named in mind while you read the five-step sequence that follows this pause. Work through that sequence in order before you decide which repair to attempt, and treat each step as evidence rather than as the fix itself.
 
 ```bash
 # Step 1: Check pod status and restart count
@@ -350,7 +368,16 @@ Configuration failures sit on the boundary between Kubernetes and the applicatio
 
 That boundary is the reason configuration problems can produce different visible states. A missing mounted ConfigMap can leave the Pod stuck during container creation, while a present ConfigMap with a missing application key can let the container start and crash. An optional key reference might allow startup with an empty or absent value, shifting the failure into application behavior. Good debugging asks whether Kubernetes rejected the dependency or the application rejected the data.
 
-Pause and predict: what Pod status would you expect if a Pod references a Secret that does not exist in the namespace? The answer depends on how the Secret is consumed, but the usual sign is a container-creation failure with Events saying the Secret could not be found, because kubelet cannot materialize the environment or mounted volume promised by the Pod spec.
+**Pause and predict:** what Pod status would you expect if a Pod references a Secret that does not exist in the namespace?
+
+<details>
+<summary>Check your prediction</summary>
+
+The usual sign is a container-creation failure whose Events say the Secret could not be found, because kubelet cannot materialize the environment or mounted volume promised by the Pod spec. The exact phase still depends on how the Secret is consumed.
+
+</details>
+
+Hold the status you expect while you read how declared inputs are checked in the same namespace. The commands that follow list those objects, and the paragraphs after them explain why two similar configuration mistakes can surface in different phases.
 
 The diagnosis begins by reading the Pod spec for declared inputs and then checking whether those objects exist in the same namespace. For mounted ConfigMaps and Secrets, the failure may appear as a volume setup error. For environment variables sourced through `valueFrom`, Kubernetes may block startup if a required key reference cannot be resolved unless the reference is optional.
 
@@ -1150,9 +1177,43 @@ The verifier requires the exact allocation marker, then compares Pod UID, contai
 
 </details>
 
-### Success Criteria
+### Card A: Empty application logs during ContainerCreating mean the process crashed after it started.
 
-Use these criteria to record verified results or unmet gates. The OOM comparison's matching samples roughly 15 seconds apart do not establish continuous health between samples or sustained stability. Do not count conceptual Secret, probe, init-container, or multi-container coverage as completed hands-on diagnosis.
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: empty application logs during ContainerCreating mean the process has not started, because kubelet is still preparing an image pull, a volume mount, a Secret, a ConfigMap, or network setup. Next action: read the Pod events for the dependency that is still being prepared, and do not treat the empty log stream as a crash after startup.
+
+</details>
+
+### Card B: A Running pod with many restarts is healthy, and its current logs are the failure.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: a Running pod with many restarts is not healthy merely because the current phase says Running, and the current logs belong to the newest process rather than the earlier failure. Next action: inspect previous logs and `lastState.terminated`, and pass `-c` to kubectl when the pod has multiple containers.
+
+</details>
+
+### Card C: A missing Secret always leaves the pod Running with empty environment variables.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: a missing Secret does not always leave the pod Running with empty environment variables. The usual sign is a container-creation failure whose Events say the Secret could not be found, because kubelet cannot materialize the environment or mounted volume promised by the Pod spec. Next action: confirm the named object exists in the same namespace before you change the application.
+
+</details>
+
+### Card D: A ConfigMap that exists but has the wrong key leaves the pod stuck in ContainerCreating the same way a missing ConfigMap does.
+
+<details>
+<summary>Reveal the failure layer and next action</summary>
+
+**False.** Failure layer: a ConfigMap that exists but has the wrong key does not leave the pod stuck in ContainerCreating the way a missing ConfigMap does. The object is present, so the container can start, and the application may then exit because it rejects the input. Next action: compare the keys the pod expects with the keys that exist, then recreate the pod if the process reads those values only at startup.
+
+</details>
+
+**Success Criteria**: Use these criteria to record verified results or unmet gates. The OOM comparison's matching samples roughly 15 seconds apart do not establish continuous health between samples or sustained stability. Do not count conceptual Secret, probe, init-container, or multi-container coverage as completed hands-on diagnosis.
 
 - [ ] Identify `crash-app` exit code `1` in terminated container state; inspect previous logs when available and record any missing evidence.
 - [ ] Create `crash-app-fixed`, verify it becomes Ready, and retain the original failed Pod for comparison.
