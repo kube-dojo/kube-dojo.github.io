@@ -91,6 +91,8 @@ A liveness probe should detect situations where the process is still present but
 
 A good liveness check is usually narrow. It should verify that the application runtime can make basic forward progress, not that every external dependency is perfect. If a downstream database is temporarily unavailable, restarting every application Pod may amplify the incident. In that case, readiness should usually fail so traffic drains, while liveness should continue to pass unless the process itself is stuck.
 
+Before choosing a liveness endpoint, name the failure that a fresh container would actually clear. A local deadlock might qualify because restarting rebuilds the process state. A shared database outage does not qualify because the replacement container will encounter the same unavailable database. This question helps separate recovery from repeated disruption. It also suggests what to verify later: an intentional liveness failure should produce a restart, followed by a container that can answer the same check. If the replacement immediately fails again, inspect the underlying condition instead of simply shortening the probe period.
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -120,6 +122,8 @@ A readiness probe answers a different question: can this Pod safely receive requ
 
 Readiness is where application-specific truth belongs. If the app requires a database connection before it can serve user requests, readiness may check that connection. If the app needs a local cache loaded before request latency is acceptable, readiness may stay false until the cache is warm. The goal is not to prove the process is alive; the goal is to avoid sending user traffic to a Pod that cannot handle it.
 
+Think about readiness across the entire request path. A process might answer a simple HTTP request while still loading the data needed for its normal operations. The readiness endpoint should represent the capability that matters to the Service's callers, with a check cheap enough to run repeatedly. When it fails, the container remains available for investigation and may become ready again without any restart. This makes readiness useful for temporary loss of a required dependency, but a check that follows every optional dependency can unnecessarily remove a Pod that could still serve useful requests.
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -143,13 +147,15 @@ spec:
       failureThreshold: 2
 ```
 
-If this readiness probe fails, `k get pod` may still show the Pod as `Running`, but the `READY` column will not show the container as ready. If a Service selects the Pod, endpoint membership changes as readiness changes. That is why readiness probes are central to zero-downtime rollouts: Kubernetes can wait for new Pods to become ready before sending them traffic.
+If this readiness probe fails, `kubectl get pod` may still show the Pod as `Running`, but the `READY` column will not show the container as ready. If a Service selects the Pod, endpoint membership changes as readiness changes. That is why readiness probes are central to zero-downtime rollouts: Kubernetes can wait for new Pods to become ready before sending them traffic.
 
 ### Startup Probe: Protect Slow Boot Without Weakening Liveness Forever
 
 A startup probe is for applications whose startup time is long, variable, or difficult to predict. Before startup probes existed, teams often used very large `initialDelaySeconds` values on liveness probes. That workaround prevented early restarts, but it also delayed detection of real failures after startup. Startup probes solve this by giving the app a separate startup budget, then handing control to normal liveness and readiness checks once startup succeeds.
 
 The key behavior is gating. When a startup probe is configured, liveness and readiness probes do not run until the startup probe succeeds. If the startup probe never succeeds and its failure threshold is exceeded, Kubernetes restarts the container. After startup succeeds once, the startup probe is done for that container instance, and normal probe behavior begins.
+
+Estimate the startup budget from the slowest startup that the workload is expected to complete successfully, rather than its fastest local run. Image initialization, cache loading, and cold node conditions can make a short default window misleading. Then check whether the same application needs prompt recovery after boot. A startup probe lets the initial window be generous while leaving the steady-state liveness window shorter. The budget is still finite: an application that never completes startup must eventually fail the startup check, so investigate repeated restarts instead of treating a larger threshold as a cure.
 
 ```yaml
 apiVersion: v1
@@ -222,6 +228,8 @@ livenessProbe:
 
 A production HTTP health endpoint should be intentionally boring. It should not allocate large objects, call half the platform, or perform an expensive database migration check. For liveness, it should answer whether the process can still serve basic work. For readiness, it may include dependencies that are required for serving user traffic, but those dependency checks should have tight timeouts and clear failure behavior.
 
+Match the HTTP path and port to what the container actually serves. A probe aimed at a plausible but nonexistent path can fail consistently even while the main application is healthy. An endpoint that redirects every request to a login page may produce a successful HTTP probe without proving the application is ready for real traffic. Compare the probe response with the meaning you intended, then inspect the Pod events when that meaning and the observed status disagree. The status code alone is only useful when the endpoint's contract is clear.
+
 ### TCP Socket Probes
 
 A TCP socket probe only checks whether the kubelet can open a TCP connection to the container port. This is useful for services that do not speak HTTP, such as Redis, MySQL, or custom binary protocols. It is also weaker than an application-level check because a process may accept TCP connections while failing every real command after connection.
@@ -255,6 +263,8 @@ livenessProbe:
 
 The power of exec probes comes with overhead and image coupling. The command must exist in the container image, run quickly, and behave consistently under load. If a minimal image does not contain `sh`, `cat`, `curl`, or a database client, the probe will fail even if the application is healthy. That failure mode is common in exam practice because learners copy an exec command into an image that does not include the binary.
 
+Review an exec probe as part of the image contract, not as an isolated YAML field. The command, its arguments, and any files it reads must be present inside the exact container that receives the probe. A local file can prove that startup code ran once, but it might remain present after the application stops making progress. Conversely, a useful protocol command might consume too much CPU if it runs every few seconds on every replica. Choose the check whose failure has the same meaning as the restart or traffic decision it controls.
+
 ### gRPC Probes
 
 A gRPC probe checks a service using the [gRPC health checking protocol](https://kubernetes.io/blog/2022/05/13/grpc-probes-now-in-beta/). It is a good fit when the application already implements the standard health service and exposes it on a known port. It avoids bundling a separate probing binary into the image, which used to be a common workaround for gRPC workloads.
@@ -287,6 +297,8 @@ Probe timing is where many correct-looking manifests become operationally danger
 The approximate failure action time is `initialDelaySeconds + (failureThreshold * periodSeconds)`, ignoring timeout details and scheduling jitter. For example, a liveness probe with `initialDelaySeconds: 10`, `periodSeconds: 10`, and `failureThreshold: 3` will usually restart the container after roughly forty seconds if every probe fails. That is long enough to avoid killing during a brief hiccup, but short enough to recover from a real stuck process.
 
 The calculation changes in meaning depending on probe type. For liveness, the action is restart. For readiness, the action is endpoint removal. For startup, the action is restart after the startup budget is exhausted. The arithmetic is similar, but the consequence is different, so the same numbers may be reasonable for one probe and too aggressive for another.
+
+Treat the formula as a planning estimate, not an exact stopwatch. Probe attempts have execution time, kubelet scheduling is not perfectly aligned with wall-clock time, and a successful attempt breaks a consecutive failure streak. Record the longest normal response time before selecting `timeoutSeconds`, then consider whether brief load spikes should be tolerated through `failureThreshold`. For readiness, faster removal may protect callers, but an overly sensitive check can make endpoints appear and disappear repeatedly. For liveness, the cost of a false positive includes a restart and another startup period, so the acceptable timing can differ.
 
 ```ascii
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -354,13 +366,15 @@ For startup, design the endpoint to become successful only when the app has fini
 
 A common senior-level design choice is to separate `/livez` and `/readyz` even when they initially return the same result. The separation gives the application room to evolve without changing Kubernetes semantics later. If the team later adds a database readiness check, it can update `/readyz` without accidentally causing liveness-driven restarts during a database incident.
 
+Write down what each endpoint promises before implementing it. If `/livez` answers only local process progress, a failing shared dependency should not turn it red. If `/readyz` answers whether this replica can serve the Service's requests, its dependencies should match those requests rather than every background feature. Keep the startup signal tied to completion of initialization so normal probing starts at the intended boundary. This contract makes a future change reviewable: a new check can be judged by the Kubernetes action it would trigger, not just by whether its HTTP response looks healthy.
+
 ---
 
 ## Worked Example: Fix a Restart Loop Caused by Liveness
 
 In this scenario, a learner inherits a Pod that keeps restarting. The container image is fine, but the liveness probe points at a missing path. The Pod reaches `Running`, the kubelet checks `/not-here`, receives a failing HTTP status, and restarts the container after the threshold is reached.
 
-First, create the broken Pod so the failure is observable. The command uses `kubectl`; after this first full command, this module uses the common CKAD alias `k` for `kubectl`, which you can create with `alias k=kubectl` in your shell.
+First, create the broken Pod so the failure is observable. Use `kubectl` throughout the module so each example runs without shell-specific aliases.
 
 ```bash
 kubectl apply -f - << 'EOF'
@@ -388,8 +402,8 @@ Wait long enough for the kubelet to run the probe more than once, then inspect t
 
 ```bash
 sleep 20
-k get pod broken-liveness
-k describe pod broken-liveness
+kubectl get pod broken-liveness
+kubectl describe pod broken-liveness
 ```
 
 You should see events indicating that the liveness probe failed. The exact wording can vary by Kubernetes version and image behavior, but the important details are the probe type, the failing path, and the restart action. In an exam, this event section is often the fastest way to confirm whether the problem is a wrong path, wrong port, timeout, or command failure.
@@ -397,9 +411,9 @@ You should see events indicating that the liveness probe failed. The exact wordi
 Now replace the Pod with a valid probe path. [Pods are mostly immutable for container probe changes](https://kubernetes.io/docs/concepts/workloads/pods/) in practical exam workflows, so deleting and recreating the Pod is usually faster than trying to patch nested fields under pressure.
 
 ```bash
-k delete pod broken-liveness --ignore-not-found=true
+kubectl delete pod broken-liveness --ignore-not-found=true
 
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -420,13 +434,13 @@ spec:
 EOF
 ```
 
-Verify that the restart count remains stable after the initial start. A single successful `k get pod` is useful, but not sufficient for this failure mode because liveness failures happen over time. Wait through more than one probe period before deciding the fix worked.
+Verify that the restart count remains stable after the initial start. A single successful `kubectl get pod` is useful, but not sufficient for this failure mode because liveness failures happen over time. Wait through more than one probe period before deciding the fix worked.
 
 ```bash
-k wait --for=condition=Ready pod/broken-liveness --timeout=60s
+kubectl wait --for=condition=Ready pod/broken-liveness --timeout=60s
 sleep 25
-k get pod broken-liveness
-k describe pod broken-liveness | grep -A 12 Events
+kubectl get pod broken-liveness
+kubectl describe pod broken-liveness | grep -A 12 Events
 ```
 
 This worked example demonstrates the full loop: observe the symptom, connect restart behavior to liveness, read kubelet events, correct the probe path, and verify over time. The same loop applies to wrong ports, missing exec commands, and probe timeouts.
@@ -435,7 +449,7 @@ This worked example demonstrates the full loop: observe the symptom, connect res
 
 ## Debugging Readiness and Service Endpoints
 
-Readiness problems often look like networking problems because the application process is alive but the Service has no eligible endpoints. Users report connection failures, while `k get pods` shows `Running`. That mismatch is a strong signal to inspect readiness, labels, and endpoints together.
+Readiness problems often look like networking problems because the application process is alive but the Service has no eligible endpoints. Users report connection failures, while `kubectl get pods` shows `Running`. That mismatch is a strong signal to inspect readiness, labels, and endpoints together.
 
 Create a small Deployment and Service to see the relationship. This example intentionally uses a readiness probe that succeeds, so you can observe the healthy baseline before thinking about failures.
 
@@ -482,21 +496,23 @@ spec:
 Apply it and verify all layers. The Deployment rollout tells you whether Kubernetes sees the desired replicas as available. The Pod list tells you readiness at the Pod level. The endpoint list tells you whether the Service has routable backend IPs.
 
 ```bash
-k apply -f ready-demo.yaml
-k rollout status deployment/ready-demo --timeout=90s
-k get pods -l app=ready-demo
-k get endpoints ready-demo
+kubectl apply -f ready-demo.yaml
+kubectl rollout status deployment/ready-demo --timeout=90s
+kubectl get pods -l app=ready-demo
+kubectl get endpoints ready-demo
 ```
 
-When readiness is broken, use the same three-layer approach. If Pods are `Running` but not `Ready`, inspect `k describe pod`. [If Pods are `Ready` but endpoints are missing, inspect Service selectors and Pod labels.](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) If endpoints exist but traffic still fails, move on to Service ports, NetworkPolicy, application behavior, or node-level networking.
+When readiness is broken, use the same three-layer approach. If Pods are `Running` but not `Ready`, inspect `kubectl describe pod`. [If Pods are `Ready` but endpoints are missing, inspect Service selectors and Pod labels.](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) If endpoints exist but traffic still fails, move on to Service ports, NetworkPolicy, application behavior, or node-level networking.
 
 ```bash
-k describe pod -l app=ready-demo
-k get svc ready-demo -o yaml
-k get pods -l app=ready-demo --show-labels
+kubectl describe pod -l app=ready-demo
+kubectl get svc ready-demo -o yaml
+kubectl get pods -l app=ready-demo --show-labels
 ```
 
 This distinction matters under exam pressure because not every "Service has no endpoints" problem is a probe problem. A bad readiness probe removes endpoints. A bad selector also removes endpoints. A good debugger checks both before changing manifests.
+
+Start with the resource nearest the visible symptom and work backward. If the Service has no backend address, compare its selector with the Pod labels before editing any health check. If labels match, compare Pod readiness and the probe events. A Pod can be running while its readiness condition is false, so phase alone does not explain routing. Once the Pod is ready and the Service selects it, endpoint membership gives a separate confirmation of the traffic path. This sequence prevents an unrelated probe edit from hiding a selector error or leaving the original failure untouched.
 
 ---
 
@@ -515,6 +531,8 @@ For a web API, HTTP probes usually provide the clearest signal. Use `/livez` for
 | Slow legacy Java service | Startup plus HTTP liveness and readiness | Separates boot budget from steady-state recovery | Do not replace startup probe with a huge liveness delay |
 
 A senior probe design also considers blast radius. If one shared dependency fails and every Pod's liveness probe checks that dependency, the cluster may restart hundreds of containers at once. That does not repair the dependency; it adds load, destroys caches, and complicates recovery. In most designs, dependency availability affects readiness first, while liveness remains focused on whether this container should continue running.
+
+Mechanism choice and probe purpose are separate decisions. An HTTP check can be either liveness or readiness, and an exec command can carry either consequence as well. First decide whether the failure should restart this container or withhold traffic; only then choose the cheapest mechanism that can observe the condition. A TCP connection may establish that a listener exists, yet it cannot establish that a request will succeed. A protocol-aware check can answer a stronger question, provided it remains reliable under load and exists in the container image used by the workload.
 
 ---
 
@@ -608,7 +626,7 @@ spec:
       failureThreshold: 2
 ```
 
-If you delete the file with `k exec exec-health-file -- rm /tmp/healthy`, the next failing probe sequence restarts the container. After restart, the startup command recreates the file, so the Pod becomes healthy again. That is a compact way to see the relationship between probe failure, container restart, and application initialization.
+If you delete the file with `kubectl exec exec-health-file -- rm /tmp/healthy`, the next failing probe sequence restarts the container. After restart, the startup command recreates the file, so the Pod becomes healthy again. That is a compact way to see the relationship between probe failure, container restart, and application initialization.
 
 ### Pattern 4: TCP Probe for a Non-HTTP Listener
 
@@ -645,31 +663,33 @@ Probe tasks on the CKAD exam are usually YAML editing tasks. Speed matters, but 
 Start by generating a manifest when possible. Imperative commands do not expose every probe option cleanly, so use dry-run output as a starting point and edit the YAML.
 
 ```bash
-k run webapp --image=nginx:1.27 --port=80 --dry-run=client -o yaml > pod.yaml
+kubectl run webapp --image=nginx:1.27 --port=80 --dry-run=client -o yaml > pod.yaml
 ```
 
 Open `pod.yaml`, add the probe block under the container, and apply it. Be careful with indentation: probes are fields of the container, not fields of the Pod spec and not fields under `ports`.
 
 ```bash
-k apply -f pod.yaml
-k describe pod webapp | grep -E "Liveness|Readiness|Startup"
-k get pod webapp
+kubectl apply -f pod.yaml
+kubectl describe pod webapp | grep -E "Liveness|Readiness|Startup"
+kubectl get pod webapp
 ```
 
 For readiness tasks, always verify endpoint membership if a Service is involved. [A Pod can be `Running` without being a Service backend](https://kubernetes.io/docs/concepts/workloads/pods/pod-condition/), and the exam often rewards checking the exact resource affected by the configuration.
 
 ```bash
-k get endpoints
-k get endpoints webapp
-k describe pod webapp | grep -A 20 Events
+kubectl get endpoints
+kubectl get endpoints webapp
+kubectl describe pod webapp | grep -A 20 Events
 ```
 
 For liveness tasks, wait long enough to observe stability or failure. If a liveness probe has `periodSeconds: 10` and `failureThreshold: 3`, checking one second after creation tells you almost nothing. Time-based behavior requires time-based verification.
 
+Finish verification by matching an observation to each probe's consequence. For liveness, read the restart count together with events after enough attempts have elapsed. For readiness, compare the Pod's ready status with the Service backend view, then confirm that labels and selectors agree. For startup, check whether normal probes begin after initialization and whether the configured budget covers the intended delay. This is also a useful review discipline outside an exam: a valid manifest proves syntax, while the resource status and event history show whether the configured checks produce the behavior you wanted.
+
 ```bash
 sleep 35
-k get pod webapp
-k describe pod webapp | grep -A 20 Events
+kubectl get pod webapp
+kubectl describe pod webapp | grep -A 20 Events
 ```
 
 ---
@@ -692,7 +712,7 @@ k describe pod webapp | grep -A 20 Events
 |---------|--------------|-----------------|
 | Using the same deep dependency check for liveness and readiness | A database or third-party outage can trigger restarts that do not fix the dependency and may worsen recovery | Keep liveness focused on local process health, and put traffic-critical dependencies in readiness with tight timeouts |
 | Making liveness too aggressive during startup | Slow but healthy containers are killed before they finish booting, creating restart loops | Use a startup probe for slow startup, then keep liveness tuned for steady-state recovery |
-| Forgetting that readiness controls Service endpoints | Debugging focuses on restart count while traffic fails because the Pod is not considered ready | Check `READY`, Pod events, Service selectors, and `k get endpoints` together |
+| Forgetting that readiness controls Service endpoints | Debugging focuses on restart count while traffic fails because the Pod is not considered ready | Check `READY`, Pod events, Service selectors, and `kubectl get endpoints` together |
 | Assuming TCP success means application success | A port can accept connections while the protocol handler or business logic is broken | Use HTTP, exec, or gRPC probes when you need an application-level signal |
 | Configuring an exec probe with missing tools | Minimal images often lack `sh`, `cat`, `curl`, database clients, or custom binaries | Verify the command exists in the image, or choose a network probe that matches the app |
 | Leaving `timeoutSeconds` at one second for slow checks | Legitimate health checks fail under load, causing endpoint flapping or restarts | Make health checks cheap, then set timeout values based on observed response behavior |
@@ -716,7 +736,7 @@ k describe pod webapp | grep -A 20 Events
    <details>
    <summary>Answer</summary>
 
-   Inspect Pod readiness status, Pod events, Service selectors, Pod labels, and `k get endpoints <service-name>`. Zero restarts make liveness failure less likely, while disappearing endpoints point toward readiness failure or a selector mismatch. If the labels and selector match, expect readiness probe failures in `k describe pod`, possibly caused by a flaky readiness endpoint, an external dependency check, or thresholds that are too aggressive under normal load.
+   Inspect Pod readiness status, Pod events, Service selectors, Pod labels, and `kubectl get endpoints <service-name>`. Zero restarts make liveness failure less likely, while disappearing endpoints point toward readiness failure or a selector mismatch. If the labels and selector match, expect readiness probe failures in `kubectl describe pod`, possibly caused by a flaky readiness endpoint, an external dependency check, or thresholds that are too aggressive under normal load.
    </details>
 
 3. **A team uses `/healthz` for both liveness and readiness. The endpoint checks the database, message queue, and a third-party billing API. When the billing API slows down, Kubernetes restarts every application Pod. How would you redesign the probes to reduce blast radius?**
@@ -740,7 +760,7 @@ k describe pod webapp | grep -A 20 Events
    <details>
    <summary>Answer</summary>
 
-   The probe command likely fails because the distroless image does not include `cat` or the expected shell utilities. Check the Pod events with `k describe pod` to confirm exec probe failures, and inspect the image design if needed. Fix the probe by using a command that actually exists in the image, adding a small purpose-built health binary, or switching to an HTTP or gRPC probe exposed by the application. Do not assume tools from a teaching image exist in a minimal production image.
+   The probe command likely fails because the distroless image does not include `cat` or the expected shell utilities. Check the Pod events with `kubectl describe pod` to confirm exec probe failures, and inspect the image design if needed. Fix the probe by using a command that actually exists in the image, adding a small purpose-built health binary, or switching to an HTTP or gRPC probe exposed by the application. Do not assume tools from a teaching image exist in a minimal production image.
    </details>
 
 6. **During a rollout, new Pods become ready for a few seconds, then drop out of endpoints, then return again. The readiness endpoint performs a slow cache verification that sometimes takes longer than the configured one-second timeout. What changes would you evaluate before increasing replica count?**
@@ -772,7 +792,7 @@ k describe pod webapp | grep -A 20 Events
 Apply a runnable Pod manifest that uses `nginx` and HTTP probes. The paths use `/` because this image serves that path by default, which lets you focus on Kubernetes probe behavior rather than application code.
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -814,31 +834,31 @@ EOF
 Use `wait`, `get`, and `describe` so you verify both high-level status and the actual probe fields attached to the container.
 
 ```bash
-k wait --for=condition=Ready pod/probe-demo --timeout=90s
-k get pod probe-demo
-k describe pod probe-demo | grep -E "Startup|Liveness|Readiness"
+kubectl wait --for=condition=Ready pod/probe-demo --timeout=90s
+kubectl get pod probe-demo
+kubectl describe pod probe-demo | grep -E "Startup|Liveness|Readiness"
 ```
 
-Success criteria: `k wait --for=condition=Ready pod/probe-demo --timeout=90s` should succeed, `k get pod probe-demo` should show the Pod running and ready, and `k describe pod probe-demo` should confirm startup, liveness, and readiness probe configuration on the `app` container.
+Success criteria: `kubectl wait --for=condition=Ready pod/probe-demo --timeout=90s` should succeed, `kubectl get pod probe-demo` should show the Pod running and ready, and `kubectl describe pod probe-demo` should confirm startup, liveness, and readiness probe configuration on the `app` container.
 
-- [ ] `k wait` reports that `pod/probe-demo` met the `Ready` condition within the timeout.
-- [ ] `k get pod probe-demo` shows the Pod in `Running` status with the container ready.
-- [ ] `k describe pod probe-demo` shows startup, liveness, and readiness probe configuration for the `app` container.
+- [ ] `kubectl wait` reports that `pod/probe-demo` met the `Ready` condition within the timeout.
+- [ ] `kubectl get pod probe-demo` shows the Pod in `Running` status with the container ready.
+- [ ] `kubectl describe pod probe-demo` shows startup, liveness, and readiness probe configuration for the `app` container.
 
 ### Step 3: Expose the Pod and Confirm Readiness Controls Endpoints
 
 Create a Service and confirm that the ready Pod appears as a backend endpoint. This connects the readiness probe to traffic routing rather than just Pod status.
 
 ```bash
-k expose pod probe-demo --port=80 --target-port=80
-k get svc probe-demo
-k get endpoints probe-demo
+kubectl expose pod probe-demo --port=80 --target-port=80
+kubectl get svc probe-demo
+kubectl get endpoints probe-demo
 ```
 
 Success criteria: after Service creation, confirm at least one endpoint appears for `probe-demo`, and explain how a readiness change can remove that endpoint without triggering a restart.
 
-- [ ] `k get svc probe-demo` shows a Service named `probe-demo`.
-- [ ] `k get endpoints probe-demo` shows at least one endpoint address and port for the Pod.
+- [ ] `kubectl get svc probe-demo` shows a Service named `probe-demo`.
+- [ ] `kubectl get endpoints probe-demo` shows at least one endpoint address and port for the Pod.
 - [ ] You can explain why a failing readiness probe would remove this endpoint without increasing the restart count.
 
 ### Step 4: Break the Liveness Probe Signal and Observe Restart Behavior
@@ -846,16 +866,16 @@ Success criteria: after Service creation, confirm at least one endpoint appears 
 Delete the default `nginx` index file so the `/` path no longer returns the same successful response. Then wait long enough for the liveness probe to fail according to the configured period and threshold.
 
 ```bash
-k exec probe-demo -- rm /usr/share/nginx/html/index.html
+kubectl exec probe-demo -- rm /usr/share/nginx/html/index.html
 sleep 40
-k get pod probe-demo
-k describe pod probe-demo | grep -A 20 Events
+kubectl get pod probe-demo
+kubectl describe pod probe-demo | grep -A 20 Events
 ```
 
 Success criteria: after deleting the default index and waiting for probe execution, the event stream should show liveness failures and container restarts, not just endpoint-only behavior.
 
 - [ ] The Pod event stream shows failed liveness probe messages or a container restart related to probe failure.
-- [ ] `k get pod probe-demo` shows that restart count changed after the liveness failures.
+- [ ] `kubectl get pod probe-demo` shows that restart count changed after the liveness failures.
 - [ ] You can state why Kubernetes restarted the container instead of merely removing the Pod from Service endpoints.
 
 ### Step 5: Repair the Application Signal and Verify Stability
@@ -863,10 +883,10 @@ Success criteria: after deleting the default index and waiting for probe executi
 Because the container restart recreates the default file for this image, wait for the Pod to become ready again and confirm that endpoint membership returns.
 
 ```bash
-k wait --for=condition=Ready pod/probe-demo --timeout=90s
+kubectl wait --for=condition=Ready pod/probe-demo --timeout=90s
 sleep 15
-k get pod probe-demo
-k get endpoints probe-demo
+kubectl get pod probe-demo
+kubectl get endpoints probe-demo
 ```
 
 Success criteria: after the restart clears, the Pod should return to `Ready` and endpoints should reappear, with restart counts matching the observed recovery path.
@@ -880,14 +900,14 @@ Success criteria: after the restart clears, the Pod should return to `Ready` and
 Remove the Service and Pod so the practice namespace is ready for the next exercise, and verify cleanup leaves no stale probes, pods, or Services that could confuse the next drill.
 
 ```bash
-k delete svc probe-demo --ignore-not-found=true
-k delete pod probe-demo --ignore-not-found=true
+kubectl delete svc probe-demo --ignore-not-found=true
+kubectl delete pod probe-demo --ignore-not-found=true
 ```
 
 Success criteria: remove the Service and Pod and verify the namespace is clean for the next drill, while confirming no unrelated resources were removed.
 
-- [ ] `k get pod probe-demo` no longer returns the practice Pod.
-- [ ] `k get svc probe-demo` no longer returns the practice Service.
+- [ ] `kubectl get pod probe-demo` no longer returns the practice Pod.
+- [ ] `kubectl get svc probe-demo` no longer returns the practice Service.
 - [ ] No unrelated resources were deleted during cleanup.
 
 ---
@@ -902,7 +922,7 @@ Create a Pod named `drill-http-live` running `nginx:1.27` with an HTTP liveness 
 <summary>Solution</summary>
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -919,8 +939,8 @@ spec:
       periodSeconds: 10
 EOF
 
-k describe pod drill-http-live | grep Liveness
-k delete pod drill-http-live --ignore-not-found=true
+kubectl describe pod drill-http-live | grep Liveness
+kubectl delete pod drill-http-live --ignore-not-found=true
 ```
 
 </details>
@@ -933,7 +953,7 @@ Create a Pod named `drill-exec-live` using `busybox:1.36`. The container should 
 <summary>Solution</summary>
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -955,8 +975,8 @@ spec:
       periodSeconds: 5
 EOF
 
-k describe pod drill-exec-live | grep Liveness
-k delete pod drill-exec-live --ignore-not-found=true
+kubectl describe pod drill-exec-live | grep Liveness
+kubectl delete pod drill-exec-live --ignore-not-found=true
 ```
 
 </details>
@@ -969,7 +989,7 @@ Create a Pod named `drill-tcp-live` running `redis:7` with a TCP liveness probe 
 <summary>Solution</summary>
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -987,8 +1007,8 @@ spec:
       periodSeconds: 5
 EOF
 
-k describe pod drill-tcp-live | grep Liveness
-k delete pod drill-tcp-live --ignore-not-found=true
+kubectl describe pod drill-tcp-live | grep Liveness
+kubectl delete pod drill-tcp-live --ignore-not-found=true
 ```
 
 </details>
@@ -1001,7 +1021,7 @@ Create a Deployment named `drill-ready` with two `nginx:1.27` replicas and an HT
 <summary>Solution</summary>
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1029,11 +1049,11 @@ spec:
           periodSeconds: 3
 EOF
 
-k expose deployment drill-ready --port=80 --target-port=80
-k rollout status deployment/drill-ready --timeout=90s
-k get endpoints drill-ready
-k delete service drill-ready --ignore-not-found=true
-k delete deployment drill-ready --ignore-not-found=true
+kubectl expose deployment drill-ready --port=80 --target-port=80
+kubectl rollout status deployment/drill-ready --timeout=90s
+kubectl get endpoints drill-ready
+kubectl delete service drill-ready --ignore-not-found=true
+kubectl delete deployment drill-ready --ignore-not-found=true
 ```
 
 </details>
@@ -1046,7 +1066,7 @@ Create a Pod named `drill-startup` that sleeps for twenty seconds before startin
 <summary>Solution</summary>
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -1081,9 +1101,9 @@ spec:
       failureThreshold: 2
 EOF
 
-k wait --for=condition=Ready pod/drill-startup --timeout=90s
-k describe pod drill-startup | grep -E "Startup|Liveness|Readiness"
-k delete pod drill-startup --ignore-not-found=true
+kubectl wait --for=condition=Ready pod/drill-startup --timeout=90s
+kubectl describe pod drill-startup | grep -E "Startup|Liveness|Readiness"
+kubectl delete pod drill-startup --ignore-not-found=true
 ```
 
 </details>
@@ -1096,7 +1116,7 @@ Create a Pod with an intentionally broken liveness path, observe the restart beh
 <summary>Solution</summary>
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -1115,12 +1135,12 @@ spec:
 EOF
 
 sleep 20
-k get pod drill-broken-path
-k describe pod drill-broken-path | grep -A 20 Events
+kubectl get pod drill-broken-path
+kubectl describe pod drill-broken-path | grep -A 20 Events
 
-k delete pod drill-broken-path --ignore-not-found=true
+kubectl delete pod drill-broken-path --ignore-not-found=true
 
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
@@ -1137,9 +1157,9 @@ spec:
       periodSeconds: 10
 EOF
 
-k wait --for=condition=Ready pod/drill-broken-path --timeout=60s
-k get pod drill-broken-path
-k delete pod drill-broken-path --ignore-not-found=true
+kubectl wait --for=condition=Ready pod/drill-broken-path --timeout=60s
+kubectl get pod drill-broken-path
+kubectl delete pod drill-broken-path --ignore-not-found=true
 ```
 
 </details>
@@ -1152,7 +1172,7 @@ Create a Deployment with a valid readiness probe, then create a Service with the
 <summary>Solution</summary>
 
 ```bash
-k apply -f - << 'EOF'
+kubectl apply -f - << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1190,13 +1210,13 @@ spec:
     targetPort: 80
 EOF
 
-k rollout status deployment/drill-selector --timeout=90s
-k get pods -l app=drill-selector --show-labels
-k get endpoints drill-selector
-k get service drill-selector -o yaml
+kubectl rollout status deployment/drill-selector --timeout=90s
+kubectl get pods -l app=drill-selector --show-labels
+kubectl get endpoints drill-selector
+kubectl get service drill-selector -o yaml
 
-k delete service drill-selector --ignore-not-found=true
-k delete deployment drill-selector --ignore-not-found=true
+kubectl delete service drill-selector --ignore-not-found=true
+kubectl delete deployment drill-selector --ignore-not-found=true
 ```
 
 </details>
@@ -1213,13 +1233,19 @@ Finally, verify behavior with the Kubernetes resources that actually change. Use
 
 ---
 
-## Next Module
-
-Move next to [Module 3.2: Container Logging](../module-3.2-logging/) to continue with practical log collection patterns once probe behavior and endpoint routing are stable.
-
 ## Sources
 
 - [Kubernetes v1.35: Liveness, Readiness, and Startup Probes](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/) — This is the canonical v1.35 reference for probe semantics, mechanisms, defaults, and failure behavior.
 - [Configure Liveness, Readiness and Startup Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/) — This task page provides runnable examples and concrete event output for probe troubleshooting.
 - [Pod Conditions](https://kubernetes.io/docs/concepts/workloads/pods/pod-condition/) — It clarifies the difference between Running and Ready and explains why readiness affects Service endpoint membership.
 - [Certified Kubernetes Application Developer (CKAD)](https://training.linuxfoundation.org/certification/certified-kubernetes-application-developer-ckad/) — It shows the official CKAD v1.35 domain coverage, including probes and health checks.
+- [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) — It documents why repeated liveness or startup failures can appear as container restarts and `CrashLoopBackOff` during debugging.
+- [Kubernetes v1.35: Pod Lifecycle](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) — It documents the restart-policy behavior behind the module's v1.35 startup and liveness examples.
+- [Pods](https://kubernetes.io/docs/concepts/workloads/pods/) — It explains the Pod update limits behind deleting and recreating the example Pod to change its probe.
+- [Service](https://kubernetes.io/docs/concepts/services-networking/service/) — It explains how a Service selects backing Pods and why the module compares selectors with labels.
+- [EndpointSlices](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/) — It explains the ready condition of Service backends behind the module's endpoint-membership checks.
+- [kubectl describe](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/) — It documents the resource details and related events used to diagnose the module's failed probes.
+
+## Next Module
+
+Move next to [Module 3.2: Container Logging](../module-3.2-logging/) to continue with practical log collection patterns once probe behavior and endpoint routing are stable.
