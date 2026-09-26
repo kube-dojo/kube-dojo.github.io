@@ -14,14 +14,12 @@ sidebar:
 > **Exam Weight**: [Troubleshooting is 30% of the CKA exam domain coverage.](https://www.cncf.io/training/certification/cka/)
 >
 > **Cluster Target**: Kubernetes 1.35+
->
-> **Command Note**: This module uses `k` as shorthand for `kubectl` after the first command examples. In an exam shell, set it with `alias k=kubectl`.
 
 ---
 
 ## Learning Outcomes
 
-By the end of this cumulative troubleshooting module, you will be able to:
+By the end of this cumulative troubleshooting module, you will be able to carry the Part 5 diagnostic habits across workloads, nodes, and networks:
 
 1. **Debug** failing Kubernetes workloads by moving from symptoms to evidence, using Events, status fields, logs, rollout state, and resource data instead of guessing.
 2. **Analyze** control plane and worker node failures by separating API reachability, static pod health, kubelet behavior, container runtime state, certificates, and node pressure conditions.
@@ -33,7 +31,7 @@ By the end of this cumulative troubleshooting module, you will be able to:
 
 ## Why This Module Matters
 
-At 02:13, an on-call engineer is paged because checkout requests have started failing across two regions. The application team says their Deployment "looks fine" because the desired replica count still says six, the platform team says the cluster "looks fine" because most nodes are `Ready`, and the incident commander wants to know whether to roll back, drain nodes, or fail traffic away from the cluster. In that moment, a troubleshooter who only remembers commands becomes slow. A troubleshooter who understands failure paths can turn vague symptoms into a narrow, testable hypothesis.
+Hypothetical scenario: At 02:13, an on-call engineer is paged because checkout requests have started failing across two regions. The application team says their Deployment "looks fine" because the desired replica count still says six, the platform team says the cluster "looks fine" because most nodes are `Ready`, and the incident commander wants to know whether to roll back, drain nodes, or fail traffic away from the cluster. In that moment, a troubleshooter who only remembers commands becomes slow. A troubleshooter who understands failure paths can turn vague symptoms into a narrow, testable hypothesis.
 
 The CKA exam compresses that pressure into short scenarios. You do not get time to read every object in the namespace, and you do not get credit for running commands that merely look sophisticated. You get credit for identifying the failing layer, applying the smallest correct fix, and proving the cluster now behaves as expected. That skill is not command memorization. It is diagnostic reasoning under time pressure.
 
@@ -72,31 +70,25 @@ For workload incidents, start with the controller and Pod because they connect d
 
 > **Active Learning Prompt: Predict Before You Inspect**
 >
-> Your teammate says a Deployment has `READY 0/3`, and `k get pods` shows all three Pods are `Pending`. Before running another command, predict which evidence source is most likely to explain the cause: container logs, Pod Events, Service endpoints, or CoreDNS logs. Then explain why the other three are weaker first checks for a `Pending` Pod.
+> Your teammate says a Deployment has `READY 0/3`, and `kubectl get pods` shows all three Pods are `Pending`. Before running another command, predict which evidence source is most likely to explain the cause: container logs, Pod Events, Service endpoints, or CoreDNS logs. Then explain why the other three are weaker first checks for a `Pending` Pod.
 
-The best first command for many workload failures is still:
+The best first pair of commands for many workload failures is still a wide Pod listing followed by a describe of one representative Pod, because the listing shows where each Pod landed and the describe output shows what Kubernetes last tried to do with it:
 
 ```bash
 kubectl get pods -o wide
-```
-
-After that, use the alias:
-
-```bash
-alias k=kubectl
-k describe pod <pod-name>
+kubectl describe pod <pod-name>
 ```
 
 `-o wide` gives you node placement, Pod IPs, and readiness at a glance. `describe` gives you Events, which are often the fastest path to causes such as failed scheduling, image pull errors, missing ConfigMaps, missing Secrets, volume mount failures, failed probes, and node pressure. Logs are powerful, but they are application evidence; Events are Kubernetes orchestration evidence. A Pod that never started will usually have no useful application logs.
 
-A practical CKA troubleshooting loop looks like this:
+A practical CKA troubleshooting loop moves from controller state to one Pod's Events, then to previous logs, recent namespace Events, and finally the full object YAML:
 
 ```bash
-k get deploy,rs,pods -o wide
-k describe pod <pod-name>
-k logs <pod-name> --previous
-k get events --sort-by=.lastTimestamp
-k get pod <pod-name> -o yaml
+kubectl get deploy,rs,pods -o wide
+kubectl describe pod <pod-name>
+kubectl logs <pod-name> --previous
+kubectl get events --sort-by=.lastTimestamp
+kubectl get pod <pod-name> -o yaml
 ```
 
 Do not run all of those every time. Use them as a sequence only when the earlier command does not answer the question. If Events say `FailedScheduling` because the Pod requests more CPU than any node can provide, logs will not help. If Events show the container starts and then exits, logs become the better source. If logs show the app cannot read a file mounted from a ConfigMap, the Pod spec and mounted volume configuration become relevant.
@@ -120,23 +112,25 @@ Pod state is not a root cause. `Pending`, `ContainerCreating`, `ImagePullBackOff
   admission denied?      taints/resources?         ConfigMap/Secret/CNI?         logs/probes/OOM?
 ```
 
-`Pending` usually means scheduling has not completed. The fastest evidence is the Events section of `k describe pod`. Common causes include insufficient CPU or memory, untolerated taints, node selectors that match no nodes, required node affinity that is too strict, PVCs that cannot bind, or a scheduler that is unavailable. Logs are not useful because the container has not run.
+`Pending` usually means scheduling has not completed. The fastest evidence is the Events section of `kubectl describe pod`. Common causes include insufficient CPU or memory, untolerated taints, node selectors that match no nodes, required node affinity that is too strict, PVCs that cannot bind, or a scheduler that is unavailable. Logs are not useful because the container has not run.
 
 `ContainerCreating` means the Pod was scheduled, but kubelet has not completed local setup. This often points to image preparation, volume mounting, missing ConfigMaps or Secrets, CNI setup, or container runtime problems. Again, Events usually beat logs. If Events say `MountVolume.SetUp failed` for a missing Secret, the fix is not to restart the Deployment. The fix is to create or correct the referenced Secret or update the Pod template to use the right name.
 
 `ImagePullBackOff` means kubelet cannot obtain the image, and the backoff is merely Kubernetes slowing repeated attempts. The cause might be a wrong repository, wrong tag, missing registry credentials, unauthorized access to a private registry, DNS failure to the registry, registry rate limiting, or a network egress block. The image string and Event messages are the key evidence, not application logs.
 
-[`CrashLoopBackOff` means the container process starts, exits, and is restarted according to Pod restart policy.](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) The application did run, so `k logs --previous` is often the most useful command. Causes include invalid command arguments, missing runtime configuration, app-level dependency failures, failed startup probes, failed liveness probes, permission errors, and memory limits causing `OOMKilled`.
+[`CrashLoopBackOff` means the container process starts, exits, and is restarted according to Pod restart policy.](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) The application did run, so `kubectl logs --previous` is often the most useful command. Causes include invalid command arguments, missing runtime configuration, app-level dependency failures, failed startup probes, failed liveness probes, permission errors, and memory limits causing `OOMKilled`.
+
+Comparing similar failure signatures side by side is what turns these labels into decisions. `Pending` and `ContainerCreating` both mean the application has not produced useful logs yet, but `Pending` points at scheduling while `ContainerCreating` points at kubelet setup on a node that was already chosen, so the node placement column in `kubectl get pods -o wide` is a quick tiebreaker. `ImagePullBackOff` and `CrashLoopBackOff` both describe a backoff, but only the second one means a process actually ran, which is why previous logs help with a crash and not with a pull failure. The same comparison works beyond Pods: an empty EndpointSlice and a `NotReady` node can both make a Service look down, yet the first sends you to selectors and readiness while the second sends you to kubelet, the runtime, and host resources.
 
 #### Worked Example: Debugging A CrashLoopBackOff Without Guessing
 
 Suppose a team deploys a simple API, and the Deployment never becomes available. The first view shows that Kubernetes created the desired Pods, but they are restarting.
 
 ```bash
-k get deploy,pods -l app=orders-api
+kubectl get deploy,pods -l app=orders-api
 ```
 
-Example output:
+In this example output, the Deployment has created all three Pods, yet none of them is ready and each one has already restarted several times:
 
 ```text
 NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
@@ -151,10 +145,10 @@ pod/orders-api-6b6f8f7b8d-tm8xs   0/1     CrashLoopBackOff   5          6m
 At this point, the status tells you the process has started and failed repeatedly. That makes previous logs and termination state more useful than scheduling checks. You inspect one Pod rather than all three because all three share the same Deployment template.
 
 ```bash
-k describe pod orders-api-6b6f8f7b8d-2bq9m
+kubectl describe pod orders-api-6b6f8f7b8d-2bq9m
 ```
 
-Example evidence:
+The describe output for that Pod includes an example termination record like the one below, which shows why the last container instance stopped and how many times it has been restarted:
 
 ```text
 Last State:     Terminated
@@ -166,10 +160,10 @@ Restart Count:  5
 Exit code 137 is commonly associated with a `SIGKILL`, and Kubernetes reporting `OOMKilled` confirms memory pressure at the container limit. The next question is whether the configured limit is unrealistically low for this app. You inspect the Pod template through the Deployment, because editing an individual Pod would be temporary and the controller would recreate it.
 
 ```bash
-k get deployment orders-api -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
+kubectl get deployment orders-api -o jsonpath='{.spec.template.spec.containers[0].resources}{"\n"}'
 ```
 
-Example output:
+In this example output, the container both requests and is limited to only 64Mi of memory, which is the value to weigh against what the application actually needs to run:
 
 ```json
 {"limits":{"memory":"64Mi"},"requests":{"cpu":"100m","memory":"64Mi"}}
@@ -178,37 +172,37 @@ Example output:
 A safe exam fix is to patch the Deployment template to a more realistic memory value, then watch the rollout. In production, you would compare against metrics and application history, but in a CKA scenario the evidence often makes the intended correction clear.
 
 ```bash
-k set resources deployment/orders-api \
+kubectl set resources deployment/orders-api \
   --containers=orders-api \
   --requests=cpu=100m,memory=128Mi \
   --limits=memory=256Mi
 ```
 
-Now verify that Kubernetes creates new Pods and that they remain running.
+Now verify that Kubernetes creates new Pods from the updated template and that they remain running, instead of trusting the successful exit of the `set resources` command.
 
 ```bash
-k rollout status deployment/orders-api
-k get pods -l app=orders-api
+kubectl rollout status deployment/orders-api
+kubectl get pods -l app=orders-api
 ```
 
 The important teaching point is not that every `CrashLoopBackOff` is memory-related. It is that the status selected the evidence source, the evidence identified the cause, the fix targeted the controller template, and verification checked the rollout rather than merely checking that the command returned without error.
 
 > **Active Learning Prompt: Choose The Next Command**
 >
-> You see `CrashLoopBackOff`, but `k describe pod` shows `Last State: Terminated, Reason: Error, Exit Code: 1` rather than `OOMKilled`. Which command should you run next, and what kind of evidence would make you patch the Deployment versus roll back the image?
+> You see `CrashLoopBackOff`, but `kubectl describe pod` shows `Last State: Terminated, Reason: Error, Exit Code: 1` rather than `OOMKilled`. Which command should you run next, and what kind of evidence would make you patch the Deployment versus roll back the image?
 
-A different `CrashLoopBackOff` may point to application configuration. The next command would be previous logs:
+A different `CrashLoopBackOff` may point to application configuration rather than memory. When the termination reason is a plain error, the next command would be previous logs, because the last container instance is the one that actually hit the failure and exited:
 
 ```bash
-k logs <pod-name> --previous
+kubectl logs <pod-name> --previous
 ```
 
-If the log says `missing environment variable DATABASE_URL`, inspect the Deployment environment and referenced ConfigMaps or Secrets:
+If the log says `missing environment variable DATABASE_URL`, inspect the Deployment environment and the ConfigMaps or Secrets it references, since the fix belongs in whichever object is supposed to supply that value:
 
 ```bash
-k get deployment <deployment-name> -o yaml
-k get configmap
-k get secret
+kubectl get deployment <deployment-name> -o yaml
+kubectl get configmap
+kubectl get secret
 ```
 
 If the missing value is supposed to come from a ConfigMap, correct the ConfigMap name or key in the Deployment template, or create the missing ConfigMap when the scenario clearly expects it. Avoid changing the container image, resource limits, and probes at the same time. Multiple simultaneous fixes make it harder to prove what mattered, and in an exam they increase the chance of breaking a previously correct field.
@@ -217,31 +211,31 @@ If the missing value is supposed to come from a ConfigMap, correct the ConfigMap
 
 | Symptom | Most Useful First Evidence | Likely Layer | Good Next Action |
 |---|---|---|---|
-| Pod is `Pending` | `k describe pod` Events | Scheduler, PVC binding, taints, resources | Fix requests, tolerations, selectors, affinity, or storage binding |
-| Pod is `ContainerCreating` | `k describe pod` Events | Kubelet setup, volume mount, CNI, runtime | Fix missing ConfigMap or Secret, volume, CNI, or runtime issue |
-| Pod is `ImagePullBackOff` | `k describe pod` Events and image field | Registry, image name, credentials, network | Correct image, tag, `imagePullSecrets`, or registry access |
-| Pod is `CrashLoopBackOff` | `k logs --previous` and last termination state | Process, configuration, probes, memory | Fix config, command, resources, probes, or roll back bad image |
-| Deployment stuck rolling out | `k rollout status` and new ReplicaSet Pods | New template revision | Fix new Pod cause or `k rollout undo` when rollback is safest |
-| Service has no endpoints | `k get endpointslice` and Pod readiness | Labels or readiness | Fix selector, labels, readiness probe, or container health |
+| Pod is `Pending` | `kubectl describe pod` Events | Scheduler, PVC binding, taints, resources | Fix requests, tolerations, selectors, affinity, or storage binding |
+| Pod is `ContainerCreating` | `kubectl describe pod` Events | Kubelet setup, volume mount, CNI, runtime | Fix missing ConfigMap or Secret, volume, CNI, or runtime issue |
+| Pod is `ImagePullBackOff` | `kubectl describe pod` Events and image field | Registry, image name, credentials, network | Correct image, tag, `imagePullSecrets`, or registry access |
+| Pod is `CrashLoopBackOff` | `kubectl logs --previous` and last termination state | Process, configuration, probes, memory | Fix config, command, resources, probes, or roll back bad image |
+| Deployment stuck rolling out | `kubectl rollout status` and new ReplicaSet Pods | New template revision | Fix new Pod cause or `kubectl rollout undo` when rollback is safest |
+| Service has no endpoints | `kubectl get endpointslice` and Pod readiness | Labels or readiness | Fix selector, labels, readiness probe, or container health |
 
 This table is useful because it prevents a common troubleshooting mistake: treating every workload failure as if it requires deleting Pods. Deleting a Pod may temporarily retry the same broken configuration, but it rarely fixes a bad template. For controller-managed workloads, fix the controller template unless the evidence proves the Pod is stuck due to transient node state.
 
 Rollbacks are appropriate when the newest revision introduced the failure and the previous revision was known good. They are not a substitute for diagnosis when the issue is missing infrastructure or a cluster-level dependency. If a new image crashes because it expects a new ConfigMap key that was not created, rollback may restore service quickly, but the lasting fix still includes aligning configuration with the application version.
 
-Use this rollback sequence when availability matters more than preserving the new revision:
+Use this rollback sequence when availability matters more than preserving the new revision, and read the history first so you know which revisions exist before the undo moves the Deployment back:
 
 ```bash
-k rollout history deployment/<deployment-name>
-k rollout undo deployment/<deployment-name>
-k rollout status deployment/<deployment-name>
+kubectl rollout history deployment/<deployment-name>
+kubectl rollout undo deployment/<deployment-name>
+kubectl rollout status deployment/<deployment-name>
 ```
 
-Use this correction sequence when the intended state is clear and the current template is wrong:
+Use this correction sequence when the intended state is clear and the current template is wrong, because editing the Deployment changes the source of truth and the rollout status then shows whether the new Pods became available:
 
 ```bash
-k edit deployment/<deployment-name>
-k rollout status deployment/<deployment-name>
-k get pods -l app=<label-value>
+kubectl edit deployment/<deployment-name>
+kubectl rollout status deployment/<deployment-name>
+kubectl get pods -l app=<label-value>
 ```
 
 In CKA scenarios, prefer direct, narrow changes that can be verified. If a Pod references `configmap app-config` and Events say that ConfigMap is missing, creating that ConfigMap or correcting the reference is a narrow fix. Recreating the Deployment from scratch is broad, risky, and usually unnecessary.
@@ -279,7 +273,7 @@ In kubeadm-style clusters, [key control plane components commonly run as static 
 
 When `kubectl` times out, SSH to the control plane node and ask whether the kubelet is running. If kubelet is down, it cannot manage static Pods. If kubelet is running, inspect the container runtime and static pod containers. If the API server container exists but restarts, inspect kubelet logs and container logs. If the API server runs but returns certificate errors, inspect certificate expiration and file references.
 
-A useful host-level sequence is:
+A useful host-level sequence follows the same dependency order, moving from the kubelet service and its journal to the runtime's view of the API server container and then to the manifests:
 
 ```bash
 sudo systemctl status kubelet
@@ -309,7 +303,7 @@ Certificate failures often look like authentication or connection errors rather 
 sudo kubeadm certs check-expiration
 ```
 
-If certificates are expired in a practice cluster, the renewal command is:
+If the expiration check confirms that certificates are expired in a practice cluster, the renewal commands are shown below, and the proof afterward is that the API answers requests again:
 
 ```bash
 sudo kubeadm certs renew all
@@ -342,14 +336,14 @@ Worker node failures have a similar layered model. [A node becomes `NotReady` wh
 +--------------------------------------------------------------------------+
 ```
 
-Start from the API view if the API is reachable:
+Start from the API view if the API is reachable, because node conditions and recent node Events show what the control plane believes about the node before you log in to it:
 
 ```bash
-k get nodes -o wide
-k describe node <node-name>
+kubectl get nodes -o wide
+kubectl describe node <node-name>
 ```
 
-Then move to the node when node-local evidence is needed:
+Then move to the node when node-local evidence is needed, checking kubelet, containerd, running containers, disk space, and memory in roughly the order the worker node diagram shows:
 
 ```bash
 ssh <node-name>
@@ -366,14 +360,14 @@ Node pressure conditions affect scheduling and eviction. `MemoryPressure=True` c
 A safe maintenance response is to cordon before drain when you need to stop new workloads arriving and evict existing workloads deliberately:
 
 ```bash
-k cordon <node-name>
-k drain <node-name> --ignore-daemonsets --delete-emptydir-data
+kubectl cordon <node-name>
+kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
 ```
 
-After maintenance, return the node to scheduling:
+After maintenance, return the node to scheduling, because a cordoned node stays unschedulable until someone explicitly reverses the cordon, even after it is healthy again:
 
 ```bash
-k uncordon <node-name>
+kubectl uncordon <node-name>
 ```
 
 Do not drain a node as a first response to every `NotReady` condition. Draining requires the API server and eviction path to work, and it may disrupt workloads with strict PodDisruptionBudgets. First determine whether the node can be recovered by restarting kubelet or containerd, freeing disk, correcting network access, or fixing certificates. Drain is a maintenance action, not a diagnostic shortcut.
@@ -404,29 +398,29 @@ The packet path is the best organizing model. Start with name resolution only if
 +-------------+                    +----------------+                  +-------------+
 ```
 
-A compact service-debug sequence is:
+A compact service-debug sequence checks the Service definition, the EndpointSlices that back it, the labels on candidate Pods, and the Service description with its selector and endpoints:
 
 ```bash
-k get svc <service-name> -o wide
-k get endpointslice -l kubernetes.io/service-name=<service-name>
-k get pods --show-labels
-k describe svc <service-name>
+kubectl get svc <service-name> -o wide
+kubectl get endpointslice -l kubernetes.io/service-name=<service-name>
+kubectl get pods --show-labels
+kubectl describe svc <service-name>
 ```
 
 If the EndpointSlice has no addresses, check the selector and Pod labels. A Service selector must match Pod labels exactly. It is common for a Deployment to use `app: checkout-api` while the Service selects `app: checkout`. Kubernetes will create the Service happily, but the Service will have no endpoints because no ready Pods match.
 
 ```bash
-k get svc checkout -o jsonpath='{.spec.selector}{"\n"}'
-k get pods -l app=checkout --show-labels
-k get pods -l app=checkout-api --show-labels
+kubectl get svc checkout -o jsonpath='{.spec.selector}{"\n"}'
+kubectl get pods -l app=checkout --show-labels
+kubectl get pods -l app=checkout-api --show-labels
 ```
 
 Readiness also matters. [A Pod can match the selector but be excluded from endpoints when it is not ready.](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/) That behavior protects clients from traffic to unhealthy Pods, but it can surprise learners who only look at labels. If endpoints are missing and labels look correct, inspect Pod readiness, probe Events, and container logs.
 
 ```bash
-k get pods -l app=checkout -o wide
-k describe pod <pod-name>
-k logs <pod-name>
+kubectl get pods -l app=checkout -o wide
+kubectl describe pod <pod-name>
+kubectl logs <pod-name>
 ```
 
 Port mismatches are another common service failure. [In a Service, `port` is the port clients use on the Service, while `targetPort` is the port on the Pod.](https://kubernetes.io/docs/concepts/services-networking/service/index.html) If the Service has `port: 80` and `targetPort: 8080`, but the container listens on 80, traffic will be forwarded to a port where nothing is listening. The Service object can look normal, endpoints can exist, and DNS can resolve, yet the application remains unreachable.
@@ -449,18 +443,18 @@ The fix is to align the Service `targetPort` with the container's actual listeni
 DNS troubleshooting begins inside a Pod because cluster DNS behavior depends on the Pod's resolver configuration and network path to CoreDNS. Use a temporary Pod or an existing app Pod when allowed:
 
 ```bash
-k run dns-test --image=busybox:1.36 --restart=Never -- sleep 3600
-k exec dns-test -- nslookup kubernetes.default.svc.cluster.local
-k exec dns-test -- cat /etc/resolv.conf
+kubectl run dns-test --image=busybox:1.36 --restart=Never -- sleep 3600
+kubectl exec dns-test -- nslookup kubernetes.default.svc.cluster.local
+kubectl exec dns-test -- cat /etc/resolv.conf
 ```
 
-If every Service name fails, inspect CoreDNS and the kube-dns Service:
+If every Service name fails, inspect CoreDNS and the kube-dns Service, because a cluster-wide resolution failure points at the shared DNS path rather than at any one application:
 
 ```bash
-k -n kube-system get pods -l k8s-app=kube-dns -o wide
-k -n kube-system logs -l k8s-app=kube-dns
-k -n kube-system get svc kube-dns
-k -n kube-system get endpointslice -l kubernetes.io/service-name=kube-dns
+kubectl -n kube-system get pods -l k8s-app=kube-dns -o wide
+kubectl -n kube-system logs -l k8s-app=kube-dns
+kubectl -n kube-system get svc kube-dns
+kubectl -n kube-system get endpointslice -l kubernetes.io/service-name=kube-dns
 ```
 
 If only one Service name fails, DNS is less likely to be the root cause. The Service might not exist, the namespace might be wrong, or the client might be using the wrong short name. [A Pod in namespace `frontend` resolving `checkout` will search `checkout.frontend.svc.cluster.local` before other names. If the Service lives in namespace `payments`, the client should use `checkout.payments` or the fully qualified name.](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
@@ -468,16 +462,16 @@ If only one Service name fails, DNS is less likely to be the root cause. The Ser
 NetworkPolicy failures require a different habit: check whether a policy selects the affected Pods and whether it allows the direction you are testing. [A policy that selects Pods and has ingress rules makes ingress restricted for those Pods. Egress remains unrestricted unless egress isolation is also created by policy type and rules. If both ingress and egress are restricted, you must allow DNS as well as application traffic when Pods need name resolution.](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 
 ```bash
-k get networkpolicy
-k describe networkpolicy <policy-name>
-k get pod <pod-name> --show-labels
+kubectl get networkpolicy
+kubectl describe networkpolicy <policy-name>
+kubectl get pod <pod-name> --show-labels
 ```
 
 Cross-node communication failures often point below Service objects. If Pods on the same node communicate but Pods on different nodes do not, suspect CNI routing, overlay encapsulation, MTU, node firewalling, or blocked node-to-node traffic. Check CNI Pods across nodes, then inspect node-level CNI configuration only when needed.
 
 ```bash
-k -n kube-system get pods -o wide
-k -n kube-system logs <cni-pod-name>
+kubectl -n kube-system get pods -o wide
+kubectl -n kube-system logs <cni-pod-name>
 ```
 
 The key is to follow the packet rather than chase components randomly. If the name does not resolve, work on DNS. If the name resolves and the Service has no endpoints, work on labels and readiness. If endpoints exist but connections fail, work on ports, NetworkPolicy, dataplane, and CNI. Each step eliminates several possible causes.
@@ -491,27 +485,27 @@ Kubernetes gives you several observability signals, but each signal has a differ
 [Events are not a durable incident archive. They can expire, be compacted, or be absent by the time you investigate.](https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/) That is why recent CKA-style problems often expect you to look at Events immediately, while real production systems need centralized logging, metrics, and alerting. In the exam, if Events are still present, they are often the fastest clue.
 
 ```bash
-k get events --sort-by=.lastTimestamp
-k describe pod <pod-name>
+kubectl get events --sort-by=.lastTimestamp
+kubectl describe pod <pod-name>
 ```
 
 For a crashing container, current logs may show only the newest instance, which might not yet have reached the failure point. [Previous logs show the prior terminated container instance:](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_logs/)
 
 ```bash
-k logs <pod-name> --previous
+kubectl logs <pod-name> --previous
 ```
 
-For multi-container Pods, always specify the container when needed:
+For multi-container Pods, always specify the container when needed, because without `-c` you may read a different container from the one that actually restarted:
 
 ```bash
-k logs <pod-name> -c <container-name> --previous
+kubectl logs <pod-name> -c <container-name> --previous
 ```
 
 [Metrics Server powers `kubectl top`, but metrics absence does not automatically mean workloads are healthy or unhealthy.](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/) It means the metrics pipeline is not available to that command. Check whether Metrics Server exists and is ready before assuming a resource view is meaningful:
 
 ```bash
-k top pods
-k -n kube-system get pods | grep metrics-server
+kubectl top pods
+kubectl -n kube-system get pods | grep metrics-server
 ```
 
 When Metrics Server is unavailable in a cluster where you are allowed to install it, the standard manifest is often used. In a locked-down exam or production environment, do not install components unless the task explicitly allows it. Verify the expected cluster policy first.
@@ -546,10 +540,10 @@ Use rollbacks when they match the evidence. A Deployment that broke immediately 
 A good final verification follows the dependency path in reverse. If you fixed a Deployment, check rollout status and Pods. If you fixed a Service selector, check EndpointSlices and run a request from a client Pod. If you restarted kubelet, check node readiness and that Pods can be scheduled. If you renewed certificates, check API health and component status through supported commands.
 
 ```bash
-k rollout status deployment/<deployment-name>
-k get pods -o wide
-k get endpointslice -l kubernetes.io/service-name=<service-name>
-k run curl-test --image=curlimages/curl:8.11.1 --restart=Never --rm -it -- \
+kubectl rollout status deployment/<deployment-name>
+kubectl get pods -o wide
+kubectl get endpointslice -l kubernetes.io/service-name=<service-name>
+kubectl run curl-test --image=curlimages/curl:8.11.1 --restart=Never --rm -it -- \
   curl -sS http://<service-name>.<namespace>.svc.cluster.local
 ```
 
@@ -573,13 +567,13 @@ The exam does not require perfect production incident management, but it does re
 
 | Mistake | Why It Hurts | Better Practice |
 |---|---|---|
-| Checking application logs before Events for a `Pending` Pod | A `Pending` Pod has not run, so logs usually cannot explain the scheduling failure | Use `k describe pod` and read Events before moving to logs |
+| Checking application logs before Events for a `Pending` Pod | A `Pending` Pod has not run, so logs usually cannot explain the scheduling failure | Use `kubectl describe pod` and read Events before moving to logs |
 | Deleting Pods owned by a broken Deployment template | The ReplicaSet recreates Pods with the same bad configuration | Fix the Deployment template, then verify the rollout |
 | Treating `CrashLoopBackOff` as one specific failure | Crashes can come from app bugs, missing config, probes, permissions, or memory limits | Inspect previous logs and last termination state before patching |
 | Restarting CoreDNS for one Service with empty endpoints | DNS may be healthy while the Service selector or Pod readiness is wrong | Check Service selector, EndpointSlices, labels, and readiness first |
 | Draining a `NotReady` node before checking kubelet and runtime | Drain can disrupt workloads and may fail if node or API paths are unhealthy | Inspect kubelet, containerd, disk, memory, and API reachability first |
 | Editing a static pod manifest without validating syntax and paths | A typo can keep a control plane component down because kubelet continuously retries the bad manifest | Check kubelet logs and manifest content carefully before and after changes |
-| Installing Metrics Server whenever `k top` fails | The command failure may reflect missing metrics, permissions, or cluster policy rather than workload failure | Verify whether Metrics Server is expected and allowed before installing components |
+| Installing Metrics Server whenever `kubectl top` fails | The command failure may reflect missing metrics, permissions, or cluster policy rather than workload failure | Verify whether Metrics Server is expected and allowed before installing components |
 
 ---
 
@@ -589,23 +583,35 @@ The exam does not require perfect production incident management, but it does re
 
 Your team deploys `reports-api` with three replicas. The Deployment exists, but every Pod is `Pending`, and the application team asks you for container logs. You need to choose the fastest useful first check and explain what you would do with the result.
 
+A) Run `kubectl logs` on each Pod, because the application team needs container output to explain why startup is blocked.
+B) Run `kubectl describe pod` on one Pod and read its Events, because a `Pending` Pod has not been scheduled or started yet.
+C) Restart the CoreDNS Pods, because new Pods often stay `Pending` when the cluster cannot resolve Service names during startup.
+D) Delete the three Pods so the ReplicaSet recreates them, because a fresh scheduling attempt usually clears a `Pending` state.
 <details>
 <summary>Answer</summary>
 
-Start with `k describe pod <pod-name>` and read the Events section because `Pending` means the Pod has not been scheduled or cannot complete scheduling-related prerequisites. Container logs are unlikely to exist because the container has not started.
+B is correct because `Pending` means scheduling has not completed, so the Events from `kubectl describe pod` are where Kubernetes explains what blocked placement. A is wrong because the container has not started, so there are usually no application logs to read. C is wrong because the usual `Pending` causes are resources, taints, selectors, affinity, PVC binding, or the scheduler itself, and cluster DNS is not part of that placement decision. D is wrong because the ReplicaSet recreates Pods from the same template, so the replacements hit the same scheduling constraint.
 
-If Events show insufficient CPU or memory, reduce the request if appropriate or add capacity in a real cluster. If Events show an untolerated taint, add the correct toleration only if the workload should run there. If Events show node selector or affinity mismatch, correct the Deployment template. If Events show PVC binding problems, inspect the PVC and StorageClass. The verification is `k get pods -o wide` showing assigned nodes and then readiness progressing.
+Start with `kubectl describe pod <pod-name>` and read the Events section because `Pending` means the Pod has not been scheduled or cannot complete scheduling-related prerequisites. Container logs are unlikely to exist because the container has not started.
+
+If Events show insufficient CPU or memory, reduce the request if appropriate or add capacity in a real cluster. If Events show an untolerated taint, add the correct toleration only if the workload should run there. If Events show node selector or affinity mismatch, correct the Deployment template. If Events show PVC binding problems, inspect the PVC and StorageClass. The verification is `kubectl get pods -o wide` showing assigned nodes and then readiness progressing.
 
 </details>
 
 ### Q2: CrashLoopBackOff After A New Image
 
-A Deployment was updated ten minutes ago, and the new Pods are in `CrashLoopBackOff`. `k describe pod` shows `Last State: Terminated, Reason: Error, Exit Code: 1`, but no `OOMKilled`. The previous revision worked. You need to decide whether to roll back immediately or patch configuration.
+A Deployment was updated ten minutes ago, and the new Pods are in `CrashLoopBackOff`. `kubectl describe pod` shows `Last State: Terminated, Reason: Error, Exit Code: 1`, but no `OOMKilled`. The previous revision worked. You need to decide whether to roll back immediately or patch configuration.
 
+A) Roll back with `kubectl rollout undo` right away, because any crash after an image change proves the new image is the cause.
+B) Raise the Deployment memory limit, because a `CrashLoopBackOff` that starts right after an update is usually an out-of-memory kill.
+C) Read `kubectl logs --previous` first, then roll back if the new image is bad or patch if expected configuration is missing.
+D) Delete the new Pods so the ReplicaSet retries them, because exit code 1 usually signals a transient startup problem that clears itself.
 <details>
 <summary>Answer</summary>
 
-Run `k logs <pod-name> --previous` first because the container started and exited. If the previous logs show an application error caused by the new image, such as a failed migration or missing binary, and availability is the immediate goal, `k rollout undo deployment/<name>` is the fastest safe recovery. Verify with `k rollout status deployment/<name>` and `k get pods`.
+C is correct because the container started and exited, so the previous instance's logs hold the evidence that decides between a rollback and a narrow patch. A is wrong because it skips the evidence step, and a crash after an update does not by itself prove the image is bad; the new image may simply expect configuration that was never created. B is wrong because the termination reason is `Error` with exit code 1, not `OOMKilled`, so nothing points at memory. D is wrong because the replacement Pods come from the same template, and nothing in the evidence suggests the failure is transient.
+
+Run `kubectl logs <pod-name> --previous` first because the container started and exited. If the previous logs show an application error caused by the new image, such as a failed migration or missing binary, and availability is the immediate goal, `kubectl rollout undo deployment/<name>` is the fastest safe recovery. Verify with `kubectl rollout status deployment/<name>` and `kubectl get pods`.
 
 If the logs clearly show a missing environment variable or missing ConfigMap key that the scenario expects you to provide, patch the Deployment or create the missing configuration instead of rolling back. The decision depends on evidence. Roll back when the new revision itself is bad or unknown; patch when the intended configuration is clearly absent and the fix is narrow.
 
@@ -615,15 +621,21 @@ If the logs clearly show a missing environment variable or missing ConfigMap key
 
 A client Pod can resolve `checkout.default.svc.cluster.local`, but HTTP requests time out. The Service exists, and CoreDNS Pods are healthy. You need to trace the next layers without randomly restarting components.
 
+A) Check the Service and its EndpointSlices, then compare the selector, Pod readiness, and `targetPort` with the Pods behind it.
+B) Restart the CoreDNS Pods, because a timeout after a successful lookup usually means the DNS answer was stale or cached.
+C) Recreate the client Pod with a new `/etc/resolv.conf`, because its resolver search path is probably pointing at the wrong namespace.
+D) Delete and recreate the Service, because a new ClusterIP forces the dataplane on every node to rebuild its forwarding rules.
 <details>
 <summary>Answer</summary>
+
+A is correct because name resolution already works, so the next layers on the packet path are Service routing, endpoints, readiness, and ports. B is wrong because the name resolved, which means CoreDNS has already done its part of the request. C is wrong because the client used the fully qualified name, so the resolver search path is not involved in this lookup. D is wrong because recreating the Service from the same definition brings back the same selector and `targetPort`, so it is a broad change that does not test any specific cause.
 
 Because DNS resolution works, move to Service routing evidence. Check the Service and EndpointSlices:
 
 ```bash
-k get svc checkout -o wide
-k get endpointslice -l kubernetes.io/service-name=checkout
-k describe svc checkout
+kubectl get svc checkout -o wide
+kubectl get endpointslice -l kubernetes.io/service-name=checkout
+kubectl describe svc checkout
 ```
 
 If EndpointSlices are empty, compare the Service selector with Pod labels and readiness. If endpoints exist, compare Service `targetPort` with the container's actual listening port, then consider NetworkPolicy, kube-proxy or dataplane behavior, and CNI. Restarting CoreDNS is not justified because name resolution already works.
@@ -634,8 +646,14 @@ If EndpointSlices are empty, compare the Service selector with Pod labels and re
 
 Every `kubectl` command times out. You can SSH to the control plane node. The incident started after someone edited a control plane manifest. You need to restore API access while collecting useful evidence.
 
+A) Run `kubectl describe pod` for the API server in `kube-system`, because its Events will show the flag rejected after the manifest edit.
+B) Run `kubeadm certs renew all` first, because API timeouts right after a manifest edit are most often caused by expired certificates.
+C) Drain the control plane node and reboot it, because a restart makes kubelet rebuild every static Pod from a clean state.
+D) Use host-level tools: check kubelet status and its journal, find the API server container with `crictl`, and review the edited manifest.
 <details>
 <summary>Answer</summary>
+
+D is correct because the API is unavailable, so evidence has to come from kubelet, the container runtime, and the static Pod manifest directory on the node. A is wrong because every `kubectl` command already times out, so it cannot fetch Pod Events from the API server. B is wrong because the evidence points at the recent manifest edit, and renewing certificates changes a second thing without any sign that they expired. C is wrong because draining needs a working API server and eviction path, and a reboot does not correct a bad manifest that kubelet will simply read again.
 
 Use host-level checks because the API is unavailable. Start with kubelet and static pod evidence:
 
@@ -654,8 +672,14 @@ If the API server container is restarting, inspect its container logs with `cric
 
 A worker node becomes `NotReady`. Existing workloads on other nodes are fine, but new Pods avoid the affected node. You can SSH to the node, and the container runtime is running. Kubelet logs show repeated failures reaching the API server. You need to choose the next diagnostic layer.
 
+A) Inspect the Service selectors for workloads on that node, because `NotReady` usually means those Pods have dropped out of every endpoint list.
+B) Test API server reachability from the node and read kubelet journal errors, because kubelet must reach the API to report node status.
+C) Restart containerd on the node, because a `NotReady` node almost always means the container runtime has stopped answering kubelet.
+D) Drain the node right away, because eviction is the fastest way to find out which host component has failed on it.
 <details>
 <summary>Answer</summary>
+
+B is correct because the kubelet journal already shows that it cannot reach the API server, and the node reports its status only through that connection. A is wrong because Service selectors decide which Pods receive traffic, not whether a node reports itself `Ready`. C is wrong because the scenario states that the runtime is running, and the kubelet errors point at the API connection instead. D is wrong because drain is a maintenance action, not a diagnostic shortcut, and it depends on the same API path that is failing.
 
 Focus on API server reachability from the node and kubelet authentication or network path, not application logs or Service selectors. The kubelet must communicate with the API server to report node status. Check network connectivity to the API endpoint, DNS or host resolution if a name is used, firewall rules, and kubelet certificate-related errors in the journal.
 
@@ -672,16 +696,22 @@ If the API endpoint is reachable but kubelet authentication fails, inspect kubel
 
 ### Q6: Empty Endpoints After A Label Change
 
-A developer changed Pod labels during a cleanup. The Deployment has healthy Pods, but traffic through the Service fails, and `k get endpointslice -l kubernetes.io/service-name=web` shows no ready addresses. You need to restore traffic without recreating the application.
+A developer changed Pod labels during a cleanup. The Deployment has healthy Pods, but traffic through the Service fails, and `kubectl get endpointslice -l kubernetes.io/service-name=web` shows no ready addresses. You need to restore traffic without recreating the application.
 
+A) Restart kube-proxy on every node, because empty EndpointSlices mean the dataplane has lost its forwarding rules for the Service.
+B) Delete and recreate the Deployment, because fresh Pods register themselves with the Service automatically when they start.
+C) Compare the Service selector with the current Pod labels, then realign either the selector or the Deployment template labels.
+D) Restart CoreDNS, because a label cleanup changes the Service name that DNS returns to clients inside the cluster.
 <details>
 <summary>Answer</summary>
+
+C is correct because EndpointSlices get their ready addresses from Pods that match the Service selector, and the label change is the most recent difference between the two. A is wrong because kube-proxy programs traffic toward endpoints that already exist; it cannot fill an EndpointSlice whose selector matches no Pods. B is wrong because recreated Pods get the same labels from the same template, so the selector still matches nothing. D is wrong because Pod labels do not change the Service name, and DNS resolution is not the failing step here.
 
 Compare the Service selector to the actual Pod labels:
 
 ```bash
-k get svc web -o jsonpath='{.spec.selector}{"\n"}'
-k get pods --show-labels
+kubectl get svc web -o jsonpath='{.spec.selector}{"\n"}'
+kubectl get pods --show-labels
 ```
 
 If the Service selects `app=web` but Pods now have `app=frontend`, either restore the expected Pod label through the Deployment template or update the Service selector to the correct stable label. Choose the option that matches the intended naming convention in the scenario. Verify with EndpointSlices showing addresses and a request from a client Pod. Recreating Pods is unnecessary unless you changed the Deployment template and need the controller to roll out new labels.
@@ -692,14 +722,20 @@ If the Service selects `app=web` but Pods now have `app=frontend`, either restor
 
 A Pod is repeatedly restarting, and the application owner asks for `kubectl top pod` output. The command returns `metrics not available`. You still need to determine whether memory limits are involved and decide the next action.
 
+A) Install Metrics Server first, because the memory question cannot be answered until `kubectl top pod` returns current usage data.
+B) Delete the Pod so its replacement starts with fresh memory, then watch whether the restart count keeps climbing afterward.
+C) Rule memory out, because a missing `kubectl top` result means the container never used enough memory to be measured.
+D) Read the Pod's last termination state and Events, then adjust the controller's memory limit if the reason is `OOMKilled`.
 <details>
 <summary>Answer</summary>
+
+D is correct because the last termination state records whether the container was `OOMKilled`, and that evidence exists without any metrics pipeline. A is wrong because the root-cause question does not depend on current metrics, and installing a component may not be allowed in the cluster. B is wrong because the replacement Pod uses the same template and limit, and deleting the Pod removes the termination record you need. C is wrong because missing metrics only mean the metrics pipeline is unavailable to that command, not that memory usage was low.
 
 Do not block on metrics if status evidence is available. Inspect the Pod termination state and Events:
 
 ```bash
-k describe pod <pod-name>
-k get pod <pod-name> -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}{"\n"}'
+kubectl describe pod <pod-name>
+kubectl get pod <pod-name> -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}{"\n"}'
 ```
 
 If the reason is `OOMKilled`, inspect the container resource limits in the controller template and adjust them if the scenario supports that fix. Metrics Server absence only means `kubectl top` cannot provide current metrics; it does not erase termination evidence. You can separately check whether Metrics Server is installed, but the immediate root-cause path uses Pod status and Events.
@@ -710,16 +746,22 @@ If the reason is `OOMKilled`, inspect the container resource limits in the contr
 
 Two Pods on the same node can communicate, but the same application fails when client and server Pods land on different nodes. Services and EndpointSlices look correct. You need to identify the likely failing subsystem and choose evidence to confirm it.
 
+A) Inspect CNI Pods and logs across nodes, then check node-to-node reachability, because only traffic that crosses nodes is failing.
+B) Fix the Service selector, because traffic between nodes is matched by labels, and a mismatch only affects Pods on remote nodes.
+C) Restart CoreDNS, because Pods on different nodes resolve Service names through separate DNS caches that can drift apart.
+D) Roll back the application Deployment, because a new image that fails only across nodes must contain a networking bug.
 <details>
 <summary>Answer</summary>
+
+A is correct because the failure follows node placement, which points below Service objects to the CNI, overlay routing, MTU, or node firewalling. B is wrong because the Services and EndpointSlices already look correct, and a selector mismatch would break same-node traffic as well. C is wrong because same-node traffic already works with the same DNS setup, so name resolution is not what separates the working case from the failing one. D is wrong because the same application works when both Pods share a node, so the code is not the variable that changes.
 
 Suspect CNI cross-node networking, node-to-node firewalling, overlay routing, or MTU issues because same-node traffic works while cross-node traffic fails. Service selectors and endpoints are less likely because they are already correct and same-node communication succeeds.
 
 Check CNI Pods and logs across nodes:
 
 ```bash
-k -n kube-system get pods -o wide
-k -n kube-system logs <cni-pod-name>
+kubectl -n kube-system get pods -o wide
+kubectl -n kube-system logs <cni-pod-name>
 ```
 
 Then inspect node network reachability if the scenario allows host access. The fix depends on the CNI implementation and evidence, but the diagnostic decision is to move below Service objects into the dataplane and node network layer.
@@ -736,66 +778,66 @@ Then inspect node network reachability if the scenario allows host access. The f
 
 ### Step 1: Establish The Namespace And Baseline
 
-Run the broadest safe read commands first so you can identify the visible symptom without changing state.
+Run the broadest safe read commands first so you can identify the visible symptom without changing state or triggering controller activity that could replace the evidence you need.
 
 ```bash
-k get all -n trouble-lab -o wide
-k get events -n trouble-lab --sort-by=.lastTimestamp
+kubectl get all -n trouble-lab -o wide
+kubectl get events -n trouble-lab --sort-by=.lastTimestamp
 ```
 
 Record whether the primary symptom appears to be workload startup, Service routing, DNS, node placement, or a combination. Do not edit anything yet. The goal is to select a layer before selecting a fix.
 
 ### Step 2: Inspect Pods By Lifecycle State
 
-If any Pod is `Pending`, `ContainerCreating`, `ImagePullBackOff`, or `CrashLoopBackOff`, inspect one representative Pod.
+If any Pod is `Pending`, `ContainerCreating`, `ImagePullBackOff`, or `CrashLoopBackOff`, inspect one representative Pod, because Pods created from the same template usually fail for the same reason and one describe output is enough to start.
 
 ```bash
-k describe pod -n trouble-lab <pod-name>
+kubectl describe pod -n trouble-lab <pod-name>
 ```
 
-If the container has restarted, collect previous logs.
+If the container has restarted, collect previous logs, because the current instance may not have reached the failure point yet when you read its output.
 
 ```bash
-k logs -n trouble-lab <pod-name> --previous
+kubectl logs -n trouble-lab <pod-name> --previous
 ```
 
 Decide whether the fix belongs in the Deployment template, a referenced ConfigMap or Secret, a resource request or limit, an image reference, or a probe. Apply only the change supported by the evidence.
 
 ### Step 3: Verify The Controller Source Of Truth
 
-If you change workload configuration, change the owning controller rather than an individual Pod.
+If you change workload configuration, change the owning controller rather than an individual Pod, because the controller recreates Pods from its template and would overwrite an edit made to one Pod.
 
 ```bash
-k get deploy -n trouble-lab
-k edit deployment -n trouble-lab <deployment-name>
-k rollout status deployment -n trouble-lab <deployment-name>
+kubectl get deploy -n trouble-lab
+kubectl edit deployment -n trouble-lab <deployment-name>
+kubectl rollout status deployment -n trouble-lab <deployment-name>
 ```
 
-After the rollout, confirm that new Pods are healthy.
+After the rollout, confirm that new Pods are healthy, using the wide listing so that readiness, restarts, and node placement appear together in one view.
 
 ```bash
-k get pods -n trouble-lab -o wide
+kubectl get pods -n trouble-lab -o wide
 ```
 
 ### Step 4: Trace Service Routing
 
-Once Pods are healthy or while another teammate fixes the workload, inspect the Service path.
+Once Pods are healthy or while another teammate fixes the workload, inspect the Service path, starting with the Service object and ending with the labels on the Pods it should select.
 
 ```bash
-k get svc -n trouble-lab web -o wide
-k describe svc -n trouble-lab web
-k get endpointslice -n trouble-lab -l kubernetes.io/service-name=web
-k get pods -n trouble-lab --show-labels
+kubectl get svc -n trouble-lab web -o wide
+kubectl describe svc -n trouble-lab web
+kubectl get endpointslice -n trouble-lab -l kubernetes.io/service-name=web
+kubectl get pods -n trouble-lab --show-labels
 ```
 
 If endpoints are empty, compare selectors and labels, then fix the Service selector or the Deployment template labels according to the intended naming. If endpoints exist, compare Service `targetPort` with the container port and application listener.
 
 ### Step 5: Test From A Client Pod
 
-Use a temporary client Pod to test the same path a real in-cluster client would use.
+Use a temporary client Pod to test the same path a real in-cluster client would use, so the check exercises DNS, the Service, its endpoints, and the network path together.
 
 ```bash
-k run curl-test -n trouble-lab \
+kubectl run curl-test -n trouble-lab \
   --image=curlimages/curl:8.11.1 \
   --restart=Never \
   --rm -it -- \
@@ -808,18 +850,18 @@ If DNS fails, test CoreDNS and resolver configuration. If DNS succeeds but the H
 
 Write a short incident note for yourself with the symptom, evidence, root cause, fix, and verification command. This is not busywork. It trains the same diagnostic discipline you need during CKA scenarios, where the difference between a fast fix and a lucky guess is whether you can explain the evidence chain.
 
-**Success Criteria**:
+**Success Criteria**: tick an item only when you can point to the command output that proved it, not when you merely remember running the command.
 
-- [ ] You identified the first failing layer before making changes.
-- [ ] You used `k describe pod` Events for scheduling, image, mount, probe, or lifecycle evidence.
-- [ ] You used `k logs --previous` only when the container had actually started and restarted.
+- [ ] You compared the failure signature with similar states, such as `Pending` versus `ContainerCreating`, and identified the first failing layer before making changes.
+- [ ] You used `kubectl describe pod` Events for scheduling, image, mount, probe, or lifecycle evidence.
+- [ ] You used `kubectl logs --previous` only when the container had actually started and restarted.
 - [ ] You changed the owning controller or referenced object rather than patching an ephemeral Pod.
-- [ ] You verified Deployment recovery with `k rollout status` when a rollout was involved.
+- [ ] You verified Deployment recovery with `kubectl rollout status` when a rollout was involved.
 - [ ] You verified Service routing with EndpointSlices or endpoints before testing HTTP.
 - [ ] You tested the final user path from a client Pod inside the cluster.
 - [ ] You can explain why your fix was narrower than deleting and recreating the application.
 
-**Reflection Questions**:
+**Reflection Questions**: answer these after the lab, while your incident note still holds the evidence chain from the first symptom to the verified fix.
 
 1. Which command gave you the first decisive evidence, and why was it better than the command you almost ran?
 2. What would have happened if you deleted the failing Pods without fixing the source object?
@@ -830,7 +872,7 @@ Write a short incident note for yourself with the symptom, evidence, root cause,
 
 ## Next Module
 
-Continue to [Part 6: Mock Exams](/k8s/cka/part6-mock-exams/) for timed practice under exam conditions.
+Continue to [Part 6: Mock Exams](/k8s/cka/part6-mock-exams/) for timed practice under exam conditions, where the same layered loop of symptom, evidence, narrow fix, and verification has to fit inside a fixed time budget.
 
 ## Sources
 
