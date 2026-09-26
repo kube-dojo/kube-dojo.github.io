@@ -91,7 +91,16 @@ kubectl logs <pod> --timestamps
 kubectl logs <pod> --tail=100 --timestamps -f
 ```
 
-Pause and predict: if a pod has two containers and you run `kubectl logs <pod>` without `-c`, what evidence do you expect Kubernetes to return, and what risk does that create for your investigation? The important habit is to ask what object boundary the command is reading from. A pod is a scheduling unit, but logs belong to containers inside that pod, so a command that does not name a container can be ambiguous when more than one stream exists.
+**Pause and predict:** A pod has two containers. If you run `kubectl logs <pod>` without `-c`, what evidence would you expect, and what might you miss while investigating?
+
+<details>
+<summary>Reveal the container boundary</summary>
+
+Logs belong to containers, not the pod as a merged unit. With two containers, a command that does not name one is ambiguous; identify the container you need or explicitly request all containers.
+
+</details>
+
+Before choosing a command, inspect the pod specification and decide which component could explain the symptom you are investigating.
 
 Multi-container pods are common in production even when the application itself seems simple. A service mesh proxy, file tailer, authentication helper, or metrics exporter can all live beside the main application and fail independently. When the symptom involves traffic, logging, startup ordering, or shared volumes, inspect the container list before assuming the app container is the only useful source of evidence.
 
@@ -213,7 +222,16 @@ kubectl get events --field-selector involvedObject.name=<pod-name>
 kubectl get events -w
 ```
 
-Pause and predict: if a pod was created three days ago and has been restarting since then, which events can still be present, and which early events are probably gone? You should expect recent restart, backoff, probe, or image events to be available if they are still being emitted, but the original scheduling and creation events may have aged out. The age column is evidence too; it tells you whether you are looking at the beginning of the incident or only the latest repetition.
+**Pause and predict:** A pod was created three days ago and has been restarting since then. Which observations might still be visible, and which early observations might be gone?
+
+<details>
+<summary>Reveal the time boundary</summary>
+
+Recent restart, backoff, probe, or image events may remain if they are still emitted, while the original scheduling and creation events may have aged out. Use the age column to distinguish the latest repetition from the beginning of the incident.
+
+</details>
+
+Compare the remaining timeline with current pod state before deciding whether it explains the initial failure or only its continuing symptoms.
 
 | Reason | Type | What It Means |
 |--------|------|---------------|
@@ -574,7 +592,16 @@ Node placement can also change the path. If every failing pod lands on the same 
 
 Timing is the thread that ties these observations together. A useful timeline might say: the new ReplicaSet created pods at 10:12, kubelet started containers at 10:13, the application logged a configuration error at 10:13, kubelet recorded `BackOff` at 10:14, and the Deployment stayed unavailable afterward. That sequence supports a configuration rollback. A different timeline, where scheduling failed before any container started, would support a placement or capacity fix instead.
 
-Pause and predict: if the application team asks for "the logs from the failed rollout," which exact streams would you collect, and how would you label them so the team can reason about time? A high-quality answer includes previous logs for each failing container, current logs for any surviving replicas, relevant Events sorted by timestamp, and the Deployment or ReplicaSet status that shows which revision the pods belong to. Raw text without labels is hard to use during a handoff.
+**Pause and predict:** The application team asks for "the logs from the failed rollout." What would you collect, and how would you label it so they can reconstruct the timeline?
+
+<details>
+<summary>Reveal the evidence set</summary>
+
+Collect previous logs for each failing container, current logs for surviving replicas, relevant Events sorted by time, and the Deployment or ReplicaSet revision. Label each item with its pod, container, and timestamp so the handoff identifies what failed and when.
+
+</details>
+
+Group the captured material by workload and time, then explain which observations support the diagnosis and which gaps still need investigation.
 
 This example also explains why log aggregation does not eliminate `kubectl` skills. A central log system may preserve history and improve search, but Kubernetes object state is still the fastest way to map a symptom to pods, containers, nodes, restart reasons, and Events. Conversely, `kubectl` may show only recent or node-local evidence, so durable logging remains essential for delayed investigations. Effective operators understand both views and move between them deliberately.
 
@@ -1004,7 +1031,51 @@ kubectl top nodes
 kubectl top pods -A --sort-by=memory | head
 ```
 
-### Success Criteria
+### Card A: Two-container logs
+
+`kubectl logs` without `-c` on a two-container pod returns one merged stream of both containers. Decide whether that claim is true before revealing the answer.
+
+<details>
+<summary>Reveal Card A</summary>
+
+**False.** Logs are container-specific; without `-c`, the command does not automatically merge both containers. Name a container or request all containers explicitly so the evidence has a clear origin.
+
+</details>
+
+### Card B: Three-day-old pod
+
+Events from pod creation three days ago are still the best record of the original schedule. Decide whether that claim is true before revealing the answer.
+
+<details>
+<summary>Reveal Card B</summary>
+
+**False.** Early scheduling and creation Events may have expired, even when newer Events from recurring failures remain. Check timestamps and seek another retained record before treating recent Events as the original timeline.
+
+</details>
+
+### Card C: Failed rollout logs
+
+The logs from a failed rollout are the current logs of the newest pod. Decide whether that claim is true before revealing the answer.
+
+<details>
+<summary>Reveal Card C</summary>
+
+**False.** A useful handoff also includes previous logs from failing containers, current logs from surviving replicas, time-sorted Events, and the Deployment or ReplicaSet revision. The newest pod alone cannot establish the full failure sequence.
+
+</details>
+
+### Card D: Missing Metrics Server
+
+`kubectl top` works even when Metrics Server is not installed. Decide whether that claim is true before revealing the answer.
+
+<details>
+<summary>Reveal Card D</summary>
+
+**False.** `kubectl top` depends on the resource metrics pipeline, commonly supplied by Metrics Server. If it is absent, the metrics API may be unavailable, so diagnose that dependency before interpreting the command failure.
+
+</details>
+
+**Success Criteria**: Confirm live logs, previous container logs, event age, and why a metrics command can fail when the metrics server is absent.
 
 - [ ] Viewed live logs with follow and stopped the stream intentionally.
 - [ ] Filtered logs for errors and explained what the filter hides.
