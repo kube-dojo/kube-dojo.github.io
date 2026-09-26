@@ -44,7 +44,18 @@ Think of cluster networking as a highway system. Pods are cars with unique addre
 
 Kubernetes gives every pod its own IP address, and the platform expects pods to reach other pods without application-level port mapping. That design is powerful because a workload can move across nodes while still behaving like a small machine on a flat network, but it also means failure signals can look deceptively similar. A timeout from `curl` might mean a process is not listening, a Service has no endpoints, a NetworkPolicy denies egress, a CNI route is broken, or a firewall outside the cluster blocks node traffic.
 
-The first discipline is to separate name, route, translation, and application response. If DNS cannot resolve a name, Service debugging is premature. If a pod IP responds but a Service name fails, the pod network is probably alive and the Service-to-endpoint path deserves attention. If a Service ClusterIP works from one namespace but not another, policy or namespace selection becomes more likely. Pause and predict: if `nslookup web.network-lab.svc.cluster.local` succeeds but `wget http://web.network-lab.svc.cluster.local` returns connection refused, which layer has been proven good, and which layer should you inspect next?
+The first discipline is to separate name, route, translation, and application response. If DNS cannot resolve a name, Service debugging is premature. If a pod IP responds but a Service name fails, the pod network is probably alive and the Service-to-endpoint path deserves attention. If a Service ClusterIP works from one namespace but not another, policy or namespace selection becomes more likely.
+
+**Pause and predict:** If `nslookup web.network-lab.svc.cluster.local` succeeds but `wget http://web.network-lab.svc.cluster.local` returns connection refused, which layer has been proven good, and which layer should you inspect next?
+
+<details>
+<summary>Check your prediction</summary>
+
+The successful `nslookup` proves name lookup only; it does not prove the Service path or application listener. A refused connection usually means traffic reached an address where nothing accepted the requested port, so check Service translation and the backend listener next, not CoreDNS.
+
+</details>
+
+Keep the original error and the source of each test in your notes so later checks can distinguish a changed failure from a changed observation point.
 
 ```mermaid
 flowchart TD
@@ -836,7 +847,43 @@ kubectl exec <pod> -- nc -zv <service> 80    # TCP
 kubectl get endpoints <service>              # Endpoints (deprecated view; prefer EndpointSlices on 1.33+)
 ```
 
-### Success Criteria
+### Card A: A successful nslookup proves the Service path and the application listener.
+
+<details>
+<summary>Reveal Card A</summary>
+
+**False.** Name lookup confirms that the client received a DNS answer for the Service name. Test traffic through the Service separately before concluding that translation and the application listener work.
+
+</details>
+
+### Card B: Connection refused means the CNI dropped the packet.
+
+<details>
+<summary>Reveal Card B</summary>
+
+**False.** A refused connection usually means traffic reached an address where nothing accepted the requested port. A drop is more likely to appear as a timeout; compare the Service mapping and backend listener.
+
+</details>
+
+### Card C: Empty endpoints are fixed by restarting CoreDNS.
+
+<details>
+<summary>Reveal Card C</summary>
+
+**False.** DNS can resolve an existing Service even when it has no Ready backends. Check its selector against pod labels and readiness before changing any component.
+
+</details>
+
+### Card D: Same-node pod traffic proves that cross-node routes work.
+
+<details>
+<summary>Reveal Card D</summary>
+
+**False.** Same-node success tests a local path, while cross-node traffic also depends on routes, encapsulation, MTU, and firewalls between nodes. Test pods on different nodes to verify that boundary.
+
+</details>
+
+**Success Criteria**: Confirm name lookup, the Service port mapping, endpoint membership, and why a refused connection is not a failed name lookup.
 
 - [ ] Verified pod-to-service connectivity from the source pod
 - [ ] Confirmed DNS resolution works for short and fully qualified Service names
