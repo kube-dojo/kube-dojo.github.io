@@ -459,7 +459,7 @@ kubectl describe node <node-name> | grep -A8 Conditions
 <details>
 <summary>Reveal the prediction</summary>
 
-You must prove the old writer has stopped before any force-deletion. A host that is only partitioned or unreachable can still have the filesystem open, and a Ready node is the dangerous case. Proceed only when the process has terminated, or the node is NotReady and has been fenced or powered down. After the workload recovers, run an application-level integrity check to verify that no half-written records remain.
+You must prove whether the old writer has stopped before any force-deletion. A Ready node is the dangerous case, because the original process may still have the filesystem open. A partitioned or merely unreachable host is not that proof. If the node is NotReady and recovery is required, document the risk before removing the stale API object. After the replacement pod starts, run an application-level integrity check, because attach success does not prove the previous writer exited cleanly.
 </details>
 
 Consider how you would defend this cautious operational sequence during an escalation before reading the next section on storage quotas.
