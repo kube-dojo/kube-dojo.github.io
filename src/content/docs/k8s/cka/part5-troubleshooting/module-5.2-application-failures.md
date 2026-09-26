@@ -1204,7 +1204,7 @@ The verifier requires the exact allocation marker, then compares Pod UID, contai
 
 </details>
 
-### Card D: A ConfigMap that exists, but has a key the application reads and the Pod spec does not name, leaves the pod stuck in ContainerCreating the same way a missing ConfigMap does.
+### Card D: A ConfigMap that exists, but lacks a key the application reads and the Pod spec does not name, leaves the pod stuck in ContainerCreating the same way a missing ConfigMap does.
 
 <details>
 <summary>Reveal the failure layer and next action</summary>
