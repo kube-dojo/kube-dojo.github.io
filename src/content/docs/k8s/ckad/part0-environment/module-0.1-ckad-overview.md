@@ -561,6 +561,40 @@ kubectl delete secret ckad-secret
 
 Now expand the same workflow with progressive tasks. Each task should produce observable evidence, and each cleanup should remove only the resources you created. If a task fails, write down the failure category: command recall, YAML shape, context, namespace, selector, probe behavior, or workload choice. That failure log becomes your next study plan.
 
+### Card A: CKAD tests control-plane repair the same way CKA does
+
+<details>
+<summary>Reveal</summary>
+
+**False.** CKA emphasizes operating and troubleshooting the cluster, including control-plane components. CKAD asks you to deliver and debug applications on that cluster. A familiar Pod or Service can appear in both exams, but the task and the evidence of success differ.
+</details>
+
+### Card B: After CKA, the first CKAD week should relearn what a Pod is
+
+<details>
+<summary>Reveal</summary>
+
+**False.** If your CKA fundamentals are fresh, use them to practice developer workflows instead: create resources, connect configuration, inspect health, and verify application behavior. Revisit Pod basics only when a specific gap prevents you from completing those tasks.
+</details>
+
+### Card C: Container image building is a CKA topic and is not on CKAD
+
+<details>
+<summary>Reveal</summary>
+
+**False.** The CKAD application design and build domain includes defining, building, and modifying container images. Its developer focus starts with the application artifact, while CKA emphasizes administering the cluster that runs it.
+</details>
+
+### Card D: CKAD and CKA use different passing scores
+
+<details>
+<summary>Reveal</summary>
+
+**False.** The Linux Foundation lists a passing score of 66% for each exam. The same threshold does not make their tasks interchangeable: prepare for CKAD by practicing application delivery and verification, not by repeating a cluster-administration study plan.
+</details>
+
+**Success Criteria**: Confirm the CKAD job is application delivery, name three developer-weighted topics, and explain why a shared object name is not a shared exam task.
+
 - [ ] **Implement a Kubernetes 1.35+ practice environment with kind and confirm the active `kubectl` context.**
 - [ ] **Create and expose the `ckad-test` Deployment, then verify the Service and selected Pods.**
 - [ ] **Generate dry-run YAML for a Pod, Deployment, and ClusterIP Service, then inspect the generated files before applying anything.**
