@@ -90,9 +90,15 @@ kubectl describe node <node-name> | grep -E "MemoryPressure|DiskPressure|PIDPres
 
 Under default controller-manager behavior, node health is monitored frequently, and missed heartbeats eventually turn into `Ready=Unknown`. Kubernetes also uses taints such as `node.kubernetes.io/not-ready` and `node.kubernetes.io/unreachable` to influence scheduling and eviction. The important operational lesson is that Kubernetes intentionally delays some reactions because short network blips are common. Immediate eviction on every missed heartbeat would create more disruption than it solves.
 
-Pause and predict: if a node becomes `Unknown`, do the containers that were already running on that machine immediately stop? Think about which component starts containers, which component reports status, and which component can still be alive when the API server loses contact with the node.
+**Pause and predict:** if a node becomes `Unknown`, do the containers that were already running on that machine immediately stop? Think about which component starts containers, which component reports status, and which component can still be alive when the API server loses contact with the node.
+
+<details>
+<summary>Answer</summary>
 
 The answer is usually no. Existing containers may continue running if the node and runtime are alive, even while the control plane lacks confirmed status. The scheduler will avoid placing new work on the unhealthy node, and eviction logic may eventually replace pods elsewhere, but that is a control-plane decision. This is why node troubleshooting always separates application liveness, container runtime state, kubelet reporting, and API visibility.
+</details>
+
+Use this distinction to choose whether your next check belongs in the API, on the host, or in workload-level observations before you change recovery behavior.
 
 This distinction also explains why application owners may report mixed symptoms. A user request routed to a still-running pod can succeed while `kubectl get pods` shows stale information. A replacement pod can start elsewhere only after controller logic decides the old pod should no longer count. A log command can fail through the API while the container's local stdout file still exists on the node. Worker-node troubleshooting is the practice of reconciling those perspectives without assuming they should all change at the same instant.
 
@@ -343,7 +349,15 @@ evictionHard:
 
 When a threshold is crossed, the kubelet sets the relevant node condition, the scheduler avoids assigning new pods to the node, and the kubelet chooses pods to evict based on quality of service, priority, and resource usage relative to requests. `BestEffort` pods are usually most exposed because they have no requests. Overcommitted `Burstable` pods can also be evicted before `Guaranteed` pods. This is why resource requests are not just scheduling hints; they become evidence during node survival decisions.
 
-Pause and predict: if a pod using an `emptyDir` volume is evicted because the node is under memory or disk pressure, what happens to data stored in that volume? The important clue is in the name. `emptyDir` is local ephemeral storage tied to the pod's life on that node, so eviction can destroy local contents even if the replacement pod starts cleanly elsewhere.
+**Pause and predict:** if a pod using an `emptyDir` volume is evicted because the node is under memory or disk pressure, what happens to data stored in that volume?
+
+<details>
+<summary>Answer</summary>
+
+The important clue is in the name. `emptyDir` is local ephemeral storage tied to the pod's life on that node, so eviction can destroy local contents even if the replacement pod starts cleanly elsewhere.
+</details>
+
+When planning recovery, identify which state is durable, which controller recreates it, and what evidence you need before deciding whether the service is safe to restore.
 
 Memory pressure troubleshooting starts by proving whether the pressure is container-driven, host-driven, or an accounting problem. Compare `kubectl top` with OS-level process lists, then inspect the workload that changed recently. If a single pod is consuming far beyond its request, eviction or deletion may be a containment step. If the pressure is caused by host daemons, logging agents, kernel memory, or a DaemonSet, rescheduling the application pods will not fix the node pool because the culprit follows every node.
 
@@ -810,7 +824,39 @@ kubectl delete pod test-pod
 ```
 </details>
 
-### Success Criteria
+### Card A: An Unknown node means every container on it has already stopped.
+
+<details>
+<summary>Reveal</summary>
+
+False. A missing heartbeat leaves the control plane without current confirmation; processes can keep running when the host and runtime remain alive.
+</details>
+
+### Card B: Evicting a pod deletes emptyDir data only when the replacement pod starts on the same node.
+
+<details>
+<summary>Reveal</summary>
+
+False. The volume belongs to the original pod on its original host, and eviction can remove its local contents before a replacement is scheduled elsewhere.
+</details>
+
+### Card C: BestEffort pods are protected from eviction because they have no requests.
+
+<details>
+<summary>Reveal</summary>
+
+False. BestEffort pods have no requests or limits and are usually among the first workloads selected during node-pressure eviction.
+</details>
+
+### Card D: Kubernetes evicts pods on the first missed heartbeat so that node blips stay short.
+
+<details>
+<summary>Reveal</summary>
+
+False. Taints and toleration windows delay eviction so brief communication interruptions do not immediately cause unnecessary workload churn.
+</details>
+
+**Success Criteria**: Confirm node conditions, kubelet health, and why an Unknown node does not prove that its workloads have already stopped.
 
 - [ ] Checked node conditions for all nodes using jsonpath.
 - [ ] Verified kubelet is running and inspected the systemd logs.
