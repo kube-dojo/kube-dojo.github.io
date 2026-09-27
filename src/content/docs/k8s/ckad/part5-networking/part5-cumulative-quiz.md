@@ -127,7 +127,7 @@ Cost and ownership are part of that choice. A LoadBalancer Service can request e
 
 ### Interpret failures without overclaiming
 
-A DNS failure is not the same as a connection refusal or a timeout. A failed name lookup directs you to the caller's namespace, DNS configuration, Service record, and any egress policy affecting DNS. A connection to a resolved address that refuses immediately may point to a listener or port problem, though exact behavior depends on the network path. A timeout can arise from missing endpoints, policy enforcement, routing, or an unreachable external entry point. Use these symptoms as branching clues, then inspect objects and test the next boundary.
+A DNS failure is not the same as a connection refusal or a timeout. A failed name lookup directs you to the caller's namespace, DNS configuration, Service record, and any egress policy affecting DNS. A connection to a resolved address that refuses immediately may indicate missing endpoints or a listener or port problem, though exact behavior depends on the data plane. A timeout can arise from policy enforcement, routing, or an unreachable external entry point. Use these symptoms as branching clues, then inspect objects and test the next boundary.
 
 An empty endpoint set is unusually decisive when the Service is meant to select Pods. Compare the selector, Pod labels, readiness, and EndpointSlices. For ExternalName, an empty Kubernetes endpoint set is expected because the target is a DNS alias outside that selection path. For headless Services, do not search for a ClusterIP that cannot exist. State the Service type before interpreting the absence of a virtual address. The same output column can mean different things under different declared contracts.
 
@@ -190,9 +190,9 @@ Choose one answer for each scenario before opening its explanation. Each set use
 A client resolves `catalog.store.svc.cluster.local`, and the Service has a ClusterIP. The `catalog` Service selects `app: catalog-api`, while the only Ready Pods show `app: catalog`. Its EndpointSlices contain no ready backend addresses. Which first change is supported by the evidence?
 
 A) Change the Service selector to match the intended Ready Pods, then recheck endpoints.
-B) Replace the ClusterIP Service with a NodePort Service for the same selector.
-C) Change the client to call the Service's ClusterIP instead of its DNS name.
-D) Add an Ingress rule pointing at the current Service and port.
+B) Replace the ClusterIP Service with a NodePort Service, retaining the current selector.
+C) Change the client to call the Service's ClusterIP; the successful DNS lookup already rules out a name-resolution fault.
+D) Add an Ingress rule for the current Service and port, then test whether its external route reaches a backend.
 
 <details>
 <summary>Answer to Question 1</summary>
@@ -205,7 +205,7 @@ D) Add an Ingress rule pointing at the current Service and port.
 
 A Service listens on `port: 80`, selects two Ready Pods, and shows populated endpoints. The application listens on container port `8080`, but the Service declares numeric `targetPort: 9090`. A colleague proposes changing the Pod labels. What should you do first?
 
-A) Change `nodePort` to `8080` because every Service needs a node port.
+A) Change `nodePort` to `8080` and test through that port, even though this client currently uses the ClusterIP.
 B) Set `targetPort` to `8080` and verify a request through Service port `80`.
 C) Change the selector because populated endpoints indicate a selection failure.
 D) Replace the Service with ExternalName to bypass Kubernetes port translation.
@@ -221,8 +221,8 @@ D) Replace the Service with ExternalName to bypass Kubernetes port translation.
 
 A clustered application needs clients to discover individual member Pods for peer identity. Another client needs a stable internal name for a managed database at `database.example.com`. Which pair of Service contracts fits those distinct requirements?
 
-A) LoadBalancer for members; NodePort for the managed database.
-B) ClusterIP for both because every Service returns one virtual address.
+A) LoadBalancer for members so clients can reach them individually; NodePort for the managed database alias.
+B) ClusterIP for both because every Service returns one virtual address and can alias the external database name.
 C) Headless for member discovery; ExternalName for the external DNS alias.
 D) ExternalName for members; headless for the managed database alias.
 
@@ -240,7 +240,7 @@ An Ingress uses `networking.k8s.io/v1` and names a valid backend Service. An int
 A) Rewrite the Service selector because any blank Ingress address means no endpoints.
 B) Change the Ingress into a NodePort Service so the same object routes hosts.
 C) Assume the route works because the manifest passed API validation.
-D) Check `spec.ingressClassName`, the corresponding controller, and its published entry point.
+D) Check `spec.ingressClassName`, the controller, and its published entry point.
 
 <details>
 <summary>Answer to Question 4</summary>
@@ -253,7 +253,7 @@ D) Check `spec.ingressClassName`, the corresponding controller, and its publishe
 
 A policy selects backend Pods for ingress and declares `ingress: []`. A second policy selects the same Pods and has one TCP `8080` ingress rule with `from: []`. Assuming enforcement and no restrictive source egress, what does the second rule allow?
 
-A) No sources, because both empty lists mean that nobody matches.
+A) No sources, because the empty top-level ingress list and the empty peer list both mean nobody matches.
 B) All sources on the listed port, because the rule's empty peer list has no source restriction.
 C) Only Pods in the policy namespace, because an empty list acts like a pod selector.
 D) Only the backend Pods themselves, because top-level selection also selects peers.
@@ -269,7 +269,7 @@ D) Only the backend Pods themselves, because top-level selection also selects pe
 
 Only Pods labeled `role: frontend` in namespaces labeled `env: production` should reach a backend. A reviewer sees one `from` item containing both `namespaceSelector` and `podSelector`. What would moving the pod selector into a separate `from` item do?
 
-A) Preserve the same AND condition while making the YAML easier to read.
+A) Preserve the same AND condition while making the YAML easier to read, because both selectors still appear in the rule.
 B) Deny every source because two selector types cannot appear in one rule.
 C) Create OR logic that allows all Pods in selected namespaces or matching local Pods.
 D) Turn the rule into egress because namespace selectors are outbound only.
@@ -285,8 +285,8 @@ D) Turn the rule into egress because namespace selectors are outbound only.
 
 A frontend Pod can call `api.store.svc.cluster.local` before an egress policy selects it. After the policy is applied, its name lookup fails. The destination has ready endpoints and an ingress rule allowing frontend traffic. What is the most useful next check?
 
-A) Inspect the frontend egress policy for an allowance to cluster DNS, then test name resolution.
-B) Add another destination ingress policy with the same frontend allowance.
+A) Inspect the frontend egress policy for an allowance to cluster DNS, then test name resolution from that Pod.
+B) Add another destination ingress policy with the same frontend allowance, then confirm it selects the backend Pods.
 C) Replace the API Service with LoadBalancer to avoid DNS inside the cluster.
 D) Change the API Service's numeric `targetPort` before checking DNS.
 
@@ -304,7 +304,7 @@ The same ClusterIP request succeeds from a Pod on node one and fails from an equ
 A) Accept that conclusion because every successful packet must pass through a live kube-proxy process.
 B) Delete the Service and recreate it before comparing the nodes.
 C) Assume NetworkPolicy cannot matter because endpoints are populated.
-D) Compare node-local forwarding behavior and kube-proxy state, since existing rules may still work after updates stop.
+D) Compare node-local forwarding and kube-proxy state; installed rules can outlast updates.
 
 <details>
 <summary>Answer to Question 8</summary>
@@ -317,7 +317,7 @@ D) Compare node-local forwarding behavior and kube-proxy state, since existing r
 
 Simulation: use an isolated practice namespace to demonstrate Service selection, a corrected numeric target port, and a narrow ingress policy. This exercise assumes a working Kubernetes cluster, permission to create namespaced resources, and a network plugin that enforces NetworkPolicy for the final isolation check. The example uses the `nginx` image as a simple HTTP listener on port `80`. If the cluster cannot pull the image or lacks policy enforcement, report those environmental limits rather than claiming the missing behavior was observed.
 
-Start by creating a namespace and three Pods with distinct labels. The backend listens on port `80`; the two client Pods provide one permitted caller and one excluded caller. Wait for readiness before interpreting Service or policy output. The initial Service deliberately selects a label that no Pod has, which gives you an observable discovery defect to diagnose before making any policy change. Apply these manifests in a disposable practice cluster and keep the namespace name unique to this exercise.
+Start by creating a namespace and three Pods with distinct labels. The backend listens on port `80`; the two client Pods provide one permitted caller and one excluded caller. Wait for readiness before interpreting Service or policy output. The initial Service manifest deliberately selects a label that no Pod has, which gives you an observable discovery defect to diagnose before making any policy change. Apply these commands in a disposable practice cluster and keep the namespace name unique to this exercise.
 
 ```bash
 kubectl create namespace ckad-part5-practice
@@ -325,8 +325,21 @@ kubectl run catalog --image=nginx:1.27 --port=80 --labels=app=catalog -n ckad-pa
 kubectl run frontend --image=busybox:1.36 -n ckad-part5-practice --labels=role=frontend --command -- sleep 3600
 kubectl run outsider --image=busybox:1.36 -n ckad-part5-practice --labels=role=other --command -- sleep 3600
 kubectl wait --for=condition=Ready pod/catalog pod/frontend pod/outsider -n ckad-part5-practice --timeout=120s
-kubectl create service clusterip catalog --tcp=80:80 -n ckad-part5-practice
-kubectl patch service catalog -n ckad-part5-practice --type=merge -p '{"spec":{"selector":{"app":"wrong-label"}}}'
+kubectl apply -n ckad-part5-practice -f - <<'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog
+spec:
+  type: ClusterIP
+  selector:
+    app: wrong-label
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+EOF
 kubectl get service catalog -n ckad-part5-practice -o yaml
 kubectl get endpointslices -n ckad-part5-practice -l kubernetes.io/service-name=catalog
 ```
@@ -419,4 +432,4 @@ kubectl delete namespace ckad-part5-practice
 
 ## Next Module
 
-Part 5 completes the networking sequence. Return to the [CKAD curriculum](../) to revisit earlier application tasks and repeat any question whose evidence boundary was still uncertain.
+Part 5 completes the networking sequence. Return to the [CKAD curriculum](../../) to revisit earlier application tasks and repeat any question whose evidence boundary was still uncertain.
