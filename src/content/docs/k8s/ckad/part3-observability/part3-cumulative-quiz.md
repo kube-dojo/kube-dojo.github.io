@@ -203,7 +203,7 @@ Treat a Pod’s containers as separate diagnostic subjects even though Kubernete
 
 The `--previous` flag has a narrow time window because it refers to the prior instance of a container in the current Pod. It does not provide an unlimited archive, and a later lifecycle change can replace the instance that the command would return. Capture relevant output promptly when restarts are frequent, then preserve the facts needed to reason: timestamps, exit code, termination reason, and nearby Events. A Pod replacement can require looking at centralized logging if retention beyond the current object matters.
 
-Log volume is another reason to scope requests deliberately. Start with a bounded tail or time interval, add a container selector, and use a label selector only when comparing replicas is the question. Deployment-level logs may combine output from several Pods, which can interleave events and make causal ordering unclear. Once one Pod is suspicious, query it directly and use timestamps or request identifiers to connect an application message with the lifecycle evidence from `describe`.
+Log volume is another reason to scope requests deliberately. Start with a bounded tail or time interval, add a container selector, and use a label selector only when comparing replicas is the question. A Deployment log request selects one Pod, while a label selector can retrieve output from several Pods; combined lines may interleave events and make causal ordering unclear. Once one Pod is suspicious, query it directly and use timestamps or request identifiers to connect an application message with the lifecycle evidence from `describe`.
 
 ```bash
 kubectl get pod multi-app -o jsonpath='{.spec.containers[*].name}{"\n"}'
@@ -227,10 +227,10 @@ The following decision flow is a practical way to avoid command wandering during
 +----------+-----------+
            |
            v
-+----------------------+
-| Read previous logs   |
-| kubectl logs --previous    |
-+----------+-----------+
++------------------------------------------+
+| Read previous logs                       |
+| kubectl logs --previous                  |
++----------+-------------------------------+
            |
            v
 +----------------------+
@@ -261,7 +261,7 @@ A senior troubleshooting stance is to change one thing at a time and verify the 
 
 CKAD tasks often reward speed, but speed should come from practiced command selection rather than from guessing. Logs answer “what did the process emit?” [Metrics answer “what resources are objects consuming now?”](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/) API discovery answers “what schema does this cluster accept?” These tools are complementary, and confusing them leads to shallow troubleshooting.
 
-Logs are strongest for application behavior and container output. Use `--tail` to keep output focused, `-f` to follow active logs, `--previous` for restarted containers, and `-c` for a specific container. Use label selectors when the question is about all replicas of a Deployment, but remember that combined logs from multiple Pods can interleave lines and hide sequence. For exact diagnosis, narrow the evidence when needed.
+Logs are strongest for application behavior and container output. Use `--tail` to keep output focused, `-f` to follow active logs, `--previous` for restarted containers, and `-c` for a specific container. A request such as `kubectl logs deploy/checkout-api` selects one Pod and reports `Found N pods, using pod/...` when the Deployment has several matches; it does not combine their logs. Use `kubectl logs -l app=checkout-api` when you intend to retrieve logs from Pods selected by a label, where lines from multiple Pods can interleave and hide sequence. For exact diagnosis, narrow the evidence when needed.
 
 ```bash
 kubectl logs deploy/checkout-api --tail=100
@@ -294,9 +294,9 @@ For a version migration, update the object shape as well as `apiVersion`. The In
 There are three useful validation boundaries after discovery. Local generation and `kubectl explain` help check command syntax and field expectations; server-side dry run asks the API server to validate an object without persisting it; an applied object then needs controller and runtime verification. Each boundary catches a different class of failure. Passing schema checks does not prove that a controller has reconciled the object, and seeing an accepted object does not prove that its Pods or traffic path are healthy.
 
 ```bash
-kubectl explain ingress | grep VERSION
-kubectl explain cronjob | grep VERSION
-kubectl explain networkpolicy | grep VERSION
+kubectl explain ingress | grep -E '^(GROUP|VERSION)'
+kubectl explain cronjob | grep -E '^(GROUP|VERSION)'
+kubectl explain networkpolicy | grep -E '^(GROUP|VERSION)'
 kubectl api-resources | grep -E 'ingresses|cronjobs|networkpolicies'
 ```
 
@@ -359,6 +359,7 @@ If you miss a question, classify the miss. Was the problem that you chose the wr
 ### Question 1: Service Routes to No Pods
 
 Your team exposes a Deployment named `orders-api` through a Service named `orders-svc`. The Deployment has two Running Pods, but requests through the Service fail with connection errors. `kubectl get endpoints orders-svc` shows no addresses. What should you inspect first, and what is a focused fix if the Service selector does not match the Pod labels?
+
 A) Restart both Pods, because Running status suggests stale network state.
 B) Compare the Service selector with Pod labels, then patch the selector or labels so they match.
 C) Increase the liveness failure threshold so the Service waits longer.
@@ -391,6 +392,7 @@ The key reasoning is that logs are not the first evidence when the Service alrea
 ### Question 2: Running Pod Is Not Ready
 
 A Pod named `catalog-0` is Running but never becomes Ready. The readiness probe is configured as an HTTP GET on `/ready` port `8080`, but the application listens on port `8000`. What commands would you use to confirm the probe failure, and how would you correct the configuration?
+
 A) Patch the live Pod's container port and leave its owning controller unchanged.
 B) Delete the Pod so its readiness probe is evaluated again from a clean start.
 C) Change the Service target port to 8000 while keeping the Pod probe on 8080.
@@ -424,6 +426,7 @@ The correction should be verified through readiness and endpoints, not only thro
 ### Question 3: Slow Startup Causes Restart Loop
 
 A Java application takes three minutes to initialize on a busy node. The Deployment has a liveness probe with `initialDelaySeconds: 20`, `periodSeconds: 10`, and `failureThreshold: 3`. The Pods enter CrashLoopBackOff even though the application works locally. How would you redesign the probes so Kubernetes does not kill the application during normal startup?
+
 A) Add a startup probe with a sufficient startup budget, then retain liveness and readiness for their separate jobs.
 B) Remove readiness so every starting Pod immediately receives Service traffic.
 C) Set liveness to check the database and restart whenever the dependency is unavailable.
@@ -432,7 +435,7 @@ D) Increase the replica count without changing the probe behavior.
 <details>
 <summary>Answer</summary>
 
-Add a startup probe that allows enough time for initialization, then keep liveness for post-startup process health and readiness for traffic serving. The startup probe disables liveness and readiness until startup succeeds, which prevents normal slow boot from becoming a restart loop.
+Add a startup probe that allows enough time for initialization, then keep the existing liveness and readiness probes for their separate jobs. The startup probe disables those other probes until startup succeeds, preventing normal slow boot from triggering liveness restarts. This patch adds only the startup probe, so it does not depend on an existing readiness path or change the liveness path.
 
 Option A is correct because a startup probe delays the other probes until initialization succeeds. Options B, C, and D are wrong because removing readiness risks premature traffic, dependency-heavy liveness can cause restart storms, and extra replicas repeat the same bad probe design.
 
@@ -449,16 +452,6 @@ kubectl patch deployment java-api --type='json' -p='[
       "periodSeconds": 10,
       "failureThreshold": 30
     }
-  },
-  {
-    "op": "replace",
-    "path": "/spec/template/spec/containers/0/livenessProbe/httpGet/path",
-    "value": "/healthz"
-  },
-  {
-    "op": "replace",
-    "path": "/spec/template/spec/containers/0/readinessProbe/httpGet/path",
-    "value": "/ready"
   }
 ]'
 
@@ -473,6 +466,7 @@ The important design choice is not simply increasing liveness delay. A startup p
 ### Question 4: CrashLoopBackOff With Missing Stack Trace
 
 A Pod named `billing-worker` is in CrashLoopBackOff. Running `kubectl logs billing-worker` only shows the newest startup message, and the useful exception is not visible. What evidence should you collect next, and how do you decide whether the process exited or kubelet killed it?
+
 A) Stream only current logs until the next restart and infer the previous failure from the startup banner.
 B) Delete the Pod immediately so its replacement starts without the old failure state.
 C) Read previous logs and inspect terminated state, exit code, reason, and Events before another restart replaces the evidence.
@@ -498,6 +492,7 @@ If previous logs show an application exception and `Last State` shows a nonzero 
 ### Question 5: Multi-Container Pod Hides the Failing Container
 
 A Pod named `web-stack` has containers named `frontend`, `backend`, and `log-agent`. The Pod restarts repeatedly, but the frontend logs look normal. How do you identify which container is failing and retrieve the relevant logs?
+
 A) Run `kubectl logs web-stack` repeatedly and treat the default container output as the combined Pod stream.
 B) Inspect container statuses and request logs with `-c backend`, including `--previous` when the failing instance terminated.
 C) Restart the frontend container so its logs include messages from the backend.
@@ -525,6 +520,7 @@ If `backend` shows restarts and previous logs contain the exception, that is the
 ### Question 6: High Memory During an Incident
 
 An API Deployment is responding slowly. One Pod is suspected of using much more memory than the others, but it has not restarted yet. What commands help you compare usage across the namespace and then inspect container-level usage for the suspicious Pod?
+
 A) Read previous logs from every Pod and use line count as a proxy for memory use.
 B) Sort nodes by CPU, then raise memory requests for every Deployment in the cluster.
 C) Inspect only the Pod's YAML because configured limits show its current memory consumption.
@@ -550,6 +546,7 @@ Metrics help identify the live resource pattern, but they do not prove the histo
 ### Question 7: Manifest Uses a Deprecated API
 
 A teammate gives you an Ingress manifest that starts with `apiVersion: extensions/v1beta1`, and `kubectl apply` fails on a Kubernetes 1.35 cluster. How do you confirm the supported API version and avoid guessing the replacement shape?
+
 A) Discover the API on the target cluster, inspect the current schema, and use `networking.k8s.io/v1` with its current fields.
 B) Change only `apiVersion` and assume every old field remains valid.
 C) Apply the object to a different cluster and copy whatever version that cluster accepts.
@@ -563,7 +560,7 @@ Use API discovery against the target cluster, then inspect the resource schema. 
 Option A is correct because discovery reflects the target API server and the schema reveals field-shape changes. Options B, C, and D are wrong because a version-string edit can leave removed fields, another cluster may serve different APIs, and replacing the resource can change routing behavior.
 
 ```bash
-kubectl explain ingress | grep VERSION
+kubectl explain ingress | grep -E '^(GROUP|VERSION)'
 kubectl explain ingress.spec
 kubectl api-resources | grep ingress
 ```
@@ -575,6 +572,7 @@ A correct fix changes more than the version string if the old manifest used obso
 ### Question 8: Probe Fix Without Verification
 
 You patch a Deployment to change its readiness path from `/health` to `/ready`. The command succeeds, so a teammate says the incident is fixed. What verification sequence would you run before agreeing?
+
 A) Stop after the patch because API acceptance guarantees that Pods are healthy.
 B) Check only the Deployment's desired replica count, which proves endpoint readiness.
 C) Verify rollout, Pod readiness, Events, and Service endpoints because the accepted patch alone does not prove runtime behavior.
@@ -756,9 +754,9 @@ If your cluster has Metrics Server, compare resource usage in the namespace. If 
 kubectl top pods -n part3-observability --sort-by=memory
 POD_NAME="$(kubectl -n part3-observability get pod -l app=inventory-api -o jsonpath='{.items[0].metadata.name}')"
 kubectl top pod "$POD_NAME" -n part3-observability --containers
-kubectl explain ingress | grep VERSION
-kubectl explain cronjob | grep VERSION
-kubectl explain networkpolicy | grep VERSION
+kubectl explain ingress | grep -E '^(GROUP|VERSION)'
+kubectl explain cronjob | grep -E '^(GROUP|VERSION)'
+kubectl explain networkpolicy | grep -E '^(GROUP|VERSION)'
 ```
 
 Expected reasoning: metrics are useful only when the metrics pipeline is available and current. API discovery is useful for confirming what the target cluster accepts. Neither replaces `describe`, Events, logs, endpoints, or rollout verification; they answer different questions.
