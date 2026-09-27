@@ -24,15 +24,11 @@ You should also have a disposable Linux VM, cloud instance, or lab machine where
 
 ## Learning Outcomes
 
-After this module, you will be able to design an LFCS-style timed run that covers essential commands, users, services, networking, storage, and scheduled tasks without turning the practice into random command drilling.
-
-After this module, you will be able to prioritize mixed-domain exam tasks by effort, risk, and verification cost so easy points are captured before harder tasks consume the session.
-
-After this module, you will be able to execute common LFCS task patterns using runnable shell commands, then prove the system state with independent verification instead of trusting command exit codes alone.
-
-After this module, you will be able to debug failed task attempts by reading symptoms, choosing the next inspection command, and correcting the smallest cause that explains the observed state.
-
-After this module, you will be able to evaluate your own mock-exam performance with a debrief that turns timing mistakes and command gaps into a focused retake plan.
+- Design a timed mock exam task list using effort, risk, and verification cost to plan the run.
+- Prioritize archive and user tasks before risky storage work when their verification is faster.
+- Execute service and mount changes with independent verification of loaded and persistent state.
+- Debug access and networking failures by inspecting groups, path components, routes, and listeners.
+- Evaluate mock exam performance through final review, unresolved tasks, and a focused retake plan.
 
 ## Why This Module Matters
 
@@ -599,64 +595,99 @@ A strong run also includes cleanup when appropriate. Practice accounts, loopback
 
 1. Your mock begins with six tasks, and the storage task looks familiar but requires editing `/etc/fstab`. The user task and archive task both look straightforward and have obvious verification commands. What order should you choose, and why?
 
+A) Edit `/etc/fstab` first because familiarity removes every risk of a persistent storage change under exam pressure.\
+B) Finish and verify the archive and user tasks first, unless a dependency changes their risk.\
+C) Work strictly in printed order, even when verification costs and task risks differ.\
+D) Start every task briefly, leaving each one unverified until the final review period.
+
    <details>
    <summary>Answer</summary>
 
-   Start with the archive and user tasks unless the exam wording creates a dependency that changes the risk. They have lower blast radius and faster proof, so completing them first captures verified progress. The storage task may still be important, but fstab changes deserve a slower verification loop that includes a backup and `mount -a`. This answer applies the ranking model: choose tasks by payoff, effort, risk, and verification cost rather than printed order.
+   B is correct because the archive and user tasks have lower risk and faster verification, unless a dependency changes that ranking. A is wrong because it puts the persistent `/etc/fstab` edit ahead of quick, verifiable work without accounting for risk. C is wrong because it ignores effort and verification cost, while D leaves even completed tasks without proof. The storage task still deserves a backup and `mount -a` before it is marked complete.
 
    </details>
 
 2. You create a shared directory, set its group correctly, and confirm with `ls -ld` that the mode is `2770`. The target user still cannot create a file there during your test. What should you inspect before changing the mode to something broader?
 
+A) Change the directory to mode `2777` and retry the write as the target user.\
+B) Restart the service that uses the directory before checking the user's identity.\
+C) Remove the setgid bit because inherited group ownership prevents directory traversal.\
+D) Inspect the user's groups and every path component before changing permissions.
+
    <details>
    <summary>Answer</summary>
 
-   Inspect the user's effective groups with `id USER` or `sudo -u USER id`, then inspect every path component with `namei -l /path/to/shared-directory`. The failure may come from missing supplementary group membership, a stale session, or a parent directory without execute permission. Broadening the final directory mode may hide the symptom without fixing the actual access path. The right test is an actual write as the target user after the identity and path checks explain why access should work.
+   D is correct because `id USER` or `sudo -u USER id` checks effective groups, while `namei -l /path/to/shared-directory` reveals permissions on every parent component. A is wrong because it broadens access without locating the failure. B is wrong because it investigates a service when the observed test is a direct user write, and C removes useful group inheritance without explaining a missing parent execute bit or stale group session. Retest the write as the target user after correcting the actual cause.
 
    </details>
 
 3. You fix a systemd unit file by correcting the `ExecStart` path, then immediately restart the service and see the same old failure in the logs. What did you likely forget, and how should you verify the corrected unit is the one systemd sees?
 
+A) Run `systemctl daemon-reload`, then inspect the loaded unit with `systemctl cat UNIT`.\
+B) Run `systemctl reset-failed UNIT`, then assume the edited file is loaded.\
+C) Restart the service again without reloading the manager or inspecting its unit.\
+D) Delete the journal entries so the old failure no longer appears in the logs.
+
    <details>
    <summary>Answer</summary>
 
-   You likely forgot `systemctl daemon-reload`, which tells systemd to reload changed unit files. After running it, use `systemctl cat UNIT` to confirm the effective unit content includes the corrected `ExecStart`. Then restart the service and check `systemctl status` plus `journalctl -u UNIT -n 20`. The key is verifying the manager's loaded view, not only the file you edited.
+   A is correct because `systemctl daemon-reload` updates systemd's unit view, and `systemctl cat UNIT` confirms the corrected `ExecStart` appears there. B is wrong because it clears failure state without loading the edit, while C is wrong because it repeats a restart with the same stale view. D hides evidence rather than fixing the service. After confirming the loaded unit, restart it and inspect `systemctl status UNIT` and `journalctl -u UNIT -n 20`.
 
    </details>
 
 4. A networking task says users cannot reach `app.internal` on port 8080. `getent hosts app.internal` returns an address, but `curl http://app.internal:8080` fails. What is a good next diagnostic sequence?
 
+A) Rewrite DNS records and retry the name lookup before inspecting any network path or service listener.\
+B) Open port 8080 in the firewall first, without checking whether a service listens.\
+C) Check the route, then the listener, then firewall rules if the service listens.\
+D) Restart every networking service and retry `curl` before collecting more evidence.
+
    <details>
    <summary>Answer</summary>
 
-   Since name resolution works, move to transport and service checks. Inspect the route with `ip route get ADDRESS` if available, check local or target listener state with `ss -ltnp` when you are on the host that should serve the port, and inspect firewall rules only after confirming that the service is actually listening. If the service is remote, use a connection test such as `nc -vz app.internal 8080` if available. The sequence avoids changing DNS because DNS has already produced an address.
+   C is correct because `getent hosts app.internal` already proved name resolution. Use `ip route get ADDRESS` to inspect the route, then `ss -ltnp` on the serving host to check its listener, then inspect firewall rules if the service listens. A is wrong because it changes working DNS, B is wrong because it assumes filtering before confirming a listener, and D changes services without narrowing the failure. For a remote host, `nc -vz app.internal 8080` can test connectivity if available.
 
    </details>
 
 5. You mount a filesystem at `/data`, write a proof file, and `df -h /data` looks correct. The task explicitly says the mount must survive reboot. What additional verification should you perform before marking the task complete?
 
+A) Trust `df -h /data`; a live mount and proof file already establish reboot persistence.\
+B) Back up and inspect `/etc/fstab`, test with `mount -a`, then check `findmnt /data`.\
+C) Unmount `/data` immediately and skip configuration checks to avoid a reboot.\
+D) Add another proof file because more runtime writes establish the persistent mount state.
+
    <details>
    <summary>Answer</summary>
 
-   Verify the persistence configuration, usually `/etc/fstab`, and test it safely with `mount -a` after backing up the file during practice. Also use `findmnt /data` to confirm the source and options. A current mount plus a write test proves runtime behavior, but it does not prove reboot survival. Persistence requires checking the configuration that will be used later.
+   B is correct because a live mount proves runtime state, while `/etc/fstab` controls how the mount is restored after reboot. Back up the file before testing its entries with `mount -a`, then use `findmnt /data` to confirm the source and options. A is wrong because it confuses runtime evidence with persistence, and D is wrong for the same reason. C removes the mount without checking the reboot configuration.
 
    </details>
 
 6. A cron task works when you run the command manually, but the scheduled output file never appears. What differences between your shell and cron should you evaluate?
 
+A) Assume cron inherits your current shell environment and check only the command's syntax.\
+B) Run the command manually again from the same terminal and treat success as cron proof.\
+C) Change the system clock before checking which account owns the scheduled entry.\
+D) Check cron's PATH, working directory, scheduled user, and absolute command paths.
+
    <details>
    <summary>Answer</summary>
 
-   Check whether the cron service is active, whether the entry is installed for the correct user, whether the command uses absolute paths, and whether the output path is writable by the scheduled user. Cron runs with a smaller environment than an interactive shell, so PATH, working directory, and permissions often differ. Verify with `crontab -l`, service inspection, and a command written with explicit executable and output paths.
+   D is correct because cron may use a different PATH and working directory, run as another user, and require absolute paths for the executable and output file. A is wrong because it assumes the environment matches your shell, while B is wrong because it repeats a test under the wrong conditions. C changes the clock without evidence of a scheduling problem. Verify the installed entry with `crontab -l`, inspect the cron service, and test paths and permissions as the scheduled user.
 
    </details>
 
 7. During final review, you find that a service task is still failing, but three other tasks are complete and verified. You have only a few minutes left. What should you do with the remaining time?
 
+A) Protect the three verified tasks and record the unresolved service task.\
+B) Start a broad service investigation and change related units without time for verification.\
+C) Undo the three completed tasks so the final machine state looks consistent.\
+D) Spend the remaining minutes trying unverified fixes to the service and skip final proof.
+
    <details>
    <summary>Answer</summary>
 
-   Protect the verified work first by running the final proof commands for the completed tasks and ensuring no cleanup or persistence step is missing. If the service fix is obvious and low risk, apply it and verify quickly; otherwise, record it as unresolved rather than making broad changes that could damage other results. The final review phase is for evidence and small corrections, not for starting a risky investigation under severe time pressure.
+   A is correct because the three completed tasks already have evidence and should survive the final review; record the service task as unresolved rather than starting a risky investigation. B is wrong because it risks disturbing working state without time to verify. C is wrong because it discards valid results, and D sacrifices final proof for speculative changes. A small, obvious service fix is reasonable only if enough time remains to verify it.
 
    </details>
 
@@ -907,3 +938,10 @@ This is the final module in the LFCS sequence; continue by returning to the [LFC
 - [Linux Foundation LFCS Important Instructions](https://docs.linuxfoundation.org/tc-docs/certification/instructions-lfcs-and-lfce) — Authoritative source for LFCS exam format, timing, and performance-based structure.
 - [systemd.service unit configuration reference](https://raw.githubusercontent.com/systemd/systemd/main/man/systemd.service.xml) — Primary reference for `Type=oneshot`, `RemainAfterExit`, and service-state verification details.
 - [util-linux mount(8) reference](https://raw.githubusercontent.com/util-linux/util-linux/master/sys-utils/mount.8.adoc) — Primary reference for UUID-vs-device-name guidance and `mount -a` behavior when checking persistence.
+- [Linux Foundation Certified System Administrator LFCS](https://training.linuxfoundation.org/certification/lfcs)
+- [Linux Foundation certification candidate handbook](https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook1)
+- [Linux Foundation candidate requirements](https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook1/candidate-requirements)
+- [Linux Foundation exam rules and policies](https://docs.linuxfoundation.org/tc-docs/certification/lf-handbook2/exam-rules-and-policies)
+- [Linux man-pages chmod manual](https://man7.org/linux/man-pages/man1/chmod.1.html)
+- [systemd systemctl manual](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)
+- [Linux man-pages fstab manual](https://man7.org/linux/man-pages/man5/fstab.5.html)
