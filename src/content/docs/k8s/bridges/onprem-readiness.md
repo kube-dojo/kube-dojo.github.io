@@ -218,8 +218,8 @@ The first deployment is a chance to bound scope. Select a workload with represen
 
 ## Did You Know?
 
-- **Quorum means a majority:** etcd documents that a cluster needs a majority of members to agree on updates; for three members, two must remain available for quorum. Use the etcd FAQ in Sources [2] when validating a topology calculation.
-- **BGP is an upstream change:** MetalLB's BGP documentation describes peering with routers and advertising service IP reachability, so a BGP-mode deployment changes routing information beyond the Kubernetes API. See Sources [3] and [4].
+- **Quorum means a majority:** etcd documents that a cluster needs a majority of members to agree on updates; for three members, two must remain available for quorum. Use the etcd FAQ in Sources [1] when validating a topology calculation.
+- **BGP is an upstream change:** MetalLB's BGP documentation describes peering with routers and advertising service IP reachability, so a BGP-mode deployment changes routing information beyond the Kubernetes API. See Sources [2], [3], and [4].
 - **PXE relies on a chain:** the PXE DHCP options and UEFI network-boot specifications define pieces of a boot process, while the installer and host configuration remain separate steps. Review Sources [5] and [6] before designing a complete workflow.
 - **Storage copies have placement semantics:** Ceph's CRUSH documentation describes rules for mapping data to devices and failure domains, which means copy count must be reviewed alongside placement topology. See Source [7].
 
