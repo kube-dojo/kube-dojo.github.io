@@ -25,7 +25,7 @@ After completing this module, you will be able to make architecture and operatio
 
 ## Why This Module Matters
 
-A retail company launched a recommendation feature that worked perfectly during a small pilot, then failed during the holiday traffic surge. The application Pods scaled, the frontend remained healthy, and the database had spare capacity, yet the recommendation endpoint became slow and then unavailable. The platform team eventually found the real problem: the model server needed GPUs, the cluster autoscaler was only adding CPU nodes, and half the inference replicas were stuck Pending while users waited for product suggestions that never arrived.
+Hypothetical scenario: a retail company launched a recommendation feature that worked perfectly during a small pilot, then failed during the holiday traffic surge. The application Pods scaled, the frontend remained healthy, and the database had spare capacity, yet the recommendation endpoint became slow and then unavailable. The platform team eventually found the real problem: the model server needed GPUs, the cluster autoscaler was only adding CPU nodes, and half the inference replicas were stuck Pending while users waited for product suggestions that never arrived.
 
 That failure is common because AI/ML workloads look familiar from a distance but behave differently under pressure. They still run in containers, they still need networking, and they still benefit from Kubernetes controllers, but their most expensive resources are accelerators and memory rather than ordinary CPU. A learner who treats model serving like a normal stateless API will miss the scheduling constraints, startup time, GPU capacity, model size, and latency behavior that determine whether the system works.
 
