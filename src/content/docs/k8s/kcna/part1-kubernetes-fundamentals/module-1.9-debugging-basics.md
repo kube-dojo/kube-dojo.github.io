@@ -92,6 +92,10 @@ A useful way to practice restraint is to narrate the failure in terms of ownersh
 A pod status line is a compressed timeline, not a final diagnosis. `STATUS` in `k get pods` often displays a container reason chosen for human readability, while the pod phase is a broader lifecycle category such as `Pending`, `Running`, `Succeeded`, `Failed`, or `Unknown`. That distinction matters because a pod can be in the `Running` phase while one container is not ready, and [a pod can appear `Pending` because it has not been scheduled or because it is already assigned to a node while the kubelet prepares images and volumes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/).
 
 ```bash
+alias k=kubectl
+```
+
+```bash
 k get pods -n default -o wide
 ```
 
