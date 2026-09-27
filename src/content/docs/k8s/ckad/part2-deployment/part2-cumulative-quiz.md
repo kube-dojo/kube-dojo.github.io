@@ -13,27 +13,22 @@ sidebar:
 >
 > **Exam Context**: CKAD cumulative practice for application deployment workflows on Kubernetes 1.35+
 >
-> **Command Note**: This module uses `k` as a shorthand for `kubectl` after this point, matching the alias many CKAD candidates configure for speed.
 
 ---
 
 ## Learning Outcomes
 
-By the end of this module, you will be able to **debug** a failed Deployment rollout by reading rollout status, ReplicaSet state, Pod events, and revision history instead of guessing from the top-level Deployment condition alone.
-
-You will be able to **design** rollout configuration for common application constraints, including zero-downtime web updates, single-version database workloads, blue/green cutovers, and replica-weighted canary releases.
-
-You will be able to **compare** Helm and Kustomize workflows for packaging, environment customization, rollback behavior, and exam-speed troubleshooting under time pressure.
-
-You will be able to **evaluate** whether a Service selector, Deployment label set, Helm value change, or Kustomize image override is the safest control point for a production deployment change.
-
-You will be able to **implement** a complete deployment recovery workflow that previews changes, applies them, verifies endpoint routing, rolls back safely, and cleans up without leaving misleading cluster state behind.
+- **Debug** a failed Deployment rollout by reading rollout status, ReplicaSet state, Pod events, and revision history instead of guessing from the top-level Deployment condition alone.
+- **Design** rollout configuration for common application constraints, including zero-downtime web updates, single-version database workloads, blue/green cutovers, and replica-weighted canary releases.
+- **Compare** Helm and Kustomize workflows for packaging, environment customization, rollback behavior, and exam-speed troubleshooting under time pressure.
+- **Evaluate** whether a Service selector, Deployment label set, Helm value change, or Kustomize image override is the safest control point for a production deployment change.
+- **Implement** a complete deployment recovery workflow that previews changes, applies them, verifies endpoint routing, rolls back safely, and cleans up without leaving misleading cluster state behind.
 
 ---
 
 ## Why This Module Matters
 
-A platform team ships a routine web release late in the afternoon. The Deployment reports that a rollout is in progress, the new ReplicaSet exists, and the manifest looks reasonable at first glance. A few minutes later, customers report intermittent failures because the Service is still routing to old and new pods while the new image crashes only after receiving real traffic. The engineer who treats Deployment work as a list of commands loses time changing random fields. The engineer who understands rollout mechanics follows the evidence from Deployment to ReplicaSet to Pod to Service endpoints and fixes the real fault.
+Hypothetical scenario: A platform team ships a routine web release late in the afternoon. The Deployment reports that a rollout is in progress, the new ReplicaSet exists, and the manifest looks reasonable at first glance. A few minutes later, customers report intermittent failures because the Service is still routing to old and new pods while the new image crashes only after receiving real traffic. The engineer who treats Deployment work as a list of commands loses time changing random fields. The engineer who understands rollout mechanics follows the evidence from Deployment to ReplicaSet to Pod to Service endpoints and fixes the real fault.
 
 Application deployment is where CKAD knowledge becomes operational judgment. It is not enough to know that `k rollout undo` exists or that Helm has a `rollback` command. In a real cluster, the question is whether the rollback returns traffic to a known-good version, whether a Kustomize overlay changed the name of a referenced object, whether a Helm upgrade reused the intended values, and whether a Service selector accidentally included both stable and experimental pods. Those are applied and analytical skills, not recall skills.
 
@@ -78,14 +73,16 @@ The answer is that the new ReplicaSet can grow only as far as the surge budget a
 
 A useful Deployment workflow always separates intent, rollout, and serving traffic. The manifest expresses intent. The rollout machinery creates or scales ReplicaSets. [The Service chooses which Pods receive traffic based on labels.](https://kubernetes.io/docs/concepts/services-networking/service/index.html) When those layers are confused, teams patch the wrong thing. For example, scaling a Deployment will not fix a Service selector that matches zero Pods, and changing a Service selector will not repair a crashing container image. The fastest path is to ask which layer is broken before choosing the command.
 
+The order of inspection also helps you distinguish a stalled replacement from a completed replacement with broken routing. Compare the desired and available replica counts, then identify which ReplicaSet owns each Pod. A Pod that cannot be scheduled points toward capacity or placement; a running Pod that never becomes ready points toward its probe or application startup. Only after those observations should you inspect whether the Service has ready endpoints. Each step narrows the failure boundary before you change a field.
+
 ```bash
-k get deploy api
-k rollout status deploy/api
-k get rs -l app=api
-k get pods -l app=api -o wide
-k describe pod -l app=api
-k get svc api -o yaml
-k get endpointslice -l kubernetes.io/service-name=api
+kubectl get deploy api
+kubectl rollout status deploy/api
+kubectl get rs -l app=api
+kubectl get pods -l app=api -o wide
+kubectl describe pod -l app=api
+kubectl get svc api -o yaml
+kubectl get endpointslice -l kubernetes.io/service-name=api
 ```
 
 The commands above form an evidence ladder. Start from the controller that owns intent, then walk down toward the concrete Pods and across toward the Service endpoints. In CKAD practice, this prevents a common failure mode: answering a rollback question with a rollback command before proving which revision is broken. In production, it prevents a worse failure mode: rolling back a Deployment when the real outage is a selector mismatch or missing readiness gate.
@@ -97,35 +94,37 @@ Suppose a team updates `api` from `registry.example.com/api:1.3` to `registry.ex
 First, check the Deployment and rollout state. This establishes whether the controller is still progressing, timed out, or already complete from Kubernetes' perspective. A Deployment can be "available" enough to serve some traffic while still failing to complete a new rollout, so look at both availability and revision movement.
 
 ```bash
-k rollout status deploy/api --timeout=30s
-k rollout history deploy/api
-k get deploy api -o wide
+kubectl rollout status deploy/api --timeout=30s
+kubectl rollout history deploy/api
+kubectl get deploy api -o wide
 ```
 
 Next, inspect the ReplicaSets. The new ReplicaSet should have the current image and some desired Pods. If the new ReplicaSet has Pods that exist but are not ready, the problem is likely inside the Pod lifecycle. If the new ReplicaSet has no Pods, look for quota, scheduling, or selector problems. If the old ReplicaSet was scaled down too far, examine strategy settings and readiness timing.
 
 ```bash
-k get rs -l app=api
-k describe rs -l app=api
+kubectl get rs -l app=api
+kubectl describe rs -l app=api
 ```
 
 Then, inspect the new Pods. The fastest signal often appears in `READY`, `STATUS`, `RESTARTS`, events, and container logs. A readiness probe failure is different from an image pull failure, and both are different from a crash after start. Each points to a different fix, so do not collapse every failed rollout into the same rollback reflex.
 
 ```bash
-k get pods -l app=api --sort-by=.metadata.creationTimestamp
-k describe pod -l app=api
-k logs -l app=api --tail=80
+kubectl get pods -l app=api --sort-by=.metadata.creationTimestamp
+kubectl describe pod -l app=api
+kubectl logs -l app=api --tail=80
 ```
 
 Finally, decide whether to fix forward or roll back. If the issue is a typo in an environment variable and you have the correct value, a fast patch or apply may be safer than a rollback. If the new image itself is bad, rolling back to the previous known-good revision is appropriate. If the Service selector is wrong, neither image change nor rollback will fix traffic until the selector matches the intended Pods.
 
 ```bash
-k rollout undo deploy/api
-k rollout status deploy/api
-k get endpointslice -l kubernetes.io/service-name=api
+kubectl rollout undo deploy/api
+kubectl rollout status deploy/api
+kubectl get endpointslice -l kubernetes.io/service-name=api
 ```
 
 The worked example shows the core habit this module expects: choose commands because they answer a question. `rollout status` answers whether the controller completed the rollout. `get rs` answers how replicas are distributed across revisions. `describe pod` and `logs` answer why concrete containers are not becoming healthy. `get endpointslice` answers whether traffic has real backend Pods. When you can state the question, the command becomes easier to remember under exam pressure.
+
+When a rollback is justified, verify both the restored Pod template and the serving path. The undo command can create another rollout, so wait for its status and compare the resulting Pods with the expected image. Then check the Service selector and EndpointSlices again. If a separate configuration object changed outside the Deployment, undoing its Pod template cannot restore that object. This is why the recovery boundary must match the boundary of the original change.
 
 ---
 
@@ -154,7 +153,7 @@ helm repo update
 helm show values bitnami/nginx | less
 helm install my-nginx bitnami/nginx --set replicaCount=3 -n web --create-namespace
 helm status my-nginx -n web
-k rollout status deploy -n web
+kubectl rollout status deploy -n web
 ```
 
 > **Active Learning Prompt**: A release was installed with custom resource limits and later upgraded with `helm upgrade app chart --set service.type=LoadBalancer`. Predict what could happen to the resource limits if `--reuse-values` is omitted, then explain which command would prove the current values.
@@ -163,11 +162,13 @@ The risk is that the upgrade may render from chart defaults plus the newly suppl
 
 Helm rollback deserves the same caution as Deployment rollback. Rolling back a release may change multiple Kubernetes objects, not only a Deployment image. That is often exactly what you want after a bad chart upgrade, because the Service, ConfigMap, and Deployment may need to return together. It can also surprise teams that manually patched one object outside Helm. The professional habit is to [inspect `helm history`, choose the target revision intentionally, roll back](https://helm.sh/docs/helm/helm_rollback/), and then verify the workloads and Services that matter to users.
 
+Before any Helm upgrade, compare the proposed values with the release that is actually deployed. A single `--set` flag expresses only one requested difference; it is not a complete description of every earlier override. Render the proposed chart when time permits, inspect the Deployment and related ConfigMap, and record which release revision is currently healthy. If the upgrade fails, that revision gives you a concrete target for recovery, while post-upgrade checks tell you whether all affected objects returned together.
+
 ```bash
 helm history my-app -n production
 helm rollback my-app 2 -n production
 helm status my-app -n production
-k get all -n production -l app.kubernetes.io/instance=my-app
+kubectl get all -n production -l app.kubernetes.io/instance=my-app
 ```
 
 ---
@@ -206,8 +207,8 @@ A reliable Kustomize workflow has two separate steps: preview and apply. [`kubec
 
 ```bash
 kubectl kustomize overlays/prod
-k apply -k overlays/prod
-k get deploy,svc -n production
+kubectl apply -k overlays/prod
+kubectl get deploy,svc -n production
 ```
 
 [The `images` transformer is one of the most exam-relevant Kustomize features. It lets you replace an image tag or full image name without editing the base Deployment.](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/) This keeps the base stable while allowing each overlay to choose a release artifact. The image name must match the image name in the base, so `name: nginx` matches `nginx:1.21`, while a base that uses `registry.example.com/nginx` may need that full name as the match target. When an override appears to do nothing, inspect the rendered output before assuming Kubernetes ignored the change.
@@ -234,6 +235,8 @@ kubectl kustomize overlays/prod | grep -E "name:|namespace:|image:|app:|selector
 > **Active Learning Prompt**: An overlay adds `namePrefix: prod-` and `namespace: production`, but a teammate manually runs `k get svc app-svc -n production` and says the Service is missing. What should you check before recreating anything?
 
 The first check is whether the rendered Service name changed to `prod-app-svc`. The second check is whether the Service exists in the intended namespace. The third check is whether the Service selector still matches the Pod template labels after transformations and patches. Recreating a missing object by hand may create drift and hide the fact that the overlay already produced a differently named object. Rendering the overlay answers the naming question cleanly.
+
+Treat the rendered overlay as the object you are about to submit, not merely as a preview of source files. A reviewer can compare the final Deployment selector with its Pod template labels and the final Service selector in one pass. This also catches a common naming mistake: a command aimed at the unprefixed base object will report it missing even though the prefixed production object exists. Edit the overlay when the rendered contract is wrong, then render it again before applying.
 
 Kustomize and Helm can be combined in real organizations, but CKAD tasks usually test them separately. When comparing them, focus on ownership and change model. Helm owns release history and chart-rendered resources. Kustomize owns a rendered manifest view built from bases and overlays. Helm rollback is release-aware. Kustomize rollback usually means applying a previous Git state or reverting overlay changes. Knowing that boundary helps you choose the right tool when a scenario gives you both packaging and environment customization clues.
 
@@ -283,11 +286,13 @@ After cutover:
 
 A blue/green switch is often just a Service patch. That simplicity is both the strength and the danger. A precise patch changes the selector to the new version label while preserving the common application label. A careless patch may remove other selector keys and accidentally include unrelated Pods. Always verify endpoints after the switch, because the Service object can look valid while endpoint discovery shows zero ready backends.
 
+Prepare the reverse selector before cutting traffic, and check that the green Pods are ready while the blue Pods remain available. After the patch, inspect the whole selector rather than assuming only one key changed. EndpointSlices then show whether the intended green backends are eligible to receive Service traffic. Keeping both sets temporarily costs extra capacity, but it makes a selector switch back possible without waiting for another image rollout.
+
 ```bash
-k patch svc shop-svc -p '{"spec":{"selector":{"app":"shop","version":"green"}}}'
-k get svc shop-svc -o yaml
-k get endpointslice -l kubernetes.io/service-name=shop-svc
-k get pods -l app=shop,version=green
+kubectl patch svc shop-svc -p '{"spec":{"selector":{"app":"shop","version":"green"}}}'
+kubectl get svc shop-svc -o yaml
+kubectl get endpointslice -l kubernetes.io/service-name=shop-svc
+kubectl get pods -l app=shop,version=green
 ```
 
 Canary deployment sends a small portion of traffic to a new version while most traffic continues to reach the stable version. With plain Kubernetes Services, replica weighting is approximate because the Service load-balances across ready endpoints rather than understanding percentages as policy. If stable has nine ready Pods and canary has one ready Pod under the same selector, the canary may receive roughly a small share of traffic, but actual distribution depends on client behavior, connection reuse, and kube-proxy or service mesh behavior. For CKAD, the key skill is setting labels and replica counts so one Service selects both sets of Pods.
@@ -309,15 +314,19 @@ Canary deployment sends a small portion of traffic to a new version while most t
 
 A canary should be observable before it is expanded. That means you need a way to identify canary Pods, check their logs, and compare readiness or error signals with stable Pods. If every Pod has only `app=myapp`, the Service can route to both, but you lose easy operational separation. [A better label set includes a shared selector label for traffic and a separate version or track label for diagnosis.](https://kubernetes.io/docs/concepts/workloads/management/) The Service selector uses the shared label, while your debugging commands filter by the track label.
 
+Replica counts give a useful practice model for canary exposure, yet they are not a promise that every tenth request reaches the new version. A client may reuse connections, and ready endpoints may change while the test runs. Keep the traffic selector broad enough for both tracks, use `track: canary` to isolate logs and Pod checks, and state the observation window before increasing replicas. If exact request percentages are required, this simple Service pattern is insufficient.
+
 ```bash
-k scale deploy stable-app --replicas=9
-k scale deploy canary-app --replicas=1
-k get pods -l app=myapp -o wide
-k logs -l app=myapp,track=canary --tail=80
-k get endpointslice -l kubernetes.io/service-name=myapp-svc
+kubectl scale deploy stable-app --replicas=9
+kubectl scale deploy canary-app --replicas=1
+kubectl get pods -l app=myapp -o wide
+kubectl logs -l app=myapp,track=canary --tail=80
+kubectl get endpointslice -l kubernetes.io/service-name=myapp-svc
 ```
 
 The release strategy decision can be summarized as a compatibility question followed by a verification question. Can old and new versions run together? If no, prefer Recreate or a more specialized migration plan. If yes, do you need instant switchback? Blue/green may fit. If yes, do you need gradual exposure? Canary may fit. If neither special control is needed, rolling update is usually enough. After choosing, verify that traffic routing matches the strategy, because Kubernetes object success is not the same as user-facing success.
+
+Downtime tolerance and simultaneous-version tolerance are separate constraints. Recreate addresses the latter by terminating old Pods before starting new ones, but it creates an availability gap. RollingUpdate usually protects availability better, provided the application tolerates both versions at once and the cluster can host any surge Pods. Blue/green needs capacity for two complete sets, while a simple canary adds only a smaller second set. Write down these costs before choosing a pattern from its name alone.
 
 | Strategy | Best Fit | Main Control Point | Verification Focus |
 |---|---|---|---|
@@ -344,9 +353,9 @@ The final step is recovery. Know whether recovery means `k rollout undo`, `helm 
 
 ```bash
 # Raw Deployment recovery
-k rollout history deploy/api
-k rollout undo deploy/api --to-revision=2
-k rollout status deploy/api
+kubectl rollout history deploy/api
+kubectl rollout undo deploy/api --to-revision=2
+kubectl rollout status deploy/api
 
 # Helm release recovery
 helm history api -n production
@@ -355,15 +364,17 @@ helm status api -n production
 
 # Kustomize recovery through a known overlay state
 kubectl kustomize overlays/prod
-k apply -k overlays/prod
-k rollout status deploy/prod-api -n production
+kubectl apply -k overlays/prod
+kubectl rollout status deploy/prod-api -n production
 
 # Blue/green traffic recovery
-k patch svc shop-svc -p '{"spec":{"selector":{"app":"shop","version":"blue"}}}'
-k get endpointslice -l kubernetes.io/service-name=shop-svc
+kubectl patch svc shop-svc -p '{"spec":{"selector":{"app":"shop","version":"blue"}}}'
+kubectl get endpointslice -l kubernetes.io/service-name=shop-svc
 ```
 
 A senior deployment habit is to write down the verification target before running the change. If you patch a Service to green, [the verification target is EndpointSlices that contain green Pods and exclude blue Pods](https://kubernetes.io/docs/concepts/services-networking/service/index.html). If you upgrade a Helm release, the target is release status plus healthy workloads. If you apply a Kustomize overlay, the target is rendered names, namespaces, labels, and healthy rollout. This prevents the common exam mistake of stopping at the first command that returns no error.
+
+Use the same four-step loop when recovery itself introduces another change. Diagnose the failed release, choose the rollback boundary, verify its new state, and retain enough evidence to explain what failed. A Deployment undo should be checked against its ReplicaSets and Pods; a Helm rollback should be checked against every affected resource; a blue/green switchback should be checked against endpoints. Finishing the command sequence without those checks leaves the central question unanswered: which version can users reach now?
 
 ---
 
@@ -400,10 +411,17 @@ A senior deployment habit is to write down the verification target before runnin
 
 Your team runs a four-replica Deployment named `webapp` using `nginx:1.20`. They need a zero-downtime update pattern for a web tier and ask you to configure a rolling update with at most one extra Pod and no planned unavailable Pods. Later, the rollout stalls because the new Pods are not becoming ready. What manifest fields should encode the strategy, and what evidence should you inspect before rolling back?
 
+A) Use `Recreate`; inspect only Deployment status, then undo if the new Pods are unready.
+B) Use `RollingUpdate` with surge one and unavailable zero; inspect rollout, ReplicaSets, Pods, events, and logs.
+C) Use `RollingUpdate` with surge zero and unavailable one; inspect the Service before any Pod evidence.
+D) Set replicas to five and keep default strategy; inspect only the new image tag before undoing.
+
 <details>
 <summary>Answer</summary>
 
 Use a `RollingUpdate` strategy with `maxSurge: 1` and `maxUnavailable: 0`, then inspect the rollout status, ReplicaSets, Pod readiness, events, and logs before deciding whether rollback is needed.
+
+**B is correct** because it matches the requested capacity envelope and traces the stalled rollout to concrete Pods. A is wrong because Recreate permits downtime. C is wrong because it allows an unavailable Pod, and D is wrong because it changes steady-state capacity without encoding the requested strategy.
 
 ```yaml
 apiVersion: apps/v1
@@ -431,10 +449,10 @@ spec:
 ```
 
 ```bash
-k rollout status deploy/webapp
-k get rs -l app=webapp
-k get pods -l app=webapp
-k describe pod -l app=webapp
+kubectl rollout status deploy/webapp
+kubectl get rs -l app=webapp
+kubectl get pods -l app=webapp
+kubectl describe pod -l app=webapp
 ```
 
 The strategy preserves desired availability when possible, but failed readiness can prevent progress. The ReplicaSet and Pod evidence tells you whether the issue is the image, probes, scheduling, or another Pod-level failure.
@@ -447,16 +465,23 @@ The strategy preserves desired availability when possible, but failed readiness 
 
 A Deployment named `api` was upgraded through a Helm release named `api-prod` in namespace `production`. The new release changed both the image and a ConfigMap value, and the application now fails startup. A teammate suggests `k rollout undo deploy/api -n production`. Evaluate that plan and choose the safer recovery command.
 
+A) Run Deployment undo first, then patch the ConfigMap manually if startup still fails.
+B) Delete the new ReplicaSet and wait for Helm to reconstruct the previous ConfigMap.
+C) Inspect Helm history and roll back the release revision, then verify both changed objects.
+D) Scale the Deployment to zero and back so it reloads the old ConfigMap value.
+
 <details>
 <summary>Answer</summary>
 
 A Deployment rollback may only restore the Deployment's ReplicaSet state, while the Helm upgrade also changed a ConfigMap. Because the scenario says the change was made through a Helm release and affected multiple rendered objects, recover through Helm release history.
 
+**C is correct** because Helm history identifies a prior release state covering the Deployment and ConfigMap. A is wrong because Deployment undo does not restore the ConfigMap. B is wrong because it bypasses release history, and D is wrong because it restarts Pods against the current configuration rather than recovering the release.
+
 ```bash
 helm history api-prod -n production
 helm rollback api-prod 2 -n production
 helm status api-prod -n production
-k rollout status deploy/api -n production
+kubectl rollout status deploy/api -n production
 ```
 
 The exact revision depends on `helm history`, so do not assume revision `2` without checking. Helm rollback is the safer boundary because it restores the release's rendered state rather than only one Deployment object.
@@ -469,16 +494,23 @@ The exact revision depends on `helm history`, so do not assume revision `2` with
 
 You apply a production Kustomize overlay that sets `namespace: production`, adds `namePrefix: prod-`, and overrides the image tag. The Deployment is running, but `k get svc app-svc -n production` says the Service does not exist. Your team wants to recreate the Service manually. What should you do first, and what fields should you inspect?
 
+A) Render the overlay, then inspect the transformed Service name, namespace, labels, and selector.
+B) Recreate `app-svc` manually in production and compare it with the base manifest.
+C) Remove `namePrefix` immediately, then retry the unprefixed Service lookup.
+D) Roll back the Deployment image because an image override can hide a Service.
+
 <details>
 <summary>Answer</summary>
 
 Render the overlay first and inspect the transformed object names, namespace, labels, and Service selector. The prefix may have changed `app-svc` to `prod-app-svc`, and manual recreation would create drift.
 
+**A is correct** because the rendered overlay reveals whether `app-svc` became `prod-app-svc`. B is wrong because manual recreation bypasses the overlay. C is wrong because it changes the intended naming policy without diagnosis, and D is wrong because it targets the image instead of Service identity or routing.
+
 ```bash
 kubectl kustomize overlays/prod
-k get svc -n production
-k get deploy -n production
-k get endpointslice -n production
+kubectl get svc -n production
+kubectl get deploy -n production
+kubectl get endpointslice -n production
 ```
 
 If the rendered Service is named `prod-app-svc`, use that name. If the Service exists but has no endpoints, inspect whether the selector matches the Pod template labels. The correct fix belongs in the overlay, not in an untracked manual Service.
@@ -491,16 +523,23 @@ If the rendered Service is named `prod-app-svc`, use that name. If the Service e
 
 You have two Deployments, `shop-blue` and `shop-green`. Both use `app: shop`, while blue has `version: blue` and green has `version: green`. The Service `shop-svc` currently selects blue with `app: shop, version: blue`. Green has passed smoke tests. Patch the Service to cut traffic to green and state how you would verify that blue is no longer receiving traffic through that Service.
 
+A) Replace the selector with only `version: green`, then verify the Service name exists.
+B) Keep `version: blue` and scale blue down, then inspect Deployment status.
+C) Add `version: green` to blue Pods, then verify that both colors stay ready.
+D) Set `app: shop, version: green` together, then inspect ready Service endpoints.
+
 <details>
 <summary>Answer</summary>
 
 Patch the full intended selector so the Service keeps the shared app label and changes only the version target.
 
+**D is correct** because the full selector retains the shared app identity and targets green Pods. A is wrong because dropping `app` can select unrelated Pods. B is wrong because it removes capacity without moving the selector, and C is wrong because it changes blue Pod identity instead of performing a controlled cutover.
+
 ```bash
-k patch svc shop-svc -p '{"spec":{"selector":{"app":"shop","version":"green"}}}'
-k get svc shop-svc -o yaml
-k get endpointslice -l kubernetes.io/service-name=shop-svc
-k get pods -l app=shop,version=green
+kubectl patch svc shop-svc -p '{"spec":{"selector":{"app":"shop","version":"green"}}}'
+kubectl get svc shop-svc -o yaml
+kubectl get endpointslice -l kubernetes.io/service-name=shop-svc
+kubectl get pods -l app=shop,version=green
 ```
 
 The important verification is endpoint membership, not only the Service YAML. EndpointSlices should point to ready green Pods and should not include blue Pods for this Service.
@@ -513,17 +552,24 @@ The important verification is endpoint membership, not only the Service YAML. En
 
 A team wants a simple canary for `myapp` using plain Kubernetes Services. The stable Deployment should run nine replicas, the canary should run one replica, and one Service should route to both. They also want logs from the canary only during the test. Design the labels, scaling commands, and Service selector.
 
+A) Give both tracks `app: myapp`, add distinct `track` labels, and select only `app` in the Service.
+B) Give stable and canary different `app` labels, then select only `track: canary` in the Service.
+C) Give every Pod only `app: myapp`, then use the shared label to isolate canary logs.
+D) Give both tracks the same `track: stable`, then select `app` and `track` together.
+
 <details>
 <summary>Answer</summary>
 
 Use a shared traffic label such as `app: myapp` for both Deployments and a separate diagnostic label such as `track: stable` or `track: canary`.
 
+**A is correct** because the shared app label includes both tracks in traffic while distinct track labels isolate canary logs. B is wrong because its Service excludes stable Pods. C is wrong because it loses diagnostic separation, and D is wrong because it gives the canary the same track identity as stable.
+
 ```bash
-k scale deploy stable-app --replicas=9
-k scale deploy canary-app --replicas=1
-k expose deploy stable-app --name=myapp-svc --port=80 --selector=app=myapp
-k get endpointslice -l kubernetes.io/service-name=myapp-svc
-k logs -l app=myapp,track=canary --tail=80
+kubectl scale deploy stable-app --replicas=9
+kubectl scale deploy canary-app --replicas=1
+kubectl expose deploy stable-app --name=myapp-svc --port=80 --selector=app=myapp
+kubectl get endpointslice -l kubernetes.io/service-name=myapp-svc
+kubectl logs -l app=myapp,track=canary --tail=80
 ```
 
 The Service selector should be broad enough to include both stable and canary Pods, while the track label lets you inspect canary behavior separately. With plain Services, the traffic share is approximate, so the answer should not claim exact percentage enforcement.
@@ -536,10 +582,17 @@ The Service selector should be broad enough to include both stable and canary Po
 
 A release named `frontend` was installed with custom CPU limits and `replicaCount=3`. Your teammate runs `helm upgrade frontend repo/frontend --set service.type=LoadBalancer`, and after the upgrade the resource limits appear to have returned to chart defaults. Explain what likely happened and show a safer upgrade pattern.
 
+A) Patch the Deployment limits directly; Helm will preserve the patch on later upgrades.
+B) Reinstall the chart with defaults; a new release will recover the earlier limits.
+C) Inspect deployed values, then upgrade with `--reuse-values` or a complete values file.
+D) Run `helm show values` only, then repeat the same upgrade with a new revision.
+
 <details>
 <summary>Answer</summary>
 
 The upgrade likely did not preserve previous custom values, or it rendered from a value set that omitted the resource limits. Inspect the deployed values and then upgrade using `--reuse-values` or a complete values file.
+
+**C is correct** because it starts from evidence of deployed custom values and supplies a complete intended value set. A is wrong because direct patches can be overwritten by Helm. B is wrong because it discards the overrides, and D is wrong because it shows chart defaults rather than proving the release's deployed values.
 
 ```bash
 helm get values frontend --all
@@ -558,10 +611,17 @@ The safer pattern is to treat values as desired configuration, not as a one-off 
 
 A small internal database-like application cannot safely run two versions at the same time because the new version writes data in a format the old version cannot read. The team currently uses the default Deployment strategy and sees both versions serving briefly during updates. Evaluate the strategy and provide the Deployment configuration change that matches the constraint.
 
+A) Keep RollingUpdate and set `maxSurge: 1` to make overlap shorter.
+B) Use a canary so only one new Pod overlaps with the old version.
+C) Switch the Service selector after both versions are running and ready.
+D) Use Recreate and accept downtime while old Pods stop before new Pods start.
+
 <details>
 <summary>Answer</summary>
 
 The default rolling update is mismatched because it can run old and new Pods concurrently. Use `Recreate` if the requirement is that only one version runs at a time and downtime is acceptable for this workload.
+
+**D is correct** because Recreate prevents concurrent old and new Pods when downtime is acceptable. A is wrong because a surge Pod still overlaps with old Pods. B is wrong because it deliberately mixes versions, and C is wrong because it requires both versions to run before cutover.
 
 ```yaml
 apiVersion: apps/v1
@@ -594,10 +654,17 @@ The answer should also mention the trade-off: Recreate avoids mixed versions but
 
 During a practice exam, one task says, "Install the `bitnami/nginx` chart as release `my-nginx` in namespace `web` with three replicas." Another task says, "Create a `kustomization.yaml` that includes `deployment.yaml`, sets namespace `production`, prefixes names with `prod-`, and overrides the nginx image tag." Compare the correct tool choices and provide the core commands for each.
 
+A) Use Helm for both tasks because each involves an image and a namespace.
+B) Use Helm for the chart release and Kustomize for local manifest transformations.
+C) Use Kustomize for the chart release and Helm for the prefix transformation.
+D) Use raw `kubectl apply` for both tasks and skip release or overlay metadata.
+
 <details>
 <summary>Answer</summary>
 
 The first task is Helm because it names a chart and release. The second task is Kustomize because it asks for a `kustomization.yaml` and manifest transformations.
+
+**B is correct** because a chart and named release indicate Helm, while `kustomization.yaml` indicates Kustomize transformations. A is wrong because Helm is not requested for the raw-manifest task. C is wrong because it reverses the tools, and D is wrong because it omits the required release and overlay workflows.
 
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -620,7 +687,7 @@ images:
 
 ```bash
 kubectl kustomize .
-k apply -k .
+kubectl apply -k .
 ```
 
 The key distinction is ownership. Helm manages a release revision from a chart, while Kustomize renders transformed Kubernetes YAML from local manifests.
@@ -640,8 +707,8 @@ The exercise is intentionally multi-step because real deployment work is multi-s
 Create a namespace for the exercise and keep every object inside it. This keeps the lab isolated and makes cleanup predictable.
 
 ```bash
-k create ns ckad-part2-lab
-k config set-context --current --namespace=ckad-part2-lab
+kubectl create ns ckad-part2-lab
+kubectl config set-context --current --namespace=ckad-part2-lab
 ```
 
 Success criteria:
@@ -655,7 +722,7 @@ Success criteria:
 Create a stable Deployment with four replicas and a rolling update configuration that allows one surge Pod and no planned unavailability. Expose it with a Service that selects `app: webapp`.
 
 ```bash
-cat <<'EOF' | k apply -f -
+cat <<'EOF' | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -698,9 +765,9 @@ EOF
 ```
 
 ```bash
-k rollout status deploy/webapp
-k get deploy,rs,pods,svc
-k get endpointslice -l kubernetes.io/service-name=webapp-svc
+kubectl rollout status deploy/webapp
+kubectl get deploy,rs,pods,svc
+kubectl get endpointslice -l kubernetes.io/service-name=webapp-svc
 ```
 
 Success criteria:
@@ -715,11 +782,11 @@ Success criteria:
 Update the image to a newer nginx tag and verify that Kubernetes creates a new ReplicaSet. This step practices the difference between changing the Pod template and changing only the replica count.
 
 ```bash
-k set image deploy/webapp nginx=nginx:1.26
-k rollout status deploy/webapp
-k rollout history deploy/webapp
-k get rs -l app=webapp
-k get pods -l app=webapp -o wide
+kubectl set image deploy/webapp nginx=nginx:1.26
+kubectl rollout status deploy/webapp
+kubectl rollout history deploy/webapp
+kubectl get rs -l app=webapp
+kubectl get pods -l app=webapp -o wide
 ```
 
 Success criteria:
@@ -734,10 +801,10 @@ Success criteria:
 Roll back the Deployment to the previous revision and verify that the ReplicaSet distribution changes. This is a raw Deployment rollback, not a Helm rollback, because the workload was created directly with Kubernetes manifests.
 
 ```bash
-k rollout undo deploy/webapp
-k rollout status deploy/webapp
-k rollout history deploy/webapp
-k get rs -l app=webapp
+kubectl rollout undo deploy/webapp
+kubectl rollout status deploy/webapp
+kubectl rollout history deploy/webapp
+kubectl get rs -l app=webapp
 ```
 
 Success criteria:
@@ -752,7 +819,7 @@ Success criteria:
 Create a second Deployment representing the green version. Keep the same `app: webapp` label but use `track: green` so the Service can switch traffic precisely.
 
 ```bash
-cat <<'EOF' | k apply -f -
+cat <<'EOF' | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -778,9 +845,9 @@ EOF
 ```
 
 ```bash
-k rollout status deploy/webapp-green
-k get pods -l app=webapp --show-labels
-k get endpointslice -l kubernetes.io/service-name=webapp-svc
+kubectl rollout status deploy/webapp-green
+kubectl get pods -l app=webapp --show-labels
+kubectl get endpointslice -l kubernetes.io/service-name=webapp-svc
 ```
 
 Success criteria:
@@ -792,13 +859,13 @@ Success criteria:
 
 ### Step 6: Cut Traffic to Green and Verify Endpoint Routing
 
-Patch the Service selector to green. Then verify endpoints, not only the Service object.
+Patch the Service selector to green while preserving the shared app label. Then inspect both the complete selector and its EndpointSlices, because the patch command can succeed even when no ready green Pod matches the resulting traffic rule.
 
 ```bash
-k patch svc webapp-svc -p '{"spec":{"selector":{"app":"webapp","track":"green"}}}'
-k get svc webapp-svc -o yaml
-k get endpointslice -l kubernetes.io/service-name=webapp-svc
-k get pods -l app=webapp,track=green
+kubectl patch svc webapp-svc -p '{"spec":{"selector":{"app":"webapp","track":"green"}}}'
+kubectl get svc webapp-svc -o yaml
+kubectl get endpointslice -l kubernetes.io/service-name=webapp-svc
+kubectl get pods -l app=webapp,track=green
 ```
 
 Success criteria:
@@ -813,8 +880,8 @@ Success criteria:
 Recover traffic by switching the Service selector back to stable. This shows that a blue/green rollback is a traffic routing change rather than a Deployment image rollback.
 
 ```bash
-k patch svc webapp-svc -p '{"spec":{"selector":{"app":"webapp","track":"stable"}}}'
-k get endpointslice -l kubernetes.io/service-name=webapp-svc
+kubectl patch svc webapp-svc -p '{"spec":{"selector":{"app":"webapp","track":"stable"}}}'
+kubectl get endpointslice -l kubernetes.io/service-name=webapp-svc
 ```
 
 Success criteria:
@@ -873,12 +940,12 @@ Success criteria:
 
 ### Step 9: Apply the Overlay and Verify the Rendered Object
 
-Apply the overlay only after previewing it. Then verify the actual object name and rollout status.
+Apply the overlay only after previewing its rendered name, namespace, labels, and image. Then verify the actual object name and rollout status in the cluster so the result matches the manifest you inspected before the apply operation.
 
 ```bash
-k apply -k .
-k rollout status deploy/prod-api
-k get deploy prod-api -o wide
+kubectl apply -k .
+kubectl rollout status deploy/prod-api
+kubectl get deploy prod-api -o wide
 ```
 
 Success criteria:
@@ -894,8 +961,8 @@ Return to a safe namespace, remove the lab namespace, and delete the temporary K
 
 ```bash
 cd -
-k config set-context --current --namespace=default
-k delete ns ckad-part2-lab
+kubectl config set-context --current --namespace=default
+kubectl delete ns ckad-part2-lab
 rm -rf /tmp/ckad-part2-kustomize
 ```
 
@@ -907,10 +974,6 @@ Success criteria:
 - [ ] You can rerun `k get ns ckad-part2-lab` and explain the result.
 
 ---
-
-## Next Module
-
-[Part 3: Application Observability and Maintenance](/k8s/ckad/part3-observability/module-3.1-probes/) - Probes, logging, debugging, and API deprecations.
 
 ## Sources
 
@@ -927,3 +990,7 @@ Success criteria:
 - [kubernetes.io: management](https://kubernetes.io/docs/concepts/workloads/management/) — The Kubernetes workload-management docs explicitly present the `track`-label canary pattern, shared Service selector, and 3:1 replica example.
 - [EndpointSlices](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/) — Best reference for how Services track ready backends and how endpoint conditions change during updates and termination.
 - [Helm Commands](https://helm.sh/docs/helm/) — Central CLI reference for `helm show values`, `get values`, `upgrade`, `history`, `rollback`, and `template`.
+
+## Next Module
+
+[Part 3: Application Observability and Maintenance](/k8s/ckad/part3-observability/module-3.1-probes/) - Probes, logging, debugging, and API deprecations.
