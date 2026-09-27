@@ -24,9 +24,9 @@ You should also have a disposable Linux VM, cloud instance, or lab machine where
 
 ## Learning Outcomes
 
-- Design a timed mock exam task list using effort, risk, and verification cost to plan the run.
-- Prioritize archive and user tasks before risky storage work when their verification is faster.
-- Execute service and mount changes with independent verification of loaded and persistent state.
+- Design a timed LFCS mock run covering commands, users, services, networking, storage, and scheduled tasks.
+- Prioritize mixed-domain tasks by effort, risk, and verification cost so quick, verifiable work lands first.
+- Execute service, mount, and cron changes with independent verification of loaded, persistent, and scheduled state.
 - Debug access and networking failures by inspecting groups, path components, routes, and listeners.
 - Evaluate mock exam performance through final review, unresolved tasks, and a focused retake plan.
 
