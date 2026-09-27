@@ -467,7 +467,7 @@ AWS EKS                      GCP GKE                      Azure AKS
 │  │ controller │  │         │  │ controller │  │         │  │ controller │  │
 │  └────────────┘  │         │  └────────────┘  │         │  └────────────┘  │
 │  Cost: ~$73/mo   │         │  Cost: ~$73/mo   │         │  Cost: $0 (free) │
-│                  │         │  (1 free zonal)  │         │  $73/mo (std)    │
+│                  │         │ (1 zonal/AP free) │         │  $73/mo (std)    │
 └────────┬─────────┘         └────────┬─────────┘         └────────┬─────────┘
          │                            │                            │
 ┌────────▼─────────┐         ┌────────▼─────────┐         ┌────────▼─────────┐
@@ -560,7 +560,7 @@ The Container Network Interface (CNI) configuration dictates pod density and IP 
 
 | Feature | AWS EKS | GCP GKE | Azure AKS |
 | :--- | :--- | :--- | :--- |
-| Control plane / cluster fee | ~$73/month (as of mid-2024) | ~$73/month ($0.10/cluster-hr as of 2026-09; free tier covers 1 zonal cluster per billing account) | Free (Free tier), ~$73/month (Standard) |
+| Control plane / cluster fee | ~$73/month (as of mid-2024) | ~$73/month ($0.10/cluster-hr as of 2026-09; free tier covers 1 zonal Standard or Autopilot cluster per billing account) | Free (Free tier), ~$73/month (Standard) |
 | Serverless nodes | Fargate profiles | Autopilot (fully managed) | Virtual Nodes (ACI-backed) |
 | Default CNI | VPC CNI (VPC IPs to pods) | Dataplane V2 (Cilium/eBPF) | Azure CNI / CNI Overlay |
 | Node auto-provisioning | Karpenter | Autopilot / NAP | Karpenter (preview) |
@@ -1022,6 +1022,7 @@ Key insight: GCP's Sustained Use Discounts lower steady-state costs automaticall
 - [Google Cloud VPC Network Pricing](https://cloud.google.com/vpc/network-pricing) — Google Cloud documentation detailing traffic egress and inter-zone data transfer rates.
 - [Azure VMSS Automatic Instance Repairs](https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-automatic-instance-repairs) — Microsoft documentation detailing automatic repair policies and health probe evaluations on Virtual Machine Scale Sets.
 - [Google Cloud Deployment Manager Deprecations](https://docs.cloud.google.com/deployment-manager/docs/deprecations) — Google Cloud documentation detailing deprecation timelines and shutdown milestones for Deployment Manager.
+- [Cloud SQL Managed Connection Pooling](https://docs.cloud.google.com/sql/docs/postgres/managed-connection-pooling) — Google Cloud documentation for Managed Connection Pooling on Cloud SQL Enterprise Plus.
 
 ---
 
