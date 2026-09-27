@@ -346,7 +346,7 @@ D) Partly wrong: the value should move to a ConfigMap, because ConfigMaps are na
 
 ### Question 5: Pending while memory sits idle
 
-Pod `report-api` stays `Pending`, and `kubectl describe pod` shows that no node has enough memory, reporting `Insufficient memory` for each one. Its only container requests `memory: 3Gi` with a `4Gi` limit, and it declares `cpu: 0.5` for both its request and its limit. Monitoring from a similar environment shows the process uses about `1Gi`. Which change addresses the `Pending` status?
+Pod `report-api` stays `Pending`, and `kubectl describe pod` shows that no node has enough memory, reporting `Insufficient memory` for each one. Its only container requests `memory: 3Gi` with a `4Gi` limit, and it declares `cpu: 0.5` for both its request and its limit. Monitoring from a similar environment shows the process uses about `1Gi`. Which change is the safest effective way to clear the `Pending` status?
 
 A) Raise the memory limit to `6Gi`, so the scheduler sees more headroom for this container on every node.
 B) Rewrite `cpu: 0.5` as `cpu: 500m`, because decimal CPU quantities make the scheduler reject the resource request.
@@ -356,7 +356,7 @@ D) Lower the memory request toward the measured baseline, keep a limit with head
 <details>
 <summary>Answer and reasoning</summary>
 
-**Correct: D.** The scheduler places Pods by comparing requests against unreserved allocatable capacity, so an overstated `3Gi` request can block placement even when node memory sits idle. A request closer to real use, with a limit above expected peaks, addresses the stage that failed. A) is wrong because limits are runtime ceilings, and raising one does not shrink the reservation. B) is wrong because `cpu: 0.5` and `cpu: 500m` are the same quantity. C) is wrong because a BestEffort Pod has no reservation, is first in line for eviction under pressure, and may still receive defaults from a LimitRange.
+**Correct: D.** The scheduler places Pods by comparing requests against unreserved allocatable capacity, so an overstated `3Gi` request can block placement even when node memory sits idle. A request closer to real use, with a limit above expected peaks, addresses the stage that failed. A) is wrong because limits are runtime ceilings, and raising one does not shrink the reservation. B) is wrong because `cpu: 0.5` and `cpu: 500m` are the same quantity. C) can drop the scheduling request when no LimitRange injects defaults, so the Pod might schedule. It is still the wrong choice here, because a BestEffort Pod is evicted first when the node comes under memory pressure.
 
 </details>
 
@@ -378,7 +378,7 @@ D) The container starts once `privileged: true` is added, because privileged mod
 
 ### Question 7: The Pod that never calls the API
 
-Deployment `status-page` serves static pages and never calls the Kubernetes API. Its Pod template has no `serviceAccountName`, and `kubectl describe sa default` shows `Tokens: <none>`. A security review asks whether the running Pods hold an API credential. Which answer is accurate?
+Deployment `status-page` serves static pages and never calls the Kubernetes API. Its Pod template has no `serviceAccountName`, and `kubectl describe sa default` shows `Tokens: <none>`. Neither the Pod template nor the `default` ServiceAccount sets `automountServiceAccountToken: false`. A security review asks whether the running Pods hold an API credential. Which answer is accurate?
 
 A) No. An empty `serviceAccountName` means admission creates the Pod without any identity, so the kubelet has nothing to mount.
 B) Yes. Admission assigns the namespace `default` ServiceAccount and a token is projected; set `automountServiceAccountToken: false` in the template.
@@ -388,7 +388,7 @@ D) Yes. The fix is a RoleBinding that grants the `default` ServiceAccount zero v
 <details>
 <summary>Answer and reasoning</summary>
 
-**Correct: B.** When the field is empty, admission writes `default`, and unless automounting is disabled on the Pod or the ServiceAccount, the kubelet projects a token under `/var/run/secrets/kubernetes.io/serviceaccount/`. Setting `automountServiceAccountToken: false` in the Pod template removes the credential from new Pods. A) is wrong because an empty field still yields an identity. C) is wrong because Kubernetes 1.24 stopped auto-creating long-lived token Secrets, not projected tokens. D) is wrong because RBAC controls what a token may do and does not remove the token file.
+**Correct: B.** When the field is empty, admission writes `default`, and because neither the Pod nor the ServiceAccount disables automounting, the kubelet projects a token under `/var/run/secrets/kubernetes.io/serviceaccount/`. Setting `automountServiceAccountToken: false` in the Pod template removes the credential from new Pods. A) is wrong because an empty field still yields an identity. C) is wrong because Kubernetes 1.24 stopped auto-creating long-lived token Secrets, not projected tokens. D) is wrong because RBAC controls what a token may do and does not remove the token file.
 
 </details>
 
