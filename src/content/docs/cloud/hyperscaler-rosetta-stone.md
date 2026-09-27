@@ -466,8 +466,8 @@ AWS EKS                      GCP GKE                      Azure AKS
 │  │ scheduler  │  │         │  │ scheduler  │  │         │  │ scheduler  │  │
 │  │ controller │  │         │  │ controller │  │         │  │ controller │  │
 │  └────────────┘  │         │  └────────────┘  │         │  └────────────┘  │
-│  Cost: ~$73/mo   │         │  Cost: $0 (std)  │         │  Cost: $0 (free) │
-│                  │         │  $73/mo (autoplt) │         │  $73/mo (std)    │
+│  Cost: ~$73/mo   │         │  Cost: ~$73/mo   │         │  Cost: $0 (free) │
+│                  │         │  (1 free zonal)  │         │  $73/mo (std)    │
 └────────┬─────────┘         └────────┬─────────┘         └────────┬─────────┘
          │                            │                            │
 ┌────────▼─────────┐         ┌────────▼─────────┐         ┌────────▼─────────┐
@@ -560,7 +560,7 @@ The Container Network Interface (CNI) configuration dictates pod density and IP 
 
 | Feature | AWS EKS | GCP GKE | Azure AKS |
 | :--- | :--- | :--- | :--- |
-| Control plane cost (as of mid-2024) | ~$73/month | Free (Standard), ~$73/month (Autopilot/Enterprise) | Free (Free tier), ~$73/month (Standard) |
+| Control plane / cluster fee | ~$73/month (as of mid-2024) | ~$73/month ($0.10/cluster-hr as of 2026-09; free tier covers 1 zonal cluster per billing account) | Free (Free tier), ~$73/month (Standard) |
 | Serverless nodes | Fargate profiles | Autopilot (fully managed) | Virtual Nodes (ACI-backed) |
 | Default CNI | VPC CNI (VPC IPs to pods) | Dataplane V2 (Cilium/eBPF) | Azure CNI / CNI Overlay |
 | Node auto-provisioning | Karpenter | Autopilot / NAP | Karpenter (preview) |
@@ -655,7 +655,7 @@ Managed relational database services automate hardware provisioning, database en
 
 Distributed database consistency models represent a critical architectural fork in multi-cloud system design. Google Cloud Spanner leverages proprietary TrueTime hardware clocks to guarantee external consistency (linearizability) across global regions without locking bottlenecks. Amazon Aurora decouples SQL execution nodes from a distributed storage volume that replicates write operations across three Availability Zones. Azure Cosmos DB allows architects to configure five distinct consistency levels ranging from Strong to Eventual consistency, trading consistency guarantees against latency and availability based on specific application requirements.
 
-Relational database connection pooling and failover orchestration require distinct architectural patterns across cloud providers. High-concurrency serverless microservices connecting to PostgreSQL instances can easily exhaust database connection pools. AWS addresses this challenge with Amazon RDS Proxy, a fully managed, highly available database proxy that pools and multiplexes connections while preserving application state during automated multi-AZ failovers. Google Cloud does not provide a managed database connection pooler inside Cloud SQL. While Cloud SQL Auth Proxy establishes secure, IAM-authenticated mutual TLS tunnels to instances, it does not pool connections. Engineering teams using Cloud SQL must deploy standalone poolers like PgBouncer or adopt AlloyDB for native connection management. Microsoft Azure provides built-in PgBouncer integration directly inside Azure Database for PostgreSQL Flexible Server, allowing engineering teams to handle connection spikes without provisioning separate intermediate proxy instances.
+Relational database connection pooling and failover orchestration require distinct architectural patterns across cloud providers. High-concurrency serverless microservices connecting to PostgreSQL instances can easily exhaust database connection pools. AWS addresses this challenge with Amazon RDS Proxy, a fully managed, highly available database proxy that pools and multiplexes connections while preserving application state during automated multi-AZ failovers. In Google Cloud, Cloud SQL Enterprise Plus provides Managed Connection Pooling, which serves as the closest native architectural equivalent to RDS Proxy. However, Cloud SQL Auth Proxy only establishes secure, IAM-authenticated mutual TLS tunnels to instances and does not pool connections. Engineering teams running other Cloud SQL editions must deploy standalone poolers like PgBouncer or adopt AlloyDB for native connection management. Microsoft Azure provides built-in PgBouncer integration directly inside Azure Database for PostgreSQL Flexible Server, allowing engineering teams to handle connection spikes without provisioning separate intermediate proxy instances.
 
 ### Database Service Translation Table
 
@@ -761,7 +761,7 @@ Progressive delivery patterns require tight integration with cloud monitoring te
 
 ## 7. Infrastructure as Code: Native Tools
 
-While third-party tools such as Terraform and OpenTofu represent the universal industry standard for multi-cloud provisioning, each hyperscaler maintains a proprietary Infrastructure as Code (IaC) toolchain optimized for its native resource APIs.
+While third-party tools such as Terraform and OpenTofu enable declarative multi-cloud provisioning, each hyperscaler maintains a native Infrastructure as Code (IaC) toolchain optimized for its own resource APIs.
 
 | Characteristic | AWS CloudFormation | GCP Infrastructure Manager | Azure ARM / Bicep |
 | :--- | :--- | :--- | :--- |
@@ -770,7 +770,6 @@ While third-party tools such as Terraform and OpenTofu represent the universal i
 | Rollback on failure | Automatic | Managed through Terraform / GitOps | Automatic |
 | Preview changes | Change Sets | Terraform plan preview | What-if |
 | Multi-region | StackSets | Configured via Terraform modules | Deployment Stacks |
-| Community adoption | High (legacy) | Broad (standard Terraform) | Growing (Bicep) |
 | Recommendation | Use for AWS-only shops | Use for managed Terraform deployments | Use Bicep for Azure-only |
 
 Support for Google Cloud Deployment Manager has officially ended, and Google Cloud now provides Infrastructure Manager as its native infrastructure-as-code service, running Terraform configurations through managed Google Cloud execution. In contrast, AWS CloudFormation remains a deeply supported native tool within the AWS ecosystem, providing managed state storage and automated rollbacks. In the Microsoft ecosystem, Azure Bicep provides a modern domain-specific language that transpiles into Azure Resource Manager (ARM) templates, offering immediate zero-day support for new resource APIs.
@@ -783,7 +782,7 @@ When teams design multi-cloud architectures, they must avoid the naive assumptio
 
 ## 8. Pricing Models: The Most Dangerous Translation
 
-The most expensive errors in multi-cloud engineering are frequently financial rather than architectural. While headline compute prices appear nearly identical across providers, underlying commitment structures, billing increments, and data egress fees diverge substantially.
+The most expensive errors in multi-cloud engineering are frequently financial rather than architectural. While headline compute prices appear nearly identical across providers, underlying commitment structures, billing increments, and data egress fees diverge substantially. Readers should confirm rates on the current provider price page before relying on them.
 
 ### On-Demand Pricing (Pay-as-you-go)
 
@@ -804,7 +803,7 @@ Because base compute rates are nearly indistinguishable, enterprise cost optimiz
 | Commitment (1-3 yr) | Reserved Instances / Savings Plans | Committed Use Discounts (CUDs) | Reserved VM Instances |
 | Typical 1-year savings | 30-40% | 28-37% | 30-40% |
 | Typical 3-year savings | 50-60% | 52-57% | 55-65% |
-| Automatic discounts | None | Sustained Use Discounts (series-dependent, up to 30%) | None |
+| Automatic discounts | None | Sustained Use Discounts (up to 30% on N1, up to 20% on N2 as of 2026-09) | None |
 | Preemptible / Spot | Spot Instances (up to 90% off) | Spot VMs (up to 91% off) | Spot VMs (up to 90% off) |
 | Spot termination notice | 2 minutes | 30 seconds | 30 seconds |
 | Free tier | 750 hrs/mo t2.micro (12 mo) | e2-micro always-free | 750 hrs/mo B1s (12 mo) |
@@ -813,7 +812,7 @@ Commitment discount architectures require careful financial planning. AWS Saving
 
 ### The GCP Sustained Use Discount Advantage
 
-Google Cloud Platform distinguishes itself from competitors by automatically applying **Sustained Use Discounts (SUDs)** to steady-state workloads on eligible machine types. If an uncommitted Compute Engine instance executes for more than twenty-five percent of a billing month, GCP incrementally reduces the hourly rate without requiring upfront contractual commitments. These automatic savings vary across machine types. Older N1 instances receive discounts up to thirty percent, while N2 instances receive up to twenty percent. Newer series such as E2 or C3 do not receive sustained use discounts at all. On AWS and Azure, workloads run at full on-demand rates unless teams explicitly purchase Reserved Instances or Savings Plans.
+Google Cloud Platform distinguishes itself from competitors by automatically applying **Sustained Use Discounts (SUDs)** to steady-state workloads on eligible machine types. If an uncommitted Compute Engine instance executes for more than twenty-five percent of a billing month, GCP incrementally reduces the hourly rate without requiring upfront contractual commitments. These automatic savings vary across machine types. As of 2026-09, older N1 instances receive discounts up to thirty percent, while N2 instances receive up to twenty percent. Newer series such as E2 or C3 do not receive sustained use discounts at all. On AWS and Azure, workloads run at full on-demand rates unless teams explicitly purchase Reserved Instances or Savings Plans.
 
 ### Data Egress: The Hidden Cost
 
@@ -823,11 +822,11 @@ Network data transfer represents the single greatest source of unexpected expend
 | :--- | :--- | :--- | :--- |
 | Ingress (data in) | Free | Free | Free |
 | Same-zone traffic | Free | Free | Free |
-| Cross-zone (same region, as of mid-2024) | ~$0.01/GB | ~$0.01/GiB | Check current pricing |
+| Cross-zone (same region) | ~$0.01/GB (as of mid-2024) | ~$0.01/GiB (as of 2026-09) | Check current pricing |
 | Cross-region (same provider, as of mid-2024) | $0.01-0.02/GB | $0.01-0.08/GB | $0.02-0.05/GB |
 | Egress to internet (first 10 TB, as of mid-2024) | ~$0.09/GB | ~$0.12/GB | ~$0.087/GB |
 
-A critical architectural reality is that both AWS and GCP charge for inter-zone data transfer within the same geographic region. As of mid-2024, AWS charges ~$0.01 per GB in each direction, while GCP charges ~$0.01 per GiB for inter-zone traffic within the same region. If a distributed microservice transmits fifty terabytes of internal RPC traffic across zones for high availability, the network bill will include hundreds of dollars in cross-zone fees on both platforms. For Microsoft Azure, zone-to-zone data transfer pricing varies and must be checked on the current bandwidth pricing page rather than assumed to be free.
+A critical architectural reality is that both AWS and GCP charge for inter-zone data transfer within the same geographic region. As of mid-2024, AWS charges ~$0.01 per GB in each direction, while as of 2026-09, GCP charges ~$0.01 per GiB for inter-zone traffic within the same region. If a distributed microservice transmits fifty terabytes of internal RPC traffic across zones for high availability, the network bill will include hundreds of dollars in cross-zone fees on both platforms. For Microsoft Azure, zone-to-zone data transfer pricing varies and must be checked on the current bandwidth pricing page rather than assumed to be free.
 
 Network egress to the public internet represents a substantial financial burden when transferring large data sets between cloud providers. Replicating multi-terabyte database snapshots or streaming high-resolution media across clouds incurs continuous egress fees ranging from eight to twelve cents per gigabyte. Multi-cloud architectures must minimize cross-cloud data transfers by processing data locally within the originating cloud and synchronizing only compressed metadata summaries across provider boundaries.
 
@@ -857,7 +856,7 @@ Establishing financial operations (FinOps) governance across disparate cloud pro
 | **Overlooking regional data egress costs** | Assuming data transfer between regions, or data out to the internet, costs the exact same everywhere. | Architect systems to keep high-bandwidth, chatty traffic within the exact same availability zone or region whenever possible, regardless of the cloud provider. |
 | **Assuming 'Serverless' implies identical limits** | AWS Lambda has specific execution time maximums and payload limits that differ entirely from Azure Functions. | Rigorously validate payload sizes, maximum execution timeouts, and concurrent invocation limits when migrating serverless architectures. |
 | **Translating AWS Tags directly to Azure Resource Groups** | AWS uses flat tags for everything. Azure relies on Resource Groups as mandatory deployment boundaries. | Do not use Azure Resource Groups just for tagging. Use them to group resources that share identical lifecycles, and use Azure Tags for billing categorizations. |
-| **Assuming cross-zone traffic is free within a region** | Engineers assume inter-zone data transfer within the same geographic region carries zero cost across cloud providers. | Both AWS and GCP charge for cross-zone traffic within the same region (about $0.01 per GB or GiB as of mid-2024), while Azure availability-zone data transfer rates must be confirmed on current pricing pages. Design services to localize chatty RPC traffic within the same zone where feasible, or budget for cross-zone high-availability costs. |
+| **Assuming cross-zone traffic is free within a region** | Engineers assume inter-zone data transfer within the same geographic region carries zero cost across cloud providers. | Both AWS (about $0.01 per GB as of mid-2024) and GCP (about $0.01 per GiB as of 2026-09) charge for cross-zone traffic within the same region, while Azure availability-zone data transfer rates must be confirmed on current pricing pages. Design services to localize chatty RPC traffic within the same zone where feasible, or budget for cross-zone high-availability costs. |
 
 ---
 
@@ -880,7 +879,7 @@ When teams design multi-cloud architectures that account for fundamental structu
 
 <details>
 <summary>Question 4: When you evaluate cloud provider tradeoffs for specific workload patterns using the service mapping framework, which hyperscaler model offers automatic cost reductions for sustained execution without upfront financial commitments?</summary>
-When engineers evaluate cloud provider tradeoffs for specific workload patterns using the service mapping framework, Google Cloud Platform provides automatic Sustained Use Discounts (SUDs) on eligible VM series. Workloads that execute continuously for more than twenty-five percent of a billing month automatically receive tiered pricing reductions. These reductions vary by machine series, offering up to twenty percent on N2 instances or up to thirty percent on legacy N1 types. On AWS and Microsoft Azure, securing comparable discounts requires teams to evaluate tradeoffs and commit in advance to one-year or three-year Reserved Instances or Savings Plans.
+When engineers evaluate cloud provider tradeoffs for specific workload patterns using the service mapping framework, Google Cloud Platform provides automatic Sustained Use Discounts (SUDs) on eligible VM series. Workloads that execute continuously for more than twenty-five percent of a billing month automatically receive tiered pricing reductions. These reductions vary by machine series; as of 2026-09, they offer up to twenty percent on N2 instances or up to thirty percent on legacy N1 types. On AWS and Microsoft Azure, securing comparable discounts requires teams to evaluate tradeoffs and commit in advance to one-year or three-year Reserved Instances or Savings Plans.
 </details>
 
 <details>
@@ -988,7 +987,7 @@ Review the practical tasks detailed below and complete the architectural transla
 **On-demand monthly cost (approximate, US region, Linux, as of mid-2024):**
 
 *   **AWS** (m5.xlarge): ~$0.192/hr x 730 hrs x 10 = ~$1,402/month
-*   **GCP** (n2-standard-4): ~$0.194/hr x 730 hrs x 10 = ~$1,416/month (with Sustained Use Discounts up to 20% on the N2 series for full-month usage, effective rate drops to ~$0.155/hr = ~$1,133/month)
+*   **GCP** (n2-standard-4): ~$0.194/hr x 730 hrs x 10 = ~$1,416/month (with Sustained Use Discounts up to 20% on the N2 series as of 2026-09 for full-month usage, effective rate drops to ~$0.155/hr = ~$1,133/month)
 *   **Azure** (Standard_D4s_v5): ~$0.192/hr x 730 hrs x 10 = ~$1,402/month
 
 **With 1-year commitment (approximate, as of mid-2024):**
@@ -1018,9 +1017,14 @@ Key insight: GCP's Sustained Use Discounts lower steady-state costs automaticall
 - [Azure Container Instances Overview](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-overview) — Microsoft documentation detailing the serverless container primitive and per-second billing model.
 - [Azure Functions Hosting Options](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale) — Microsoft reference for Consumption, Flex Consumption, Premium, and Dedicated hosting plans.
 - [Azure Key Vault Developers Guide](https://learn.microsoft.com/en-us/azure/key-vault/general/developers-guide) — Microsoft Key Vault documentation detailing secure storage for cryptographic keys, secrets, and certificates.
+- [GKE Pricing](https://cloud.google.com/kubernetes-engine/pricing) — Google Kubernetes Engine documentation covering cluster management fees and the single-cluster monthly free tier credit.
+- [Compute Engine Sustained Use Discounts](https://cloud.google.com/compute/docs/sustained-use-discounts) — Google Cloud documentation detailing automatic sustained use discounts across machine series including N1 and N2.
+- [Google Cloud VPC Network Pricing](https://cloud.google.com/vpc/network-pricing) — Google Cloud documentation detailing traffic egress and inter-zone data transfer rates.
+- [Azure VMSS Automatic Instance Repairs](https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-automatic-instance-repairs) — Microsoft documentation detailing automatic repair policies and health probe evaluations on Virtual Machine Scale Sets.
+- [Google Cloud Deployment Manager Deprecations](https://docs.cloud.google.com/deployment-manager/docs/deprecations) — Google Cloud documentation detailing deprecation timelines and shutdown milestones for Deployment Manager.
 
 ---
 
 ## Next Module
 
-Ready to dive deep into Amazon's ecosystem and master the specific tools of the most widely used cloud provider? Continue to the [AWS DevOps Essentials](/cloud/aws-essentials/).
+Ready to dive deep into Amazon's ecosystem and master its core cloud services? Continue to the [AWS DevOps Essentials](/cloud/aws-essentials/).
