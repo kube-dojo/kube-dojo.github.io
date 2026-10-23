@@ -57,6 +57,7 @@ body { -webkit-font-smoothing: antialiased; }
 .sl-markdown-content h2:first-of-type { margin-top: 0; }
 .sl-markdown-content h3 { font-size: 1.0625rem; font-weight: 700; margin: 1.5rem 0 0.625rem; }
 .sl-markdown-content p { margin-bottom: 0.875rem; font-size: 0.9375rem; }
+/* Mermaid's HTML labels inherit their diagram colors instead of prose colors. */
 :root[data-theme='light'] .sl-markdown-content p:not(:where(.kd-mermaid__mount *)) { color: var(--g700); }
 :root[data-theme='light'] .sl-markdown-content strong:not(:where(.kd-mermaid__mount *)) { color: var(--g900); }
 
