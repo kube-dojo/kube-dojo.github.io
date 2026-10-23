@@ -70,8 +70,8 @@ flowchart LR
     A[Code] -- "$" --> B[Build]
     B -- "$$" --> C[Test]
     C -- "$$$" --> D[Stage]
-    D -- "$$$$" --> E[Production]
-    E -- "$$$$$$$" --> F[Breach!]
+    D -- "#36;#36;#36;#36;" --> E[Production]
+    E -- "#36;#36;#36;#36;#36;#36;#36;" --> F[Breach!]
 
     classDef default fill:#f9f9f9,color:#111,stroke:#333,stroke-width:2px;
     style F fill:#ff9999,stroke:#cc0000,stroke-width:3px;
