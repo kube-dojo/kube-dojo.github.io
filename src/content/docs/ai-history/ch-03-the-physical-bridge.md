@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::tip[In one paragraph]
-In August 1937, Claude Shannon signed a master's thesis at MIT that gave switching-circuit design an axiomatic foundation: eight postulates, perfect-induction proofs, and an explicit identification of relay algebra with George Boole's calculus of propositions. Akira Nakashima at NEC had reached the same insight in Tokyo two years earlier. Hansi Piesch (1939) and Plechl–Duschek (1946) later published related German-language titles; this chapter uses their accessible opening pages, not complete-paper priority claims. Shannon's distinctive contribution was axiomatic completeness — circuit design became a deductive discipline, not a uniquely Shannon-only insight.
+In August 1937, Claude Shannon signed his MIT thesis on switching circuits: eight postulates, perfect-induction proofs, and an explicit connection to Boole's calculus of propositions made circuit design deductive. Akira Nakashima's relay-network algebra preceded it. Hansi Piesch (1939) and Plechl–Duschek (1946) later published related German-language work; this chapter uses their accessible opening pages, not complete-paper priority claims. Shannon's contribution was an axiomatic treatment, not sole discovery of the connection between algebra and switching.
 :::
 
 <details>

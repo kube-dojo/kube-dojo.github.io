@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::tip[In one paragraph]
-In 1943, Warren McCulloch and Walter Pitts published "A Logical Calculus of the Ideas Immanent in Nervous Activity" in the *Bulletin of Mathematical Biophysics*. They did not invent the mathematical study of neurons — Nicolas Rashevsky's biophysics community already existed at Chicago — but they replaced its continuous differential equations with the propositional logic of Carnap and Russell-Whitehead. Von Neumann's 1945 *First Draft of a Report on the EDVAC* explicitly cites their paper while discussing simplified neuron functions and computing elements.
+In 1943, Warren McCulloch and Walter Pitts published "A Logical Calculus of the Ideas Immanent in Nervous Activity." They applied propositional logic to idealized neural activity within an existing mathematical-biophysics community at Chicago, rather than inventing the mathematical study of neurons. Von Neumann's 1945 *First Draft of a Report on the EDVAC* explicitly cites their paper while discussing simplified neuron functions and computing elements. Formal representation, biological explanation, and learning a chosen task remain distinct questions.
 :::
 
 <details>
@@ -170,6 +170,10 @@ One connection can be checked directly in a later technical report. What could a
 The comparison with computing elements does not settle what real neurons do. In 1959, Lettvin, Maturana, McCulloch, and Pitts investigated a different question: what information does a frog's eye send to its brain? Recording individual optic-nerve fibers, they found responses chiefly associated with local patterns of light variation. Their paper, [*What the Frog's Eye Tells the Frog's Brain*](https://stuff.mit.edu/afs/athena/course/9/9.49/www/Supplementary/Frog.pdf#page=1), argued that the eye was already organizing visual information before sending it onward. The authors explicitly restricted their interpretation to frogs. That gives us a concrete question to carry forward: how much processing has already happened before a signal reaches the brain?
 
 The 1943 paper gives us a precise question to ask of a model: under its stated assumptions, which patterns of activity can a network express? McCulloch and Pitts answered that question through logical constructions using idealized neurons. A construction within those assumptions is not proof that the mind works that way. Keeping that boundary visible makes the result more useful: we can test what the abstraction does without confusing it with everything a living nervous system does.
+
+:::note[Why this still matters today]
+When reading a proposed neural model, ask three questions: what behavior can it represent, what changes during learning, and what evidence shows that those changes solve the intended task? McCulloch and Pitts's [Theorem 7 (reprint p. 108)](https://www.cs.cmu.edu/~epxing/Class/10715/reading/McCulloch.and.Pitts.pdf#page=10) represents a specified connection-alteration rule using a fixed net with circles. It does not establish successful training for a chosen task. Their [earlier qualification (reprint p. 101)](https://www.cs.cmu.edu/~epxing/Class/10715/reading/McCulloch.and.Pitts.pdf#page=3) also separates formal equivalence from physiological explanation. Use those distinctions to identify what a model's result actually establishes before inferring how a brain works or how a learning system will perform.
+:::
 
 ## Sources and reading notes
 
