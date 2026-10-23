@@ -389,13 +389,7 @@ def test_route_request_serves_delivery_status(tmp_path: Path) -> None:
     _write(repo_root / "dist/index.html", "built\n")
     _write(
         repo_root / "scripts/check_site_health.py",
-        "\n".join(
-            [
-                "#!/usr/bin/env python3",
-                "print('RESULTS: 0 errors, 3 warnings')",
-                "print('STATS:   10 files, 4 modules, 20 links checked')",
-            ]
-        ),
+        "#!/usr/bin/env python3\nprint('RESULTS: 0 errors, 3 warnings')\nprint('STATS:   10 files, 4 modules, 20 links checked')",
     )
 
     status_code, payload, _ = local_api.route_request(repo_root, "/api/delivery/status")
@@ -726,7 +720,7 @@ def test_388_batches_reconciles_held_prs_merged_on_main(tmp_path: Path, monkeypa
     _write(tmp_path / "README.md", "merged\n")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-m", "feat(388): rewrite module b (#101)")
-    monkeypatch.setattr(local_api, "_fetch_388_pr_states", lambda: {})
+    monkeypatch.setattr(local_api, "_fetch_388_pr_states", dict)
 
     status_code, payload, _ = local_api.route_request(tmp_path, "/api/388/batches")
 
@@ -852,7 +846,7 @@ def test_cached_response_reuses_entry_until_version_bump(tmp_path: Path) -> None
     assert calls["n"] == 1
 
     # Second call within TTL + same version -> cached.
-    code_b, body_b, _ct, etag_b = local_api.cached_response(
+    _code_b, body_b, _ct, etag_b = local_api.cached_response(
         key, ttl_seconds=60, version_fn=version, builder=builder
     )
     assert calls["n"] == 1
@@ -861,7 +855,7 @@ def test_cached_response_reuses_entry_until_version_bump(tmp_path: Path) -> None
 
     # Version bump -> rebuild.
     version_state["v"] = 2
-    code_c, body_c, _ct, etag_c = local_api.cached_response(
+    _code_c, _body_c, _ct, etag_c = local_api.cached_response(
         key, ttl_seconds=60, version_fn=version, builder=builder
     )
     assert calls["n"] == 2
@@ -1327,7 +1321,7 @@ def test_pipeline_stuck_catches_expired_and_silent_jobs_in_seconds(tmp_path: Pat
     """Bug-fix regression: Codex caught the ms-vs-seconds mismatch.
     Threshold is now honored in seconds against seconds-valued
     timestamps from the real control-plane."""
-    module_key, _ = _setup_repo(tmp_path)
+    _module_key, _ = _setup_repo(tmp_path)
     now_s = 10_000
     conn = sqlite3.connect(tmp_path / ".pipeline/v2.db")
     # Expired lease -> stuck_leased
@@ -2615,35 +2609,32 @@ def test_briefing_critical_quality_not_in_actions_next(tmp_path: Path) -> None:
     assert "critical_quality" not in top_reasons
 
 
-def test_quality_scores_live_repo_no_citations_force_critical() -> None:
-    """Modules without a ``## Sources`` section with external links now
-    auto-fail (critical severity, 'no citations' as primary_issue).
-    Issue #303's original guarantee — that the structure-rich CKA/KCNA
-    modules aren't critical by length/structure heuristics — still
-    holds, but citations is now an independent floor. Until content is
-    backfilled with real Sources blocks, every untouched module is
-    critical, which is the intentional surface-the-truth state."""
+def test_quality_scores_uncited_fixture_is_critical(tmp_path: Path) -> None:
+    """Citation deficiency must remain visible after the live corpus improves."""
+    for slug, cited in [("cited", True), ("uncited", False)]:
+        _seed_quality_module(
+            tmp_path, f"ai/foundations/module-1.1-{slug}", title=slug,
+            filler_lines=120, quiz=True, exercise=True, diagram=True, citations=cited,
+        )
     with local_api._QUALITY_AUDIT_CACHE_LOCK:
         local_api._QUALITY_AUDIT_CACHE.clear()
-    quality = local_api.build_quality_scores(local_api.REPO_ROOT)
+    quality = local_api.build_quality_scores(tmp_path)
     assert quality["source"] == "heuristic"
-    by_module = {m["module"]: m for m in quality["modules"]}
-    assert all(isinstance(entry.get("path"), str) for entry in quality["modules"])
     by_path = {m["path"]: m for m in quality["modules"]}
-    assert "ai/foundations/module-1.1-what-is-ai.md" in by_path
-    # Guard against content drift: keep assertion at least one module
-    # without citations is still enforced as critical severity.
-    no_citations_modules = [
-        m
-        for m in by_module.values()
-        if "no citations" in (m.get("primary_issue") or "").lower()
-    ]
-    assert no_citations_modules, (
-        "Expected at least one module with no citations to be flagged "
-        "as a critical issue."
-    )
-    for entry in no_citations_modules[:5]:
-        assert entry["severity"] == "critical"
+    assert set(by_path) == {
+        "ai/foundations/module-1.1-cited.md", "ai/foundations/module-1.1-uncited.md",
+    }
+    uncited = by_path["ai/foundations/module-1.1-uncited.md"]
+    assert uncited["primary_issue"].startswith("no citations")
+    assert uncited["severity"] == "critical"
+    assert uncited["score"] == 1.5
+    assert by_path["ai/foundations/module-1.1-cited.md"]["severity"] != "critical"
+
+
+def test_unknown_lexer_fallback_escapes_code() -> None:
+    rendered = local_api._highlight_code_block("<script>bad()</script>", "no-such-lexer")
+    assert "&lt;script&gt;bad()&lt;/script&gt;" in rendered
+    assert "<script>" not in rendered
 
 
 def test_compact_briefing_keeps_actions_and_top_modules(tmp_path: Path) -> None:
