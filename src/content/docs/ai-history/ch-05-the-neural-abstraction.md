@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::tip[In one paragraph]
-In 1943, Warren McCulloch and Walter Pitts published "A Logical Calculus of the Ideas Immanent in Nervous Activity." They applied propositional logic to idealized neural activity within an existing mathematical-biophysics community at Chicago, rather than inventing the mathematical study of neurons. Von Neumann's 1945 *First Draft of a Report on the EDVAC* explicitly cites their paper while discussing simplified neuron functions and computing elements. Formal representation, biological explanation, and learning a chosen task remain distinct questions.
+In 1943, Warren McCulloch and Walter Pitts published "A Logical Calculus of the Ideas Immanent in Nervous Activity." They applied propositional logic to idealized neural activity within an existing mathematical-biophysics community at Chicago, rather than inventing the mathematical study of neurons. Von Neumann's 1945 *First Draft of a Report on the EDVAC* explicitly cites their paper while discussing simplified neuron functions and computing elements. Formal representation, biological explanation, and learning a chosen task are distinct questions.
 :::
 
 <details>
@@ -172,7 +172,7 @@ The comparison with computing elements does not settle what real neurons do. In 
 The 1943 paper gives us a precise question to ask of a model: under its stated assumptions, which patterns of activity can a network express? McCulloch and Pitts answered that question through logical constructions using idealized neurons. A construction within those assumptions is not proof that the mind works that way. Keeping that boundary visible makes the result more useful: we can test what the abstraction does without confusing it with everything a living nervous system does.
 
 :::note[Why this still matters today]
-When reading a proposed neural model, ask three questions: what behavior can it represent, what changes during learning, and what evidence shows that those changes solve the intended task? McCulloch and Pitts's [Theorem 7 (reprint p. 108)](https://www.cs.cmu.edu/~epxing/Class/10715/reading/McCulloch.and.Pitts.pdf#page=10) represents a specified connection-alteration rule using a fixed net with circles. It does not establish successful training for a chosen task. Their [earlier qualification (reprint p. 101)](https://www.cs.cmu.edu/~epxing/Class/10715/reading/McCulloch.and.Pitts.pdf#page=3) also separates formal equivalence from physiological explanation. Use those distinctions to identify what a model's result actually establishes before inferring how a brain works or how a learning system will perform.
+When reading a proposed neural model, ask three questions: what behavior can it represent, what does it claim about biology, and what evidence shows that learning solves the intended task? McCulloch and Pitts's [Theorem 7 (reprint p. 108)](https://www.cs.cmu.edu/~epxing/Class/10715/reading/McCulloch.and.Pitts.pdf#page=10) represents a specified connection-alteration rule using a fixed net with circles. It does not establish successful training for a chosen task. Their [earlier qualification (reprint p. 101)](https://www.cs.cmu.edu/~epxing/Class/10715/reading/McCulloch.and.Pitts.pdf#page=3) also separates formal equivalence from physiological explanation. Use those distinctions to identify what a model's result actually establishes before inferring how a brain works or how a learning system will perform.
 :::
 
 ## Sources and reading notes
