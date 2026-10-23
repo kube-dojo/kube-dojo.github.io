@@ -250,4 +250,4 @@ At the beginning of AI history, intelligence looked like a theorem, a neuron, a 
 
 By the 2020s, it also looked like an export license.
 
-That long arc leads to a technical case and an open historical question in [Chapter 73: The Algorithmic Response](./ch-73-the-algorithmic-response/): how could we establish a link between hardware constraints and an architectural choice?
+That long arc leads to a technical case and an open historical question in [Chapter 73: The Algorithmic Response](../ch-73-the-algorithmic-response/): how could we establish a link between hardware constraints and an architectural choice?
