@@ -470,7 +470,7 @@ flowchart TD
     R --> C2
     A --> C3
 
-    style ETCD fill:#ffcccc,stroke:#ff0000
+    style ETCD fill:#ffcccc,color:#111,stroke:#ff0000
 ```
 
 ```text
