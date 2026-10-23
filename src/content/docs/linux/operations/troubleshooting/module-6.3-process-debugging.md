@@ -88,7 +88,7 @@ stateDiagram-v2
     direction TB
     state "Symptom reported" as Symptom
     state "Confirm PID and command" as Confirm
-    state "Check state, wchan, parent" as State
+    state "Check state, wchan, parent" as ProcessState
     state "Inspect /proc and limits" as Proc
     state "Inspect descriptors with lsof" as Lsof
     state "Attach filtered strace" as Strace
@@ -96,8 +96,8 @@ stateDiagram-v2
     state "Recommend fix or gather escalation bundle" as Fix
 
     Symptom --> Confirm : identify target
-    Confirm --> State : process exists
-    State --> Proc : state explains part of symptom
+    Confirm --> ProcessState : process exists
+    ProcessState --> Proc : state explains part of symptom
     Proc --> Lsof : descriptors or files matter
     Lsof --> Strace : live behavior still unknown
     Strace --> Deep : syscall layer not enough

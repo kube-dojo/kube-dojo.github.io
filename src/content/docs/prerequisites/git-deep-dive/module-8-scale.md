@@ -70,7 +70,7 @@ graph TD
     SVC --> INV
     SVC --> UA
 
-    classDef hidden stroke-dasharray: 5 5, color: #999, fill: #f9f9f9, stroke: #ccc;
+    classDef hidden stroke-dasharray: 5 5, color: #999, fill: #f9f9f9, stroke: #ccc
     class CA,CAL,CERT,NS,DEF,KS,INV,UA hidden;
 ```
 

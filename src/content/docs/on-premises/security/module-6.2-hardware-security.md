@@ -220,7 +220,7 @@ flowchart LR
         V --> E
     end
     
-    subgraph HSM Appliance
+    subgraph HSMAppliance["HSM Appliance"]
         M[Master Key<br/>Never leaves the HSM]
         API[PKCS#11 API]
         API --- M
@@ -229,7 +229,7 @@ flowchart LR
     V <-->|mTLS| API
     
     note[Auto-unseal: HSM unwraps the Vault master key at startup.<br/>No Shamir shares needed.]
-    HSM Appliance -.-> note
+    HSMAppliance -.-> note
 ```
 
 > **Stop and think**: Without HSM auto-unseal, Vault requires multiple keyholders to perform a "key ceremony" every time Vault restarts. In a Kubernetes environment where pods can be rescheduled at any time, why is this operationally untenable?

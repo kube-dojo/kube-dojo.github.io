@@ -141,8 +141,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A[Original: A B C D] --> B[With Checksum: A B C D | CRC32]
-    A --> C[With ECC: A B C D | parity bits]
+    A[Original: A B C D] --> B["With Checksum: A B C D | CRC32"]
+    A --> C["With ECC: A B C D | parity bits"]
 ```
 
 Understanding these six categories together lets you evaluate the completeness of a system's redundancy coverage. A Kubernetes Deployment with `replicas: 3` and pod anti-affinity provides software redundancy and some hardware redundancy (spread across nodes). Adding a replicated database provides data redundancy. Deploying to multiple availability zones provides geographic redundancy. But if none of those replicas use checksums and the application does no end-to-end integrity verification, informational redundancy is absent — and a silent data corruption event could propagate through all supposedly redundant copies before anyone notices.

@@ -231,13 +231,13 @@ Interactive shell changes disappear when the shell exits because they live in pr
 flowchart TD
     subgraph Login ["LOGIN SHELL (SSH session, first terminal on Linux)"]
         L1["Runs: /etc/profile<br/>then the FIRST one found of:<br/>~/.bash_profile<br/>~/.bash_login<br/>~/.profile"]
-        L2>Think: "Welcome! Let me set up your entire session."]
+        L2>"Think: #quot;Welcome! Let me set up your entire session.#quot;"]
         L1 --> L2
     end
 
     subgraph NonLogin ["INTERACTIVE NON-LOGIN SHELL (new terminal tab/window on desktop)"]
         N1["Runs: ~/.bashrc"]
-        N2>Think: "Just another shell, here are your shortcuts."]
+        N2>"Think: #quot;Just another shell, here are your shortcuts.#quot;"]
         N1 --> N2
     end
 ```

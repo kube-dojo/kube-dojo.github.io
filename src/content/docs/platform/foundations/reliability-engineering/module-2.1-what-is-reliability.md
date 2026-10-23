@@ -140,10 +140,10 @@ quadrantChart
     title Reliability vs Availability Matrix
     x-axis Low Availability --> High Availability
     y-axis Low Reliability --> High Reliability
-    quadrant-1 IDEAL (Works great when reachable)
-    quadrant-2 FLAKY (Great when up, often unreachable)
-    quadrant-3 WORST (Down and wrong)
-    quadrant-4 UNRELIABLE (Always up, frequently wrong)
+    quadrant-1 "IDEAL (Works great when reachable)"
+    quadrant-2 "FLAKY (Great when up, often unreachable)"
+    quadrant-3 "WORST (Down and wrong)"
+    quadrant-4 "UNRELIABLE (Always up, frequently wrong)"
 ```
 
 Real systems occupy every quadrant. An API that responds quickly but returns errors five percent of the time is highly available yet unreliable—users experience a broken product while operators argue about semantics. A batch system with weekly maintenance windows may show lower availability while exhibiting excellent reliability during operating hours. The worst quadrant combines both: unreachable often and wrong when reachable. Your observability stack needs signals for each dimension, not a single ping check.

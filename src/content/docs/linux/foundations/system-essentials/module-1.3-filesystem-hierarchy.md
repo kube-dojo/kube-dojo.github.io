@@ -238,9 +238,9 @@ graph LR
     block --> sda["sda/"]
     sda --> size["size (Size in 512-byte sectors)"]
     sda --> queue["queue/ (I/O scheduler settings)"]
-    sys --> class["class/ (Device classes)"]
-    class --> net["net/ (Network interfaces)"]
-    class --> class_block["block/ (Block devices)"]
+    sys --> device_class["class/ (Device classes)"]
+    device_class --> net["net/ (Network interfaces)"]
+    device_class --> class_block["block/ (Block devices)"]
     sys --> devices["devices/ (Device hierarchy)"]
     sys --> fs["fs/ (Filesystem info)"]
     fs --> cgroup["cgroup/ (Cgroup information)"]
@@ -412,11 +412,11 @@ Mounting is how Linux attaches different storage resources into the one visible 
 
 ```mermaid
 graph TD
-    A[/ root<br>ext4 on /dev/sda1]
-    A --> B[/boot<br>ext4 on /dev/sda2]
-    A --> C[/home<br>xfs on /dev/sda3]
-    A --> D[/var<br>ext4 on /dev/sda4]
-    C --> E[/home/nfs<br>NFS]
+    A["/ root<br>ext4 on /dev/sda1"]
+    A --> B["/boot<br>ext4 on /dev/sda2"]
+    A --> C["/home<br>xfs on /dev/sda3"]
+    A --> D["/var<br>ext4 on /dev/sda4"]
+    C --> E["/home/nfs<br>NFS"]
 ```
 
 In the diagram, `/`, `/boot`, `/home`, and `/var` are visible as ordinary directories, but each may have its own filesystem underneath. That is why `df -h /var` can report a different capacity from `df -h /`, and why a full `/var` partition can break logging without filling the root filesystem. The same boundary explains why hard links cannot cross from `/home` to `/var` if those paths are backed by different filesystems, even though they appear in one tree.

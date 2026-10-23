@@ -338,25 +338,25 @@ Rerere is especially useful for long-running rebases, patch stacks, release bran
 
 ```mermaid
 flowchart TD
-    subgraph Step 1: The Initial Conflict
+    subgraph Step1["Step 1: The Initial Conflict"]
         direction TB
         C1["Conflict (Main vs Feature)\n\n<<<<<<< HEAD\nspec.replicas: 3\n=======\nspec.replicas: 5\n>>>>>>> feature"]
         R1["You manually resolve this to:\n\nspec.replicas: 5"]
         C1 --> R1
     end
     
-    subgraph Step 2: Rerere Records State
+    subgraph Step2["Step 2: Rerere Records State"]
         Mem["Git memorizes the state:\n\n1. Preimage (The conflict signature)\n2. Postimage (Your final resolved state)"]
     end
     
-    subgraph Step 3: The Future Rebase Conflict
+    subgraph Step3["Step 3: The Future Rebase Conflict"]
         direction TB
         C2["Rebasing Feature onto Main\n\n<<<<<<< HEAD\nspec.replicas: 3\n=======\nspec.replicas: 5\n>>>>>>> feature"]
         R2["Git recognizes the signature!\nSilently auto-resolves to:\n\nspec.replicas: 5"]
         C2 --> R2
     end
     
-    Step 1 --> Step 2 --> Step 3
+    Step1 --> Step2 --> Step3
 ```
 
 The diagram uses a Kubernetes replica count because it is easy to visualize, but the same mechanism applies to application code, documentation, configuration, and generated files. Git is not understanding business intent; it is matching conflict geometry. If the same conflict shape appears again, rerere can apply the same textual resolution. That is powerful during repetitive rebases and dangerous if you stop reviewing the final diff.

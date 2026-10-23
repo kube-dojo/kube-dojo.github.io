@@ -348,7 +348,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    subgraph Option 4: Origin Pull (mTLS)
+    subgraph OriginPull["Option 4: Origin Pull (mTLS)"]
     C4["Client"] -- "HTTPS" --> E4["Edge"]
     E4 -- "mTLS\n(Both present certs)" --> O4["Origin"]
     end
