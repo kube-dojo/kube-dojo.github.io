@@ -703,7 +703,7 @@ Add timing expectations:
 
 ### Part 4: Correlation Plan (5 minutes)
 
-How will you connect the three pillars during an incident?
+Design the joins between signals for this checkout service. For each transition, name the identifier or shared dimensions, explain how you would verify a matching record, and state what a missing target would leave unresolved.
 
 | Correlation Need | Solution |
 |------------------|----------|
