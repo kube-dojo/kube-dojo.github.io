@@ -43,7 +43,7 @@ graph TD
         HDD["<b>Standard HDD</b><br/>Max IOPS: 2000<br/>Max BW: 500MB/s<br/>Latency: ~10ms<br/><br/>Use: backups, cold data<br/>Cost: $"]
         SSD["<b>Standard SSD</b><br/>Max IOPS: 6000<br/>Max BW: 750MB/s<br/>Latency: ~4ms<br/><br/>Use: dev/test, light workloads<br/>Cost: $$"]
         Premium["<b>Premium SSD</b><br/>Max IOPS: 20k<br/>Max BW: 900MB/s<br/>Latency: ~1ms<br/><br/>Use: most production databases<br/>Cost: $$$"]
-        Ultra["<b>Ultra Disk</b><br/>Max IOPS: 400,000<br/>Max BW: 10,000 MB/s<br/>Latency: sub-ms<br/><br/>Use: high-perf DBs, real-time analytics<br/>Cost: $$$$"]
+        Ultra["<b>Ultra Disk</b><br/>Max IOPS: 400,000<br/>Max BW: 10,000 MB/s<br/>Latency: sub-ms<br/><br/>Use: high-perf DBs, real-time analytics<br/>Cost: #36;#36;#36;#36;"]
     end
 ```
 
