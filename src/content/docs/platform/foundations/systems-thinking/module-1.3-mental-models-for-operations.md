@@ -78,8 +78,8 @@ The accompanying diagram organizes the twelve leverage points into two tiers—w
 
 ```mermaid
 flowchart TD
-    classDef weak fill:#f2f2f2,stroke:#333,stroke-width:1px;
-    classDef strong fill:#e6f3ff,stroke:#0066cc,stroke-width:2px;
+    classDef weak fill:#f2f2f2,color:#111,stroke:#333,stroke-width:1px;
+    classDef strong fill:#e6f3ff,color:#111,stroke:#0066cc,stroke-width:2px;
 
     subgraph Weak ["WEAK LEVERAGE (Easy but ineffective)"]
         direction TB
@@ -180,7 +180,7 @@ flowchart TD
     Faucet["FAUCET<br/>(Inflow: gal/min)"] -->|Water Flow| WaterLevel["WATER LEVEL (Stock)<br/>(gallons at this moment)"]
     WaterLevel -->|Water Flow| Drain["DRAIN<br/>(Outflow: gal/min)"]
 
-    classDef stock fill:#d4e6f1,stroke:#2874a6,stroke-width:2px;
+    classDef stock fill:#d4e6f1,color:#111,stroke:#2874a6,stroke-width:2px;
     class WaterLevel stock;
 ```
 
@@ -221,7 +221,7 @@ flowchart TD
     Failures -->|60% retry| Retries["Retries<br/>3/s"]
     Retries -.->|Adds to inflow!| Incoming
     
-    classDef stock fill:#d4e6f1,stroke:#2874a6,stroke-width:2px;
+    classDef stock fill:#d4e6f1,color:#111,stroke:#2874a6,stroke-width:2px;
     class Queue stock;
 ```
 
@@ -400,7 +400,7 @@ flowchart TD
     Incoming["New queries<br/>Rate: 50/s"] --> Pool["ACTIVE CONNECTIONS<br/>Stock: 200 (AT MAX!)<br/>Max: 200"]
     Pool -->|"Rate: 20/s (!!)"| Completed["Completed queries"]
     
-    classDef stock fill:#d4e6f1,stroke:#2874a6,stroke-width:2px;
+    classDef stock fill:#d4e6f1,color:#111,stroke:#2874a6,stroke-width:2px;
     class Pool stock;
 ```
 

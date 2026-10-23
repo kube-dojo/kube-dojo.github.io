@@ -67,7 +67,7 @@ flowchart TD
     CM -.->|Watches/Updates| API
     CCM -.->|Watches/Updates| API
 
-    classDef critical fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef critical fill:#f9f,color:#111,stroke:#333,stroke-width:2px;
     class ETCD,API critical;
 ```
 

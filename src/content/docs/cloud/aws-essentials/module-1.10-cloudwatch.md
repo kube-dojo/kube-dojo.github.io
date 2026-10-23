@@ -824,7 +824,7 @@ graph LR
     LA --trace--> SQS[SQS<br>3ms]
     SQS --trace--> LB[Lambda B<br>28ms]
 
-    classDef bottleneck fill:#f99,stroke:#f33,stroke-width:2px;
+    classDef bottleneck fill:#f99,color:#111,stroke:#f33,stroke-width:2px;
     class LA bottleneck
 ```
 

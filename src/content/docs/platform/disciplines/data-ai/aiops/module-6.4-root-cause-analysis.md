@@ -219,8 +219,8 @@ root, confidence, blast = rca.find_root_cause(alerting)
 
 ```mermaid
 graph TD
-    classDef alert fill:#ffcccc,stroke:#ff0000,stroke-width:2px;
-    classDef rootCause fill:#ff9999,stroke:#cc0000,stroke-width:4px;
+    classDef alert fill:#ffcccc,color:#111,stroke:#ff0000,stroke-width:2px;
+    classDef rootCause fill:#ff9999,color:#111,stroke:#cc0000,stroke-width:4px;
 
     F["Frontend"]:::alert
     API["API"]:::alert

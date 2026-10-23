@@ -203,8 +203,8 @@ To navigate the complex tooling environment, we must categorize orchestrators ba
 The same landscape can be visualized as a dependency matrix when you need to explain relationships to stakeholders who will not read a full toolchain comparison document.
 ```mermaid
 graph TD
-    classDef code fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef visual fill:#e1f5fe,stroke:#333,stroke-width:2px;
+    classDef code fill:#f9f9f9,color:#111,stroke:#333,stroke-width:2px;
+    classDef visual fill:#e1f5fe,color:#111,stroke:#333,stroke-width:2px;
 
     Tools[ML Orchestration Tools] --> CodeFirst[Code-First]
     Tools --> VisualLowCode[Visual/Low-Code]

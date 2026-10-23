@@ -54,7 +54,7 @@ flowchart TD
     N --> DA{Node A<br>decides ?}
     N --> DB{Node B<br>decides ?}
 
-    classDef note fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef note fill:#f9f9f9,color:#111,stroke:#333,stroke-width:1px;
     Note[What if A doesn't hear from B?<br>What if B crashes mid-decision?<br>What if the network partitions?]:::note
 ```
 
