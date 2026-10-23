@@ -787,7 +787,7 @@ aws logs filter-log-events \
 
 For archival, configure a [cross-account CloudWatch subscription](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CrossAccountSubscriptions.html) to a receiving destination, such as a Firehose delivery pipeline to S3. This requires a receiver destination and access policy, delivery-role permissions, a sender subscription and permission to use the destination, plus working S3/encryption permissions downstream. The log group and subscription destination must share a Region. Verify arrival and retention on the resulting S3 versions separately; seeing CloudWatch events proves neither cross-account delivery nor Object Lock protection.
 
-**Pause and predict:** Audit export is enabled and CloudWatch contains yesterday's EKS events, but the archive contains none. Would switching the archive from Governance to Compliance recover those events? Which boundary should you inspect first?
+> **Pause and predict:** Audit export is enabled and CloudWatch contains yesterday's EKS events, but the archive contains none. Would switching the archive from Governance to Compliance recover those events? Which boundary should you inspect first?
 
 <details>
 <summary>Check your prediction</summary>
