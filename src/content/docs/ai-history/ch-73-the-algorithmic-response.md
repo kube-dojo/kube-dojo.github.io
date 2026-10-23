@@ -12,7 +12,7 @@ DeepSeek-V2's Multi-head Latent Attention caches a shared latent plus a decouple
 ## Learning outcomes
 
 - Distinguish where KV bottlenecks appear in Transformer serving and why that memory bottleneck, not only compute count, constrains throughput in long-context inference.
-- Explain MLA's low-rank key-value joint compression in prose, including what is shared, what is per-head, and what gets reconstructed during attention.
+- Explain MLA's shared latent and positional-key cache, distinguishing conceptual up-projections from their absorption during inference.
 - Identify which DeepSeek-V2 claims are directly documented (and where) versus where this chapter should avoid overextending inference.
 - Identify public implementation and backend-selection paths, and the compatibility evidence needed before claiming that a deployment can use them.
 - Connect the chapter's argument to Chapter 71's uneven adaptation thesis without asserting a single-cause, policy-only causation line.
@@ -64,10 +64,9 @@ That is the key shape.
 Rather than caching full key and value tensors at each token step in the traditional form, MLA compresses and reuses them into a lower-dimensional representation.
 
 The mechanism can be explained at a high level without treating it like a tutorial.
-For each time step, keys and values are projected through a down-projection into a compressed latent space.
+For each token, the attention input is down-projected into a latent vector from which the content keys and values are defined through learned up-projections.
 Those latent vectors are what carry the needed context information forward.
-The model then reconstructs projected forms for attention calculation through learned up-projections.
-In other words, MLA does not throw context away; it changes where and how that context is stored.
+Those equations describe the representation; they do not require materializing full keys and values during inference. Section 2.1.2 explains how the up-projections can be absorbed into the query and output projections. Quality still needs evaluation; compression is not a claim of lossless recovery of an arbitrary model's cache.
 
 ### Low-rank intuition without mathematical overstatement
 
@@ -81,46 +80,42 @@ For a reader-friendly picture, think of one token's context as a set of per-head
 Each sheet is separate and mostly similar in role, because each head performs its own key/value projection.
 MLA interposes a shared latent table `C_t` first.
 That table is smaller and shared across heads, then head-specific projectors recover what each head needs.
-The paper frames this as low-rank key-value joint compression: move shared structure into one latent object, and keep head specialization in reconstruction steps.
+The paper frames this as low-rank key-value joint compression: use a shared latent representation while retaining head-specific learned projections.
 
 What this changes is where the bottleneck sits.
 Before, the bottleneck sat in many per-head cache planes.
 After, it sits in two terms:
 - a shared latent term per token,
-- plus per-head reconstruction terms that are no longer as heavy as full K/V storage.
+- plus a shared positional key for decoupled rotary position embedding (RoPE).
 
-In a simplified form, this is often written as `(d_c + d_h^R) × l` per token, where `d_c` is shared latent size, `d_h^R` is the per-head reconstruction reserve, and `l` is context length.
-That compares against the broad MHA pressure term in proportional form with full per-head K/V tables.
+Table 1 of the [DeepSeek-V2 paper, v5](https://arxiv.org/html/2405.04434v5) gives `(d_c + d_h^R) × l` cached elements per token across `l` layers. Here `d_c` is the KV compression dimension and `d_h^R` is the per-head dimension of the decoupled queries and key; it is not a reconstruction reserve.
+The MHA comparison is `2 × n_h × d_h × l` elements per token. A sequence of `N` cached tokens multiplies either count by `N`; storage bytes additionally depend on precision and representation. Neither expression uses `l` for context length.
 So the mechanism is not just a clever rewrite in algebra.
 It is a materially different storage topology.
 
 That topology can be read directly in serving arithmetic.
 In standard MHA, per-layer cache writes scale with the number of head slices that must be preserved per token.
-In MLA, the shared latent is charged once per token per layer, while head-specific reconstruction is applied only through lightweight reconstruction operators.
-This trade is operational: fewer hot cache bytes can unlock concurrency, while the reconstruction path shifts some cost toward compute.
+In MLA, each layer caches the shared latent and the decoupled positional key. Projection absorption means that a mandatory full-key/value reconstruction cost cannot be read off the conceptual equations alone (§2.1.2).
 If memory is the first bottleneck, this generally favors longer windows and higher request density.
 If compute becomes the bottleneck, gains become backend-sensitive and depend on kernel scheduling.
 
 The chapter should therefore frame MLA as a conditional architecture, not a universal replacement.
 The same mechanism that reduces memory pressure can produce different returns across hardware profiles and serving stack choices.
-That is why the RoPE and backend details are narratively paired in the paper.
+RoPE compatibility and backend implementation therefore need separate attention.
 
 The paper's RoPE discussion is essential here.
 The same attention model uses positional encodings, and those encodings are not free to be rearranged by arbitrary projection choices.
-If compression were applied through the wrong order, positional structure can be distorted before reconstruction and the downstream attention result changes.
-So MLA decouples position-sensitive channels and compresses the components that remain stable under that separation.
-This is why the positional treatment appears in the same family as compression details in the DeepSeek-V2 write-up: it is not ornamental, it is required for correctness under long-range decoding.
+Section 2.1.3 explains that applying RoPE to the content keys would place a position-dependent matrix between projections and prevent the absorption described above. Equations 14–19 instead introduce decoupled positional queries and a shared positional key. The key must also be cached; the queries are not part of that cache term.
 
 So the key answer is straightforward and checkable.
 MLA reduces memory by changing which representation must be cached for every token.
-Standard MHA stores most of what the model might reuse in duplicated per-head buffers.
-MLA stores less duplication, then pays a reconstruction tax where needed.
+Standard MHA caches each head's keys and values; separate heads need not contain identical data.
+MLA stores a compressed latent plus positional information, while its inference algebra permits avoiding explicit reconstruction of the full content keys and values.
 That is the architecture change, not a slogan.
 
 The most useful way to read this in 2026 is as an operational claim about cache shape rather than a generic "compression" slogan.
 Standard attention forces each layer to persist per-head key/value tensors that are mostly similar in purpose but not shared in memory form.
-MLA introduces a shared latent stage first, then reuses lightweight head-specific operators.
-That means every new token now contributes to a smaller set of stored objects and a compact set of head transforms, rather than full per-head K/V tables.
+MLA introduces a shared latent stage and a decoupled positional key. New tokens add cache entries; learned projection weights are not new per-token cache objects.
 The practical effect is not that "memory is less."
 The practical effect is that some memory structures become shared and therefore scale with the sequence length in a way that is less expensive for long-context workloads.
 
@@ -131,14 +126,14 @@ In the chapter's terms, the mechanism is mostly about serving-state geometry, no
 The paper ties this explicitly to inference behavior in the MLA formulation and to where the context state must be retained during decoding.
 
 In standard MHA, each head owns a larger slice of cache.
-In MLA, the shared latent (`d_c`) holds the common content structure and each head needs only a small reconstruction channel (`d_h^R`), which is why the memory budget expression is written in terms of `(d_c + d_h^R) × l`.
-In concrete terms: each token still needs storage over context steps (`l`), but each step is represented by fewer bytes in the part that was duplicated across heads.
+In MLA, `d_c` counts the latent dimensions and `d_h^R` the dimensions of the shared decoupled key cached at each layer. Multiplying their sum by the layer count `l` gives the per-token element count, not the whole sequence's bytes.
+Context length enters through the number of cached tokens `N`; Table 1 explicitly excludes storage precision from its element counts.
 This is where the memory benefit is located.
 
 The conceptual error to avoid is saying this is a complete removal of head-specific structure.
 It is not.
 MLA keeps the head-level specialization, but moves the expensive common part out of per-head repetition.
-In the DeepSeek framing, the method is therefore conditional: where memory is the choke point, this redesign can materially improve serving headroom; where memory is not first in the bottleneck order, gains become mixed.
+The operational inference is conditional: reduced cache may improve serving headroom where memory is the choke point; other bottlenecks require their own measurements. This is a deployment consideration, not the paper's stated framing.
 
 ### Why this changes serving geometry
 
@@ -146,36 +141,22 @@ Inference math and systems economics can look independent, but this mechanism co
 In long-context serving, the sequence length and concurrency create two pressure channels at once:
 KB-level KV state and token-level reuse.
 MLA reduces one pressure channel by changing what must be kept hot.
-That is not a free win, so DeepSeek's own paper still frames the method as a design tradeoff plus engineering integration task.
+A smaller cache does not establish every deployment's performance; the need to test integration and remaining bottlenecks is this chapter's engineering inference.
 
-The paper's own wording in the abstract says MLA “guarantees efficient inference through significantly compressing the KV cache,” and Figure 1 plus Section 1 quantify this effect with explicit reported numbers.
-In the documented DeepSeek-V2 setting, the authors report a **93.3% KV-cache reduction** and **5.76× maximum generation throughput** (arXiv:2405.04434, Abstract and §1 / Figure 1; MLA architecture details are in §2.1).
-That numerical claim is the strongest place where we can say “documented effect” rather than “inferred adaptation.”
+The paper's abstract reports **93.3% KV-cache reduction** and **5.76× maximum generation throughput** compared with DeepSeek 67B. This compares a V2 mixture-of-experts model with 236B total parameters and 21B active per token against the dense 67B baseline (abstract; §3.2.3, Training Costs).
+The throughput setup matters: §3.2.3, Inference Efficiency, specifies one node with eight H800 GPUs for V2's measurement and the prompt/generation-length distribution from the DeepSeek 67B service. It does not specify the 67B comparison hardware there. V2 deployment also uses FP8 parameters and KV-cache quantization averaging six bits per element. The result therefore cannot be attributed to MLA alone.
 
-That reduction is most visible in production where context length and concurrent sequences are directly competing for memory capacity.
-Holding hardware and serving policy fixed, a 93.3% KV reduction means the cache budget for one serving profile can be redistributed at scale.
-In the simplest case, this enables longer contexts, larger concurrency, or lower reclaim pressure before paging-like fragmentation and throttling begin to dominate.
-The chapter should preserve this conditional shape: this is a feasibility shift in the cache plane.
+As an engineering inference, reducing per-token cache can leave room for longer sequences or more concurrent requests when memory is the limiting resource. The reported percentage is a model comparison, not a controlled measurement holding every architecture and serving choice fixed. Its full accounting needs attention dimensions, layer counts and precision; §3.2.3 does not state whether quantization contributes to the 93.3% figure.
 
-The production translation is therefore not just “less memory,” but more stable planning at model boundaries.
-When one stack was previously forced to choose between context and throughput, MLA can change that trade-off frontier.
-Even the paper's paired 5.76× throughput signal matters because it shows this is not only an accounting trick in a table; it is a deployment effect when the memory budget is the blocking variable.
+The 5.76× result is reported for the authors' evaluated configuration, rather than a guaranteed memory-bound deployment effect. A different stack needs its own comparison before claiming the same trade-off improvement.
 
 This is also where the linear term `(d_c + d_h^R) × l` does real design work.
-Every extra context token increases memory at a constant per-token cost in that reduced representation, rather than through duplicated per-head tables.
-When memory pressure dominates, that linear reduction often shows up as fewer preemption events, fewer cache churn events, and more predictable scheduling under high concurrency.
-Those are not headline benchmarks, but they are the things that matter to service reliability.
+For a fixed model, every additional cached token adds the Table 1 element count. Fragmentation, preemption, cache churn and scheduling reliability require separate measurements; the reported cache and throughput figures do not establish those outcomes.
 
-Read another way, the 93.3% figure is the gate opening statement.
-The rest of the engineering is choosing what the platform gets after that gate opens:
-longer effective context, higher concurrency, or tighter token-per-dollar envelopes.
-DeepSeek's own 5.76× throughput signal gives one public anchor that this opened gate is meaningful in at least one operational profile.
-The chapter should stay with conditional language here:
-the mechanism improves one slice of the system envelope, and the exact win appears only if a deployment is actually memory-bound.
+The practical question is what a tested deployment can do with a different cache shape. Longer context, higher concurrency and lower cost are possible objectives, not interchangeable conclusions from one benchmark.
 
 At the same time, this does not grant universal claims.
-The same 93.3% number applies to the published DeepSeek-V2 architecture slice, not all checkpoints, not all hardware, and not all long-context workloads.
-The next question is what public implementation paths make inspectable, separately from the paper's reported results.
+The 93.3% number remains the paper's V2-versus-67B claim, not a property of every checkpoint, hardware platform or long-context workload. Public implementation paths are a separate kind of evidence.
 
 The architecture in the paper is not an isolated software patch.
 It sits in the same section family that compares attention variants and discusses cache size in operational terms.
@@ -264,7 +245,7 @@ The previous sections stay close to what the public record supports, but they al
 Algorithmic substitution does not erase constraints; it reorders them.
 Chapter 71's uneven-adaptation frame suggests asking how tooling and integration capacity affect the options available to particular teams.
 
-The direct counter-example in the same direction is simple: reducing KV cache does not solve compute-bound or bandwidth-bound deployment.
+Reducing KV cache does not by itself guarantee a speedup when another resource dominates. It may also affect memory traffic; a bandwidth-bound workload is not automatically excluded from benefiting.
 If a stack is already dominated by scheduler contention, quantization overhead, network latency, or I/O bottlenecks, a cache reduction alone does not produce proportional gains.
 A second counter-example is quality sensitivity.
 MLA is an optimization design with explicit quality-preservation assumptions.
@@ -408,7 +389,7 @@ policy regime, hardware constraint, memory pressure, architectural choice, open 
 
 1. Why does this chapter treat MLA as a "case of constrained architectural response" instead of "proof of policy intent"?
 2. In one paragraph, describe MLA's storage change and why this affects long-context generation more directly than raw parameter count alone.
-3. State the two exact DeepSeek-V2 numbers used in this chapter and trace each to a precise paper location.
+3. State the two reported DeepSeek-V2 numbers, their baseline and source locations, and the throughput setup that limits their interpretation.
 4. Distinguish FlashMLA's public availability from evidence of V2 compatibility or adoption. Which version and deployment facts would you check next?
 5. Relate the technical case to Chapter 71's uneven-adaptation argument. What further evidence would establish a causal connection to export controls?
 
