@@ -116,6 +116,6 @@ The historical filename is retained. Research contracts currently cover Chapters
 71. **The Chip War:** US export controls, ASML EUV machines, and geopolitics.
 72. **The Infinite Datacenter:** Planning for the 100,000 GPU cluster and the future of industrial AI.
 
-## Technical Coda
+### Technical Coda
 
 73. **The Algorithmic Response:** Long-context inference, KV-cache memory pressure, and DeepSeek-V2's Multi-head Latent Attention as an architectural response, with open kernels and serving backends carrying the implementation outward. This describes the existing coda's scope; its research contract and applicable reviews remain pending.

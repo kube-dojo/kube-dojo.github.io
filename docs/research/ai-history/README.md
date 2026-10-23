@@ -6,6 +6,11 @@ This directory contains the operational research files for the 73-chapter AI His
 
 Chapter 73, **The Algorithmic Response**, is the book's technical coda. Its prose and index entry exist, but its research contract and contract-backed readiness remain pending under #2288. Inventory inclusion does not establish accepted status or review clearance.
 
+The 72 existing contracts currently record **40 `accepted`, 11 `prose_ready`, and 21 `capacity_plan_anchored`** top-level statuses. These are recorded workflow labels, not fresh source or editorial acceptance. Reconciliation of the supporting review records remains open under #2288; this inventory does not promote any chapter.
+
+<details>
+<summary>Earlier era-specific status notes (historical; not the current status board)</summary>
+
 - **Golden Research (Parts 1-2, Chapters 1-10):** Currently under revision based on cross-family review (downgraded to `reviewing` while we convert to claim-level anchoring and resolve factual disputes).
 - **Part 3 (The Birth of Symbolic AI):** Ch11-14 prose `accepted`; Ch15 dual-cleared `prose_ready` 2026-04-28; Ch16 still researching (now Codex-owned per 2026-04-29 split).
 - **Part 6 (The Rise of Data & Distributed Compute):** Ch32-37 dual-cleared `prose_ready` 2026-04-28 (caps 5,600 / 4,900 / 5,200 / 4,300 / 5,000 / 5,000); Ch38-40 not yet rebuilt.
@@ -13,6 +18,8 @@ Chapter 73, **The Algorithmic Response**, is the book's technical coda. Its pros
 - **Part 5 (The Mathematical Resurrection):** Ch24-31 prose `accepted`.
 - **Part 8 (The Transformer, Scale & Open Source):** Ch50-58 dual-cleared `prose_ready`; Ch58 cap is 5,200 words.
 - **Part 9 (The Product Shock & Physical Limits):** Ch59-Ch72 dual-cleared `prose_ready` with 5,700-, 5,800-, 5,800-, 4,800-, 4,500-, 5,000-, 5,300-, 5,400-, 5,400-, 5,500-, 6,000-, 6,000-, 6,200-, and 6,400-word caps.
+
+</details>
 
 All drafting is paused for any chapter whose contract is not at `prose_ready` or beyond.
 

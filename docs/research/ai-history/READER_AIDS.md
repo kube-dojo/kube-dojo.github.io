@@ -2,7 +2,7 @@
 
 This document defines the canonical reader-aid layout for the AI History book, established by the Chapter 1 prototype (Issue #561). Chapters 2–72 follow this template within the existing contract and review requirements.
 
-The current book contains 73 English chapters. Chapter 73, **The Algorithmic Response**, has prose and a public-index entry but no research-contract directory. Its reader aids await that contract and the applicable source and editorial reviews below; existing prose or aids do not establish approval. References to “every chapter” in this layout retain the Chapters 1–72 applicability boundary until that gap is resolved under #2288. This inventory clarification does not extend Tier 2 selections or waive Tier 3's per-element adversarial approval.
+The current book contains 73 English chapters. Chapter 73, **The Algorithmic Response**, has prose and a public-index entry but no research-contract directory. Its reader aids await that contract and the applicable source and editorial reviews below; existing prose or aids do not establish approval. Chapter 73's aids are pending, not exempt from source or layout requirements. References to “every chapter” in this layout retain the Chapters 1–72 applicability boundary until that gap is resolved under #2288. This inventory clarification does not extend Tier 2 selections or waive Tier 3's per-element adversarial approval.
 
 ## Hard rule — prose body is bit-identical to the verified draft
 
