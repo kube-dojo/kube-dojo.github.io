@@ -3055,8 +3055,11 @@ _SAFE_CHECK_SEVERITIES = {"ERROR": "ERROR", "WARNING": "WARNING", "INFO": "INFO"
 
 def _safe_check_summary(result: structural.CheckResult) -> str:
     """Persist only canonical metadata; messages can contain source content."""
-    check = _SAFE_CHECK_IDS.get(getattr(result, "check", None), "UNKNOWN")
-    severity = _SAFE_CHECK_SEVERITIES.get(getattr(result, "severity", None), "UNKNOWN")
+    raw_check = getattr(result, "check", None)
+    raw_severity = getattr(result, "severity", None)
+    check = _SAFE_CHECK_IDS.get(raw_check, "UNKNOWN") if isinstance(raw_check, str) else "UNKNOWN"
+    severity = (_SAFE_CHECK_SEVERITIES.get(raw_severity, "UNKNOWN")
+                if isinstance(raw_severity, str) else "UNKNOWN")
     return f"[{severity}] {check}"
 
 
@@ -3084,7 +3087,10 @@ def step_check(content: str, path: Path) -> tuple[bool, list]:
             print("  ✗ CHECK: frontmatter missing 'title' field")
             return False, []
     except yaml.YAMLError as e:
-        print(f"  ✗ CHECK: broken YAML frontmatter — {e}")
+        mark = getattr(e, "problem_mark", None)
+        location = (f" (line {mark.line + 1}, column {mark.column + 1})"
+                    if mark is not None and type(mark.line) is int and type(mark.column) is int else "")
+        print(f"  ✗ CHECK: broken YAML frontmatter{location}")
         return False, []
 
     # Language guard: reject Ukrainian content in EN files (and vice versa)
