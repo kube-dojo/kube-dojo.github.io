@@ -198,7 +198,7 @@ The asymmetry is important. The United States and allies targeted high-end compu
 
 China's response also increased domestic substitution pressure. Export controls can slow access to frontier tools while also motivating alternatives. They can increase cost and delay, but they can also push investment into domestic accelerators, domestic equipment, indigenous software stacks, and alternative supply chains. The safe claim is not that China was stopped. The safe claim is that controls changed the path: more expensive, more constrained, more politically managed, and more focused on substitution.
 
-That substitution pressure can have ambiguous long-term effects. In the short term, denial may slow access to the frontier. In the long term, it may deepen domestic investment and reduce dependence on foreign suppliers. Whether that tradeoff is worth it is a policy judgment beyond this chapter. The historical point is that export controls do not freeze technology. They redirect incentives. The pattern is developed as a concrete architecture case.
+That substitution pressure can have ambiguous long-term effects. In the short term, denial may slow access to the frontier. In the long term, it may deepen domestic investment and reduce dependence on foreign suppliers. Whether that tradeoff is worth it is a policy judgment beyond this chapter. The historical point is that export controls do not freeze technology. They redirect incentives. Chapter 73 examines a memory design and asks what evidence would connect such an architectural choice to policy pressure.
 
 Substitution also changes the technical shape of the race. If one side cannot freely obtain the most efficient accelerator stack, it may pursue different chips, different interconnect assumptions, different software compilers, different deployment strategies, or heavier use of older hardware. Those paths can be slower and more expensive, but they are still paths. This is why a serious history cannot equate export controls with technological immobility. The more accurate picture is uneven adaptation under constraint.
 
@@ -250,4 +250,4 @@ At the beginning of AI history, intelligence looked like a theorem, a neuron, a 
 
 By the 2020s, it also looked like an export license.
 
-That long arc returns with a concrete architectural follow-through in [Chapter 73: The Algorithmic Response](./ch-73-the-algorithmic-response/).
+That long arc leads to a technical case and an open historical question in [Chapter 73: The Algorithmic Response](./ch-73-the-algorithmic-response/): how could we establish a link between hardware constraints and an architectural choice?
