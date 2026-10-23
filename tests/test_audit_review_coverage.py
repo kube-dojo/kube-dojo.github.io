@@ -24,19 +24,24 @@ def test_part6_codex_gemini_research_markers_satisfy_cross_family_rule():
 
 
 @pytest.mark.parametrize("lane", ["research", "prose", "unknown"])
-@pytest.mark.parametrize("values", [{}, {"claude_anchor": "n/a"}])
+@pytest.mark.parametrize("values", [{}, {"claude_anchor": "n/a"}, {"grok_prose": "done", "deepseek_prose": "done"}])
 def test_missing_lane_evidence_is_not_coverage(lane, values):
     assert not _lane_satisfied(values, 73, lane)
 
 
 @pytest.mark.parametrize("title", [None, "docs: Chapter 73 research contract", "research: Ch73", "prose: Ch73"])
-def test_missing_pr_or_comments_stays_pending(tmp_path, monkeypatch, title):
+@pytest.mark.parametrize("evidence", ["none", "failed", "wrong_phase"])
+def test_missing_pr_or_comments_stays_pending(tmp_path, monkeypatch, title, evidence):
     chapter = tmp_path / "ch-73-test"
     chapter.mkdir()
     (chapter / "status.yaml").write_text("status: researching\n")
     monkeypatch.setattr(audit, "CHAPTER_ROOT", tmp_path)
     monkeypatch.setattr(audit, "_fetch_prs", lambda: [] if title is None else [{"number": 1, "title": title}])
-    monkeypatch.setattr(audit, "_fetch_comment_bodies", lambda _: ["No review evidence"])
+    prefix = "verdict" if title == "research: Ch73" else "prose review"
+    if evidence == "wrong_phase":
+        prefix = "prose review" if prefix == "verdict" else "verdict"
+    comments = [f"<!-- {prefix} {family} -->\n\n_FAILED_\n\n_dispatch failed_: timeout" if evidence == "failed" else f"<!-- {prefix} {family} -->" for family in ("claude", "gemini")]
+    monkeypatch.setattr(audit, "_fetch_comment_bodies", lambda _: comments if evidence != "none" else [])
     coverage = audit._build_coverage(strict_gh=True)[73]
     assert audit._summary_rows({73: coverage})[0][1:4] == (False, False, True)
     assert "done" not in (*coverage.research.values(), *coverage.prose.values())
@@ -45,13 +50,21 @@ def test_missing_pr_or_comments_stays_pending(tmp_path, monkeypatch, title):
 
 
 @pytest.mark.parametrize("chapter_num", [11, 16, 38, 73])
-def test_offline_labels_and_pending_verdicts_are_not_evidence(tmp_path, chapter_num):
+@pytest.mark.parametrize("status", ["researching", "accepted"])
+def test_offline_labels_and_pending_verdicts_are_not_evidence(tmp_path, monkeypatch, chapter_num, status):
     path = tmp_path / f"ch-{chapter_num}-test" / "status.yaml"
     path.parent.mkdir()
-    text = "status: researching\nverdicts:\n  claude: null\n  gemini: pending\n  codex: null\n"
+    text = f"status: {status}\nverdicts:\n  claude: null\n  gemini: pending\n  codex: null\nnotes: review approved\n"
     path.write_text(text)
-    coverage = audit._offline_seed([path])[chapter_num]
+    monkeypatch.setattr(audit, "CHAPTER_ROOT", tmp_path)
+    def unavailable():
+        raise RuntimeError("offline")
+    monkeypatch.setattr(audit, "_fetch_prs", unavailable)
+    coverage = audit._build_coverage(strict_gh=False)[chapter_num]
     assert audit._summary_rows({chapter_num: coverage})[0][1:] == (False, False, True, "offline")
+    monkeypatch.setattr("sys.argv", ["audit", "--write"])
+    with pytest.raises(RuntimeError, match="offline"):
+        audit.main()
     assert path.read_text() == text
 
 

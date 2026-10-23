@@ -3428,6 +3428,8 @@ def test_briefing_book_groups_chapters_by_part_with_rollup(tmp_path: Path) -> No
     _seed_book_chapter(tmp_path, 50, "attention-is-all-you-need", status="researching", owner="Codex")
     _seed_book_chapter(tmp_path, 72, "the-infinite-datacenter", status="researching", owner="Claude")
     _seed_book_chapter(tmp_path, 73, "mla", status="researching", owner="Codex")
+    ch73_status = tmp_path / "docs/research/ai-history/chapters/ch-73-mla/status.yaml"
+    ch73_status.write_text(ch73_status.read_text() + "prose_state: published_on_main\n")
 
     status_code, payload, content_type = local_api.route_request(tmp_path, "/api/briefing/book")
     assert status_code == 200
@@ -3442,7 +3444,7 @@ def test_briefing_book_groups_chapters_by_part_with_rollup(tmp_path: Path) -> No
     assert parts_by_num[9]["chapter_range"] == [59, 73]
     assert parts_by_num[9]["chapters"][-1]["status"] == "researching"
     assert parts_by_num[9]["chapters"][-1]["chapter"] == 73
-    assert parts_by_num[9]["published_count"] == parts_by_num[9]["aids_landed_count"] == 0
+    assert parts_by_num[9]["published_count"] == 1 and parts_by_num[9]["aids_landed_count"] == 0
     # Part 3 (Ch 11-16): one anchored chapter with all the GYR counts.
     part3 = parts_by_num[3]
     assert part3["chapter_range"] == [11, 16]
