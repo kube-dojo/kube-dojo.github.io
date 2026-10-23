@@ -1035,7 +1035,7 @@ The final step is to measure unit economics after the change. If the cost action
 | Mistake | Why It Happens | How to Fix It |
 |---|---|---|
 | Setting resource requests to match limits | "Same value means guaranteed QoS" | Requests should reflect typical usage, limits reflect peak. VPA recommendations help find the right values. Over-requesting wastes money. |
-| Buying Savings Plans based on current usage | "We're using $10K/month now, commit to $10K" | Usage fluctuates. Commit conservatively to stable baseline usage and validate it with provider recommendation tools before buying long-term commitments. |
+| Buying Savings Plans based on current usage | "We're using \$10K/month now, commit to \$10K" | Usage fluctuates. Commit conservatively to stable baseline usage and validate it with provider recommendation tools before buying long-term commitments. |
 | Running dev/staging clusters 24/7 | "Someone might need them on weekends" | Implement auto-shutdown for non-production clusters and scale down idle capacity outside working hours to cut spend substantially. |
 | Not diversifying Spot instance types | "We need m7i.xlarge specifically" | Single-type Spot pools are more fragile. Use multiple compatible instance types, and let provisioning tools such as Karpenter manage that diversity where appropriate. |
 | Ignoring namespace-level resource quotas | "Trust developers to be reasonable" | Without quotas, one team can consume the entire cluster. Set ResourceQuotas per namespace based on team budgets. |

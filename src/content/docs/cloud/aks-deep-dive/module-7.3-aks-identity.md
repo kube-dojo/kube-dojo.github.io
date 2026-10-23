@@ -528,7 +528,7 @@ Defender for Containers operates across three layers, not just the runtime Daemo
 
 ### Cost Model
 
-Defender for Containers is priced per vCPU-hour of protected container workload. The list price is approximately $0.0095 per vCPU per hour, which at a cluster running 100 vCPUs across workloads translates to roughly $0.95 per hour or about $684 per month for runtime protection. This is the per-workload-vCPU count (the sum of `requests` or actual usage across all pods), not the node vCPU count. Clusters that overprovision CPU requests pay for the requested vCPUs, not just the utilized ones — making resource right-sizing a cost optimization lever for Defender as well as for your compute bill.
+Defender for Containers is priced per vCPU-hour of protected container workload. The list price is approximately \$0.0095 per vCPU per hour, which at a cluster running 100 vCPUs across workloads translates to roughly \$0.95 per hour or about \$684 per month for runtime protection. This is the per-workload-vCPU count (the sum of `requests` or actual usage across all pods), not the node vCPU count. Clusters that overprovision CPU requests pay for the requested vCPUs, not just the utilized ones — making resource right-sizing a cost optimization lever for Defender as well as for your compute bill.
 
 Key cost drivers to watch: large node pools with many small pods (each pod's CPU request counts toward the protected vCPU total), clusters with generous default resource requests, and development clusters that run 24/7 without scaling down overnight. The cost is per-cluster, per-hour, and there is no free tier for runtime protection — the Standard tier is required for any detection beyond basic container security hygiene recommendations.
 
