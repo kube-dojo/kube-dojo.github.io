@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """KubeDojo Module Quality Pipeline — v1.
 
 Processes each module through 8 quality dimensions to reach 33/40.
@@ -43,7 +42,9 @@ import builtins
 import copy
 import fcntl
 import html as html_lib
+import http.client
 import json
+import logging
 import os
 import random
 import re
@@ -51,14 +52,16 @@ import shutil
 import subprocess
 import sys
 import threading
-import http.client
 import urllib.error
 import urllib.request
-import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, datetime, timedelta, UTC
-from functools import lru_cache
+from datetime import UTC, date, datetime, timedelta
+from functools import cache
 from pathlib import Path
+
+import yaml
+
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).parent.parent
 CONTENT_ROOT = REPO_ROOT / "src" / "content" / "docs"
@@ -148,21 +151,29 @@ builtins.print = _logged_print
 # Add scripts to path for imports
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from checks import structural, ukrainian, gaps
+from checks import gaps, structural, ukrainian
 from dispatch import (
     GEMINI_WRITER_MODEL,
+    ClaudeUnavailableError,
+    _is_rate_limited,
     dispatch_agy,
     dispatch_claude,
     dispatch_codex,
-    _is_rate_limited,
-    ClaudeUnavailableError,
+)
+from uk_sync import (
+    CONTENT_ROOT as UK_CONTENT_ROOT,
+)
+from uk_sync import (
+    UK_ROOT,
+)
+from uk_sync import (
+    _find_content_files as uk_find_content_files,
+)
+from uk_sync import (
+    fix_module as uk_fix,
 )
 from uk_sync import (
     translate_new_module as uk_translate,
-    fix_module as uk_fix,
-    _find_content_files as uk_find_content_files,
-    CONTENT_ROOT as UK_CONTENT_ROOT,
-    UK_ROOT,
 )
 
 
@@ -175,7 +186,7 @@ def dispatch_auto(prompt: str, model: str, timeout: int = 900) -> tuple[bool, st
         return dispatch_agy(prompt, model=model, timeout=timeout)
     if model.startswith("claude"):
         return dispatch_claude(prompt, model=model, timeout=timeout)
-    if model.startswith("codex") or "codex" in model or model.startswith("gpt-"):
+    if model.startswith(("codex", "gpt-")) or "codex" in model:
         return dispatch_codex(prompt, model=model, timeout=timeout)
     raise ValueError(f"Unknown model family: {model!r} — must start with 'gemini', 'claude', or 'codex'")
 
@@ -300,8 +311,8 @@ def _git_stage_and_commit(add_paths: list[str], commit_msg: str,
         }
         if timeout is not None:
             kwargs["timeout"] = timeout
-        add_result = subprocess.run(["git", "add", *add_paths], **kwargs)
-        commit_result = subprocess.run(["git", "commit", "-m", commit_msg], **kwargs)
+        add_result = subprocess.run(["git", "add", *add_paths], check=False, **kwargs)
+        commit_result = subprocess.run(["git", "commit", "-m", commit_msg], check=False, **kwargs)
         return add_result, commit_result
 
     return _with_parallel_git_lock(_run)
@@ -474,7 +485,7 @@ def _model_family(model: str) -> str:
         return "gemini"
     if model.startswith("claude"):
         return "claude"
-    if model.startswith("codex") or "codex" in model or model.startswith("gpt-"):
+    if model.startswith(("codex", "gpt-")) or "codex" in model:
         return "codex"
     return model.split("-", 1)[0]
 
@@ -1006,9 +1017,8 @@ def _matching_seed_lines(seed_path: Path, module_key: str) -> list[str]:
             continue
         line = raw_line.strip()
         if "http" in line and (
-            line.startswith("- ")
+            line.startswith(("- ", "http"))
             or re.match(r"^\d+\.\s+", line)
-            or line.startswith("http")
         ):
             lines.append(line)
     return lines
@@ -1363,7 +1373,7 @@ def step_write(module_path: Path, plan: str, model: str = MODELS["write"],
     ok, output = dispatch_auto(prompt, model=model, timeout=900)
 
     if not ok or not output.strip():
-        print(f"  ❌ WRITE failed")
+        print("  ❌ WRITE failed")
         return None
 
     # Strip markdown wrapper if present
@@ -1380,7 +1390,7 @@ def step_write(module_path: Path, plan: str, model: str = MODELS["write"],
     thinking_markers = ["CRITICAL INSTRUCTION", "thought\n", "Wait,", "I will ", "I'll just",
                         "the prompt says", "standard behavior"]
     if any(marker in output[:500] for marker in thinking_markers):
-        print(f"  ❌ WRITE failed — Gemini leaked chain-of-thought into output")
+        print("  ❌ WRITE failed — Gemini leaked chain-of-thought into output")
         return None
 
     # Ensure output starts with frontmatter
@@ -1391,7 +1401,7 @@ def step_write(module_path: Path, plan: str, model: str = MODELS["write"],
             output = output[fm_start:]
             print(f"  ⚠ Stripped {fm_start} chars of preamble before frontmatter")
         else:
-            print(f"  ❌ WRITE failed — output has no frontmatter")
+            print("  ❌ WRITE failed — output has no frontmatter")
             return None
 
     # Reject degenerate output — a real module rewrite is thousands of chars.
@@ -1636,7 +1646,7 @@ def rubric_profile_name_for_module(module_path: Path) -> str:
     return "default"
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_rubric_profile(profile_name: str) -> dict:
     normalized = _normalize_rubric_track(profile_name) or "default"
     profile_path = RUBRIC_PROFILE_DIR / f"{normalized}.yaml"
@@ -1911,7 +1921,7 @@ def step_update_index(section_path: Path, model: str = MODELS["write"]) -> bool:
     ok, output = dispatch_auto(prompt, model=model, timeout=600)
 
     if not ok or not output.strip():
-        print(f"  ❌ INDEX rewrite failed")
+        print("  ❌ INDEX rewrite failed")
         return False
 
     # Strip markdown wrapper
@@ -1925,18 +1935,18 @@ def step_update_index(section_path: Path, model: str = MODELS["write"]) -> bool:
         output = output[:-3].strip()
 
     if not output.startswith("---"):
-        print(f"  ❌ INDEX rewrite has no frontmatter")
+        print("  ❌ INDEX rewrite has no frontmatter")
         return False
 
     # Validate frontmatter
     parts = output.split("---", 2)
     if len(parts) < 3:
-        print(f"  ❌ INDEX rewrite has malformed frontmatter")
+        print("  ❌ INDEX rewrite has malformed frontmatter")
         return False
     try:
         fm = yaml.safe_load(parts[1])
         if not isinstance(fm, dict) or "title" not in fm:
-            print(f"  ❌ INDEX rewrite missing title in frontmatter")
+            print("  ❌ INDEX rewrite missing title in frontmatter")
             return False
     except yaml.YAMLError as e:
         print(f"  ❌ INDEX rewrite has broken YAML: {e}")
@@ -1961,7 +1971,7 @@ def step_update_index(section_path: Path, model: str = MODELS["write"]) -> bool:
     # Git add
     subprocess.run(
         ["git", "add"] + files_to_add,
-        cwd=str(REPO_ROOT), capture_output=True, text=True,
+        cwd=str(REPO_ROOT), capture_output=True, text=True, check=False,
     )
 
     return True
@@ -2010,8 +2020,7 @@ def _extract_review_json(output: str,
         parts = text.split("```")
         if len(parts) >= 2:
             candidate = parts[1]
-            if candidate.startswith("json"):
-                candidate = candidate[4:]
+            candidate = candidate.removeprefix("json")
             try:
                 obj = json.loads(candidate.strip())
                 if isinstance(obj, dict) and _has_required_json_keys(obj, required_keys):
@@ -2286,7 +2295,7 @@ def _atomic_write_text(path: Path, content: str) -> None:
         raise
 
 
-def _format_audit_duration(seconds: float | int | None) -> str:
+def _format_audit_duration(seconds: float | None) -> str:
     """Render a human-readable duration for audit entries."""
     if seconds is None:
         return "unknown"
@@ -2296,16 +2305,16 @@ def _format_audit_duration(seconds: float | int | None) -> str:
         return str(seconds)
     if total >= 60:
         minutes = int(total // 60)
-        remainder = int(round(total - (minutes * 60)))
+        remainder = round(total - (minutes * 60))
         if remainder == 60:
             minutes += 1
             remainder = 0
         return f"{minutes}m {remainder}s"
     if total >= 10:
-        return f"{int(round(total))}s"
+        return f"{round(total)}s"
     if total >= 1:
         return f"{total:.1f}s"
-    return f"{int(round(total * 1000))}ms"
+    return f"{round(total * 1000)}ms"
 
 
 def _format_audit_timestamp(value: datetime | str | None = None) -> str:
@@ -2642,9 +2651,9 @@ def step_review(module_path: Path, improved: str, model: str = MODELS["review"],
     if not ok:
         # Rate-limit detection so run_module can degrade gracefully
         if output and _is_rate_limited(output):
-            print(f"  ⚠ REVIEW rate-limited — module flagged for later re-review")
+            print("  ⚠ REVIEW rate-limited — module flagged for later re-review")
             return {"rate_limited": True}
-        print(f"  ❌ REVIEW failed")
+        print("  ❌ REVIEW failed")
         return None
 
     result = _normalize_review_result(output)
@@ -2702,7 +2711,7 @@ def step_review(module_path: Path, improved: str, model: str = MODELS["review"],
         type_summary = ", ".join(f"{k}={v}" for k, v in sorted(by_type.items()))
         print(f"  Structured edits: {len(edits)} ({type_summary})")
     if feedback:
-        print(f"  Feedback:")
+        print("  Feedback:")
         print(f"  {'─' * 70}")
         for line in feedback.splitlines() or [feedback]:
             print(f"  {line}")
@@ -2771,8 +2780,8 @@ def _probe_url(url: str) -> int | None:
                 if method == "GET":
                     try:
                         response.read(1024)
-                    except Exception:
-                        pass
+                    except (OSError, http.client.HTTPException):
+                        print("  ⚠ Link probe body read failed; retaining HTTP status")
                 return int(response.getcode())
         except urllib.error.HTTPError as e:
             return int(e.code)
@@ -3021,16 +3030,16 @@ def step_check_integrity(content: str, fact_ledger: dict) -> tuple[bool, list[st
                 supported_ledger_texts.append(current_truth.strip())
             if isinstance(claim.get("claim"), str) and claim.get("claim", "").strip():
                 supported_ledger_texts.append(claim.get("claim", "").strip())
-            if isinstance(statement, str) and statement.strip():
-                if not _contains_with_tolerance(content, statement):
-                    warnings.append(f"MISSING_SUPPORTED_CLAIM: claim {claim_id}")
+            if (isinstance(statement, str) and statement.strip()
+                    and not _contains_with_tolerance(content, statement)):
+                warnings.append(f"MISSING_SUPPORTED_CLAIM: claim {claim_id}")
 
-        if status == "CONFLICTING" and isinstance(statement, str) and statement.strip():
-            if _is_unhedged_claim_assertion(content, statement):
-                errors.append(f"UNHEDGED_CONFLICT: claim {claim_id}")
-        if status == "UNVERIFIED" and isinstance(statement, str) and statement.strip():
-            if _is_unhedged_claim_assertion(content, statement):
-                errors.append(f"UNHEDGED_UNVERIFIED: claim {claim_id}")
+        if (status == "CONFLICTING" and isinstance(statement, str) and statement.strip()
+                and _is_unhedged_claim_assertion(content, statement)):
+            errors.append(f"UNHEDGED_CONFLICT: claim {claim_id}")
+        if (status == "UNVERIFIED" and isinstance(statement, str) and statement.strip()
+                and _is_unhedged_claim_assertion(content, statement)):
+            errors.append(f"UNHEDGED_UNVERIFIED: claim {claim_id}")
 
     # 5) Reverse evidence mapping: content claims should map to supported
     # ledger facts. Downgraded to WARNING because the topic-based ledger
@@ -3045,7 +3054,7 @@ def step_check_integrity(content: str, fact_ledger: dict) -> tuple[bool, list[st
 
 def step_check(content: str, path: Path) -> tuple[bool, list]:
     """Run all deterministic checks on the improved content."""
-    print(f"\n  CHECK: running deterministic checks")
+    print("\n  CHECK: running deterministic checks")
 
     # Safety guard: reject truncated content (Gemini output limit)
     original = path.read_text()
@@ -3064,7 +3073,7 @@ def step_check(content: str, path: Path) -> tuple[bool, list]:
     try:
         fm = yaml.safe_load(parts[1])
         if not isinstance(fm, dict) or "title" not in fm:
-            print(f"  ✗ CHECK: frontmatter missing 'title' field")
+            print("  ✗ CHECK: frontmatter missing 'title' field")
             return False, []
     except yaml.YAMLError as e:
         print(f"  ✗ CHECK: broken YAML frontmatter — {e}")
@@ -3076,10 +3085,10 @@ def step_check(content: str, path: Path) -> tuple[bool, list]:
     has_uk_slug = bool(re.search(r'^slug:\s*uk/', parts[1], re.MULTILINE))
     has_en_commit = "en_commit:" in parts[1]
     if not is_uk and (has_cyrillic_title or has_uk_slug or has_en_commit):
-        print(f"  ✗ CHECK: Ukrainian content in EN file (title/slug/en_commit detected)")
+        print("  ✗ CHECK: Ukrainian content in EN file (title/slug/en_commit detected)")
         return False, []
     if is_uk and not has_cyrillic_title and not has_en_commit:
-        print(f"  ✗ CHECK: English content in UK file (no Cyrillic title or en_commit)")
+        print("  ✗ CHECK: English content in UK file (no Cyrillic title or en_commit)")
         return False, []
 
     # Asset preservation check: compare original vs improved
@@ -3174,7 +3183,7 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
     # gets an independent pass without forcing a rewrite.
     if ms["phase"] == "done":
         if ms.get("needs_independent_review"):
-            print(f"  ↻ Flagged needs_independent_review — resetting to review for independent re-review")
+            print("  ↻ Flagged needs_independent_review — resetting to review for independent re-review")
             ms["phase"] = "review"
             save_state(state)
             # fall through to resume block below
@@ -3198,11 +3207,11 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
     # re-initial-write, no re-review).
     if ms["phase"] == "needs_targeted_fix":
         if staging_path.exists() and ms.get("plan"):
-            print(f"  ↻ Resuming targeted fix from peak-hours pause")
+            print("  ↻ Resuming targeted fix from peak-hours pause")
             ms["phase"] = "write"
             save_state(state)
         else:
-            print(f"  ⚠ needs_targeted_fix phase but staging/plan missing — restarting from initial write")
+            print("  ⚠ needs_targeted_fix phase but staging/plan missing — restarting from initial write")
             ms["phase"] = "pending"
             _clear_resume_metadata(ms, staging_path)
             save_state(state)
@@ -3366,13 +3375,13 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
                 # - Set phase=needs_targeted_fix as a pause marker
                 # - Return True so the batch runner moves on cleanly
                 print(f"\n  ⏸ PAUSED (Claude unavailable): {e}")
-                print(f"  Progress preserved — will resume at targeted-fix step on next run.")
+                print("  Progress preserved — will resume at targeted-fix step on next run.")
                 staging_path = module_path.with_suffix(".staging.md")
                 if last_good:
                     _atomic_write_text(staging_path, last_good)
                     print(f"  Staged {len(last_good)} chars to {staging_path.name}")
                 else:
-                    print(f"  ⚠ No last_good content to stage — resume will restart from the initial write")
+                    print("  ⚠ No last_good content to stage — resume will restart from the initial write")
                 ms["phase"] = "needs_targeted_fix"
                 ms["plan"] = plan
                 ms["targeted_fix"] = targeted_fix
@@ -3417,9 +3426,9 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
                         f"chore(content): write-only draft [{module_key_from_path(module_path)}]",
                         timeout=30,
                     )
-                    print(f"  Committed draft")
-                except Exception:
-                    pass  # non-critical
+                    print("  Committed draft")
+                except (OSError, subprocess.SubprocessError, UnicodeError):
+                    print("  ⚠ Draft commit failed; continuing with saved draft")
                 return True
 
         if ms["phase"] == "citation":
@@ -3829,7 +3838,7 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
                         # 0/N — reviewer anchors don't match. Escalate to
                         # severe rewrite (a fresh reviewer pass should
                         # produce fresh anchors against the same content).
-                        print(f"  ⚠ Zero edits applied deterministically — escalating to severe rewrite")
+                        print("  ⚠ Zero edits applied deterministically — escalating to severe rewrite")
                         r_severity = "severe"
 
                 # Non-deterministic paths below: severe rewrite, or invalid
@@ -3841,7 +3850,7 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
                         "REVIEW OUTPUT INVALID. Rewrite the module from "
                         f"scratch and resolve these issues.\n\nReviewer feedback:\n{r_feedback}"
                     )
-                    print(f"  ⚠ Review returned no valid checks — using full rewrite")
+                    print("  ⚠ Review returned no valid checks — using full rewrite")
                 elif r_severity == "severe":
                     needs_rewrite = True
                     targeted_fix = False
@@ -3918,9 +3927,9 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
             _atomic_write_text(staging, improved)
         elif staging.exists():
             improved = staging.read_text()
-            print(f"  Resuming CHECK from staging file")
+            print("  Resuming CHECK from staging file")
         else:
-            print(f"  ❌ No improved content available for CHECK")
+            print("  ❌ No improved content available for CHECK")
             return False
 
         results = []
@@ -4030,7 +4039,7 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
             if commit_result.returncode != 0:
                 print(f"  ⚠ git commit failed: {commit_result.stderr[:200]}")
             else:
-                print(f"  ✓ Committed")
+                print("  ✓ Committed")
             return True
         else:
             print(f"\n  ✗ FAIL: {result_label} — needs manual intervention")
@@ -4173,13 +4182,13 @@ def cmd_run_section(args):
             ],
         }
         gaps_file.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
-        print(f"  Gaps saved to .pipeline/gaps-report.json")
+        print("  Gaps saved to .pipeline/gaps-report.json")
     else:
         print("  ✓ No scaffolding gaps detected")
 
     if gap_errors and not args.skip_gaps:
         print(f"\n  ❌ {len(gap_errors)} gap errors — fix before processing modules")
-        print(f"  Use --skip-gaps to override")
+        print("  Use --skip-gaps to override")
         sys.exit(1)
 
     models = dict(MODELS)
@@ -4240,8 +4249,9 @@ def cmd_run_section(args):
                             passed += 1
                         else:
                             failed += 1
-                    except Exception as e:
-                        print(f"  ❌ Exception processing {path}: {e}")
+                    except Exception:
+                        # Worker failures are isolated; never log generated exception details.
+                        logger.exception("Module worker failed; continuing batch", exc_info=False)
                         failed += 1
         finally:
             _PARALLEL_RUN_SECTION_STATE_LOCK = previous_state_lock
@@ -4267,7 +4277,7 @@ def cmd_run_section(args):
                 "D1:Pedagogy", "D2:Accuracy", "D3:Depth", "D4:Practical",
                 "D5:Assessment", "D6:Coverage", "D7:Production", "D8:Practitioner",
             ]
-            print(f"\n  Weak dimensions across section:")
+            print("\n  Weak dimensions across section:")
             for name, count in zip(dim_names, weak_counts):
                 if count > 0:
                     print(f"    {name}: {count} modules below 4")
@@ -4280,7 +4290,7 @@ def cmd_run_section(args):
 
 def cmd_learning_path(args):
     """Detect gaps across the full learning path (cross-track transitions)."""
-    print(f"\nCross-Track Gap Analysis")
+    print("\nCross-Track Gap Analysis")
     print(f"{'='*60}")
     print(f"  Learning path: {' → '.join(d.split('/')[-1] for d, _ in gaps.LEARNING_PATH)}")
     print()
@@ -4326,7 +4336,7 @@ def cmd_learning_path(args):
         ],
     }
     gaps_file.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
-    print(f"\n  Saved to .pipeline/gaps-report.json")
+    print("\n  Saved to .pipeline/gaps-report.json")
 
     sys.exit(1 if errors else 0)
 
@@ -4776,7 +4786,7 @@ def cmd_resume(args):
 
     models = _apply_model_overrides(args)
 
-    for key, ms in incomplete.items():
+    for key in incomplete:
         path = find_module_path(key)
         if path and path.exists():
             _run_module_with_retry_policy(
@@ -4844,11 +4854,11 @@ def cmd_reset_stuck(args):
             has_legit_rewrite = bool(
                 ms.get("severity") in ("severe", "targeted") and ms.get("checks_failed")
             )
-            if not has_legit_rewrite and module_path is not None:
-                if _safe_read_len(module_path) >= 2000:
-                    ms["phase"] = "review"
-                    cleared_errors.append("stale phase=write (draft exists on disk)")
-                    was_stuck = True
+            if (not has_legit_rewrite and module_path is not None
+                    and _safe_read_len(module_path) >= 2000):
+                ms["phase"] = "review"
+                cleared_errors.append("stale phase=write (draft exists on disk)")
+                was_stuck = True
 
         if was_stuck:
             reset_count += 1
@@ -4978,10 +4988,9 @@ def cmd_e2e(args):
                         subdir = sub.parent
                         if list(subdir.glob("module-*.md")) and str(subdir) != str(section_path):
                             expanded.append(str(subdir.relative_to(CONTENT_ROOT)))
-                    if not expanded or expanded[-1] != s:
-                        # Fallback: just use the path as-is
-                        if s not in expanded:
-                            expanded.append(s)
+                    # Fallback: just use the path as-is
+                    if (not expanded or expanded[-1] != s) and s not in expanded:
+                        expanded.append(s)
                 else:
                     expanded.append(s)
         sections_to_run = expanded
@@ -5014,7 +5023,7 @@ def cmd_e2e(args):
                     phase1_failed_modules.add(key)
                     consecutive_failures += 1
                 if consecutive_failures >= 5:
-                    print(f"\n  CIRCUIT BREAKER: 5 consecutive resume failures — halting")
+                    print("\n  CIRCUIT BREAKER: 5 consecutive resume failures — halting")
                     print(f"  Check logs: {LOG_FILE}")
                     break
         print(f"\n  Resumed: {resumed}/{len(incomplete)} completed")
@@ -5099,15 +5108,15 @@ def cmd_e2e(args):
             if index_files:
                 subprocess.run(
                     ["git", "add"] + index_files,
-                    cwd=str(REPO_ROOT), capture_output=True, text=True,
+                    cwd=str(REPO_ROOT), capture_output=True, text=True, check=False,
                 )
                 idx_commit = subprocess.run(
                     ["git", "commit", "-m",
                      f"docs: update section indexes for {section}"],
-                    cwd=str(REPO_ROOT), capture_output=True, text=True,
+                    cwd=str(REPO_ROOT), capture_output=True, text=True, check=False,
                 )
                 if idx_commit.returncode == 0:
-                    print(f"  ✓ Index updates committed")
+                    print("  ✓ Index updates committed")
 
     # UK translations: sync modules for completed sections
     if not getattr(args, "no_translate", False):
@@ -5147,7 +5156,7 @@ def cmd_e2e(args):
                     consecutive_uk_failures += 1
 
                 if consecutive_uk_failures >= 3:
-                    print(f"  CIRCUIT BREAKER: 3 consecutive UK translation failures — skipping rest")
+                    print("  CIRCUIT BREAKER: 3 consecutive UK translation failures — skipping rest")
                     break
 
             print(f"\n  UK: {translated} translated, {failed} failed")
@@ -5205,9 +5214,9 @@ def cmd_gap_check(args):
 
     # Also run LLM gap analysis for deeper detection
     if args.track in ("prerequisites", "linux"):
-        print(f"\n  For deeper analysis, consider running:")
+        print("\n  For deeper analysis, consider running:")
         print(f"  python scripts/v1_pipeline.py gap-check {args.path} --track {args.track}")
-        print(f"  and reviewing CONCEPT_JUMP warnings manually")
+        print("  and reviewing CONCEPT_JUMP warnings manually")
 
     sys.exit(1 if errors else 0)
 
