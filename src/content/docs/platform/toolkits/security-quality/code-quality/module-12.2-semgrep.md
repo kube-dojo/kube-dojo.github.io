@@ -207,7 +207,7 @@ That example deliberately uses custom local rules and SARIF output. SARIF is use
 
 Ignore files are part of the policy too. A `.semgrepignore` file should exclude generated code, vendored dependencies, large test fixtures, and other paths where findings are not actionable. It should not become a hiding place for uncomfortable production code. The distinction is ownership: if developers cannot or should not edit a path, scanning it in PR gates creates noise; if developers own the path and the rule is correct, ignoring it is risk acceptance and should be reviewed.
 
-```gitignore
+```text
 # .semgrepignore
 vendor/
 third_party/
