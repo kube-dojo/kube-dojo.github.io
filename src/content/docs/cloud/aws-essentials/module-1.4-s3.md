@@ -352,7 +352,7 @@ You cannot transition from Glacier back to Standard-IA via a lifecycle rule. To 
 <details>
 <summary>Check your prediction</summary>
 
-Your monthly storage bill will increase substantially rather than decrease. Although the per-gigabyte storage rate of Standard-IA is roughly half that of S3 Standard, S3 bills every object transitioned to Standard-IA as if it were at least 128 KB. Storing 10 million 5 KB objects requires only 50 GB of physical space in S3 Standard (~\$1.15/month), but Standard-IA charges you for 1.28 TB (128 KB × 10 million) of capacity (~\$16.00/month), plus lifecycle transition request fees (\$10.00 for 10 million PUT/lifecycle requests).
+Your monthly storage bill will increase substantially rather than decrease. Although the per-gigabyte storage rate of Standard-IA is roughly half that of S3 Standard, S3 bills every object transitioned to Standard-IA as if it were at least 128 KB. Storing 10 million 5 KB objects requires only 50 GB of physical space in S3 Standard (\~\$1.15/month), but Standard-IA charges you for 1.28 TB (128 KB × 10 million) of capacity (\~\$16.00/month), plus lifecycle transition request fees (\$10.00 for 10 million PUT/lifecycle requests).
 
 </details>
 
