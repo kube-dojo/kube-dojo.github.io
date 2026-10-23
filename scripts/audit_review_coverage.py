@@ -1,9 +1,8 @@
 """Audit AI History review coverage for per-chapter status.yaml files.
 
 The authoritative mode reads merged PRs and PR comments through ``gh``. When
-GitHub is unavailable, the script falls back to a conservative local seed so the
-schema can still be applied in offline worktrees; rerun with network access to
-replace pending/inferred values with marker-derived values.
+GitHub is unavailable, coverage stays pending and cannot be written to contracts.
+Rerun with network access to obtain marker-derived coverage, not approval.
 """
 from __future__ import annotations
 
@@ -166,22 +165,24 @@ def _apply_comment_markers(coverage: ChapterCoverage, lane: str, comments: list[
     marker_seen: set[str] = set()
     for body in comments:
         lowered = body.lower()
-        if "<!-- verdict claude" in lowered:
+        if "_failed_" in lowered:
+            continue
+        if lane == "research" and "<!-- verdict claude" in lowered:
             coverage.research["claude_anchor"] = "done"
             marker_seen.add("claude_anchor")
-        if "<!-- verdict gemini" in lowered:
+        if lane == "research" and "<!-- verdict gemini" in lowered:
             coverage.research["gemini_gap"] = "done"
             marker_seen.add("gemini_gap")
-        if "<!-- verdict codex" in lowered:
+        if lane == "research" and "<!-- verdict codex" in lowered:
             coverage.research["codex_anchor"] = "done"
             marker_seen.add("codex_anchor")
-        if "<!-- prose review claude" in lowered:
+        if lane == "prose" and "<!-- prose review claude" in lowered:
             coverage.prose["claude_source_fidelity"] = "done"
             marker_seen.add("claude_source_fidelity")
-        if "<!-- prose review gemini" in lowered:
+        if lane == "prose" and "<!-- prose review gemini" in lowered:
             coverage.prose["gemini_prose_quality"] = "done"
             marker_seen.add("gemini_prose_quality")
-        if "<!-- prose review codex" in lowered:
+        if lane == "prose" and "<!-- prose review codex" in lowered:
             coverage.prose["codex_prose_quality"] = "done"
             marker_seen.add("codex_prose_quality")
 
@@ -290,6 +291,8 @@ def _replace_top_level_block(text: str, block_name: str, replacement: str) -> st
 
 
 def _write_status_files(coverages: dict[int, ChapterCoverage]) -> None:
+    if any(coverage.source == "offline" for coverage in coverages.values()):
+        raise RuntimeError("Refusing to write offline coverage without observed reviews")
     for path in sorted(CHAPTER_ROOT.glob("ch-*/status.yaml")):
         chapter_num = _chapter_num_from_path(path)
         text = path.read_text(encoding="utf-8")
