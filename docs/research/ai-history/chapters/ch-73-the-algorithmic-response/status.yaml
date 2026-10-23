@@ -24,11 +24,17 @@ prose_review:
   editorial: {model: null, date: null, verdict: null, review_url: null}
 prose_state: published_on_main
 prose_path: src/content/docs/ai-history/ch-73-the-algorithmic-response.md
-reader_aids: incomplete_pending_reviews
+reader_aids: none
 lifecycle_updated: 2026-10-23
 review_coverage:
-  research: {source_fidelity: pending, gap_capacity: pending}
-  prose: {source_fidelity: pending, editorial: pending}
+  research:
+    claude_anchor: pending
+    gemini_gap: pending
+    codex_anchor: pending
+  prose:
+    claude_source_fidelity: pending
+    gemini_prose_quality: pending
+    codex_prose_quality: pending
   cross_family_satisfied: {research: false, prose: false, overall: false}
   backfill_pending: true
   last_audited: null
@@ -36,3 +42,5 @@ notes: >-
   First provisional contract under #3460/#2288. Published prose is recorded,
   not accepted. Source-visible Yellow claims await independent review;
   Red claims cannot be drafted. No benchmark execution or reader-aid clearance.
+  reader_aids none records no approved rollout: an overlong TL;DR already exists,
+  but the remaining required aids are absent and no aid is cleared by this contract.
