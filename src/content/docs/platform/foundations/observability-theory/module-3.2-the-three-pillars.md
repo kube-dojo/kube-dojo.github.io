@@ -30,15 +30,7 @@ After completing this module, you will be able to:
 
 The dashboard identifies a population and time window. The trace describes one recorded request. The log describes an event that may belong to a different request. Matching their timestamps is a useful search strategy, but it does not establish that the timeout explains the slow span or the population-wide latency change.
 
-| Evidence available | Next decision | Limit to check |
-|--------------------|---------------|----------------|
-| Latency histogram | Select the affected service and time window | An aggregate does not identify each request |
-| Retained slow trace | Inspect recorded spans and compare other requests | Sampling and missing instrumentation limit coverage |
-| Timeout log without a trace ID | Inspect context propagation and logger integration | Timestamp overlap alone does not establish request identity |
-
-[OpenTelemetry context propagation](https://opentelemetry.io/docs/concepts/context-propagation/#context-propagation) explains how trace context connects work across services. Its [log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/#trace-context-fields) provides optional `TraceId` and `SpanId` fields for logs associated with request processing. Recording those fields when context exists provides a stronger join than guessing from timestamps; background logs need not have request context.
-
-An absent exemplar does not make trace search impossible. [Jaeger's documented search URL](https://www.jaegertracing.io/docs/2.22/deployment/frontend-ui/#search-page) includes service, time-range, and minimum/maximum duration parameters. Use those filters to find candidates; use an exemplar when available to navigate to a particular observation's trace. Neither route guarantees that the trace was retained or that it explains the broader anomaly.
+[OpenTelemetry context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) explains how trace context connects work across services. Its [log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/#trace-context-fields) provides optional `TraceId` and `SpanId` fields for logs associated with request processing. Recording those fields when context exists provides a stronger join than guessing from timestamps; background logs need not have request context. An absent exemplar does not make trace search impossible. [Jaeger's documented search URL](https://www.jaegertracing.io/docs/2.22/deployment/frontend-ui/#search-page) includes service, time-range, and minimum/maximum duration parameters. Use those filters to find candidates; use an exemplar when available to navigate to a particular observation's trace. Neither route guarantees that the trace was retained or that it explains the broader anomaly.
 
 > **Stop and think:** What would let you associate the timeout log with the slow span? After establishing that association, what additional evidence would distinguish connection-pool waiting from slow database execution?
 
@@ -288,7 +280,7 @@ Every span in the resulting tree shares the same `trace_id` and is linked to its
 | Identifies which service owns which slice of latency | Almost always requires sampling |
 | Auto-discovers service-to-service dependencies | Relies on disciplined header propagation |
 | Pinpoints specific failed or slow requests | Instrumentation effort is non-trivial |
-| Surfaces serial execution that should be parallel | Hard to set up correctly the first time |
+| Surfaces serial execution to investigate for possible parallelism | Hard to set up correctly the first time |
 
 ### 3.5 When to Use Traces
 
@@ -375,7 +367,7 @@ The diagram uses `abc-123` as a shortened teaching identifier. Querying a real t
 A latency histogram can estimate a percentile but does not enumerate the requests behind it. [Prometheus documents exemplars](https://prometheus.io/docs/prometheus/latest/feature_flags/#exemplars-storage) as references to data outside the metrics, commonly trace IDs. An exemplar links a particular observation to additional context; it is not necessarily representative of the percentile or population. The following shortened ID and values are illustrative OpenMetrics exposition, not captured output.
 
 ```text
-# Prometheus Exemplar format:
+# Illustrative OpenMetrics exemplar:
 http_request_duration_seconds_bucket{path="/checkout",le="0.5"} 12483 # {trace_id="abc-123"} 0.48 1705320735
 ```
 
@@ -388,7 +380,7 @@ The following synthetic workflow illustrates navigation. Its final step is a hyp
 ```mermaid
 graph TD
     A["1. ALERT (Metrics)<br/>Error rate above 1% for /api/checkout"] --> B["2. SCOPE (Metrics)<br/>Break down by region, version<br/>Errors concentrated in US-West, v2.3.1"]
-    B --> C["3. SAMPLE (Traces via Exemplar)<br/>Click exemplar in p99 histogram<br/>Trace abc-123 shows timeout to payment service"]
+    B --> C["3. SAMPLE (Trace search)<br/>Search retained error traces in this scope<br/>Trace abc-123 shows timeout to payment service"]
     C --> D["4. DETAIL (Logs)<br/>Filter logs by trace_id=abc-123<br/>'Connection refused: payment-db-03.us-west'"]
     D --> E["5. TEST HYPOTHESIS<br/>Was payment-db-03 under maintenance?<br/>Did failover engage as expected?"]
 ```
@@ -408,53 +400,37 @@ The five steps — alert, scope, sample, detail, test — provide a starting pat
 >
 > Record transitions where context is lost or matching data cannot be retrieved. Prioritize fixes using observed exercise results; multiple clicks alone do not prove an instrumentation defect or quantify incident cost.
 
-> **Decision exercise: a link is not a diagnosis**
->
-> Synthetic inputs: an exemplar references a trace that is no longer retained; a timeout log has a trace ID; another slow trace contains a long database-client span. Decide what each observation permits you to conclude before proposing a fix. No incident outcome or financial impact is assumed.
->
-> | Observation | Defensible next step | Conclusion to avoid |
-> |-------------|-----------------------|---------------------|
-> | Exemplar target is absent | Check trace sampling, export, and retention | The request never happened |
-> | Timeout log carries a trace ID | Retrieve matching spans if retained | This timeout explains all slow requests |
-> | Database-client span is long | Inspect pool-wait instrumentation and database telemetry | Increasing the connection pool must fix it |
->
-> Success means identifying the missing evidence and testing a hypothesis. [OpenTelemetry's sampling guidance](https://opentelemetry.io/docs/concepts/sampling/#head-sampling) explains why a head-sampling decision cannot use the request's eventual outcome. A correlation contract should therefore include what is retained and what may be missing, not just which identifiers exist.
-
 ### 4.5 Worked Evidence Packet: Which Timeout Belongs Here?
 
-Use this deliberately small synthetic packet to practice a join before interpreting its meaning. All durations are invented inputs in milliseconds, measured relative to one request's start. The labels `T1` and `T2` stand for distinct trace IDs; they are not valid wire-format identifiers. No live service, incident, or successful remediation is represented.
+Use this deliberately small synthetic packet to practice a join before interpreting its meaning. Start and end offsets are invented milliseconds relative to the request's start. The labels `T1` and `T2` stand for distinct trace IDs; they are not valid wire-format identifiers. No live service, incident, or successful remediation is represented. Assume a histogram observation of 900 milliseconds carries an exemplar referencing `T1`. Its retained parent span also lasts 900 milliseconds. Two instrumented child operations occur sequentially: acquiring a database connection takes 700 milliseconds, then executing a query takes 100 milliseconds. Two logs occur in the same dashboard window, but only one belongs to this request.
 
-Assume a histogram observation of 900 milliseconds carries an exemplar referencing `T1`. Its retained parent span also lasts 900 milliseconds. Two instrumented child operations occur sequentially: acquiring a database connection takes 700 milliseconds, then executing a query takes 100 milliseconds. Two logs occur in the same dashboard window, but only one belongs to this request.
-
-The following local check makes the association and arithmetic reproducible without a telemetry backend. Run it from this repository root using its Python environment. The assertions verify the supplied records only; they do not validate an exporter, a dashboard integration, or any production diagnosis.
+The following local check makes the association and arithmetic reproducible without a telemetry backend. Run it in a shell with Python 3 installed; it needs no packages or repository checkout. The assertions verify the supplied records only, not an exporter, dashboard integration, or production diagnosis.
 
 ```bash
-.venv/bin/python - <<'PY'
+python3 - <<'PY'
 observation = {"trace_id": "T1", "duration_ms": 900}
-spans = {"T1": {"total_ms": 900, "pool_wait_ms": 700, "query_ms": 100}}
+spans = {"T1": {"parent": (0, 900), "acquire": (0, 700), "query": (700, 800)}}
 logs = [{"trace_id": "T1", "event": "connection_acquired"}, {"trace_id": "T2", "event": "query_timeout"}]
-matched = [log for log in logs if log["trace_id"] == observation["trace_id"]]
 span = spans[observation["trace_id"]]
-unattributed = span["total_ms"] - span["pool_wait_ms"] - span["query_ms"]
-assert matched == [{"trace_id": "T1", "event": "connection_acquired"}]
-assert unattributed == 100
-print(matched[0]["event"], unattributed)
+(p0, p1), (a0, a1), (q0, q1) = span["parent"], span["acquire"], span["query"]
+assert observation["duration_ms"] == p1 - p0
+assert p0 <= a0 <= a1 <= q0 <= q1 <= p1, "Intervals must be sequential and contained"
+acquire_ms, query_ms = a1 - a0, q1 - q0
+unaccounted_ms = p1 - p0 - acquire_ms - query_ms
+assert [log for log in logs if log["trace_id"] == observation["trace_id"]] == [{"trace_id": "T1", "event": "connection_acquired"}]
+print(f"acquire={acquire_ms} query={query_ms} unaccounted={unaccounted_ms}")
 PY
 ```
 
-The expected output is `connection_acquired 100`. Start by explaining the join: the exemplar names `T1`, the retained spans are indexed by that identifier, and the matching log carries it too. The timeout belongs to `T2`. Its presence in the same window does not turn it into an explanation for `T1`.
+The expected output is `acquire=700 query=100 unaccounted=100`. Start by explaining the join: the exemplar names `T1`, the retained spans are indexed by that identifier, and the matching log carries it too. The timeout belongs to `T2`. Its presence in the same window does not turn it into an explanation for `T1`.
 
-Next, interpret the measured intervals under the stated assumptions. Connection acquisition accounts for 700 of the request's 900 milliseconds, while the query accounts for 100. This supports investigating waiting before execution for this request. It does not support calling the query timeout its cause, because that log was excluded by the identifier match.
+Next, interpret the measured intervals under the stated assumptions. Connection acquisition accounts for 700 of the request's 900 milliseconds, while the query accounts for 100. This supports investigating waiting before execution for this request. It does not support calling the query timeout its cause, because that log was excluded by the identifier match. The remaining 100 milliseconds are unattributed by these child spans. Do not subtract child durations blindly in another trace: overlapping child operations would make that arithmetic misleading. Here the sequential, non-overlapping assumption makes subtraction valid. The remainder could contain local processing or uninstrumented waiting; this packet cannot distinguish them.
 
-The remaining 100 milliseconds are unattributed by these child spans. Do not subtract child durations blindly in another trace: overlapping child operations would make that arithmetic misleading. Here the sequential, non-overlapping assumption makes subtraction valid. The remainder could contain local processing or uninstrumented waiting; this packet cannot distinguish them.
+A pool-wait hypothesis now deserves a targeted check. Inspect how the acquisition span is defined, then seek pool occupancy and pending-acquisition measurements over the same interval. A long acquisition operation does not by itself show why capacity was unavailable. Connections could be held by other work, or acquisition instrumentation could include connection establishment. A database-execution hypothesis needs different evidence. Inspect query spans from other affected requests and corresponding database telemetry rather than borrowing `T2`'s timeout. Compare a retained faster request with similar service and operation attributes. If the difference lies in execution rather than acquisition, revise the hypothesis instead of choosing a larger pool automatically.
 
-A pool-wait hypothesis now deserves a targeted check. Inspect how the acquisition span is defined, then seek pool occupancy and pending-acquisition measurements over the same interval. A long acquisition operation does not by itself show why capacity was unavailable. Connections could be held by other work, or acquisition instrumentation could include connection establishment.
+Now consider coverage. A valid join establishes an association among retained records, not the proportion of requests with this behavior. The histogram describes a population; this exemplar names one observation. [Head sampling](https://opentelemetry.io/docs/concepts/sampling/#head-sampling) cannot ensure that all eventual errors are retained. Check sampling and retention before generalizing; an expired `T1` leaves a reference whose target cannot be inspected.
 
-A database-execution hypothesis needs different evidence. Inspect query spans from other affected requests and corresponding database telemetry rather than borrowing `T2`'s timeout. Compare a retained faster request with similar service and operation attributes. If the difference lies in execution rather than acquisition, revise the hypothesis instead of choosing a larger pool automatically.
-
-Now consider coverage. A valid join establishes an association among these retained records, not the proportion of requests with this behavior. The histogram describes a population; this exemplar names one observation. Check additional samples and sampling policy before generalizing. If `T1` has expired, the exemplar remains a reference whose target cannot be inspected.
-
-For transfer, change the matching log's identifier to `T2` and predict which assertion fails before rerunning. Then remove `T1` from the span mapping and explain why lookup failure is not proof of a healthy request. Success means separating a broken join, absent evidence, and evidence contradicting a hypothesis, while stating what you would measure next.
+For transfer, independently change the matching log's identifier to `T2` (expect `AssertionError`), remove `T1` from the mapping (expect `KeyError`), set the observation to 1500 milliseconds (expect `AssertionError`), and overlap the intervals by starting the query at 600 (expect `AssertionError`). These failures distinguish broken joins, absent evidence, inconsistent measurements, and invalid arithmetic assumptions; none proves that a request was healthy. Finally, replace the acquisition interval with `(0, 100)` and the query interval with `(100, 800)`. This valid mutation prints `acquire=100 query=700 unaccounted=100`, shifting attention toward execution rather than acquisition. Explain which database measurements you would seek next. The unchanged request total and matching log cannot decide between these hypotheses; the operation timings provide the distinguishing evidence.
 
 ---
 
@@ -464,7 +440,7 @@ For transfer, change the matching log's identifier to `T2` and predict which ass
 
 The three-pillar framing is useful for choosing signals, but it is insufficient as a purchasing checklist. Evaluate how a proposed stack preserves context across services, retrieves related records, and exposes missing data. Separate products can support those capabilities; a unified interface still needs correct instrumentation, propagation, and retention. The exercises above test those requirements without assuming a particular vendor arrangement causes outages.
 
-The critique's positive claim is more interesting than the negative one. The argument is that systems do not really emit "logs" or "metrics" or "traces"; they emit **events** — structured records of something that happened — and the three pillars are simply three different *projections* of the same underlying event stream. View an event in isolation and it is a log. Aggregate events over time into counts and percentiles and they are metrics. Connect events together by trace ID and they are a trace. The pillars are lenses, not data types, and treating them as data types creates the silos the lenses were supposed to eliminate.
+A related design approach starts with **events** — structured records of work — and derives different views from them. An event can supply log detail, measurements for aggregation, and trace context linking related operations. These projections still require explicit instrumentation and processing; storing an event does not automatically construct all three signals. Evaluate whether each view answers the intended question and whether its correlation fields survive processing.
 
 ### 5.2 Events-Based Observability
 
@@ -527,10 +503,10 @@ The benefits compound: instrumentation is vendor-neutral so you can change backe
 | High-cardinality metric labels | Storage explodes, query latency collapses, Prometheus OOM-kills itself | Move identifiers (`user_id`, `request_id`) to logs and trace attributes; metrics get bounded labels only |
 | Unstructured logs | Cannot query, cannot filter, cannot correlate without regex archaeology | JSON or logfmt output with consistent field names across services |
 | No `trace_id` in log lines | Cannot pivot from a trace to its logs or vice versa | Configure your logger to read the active trace context and inject `trace_id` automatically |
-| Three siloed tools, no shared IDs | Manual timestamp correlation during incidents adds 60+ minutes to MTTR | Use exemplars, shared `trace_id`, and a unified UI that deep-links between signals |
+| Three siloed tools, no shared IDs | Timestamp guesses may not identify the matching request | Use exemplars, shared `trace_id`, and tested links between signals |
 | Probabilistic sampling on rare errors | Critical failures are statistically dropped before they reach the trace store | Use tail-based sampling (or hybrid) with always-keep-errors and always-keep-slow rules |
 | Logging every request body | Storage cost and PII exposure both balloon; signal-to-noise drops to nothing | Log meaningful events with structured fields; sample debug logs; never log secrets |
-| Treating pillars as products, not signals | Three teams, three vendors, three query languages, no correlation | Adopt OpenTelemetry and design the instrumentation contract before picking backends |
+| Treating pillars as products, not signals | Product count is taken as proof of correlation | Test propagation, retrieval, and navigation across the chosen tools |
 
 ---
 
@@ -707,8 +683,8 @@ Design the joins between signals for this checkout service. For each transition,
 
 | Correlation Need | Solution |
 |------------------|----------|
-| Find logs for a known trace | Inject `trace_id` into every log line via the logger's MDC/context |
-| Find traces for a metric spike | Enable exemplars on every histogram |
+| Find logs for a known trace | Record active trace context in request-scoped logs; verify the returned ID |
+| Find traces for a metric spike | Enable exemplars on useful histograms; check target retention |
 | Find metrics for a time window | Query by timestamp range and filter by label |
 | | |
 
@@ -717,7 +693,7 @@ Design the joins between signals for this checkout service. For each transition,
 - [ ] At least 5 meaningful log events defined with fields
 - [ ] At least 4 metrics with appropriate types and label sets
 - [ ] Trace structure with at least 4 spans and a stated timing budget
-- [ ] Correlation strategy explicitly defined for all three pivot directions
+- [ ] All three pivot directions include matching-record checks and missing-target explanations
 
 ### Model Answer
 
@@ -780,13 +756,13 @@ Two further design notes: if `send_confirmation` runs after the response, exclud
 
 | Correlation Need | Solution |
 |------------------|----------|
-| Find logs for a known trace | Inject `trace_id` into every log line via the logger's MDC / context (OpenTelemetry's logs SDK handles this automatically when correctly wired). |
+| Find logs for a known trace | Record active trace context in request-scoped logs; verify returned trace/span IDs and service. An empty result leaves the event unknown. |
 | Find traces for a metric spike | Enable Prometheus exemplars on `checkout_duration_seconds` and `payment_gateway_latency_seconds`; configure Grafana panels to render the exemplars as clickable trace links. |
 | Find metrics for a time window | Query by timestamp range filtered by `service`, `region`, and `deploy_version` labels so the metric view matches the trace view. |
 | **Compare releases when investigating a regression** | Record release metadata in metrics and spans; compare affected requests and test whether the deployment explains the change. |
 | **Find the customer affected by a known failed trace** | Pull `user_id` from the root span's tags or from any log line carrying that `trace_id`; never put it on a metric. |
 
-This plan satisfies the original success criteria, but more importantly it satisfies the underlying question those criteria are testing for: **for every signal you produce, can you state which other signals it lets you pivot to, and how?** If yes, you have observability. If no, you have three lakes and a lot of dashboards.
+Validate each pivot: compare returned trace IDs with exemplar references, log IDs with selected spans, and metric time windows and labels with the requested scope. Missing trace or log targets require checking sampling, export, and retention; they do not show that no failure occurred. For the metric pivot, confirm that the selected service and release labels actually exist and that the query covers the request's time window. An empty series differs from a recorded zero; do not interpret missing telemetry as successful requests. A query without matching dimensions leaves population comparison unresolved. Record these limits alongside the navigation steps.
 
 ---
 ## Sources
