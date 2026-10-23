@@ -76,7 +76,7 @@ flowchart LR
         M1 -.-> C1[C1] -.-> C2[C2]
     end
 
-    classDef discarded fill:#f9f9f9,stroke:#999,stroke-dasharray: 5 5,color:#999;
+    classDef discarded fill:#f9f9f9,stroke:#999,stroke-dasharray: 5 5,color:#555;
     class C1,C2 discarded;
 ```
 
@@ -298,7 +298,7 @@ flowchart LR
         M2_A --> A1_A["A1'"] --> A2_A["A2'"]
     end
 
-    classDef ghost fill:#f9f9f9,stroke:#999,stroke-dasharray: 5 5,color:#999;
+    classDef ghost fill:#f9f9f9,stroke:#999,stroke-dasharray: 5 5,color:#555;
     class D1_B,D2_B ghost;
 ```
 

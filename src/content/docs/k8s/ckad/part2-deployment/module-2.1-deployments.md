@@ -204,7 +204,7 @@ graph TD
 
     classDef deploy fill:#326ce5,stroke:#fff,stroke-width:2px,color:#fff;
     classDef rs fill:#2b3a42,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef pod fill:#68a063,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef pod fill:#68a063,stroke:#fff,stroke-width:2px,color:#111;
     classDef terminating fill:#e53935,stroke:#fff,stroke-width:2px,color:#fff,stroke-dasharray: 5 5;
 
     class D deploy;
