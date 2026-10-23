@@ -106,7 +106,7 @@ sequenceDiagram
         Server->>GPU: schedule prefill, decode, and KV-cache operations
         GPU-->>Server: return generated tokens and timing behavior
         Server-->>Client: stream tokens until each request finishes
-        Note over Client,Server: TPOT = per-request mean decode speed; ITL = per-response token gap; p99 ITL flags stalls within the response
+        Note over Client,Server: TPOT = per-request mean decode speed#59; ITL = per-response token gap#59; p99 ITL flags stalls within the response
         Client->>Report: store TTFT, TPOT, throughput, percentiles, and metadata
     end
     Engineer->>Report: compare measured results with bandwidth prediction

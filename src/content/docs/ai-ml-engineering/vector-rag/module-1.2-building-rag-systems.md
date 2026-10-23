@@ -59,11 +59,11 @@ The RAG pipeline operates as an orchestration bridge between the user's query an
 
 ```mermaid
 flowchart TD
-    User[User Query: "How do I configure authentication in our app?"] --> Embed[Embed: Convert query to vector]
+    User["User Query: #quot;How do I configure authentication in our app?#quot;"] --> Embed[Embed: Convert query to vector]
     Embed --> Search[Search: Vector Database]
     Search -->|176K docs| Retrieved[Retrieved Context: <br>- auth.md: Configure JWT tokens...<br>- security.md: Best practices for...<br>- api.md: Authentication endpoints...]
     Retrieved --> Generate[Generate: LLM creates answer from context]
-    Generate --> Answer[Answer: "To configure authentication:<br>1. Set JWT_SECRET in .env<br>2. Configure auth middleware in app.py<br>3. See auth.md for complete guide..."]
+    Generate --> Answer["Answer: #quot;To configure authentication:<br>1. Set JWT_SECRET in .env<br>2. Configure auth middleware in app.py<br>3. See auth.md for complete guide...#quot;"]
 ```
 
 > **Stop and think**: If the embedding model used during retrieval is different from the embedding model used during indexing, what will happen to the search results?
@@ -76,13 +76,13 @@ A production RAG system divides cleanly into three phases. **Indexing** runs off
 
 ```mermaid
 flowchart TD
-    subchart Phase 1: Indexing Offline - done once per document update
+    subgraph Phase 1: Indexing Offline - done once per document update
         D[Documents raw] --> C[Chunk] --> E[Embed] --> S[Store in Vector DB]
     end
-    subchart Phase 2: Retrieval Online - per query
+    subgraph Phase 2: Retrieval Online - per query
         Q[Query] --> E2[Embed] --> S2[Search Vector DB] --> T[Top-K Documents]
     end
-    subchart Phase 3: Generation Online - per query
+    subgraph Phase 3: Generation Online - per query
         CTX[Context + Query] --> B[Build Prompt] --> LLM[LLM Generate] --> A[Answer]
     end
 ```

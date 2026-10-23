@@ -215,7 +215,7 @@ flowchart TD
     classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
     A["1. Create ServiceAccount\n<code>kubectl create serviceaccount my-app-sa</code>"] --> B["2. Assign to Pod\n<code>spec:</code>\n<code>  serviceAccountName: my-app-sa</code>"]
     B --> C["3. Token Mounted Automatically\n<code>/var/run/secrets/kubernetes.io/serviceaccount/</code>\n<code>├── token     ← JWT token</code>\n<code>├── ca.crt    ← API CA cert</code>\n<code>└── namespace ← Pod namespace</code>"]
-    C --> D["4. Pod Uses Token for API Access\n<code>curl -H \"Authorization: Bearer $(cat /var/run/...)\"</code>\n<code>https://kubernetes/api/v1/...</code>"]
+    C --> D["4. Pod Uses Token for API Access\n<code>curl -H #quot;Authorization: Bearer $(cat /var/run/...)#quot;</code>\n<code>https://kubernetes/api/v1/...</code>"]
 ```
 
 Notice that the diagram does not include permission creation. That absence is deliberate. A token proves identity, but it does not grant the right to list Pods, read Secrets, or patch Deployments. Permissions are separate authorization rules, and keeping that separation clear will save time when you face a `403 Forbidden` response during the CKAD exam.

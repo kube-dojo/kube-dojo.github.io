@@ -62,7 +62,7 @@ flowchart TD
     end
     C1 -->|Syscalls| Kernel
     C2 -->|Syscalls| Kernel
-    C3 -->|[Exploit] Malicious Syscalls| Kernel
+    C3 -->|"[Exploit] Malicious Syscalls"| Kernel
 ```
 
 > **Stop and think**: Standard containers share the host kernel directly -- all 300+ syscalls go straight to the kernel. gVisor intercepts these syscalls and reimplements them in userspace. What does this mean for an attacker trying to exploit a kernel vulnerability from inside a gVisor-sandboxed container?

@@ -110,7 +110,7 @@ flowchart TD
     end
 
     subgraph Visualization
-        V[Grafana Dashboards | Evidently | Custom UI]
+        V["Grafana Dashboards | Evidently | Custom UI"]
     end
 
     ID --> ML

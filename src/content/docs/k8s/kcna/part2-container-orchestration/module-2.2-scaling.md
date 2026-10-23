@@ -276,7 +276,7 @@ flowchart TD
 
         subgraph Scale Down
             F[Node has low utilization for X minutes] --> G(CA checks if Pods can move elsewhere)
-            G --> H(Drains node (moves Pods))
+            G --> H("Drains node (moves Pods)")
             H --> I(Removes node from cloud)
         end
 
