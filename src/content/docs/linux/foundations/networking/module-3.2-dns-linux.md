@@ -58,10 +58,10 @@ The first habit of DNS debugging is to ask which resolver path produced the symp
 graph TD
     A["Application: #quot;Connect to api.example.com#quot;"] --> B{1. Check /etc/hosts};
     B -- Not found --> C{2. Check /etc/resolv.conf for DNS server};
-    B -- Found --> E[Application connects to 192.168.1.10];
+    B -- Found --> E1[Application connects to 192.168.1.10];
     C --> D["3. Query DNS server (10.96.0.10)"];
     D --> F[4. DNS server returns: 93.184.216.34];
-    F --> E[5. Application connects to 93.184.216.34];
+    F --> E2[5. Application connects to 93.184.216.34];
 
     subgraph etc_hosts_lookup ["/etc/hosts content"]
         H1["127.0.0.1 localhost"]
