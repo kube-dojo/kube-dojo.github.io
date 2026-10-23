@@ -75,12 +75,12 @@ Hypothetical scenario: the following table is an illustrative planning model, no
 |--------|---------------|-----------------|
 | Compute (200 nodes) | $1,200,000 | $180,000 (amortized 4yr) |
 | Storage (100TB) | $240,000 | $40,000 (Ceph, amortized) |
-| Network egress | $120,000-$220,000 (provider/tier dependent) | $12,000-$40,000 (contract dependent) |
+| Network egress | \$120,000-\$220,000 (provider/tier dependent) | \$12,000-\$40,000 (contract dependent) |
 | Managed services | $360,000 | $0 (self-managed) |
 | Additional staff | $0 | $400,000 (2 SREs) |
 | Colocation | $0 | $144,000 |
-| Migration and dual-run reserve | $0 | $150,000-$300,000 (first year only) |
-| **Total** | **$1,920,000-$2,020,000** | **$926,000-$1,064,000 first year** |
+| Migration and dual-run reserve | \$0 | \$150,000-\$300,000 (first year only) |
+| **Total** | **\$1,920,000-\$2,020,000** | **\$926,000-\$1,064,000 first year** |
 
 This model is intentionally conservative because a misleading first-year spreadsheet is worse than no spreadsheet. A team that ignores the dual-run period will understate cost exactly when the project consumes the most labor. A team that ignores spares will discover that one failed storage node can turn a planned maintenance window into a capacity emergency. A team that treats staff as "already paid for" hides the fact that every migration hour comes from somewhere: reliability improvements, security work, product enablement, incident response, or technical debt reduction.
 
@@ -521,12 +521,12 @@ Use the repository's current Kubernetes target, Kubernetes 1.35, as the compatib
 ## Quiz
 
 ### Question 1
-Hypothetical scenario: your company spends roughly $800K/year on a steady 50-node cloud Kubernetes estate. A first-pass on-prem estimate shows $600K/year in hardware, colocation, support, and bandwidth, plus two additional dedicated SRE hires at $200K each. Based on these projections, should you recommend proceeding with full bare-metal repatriation?
+Hypothetical scenario: your company spends roughly \$800K/year on a steady 50-node cloud Kubernetes estate. A first-pass on-prem estimate shows \$600K/year in hardware, colocation, support, and bandwidth, plus two additional dedicated SRE hires at \$200K each. Based on these projections, should you recommend proceeding with full bare-metal repatriation?
 
 <details>
 <summary>Answer</summary>
 
-No. The apparent infrastructure reduction disappears once staffing is included, because $600K plus $400K in added SRE cost becomes $1M/year before migration labor, dual-run cost, and risk reserve. The better first step is cloud optimization: committed-use discounts, rightsizing, storage lifecycle cleanup, managed-service audit, and workload consolidation. Full repatriation becomes plausible only when the fixed costs of people, facilities, and operational ownership are absorbed by a large and steady workload.
+No. The apparent infrastructure reduction disappears once staffing is included, because \$600K plus \$400K in added SRE cost becomes \$1M/year before migration labor, dual-run cost, and risk reserve. The better first step is cloud optimization: committed-use discounts, rightsizing, storage lifecycle cleanup, managed-service audit, and workload consolidation. Full repatriation becomes plausible only when the fixed costs of people, facilities, and operational ownership are absorbed by a large and steady workload.
 </details>
 
 ### Question 2

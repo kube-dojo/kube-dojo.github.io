@@ -158,7 +158,7 @@ flowchart LR
 | **Bandwidth** | 1, 10, 100, 400 Gbps | 50 Mbps - 100 Gbps | 10, 100, 400 Gbps dedicated (LAG up to 8×400G); Partner up to 50 Gbps |
 | **Latency** | Low single-digit ms typical within metro | Low single-digit ms typical within metro | Low single-digit ms typical within metro |
 | **Setup time** | Weeks (physical provisioning) | Weeks (physical provisioning) | Weeks (physical provisioning) |
-| **Monthly cost (10G)** | Order-of-magnitude ~$1,000–$3,000/port (verify current pricing) | Order-of-magnitude ~$3,000–$6,000/port (verify current pricing) | Order-of-magnitude ~$1,500–$2,500/port (verify current pricing) |
+| **Monthly cost (10G)** | Order-of-magnitude ~\$1,000–\$3,000/port (verify current pricing) | Order-of-magnitude ~\$3,000–\$6,000/port (verify current pricing) | Order-of-magnitude ~\$1,500–\$2,500/port (verify current pricing) |
 
 Pricing in the table is intentionally approximate because interconnect tariffs change by region, provider, and commitment term. Always verify against [AWS Direct Connect pricing](https://aws.amazon.com/directconnect/pricing/), Microsoft cost planning docs, and Google Cloud Interconnect pricing before budgeting. The architectural question is not "which vendor is cheapest per gigabit." The question is whether sustained cross-environment traffic and latency SLOs justify weeks of lead time and a physical port you cannot spin up in an afternoon. Factor in cross-connect fees at the colocation facility, redundant ports for HA, and engineering time to maintain BGP sessions—the port monthly rate is rarely the total cost of ownership.
 

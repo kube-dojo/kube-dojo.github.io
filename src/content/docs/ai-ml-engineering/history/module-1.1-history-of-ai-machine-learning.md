@@ -169,7 +169,7 @@ Funding: $7,500 awarded by the Rockefeller Foundation
 Output: The field of "Artificial Intelligence" was born
 ```
 
-The funding detail is worth getting right because it keeps the origin story proportional. McCarthy requested $13,500 for a two-month study, while Rockefeller's Robert Morison offered $7,500 for a shorter five-week gathering. The important thing about Dartmouth is not that it solved AI; it clearly did not. Its importance is that it gathered scattered work on logic, search, neural nets, automata, language, and abstraction under one research identity. Naming a field changes funding, conferences, hiring, textbooks, and standards of proof. It also creates a temptation to promise more coherence than the underlying science can yet provide.
+The funding detail is worth getting right because it keeps the origin story proportional. McCarthy requested \$13,500 for a two-month study, while Rockefeller's Robert Morison offered \$7,500 for a shorter five-week gathering. The important thing about Dartmouth is not that it solved AI; it clearly did not. Its importance is that it gathered scattered work on logic, search, neural nets, automata, language, and abstraction under one research identity. Naming a field changes funding, conferences, hiring, textbooks, and standards of proof. It also creates a temptation to promise more coherence than the underlying science can yet provide.
 
 ### The Name "Artificial Intelligence"
 
@@ -1482,7 +1482,7 @@ For further reading beyond this module, use Russell and Norvig's *Artificial Int
 - [Turing, "Computing Machinery and Intelligence"](https://courses.cs.umbc.edu/471/papers/turing.pdf) — text of the 1950 paper that introduced the imitation-game framing.
 - [Shannon, "Programming a Computer for Playing Chess"](https://www.computerhistory.org/chess/doc-431614f453dde/) — Computer History Museum record for Shannon's 1950 chess-programming paper.
 - [McCarthy, Minsky, Rochester, and Shannon, Dartmouth proposal](https://dl.acm.org/doi/10.1609/aimag.v27i4.1904) — ACM-hosted record of the 1955 proposal that introduced the artificial-intelligence research label.
-- [Rockefeller Archive Center, "A Roomful of Brains"](https://resource.rockarch.org/story/a-roomful-of-brains-early-advances-in-computer-science-and-artificial-intelligence/) — archive-backed account of the Dartmouth proposal's requested $13,500 and Rockefeller's $7,500 five-week offer.
+- [Rockefeller Archive Center, "A Roomful of Brains"](https://resource.rockarch.org/story/a-roomful-of-brains-early-advances-in-computer-science-and-artificial-intelligence/) — archive-backed account of the Dartmouth proposal's requested \$13,500 and Rockefeller's \$7,500 five-week offer.
 - [Cornell, "Professor's perceptron paved the way for AI"](https://news.cornell.edu/stories/2019/09/professors-perceptron-paved-way-ai-60-years-too-soon) — university history source for Rosenblatt, the perceptron, and the public claims around it.
 - [Weizenbaum, "ELIZA"](https://dl.acm.org/doi/10.1145/365153.365168) — ACM record for the 1966 ELIZA paper and its pattern-matching conversation mechanism.
 - [Grudin, "A Moving Target: The Evolution of Human-Computer Interaction"](https://www.microsoft.com/en-us/research/wp-content/uploads/2017/01/HCIhandbook3rd.pdf) — source for the Life magazine Minsky attribution and the later misquotation caveat.

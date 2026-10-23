@@ -28,7 +28,7 @@ After completing this module, you will be able to:
 
 ## Why This Module Matters
 
-A platform team at a growing SaaS company had a quiet reliability week and a very loud finance meeting. Their EKS clusters had no active incidents, the on-call rotation was calm, and customer-facing latency looked normal. The monthly cloud bill still climbed from $38,000 to $61,000, and nobody could explain which product, team, or workload caused the increase.
+A platform team at a growing SaaS company had a quiet reliability week and a very loud finance meeting. Their EKS clusters had no active incidents, the on-call rotation was calm, and customer-facing latency looked normal. The monthly cloud bill still climbed from \$38,000 to \$61,000, and nobody could explain which product, team, or workload caused the increase.
 
 The first argument was about ownership. Finance saw a large compute line item tagged only as `eks-platform`, product engineering said the platform team owned the clusters, and the platform team said application teams owned their Pods. Everyone was partly right, but nobody had the allocation detail needed to act. A single worker node can run Pods from five teams, and a cloud bill usually charges for the node, not the individual Pod.
 
