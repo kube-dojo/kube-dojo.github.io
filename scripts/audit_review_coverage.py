@@ -116,11 +116,11 @@ def _normalize_not_expected(
 
 
 def _lane_satisfied(values: dict[str, str], chapter_num: int, lane: str) -> bool:
-    if all(value == "n/a" for value in values.values()):
-        return True
+    if lane not in {"research", "prose"}:
+        return False
     if lane == "prose":
         # Prose cross-family rule: any two distinct families reviewed.
-        return sum(1 for value in values.values() if value == "done") >= 2
+        return sum(values.get(name) == "done" for name in PROSE_FIELDS) >= 2
     expected = _expected_lane_fields(chapter_num, lane)
     return all(values.get(field_name) == "done" for field_name in expected)
 
@@ -189,76 +189,19 @@ def _apply_comment_markers(coverage: ChapterCoverage, lane: str, comments: list[
         expected = _expected_lane_fields(coverage.chapter_num, lane)
         coverage.research = _normalize_not_expected(coverage.research, expected, marker_seen)
     else:
-        # Prose lane: any unfired marker is "n/a" (not "pending"). The cross-family
-        # rule is "any two distinct families reviewed", so families that did not
-        # review this chapter are correctly recorded as not-applicable.
+        # Missing comments are not evidence; retain markers from earlier PRs.
         coverage.prose = {
-            field_name: ("done" if field_name in marker_seen else "n/a")
+            field_name: ("done" if coverage.prose[field_name] == "done" else "pending")
             for field_name in PROSE_FIELDS
         }
 
 
-def _status_text_hints(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8").lower()
-    except OSError:
-        return ""
-
-
 def _offline_seed(chapters: list[Path]) -> dict[int, ChapterCoverage]:
-    """Conservative fallback used only when GitHub comments are unavailable."""
+    """Unavailable comments leave coverage pending, regardless of status labels."""
     coverages: dict[int, ChapterCoverage] = {}
-    fully_reviewed = {16, *range(38, 50)}
-    no_research_pr = set(range(11, 15))
     for path in chapters:
         chapter_num = _chapter_num_from_path(path)
         coverage = ChapterCoverage(chapter_num, path.parent.name, source="offline")
-        text = _status_text_hints(path)
-
-        if chapter_num in no_research_pr:
-            coverage.research = {name: "n/a" for name in RESEARCH_FIELDS}
-        elif chapter_num in fully_reviewed:
-            coverage.research = {
-                "claude_anchor": "done",
-                "gemini_gap": "done",
-                "codex_anchor": "n/a",
-            }
-        elif "verdicts:" in text:
-            if "gemini:" in text:
-                coverage.research["gemini_gap"] = "done"
-            if "codex:" in text:
-                coverage.research["codex_anchor"] = "done"
-            if "claude:" in text:
-                coverage.research["claude_anchor"] = "done"
-            coverage.research = _normalize_not_expected(
-                coverage.research,
-                _expected_lane_fields(chapter_num, "research"),
-                {name for name, value in coverage.research.items() if value == "done"},
-            )
-        else:
-            coverage.research = _normalize_not_expected(
-                coverage.research,
-                _expected_lane_fields(chapter_num, "research"),
-                set(),
-            )
-
-        if chapter_num in fully_reviewed or "claude source-fidelity review approved" in text and (
-            "gemini narrative review approved" in text or "gemini prose" in text
-        ):
-            coverage.prose = {
-                "claude_source_fidelity": "done",
-                "gemini_prose_quality": "done",
-                "codex_prose_quality": "n/a",
-            }
-        elif "status: accepted" not in text:
-            coverage.prose = {name: "n/a" for name in PROSE_FIELDS}
-        else:
-            coverage.prose = _normalize_not_expected(
-                coverage.prose,
-                _expected_lane_fields(chapter_num, "prose"),
-                set(),
-            )
-
         coverages[chapter_num] = coverage
     return coverages
 
@@ -291,18 +234,13 @@ def _build_coverage(strict_gh: bool) -> dict[int, ChapterCoverage]:
         _apply_comment_markers(coverage, lane, comments)
 
     for coverage in coverages.values():
-        if not coverage.research_prs:
-            coverage.research = {name: "n/a" for name in RESEARCH_FIELDS}
-        else:
+        if coverage.research_prs:
             coverage.research = _normalize_not_expected(
                 coverage.research,
                 _expected_lane_fields(coverage.chapter_num, "research"),
                 {name for name, value in coverage.research.items() if value == "done"},
             )
-        if not coverage.prose_prs:
-            coverage.prose = {name: "n/a" for name in PROSE_FIELDS}
-        # Otherwise prose dict was already finalized by _apply_comment_markers
-        # (any unfired marker flipped to "n/a").
+        # Missing phase PRs retain the initial pending values.
     return coverages
 
 
