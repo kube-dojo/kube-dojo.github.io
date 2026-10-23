@@ -213,7 +213,7 @@ Drawing the system explicitly, even in a rough sketch, surfaces dynamics that ar
 ```mermaid
 flowchart TD
     Incoming["Incoming requests<br/>Rate: 100/s"] --> Queue["REQUEST QUEUE<br/>Stock Level: Currently 50 items<br/>Max Capacity: 1000 items<br/>(If max -> HTTP 503)"]
-    Queue -->|Processed requests<br/>Rate: 100/s (healthy)<br/>Rate: 40/s (DB slow)| Processed{"Outcome"}
+    Queue -->|"Processed requests<br/>Rate: 100/s (healthy)<br/>Rate: 40/s (DB slow)"| Processed{"Outcome"}
     
     Processed -->|95/s| Successes["Successes"]
     Processed -->|5/s| Failures["Failures"]
@@ -398,7 +398,7 @@ This sequence is cumulative. Stock-and-flow analysis identifies the candidate cu
 ```mermaid
 flowchart TD
     Incoming["New queries<br/>Rate: 50/s"] --> Pool["ACTIVE CONNECTIONS<br/>Stock: 200 (AT MAX!)<br/>Max: 200"]
-    Pool -->|Rate: 20/s (!!)| Completed["Completed queries"]
+    Pool -->|"Rate: 20/s (!!)"| Completed["Completed queries"]
     
     classDef stock fill:#d4e6f1,stroke:#2874a6,stroke-width:2px;
     class Pool stock;

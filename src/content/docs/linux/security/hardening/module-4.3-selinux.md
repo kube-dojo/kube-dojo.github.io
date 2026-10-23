@@ -83,7 +83,7 @@ Deny. Type enforcement does not care that the mode is world-readable. Expect an 
 
 ```mermaid
 flowchart TD
-    subgraph Type Enforcement
+    subgraph TypeEnforcement["Type Enforcement"]
         direction TB
         Process["Process Context: httpd_t"]
         File["File Context: httpd_sys_content_t"]
@@ -98,7 +98,7 @@ flowchart TD
     end
     
     Note["Access requires: DAC allows AND SELinux policy allows"]
-    Type Enforcement ~~~ Note
+    TypeEnforcement ~~~ Note
 ```
 
 The practical implication is that `chmod 777` is not a serious SELinux troubleshooting step. It can confirm that discretionary permissions are not the blocker, but it cannot authorize a process type that policy does not allow. A better investigation starts by comparing the source context of the process, the target context of the file or socket, and the object class being accessed. That comparison turns "SELinux is blocking me" into a specific question such as "may `httpd_t` read `admin_home_t:file`?"

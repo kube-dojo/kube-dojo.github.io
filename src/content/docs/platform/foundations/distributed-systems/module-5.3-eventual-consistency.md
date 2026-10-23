@@ -234,13 +234,13 @@ In quorum-based systems, consistency is not a binary switch but a continuous dia
 
 ```mermaid
 flowchart LR
-    subgraph Quorum Overlap W+R > N
+    subgraph Overlap["Quorum Overlap W+R > N"]
         W[Write] --> A1[Node A]
         W --> B1[Node B]
         A1 -.->|overlap| R[Read]
         B1 -.-> R
     end
-    subgraph No Guaranteed Overlap W+R <= N
+    subgraph NoOverlap["No Guaranteed Overlap W+R <= N"]
         W2[Write] --> A2[Node A]
         B2[Node B] -.->|no overlap| R2[Read]
     end

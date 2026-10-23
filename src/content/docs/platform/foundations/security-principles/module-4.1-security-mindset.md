@@ -280,7 +280,7 @@ quadrantChart
     title The Security-Usability Spectrum
     x-axis Low Usability --> High Usability
     y-axis Low Security --> High Security
-    quadrant-1 Goal: Max Security & Acceptable Usability
+    quadrant-1 "Goal: Max Security & Acceptable Usability"
     quadrant-2 High Security, Low Usability
     quadrant-3 Low Security, Low Usability
     quadrant-4 Low Security, High Usability

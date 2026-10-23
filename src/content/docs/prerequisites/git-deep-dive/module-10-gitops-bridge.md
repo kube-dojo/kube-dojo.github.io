@@ -304,7 +304,7 @@ graph TD
     subgraph Zero-Trust GitOps Pull Model
         Developer2[Developer] -->|Signed git push| GitRepo2[(Git Repository)]
         GitRepo2 -.->|Branch Protection| Validated[(Validated Source of Truth)]
-        Validated <--|git pull| Operator[GitOps Operator]
+        Operator[GitOps Operator] -->|git pull| Validated
         Operator -->|Reconciles| Cluster2((Kubernetes Cluster))
         Attacker2[Attacker] -.->|Cannot access| Operator
     end

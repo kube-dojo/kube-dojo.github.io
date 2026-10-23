@@ -56,18 +56,18 @@ The first habit of DNS debugging is to ask which resolver path produced the symp
 
 ```mermaid
 graph TD
-    A[Application: "Connect to api.example.com"] --> B{1. Check /etc/hosts};
+    A["Application: #quot;Connect to api.example.com#quot;"] --> B{1. Check /etc/hosts};
     B -- Not found --> C{2. Check /etc/resolv.conf for DNS server};
     B -- Found --> E[Application connects to 192.168.1.10];
     C --> D["3. Query DNS server (10.96.0.10)"];
     D --> F[4. DNS server returns: 93.184.216.34];
     F --> E[5. Application connects to 93.184.216.34];
 
-    subgraph etc_hosts_lookup [/etc/hosts content]
+    subgraph etc_hosts_lookup ["/etc/hosts content"]
         H1["127.0.0.1 localhost"]
         H2["192.168.1.10 api.example.com"]
     end
-    subgraph resolv_conf_content [/etc/resolv.conf content]
+    subgraph resolv_conf_content ["/etc/resolv.conf content"]
         R1["nameserver 10.96.0.10"]
         R2["search default.svc.cluster.local ..."]
     end
@@ -325,13 +325,13 @@ Kubernetes turns DNS from a host convenience into the primary service discovery 
 
 ```mermaid
 graph TD
-    P[Pod Query: "my-service.default.svc.cluster.local"] --> C(CoreDNS);
+    P["Pod Query: #quot;my-service.default.svc.cluster.local#quot;"] --> C(CoreDNS);
     C -- Cluster queries: *.cluster.local --> K[Answer from Kubernetes API];
     C -- External queries: *.* --> U[Forward to upstream DNS];
     K --> R["Returns: 10.96.45.123 (Service ClusterIP)"];
     U --> R;
 
-    subgraph CoreDNS_Server [CoreDNS (10.96.0.10)]
+    subgraph CoreDNS_Server ["CoreDNS (10.96.0.10)"]
         C
     end
 ```

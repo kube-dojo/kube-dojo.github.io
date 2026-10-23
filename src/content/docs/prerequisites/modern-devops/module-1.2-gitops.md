@@ -54,7 +54,7 @@ flowchart LR
     subgraph GitOps["GitOps (Pull-based)"]
         direction LR
         Dev2[Dev] --> Git2[Git]
-        Git2 <--|Pulls| Agent[GitOps Agent]
+        Agent[GitOps Agent] -->|Pulls| Git2
         Agent -->|Applies| K8s[Local Kubernetes API]
     end
 ```
