@@ -20,7 +20,7 @@ After completing this module, you will be able to apply complexity thinking to p
 1. **Distinguish** complicated and complex investigative approaches using evidence about component behavior and interactions, without treating a domain as a permanent system label
 2. **Analyze** how simple component interactions produce emergent behaviors that cannot be predicted from specifications alone
 3. **Design** observability that connects service symptoms with retry, queue, and resource interactions, and propose safeguards to test
-4. **Evaluate** checkout design choices against correctness requirements and dependency failure behavior, including the limits of proposed isolation and fallback mechanisms
+4. **Evaluate** service design choices, such as a checkout path, against correctness requirements and dependency failure behavior, including the limits of proposed isolation and fallback mechanisms
 
 ---
 

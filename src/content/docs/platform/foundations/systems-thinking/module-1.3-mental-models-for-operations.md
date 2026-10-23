@@ -17,7 +17,7 @@ sidebar:
 
 1. **Apply** the three core operational mental models — leverage points, stock-and-flow diagrams, and causal loop diagrams — to decisions during live incidents
 2. **Evaluate** which mental model best fits a given incident scenario and explain why others fall short
-3. **Diagnose** queue growth by comparing entries and completions over the same observation window, including simultaneous changes in both rates
+3. **Diagnose** queue growth by comparing entries and exits across a defined boundary over the same observation window, including simultaneous changes in both rates
 4. **Compare** competing hypotheses during incidents using structured mental models rather than intuition alone
 
 ---
@@ -184,7 +184,7 @@ flowchart TD
     class WaterLevel stock;
 ```
 
-This model is disarmingly trivial to describe and yet profoundly underutilized in operational practice. It explains why queue depths grow unboundedly, why memory fills up and triggers OOM kills, why connection pools exhaust, and why incidents cascade when a reinforcing loop amplifies an inflow. The insight that transforms bathtub thinking from obvious to operationally useful is recognizing that stocks, flows, and the relationships between them are what your monitoring dashboards are actually measuring—you are simply not accustomed to reading them through this lens. Queue depth is a stock. Request rate is an inflow. Processing rate is an outflow. Latency is the stock divided by the outflow rate. Every metric in your observability stack can be classified as a stock or a flow, and understanding which is which tells you what to watch when the system degrades.
+Stock-and-flow thinking helps explain accumulation: growing queues, occupied connections, or allocated memory. Define what enters and leaves each measured stock before interpreting its growth. Queue depth counts requests; arrival and departure rates count requests per unit time. Latency measures time and needs separate interpretation. [Little's law](https://web.mit.edu/urban_or_book/www/book/chapter4/4.4.html) relates average work in a system to average arrival rate and average time in that system. Use matching boundaries and long-run averages with finite limits. It does not turn an instantaneous queue-depth sample into an end-to-end latency measurement. Use the model to choose measurements and test explanations, rather than treating every telemetry signal as a stock or flow.
 
 A critical property of stock-and-flow systems is that **stocks change the time shape of flows**. A large stock acts as a buffer, absorbing fluctuations in inflow so that outflow can remain steady. If your request queue can hold a thousand items, a brief spike in incoming requests does not immediately translate to dropped traffic—the queue absorbs the excess and drains gradually. This buffering property is simultaneously a design tool and a diagnostic hazard: it smooths out problems, which means the system can be degrading for minutes or hours before any alert fires, because the stock level is rising silently within the buffer zone. When the alert finally triggers, the degradation has been underway for far longer than the alert duration suggests.
 
@@ -194,7 +194,7 @@ Translating the bathtub model into operational terms yields a diagnostic lens th
 
 | Stock (What accumulates) | Inflow (What adds) | Outflow (What removes) | Why It Matters |
 |--------------------------|-------------------|----------------------|----------------|
-| **Request queue** | Incoming requests | Processed requests | Queue depth = latency |
+| **Request queue** | Requests entering the defined queue | Requests leaving that queue | Accumulation can increase waiting time; depth is not latency |
 | **Connection pool usage** | New connections | Released connections | Full pool = blocked requests |
 | **Memory usage** | Allocations | GC collections | Memory full = OOM kills |
 | **Error budget** | Time passing (SLO met) | Incidents (SLO violated) | Budget exhausted = no deploys |
@@ -490,7 +490,7 @@ Build a dedicated database observability dashboard showing active connections, q
    The incident commander is operating at level 7 by breaking the reinforcing loop that is likely causing the outage—a retry storm or contention spiral where each failed request generates additional load that causes more failures. The circuit breaker inserts a negative link into this reinforcing loop, immediately reducing the effective load on the system and giving it space to recover. The engineer's approach of quadrupling the connection pool operates at level 11 (buffer sizing), which is a weak intervention in Meadows' hierarchy. Worse, it can be actively harmful: if the root cause is a contention spiral, more concurrent connections will increase lock contention inside the database, making every query slower and accelerating the death spiral rather than stopping it. This counterintuitive property—that the obvious fix worsens the problem—is characteristic of reinforcing loops and is precisely why the leverage hierarchy ranks parameter changes at the bottom.
    </details>
 
-2. **Your monitoring alerts for a payment processing service: the active request queue has grown from a steady baseline of approximately 50 items to over 700 items in the span of four minutes, and latency is climbing in proportion. Diagnose this queue growth by comparing entries and completions over the same observation window: which measurements would distinguish increased arrivals, reduced processing, or both changes together, and what would remain unknown about the cause?**
+2. **Your monitoring alerts for a payment processing service: the active request queue has grown from a steady baseline of approximately 50 items to over 700 items in the span of four minutes, and latency is climbing in proportion. Diagnose this queue growth by comparing entries and exits across a defined boundary over the same observation window: which measurements would distinguish increased arrivals, reduced processing, or both changes together, and what would remain unknown about the cause?**
    <details>
    <summary>Answer</summary>
 
@@ -646,6 +646,8 @@ Each printed Job report uses one list response. The later Pod table is a separat
 
 </details>
 
+Immediately after the complete Bash block finishes, run `echo $?` before another command. A zero exit status means both the expected terminal-count check and the owned-namespace cleanup checks succeeded. Record that status with the printed context, namespace and UID. A nonzero status requires investigating the diagnostics; it does not establish successful cleanup.
+
 ---
 
 ### Part B: Analyze a System Using All Three Models (25 minutes)
@@ -674,13 +676,13 @@ flowchart LR
 | 6 | | |
 | 5 | | |
 
-**Success criteria for this exercise.** In Part A, compare the two suspended-Job counts and distinguish successful from failed terminal exits after release. Explain why these independent Jobs do not establish a shared processing capacity or demonstrate overload. In Part B, use your diagrams to compare hypotheses for the hourly latency spikes: synchronized cache expiry is one candidate, while scheduled batch work is another. Name the observations that would support or challenge each before choosing an intervention; the supplied symptoms do not establish a cause.
+**Success criteria for this exercise.** In Part A, compare the two suspended-Job counts and distinguish successful from failed terminal exits after release. Explain why these independent Jobs do not establish a shared processing capacity or demonstrate overload. In Part B, compare at least two hypotheses for the hourly latency spikes, such as synchronized cache expiry and scheduled batch work. Other justified candidates are welcome. Name observations that would support or challenge each before choosing an intervention; the supplied symptoms do not establish a cause.
 - [ ] Part A: Compared nonterminal Job counts before release and successful/failed exits afterward
 - [ ] Part A: Verified owned-namespace cleanup and explained the experiment's capacity limits
 - [ ] Part B: Stock-and-flow diagram with clear accumulation points
-- [ ] Part B: Causal loop diagram with at least 2 loops identified
-- [ ] Part B: Leverage point interventions ranked correctly
-- [ ] Part B: Compared cache-expiry and batch-work hypotheses, with evidence needed to distinguish them
+- [ ] Part B: Causal loop diagram with at least 3 loops identified and link polarities marked
+- [ ] Part B: Explained the placement and expected impact of interventions at the five requested leverage levels
+- [ ] Part B: Compared at least two justified hypotheses, with evidence needed to distinguish them
 
 ---
 
