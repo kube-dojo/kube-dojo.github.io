@@ -895,7 +895,7 @@ Per [Google Cloud Observability pricing](https://cloud.google.com/products/obser
 - **Chargeable custom metrics** (including log-based metrics): billed by bytes after **150 MiB free per billing account per month**; distribution points cost more than scalars.
 - **GMP**: billed by **samples ingested** (Prometheus-style metering), not the same byte model as generic custom metrics.
 
-Hypothetical scenario: A platform team enables Data Access audit logs project-wide and turns on VPC Flow Logs for "visibility." Ingestion jumps from 60 GiB/month to 800 GiB/month. At roughly $0.50/GiB on application logs and $0.25/GiB on vended logs, monthly Logging spend moves from single digits to hundreds of dollars before any application growth. The fix is scoped audit policies, flow-log sampling, and exclusion filters—not disabling observability entirely.
+Hypothetical scenario: A platform team enables Data Access audit logs project-wide and turns on VPC Flow Logs for "visibility." Ingestion jumps from 60 GiB/month to 800 GiB/month. At roughly \$0.50/GiB on application logs and \$0.25/GiB on vended logs, monthly Logging spend moves from single digits to hundreds of dollars before any application growth. The fix is scoped audit policies, flow-log sampling, and exclusion filters—not disabling observability entirely.
 
 Cloud Logging does **not** charge for routing copies via sinks to Pub/Sub, Cloud Storage, or BigQuery; downstream services bill separately. That makes **sink + exclude** patterns cost-effective: drop noise from `_Default` ingestion while archiving compliance streams cheaply in object storage.
 
@@ -975,7 +975,7 @@ First, **emit structured logs** to stdout with severity, request identifiers, an
 
 For Compute Engine workloads, install the **Ops Agent** in the golden image, verify IAM roles on the VM service account, and test that logs appear in Log Explorer before autoscaling the fleet. For Kubernetes, decide early whether application metrics flow through **GMP managed collection** or a self-managed Prometheus sidecar; switching later is doable but rewrites dashboards and alert rules.
 
-Hypothetical scenario: A team ships a new internal admin API with DEBUG logging enabled "temporarily" and no exclusion filter. Staging and production share a project; ingestion adds 200 GiB/month at $0.50/GiB after the free tier—roughly $75/month in logging alone for a low-traffic admin tool. The baseline fix is INFO default, DEBUG only via feature flag in non-prod, and an exclusion for known-noisy health probes—not removing logging entirely.
+Hypothetical scenario: A team ships a new internal admin API with DEBUG logging enabled "temporarily" and no exclusion filter. Staging and production share a project; ingestion adds 200 GiB/month at \$0.50/GiB after the free tier—roughly \$75/month in logging alone for a low-traffic admin tool. The baseline fix is INFO default, DEBUG only via feature flag in non-prod, and an exclusion for known-noisy health probes—not removing logging entirely.
 
 Document the baseline in the service README: dashboard link, primary alert policy names, SLO target, and which log fields are stable contracts for downstream metrics. The next engineer onboarding during a 2 AM incident will thank you.
 

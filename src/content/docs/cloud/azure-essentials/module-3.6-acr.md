@@ -588,7 +588,7 @@ Container registry cost is rarely one line item. Finance sees registry SKU days,
 
 | Cost driver | What moves the needle | Knobs that help |
 | :--- | :--- | :--- |
-| SKU daily rate | Basic ≈ $0.167/day, Standard ≈ $0.667/day, Premium ≈ $1.667/day in US regions (see [pricing](https://azure.microsoft.com/en-us/pricing/details/container-registry/)) | Use Basic only for sandboxes; downgrade dev registries copied from prod |
+| SKU daily rate | Basic ≈ \$0.167/day, Standard ≈ \$0.667/day, Premium ≈ \$1.667/day in US regions (see [pricing](https://azure.microsoft.com/en-us/pricing/details/container-registry/)) | Use Basic only for sandboxes; downgrade dev registries copied from prod |
 | Included storage | 10 / 100 / 500 GiB included per tier | Retention policy, scheduled `acr purge`, stop retagging `:dev` endlessly |
 | Storage overage | ~$0.00334/GiB/day beyond included amount | Delete untagged manifests; avoid duplicate multi-arch copies you never pull |
 | Geo-replication | Premium base + ~$1.667/day per replica region | Add replicas only where compute exists; do not replicate to vanity regions |
@@ -688,7 +688,7 @@ The same architectural diagram with Private Link, three geo-replicas, Notary Pro
 | Using the admin account for CI/CD pipelines | It is the first authentication method shown in quickstarts | Use service principals with AcrPush role for CI/CD, or OIDC federation for GitHub Actions. Run `az acr check-health` before blaming AKS for pull failures. |
 | Not cleaning up old images | [There is no built-in retention policy enabled by default](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-retention-policy) | Create an ACR Task with `acr purge` on a schedule. Delete untagged manifests weekly and old tagged images monthly. |
 | Using `:latest` tag in production deployments | It seems like "latest" means "newest and best" | `:latest` is mutable---it can point to different images at different times. Use immutable tags (semantic version or Git SHA) for production. |
-| Running Premium SKU for dev/test registries | Teams copy production configuration | Use Basic ($5/month) for dev/test. Premium ($50+/month) is only needed for geo-replication, Private Link, or Notary Project image signing. |
+| Running Premium SKU for dev/test registries | Teams copy production configuration | Use Basic (\$5/month) for dev/test. Premium (\$50+/month) is only needed for geo-replication, Private Link, or Notary Project image signing. |
 | Pulling images from a different region than compute | The registry is in East US but compute is in West Europe | Use geo-replication (Premium) or create separate registries per region. Cross-region pull adds latency and egress costs. |
 | Not enabling vulnerability scanning | Teams assume images are secure because they built them | [Enable Microsoft Defender for Containers, which automatically scans images pushed to ACR and reports vulnerabilities.](https://learn.microsoft.com/en-us/azure/container-registry/scan-images-defender) |
 | Hardcoding registry URLs in Kubernetes manifests | It works today, so why abstract it? | Use a variable or Helm value for the registry URL. This lets you switch registries (e.g., from dev ACR to prod ACR) without modifying manifests. |

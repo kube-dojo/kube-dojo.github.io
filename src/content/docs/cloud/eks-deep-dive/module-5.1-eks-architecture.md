@@ -624,7 +624,7 @@ EKS billing splits cleanly into **cluster hours** (Kubernetes version support ti
 
 ### Control plane and version support
 
-During [standard Kubernetes version support](https://aws.amazon.com/eks/pricing/) — the first 14 months after a version is available in EKS — each cluster costs **$0.10 per hour** (~$73 per 730-hour month) regardless of node count. After standard support ends, clusters on that minor version enter **extended support** at **$0.60 per hour** (~$438/month) for up to 12 additional months unless you upgrade. That sixfold jump is pure policy: identical APIs, different support tier. IaC defaults sometimes enable extended support automatically; aligning `upgradePolicy` with your tested upgrade cadence avoids silent invoice surprises.
+During [standard Kubernetes version support](https://aws.amazon.com/eks/pricing/) — the first 14 months after a version is available in EKS — each cluster costs **\$0.10 per hour** (~\$73 per 730-hour month) regardless of node count. After standard support ends, clusters on that minor version enter **extended support** at **\$0.60 per hour** (~\$438/month) for up to 12 additional months unless you upgrade. That sixfold jump is pure policy: identical APIs, different support tier. IaC defaults sometimes enable extended support automatically; aligning `upgradePolicy` with your tested upgrade cadence avoids silent invoice surprises.
 
 | Cost driver | Typical monthly impact | Knobs that reduce it |
 | :--- | :--- | :--- |
@@ -646,7 +646,7 @@ AWS monitors the managed control plane components and publishes cluster health i
 
 When opening AWS Support cases, distinguish data-plane symptoms (nodes, CNI, add-ons) from true control-plane issues (global `kubectl` failure across networks). Providing endpoint configuration, recent authentication mode changes, and timestamps of ENI modifications accelerates triage. AWS can replace managed control plane capacity, but it cannot fix a customer security group that blocks ENIs — another reason architecture reviews focus on customer-owned networking.
 
-For multi-cluster fleets, chargeback should include the flat $0.10/hour (or $0.60/hour) line item explicitly. Application teams often model only EC2 in their budgets and are surprised that ten microservice clusters mean ten control-plane bills before any pod schedules. Consolidating non-production workloads into namespace-isolated shared clusters reduces that tax but increases RBAC and noisy-neighbor governance work — a trade platforms should document rather than hide.
+For multi-cluster fleets, chargeback should include the flat \$0.10/hour (or \$0.60/hour) line item explicitly. Application teams often model only EC2 in their budgets and are surprised that ten microservice clusters mean ten control-plane bills before any pod schedules. Consolidating non-production workloads into namespace-isolated shared clusters reduces that tax but increases RBAC and noisy-neighbor governance work — a trade platforms should document rather than hide.
 
 ---
 
@@ -732,7 +732,7 @@ Pod-level AWS permissions remain separate: workloads should use IRSA or Pod Iden
 
 ## Did You Know?
 
-1. The EKS control plane runs in an AWS-owned account, not yours. [The $0.10/hour cluster fee](https://aws.amazon.com/eks/pricing/) covers at least two API server instances and three etcd nodes spread across three Availability Zones. AWS auto-scales the control plane based on the number of nodes and API request rate -- you generally do not need to "right-size" the control plane yourself. A cluster with 5 nodes and one with 5,000 nodes both cost $0.10/hour for the control plane itself.
+1. The EKS control plane runs in an AWS-owned account, not yours. [The \$0.10/hour cluster fee](https://aws.amazon.com/eks/pricing/) covers at least two API server instances and three etcd nodes spread across three Availability Zones. AWS auto-scales the control plane based on the number of nodes and API request rate -- you generally do not need to "right-size" the control plane yourself. A cluster with 5 nodes and one with 5,000 nodes both cost \$0.10/hour for the control plane itself.
 
 2. The cross-account ENIs that EKS places in your VPC use IP addresses from your subnet CIDR range. Each ENI consumes one IP address per subnet. If you create a cluster with 2 subnets, you lose 2 IPs to control plane ENIs. In tightly sized subnets (like a `/28` with only 11 usable IPs), this can matter. AWS requires each cluster subnet to have at least six free IP addresses and recommends at least 16; plan larger subnets when your node and Pod density require them.
 
@@ -806,7 +806,7 @@ To satisfy the security requirement, you must configure the EKS cluster with onl
 <details>
 <summary>Question 8: Finance asks why three idle development EKS clusters on an older Kubernetes version each cost roughly $438/month for the control plane alone while production on the latest version costs ~$73/month. What architectural and lifecycle policy change addresses the gap?</summary>
 
-The development clusters are almost certainly on a Kubernetes minor version in **extended support**, billed at [$0.60 per cluster hour](https://aws.amazon.com/eks/pricing/) versus $0.10 during standard support. Extended support exists so teams can defer upgrades, but it is intentionally expensive to encourage movement to supported versions. The fix is operational, not rightsizing nodes: upgrade dev clusters to a standard-support version (or delete them), and set `upgradePolicy` / IaC defaults so sandboxes do not silently remain on extended tiers. Production’s lower fee reflects a current version, not fewer nodes — control plane pricing is per cluster, not per node.
+The development clusters are almost certainly on a Kubernetes minor version in **extended support**, billed at [\$0.60 per cluster hour](https://aws.amazon.com/eks/pricing/) versus \$0.10 during standard support. Extended support exists so teams can defer upgrades, but it is intentionally expensive to encourage movement to supported versions. The fix is operational, not rightsizing nodes: upgrade dev clusters to a standard-support version (or delete them), and set `upgradePolicy` / IaC defaults so sandboxes do not silently remain on extended tiers. Production’s lower fee reflects a current version, not fewer nodes — control plane pricing is per cluster, not per node.
 </details>
 
 ---

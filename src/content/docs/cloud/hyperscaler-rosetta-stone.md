@@ -560,7 +560,7 @@ The Container Network Interface (CNI) configuration dictates pod density and IP 
 
 | Feature | AWS EKS | GCP GKE | Azure AKS |
 | :--- | :--- | :--- | :--- |
-| Control plane / cluster fee | ~$73/month (as of mid-2024) | ~$73/month ($0.10/cluster-hr as of 2026-09; free tier covers 1 zonal Standard or Autopilot cluster per billing account) | Free (Free tier), ~$73/month (Standard) |
+| Control plane / cluster fee | ~\$73/month (as of mid-2024) | ~\$73/month (\$0.10/cluster-hr as of 2026-09; free tier covers 1 zonal Standard or Autopilot cluster per billing account) | Free (Free tier), ~\$73/month (Standard) |
 | Serverless nodes | Fargate profiles | Autopilot (fully managed) | Virtual Nodes (ACI-backed) |
 | Default CNI | VPC CNI (VPC IPs to pods) | Dataplane V2 (Cilium/eBPF) | Azure CNI / CNI Overlay |
 | Node auto-provisioning | Karpenter | Autopilot / NAP | Karpenter (preview) |
@@ -826,7 +826,7 @@ Network data transfer represents the single greatest source of unexpected expend
 | Cross-region (same provider, as of mid-2024) | $0.01-0.02/GB | $0.01-0.08/GB | $0.02-0.05/GB |
 | Egress to internet (first 10 TB, as of mid-2024) | ~$0.09/GB | ~$0.12/GB | ~$0.087/GB |
 
-A critical architectural reality is that both AWS and GCP charge for inter-zone data transfer within the same geographic region. As of mid-2024, AWS charges ~$0.01 per GB in each direction, while as of 2026-09, GCP charges ~$0.01 per GiB for inter-zone traffic within the same region. If a distributed microservice transmits fifty terabytes of internal RPC traffic across zones for high availability, the network bill will include hundreds of dollars in cross-zone fees on both platforms. For Microsoft Azure, zone-to-zone data transfer pricing varies and must be checked on the current bandwidth pricing page rather than assumed to be free.
+A critical architectural reality is that both AWS and GCP charge for inter-zone data transfer within the same geographic region. As of mid-2024, AWS charges ~\$0.01 per GB in each direction, while as of 2026-09, GCP charges ~\$0.01 per GiB for inter-zone traffic within the same region. If a distributed microservice transmits fifty terabytes of internal RPC traffic across zones for high availability, the network bill will include hundreds of dollars in cross-zone fees on both platforms. For Microsoft Azure, zone-to-zone data transfer pricing varies and must be checked on the current bandwidth pricing page rather than assumed to be free.
 
 Network egress to the public internet represents a substantial financial burden when transferring large data sets between cloud providers. Replicating multi-terabyte database snapshots or streaming high-resolution media across clouds incurs continuous egress fees ranging from eight to twelve cents per gigabyte. Multi-cloud architectures must minimize cross-cloud data transfers by processing data locally within the originating cloud and synchronizing only compressed metadata summaries across provider boundaries.
 
@@ -856,7 +856,7 @@ Establishing financial operations (FinOps) governance across disparate cloud pro
 | **Overlooking regional data egress costs** | Assuming data transfer between regions, or data out to the internet, costs the exact same everywhere. | Architect systems to keep high-bandwidth, chatty traffic within the exact same availability zone or region whenever possible, regardless of the cloud provider. |
 | **Assuming 'Serverless' implies identical limits** | AWS Lambda has specific execution time maximums and payload limits that differ entirely from Azure Functions. | Rigorously validate payload sizes, maximum execution timeouts, and concurrent invocation limits when migrating serverless architectures. |
 | **Translating AWS Tags directly to Azure Resource Groups** | AWS uses flat tags for everything. Azure relies on Resource Groups as mandatory deployment boundaries. | Do not use Azure Resource Groups just for tagging. Use them to group resources that share identical lifecycles, and use Azure Tags for billing categorizations. |
-| **Assuming cross-zone traffic is free within a region** | Engineers assume inter-zone data transfer within the same geographic region carries zero cost across cloud providers. | Both AWS (about $0.01 per GB as of mid-2024) and GCP (about $0.01 per GiB as of 2026-09) charge for cross-zone traffic within the same region, while Azure availability-zone data transfer rates must be confirmed on current pricing pages. Design services to localize chatty RPC traffic within the same zone where feasible, or budget for cross-zone high-availability costs. |
+| **Assuming cross-zone traffic is free within a region** | Engineers assume inter-zone data transfer within the same geographic region carries zero cost across cloud providers. | Both AWS (about \$0.01 per GB as of mid-2024) and GCP (about \$0.01 per GiB as of 2026-09) charge for cross-zone traffic within the same region, while Azure availability-zone data transfer rates must be confirmed on current pricing pages. Design services to localize chatty RPC traffic within the same zone where feasible, or budget for cross-zone high-availability costs. |
 
 ---
 
@@ -986,9 +986,9 @@ Review the practical tasks detailed below and complete the architectural transla
 
 **On-demand monthly cost (approximate, US region, Linux, as of mid-2024):**
 
-*   **AWS** (m5.xlarge): ~$0.192/hr x 730 hrs x 10 = ~$1,402/month
-*   **GCP** (n2-standard-4): ~$0.194/hr x 730 hrs x 10 = ~$1,416/month (with Sustained Use Discounts up to 20% on the N2 series as of 2026-09 for full-month usage, effective rate drops to ~$0.155/hr = ~$1,133/month)
-*   **Azure** (Standard_D4s_v5): ~$0.192/hr x 730 hrs x 10 = ~$1,402/month
+*   **AWS** (m5.xlarge): ~\$0.192/hr x 730 hrs x 10 = ~\$1,402/month
+*   **GCP** (n2-standard-4): ~\$0.194/hr x 730 hrs x 10 = ~\$1,416/month (with Sustained Use Discounts up to 20% on the N2 series as of 2026-09 for full-month usage, effective rate drops to ~\$0.155/hr = ~\$1,133/month)
+*   **Azure** (Standard_D4s_v5): ~\$0.192/hr x 730 hrs x 10 = ~\$1,402/month
 
 **With 1-year commitment (approximate, as of mid-2024):**
 

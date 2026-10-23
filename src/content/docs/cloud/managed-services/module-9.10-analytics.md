@@ -101,7 +101,7 @@ Not every "warehouse" bills the same way, and the pricing model should drive arc
 | Massive Spark transforms on lake files | Athena Spark (verify region availability) or Dataproc/EMR | EMR / Dataproc with autoscaling |
 | Startup with unknown scale | BigQuery on-demand (first 1 TiB/month free per billing account) | Start serverless; move to reserved capacity when spend stabilizes |
 
-At moderate scale — say 5–20 TB of curated analytics data and 50 daily analyst queries — teams often spend **$500–$3,000/month** on compute if they partition well and avoid full scans. The same data with no partitioning, CSV ingestion, and `SELECT *` habits can exceed **$10,000/month** on scan-priced engines. Storage is usually the smaller line item: S3 Standard, GCS Standard, and ADLS Hot tiers run roughly **$0.02–$0.03/GB-month** (verify current regional rates), while egress to the public internet or cross-region replication can exceed storage cost when BI tools pull large extracts outside the cloud region.
+At moderate scale — say 5–20 TB of curated analytics data and 50 daily analyst queries — teams often spend **\$500–\$3,000/month** on compute if they partition well and avoid full scans. The same data with no partitioning, CSV ingestion, and `SELECT *` habits can exceed **\$10,000/month** on scan-priced engines. Storage is usually the smaller line item: S3 Standard, GCS Standard, and ADLS Hot tiers run roughly **\$0.02–\$0.03/GB-month** (verify current regional rates), while egress to the public internet or cross-region replication can exceed storage cost when BI tools pull large extracts outside the cloud region.
 
 ### Managed Query and Processing Engines
 
@@ -805,7 +805,7 @@ query = "SELECT trip_id, fare_amount FROM analytics.trips WHERE date = '2025-11-
 result = client.query(query, job_config=job_config).result()
 ```
 
-Hypothetical scenario: an analyst runs `SELECT *` on a 200 TB unpartitioned transactions table in BigQuery. At ~$6.25/TiB, that single query approaches **$1,250** before egress. Adding a `WHERE transaction_date = '2025-11-15'` partition filter on a daily-partitioned table might reduce scanned data to ~100 GB (~$0.60). The engineering work to partition at table creation pays for itself the first time someone forgets a WHERE clause.
+Hypothetical scenario: an analyst runs `SELECT *` on a 200 TB unpartitioned transactions table in BigQuery. At ~\$6.25/TiB, that single query approaches **\$1,250** before egress. Adding a `WHERE transaction_date = '2025-11-15'` partition filter on a daily-partitioned table might reduce scanned data to ~100 GB (~\$0.60). The engineering work to partition at table creation pays for itself the first time someone forgets a WHERE clause.
 
 ### Provisioned Cluster Costs: Redshift and Synapse Dedicated
 
@@ -828,7 +828,7 @@ aws redshift-serverless create-usage-limit \
 
 ### Storage, Egress, and Hidden Line Items
 
-Object storage is cheap until it is not. Three buckets of **10 TB each** in S3 Standard cost roughly **$690/month** in storage alone (verify current pricing). Cross-region replication doubles storage. **Egress** to the internet or to another cloud can exceed compute: [S3 data transfer out](https://aws.amazon.com/s3/pricing/) to the internet starts around **$0.09/GB** (verify current tier). [GCS egress](https://cloud.google.com/storage/pricing) and [Azure bandwidth](https://azure.microsoft.com/pricing/details/bandwidth/) follow similar tiered models. Keep BI tools and Spark executors in the **same region** as the lake. [S3 same-Region reads are free](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html) when Athena, Redshift, or EMR in the same region query the bucket.
+Object storage is cheap until it is not. Three buckets of **10 TB each** in S3 Standard cost roughly **\$690/month** in storage alone (verify current pricing). Cross-region replication doubles storage. **Egress** to the internet or to another cloud can exceed compute: [S3 data transfer out](https://aws.amazon.com/s3/pricing/) to the internet starts around **\$0.09/GB** (verify current tier). [GCS egress](https://cloud.google.com/storage/pricing) and [Azure bandwidth](https://azure.microsoft.com/pricing/details/bandwidth/) follow similar tiered models. Keep BI tools and Spark executors in the **same region** as the lake. [S3 same-Region reads are free](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html) when Athena, Redshift, or EMR in the same region query the bucket.
 
 Kubernetes compute for analytics adds another meter: even ephemeral Airflow task pods accrue CPU/memory charges on your node pool. Spot/preemptible node groups (covered later) reduce batch cost 60–80% when Airflow retries handle interruptions.
 
@@ -1001,7 +1001,7 @@ You can configure an ephemeral node pool (using Spot or Preemptible instances) w
 <details>
 <summary>4. Scenario: A junior analyst runs a query on BigQuery to find the total revenue for yesterday: `SELECT SUM(revenue) FROM analytics.transactions WHERE transaction_date = '2025-11-15'`. The `transactions` table contains 5 years of historical data and is 200 TB in size. The query costs $1,000 to execute. What critical data warehouse design feature was missing from the `transactions` table, and how would it have prevented this massive charge?</summary>
 
-The table was not partitioned by the `transaction_date` column when it was created. Without partitioning, BigQuery has no way to isolate the data for a specific day, forcing it to perform a full table scan of all 200 TB across the entire 5-year history just to find yesterday's records. If the table had been partitioned by date, the query engine would have completely ignored the partitions for the other 1,824 days. The query would have only scanned the single partition for '2025-11-15', which might be just 100 GB in size, reducing the cost of the query from $1,000 to less than $1.
+The table was not partitioned by the `transaction_date` column when it was created. Without partitioning, BigQuery has no way to isolate the data for a specific day, forcing it to perform a full table scan of all 200 TB across the entire 5-year history just to find yesterday's records. If the table had been partitioned by date, the query engine would have completely ignored the partitions for the other 1,824 days. The query would have only scanned the single partition for '2025-11-15', which might be just 100 GB in size, reducing the cost of the query from \$1,000 to less than \$1.
 </details>
 
 <details>

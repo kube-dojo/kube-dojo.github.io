@@ -870,11 +870,11 @@ Storage economics on EKS are the sum of **provisioned GiB**, **performance purch
 
 ### EBS (gp3) — moderate database tier
 
-Suppose three StatefulSet databases each hold 500 GiB gp3 with default 3,000 IOPS and 125 MiB/s (included). Storage alone is roughly **3 × 500 GiB × $0.08/GB-month ≈ $120/month** before snapshots. If one database is provisioned to 12,000 IOPS, you pay for **9,000 extra IOPS × $0.005/IOPS-month ≈ $45/month** on top of storage. Cost spikes when teams oversize IOPS/throughput “just in case,” leave **unattached volumes** after PVC deletes, or retain months of snapshots on high-churn dev clusters. Knobs that reduce cost: right-size gp3 before jumping to io2, migrate legacy gp2 to gp3, delete unused PVs, and use snapshot lifecycle policies.
+Suppose three StatefulSet databases each hold 500 GiB gp3 with default 3,000 IOPS and 125 MiB/s (included). Storage alone is roughly **3 × 500 GiB × \$0.08/GB-month ≈ \$120/month** before snapshots. If one database is provisioned to 12,000 IOPS, you pay for **9,000 extra IOPS × \$0.005/IOPS-month ≈ \$45/month** on top of storage. Cost spikes when teams oversize IOPS/throughput “just in case,” leave **unattached volumes** after PVC deletes, or retain months of snapshots on high-churn dev clusters. Knobs that reduce cost: right-size gp3 before jumping to io2, migrate legacy gp2 to gp3, delete unused PVs, and use snapshot lifecycle policies.
 
 ### EFS — shared media at 2 TiB Standard
 
-Two tebibytes on EFS Standard at about **$0.30/GB-month** is on the order of **$600/month** for capacity alone, plus Elastic throughput charges for data read/written. **Cross-AZ data transfer** ($0.01/GB in many Regions) applies when pods connect to a mount target outside their AZ—not when each AZ has a local mount target serving local reads from EFS's regional replication. Moving cold assets to **EFS IA** (roughly **$0.016/GB-month** in many Regions, plus per-GB read fees when accessed) can cut steady-state storage if lifecycle policies match real access patterns. Cost spikes when Provisioned Throughput is left pegged high after a one-time migration, or when IA objects are read continuously (paying retrieval surcharges).
+Two tebibytes on EFS Standard at about **\$0.30/GB-month** is on the order of **\$600/month** for capacity alone, plus Elastic throughput charges for data read/written. **Cross-AZ data transfer** (\$0.01/GB in many Regions) applies when pods connect to a mount target outside their AZ—not when each AZ has a local mount target serving local reads from EFS's regional replication. Moving cold assets to **EFS IA** (roughly **\$0.016/GB-month** in many Regions, plus per-GB read fees when accessed) can cut steady-state storage if lifecycle policies match real access patterns. Cost spikes when Provisioned Throughput is left pegged high after a one-time migration, or when IA objects are read continuously (paying retrieval surcharges).
 
 ### S3 + Mountpoint — 5 TiB training corpus
 
@@ -886,7 +886,7 @@ The silent budget killers in EKS storage are **Released PVCs with `Retain`**, **
 
 ### Putting cost next to reliability
 
-Cheaper storage is not cheaper operationally if it violates access semantics. Mountpoint saves GiB-month dollars versus EFS but can cost more in engineer hours when an app expects POSIX rename semantics. Likewise, EFS saves replication code for shared files but adds cross-AZ traffic charges when replicas chat across zones. Document expected **$/GiB**, **$/IOPS**, **$/snapshot-month**, and **$/GB-cross-AZ** beside each StorageClass in your internal platform catalog so application teams choose with eyes open, not from habit.
+Cheaper storage is not cheaper operationally if it violates access semantics. Mountpoint saves GiB-month dollars versus EFS but can cost more in engineer hours when an app expects POSIX rename semantics. Likewise, EFS saves replication code for shared files but adds cross-AZ traffic charges when replicas chat across zones. Document expected **\$/GiB**, **\$/IOPS**, **\$/snapshot-month**, and **\$/GB-cross-AZ** beside each StorageClass in your internal platform catalog so application teams choose with eyes open, not from habit.
 
 ---
 
@@ -995,7 +995,7 @@ Expanding the volume from 50 GB to 200 GB can be executed online without any dow
 <details>
 <summary>Question 4: Your data science team is running a machine learning training pipeline on EKS that needs to read a 5 TB dataset. When would you choose Mountpoint for S3 over EFS for this workload?</summary>
 
-You should choose Mountpoint for S3 when the ML workload exclusively needs to read large, pre-existing datasets and expects standard POSIX filesystem semantics to access them. Since S3 storage costs are drastically lower than EFS (roughly $0.023/GB-month versus $0.30/GB-month), hosting a 5 TB dataset on S3 yields massive cost savings. Additionally, Mountpoint for S3 achieves exceptionally high sequential read throughput by automatically parallelizing multi-part downloads under the hood. You would only opt for EFS if the training pipeline needed to write intermediate checkpoints, modify files in-place, or required POSIX file locking mechanisms across parallel workers, which Mountpoint does not support.
+You should choose Mountpoint for S3 when the ML workload exclusively needs to read large, pre-existing datasets and expects standard POSIX filesystem semantics to access them. Since S3 storage costs are drastically lower than EFS (roughly \$0.023/GB-month versus \$0.30/GB-month), hosting a 5 TB dataset on S3 yields massive cost savings. Additionally, Mountpoint for S3 achieves exceptionally high sequential read throughput by automatically parallelizing multi-part downloads under the hood. You would only opt for EFS if the training pipeline needed to write intermediate checkpoints, modify files in-place, or required POSIX file locking mechanisms across parallel workers, which Mountpoint does not support.
 </details>
 
 <details>
