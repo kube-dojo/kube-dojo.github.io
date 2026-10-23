@@ -83,14 +83,14 @@ Think in cost per unit of work, not cost per GPU-hour:
 
 | Metric | Formula | Example |
 |--------|---------|---------|
-| Cost per training epoch | (GPUs x $/hr x hours per epoch) | 8 A100 x $3/hr x 4hr = $96/epoch |
-| Cost per 1K inference requests | (GPU-hours per 1K requests x $/hr) | 0.007 GPU-hr x $3/hr = $0.02/1K |
-| Cost per experiment | (GPU-hours x $/hr) | 1 A100 x $3/hr x 2hr = $6/experiment |
-| Cost per idle hour (waste) | (Idle GPUs x $/hr) | 4 idle A100 x $3/hr = $12/hr waste |
+| Cost per training epoch | (GPUs x $/hr x hours per epoch) | 8 A100 x \$3/hr x 4hr = \$96/epoch |
+| Cost per 1K inference requests | (GPU-hours per 1K requests x $/hr) | 0.007 GPU-hr x \$3/hr = \$0.02/1K |
+| Cost per experiment | (GPU-hours x $/hr) | 1 A100 x \$3/hr x 2hr = \$6/experiment |
+| Cost per idle hour (waste) | (Idle GPUs x $/hr) | 4 idle A100 x \$3/hr = \$12/hr waste |
 
 The table gives you the vocabulary for a better conversation with model owners. A researcher may not know whether a week of sixteen GPUs is a large request in cloud terms, but they can usually explain what they expect from an experiment and how much accuracy improvement would justify it. An inference owner may not care about GPU-hours, but they can reason about cost per thousand requests against product margin or internal budget. Once you express costs this way, optimization stops being a generic mandate to spend less and becomes a choice between explicit tradeoffs.
 
-Track these metrics in dashboards and reviews. When a scientist says "I need 16 GPUs for a week," translate that to $8,064 at $3 per GPU-hour and ask whether the experiment is worth that spend, whether a smaller pilot could reject the idea earlier, and whether spot capacity with checkpoints would reduce the risk. The point is not to interrogate every request. The point is to make invisible opportunity cost visible before the infrastructure platform silently accepts the most expensive possible version of the plan.
+Track these metrics in dashboards and reviews. When a scientist says "I need 16 GPUs for a week," translate that to \$8,064 at \$3 per GPU-hour and ask whether the experiment is worth that spend, whether a smaller pilot could reject the idea earlier, and whether spot capacity with checkpoints would reduce the risk. The point is not to interrogate every request. The point is to make invisible opportunity cost visible before the infrastructure platform silently accepts the most expensive possible version of the plan.
 
 ## Spot Instances for Interruptible Workloads
 

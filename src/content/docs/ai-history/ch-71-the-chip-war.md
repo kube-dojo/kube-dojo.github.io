@@ -168,7 +168,7 @@ TSMC's geography also matters. Arizona expansion showed re-shoring momentum, but
 
 That is where CHIPS enters the story.
 
-The CHIPS and Science Act was an industrial-policy response to fragility. NIST's CHIPS for America fact sheet framed the program as boosting domestic semiconductor manufacturing, technological leadership, economic security, and national security. It listed $52.7 billion total, including $39 billion in manufacturing incentives, $13.2 billion for R&D and workforce, and $500 million for global supply-chain programs. It also explicitly covered fabrication, assembly, testing, and packaging facilities.
+The CHIPS and Science Act was an industrial-policy response to fragility. NIST's CHIPS for America fact sheet framed the program as boosting domestic semiconductor manufacturing, technological leadership, economic security, and national security. It listed \$52.7 billion total, including \$39 billion in manufacturing incentives, \$13.2 billion for R&D and workforce, and \$500 million for global supply-chain programs. It also explicitly covered fabrication, assembly, testing, and packaging facilities.
 
 The packaging language matters. The AI chip stack does not end when a wafer leaves a fab. Advanced packaging and memory integration determine whether compute can be delivered at the performance frontier. A country can have chip design talent and still depend on offshore packaging capacity. It can have a fab and still lack enough HBM. It can have equipment money and still wait years for tools, construction, and skilled workers.
 

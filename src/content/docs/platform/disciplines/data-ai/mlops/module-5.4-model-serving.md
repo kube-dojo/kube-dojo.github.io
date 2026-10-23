@@ -444,7 +444,7 @@ Optimization is not about making benchmarks look good; Optimization is about mee
 | Latency | 50ms → 10ms (5x faster) |
 | Throughput | 100 RPS → 1000 RPS (10x higher) |
 | Memory | 1GB → 100MB (10x smaller) |
-| Cost | $1000/mo → $100/mo (10x cheaper) |
+| Cost | \$1000/mo → \$100/mo (10x cheaper) |
 
 The table shows why optimization can change architecture when latency budgets force different runtime and batching choices.
 

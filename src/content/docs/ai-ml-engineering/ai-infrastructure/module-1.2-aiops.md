@@ -115,7 +115,7 @@ Return only valid JSON."""
 # Works for ANY format without regex maintenance!
 ```
 
-This LLM-first approach is elegant but has a critical operational constraint: **token economics**. Every byte of log data passed to an LLM costs money and latency. Consider the math: at a conservative $0.50 per million input tokens, parsing 10 billion daily log events — even with an average of just 50 tokens per log line — costs roughly $250,000 per day. The LLM inference latency, measured in hundreds of milliseconds per call, also makes it far too slow for high-throughput streaming pipelines where decisions must be made in microseconds.
+This LLM-first approach is elegant but has a critical operational constraint: **token economics**. Every byte of log data passed to an LLM costs money and latency. Consider the math: at a conservative \$0.50 per million input tokens, parsing 10 billion daily log events — even with an average of just 50 tokens per log line — costs roughly \$250,000 per day. The LLM inference latency, measured in hundreds of milliseconds per call, also makes it far too slow for high-throughput streaming pipelines where decisions must be made in microseconds.
 
 ### The Hybrid Architecture: Drain3 + LLM
 
