@@ -53,7 +53,7 @@ flowchart LR
 
 ### Worked example: deriving targets from business impact
 
-Imagine a B2B payments API on EKS in `us-east-1` processing $12M per day, roughly $138 per second ($12M ÷ 86,400). Legal requires audit logs with no gaps, but the product owner accepts brief read-only mode during disasters if no captured payment is lost. Finance estimates $250K lost revenue and churn risk for each hour of hard outage during peak.
+Imagine a B2B payments API on EKS in `us-east-1` processing \$12M per day, roughly \$138 per second (\$12M ÷ 86,400). Legal requires audit logs with no gaps, but the product owner accepts brief read-only mode during disasters if no captured payment is lost. Finance estimates \$250K lost revenue and churn risk for each hour of hard outage during peak.
 
 | Business statement | Engineering translation |
 |---|---|

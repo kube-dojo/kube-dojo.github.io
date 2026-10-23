@@ -148,7 +148,7 @@ az keyvault secret set-attributes \
 
 Key Vault keys are special: [for HSM-protected keys, the private key material stays inside the HSM](https://learn.microsoft.com/en-us/azure/key-vault/general/developers-guide). When you need to encrypt data, you send the data to Key Vault, and it returns the ciphertext. You never see the raw key.
 
-Software keys (`RSA`, `EC`) are cheaper per operation and sufficient for dev/test or low-risk signing. HSM keys (`RSA-HSM`, `EC-HSM`) require **Premium** SKU and bill a monthly **per active key version** charge when used in the prior 30 days, plus per-operation fees ([Azure Key Vault pricing](https://azure.microsoft.com/en-us/pricing/details/key-vault/)). Advanced sizes (3072/4096-bit RSA, non-2048 curves) use a higher operations meter ($0.15 per 10,000 transactions vs $0.03 for 2048-bit software keys on the public pricing page). Throttling also differs: [service limits](https://learn.microsoft.com/en-us/azure/key-vault/general/service-limits) allow fewer GETs per 10 seconds for larger HSM keys because limits are weighted—4096-bit HSM GETs consume the budget eight times faster than 2048-bit HSM GETs.
+Software keys (`RSA`, `EC`) are cheaper per operation and sufficient for dev/test or low-risk signing. HSM keys (`RSA-HSM`, `EC-HSM`) require **Premium** SKU and bill a monthly **per active key version** charge when used in the prior 30 days, plus per-operation fees ([Azure Key Vault pricing](https://azure.microsoft.com/en-us/pricing/details/key-vault/)). Advanced sizes (3072/4096-bit RSA, non-2048 curves) use a higher operations meter (\$0.15 per 10,000 transactions vs \$0.03 for 2048-bit software keys on the public pricing page). Throttling also differs: [service limits](https://learn.microsoft.com/en-us/azure/key-vault/general/service-limits) allow fewer GETs per 10 seconds for larger HSM keys because limits are weighted—4096-bit HSM GETs consume the budget eight times faster than 2048-bit HSM GETs.
 
 **Pause and predict:** If the raw key material for a Key Vault key never leaves the HSM, how does an application encrypt a 50 GB video file?
 
@@ -665,7 +665,7 @@ Key Vault billing is **operation-centric** for vaults, not capacity-based. Micro
 
 **Premium HSM keys:** Each active HSM key version can incur **$1/month (2048-bit RSA)** plus operations, with higher monthly charges for advanced key sizes on the pricing table. Idle versions you never use may avoid the monthly HSM key fee, but **each version counts separately** if it was used in the last 30 days—rotation without retiring old versions increases steady cost.
 
-**Certificates:** Ordinary certificate API operations bill like secrets; **renewal requests** bill **$3 per renewal** (not the $0.03/10k bucket). Automated TLS with frequent renewals across dozens of hostnames adds up—consolidate SAN certs where policy allows.
+**Certificates:** Ordinary certificate API operations bill like secrets; **renewal requests** bill **\$3 per renewal** (not the \$0.03/10k bucket). Automated TLS with frequent renewals across dozens of hostnames adds up—consolidate SAN certs where policy allows.
 
 **Automated key rotation policy:** Each rotation produces a new key **version**; you pay for active HSM key versions and the operations they generate—not a flat per-rotation fee. Keep rotation frequency sane so version sprawl does not inflate monthly HSM key charges.
 
