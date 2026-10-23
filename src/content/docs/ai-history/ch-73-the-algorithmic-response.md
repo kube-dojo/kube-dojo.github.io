@@ -6,7 +6,7 @@ sidebar:
 ---
 
 :::tip[In one paragraph]
-Chapter 73 is the book's technical epilogue. After power, chips, and datacenter campuses made frontier AI look like infrastructure, this coda follows one pressure back into the model itself: long-context inference made the KV cache a memory bottleneck, HBM scarcity and export controls made that bottleneck strategic, and DeepSeek-V2's Multi-head Latent Attention showed one documented way to compress attention state, shift cost into reconstruction, and diffuse the response through open kernels and serving backends. The lesson is narrow: constraints did not end capability growth; they moved some capability formation down into the attention layer.
+DeepSeek-V2's Multi-head Latent Attention caches a shared latent plus a decoupled positional key. Its paper reports cache and throughput gains against DeepSeek 67B under specified conditions. Public kernels and serving-backend guides offer implementation paths, but compatibility and actual adoption need separate evidence. This coda connects those technical questions to earlier hardware constraints without claiming that export controls caused the design.
 :::
 
 ## Learning outcomes
@@ -17,10 +17,10 @@ Chapter 73 is the book's technical epilogue. After power, chips, and datacenter 
 - Trace how open implementation (FlashMLA, serving backends, and related tooling) changed who could adopt the design beyond a single organization.
 - Connect the chapter's argument to Chapter 71's uneven adaptation thesis without asserting a single-cause, policy-only causation line.
 
-The chip war was a policy story first, but its long shadow moved into compiler code and kernel layout.
+The chip-war story leaves a question for architecture: how do teams change designs when hardware access is constrained?
 Chapter 71 showed that export controls were not only legal instruments; they were structural pressures on the whole AI stack.
 It also showed that HBM and advanced packaging sit at the center of practical frontier performance, not as an engineering afterthought.
-When one actor cannot be supplied in the same way as before, the next layer in the stack feels the cost of that constraint.
+The model case below lets us inspect one memory design and ask what would connect it to those wider pressures.
 
 The central claim we now test is narrow and explicit:
 Can policy-driven hardware constraint push a model family toward new architectural efficiency that is genuinely new, and if so, can we see one well-corroborated case?
@@ -28,7 +28,7 @@ DeepSeek-V2 gives us one defensible example.
 
 The claim is not that policy creates breakthroughs ex nihilo, or that every actor who compresses memory has the same strategic intent.
 It is that constrained contexts can make architecture changes more salient than they would otherwise be, and that DeepSeek-V2's Multi-head Latent Attention (MLA) is one documented response to a very real bottleneck.
-That is the bridge from Chapter 71's “permits and permissions” to Chapter 73's “equations and kernels.”
+This coda moves from Chapter 71's questions about supply-chain permission to the design of attention memory.
 
 ### The KV bottleneck under hardware constraint
 
@@ -44,9 +44,8 @@ Countries and firms at the top of the value chain do not share the same depth of
 That asymmetry matters for long-context systems because memory pressure compounds with every extra layer:
 chip supply, memory supplier choice, package-level bandwidth, and operating discipline.
 
-This is the same asymmetry Miller later described for high-capital geographies under constrained lithography ecosystems, now translated into a per-token arithmetic problem.
-The 2020s story of geopolitics-in-fabric becomes the 2020s story of per-request latency and per-token memory footprint.
-The actors changed from customs desks and export notices to scheduler knobs and cache policies, but the constraint pattern is recognizable.
+Chapter 71's account of uneven access raises a corresponding systems question: who can run and maintain a memory-efficient design?
+Per-request latency and per-token memory footprint are measurable parts of that question. Connecting them to export policy requires a deployment history, not just a similar pattern of constraints.
 
 In practical terms, long-context inference has a hidden fixed cost before one adds model depth.
 The larger the token budget and the larger the concurrency, the more the model spends keeping past context in a representable state.
@@ -310,13 +309,13 @@ This uncertainty is not weakness.
 It is the honest edge of causal method.
 
 What the case does not tell us is just as important as what it does:
-- it does not prove MLA was globally optimal, only that it was a workable constrained substitute in one documented release,
+- it documents an architecture and an author-reported model comparison, not global optimality or successful substitution under export controls,
 - it does not measure training-time impact across all domains,
 - it does not prove that open publication alone guarantees broad parity,
 - and it does not claim that open-source diffusion by itself overcomes unequal hardware and maintenance environments.
 
 The practical implication of that boundary is simple:
-this chapter demonstrates a transfer mechanism under one hardware-pressure profile, not an irreversible template for all pressure profiles.
+distinguish the reported memory result from the additional evidence needed for hardware-specific integration and use.
 
 Those are not caveats added for balance language only.
 They are the actual epistemic boundary of what this chapter can infer from the public record.
@@ -343,11 +342,10 @@ That sequence is why this chapter is intentionally modest, and why it aligns wit
 
 So the chapter's thesis remains modest and strong.
 The mechanism is real, documented, and materially integrated.
-But Chip War-level unevenness still predicts uneven benefits.
-Some stacks convert policy pressure into architecture quickly;
-others convert it only partially, or with delay, while waiting for stack maturity.
+Chapter 71's uneven-adaptation frame suggests asking which teams can use an architectural option, and how long integration takes.
+Answering that requires evidence about particular stacks and deployments, beyond the availability of a paper or repository.
 
-The counter-question from Chip War is therefore not “does constraint create a single innovation?” but “where does constraint move capability formation?”
+The historical question is where a constraint changes design choices, and how we could establish that change.
 In this case, it moved capability formation into a narrow layer that had previously been framed mainly as deployment engineering.
 If this pattern generalizes, then future constraint episodes will also show design moves at the infrastructure margin.
 That is not a deterministic prediction.
@@ -397,8 +395,8 @@ The next historical question now follows naturally.
 If HBM scarcity can make inference kernels more valuable than raw parameter count, then infrastructure policy will remain a research variable, not only a commercial one.
 The AI system will continue to evolve in the space between laws, materials, and memory equations.
 And in this space, Chapter 73 leaves us with one durable lesson.
-As with earlier episodes, the machine did not retreat to neutrality under pressure.
-It moved sideways.
+An architectural option can be inspected before its historical consequences are known.
+The next task is to trace how that option becomes usable capability, and for whom.
 
 At the same time, this chapter's own limits should be read forward.
 We do not claim exhaustive impact.
@@ -421,7 +419,7 @@ If future histories keep this thread explicit, they will avoid the common failur
 
 Some historical claims fail because they confuse an innovation with an outcome.
 MLA is a useful anchor because the paper links the mechanism to the memory bottleneck directly, and the mechanism is then carried into a public repository.
-That gives us two levels of documentation: a claim and a deployment path.
+That gives us two kinds of documentation: a paper's result and public implementation options whose compatibility needs checking.
 The book can use both without overstretching.
 
 A second strength is that this is not framed as a miracle optimization.
@@ -444,7 +442,7 @@ This also aligns with Chapter 71's broader point about uneven adaptation.
 One node in the ecosystem can absorb control pressure by changing design.
 Another node can absorb it by changing suppliers.
 Another can absorb it by changing service geography.
-MLA shows the design node.
+MLA supplies a design to investigate within that framework; the policy-to-design link still needs its own evidence.
 
 A design node has a special historical texture.
 Compared to procurement disputes, design moves leave code, tables, reproducibility signals, and maintenance footprints.
@@ -454,10 +452,9 @@ That is why design responses are easier to trace than policy rhetoric.
 ## What this technical epilogue changes for the book's closure
 
 The chapter's title says “algorithmic response” on purpose.
-In this sequence, we now have three levels of response under one pressure regime:
-policy, hardware, and architecture.
-Chapter 71 left us at the boundary where policy and hardware were visibly entwined.
-This chapter moves that boundary one layer deeper into what a model keeps around while it runs.
+The closing chapters pose three connected questions: which hardware can be obtained, what infrastructure can support it, and what a model must retain while it runs.
+Chapter 71 examines supply-chain permission; Chapter 72 examines physical capacity.
+This coda adds a specific memory design to investigate alongside those constraints.
 
 That clarifies the infrastructure close in Chapter 72.
 The AI system no longer looks like an either/or sequence of “policy then compute.”
@@ -469,7 +466,7 @@ The practical result is still uneven.
 Advanced stacks can adopt MLA-like mechanisms quickly when their stack is ready for custom kernels and custom scheduling.
 Constrained stacks can still adopt once tool maturity catches up and when the cost/quality frontier lines up.
 This is not a tidy leveling story.
-It is a layered leveling story with uneven timing and uneven benefit.
+The distribution and timing of any benefit remain questions for deployment evidence.
 
 The final lesson remains close to Chapter 71's punchline, but now with a new verb.
 Export controls do not freeze technology.
@@ -488,7 +485,7 @@ Everything else is context.
 2. In one paragraph, describe MLA's storage change and why this affects long-context generation more directly than raw parameter count alone.
 3. State the two exact DeepSeek-V2 numbers used in this chapter and trace each to a precise paper location.
 4. Explain how FlashMLA changes diffusion dynamics compared with a closed implementation, and what constraints remain.
-5. Map the chapter's claim to Miller's uneven adaptation frame without using deterministic or moralizing causation language.
+5. Relate the technical case to Chapter 71's uneven-adaptation argument. What further evidence would establish a causal connection to export controls?
 
 ## Sources
 
