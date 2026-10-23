@@ -711,7 +711,7 @@ flowchart TD
     A[Workload needs GCP API access] --> B{API accepts WIF principal on resource IAM?}
     B -- Yes --> C[Grant role to principal://.../subject/ns/NS/sa/KSA]
     B -- No --> D[Create GSA + grant roles on GSA]
-    D --> E[Bind roles/iam.workloadIdentityUser to serviceAccount:PROJECT.svc.id.goog[NS/KSA]]
+    D --> E["Bind roles/iam.workloadIdentityUser to serviceAccount:PROJECT.svc.id.goog[NS/KSA]"]
     E --> F[Annotate KSA with iam.gke.io/gcp-service-account]
     C --> G[Pod uses serviceAccountName: KSA]
     F --> G

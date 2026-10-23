@@ -50,14 +50,14 @@ graph TD
     Reg --> Repo2[Repository: myapp/worker]
     Reg --> Repo3[Repository: shared/nginx-base]
     
-    Repo1 --> Img1[Image: sha256:abc123... | tag: v1.2.0]
-    Repo1 --> Img2[Image: sha256:def456... | tag: v1.2.1]
-    Repo1 --> Img3[Image: sha256:ghi789... | tag: v1.3.0, latest]
+    Repo1 --> Img1["Image: sha256:abc123... | tag: v1.2.0"]
+    Repo1 --> Img2["Image: sha256:def456... | tag: v1.2.1"]
+    Repo1 --> Img3["Image: sha256:ghi789... | tag: v1.3.0, latest"]
     
-    Repo2 --> Img4[Image: sha256:jkl012... | tag: v2.0.0]
-    Repo2 --> Img5[Image: sha256:mno345... | tag: v2.1.0]
+    Repo2 --> Img4["Image: sha256:jkl012... | tag: v2.0.0"]
+    Repo2 --> Img5["Image: sha256:mno345... | tag: v2.1.0"]
     
-    Repo3 --> Img6[Image: sha256:pqr678... | tag: 1.25-custom]
+    Repo3 --> Img6["Image: sha256:pqr678... | tag: 1.25-custom"]
 ```
 
 An ECR **registry** exists once per AWS account per region; for private registries in standard commercial regions the URI is `{account_id}.dkr.ecr.{region}.amazonaws.com`, and you cannot rename that endpoint after creation. Within the registry, a **repository** groups related images the way a Git repository groups commits — teams usually adopt slash-separated names such as `team/service` or `app/component` so dozens of microservices stay navigable. Each **image** is an immutable manifest addressed by its SHA256 digest and optionally by one or more tags, which means the same digest can simultaneously carry a semantic version and a Git SHA for auditability without duplicating storage.

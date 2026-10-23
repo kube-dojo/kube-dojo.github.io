@@ -57,13 +57,13 @@ Most teams start with a **Key Vault vault** (`*.vault.azure.net`). [Standard tie
 
 ```mermaid
 graph TD
-    subgraph Azure Key Vault [Azure Key Vault 'myvault']
+    subgraph AzureKeyVault [Azure Key Vault 'myvault']
         S[Secrets<br/>- db-password<br/>- api-key-stripe<br/>- cosmos-conn-str]
         K[Keys<br/>- data-encrypt<br/>- signing-key<br/>- wrapping-key]
         C[Certificates<br/>- api-tls<br/>- mtls-cert<br/>- code-sign]
     end
     F["Features:<br/>• HSM-backed FIPS 140-2 L2 / 140-3 L3 (HSM Platform 2, current default)<br/>• Versioned updates<br/>• Audit logged access<br/>• Soft delete & purge protection<br/>• Private endpoint support"]
-    Azure Key Vault --- F
+    AzureKeyVault --- F
     style F text-align:left
 ```
 
@@ -354,7 +354,7 @@ az role assignment create \
 graph TD
     subgraph AP [Access Policies - Legacy]
         AP_V[Vault: kubedojo-vault]
-        AP_U1[alice@company.com<br/>Secrets: get, list, set]
+        AP_U1["alice@company.com<br/>Secrets: get, list, set"]
         AP_U2[app-managed-identity<br/>Keys: get, wrapKey, unwrapKey<br/>Secrets: get]
         AP_V --> AP_U1
         AP_V --> AP_U2
@@ -366,7 +366,7 @@ graph TD
         RBAC_V[Vault: kubedojo-vault]
         RBAC_S1[Scope: /secrets/db-password]
         RBAC_S2[Scope: / entire vault]
-        RBAC_U1[alice@company.com<br/>Role: Key Vault Secrets Officer]
+        RBAC_U1["alice@company.com<br/>Role: Key Vault Secrets Officer"]
         RBAC_U2[app-managed-identity<br/>Role: Key Vault Secrets User]
         RBAC_V --> RBAC_S1
         RBAC_V --> RBAC_S2
