@@ -57,10 +57,10 @@ flowchart TD
         end
         Node4[Node 4 Joins] -.-> |Auto-creates pod| DS4[DS Pod<br/>fluentd]
     end
-    style DS1 fill:#f9f,stroke:#333,stroke-width:2px
-    style DS2 fill:#f9f,stroke:#333,stroke-width:2px
-    style DS3 fill:#f9f,stroke:#333,stroke-width:2px
-    style DS4 fill:#f9f,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style DS1 fill:#f9f,color:#111,stroke:#333,stroke-width:2px
+    style DS2 fill:#f9f,color:#111,stroke:#333,stroke-width:2px
+    style DS3 fill:#f9f,color:#111,stroke:#333,stroke-width:2px
+    style DS4 fill:#f9f,color:#111,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
 The diagram shows the important mental model: the fourth pod is not a scaling decision made by a human after the new node appears. It is the natural result of the DaemonSet controller noticing that the new node matches the DaemonSet's placement rules. If a node does not match those rules because of labels, selectors, affinity, or taints that the pod does not tolerate, the absence of a pod is also expected behavior. Troubleshooting DaemonSets therefore starts by asking whether the node is eligible, not by asking whether the replica count is wrong.
@@ -292,9 +292,9 @@ flowchart TD
     end
 
     Crash[web-1 Crashes] -.-> |Recreated as| pod-1
-    style PVC0 fill:#f96,stroke:#333,stroke-width:2px
-    style PVC1 fill:#f96,stroke:#333,stroke-width:2px
-    style PVC2 fill:#f96,stroke:#333,stroke-width:2px
+    style PVC0 fill:#f96,color:#111,stroke:#333,stroke-width:2px
+    style PVC1 fill:#f96,color:#111,stroke:#333,stroke-width:2px
+    style PVC2 fill:#f96,color:#111,stroke:#333,stroke-width:2px
 ```
 
 The crash arrow is the key detail. If `web-1` disappears, Kubernetes does not create `web-3` as a replacement. The StatefulSet controller recreates `web-1`, preserving the identity that other members may reference. If the StatefulSet has a volume claim template, the replacement pod reuses the claim associated with that identity. That pairing is why StatefulSet troubleshooting usually includes three resources at once: the StatefulSet, the individual pod, and the PVC named for that pod.
@@ -594,9 +594,9 @@ flowchart TD
 
     Storage -->|Yes or No| STS[StatefulSet]
 
-    style DS fill:#bbf,stroke:#333,stroke-width:2px
-    style Deploy fill:#bfb,stroke:#333,stroke-width:2px
-    style STS fill:#fbb,stroke:#333,stroke-width:2px
+    style DS fill:#bbf,color:#111,stroke:#333,stroke-width:2px
+    style Deploy fill:#bfb,color:#111,stroke:#333,stroke-width:2px
+    style STS fill:#fbb,color:#111,stroke:#333,stroke-width:2px
 ```
 
 The flowchart intentionally asks about identity before storage because some stateful protocols need stable names even when storage is external. A clustered application may store data elsewhere but still need predictable peer addresses. Conversely, an application might mount persistent storage but remain effectively single-replica and not need a multi-member StatefulSet. Use the chart as a starting point, then verify the application's own documentation, especially for databases and distributed systems that have strict membership rules.
