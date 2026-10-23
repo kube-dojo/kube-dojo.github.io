@@ -774,7 +774,7 @@ Click the button above to review this PR in a running environment.
 | Onboarding time (30 new hires) | $180,000 | $15,000 | $165,000 |
 | **Net Annual Savings** | | | **$1,215,000** |
 
-The VP of Engineering presented the ROI to the board: "We spent $45,000 on Gitpod and saved $1.2M. That's a 27x return." The CTO added: "And we haven't quantified the morale improvement. Developers actually enjoy doing code reviews now."
+The VP of Engineering presented the ROI to the board: "We spent \$45,000 on Gitpod and saved \$1.2M. That's a 27x return." The CTO added: "And we haven't quantified the morale improvement. Developers actually enjoy doing code reviews now."
 
 ---
 
@@ -786,7 +786,7 @@ The VP of Engineering presented the ROI to the board: "We spent $45,000 on Gitpo
 
 - **The Dev Containers spec started as a VS Code feature and became an industry standard** — Microsoft's VS Code team created devcontainer.json for local Docker development. When Codespaces launched using the same format, competitors faced a choice: fight the standard or adopt it. [DevPod, JetBrains, and even Gitpod now support devcontainer.json](https://github.com/devcontainers/spec/blob/main/docs/specs/supporting-tools.md). Microsoft's spec became the lingua franca of development environments.
 
-- **One Codespaces customer reduced their laptop budget by $2.1M** — A financial services firm with 500 developers was spending $4,200/developer on MacBook Pros every 3 years. After migrating to Codespaces, they switched to $800 Chromebooks. The savings: $1.7M in hardware plus $400K in IT support. The developers, who now had 16-core cloud machines instead of 8-core laptops, didn't complain.
+- **One Codespaces customer reduced their laptop budget by \$2.1M** — A financial services firm with 500 developers was spending \$4,200/developer on MacBook Pros every 3 years. After migrating to Codespaces, they switched to \$800 Chromebooks. The savings: \$1.7M in hardware plus \$400K in IT support. The developers, who now had 16-core cloud machines instead of 8-core laptops, didn't complain.
 
 ---
 

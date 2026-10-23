@@ -331,7 +331,7 @@ A workload that does many things should not be one identity with many permission
 >
 > **In under a minute, the pipeline deleted twenty-three production services, three databases, and two years of customer order history.**
 >
-> The team had backups, but restoration took fourteen hours because the backup process itself depended on services the pipeline had deleted. The outage occurred on the second-busiest sales day of the quarter. **Total impact: $4.2 million in lost sales plus $800,000 in emergency recovery costs.**
+> The team had backups, but restoration took fourteen hours because the backup process itself depended on services the pipeline had deleted. The outage occurred on the second-busiest sales day of the quarter. **Total impact: \$4.2 million in lost sales plus \$800,000 in emergency recovery costs.**
 >
 > Post-incident analysis revealed the pipeline had permissions to delete any resource in any namespace — permissions it had never legitimately needed because production deletes were always done manually by the SRE team. After the incident, they implemented least privilege: CI/CD can create and update deployments in specific namespaces, it cannot delete, it cannot access databases, and it cannot modify networking or RBAC. The recovery took fourteen hours, but the redesign that prevented every future incident of this class took six. They wished, painfully and publicly, that they had done it first.
 

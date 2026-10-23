@@ -40,7 +40,7 @@ We accept this complexity because the alternatives are worse for modern workload
 
 ## Did You Know?
 
-- **The external $150 million estimate:** Analysts at Cyence estimated that S&P 500 companies lost roughly $150 million during the 2017 AWS S3 disruption. Treat that as a third-party economic estimate, not as an AWS-reported loss number or an exact causal accounting.
+- **The external \$150 million estimate:** Analysts at Cyence estimated that S&P 500 companies lost roughly \$150 million during the 2017 AWS S3 disruption. Treat that as a third-party economic estimate, not as an AWS-reported loss number or an exact causal accounting.
 - **Physical speed limits:** Light travels about 299,792 km/s in vacuum, but signals in fiber are commonly approximated around 200,000 km/s. New York and London are roughly 5,600 km apart in a straight line, so a perfect fiber path would still have a round-trip floor near 56 ms before routers, queues, encryption, or real cable routes add delay.
 - **The CAP theorem origins:** Eric Brewer presented CAP as a conjecture at PODC 2000, and Seth Gilbert with Nancy Lynch later formalized the result in 2002. The practical reading is narrower than the slogan: during a partition, a shared-data system must decide how it trades consistency against availability.
 - **Consensus in Kubernetes:** The Kubernetes control plane stores cluster state in `etcd`, and `etcd` uses Raft to replicate state among members. Raft was published by Diego Ongaro and John Ousterhout in 2014 with understandability as an explicit design goal compared with Paxos.

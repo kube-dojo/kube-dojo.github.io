@@ -163,9 +163,9 @@ The progression through these levels is cultural work. Moving from Level 1 to Le
 > **Hypothetical scenario: Monthly FinOps Review**
 >
 > **Executive Summary:**
-> - Total cloud spend: $170,000 (budget: $180,000) — under budget
+> - Total cloud spend: \$170,000 (budget: \$180,000) — under budget
 > - Month-over-month change: +3%
-> - Cost per customer: $0.70 (target: under $0.75) — target met
+> - Cost per customer: \$0.70 (target: under \$0.75) — target met
 > - Savings realized this month: $8,000
 >
 > **Key Wins:**
@@ -175,7 +175,7 @@ The progression through these levels is cultural work. Moving from Level 1 to Le
 >
 > **Risks:**
 > - ML training costs growing month-over-month (investigating)
-> - Untagged resources: approximately $7,000/month (down from $10,000 — improving)
+> - Untagged resources: approximately \$7,000/month (down from \$10,000 — improving)
 >
 > **Next Month Focus:**
 > - Complete cross-AZ traffic optimization
@@ -370,7 +370,7 @@ infracost:
 
 Anomaly detection is the Operate-phase capability that catches unexpected cost movements before they compound into budget-busting surprises. Its value is not in the detection itself — a spike visible on a dashboard is still a spike you have to pay for — but in the *lead time* it creates. Detecting an anomaly within hours means the team can investigate while the affected resources are still running and the root cause is fresh. Detecting it at the end of the billing cycle means the money is already spent and the investigation must reconstruct events from logs.
 
-The distinction between anomaly detection and threshold alerting is worth understanding clearly because they are often conflated. A threshold alert fires when a metric crosses a fixed boundary — "alert when daily spend exceeds $5,000." A cost anomaly detection system learns the normal spending pattern for each service, account, or tag combination and fires when the actual spending diverges from that pattern in a statistically significant way. A threshold alert on a service that normally spends $4,000/day will miss a spike to $4,900 because the threshold was never crossed, even though the spike represents a 22% increase. An anomaly detection system tuned to that service's baseline would catch the same spike because it recognizes the deviation from the expected pattern. For this reason, anomaly detection is the preferred approach for variable-cost services — those whose spending naturally fluctuates with traffic — while threshold alerting remains appropriate for fixed-cost resources like Reserved Instances and committed-use discounts where the expected spend is known precisely.
+The distinction between anomaly detection and threshold alerting is worth understanding clearly because they are often conflated. A threshold alert fires when a metric crosses a fixed boundary — "alert when daily spend exceeds \$5,000." A cost anomaly detection system learns the normal spending pattern for each service, account, or tag combination and fires when the actual spending diverges from that pattern in a statistically significant way. A threshold alert on a service that normally spends \$4,000/day will miss a spike to \$4,900 because the threshold was never crossed, even though the spike represents a 22% increase. An anomaly detection system tuned to that service's baseline would catch the same spike because it recognizes the deviation from the expected pattern. For this reason, anomaly detection is the preferred approach for variable-cost services — those whose spending naturally fluctuates with traffic — while threshold alerting remains appropriate for fixed-cost resources like Reserved Instances and committed-use discounts where the expected spend is known precisely.
 
 ### Types of Cost Anomalies
 
