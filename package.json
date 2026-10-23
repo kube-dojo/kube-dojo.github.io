@@ -20,7 +20,7 @@
     "@astrojs/starlight": "^0.42.0",
     "astro": "^7.3.2",
     "mermaid": "^11.17.2",
-    "sharp": "^0.35.1"
+    "sharp": "^0.35.5"
   },
   "overrides": {
     "uuid": "^14.0.0",
