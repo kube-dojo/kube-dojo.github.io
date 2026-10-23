@@ -296,7 +296,7 @@ flowchart LR
 
 ### Why This Structure Works
 
-**The Security OU resides at the absolute top tier**: Security accounts logically demand the most draconian and restrictive SCPs in the organization. For example, the Log Archive account is configured as strictly write-only for all other member accounts, and exclusively read-only for the security investigation teams. The log archive account should be designed so workload accounts and ordinary administrators cannot delete audit logs; if you need retention that even root cannot bypass, use controls such as S3 Object Lock compliance mode with tightly scoped administration. No principal is allowed to disable Amazon GuardDuty findings or tamper with the S3 bucket object locks.
+**The Security OU resides at the absolute top tier**: Security accounts logically demand the most draconian and restrictive SCPs in the organization. For example, the Log Archive account is configured as strictly write-only for all other member accounts, and exclusively read-only for the security investigation teams. The log archive account should be designed so workload accounts and ordinary administrators cannot delete audit logs. Compliance retention protects individual S3 object versions for their retention period, including against root deletion; Governance permits authorized bypass. Restrict changes to threat detection and archive retention separately, and verify the limits described in Centralized Logging & Audit below.
 
 **Infrastructure OU is entirely isolated from Application Workloads**: The core networking team manages immense, org-wide routing topologies via Transit Gateways and centralized Route 53 DNS configurations without ever requiring or desiring access to the actual application workloads. The CI/CD pipeline infrastructure runs completely isolated in a dedicated shared services account, securely pushing compiled container artifacts to registries that the disparate workload accounts can securely pull from via highly scoped resource policies.
 
@@ -429,7 +429,7 @@ With AFT, engineers define an account request inside a centralized Terraform mod
 
 ### Extending Vending to Kubernetes
 
-The account vending philosophy extends seamlessly into the modern Kubernetes lifecycle. Once the foundational cloud account is permanently established and secured, the exact same automated pipeline can transparently invoke secondary modules to deploy an EKS, GKE, or AKS cluster. By physically embedding the Kubernetes cluster provisioning inside the larger account vending logic, you mathematically guarantee that the cluster is automatically registered with your central ArgoCD or Flux instance, its audit logs are hard-wired to the immutable log archive account, and its inbound ingress controllers are correctly peered with the central network hub. This holistic pipeline can reduce environment setup from a multi-week manual effort to a far more repeatable and auditable automated process.
+The account vending philosophy extends seamlessly into the modern Kubernetes lifecycle. Once the foundational cloud account is permanently established and secured, the exact same automated pipeline can transparently invoke secondary modules to deploy an EKS, GKE, or AKS cluster. The pipeline can register the cluster with central ArgoCD or Flux, configure provider-specific audit export and forwarding, and connect ingress to the central network hub. These integrations require configuration and verification; for EKS audit delivery and retention limits, follow Centralized Logging & Audit below. This holistic pipeline can reduce environment setup from a multi-week manual effort to a far more repeatable and auditable automated process.
 
 ### GCP Project Factory
 
@@ -763,7 +763,7 @@ CloudTrail records AWS API activity; Kubernetes audit logs describe Kubernetes A
 
 **Configuration prerequisite:** an authorized operator must enable audit export, wait for the configuration update to succeed, and allow delivery time. EKS may need up to five available IP addresses in each subnet for the update. Delivery normally takes minutes but is best effort. CloudWatch ingestion, storage, and scanning charges apply; enabling export does not establish complete historical coverage.
 
-**Read-only inspection example, not recorded output:** use Bash and AWS CLI v2, an existing cluster, the correct AWS profile/account and Region, and permissions for `eks:DescribeCluster` and `logs:FilterLogEvents`. Replace the example identifiers; the query covers the preceding hour. Choose an interval containing known Kubernetes API activity. These commands do not enable logging or create resources.
+**Read-only inspection example, not recorded output:** use Bash and AWS CLI v2, an existing cluster, the correct AWS profile/account and Region, and permissions for `eks:DescribeCluster` and `logs:FilterLogEvents`. Replace the example identifiers; the query covers the preceding hour. To inspect known activity outside that hour, adjust both start and end bounds to the relevant epoch-millisecond interval. These commands do not enable logging or create resources.
 
 ```bash
 eks_audit_profile=workload-readonly
@@ -1323,7 +1323,7 @@ The organization condition is generally superior because you typically do not ne
 
 ### Task 4: Codify Centralized Logging Infrastructure
 
-In `shared/logging.tf`, model an S3 archive with Governance retention and a workload writer role. This configuration example demonstrates storage controls; it is not the EKS control-plane delivery pipeline. Governance intrinsically permits authorized bypass, unlike Compliance, but the solution's explicit deny policy separately blocks deletion even for bypass holders while that policy remains in force. Changing that policy does not change the retention mode. Review retention requirements and storage-cost consequences before applying either mode; local validation does not prove delivery or retention enforcement.
+In `shared/logging.tf`, model an S3 archive with Governance retention and a workload writer role. This configuration example demonstrates storage controls; it is not the EKS control-plane delivery pipeline. Governance intrinsically permits authorized bypass, unlike Compliance, but the solution's explicit deny policy separately blocks direct `DeleteObject` and `DeleteObjectVersion` requests even for bypass holders while that policy remains in force. That deny does not cover retention-setting changes; changing the policy does not change the retention mode. Review retention requirements and storage-cost consequences before applying either mode; local validation does not prove delivery or retention enforcement.
 
 **Success Criteria**:
 - [ ] S3 bucket has `object_lock_enabled = true`
