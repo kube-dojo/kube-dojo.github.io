@@ -75,6 +75,8 @@ async function renderHost(host: HTMLElement): Promise<void> {
     // existing labels using <br>, <b>, and <i> render correctly.
     securityLevel: 'loose',
     theme: currentTheme() === 'light' ? 'default' : 'dark',
+    layout: 'dagre',
+    look: 'classic',
     themeVariables: {
       fontSize: '18px',
       // The default light palette uses pale fills for these mindmap sections.
