@@ -70,7 +70,7 @@ The landing zone shapes your Kubernetes posture before you provision a single cl
 
 - **Networking**: a shared VPC (GCP) or Transit Gateway (AWS) ready for new clusters to attach to (see Module 8.2 for the full transit-hub design).
 - **Identity**: an IAM Identity Center (AWS) / Workforce Identity Federation (GCP) / Entra ID (Azure) integration so that cluster RBAC maps to organizational SSO on day one.
-- **Logging**: a centralized log sink or organization trail so every new EKS/GKE/AKS cluster ships its audit events to the immutable archive without any per-cluster configuration.
+- **Logging**: cluster provisioning must configure Kubernetes audit export and forwarding to the archive. An organization CloudTrail trail does not enable EKS control-plane audit logging; that requires a per-cluster setting, as described below.
 
 Without a landing zone, each of these integrations becomes a manual bootstrapping step performed by whoever happens to create the cluster—and almost certainly skipped the first time.
 
@@ -641,11 +641,11 @@ In all three models, the architecture is the same: the pod presents a signed ide
 
 ## Centralized Logging & Audit
 
-In an expansive multi-account architecture, security logging becomes simultaneously vastly more important and significantly more complex to execute securely. You absolutely require a unified single pane of glass for security event correlation, but you must also guarantee mathematically that no individual compromised account can tamper with or destroy its own historical audit logs to cover an attacker's tracks.
+Centralized security logs support correlation and reduce a compromised workload account's ability to erase evidence already delivered to another account. This is a layered control, not a mathematical guarantee: collection coverage, delivery failures, archive permissions, retention settings, and access to encryption keys all affect the evidence available during an investigation.
 
 ### The Immutable Log Archive Pattern
 
-To achieve this level of forensic guarantee, organizations employ the Immutable Log Archive Pattern, heavily utilizing write-once-read-many (WORM) storage mechanics.
+The Immutable Log Archive Pattern combines separate administrative ownership with write-once-read-many (WORM) storage. Retention protects stored versions; it does not prove that every relevant event was collected, delivered, or remains readable. Treat the diagram as a delivery design requiring configured pipelines, not automatic behavior.
 
 ```mermaid
 flowchart TD
@@ -662,15 +662,22 @@ flowchart TD
     end
 
     subgraph LA ["Log Archive Account (Security OU)"]
-        S3["S3 Bucket (Object Lock)<br/>- Governance mode: 1 year<br/>- No delete, even by root"]
+        S3["S3 Object Lock<br/>Governance: 365-day default per version<br/>Authorized bypass possible"]
         Query["Athena / OpenSearch for<br/>query and investigation"]
-        SCP["SCP prevents:<br/>- Disabling CloudTrail<br/>- Deleting log buckets<br/>- Modifying Object Lock"]
+        SCP["Separate guardrails required:<br/>CloudTrail configuration<br/>Archive access and retention changes"]
         S3 --- Query
         S3 --- SCP
     end
 
-    CT_A & VPC_A & EKS_A & CT_B & VPC_B & EKS_B --> S3
+    CT_A & VPC_A & CT_B & VPC_B --> S3
+    EKS_A & EKS_B --> CW["CloudWatch Logs in each workload account<br/>Audit export must be enabled"]
+    CW --> Forward["Configured cross-account subscription<br/>and delivery pipeline"]
+    Forward --> S3
 ```
+
+**Choose retention deliberately.** [S3 Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html#object-lock-retention-modes) protects individual object versions. Governance retention can be bypassed with `s3:BypassGovernanceRetention` and an explicit bypass request. Compliance retention prevents deletion or shortening retention of a protected version, including by root, until its retain-until date; AWS documents account deletion as an escape from this protection. Do not select Compliance casually: mistakes can retain unwanted data and its storage costs for the full period.
+
+A bucket default applies to new versions, not retroactively to existing ones, and explicit per-version retention can override the default. Uploading the same key creates another version; a simple delete can add a delete marker while the protected version survives. Verify the version's mode and retain-until date, not just the bucket setting. Governance is useful where controlled bypass is required; a deny policy is a separate, changeable control and does not turn Governance into Compliance.
 
 ### AWS: Organization-Wide CloudTrail
 
@@ -752,41 +759,41 @@ gsutil iam ch $SINK_SA:objectCreator gs://company-org-audit-logs
 
 ### EKS Audit Logs to Central Logging
 
-Cloud provider audit logs (like CloudTrail) track infrastructure changes, but Kubernetes audit logs are entirely separate and must be explicitly handled. They track critical API calls executed inside the cluster. You absolutely must capture both streams.
+CloudTrail records AWS API activity; Kubernetes audit logs describe Kubernetes API activity. For managed EKS, worker-node Fluent Bit agents can collect application/container logs, but they cannot tail the managed control plane's audit files. [EKS exports selected control-plane log types to CloudWatch Logs](https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html) in the cluster's account. Export is off by default; enable `audit` per cluster through its logging configuration. Other selectable types are `api`, `authenticator`, `controllerManager`, and `scheduler`.
 
-```yaml
-# Fluentbit ConfigMap to ship EKS audit logs to central account
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: fluent-bit-config
-  namespace: logging
-data:
-  fluent-bit.conf: |
-    [SERVICE]
-        Flush         5
-        Log_Level     info
-        Parsers_File  parsers.conf
+**Configuration prerequisite:** an authorized operator must enable audit export, wait for the configuration update to succeed, and allow delivery time. EKS may need up to five available IP addresses in each subnet for the update. Delivery normally takes minutes but is best effort. CloudWatch ingestion, storage, and scanning charges apply; enabling export does not establish complete historical coverage.
 
-    [INPUT]
-        Name              tail
-        Tag               kube.audit.*
-        Path              /var/log/kubernetes/audit/*.log
-        Parser            json
-        Refresh_Interval  10
-        Mem_Buf_Limit     50MB
+**Read-only inspection example, not recorded output:** use an existing cluster, the correct AWS profile/account and Region, and permissions for `eks:DescribeCluster` and `logs:FilterLogEvents`. Replace the example values and choose a recent interval containing known Kubernetes API activity; these commands do not enable logging or create resources.
 
-    [OUTPUT]
-        Name              s3
-        Match             kube.audit.*
-        bucket            central-audit-logs-cross-account
-        region            us-east-1
-        role_arn          arn:aws:iam::999888777666:role/audit-log-writer
-        total_file_size   50M
-        upload_timeout    60s
-        s3_key_format     /eks-audit/$TAG/%Y/%m/%d/%H/$UUID.gz
-        compression       gzip
+```bash
+AWS_PROFILE=workload-readonly
+AWS_REGION=us-east-1
+CLUSTER=team-a-prod
+# Replace with the start of your investigation interval, in epoch milliseconds.
+START_MS=1792713600000
+
+aws eks describe-cluster \
+  --profile "$AWS_PROFILE" --region "$AWS_REGION" --name "$CLUSTER" \
+  --query 'cluster.logging.clusterLogging' --output json --no-cli-pager
+
+aws logs filter-log-events \
+  --profile "$AWS_PROFILE" --region "$AWS_REGION" \
+  --log-group-name "/aws/eks/$CLUSTER/cluster" \
+  --log-stream-name-prefix kube-apiserver-audit- \
+  --start-time "$START_MS" --max-items 20 --output json --no-cli-pager
 ```
+
+**Expected verification:** [`describe-cluster`](https://docs.aws.amazon.com/cli/latest/reference/eks/describe-cluster.html) should show `audit` in an enabled entry. [`filter-log-events`](https://docs.aws.amazon.com/cli/latest/reference/logs/filter-log-events.html) should return audit events for the selected interval once delivered. The 20-item limit produces a sample, not an exhaustive audit. An empty sample does not prove inactivity: check account, Region, interval, export state, and delivery delay. A missing log group or access denial is a failed inspection, not evidence that the cluster had no activity. These provider calls have not been executed for this lesson.
+
+For archival, configure a [cross-account CloudWatch subscription](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CrossAccountSubscriptions.html) to a receiving destination, such as a Firehose delivery pipeline to S3. This requires a receiver destination and access policy, delivery-role permissions, a sender subscription and permission to use the destination, plus working S3/encryption permissions downstream. The log group and subscription destination must share a Region. Verify arrival and retention on the resulting S3 versions separately; seeing CloudWatch events proves neither cross-account delivery nor Object Lock protection.
+
+**Pause and predict:** Audit export is enabled and CloudWatch contains yesterday's EKS events, but the archive contains none. Would switching the archive from Governance to Compliance recover those events? Which boundary should you inspect first?
+
+<details>
+<summary>Check your prediction</summary>
+
+No. Retention protects versions that reached S3; it cannot repair missing delivery. Inspect the source subscription, receiver permissions and delivery failures, then check destination objects and their retention metadata. Recovering available CloudWatch events requires a separate delivery or export action, not a retention-mode change.
+</details>
 
 ---
 
@@ -1120,7 +1127,7 @@ Failure layer: Data-plane packet filtering boundaries versus control-plane API a
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Cloud control-plane policy enforcement versus in-guest runtime compute observability. Next action: recognize that while member accounts cannot modify or delete an organization trail, an attacker controlling local compute resources can terminate local telemetry forwarding agents, manipulate in-guest system logs, flood benign API calls to drown alerts in noise, or exploit data-plane actions (such as direct S3 data access) that are not captured if data events are omitted to minimize logging costs; combine SCPs with runtime endpoint security agents, S3 Object Lock in compliance mode, and centralized aggregate log export to ensure end-to-end auditability.
+Failure layer: Cloud control-plane policy enforcement versus in-guest runtime compute observability. An attacker controlling local compute can stop telemetry agents, alter local logs, or use data-plane actions absent from the trail's event selection. Combine configuration guardrails, runtime monitoring, centralized delivery, and version retention, then test each boundary. Compliance retention protects delivered versions for their retention period; it cannot guarantee complete collection or end-to-end auditability.
 </details>
 
 **Success Criteria**:
@@ -1139,7 +1146,7 @@ flowchart LR
     Root --> SB[Sandbox OU]
     Root --> Susp[Suspended OU]
 
-    Sec --> Sec1["log-archive<br/>(immutable S3, 1-year retention for SOC2)"]
+    Sec --> Sec1["log-archive<br/>(S3 version retention; duration chosen by policy)"]
     Sec --> Sec2["security-tooling<br/>(GuardDuty, SecurityHub, Inspector)"]
     Sec --> Sec3["audit-readonly<br/>(auditor access, no write permissions)"]
 
@@ -1312,17 +1319,17 @@ The organization condition is generally superior because you typically do not ne
 
 ### Task 4: Codify Centralized Logging Infrastructure
 
-In the `shared/logging.tf` file, strictly define the complex Terraform resource blocks required to create the immutable S3 storage bucket designated for audit logs, alongside the specific IAM role that future workload accounts must assume to deposit log events.
+In `shared/logging.tf`, model an S3 archive with Governance retention and a workload writer role. This configuration example demonstrates storage controls; it is not the EKS control-plane delivery pipeline. Retaining Governance permits authorized bypass, unlike Compliance. Review the organization's retention requirements and storage-cost consequences before applying either mode; local validation does not prove delivery or retention enforcement.
 
 **Success Criteria**:
 - [ ] S3 bucket has `object_lock_enabled = true`
-- [ ] Object lock uses `GOVERNANCE` mode with 365-day retention
+- [ ] Object Lock defaults new versions to `GOVERNANCE` with 365-day retention; explain the bypass and per-version override limits
 - [ ] Bucket versioning is enabled
 - [ ] Bucket policy denies `s3:DeleteObject` and `s3:DeleteObjectVersion` for all principals
 - [ ] IAM role uses `pods.eks.amazonaws.com` as the trusted service principal type
 - [ ] `terraform validate` passes cleanly
 
-Verify the integrity of your Infrastructure as Code implementation locally:
+Check configuration validity locally (this does not verify cloud behavior):
 ```bash
 cd shared
 terraform init
@@ -1483,6 +1490,9 @@ This specific proportional model is overwhelmingly the most common enterprise ap
 
 ## Sources
 
+- [AWS: S3 Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html) — Version scope, retention modes, bypass and delete-marker behavior.
+- [AWS: EKS control-plane logs](https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html) — Opt-in CloudWatch delivery, log types, best-effort behavior and charges.
+- [AWS: Cross-account Firehose subscriptions](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CrossAccountSubscriptions-Firehose.html) — Sender, destination, permissions and S3 delivery setup.
 - [docs.aws.amazon.com: orgs reference limits.html](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_reference_limits.html) — AWS Organizations quotas document the five-level OU nesting limit.
 - [cloud.google.com: limits](https://cloud.google.com/resource-manager/docs/limits) — Google Cloud Resource Manager limits explicitly state that folders can be nested up to 10 levels deep.
 - [learn.microsoft.com: overview](https://learn.microsoft.com/en-us/azure/governance/management-groups/overview) — Microsoft's management groups overview documents the six-level depth limit.
