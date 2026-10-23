@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import select
 import sqlite3
 import subprocess
 import sys
@@ -3161,27 +3162,37 @@ def test_iso_to_epoch_round_trip() -> None:
 def test_cli_starts_server_and_reports_host_port(tmp_path: Path) -> None:
     repo_root = tmp_path
     _init_repo(repo_root)
+    project = Path(local_api.__file__).resolve().parent.parent
+    common = Path(_git(project, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+    primary = common.parent
+    env = os.environ.copy()
+    env.pop("PYTHONUNBUFFERED", None)
     process = subprocess.Popen(
         [
-            sys.executable,
-            "scripts/local_api.py",
+            str(primary / ".venv/bin/python"),
+            str(project / "scripts/local_api.py"),
             "--host",
             "127.0.0.1",
             "--port",
-            "8876",
+            "0",
             "--repo-root",
             str(repo_root),
         ],
-        cwd="/Users/krisztiankoos/projects/kubedojo",
+        cwd=primary,
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     try:
+        assert process.stdout is not None
+        ready, _, _ = select.select([process.stdout], [], [], 10)
+        assert ready, "Feature API did not report readiness within 10 seconds"
         line = process.stdout.readline().strip()
         data = json.loads(line)
         assert data["host"] == "127.0.0.1"
-        assert data["port"] == 8876
+        assert 0 < data["port"] <= 65535
+        assert data["repo_root"] == str(repo_root)
     finally:
         process.terminate()
         process.wait(timeout=5)
@@ -3416,17 +3427,22 @@ def test_briefing_book_groups_chapters_by_part_with_rollup(tmp_path: Path) -> No
     )
     _seed_book_chapter(tmp_path, 50, "attention-is-all-you-need", status="researching", owner="Codex")
     _seed_book_chapter(tmp_path, 72, "the-infinite-datacenter", status="researching", owner="Claude")
+    _seed_book_chapter(tmp_path, 73, "mla", status="researching", owner="Codex")
 
     status_code, payload, content_type = local_api.route_request(tmp_path, "/api/briefing/book")
     assert status_code == 200
     assert content_type.startswith("application/json")
     assert isinstance(payload, dict)
     assert payload["epic_issue"] == 394
-    assert payload["expected_chapter_count"] == 72
-    assert payload["chapter_count"] == 6
+    assert payload["expected_chapter_count"] == 73
+    assert payload["chapter_count"] == 7
     assert len(payload["parts"]) == 9
 
     parts_by_num = {p["part"]: p for p in payload["parts"]}
+    assert parts_by_num[9]["chapter_range"] == [59, 73]
+    assert parts_by_num[9]["chapters"][-1]["status"] == "researching"
+    assert parts_by_num[9]["chapters"][-1]["chapter"] == 73
+    assert parts_by_num[9]["published_count"] == parts_by_num[9]["aids_landed_count"] == 0
     # Part 3 (Ch 11-16): one anchored chapter with all the GYR counts.
     part3 = parts_by_num[3]
     assert part3["chapter_range"] == [11, 16]
@@ -3454,7 +3470,7 @@ def test_briefing_book_groups_chapters_by_part_with_rollup(tmp_path: Path) -> No
         "accepted": 1,
         "capacity_plan_anchored": 1,
         "prose_ready": 1,
-        "researching": 2,
+        "researching": 3,
     }
 
 
@@ -3496,7 +3512,7 @@ def test_briefing_book_handles_missing_or_malformed_status_files(tmp_path: Path)
 def test_briefing_book_returns_empty_skeleton_when_directory_missing(tmp_path: Path) -> None:
     payload = local_api.build_book_briefing(tmp_path)
     assert payload["chapter_count"] == 0
-    assert payload["expected_chapter_count"] == 72
+    assert payload["expected_chapter_count"] == 73
     assert payload["published_count"] == 0
     assert payload["aids_landed_count"] == 0
     assert len(payload["parts"]) == 9

@@ -8228,7 +8228,7 @@ _AI_HISTORY_PARTS: tuple[dict[str, Any], ...] = (
     {"part": 6, "name": "The Rise of Data & Distributed Compute", "range": (32, 40), "issue": 404},
     {"part": 7, "name": "The Deep Learning Revolution & GPU Coup", "range": (41, 49), "issue": 405},
     {"part": 8, "name": "The Transformer, Scale & Open Source", "range": (50, 58), "issue": 406},
-    {"part": 9, "name": "The Product Shock & Physical Limits", "range": (59, 72), "issue": 407},
+    {"part": 9, "name": "The Product Shock & Physical Limits", "range": (59, 73), "issue": 407},
 )
 
 _BOOK_NUMERIC_KEYS = frozenset({"part", "chapter", "green_claims", "yellow_claims", "red_claims"})
@@ -10068,7 +10068,7 @@ def serve(repo_root: Path, host: str, port: int) -> None:
     ThreadingHTTPServer.daemon_threads = True
     ThreadingHTTPServer.allow_reuse_address = True
     server = ThreadingHTTPServer((host, port), make_handler(repo_root))
-    print(json.dumps({"repo_root": str(repo_root), "host": host, "port": port}, sort_keys=True))
+    print(json.dumps({"repo_root": str(repo_root), "host": host, "port": server.server_port}, sort_keys=True), flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
