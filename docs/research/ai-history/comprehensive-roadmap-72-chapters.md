@@ -2,7 +2,7 @@
 
 This document outlines the roadmap for the AI History book. Following a critical gap analysis, this roadmap explicitly weaves the fundamental mathematical and algorithmic breakthroughs of Machine Learning together with the infrastructural, hardware, and data constraints that shaped every era of Artificial Intelligence. 
 
-The current book has 73 English chapter source files and 73 public-index entries: Chapters 1–72 form the nine-part arc below, followed by Chapter 73's technical coda. The arc demonstrates that AI is not a sudden bubble, but the result of a century of intertwined scientific, mathematical, and engineering milestones.
+The current book has 73 English chapter source files and 73 public-index entries across nine parts. Part 9 concludes with Chapter 73's technical coda. The arc demonstrates that AI is not a sudden bubble, but the result of a century of intertwined scientific, mathematical, and engineering milestones.
 
 The historical filename is retained. Research contracts currently cover Chapters 1–72 only; Chapter 73's contract and contract-backed readiness remain pending under #2288. This inventory does not grant review clearance or accepted status.
 
