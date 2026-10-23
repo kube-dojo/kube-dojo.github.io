@@ -120,10 +120,10 @@ flowchart TD
     D["Object Storage (cold)\nDurable; request-oriented API\nS3, GCS, MinIO"]
     E["Tape/Archive\nArchival\nGlacier, Coldline"]
 
-    A -->|"Cost $, Speed $$$$"| B
-    B -->|"Cost $$, Speed $$$"| C
-    C -->|"Cost $$$, Speed $$"| D
-    D -->|"Cost $$$$, Speed $"| E
+    A -->|"Cost #36;, Speed #36;#36;#36;#36;"| B
+    B -->|"Cost #36;#36;, Speed #36;#36;#36;"| C
+    C -->|"Cost #36;#36;#36;, Speed #36;#36;"| D
+    D -->|"Cost #36;#36;#36;#36;, Speed #36;"| E
 ```
 
 Think of the pyramid as a map of distance from the GPU. The farther data sits from the accelerator, the more the platform must compensate with prefetching, caching, batching, or careful scheduling. The closer data sits to the accelerator, the more the platform must compensate for durability, capacity, and scheduling restrictions. A good architecture does not try to put every byte on the fastest tier; it puts the active working set on the fastest tier while keeping the canonical dataset in a durable tier that can survive node loss.
