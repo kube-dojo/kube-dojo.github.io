@@ -63,7 +63,7 @@ graph TD
     
     subgraph DoRA Decomposition
         M[Trainable Magnitude Vector m]
-        V_Dir[Normalized Directional Matrix V / ||V||c]
+        V_Dir["Normalized Directional Matrix V / ||V||c"]
     end
     
     subgraph LoRA Directional Update

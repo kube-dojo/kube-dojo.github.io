@@ -203,7 +203,7 @@ graph LR
         P1(Pod app: frontend) --✓--> P2(Pod app: backend)
     end
     subgraph Blocked
-        P3(Pod app: other) --x--> P4(Pod app: backend)
+        P3(Pod app: other) -->|x| P4(Pod app: backend)
     end
 ```
 

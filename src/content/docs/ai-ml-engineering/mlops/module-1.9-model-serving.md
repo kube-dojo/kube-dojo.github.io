@@ -319,7 +319,7 @@ gRPC also gives you a first-class streaming model. Unary RPCs mirror classic req
 graph TD
     subgraph REST JSON Payload
         R1[JSON Text: ~50 bytes]
-        R2[\{features: 0.5, 0.3, 0.8, id: 1\}]
+        R2["{features: 0.5, 0.3, 0.8, id: 1}"]
         R3[Requires Heavy CPU Parsing]
         R1 --- R2 --- R3
     end

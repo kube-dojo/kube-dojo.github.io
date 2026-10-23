@@ -127,7 +127,7 @@ flowchart LR
     C --> D[CRI Pod sandbox<br/>crictl pods]
     D --> E[CRI container ID<br/>crictl ps + inspect]
     E --> F[Runtime PID<br/>crictl inspect .info.pid]
-    F --> G[/proc and namespaces<br/>exe, cwd, fd, maps, net]
+    F --> G["/proc and namespaces<br/>exe, cwd, fd, maps, net"]
 ```
 
 ```bash

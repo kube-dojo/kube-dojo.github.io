@@ -653,7 +653,7 @@ sequenceDiagram
     participant TicketTool
     User->>Agent: Checkout rollout is stuck
     Agent->>Memory: Retrieve service context and past incidents
-    Memory-->>Agent: Team uses readiness probes and Argo CD; similar failure last month
+    Memory-->>Agent: Team uses readiness probes and Argo CD#59; similar failure last month
     Agent->>Planner: Build bounded investigation plan
     Planner-->>Agent: Inspect rollout, pods, events, recent manifest diff, docs
     Agent->>ClusterTool: Get rollout status and pods

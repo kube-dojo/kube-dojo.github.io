@@ -327,7 +327,7 @@ sequenceDiagram
     Policy Model->>Reward Model: Submit Response for Scoring
     Reward Model-->>Policy Model: Return Scalar Reward
     Reference Model-->>Policy Model: Return base logits (for KL vs policy)
-    Note over Policy Model: Compute KL of policy vs reference;<br/>Update Weights: Maximize (Reward - beta*KL)
+    Note over Policy Model: Compute KL of policy vs reference#59;<br/>Update Weights: Maximize (Reward - beta*KL)
 ```
 
 ### Why the KL Penalty Matters

@@ -60,7 +60,7 @@ Subresources deserve special attention because they often hide behind friendly U
 ```mermaid
 flowchart TD
     subgraph "Dashboard Attack Scenario"
-        Direction TB
+        direction TB
         A[Internet] -->|Unauthenticated Access| B(Exposed Dashboard)
         B -->|Inherits cluster-admin| C[Full Cluster Compromise]
 

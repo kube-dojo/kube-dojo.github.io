@@ -176,7 +176,7 @@ graph LR
 
     Agent -->|1. Continuously Pulls| Git
     Agent -->|2. Compares| State
-    Agent -->|3. Reconciles (Applies changes)| State
+    Agent -->|"3. Reconciles (Applies changes)"| State
 ```
 
 The pull-based GitOps model changes the credential story. The CI system may still build images and update manifests, but it only needs permission to write to Git or open a pull request. The in-cluster agent holds the Kubernetes credentials and watches the repository for changes. If a build server is compromised, the attacker does not automatically receive direct access to the production API server. They may still attempt a malicious commit, so branch protection, review, signing, and policy checks matter, but the cluster boundary is much tighter than a world where every CI runner can push arbitrary manifests.

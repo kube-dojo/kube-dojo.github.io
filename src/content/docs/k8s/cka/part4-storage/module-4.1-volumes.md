@@ -39,12 +39,12 @@ When a process writes into a normal container path, it is writing into the conta
 ```mermaid
 flowchart LR
     subgraph ContainerA[Container A]
-        A[/app] --> B[config.yml]
+        A["/app"] --> B[config.yml]
         A --> C[data/]
         C --> D[cache]
     end
     subgraph ContainerB[Container B after restart]
-        E[/app] --> F[config.yml<br/>from image]
+        E["/app"] --> F[config.yml<br/>from image]
         E --> G[data/]
         G --> H[empty!]
     end
@@ -57,11 +57,11 @@ Kubernetes volumes solve this by decoupling selected directories from the indivi
 flowchart TD
     subgraph Pod
         subgraph ContainerA[Container A]
-            A[/app] --> B[config.yml]
+            A["/app"] --> B[config.yml]
             A --> C[data/]
         end
         subgraph ContainerB[Container B]
-            E[/app] --> F[config.yml]
+            E["/app"] --> F[config.yml]
             E --> G[data/]
         end
         V[(Volume shared)]
