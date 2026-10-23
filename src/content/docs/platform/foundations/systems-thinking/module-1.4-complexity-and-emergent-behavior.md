@@ -310,7 +310,7 @@ Complex system failures rarely have a single root cause; they accumulate through
 graph TD
     subgraph Flawed: Root Cause Thinking
         I[Incident] -->|Search for single cause| R[Root Cause: Deployment Bug]
-        style R fill:#ff9999
+        style R fill:#ff9999,color:#111
     end
 ```
 
@@ -321,7 +321,7 @@ graph TD
         AM[Alert Muted] --> I2
         PT[Peak Timing] --> I2
         LS[Load Spike] --> I2
-        style I2 fill:#ff9999
+        style I2 fill:#ff9999,color:#111
     end
 ```
 
@@ -341,7 +341,7 @@ graph TD
     D3 --> Boundary[Safety Boundary Reached]
     Boundary --> Accident((Accident!))
     
-    style Accident fill:#f00,color:#fff
+    style Accident fill:#f00,color:#111
 ```
 
 **Common drift patterns in tech:**

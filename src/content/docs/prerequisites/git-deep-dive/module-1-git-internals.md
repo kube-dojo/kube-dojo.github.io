@@ -359,18 +359,18 @@ graph TD
     RootTreeC --> TreeC_dir
     TreeC_dir --> BlobC2
 
-    style CommitA fill:#f9f,stroke:#333,stroke-width:2px
-    style CommitB fill:#f9f,stroke:#333,stroke-width:2px
-    style CommitC fill:#f9f,stroke:#333,stroke-width:2px
-    style RootTreeA fill:#bbf,stroke:#333,stroke-width:2px
-    style RootTreeB fill:#bbf,stroke:#333,stroke-width:2px
-    style RootTreeC fill:#bbf,stroke:#333,stroke-width:2px
-    style BlobA1 fill:#bfb,stroke:#333,stroke-width:2px
-    style BlobA2 fill:#bfb,stroke:#333,stroke-width:2px
-    style BlobB1 fill:#bfb,stroke:#333,stroke-width:2px
-    style BlobB2 fill:#bfb,stroke:#333,stroke-width:2px
-    style BlobC1 fill:#bfb,stroke:#333,stroke-width:2px
-    style BlobC2 fill:#bfb,stroke:#333,stroke-width:2px
+    style CommitA fill:#f9f,stroke:#333,stroke-width:2px,color:#111
+    style CommitB fill:#f9f,stroke:#333,stroke-width:2px,color:#111
+    style CommitC fill:#f9f,stroke:#333,stroke-width:2px,color:#111
+    style RootTreeA fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style RootTreeB fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style RootTreeC fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style BlobA1 fill:#bfb,stroke:#333,stroke-width:2px,color:#111
+    style BlobA2 fill:#bfb,stroke:#333,stroke-width:2px,color:#111
+    style BlobB1 fill:#bfb,stroke:#333,stroke-width:2px,color:#111
+    style BlobB2 fill:#bfb,stroke:#333,stroke-width:2px,color:#111
+    style BlobC1 fill:#bfb,stroke:#333,stroke-width:2px,color:#111
+    style BlobC2 fill:#bfb,stroke:#333,stroke-width:2px,color:#111
 
     linkStyle 0 stroke-width:2px,fill:none,stroke:red;
     linkStyle 1 stroke-width:2px,fill:none,stroke:red;

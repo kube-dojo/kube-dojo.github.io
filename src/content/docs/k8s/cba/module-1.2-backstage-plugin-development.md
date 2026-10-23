@@ -86,9 +86,9 @@ flowchart TD
     BP_B --> DB
     BCore --> DB
 
-    style Browser fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Server fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style DB fill:#eee,stroke:#333,stroke-width:2px
+    style Browser fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#111
+    style Server fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#111
+    style DB fill:#eee,stroke:#333,stroke-width:2px,color:#111
 ```
 
 ### Key Differences

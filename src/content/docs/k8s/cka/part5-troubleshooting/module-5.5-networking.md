@@ -68,10 +68,10 @@ flowchart TD
     L3 --> L2
     L2 --> L1
     
-    style L4 fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style L3 fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style L2 fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style L1 fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style L4 fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#111
+    style L3 fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#111
+    style L2 fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#111
+    style L1 fill:#f9f9f9,stroke:#333,stroke-width:1px,color:#111
     
     Note["Troubleshoot bottom-up: Pod -> DNS -> Service -> External"]
 ```
@@ -276,11 +276,11 @@ flowchart TD
     C --> D
     D --> E
 
-    style A fill:#f9f9f9,stroke:#333
-    style B fill:#f9f9f9,stroke:#333
-    style C fill:#f9f9f9,stroke:#333
-    style D fill:#f9f9f9,stroke:#333
-    style E fill:#f9f9f9,stroke:#333
+    style A fill:#f9f9f9,stroke:#333,color:#111
+    style B fill:#f9f9f9,stroke:#333,color:#111
+    style C fill:#f9f9f9,stroke:#333,color:#111
+    style D fill:#f9f9f9,stroke:#333,color:#111
+    style E fill:#f9f9f9,stroke:#333,color:#111
     
     Note["Each step can fail - check systematically"]
 ```

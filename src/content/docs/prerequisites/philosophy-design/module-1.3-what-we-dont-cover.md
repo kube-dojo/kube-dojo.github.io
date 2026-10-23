@@ -248,10 +248,10 @@ flowchart TD
             end
         end
     end
-    style CNCF fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Prod fill:#ececff,stroke:#333,stroke-width:2px
-    style Cert fill:#d4edda,stroke:#333,stroke-width:2px
-    style KubeDojo fill:#28a745,color:#fff,stroke:#333,stroke-width:2px
+    style CNCF fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#111
+    style Prod fill:#ececff,stroke:#333,stroke-width:2px,color:#111
+    style Cert fill:#d4edda,stroke:#333,stroke-width:2px,color:#111
+    style KubeDojo fill:#28a745,color:#111,stroke:#333,stroke-width:2px
 ```
 
 Use this diagram when you feel tension between work relevance and exam relevance. If a topic is inside the certification box, it belongs in your immediate study plan. If it is inside production operations but outside certification, it may belong in your work learning plan or post-exam roadmap. If it is somewhere in the broader CNCF landscape, it may be worth knowing exists, but it should not consume certification time unless a direct objective pulls it inward.

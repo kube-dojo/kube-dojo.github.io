@@ -640,7 +640,7 @@ graph LR
     subgraph After[After Hijack]
         User2[User] --> ISP2[ISP]
         ISP2 --> Attacker["AS666 (Attacker)<br>8.8.8.0/25 (more specific wins!)"]
-        style Attacker fill:#f99,stroke:#333,stroke-width:2px
+        style Attacker fill:#f99,stroke:#333,stroke-width:2px,color:#111
     end
 ```
 
@@ -701,7 +701,7 @@ graph TD
         C2 -->|Accidentally re-announces<br>Transit-A's routes| TB[Transit-B]
         TB -->|Propagates to| I2[Internet]
     end
-    style C2 fill:#f9a,stroke:#333,stroke-width:2px
+    style C2 fill:#f9a,stroke:#333,stroke-width:2px,color:#111
 ```
 
 ```text

@@ -371,8 +371,8 @@ graph TD
         Item3 -.-> Match2["Both MUST match"]
     end
 
-    style Match1 fill:#ffcccc,stroke:#cc0000
-    style Match2 fill:#ccffcc,stroke:#00cc00
+    style Match1 fill:#ffcccc,stroke:#cc0000,color:#111
+    style Match2 fill:#ccffcc,stroke:#00cc00,color:#111
 ```
 
 This is the place where a CKS exam often compresses several concepts into one short manifest. You may see a target pod selector that looks correct, a port that looks correct, and a namespace selector that looks correct, but the list structure makes the policy too permissive. Slow down and read each hyphen as a new peer option. If two conditions must both be true, they belong under the same peer entry.

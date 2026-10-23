@@ -65,8 +65,8 @@ flowchart TD
     Bounded --- B_Desc
     Unbounded --- U_Desc
     
-    style Bounded fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Unbounded fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style Bounded fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#111
+    style Unbounded fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#111
     style B_Desc fill:none,stroke:none
     style U_Desc fill:none,stroke:none
 ```
@@ -625,9 +625,9 @@ flowchart TD
     Q6 -->|Yes| KStreams
     Q6 -->|No| Flink
 
-    style Flink fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    style KStreams fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Spark fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Flink fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#111
+    style KStreams fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#111
+    style Spark fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#111
 ```
 
 This decision framework is a starting point, not a replacement for benchmarking your specific workload. State size, latency, and correctness requirements dominate the initial screening. Operational factors — your team's existing expertise, your infrastructure dependencies, your monitoring stack — often determine the final choice once the technical constraints are satisfied.

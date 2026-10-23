@@ -54,7 +54,7 @@ flowchart TD
         P5 <--> P7(Pod C)
         P7 <--> P8(Pod D)
     end
-    style P6 fill:#ff9999,stroke:#333,stroke-width:2px
+    style P6 fill:#ff9999,stroke:#333,stroke-width:2px,color:#111
 ```
 
 The diagram shows the first mental split. Policies are not global firewall objects floating above the whole cluster; they apply to selected pods in the namespace where the policy object exists. The selected pod is the protected object, and the policy direction determines whether you are controlling traffic coming into it or traffic leaving it. If a different pod is not selected by any policy, that different pod remains non-isolated for the relevant direction even though another workload in the same namespace may be tightly locked down.

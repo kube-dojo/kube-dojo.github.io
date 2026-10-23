@@ -50,9 +50,9 @@ graph TD
     G --> H[Context Representation]
     H --> I(Next Token Generation)
     
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style C fill:#bbf,stroke:#333,stroke-width:2px
-    style G fill:#dfd,stroke:#333,stroke-width:2px
+    style A fill:#f9f,stroke:#333,stroke-width:2px,color:#111
+    style C fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style G fill:#dfd,stroke:#333,stroke-width:2px,color:#111
 ```
 
 The diagram keeps the original module's core idea: long context is an infrastructure problem, not just a prompt-writing trick. The model server must prefill the prompt, retain key/value state for generation, and manage memory so that useful prefixes can be reused later. Optimizations such as FlashAttention reduce memory reads and writes; distributed techniques such as Ring Attention spread work across devices; positional schemes such as RoPE help the model represent token order. None of these make irrelevant text free, and none of them prove that every position in a long prompt is equally useful.
@@ -264,8 +264,8 @@ graph TD
     H --> I(Long-Context LLM)
     I --> J[Cited Synthesis Answer]
     
-    style C fill:#f96,stroke:#333,stroke-width:2px
-    style I fill:#69f,stroke:#333,stroke-width:2px
+    style C fill:#f96,stroke:#333,stroke-width:2px,color:#111
+    style I fill:#69f,stroke:#333,stroke-width:2px,color:#111
 ```
 
 The hybrid prompt compiler has two jobs that often conflict. It wants stable prefixes for cache hits, and it wants query-specific evidence for quality. The usual compromise is to cache durable layers such as system rules, tool schemas, evaluation rubric, and tenant corpus summaries, then append retrieved macro-chunks and the user query as the dynamic suffix. For workloads where the same macro-chunks are reused across a session, the compiler can also group requests by corpus region or cache key so that repeated sessions benefit from the same prefix order.

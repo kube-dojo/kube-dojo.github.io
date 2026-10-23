@@ -404,11 +404,11 @@ flowchart TD
     Q4 -->|Yes| CRDTorMerge[CRDTs or Merge Functions<br/>Design conflict resolution]
     Q4 -->|No| Eventual[Eventual Consistency<br/>AP / W+R <= N]
 
-    style Strong fill:#f96,stroke:#333
-    style Session fill:#fc9,stroke:#333
-    style Causal fill:#ffb,stroke:#333
-    style CRDTorMerge fill:#bfb,stroke:#333
-    style Eventual fill:#bdf,stroke:#333
+    style Strong fill:#f96,stroke:#333,color:#111
+    style Session fill:#fc9,stroke:#333,color:#111
+    style Causal fill:#ffb,stroke:#333,color:#111
+    style CRDTorMerge fill:#bfb,stroke:#333,color:#111
+    style Eventual fill:#bdf,stroke:#333,color:#111
 ```
 
 **Quick reference matrix for common workload types.** Use this table to map specific operational requirements to the appropriate consistency model:

@@ -192,7 +192,7 @@ flowchart LR
     Host -->|Limit: 1.0 CPU, 1GB| CB[Container B]
     Host -->|Limit: 0.25 CPU, 256MB| CC[Container C]
     
-    style Host fill:#f9f,stroke:#333,stroke-width:2px
+    style Host fill:#f9f,stroke:#333,stroke-width:2px,color:#111
 ```
 
 Cgroups also explain why Kubernetes resource requests and limits are more than scheduling decoration. A memory limit becomes an enforcement boundary, and a container that exceeds it can be killed rather than taking down the node. A CPU limit affects scheduling and throttling behavior. The exact mechanics differ by runtime and cgroup version, but the operational lesson is stable: a container is not inherently polite. You must give the platform enough information to protect neighboring workloads.
@@ -210,10 +210,10 @@ flowchart BT
     L2 --> L3
     L3 --> L4
     
-    style L1 fill:#f9f,stroke:#333,stroke-width:2px
-    style L2 fill:#bbf,stroke:#333,stroke-width:2px
-    style L3 fill:#bbf,stroke:#333,stroke-width:2px
-    style L4 fill:#bfb,stroke:#333,stroke-width:2px
+    style L1 fill:#f9f,stroke:#333,stroke-width:2px,color:#111
+    style L2 fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style L3 fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style L4 fill:#bfb,stroke:#333,stroke-width:2px,color:#111
 ```
 
 Layering is why image build order affects performance. If the dependency installation layer changes rarely, it can be reused while small application code changes rebuild only the top layer. If a Dockerfile copies the entire source tree before installing dependencies, a one-line code change may invalidate expensive dependency layers. Even before writing Dockerfiles in the next module, you should recognize layers as a storage, transfer, and build-cache mechanism rather than as a decorative implementation detail.
