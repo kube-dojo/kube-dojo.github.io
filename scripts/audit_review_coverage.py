@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Audit AI History review coverage for per-chapter status.yaml files.
 
 The authoritative mode reads merged PRs and PR comments through ``gh``. When
@@ -17,11 +16,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 REPO = "kube-dojo/kube-dojo.github.io"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHAPTER_ROOT = REPO_ROOT / "docs" / "research" / "ai-history" / "chapters"
-AUDIT_DATE = datetime.date.today().isoformat()
+AUDIT_DATE = datetime.datetime.now(datetime.UTC).astimezone().date().isoformat()
 
 RESEARCH_FIELDS = ("claude_anchor", "gemini_gap", "codex_anchor")
 PROSE_FIELDS = ("claude_source_fidelity", "gemini_prose_quality", "codex_prose_quality")
@@ -210,7 +208,7 @@ def _status_text_hints(path: Path) -> str:
 def _offline_seed(chapters: list[Path]) -> dict[int, ChapterCoverage]:
     """Conservative fallback used only when GitHub comments are unavailable."""
     coverages: dict[int, ChapterCoverage] = {}
-    fully_reviewed = set([16, *range(38, 50)])
+    fully_reviewed = {16, *range(38, 50)}
     no_research_pr = set(range(11, 15))
     for path in chapters:
         chapter_num = _chapter_num_from_path(path)
@@ -244,13 +242,7 @@ def _offline_seed(chapters: list[Path]) -> dict[int, ChapterCoverage]:
                 set(),
             )
 
-        if chapter_num in fully_reviewed:
-            coverage.prose = {
-                "claude_source_fidelity": "done",
-                "gemini_prose_quality": "done",
-                "codex_prose_quality": "n/a",
-            }
-        elif "claude source-fidelity review approved" in text and (
+        if chapter_num in fully_reviewed or "claude source-fidelity review approved" in text and (
             "gemini narrative review approved" in text or "gemini prose" in text
         ):
             coverage.prose = {

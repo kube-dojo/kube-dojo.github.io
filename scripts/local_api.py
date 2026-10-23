@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -6,20 +5,22 @@ import hashlib
 import html
 import importlib.util
 import json
+import logging
 import os
-import shutil
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -153,7 +154,7 @@ def _validate_module_key(repo_root: Path, raw: str) -> str | None:
     """
     if not raw:
         return None
-    normalized = raw[:-3] if raw.endswith(".md") else raw
+    normalized = raw.removesuffix(".md")
     if not normalized or normalized.startswith("/") or normalized.endswith("/"):
         return None
     segments = normalized.split("/")
@@ -466,17 +467,17 @@ def get_build_job_status(repo_root: Path, job_id: str) -> tuple[int, Any, str]:
 
 
 _CACHE_LOCK = threading.Lock()
-_CACHE: dict[str, "_CacheEntry"] = {}
+_CACHE: dict[str, _CacheEntry] = {}
 
 
 class _CacheEntry:
     __slots__ = (
         "body_bytes",
+        "built_at",
         "content_type",
         "etag",
         "expires_at",
         "version_key",
-        "built_at",
     )
 
     def __init__(
@@ -826,9 +827,7 @@ def _build_gh_detail(kind: str, number: int) -> tuple[int, Any, str]:
 
 def _is_gh_path(path: str) -> bool:
     return (
-        path in {"/api/gh/issues", "/api/gh/prs"}
-        or path.startswith("/api/gh/issues/")
-        or path.startswith("/api/gh/prs/")
+        path in {"/api/gh/issues", "/api/gh/prs"} or path.startswith(("/api/gh/issues/", "/api/gh/prs/"))
     )
 
 
@@ -846,7 +845,7 @@ def _gh_payload_etag(path: str, payload: Any) -> str:
                 latest = max(updated_values)
         elif payload.get("updated_at"):
             latest = str(payload["updated_at"])
-    return _weak_etag(f"{path}:{latest}".encode("utf-8"))
+    return _weak_etag(f"{path}:{latest}".encode())
 
 
 # --- Background snapshot ---
@@ -1009,7 +1008,7 @@ def _classify_path(path: str) -> str:
         return "generated"
     if path.startswith(PIPELINE_PREFIXES):
         return "pipeline"
-    if path.startswith("src/") or path.startswith("scripts/") or path.startswith("tests/") or path.startswith("docs/"):
+    if path.startswith(("src/", "scripts/", "tests/", "docs/")):
         return "source"
     return "other"
 
@@ -1489,7 +1488,7 @@ def build_module_state(repo_root: Path, module_key: str) -> dict[str, Any]:
 
 
 def build_module_orchestration_latest(repo_root: Path, module_key: str) -> dict[str, Any]:
-    normalized = module_key[:-3] if module_key.endswith(".md") else module_key
+    normalized = module_key.removesuffix(".md")
     return {
         "module_key": normalized,
         "v2": _db_latest_for_module(repo_root / ".pipeline" / "v2.db", normalized),
@@ -1833,9 +1832,10 @@ def build_pipeline_stuck(
         if mk and mk not in bucket["module_keys"]:
             bucket["module_keys"].append(mk)
         le = row.get("last_event_at")
-        if isinstance(le, (int, float)):
-            if bucket["last_event_at"] is None or le > bucket["last_event_at"]:
-                bucket["last_event_at"] = int(le)
+        if isinstance(le, (int, float)) and (
+            bucket["last_event_at"] is None or le > bucket["last_event_at"]
+        ):
+            bucket["last_event_at"] = int(le)
 
     stale_workers: list[dict[str, Any]] = []
     for bucket in by_worker.values():
@@ -1911,8 +1911,7 @@ def _review_filename_to_module_key(filename: str) -> str:
     ``.md`` / ``.lock``."""
     name = filename
     for suffix in (".md", ".lock"):
-        if name.endswith(suffix):
-            name = name[: -len(suffix)]
+        name = name.removesuffix(suffix)
     return name.replace("__", "/")
 
 
@@ -2532,7 +2531,7 @@ def build_quality_scores(repo_root: Path) -> dict[str, Any]:
         except OSError:
             continue
         sig.update(path.relative_to(docs_root).as_posix().encode("utf-8"))
-        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode("utf-8"))
+        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode())
     signature = sig.hexdigest()
     key = str(docs_root.resolve())
     with _QUALITY_AUDIT_CACHE_LOCK:
@@ -3652,7 +3651,7 @@ def _quality_board_slug_for_path(rel_path: str) -> str:
     path. Example: ``ai/foundations/module-1.1-what-is-ai.md`` →
     ``ai-foundations-module-1.1-what-is-ai``.
     """
-    stem = rel_path[:-3] if rel_path.endswith(".md") else rel_path
+    stem = rel_path.removesuffix(".md")
     return stem.replace("/", "-")
 
 
@@ -3939,7 +3938,7 @@ def build_quality_board(repo_root: Path) -> dict[str, Any]:
 
         # Review-log lookup uses the docs-relative key without the .md
         # suffix (matches _module_key_to_review_filename semantics).
-        review_key = rel_str[:-3] if rel_str.endswith(".md") else rel_str
+        review_key = rel_str.removesuffix(".md")
         if latest_verdict is None:
             latest_verdict = latest_review_verdicts.get(review_key)
 
@@ -4025,7 +4024,12 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
     """
     started_at = time.perf_counter()
     docs_root = repo_root / "src" / "content" / "docs"
-    from status import TRACK_ORDER, _extract_frontmatter, _iter_en_modules, _track_for_key
+    from status import (
+        TRACK_ORDER,
+        _extract_frontmatter,
+        _iter_en_modules,
+        _track_for_key,
+    )
 
     read_errors = 0
     try:
@@ -4041,7 +4045,7 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
 
     for path in _iter_en_modules(docs_root):
         rel = path.relative_to(docs_root).as_posix()
-        module_key = rel[:-3] if rel.endswith(".md") else rel
+        module_key = rel.removesuffix(".md")
         try:
             page_bytes = path.read_bytes()
         except OSError:
@@ -4651,12 +4655,13 @@ def _highlight_code_block(code: str, language: str) -> str:
         from pygments import highlight
         from pygments.formatters import HtmlFormatter
         from pygments.lexers import TextLexer, get_lexer_by_name
+        from pygments.util import ClassNotFound
     except ImportError:
         return f'<pre><code class="language-{lang_class}">{html.escape(code)}</code></pre>'
 
     try:
         lexer = get_lexer_by_name(language) if language else TextLexer()
-    except Exception:
+    except ClassNotFound:
         lexer = TextLexer()
     formatter = HtmlFormatter(nowrap=True, noclasses=True)
     highlighted = highlight(code, lexer, formatter)
@@ -5341,7 +5346,7 @@ def _extract_markdown_tldr(text: str) -> str | None:
         if stripped == "---" and not paragraph:
             in_frontmatter = not in_frontmatter
             continue
-        if in_frontmatter or not stripped or stripped.startswith("#") or stripped.startswith("|"):
+        if in_frontmatter or not stripped or stripped.startswith(("#", "|")):
             if paragraph:
                 break
             continue
@@ -7317,7 +7322,7 @@ _PIPELINE_PANEL_JS = r"""
 """
 
 
-def _fmt_duration(seconds: float | int | None) -> str:
+def _fmt_duration(seconds: float | None) -> str:
     if seconds is None or seconds < 0:
         return "n/a"
     s = int(seconds)
@@ -7391,7 +7396,7 @@ def _render_autopilot_v3_panel(repo_root: Path) -> str:
 
 def _find_quality_board_module(repo_root: Path, module_key: str) -> dict[str, Any] | None:
     board = build_quality_board(repo_root)
-    rel = module_key[:-3] if module_key.endswith(".md") else module_key
+    rel = module_key.removesuffix(".md")
     rel_file = f"{rel}.md"
     slug = _quality_board_slug_for_path(rel)
     for item in board.get("modules", []):
@@ -7485,7 +7490,7 @@ def render_quality_module_page_html(repo_root: Path, module_key: str) -> str | N
         return None
 
     state = build_module_state(repo_root, module_key)
-    rel = module_key[:-3] if module_key.endswith('.md') else module_key
+    rel = module_key.removesuffix('.md')
     diagnostics = state.get("diagnostics") if isinstance(state.get("diagnostics"), list) else []
     orchestration = state.get("orchestration") if isinstance(state.get("orchestration"), dict) else {}
     v2_orchestration = orchestration.get("v2") if isinstance(orchestration.get("v2"), dict) else {}
@@ -8203,11 +8208,10 @@ def _parse_status_md(status_path: Path) -> dict[str, Any]:
                 bullet = line.lstrip()[5:].strip()
                 if bullet and len(focus) < 10:
                     focus.append(bullet)
-        elif section == "blocker":
-            if line.lstrip().startswith("- "):
-                bullet = line.lstrip()[2:].strip()
-                if bullet and len(blockers) < 10:
-                    blockers.append(bullet)
+        elif section == "blocker" and line.lstrip().startswith("- "):
+            bullet = line.lstrip()[2:].strip()
+            if bullet and len(blockers) < 10:
+                blockers.append(bullet)
 
     data = {"focus": focus, "blockers": blockers, "exists": True}
     with _STATUS_MD_CACHE_LOCK:
@@ -8252,7 +8256,7 @@ def _parse_status_yaml(path: Path) -> dict[str, Any]:
         if raw.startswith((" ", "\t")):
             continue
         line = raw.rstrip()
-        if not line or line.startswith("#") or line.startswith("---"):
+        if not line or line.startswith(("#", "---")):
             continue
         if ":" not in line:
             continue
@@ -8271,9 +8275,7 @@ def _parse_status_yaml(path: Path) -> dict[str, Any]:
         # value is on subsequent indented lines, which we skip.
         if value in ("", "|", ">", "|-", ">-"):
             continue
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
-        elif value.startswith("'") and value.endswith("'"):
+        if value.startswith('"') and value.endswith('"') or value.startswith("'") and value.endswith("'"):
             value = value[1:-1]
         if key in _BOOK_NUMERIC_KEYS:
             try:
@@ -8604,13 +8606,13 @@ def build_session_briefing(repo_root: Path) -> dict[str, Any]:
                 f"git hygiene: {cb} prunable branch(es), {cw} prunable worktree(s) "
                 "— run `git cleanup-merged` (see /api/git/cleanup)"
             )
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        logging.getLogger(__name__).debug("Git cleanup report unavailable", exc_info=True)
 
     try:
         alerts.extend(_git_hygiene_signals(repo_root, worktree, worktrees))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        logging.getLogger(__name__).debug("Git hygiene signals unavailable", exc_info=True)
 
     # Action-oriented triage lists. Agents ask "what should I touch"
     # not "what's the global state"; the lists below answer that in
@@ -9192,8 +9194,8 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
             ds_link=_design_system_link(),
         ), "text/html; charset=utf-8"
     if path == "/api/headroom/stats":
-        import urllib.request as _hr_u
         import os as _hr_os
+        import urllib.request as _hr_u
 
         _hr_host = _hr_os.environ.get("HEADROOM_HOST", "127.0.0.1")
         _hr_port = _hr_os.environ.get("HEADROOM_PORT", "8787")
@@ -9364,9 +9366,9 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         return 200, _enrich_v2_with_per_track(build_v2_status_report(db_path)), "application/json; charset=utf-8"
     if path == "/api/translation/v2/enqueue":
         from translation_v2 import (
-            ControlPlane,
             TRANSLATE_ESTIMATED_USD,
             TRANSLATE_MODEL,
+            ControlPlane,
             _has_pending_or_leased_job,
         )
 
@@ -9786,7 +9788,7 @@ def _v_quality_board(repo_root: Path) -> tuple:
             except OSError:
                 continue
             sig.update(rel.encode("utf-8"))
-            sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode("utf-8"))
+            sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode())
 
     queue_path = state_dir / "post-review-queue.txt"
     try:
@@ -9795,7 +9797,7 @@ def _v_quality_board(repo_root: Path) -> tuple:
         pass
     else:
         sig.update(queue_path.relative_to(repo_root).as_posix().encode("utf-8"))
-        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode("utf-8"))
+        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode())
 
     return ("quality-board", sig.hexdigest())
 
@@ -9812,7 +9814,7 @@ def _v_docs_frontmatter(repo_root: Path) -> tuple:
         except OSError:
             continue
         sig.update(rel.encode("utf-8"))
-        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode("utf-8"))
+        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode())
     extras = [repo_root / "docs/content-upgrade/evidence.json"]
     seeds = repo_root / "docs/citation-seeds"
     extras.extend(sorted(seeds.glob("*.json")) if seeds.is_dir() else [])
@@ -9823,7 +9825,7 @@ def _v_docs_frontmatter(repo_root: Path) -> tuple:
         except OSError:
             continue
         sig.update(rel.encode("utf-8"))
-        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode("utf-8"))
+        sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode())
     return ("docs-frontmatter", sig.hexdigest())
 
 
@@ -9869,11 +9871,11 @@ def _match_etag(if_none_match: str, etag: str) -> bool:
         return False
     candidates = [tok.strip() for tok in if_none_match.split(",") if tok.strip()]
     # Strip W/ prefix on both sides for weak-compare semantics.
-    our = etag[2:] if etag.startswith("W/") else etag
+    our = etag.removeprefix("W/")
     for cand in candidates:
         if cand == "*":
             return True
-        normalized = cand[2:] if cand.startswith("W/") else cand
+        normalized = cand.removeprefix("W/")
         if normalized == our:
             return True
     return False
@@ -9927,7 +9929,7 @@ def serve_request(
 
 def make_handler(repo_root: Path) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        def do_HEAD(self) -> None:  # noqa: N802
+        def do_HEAD(self) -> None:
             try:
                 status_code, body, content_type, etag = serve_request(repo_root, self.path)
             except Exception:  # noqa: BLE001 - HEAD should mirror GET without surfacing stack traces
@@ -9954,7 +9956,7 @@ def make_handler(repo_root: Path) -> type[BaseHTTPRequestHandler]:
                 self.send_header("ETag", etag)
             self.end_headers()
 
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             try:
                 status_code, body, content_type, etag = serve_request(repo_root, self.path)
             except sqlite3.Error as exc:
@@ -10023,7 +10025,7 @@ def make_handler(repo_root: Path) -> type[BaseHTTPRequestHandler]:
                 # worker thread alive; the server itself is unaffected.
                 return
 
-        def do_POST(self) -> None:  # noqa: N802
+        def do_POST(self) -> None:
             try:
                 content_length = int(self.headers.get("Content-Length", "0") or "0")
                 body_bytes = self.rfile.read(max(0, content_length))
