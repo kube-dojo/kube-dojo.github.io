@@ -157,7 +157,7 @@ Every charge sits on three durable dimensions that behave the same way whether y
 | **Usage quantity** | How much or how long | Instance hours, stored gigabytes, API calls |
 | **Pricing model** | How you pay | On-demand, committed discount, interruptible capacity |
 
-Hypothetical scenario: A platform team sees a month-over-month jump from $120,000 to $158,000. Drilling into the bill reveals compute flat, storage up slightly, and networking egress doubling because a new analytics export copied production data cross-region nightly. Without line-item literacy, leadership might blame "too many servers" and miss the actual lever.
+Hypothetical scenario: A platform team sees a month-over-month jump from \$120,000 to \$158,000. Drilling into the bill reveals compute flat, storage up slightly, and networking egress doubling because a new analytics export copied production data cross-region nightly. Without line-item literacy, leadership might blame "too many servers" and miss the actual lever.
 
 ### Managed Services and Hidden Meters
 

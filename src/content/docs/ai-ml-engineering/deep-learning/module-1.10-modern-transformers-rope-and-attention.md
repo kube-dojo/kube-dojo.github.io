@@ -189,7 +189,7 @@ That means attention scores are formed with many $Q_h$ but shared $K$ and $V$ pr
 The KV estimate drops dramatically to
 $\text{KV}_{\text{MQA}} \approx 2 \times N \times d_k \times L \times b$.
 
-This is near an $H\times$ reduction in KV storage relative to MHA.
+This is near an H-fold reduction in KV storage relative to MHA.
 That is a massive memory win for edge or single-user decoding.
 
 The cost is a structural coupling.

@@ -287,7 +287,7 @@ Cloud FaaS charges per invocation and GB-second, which makes idle capacity look 
 | Cost Driver | On-Prem Impact | Serverless Interaction |
 | :--- | :--- | :--- |
 | **Server CapEx** | Depreciated over 3–5 years | Scale-to-zero reclaims CPU/RAM for other workloads (batch, CI) instead of sitting idle |
-| **Power & cooling** | ~$1,200–1,900/yr per continuous kW (≈$0.14/kWh US commercial avg, EIA early-2026, ×PUE 1.3–1.6 — verify current) | Fewer running pods lowers draw, but Activator/ingress overhead remains |
+| **Power & cooling** | ~\$1,200–1,900/yr per continuous kW (≈\$0.14/kWh US commercial avg, EIA early-2026, ×PUE 1.3–1.6 — verify current) | Fewer running pods lowers draw, but Activator/ingress overhead remains |
 | **Network gear** | ToR/spine ports are fixed cost | MetalLB VIPs and BGP sessions are "free" marginally but require skilled ops |
 | **Registry & storage** | Harbor disks, backup tapes | Local pulls reduce WAN egress charges you would pay in cloud |
 | **Ops headcount** | Platform team salary | Knative + KEDA + MetalLB stack needs ongoing upgrades and on-call |

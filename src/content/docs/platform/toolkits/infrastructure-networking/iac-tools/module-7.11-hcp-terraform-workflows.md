@@ -1320,9 +1320,9 @@ risk. The better path is to design modules intentionally and measure usage.
 Here is a simple Standard-tier estimate written without the problematic price
 digits from the public page. If a production estate has 2,000 managed resources
 and Standard is forty-seven cents per resource per month, the platform portion
-is about $940 per month before taxes, discounts, or contract terms. If the same
+is about \$940 per month before taxes, discounts, or contract terms. If the same
 estate has 10,000 managed resources, the simple public-rate estimate is about
-$4,700 per month. Contracted pricing and tiered hourly tables can change the
+\$4,700 per month. Contracted pricing and tiered hourly tables can change the
 number, so use this only as a planning model.
 
 Self-hosted Atlantis looks cheaper at first glance. A small EC2 instance in
@@ -1336,8 +1336,8 @@ That comparison is incomplete unless you price operations. Someone owns
 Atlantis upgrades, webhook secrets, VCS app permissions, locking behavior,
 state backend hardening, IAM federation, audit evidence, policy integrations,
 backups, incident response, and high availability. If one platform engineer
-spends four hours per month maintaining the stack at $100 per hour fully loaded,
-that is $400 of labor before incident cost. If the team needs high availability
+spends four hours per month maintaining the stack at \$100 per hour fully loaded,
+that is \$400 of labor before incident cost. If the team needs high availability
 and compliance evidence, the labor number is usually more important than the
 EC2 bill.
 

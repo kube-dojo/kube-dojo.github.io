@@ -523,7 +523,7 @@ The same framework helps with dashboards. A top-level dashboard should contain s
    <details>
    <summary>Answer</summary>
 
-   Use the numbers as an illustrative decision model, not as a guaranteed savings claim. At 100,000 requests per minute and 5% failures, about 5,000 requests fail each minute; at $0.50 per failed request, that is roughly $2,500 per minute of impact. Reducing investigation from 40 minutes to 10 minutes avoids about 30 minutes of impact, or roughly $75,000 in this simplified scenario. The honest argument is that better tracing can pay for itself when it reliably shortens high-impact investigations, but the business case should include incident frequency, adoption, data quality, and whether responders actually use the exemplars.
+   Use the numbers as an illustrative decision model, not as a guaranteed savings claim. At 100,000 requests per minute and 5% failures, about 5,000 requests fail each minute; at \$0.50 per failed request, that is roughly \$2,500 per minute of impact. Reducing investigation from 40 minutes to 10 minutes avoids about 30 minutes of impact, or roughly \$75,000 in this simplified scenario. The honest argument is that better tracing can pay for itself when it reliably shortens high-impact investigations, but the business case should include incident frequency, adoption, data quality, and whether responders actually use the exemplars.
    </details>
 
 ---

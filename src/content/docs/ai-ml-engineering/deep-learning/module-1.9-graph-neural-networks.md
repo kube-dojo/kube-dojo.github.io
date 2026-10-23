@@ -114,7 +114,7 @@ about telling those situations apart.
 Two regimes where GNNs tend to earn their cost are large graphs whose local
 structure is rich enough that hand-engineering features is prohibitive,
 and tasks where the same feature value carries different meaning depending
-on its neighbors (a transaction at $\$50$ is normal for one merchant,
+on its neighbors (a transaction at \$50 is normal for one merchant,
 suspicious for another).
 Two regimes where they tend to lose are small graphs with strong engineered
 features and graphs whose connectivity does not actually carry signal toward

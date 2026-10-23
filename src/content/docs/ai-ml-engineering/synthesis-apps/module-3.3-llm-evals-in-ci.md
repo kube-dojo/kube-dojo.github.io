@@ -825,13 +825,13 @@ when metrics call OpenAI or another hosted grader. Naive full-suite eval on
 every commit can exceed the inference cost of the staging environment itself.
 
 Rough order-of-magnitude planning helps gates stay enabled instead of quietly
-removed. Suppose staging vLLM on one L4-class GPU costs about $0.80–$1.20 per
+removed. Suppose staging vLLM on one L4-class GPU costs about \$0.80–\$1.20 per
 hour (rates vary by provider and region), your orchestration adds 200 ms median latency, and
 you run 400 cases averaging 800 output tokens each. Inference wall time may land
 in tens of minutes even with concurrency 4, dominated by generation, not HTTP
 overhead. Add LLM-as-judge scoring at 2k judge tokens per case and you may spend
 more on judges than on the candidate model. A single pre-promotion run can land
-in the **$15–$80** range depending on model sizes and concurrency — small
+in the **\$15–\$80** range depending on model sizes and concurrency — small
 compared to one production incident hour, large if you run it hourly on every
 commit.
 
