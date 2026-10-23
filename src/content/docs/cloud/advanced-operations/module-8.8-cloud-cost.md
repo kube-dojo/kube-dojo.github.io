@@ -67,7 +67,7 @@ graph TD
 
     title[COST OPTIMIZATION FRAMEWORK]:::header
 
-    subgraph Optimization Process [ ]
+    subgraph OptimizationProcess [ ]
         direction LR
         P1["1. VISIBILITY<br/>'Where does the money go?'<br/>- Cost allocation<br/>- Showback/chargeback<br/>- Kubecost/OpenCost"]:::pillar
         P2["2. RIGHT-SIZING<br/>'Are resources matched to actual usage?'<br/>- CPU/memory utilization<br/>- VPA recommendations<br/>- Node right-sizing"]:::pillar
@@ -78,7 +78,7 @@ graph TD
     end
     
     note[Implementation order: 1 --> 2 --> 3 --> 4<br/>You can't optimize what you can't see.]
-    Optimization Process --> note
+    OptimizationProcess --> note
 ```
 
 ---
@@ -496,7 +496,8 @@ graph TD
         A2["1yr Savings Plan: lower hourly commitment rate"]
         A3["3yr Savings Plan: deeper commitment discount"]
         A4["Spot: variable, interruptible, verify current pricing"]
-    end:::provider
+    end
+    class AWS provider;
 
     subgraph GCP ["GCP (n2-standard-4, representative)"]
         G1["On-Demand: ~$0.19/hr"]
@@ -504,21 +505,24 @@ graph TD
         G3["3yr CUD: deeper committed rate"]
         G4["Spot: variable, preemptible"]
         G5["SUDs: automatic where eligible"]
-    end:::provider
+    end
+    class GCP provider;
 
     subgraph Azure ["Azure (D4s v5, representative)"]
         Z1["On-Demand: ~$0.19/hr"]
         Z2["1yr Reserved VM: lower committed rate"]
         Z3["3yr Reserved VM: deeper committed rate"]
         Z4["Spot: variable, eviction risk"]
-    end:::provider
+    end
+    class Azure provider;
 
     subgraph STRATEGY ["Optimization Strategy"]
         S1["Baseline (24/7 workloads) --> Savings Plan / CUD"]
         S2["Bursty (predictable peaks) --> On-demand"]
         S3["Fault-tolerant (batch, CI) --> Spot instances"]
         S4["Development --> Spot + auto-shutdown"]
-    end:::strategy
+    end
+    class STRATEGY strategy;
 ```
 
 ### Calculating Your Savings Plan Commitment

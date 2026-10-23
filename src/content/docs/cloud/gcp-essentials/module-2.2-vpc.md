@@ -831,7 +831,7 @@ flowchart TD
     Q_PRIV -->|No, private only| Q_EGRESS{Need internet<br/>egress?}
 
     Q_LB -->|HTTP/HTTPS| EXT_HTTP["Global external HTTP(S) LB"]
-    Q_LB -->|TCP/UDP (non-HTTP)| EXT_TCP[Regional external TCP/UDP Network LB]
+    Q_LB -->|"TCP/UDP (non-HTTP)"| EXT_TCP[Regional external TCP/UDP Network LB]
     Q_LB -->|TCP with SSL offload| EXT_SSL[Global external SSL Proxy LB]
 
     Q_EGRESS -->|Yes, all traffic| NAT[Cloud NAT + Cloud Router]

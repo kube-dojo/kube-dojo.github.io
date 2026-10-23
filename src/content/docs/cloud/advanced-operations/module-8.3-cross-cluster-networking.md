@@ -38,7 +38,7 @@ In a purely flat networking model, every single pod across every cluster deploye
 
 ```mermaid
 flowchart LR
-    subgraph Cluster A ["Cluster A (us-east-1)<br>Pod CIDR: 100.64.0.0/16"]
+    subgraph ClusterA ["Cluster A (us-east-1)<br>Pod CIDR: 100.64.0.0/16"]
         PodA["frontend-pod<br>100.64.12.5"]
         PodB["api-pod<br>100.64.33.18"]
         PodA -->|"Direct IP"| PodB
@@ -48,7 +48,7 @@ flowchart LR
         route["Routing"]
     end
     
-    subgraph Cluster B ["Cluster B (eu-west-1)<br>Pod CIDR: 100.65.0.0/16"]
+    subgraph ClusterB ["Cluster B (eu-west-1)<br>Pod CIDR: 100.65.0.0/16"]
         PodC["frontend-pod<br>100.65.8.22"]
         PodD["api-pod<br>100.65.41.9"]
         PodC --> PodD
@@ -58,7 +58,7 @@ flowchart LR
     route -->|"Direct IP"| PodD
     
     classDef cluster fill:none,stroke:#333,stroke-width:2px;
-    class Cluster A,Cluster B cluster;
+    class ClusterA,ClusterB cluster;
 ```
 
 The flat model is straightforward to reason about and can accelerate migration from legacy single-cluster architectures because it extends familiar service wiring with fewer new abstractions. At the same time, it quietly turns every subnet and route decision into shared infrastructure debt. If you inherit this model, invest heavily in change control for cluster onboarding, because a single misallocated CIDR or missing transit route can invalidate that shared assumption in multiple locations.
@@ -78,13 +78,13 @@ Conversely, in the island networking model, each Kubernetes cluster operates as 
 
 ```mermaid
 flowchart LR
-    subgraph Cluster A ["Cluster A (us-east-1)<br>Pod CIDR: 10.244.0.0/16"]
+    subgraph ClusterA ["Cluster A (us-east-1)<br>Pod CIDR: 10.244.0.0/16"]
         PodA["frontend-pod<br>10.244.1.5"]
         GWA["Gateway/LB<br>(NodePort, NLB, or Istio GW)"]
         PodA --> GWA
     end
     
-    subgraph Cluster B ["Cluster B (eu-west-1)<br>Pod CIDR: 10.244.0.0/16"]
+    subgraph ClusterB ["Cluster B (eu-west-1)<br>Pod CIDR: 10.244.0.0/16"]
         PodB["frontend-pod<br>10.244.1.5"]
         GWB["Gateway/LB<br>(NodePort, NLB, or Istio GW)"]
         GWB --> PodB
@@ -93,7 +93,7 @@ flowchart LR
     GWA -->|"HTTPS<br>(public or private link)"| GWB
     
     classDef cluster fill:none,stroke:#333,stroke-width:2px;
-    class Cluster A,Cluster B cluster;
+    class ClusterA,ClusterB cluster;
 ```
 
 Island networking often aligns better with organizations that run multiple platform stacks, cloud providers, or independently managed clusters. It is intentionally conservative: cluster teams can move quickly inside their own network boundaries, while your cross-cluster layer remains explicit and testable. This produces a more deliberate integration posture, because every external dependency must pass through governed gateways and contracts before becoming available to peer clusters.
@@ -683,7 +683,7 @@ sequenceDiagram
     participant B as Cluster B
     
     Note over A,B: Normal Operation
-    A<-->>B: Network Connected
+    A<<-->>B: Network Connected
     Note left of A: User X balance: $500
     Note right of B: User X balance: $500
     
@@ -694,7 +694,7 @@ sequenceDiagram
     Note right of B: User X: $300
     
     Note over A,B: Network restores
-    A<-->>B: Network Connected
+    A<<-->>B: Network Connected
     Note left of A: "User X: $600"
     Note right of B: "User X: $300"
     

@@ -752,7 +752,7 @@ A compliance dashboard brings together findings from all layers into a single vi
 ```mermaid
 flowchart TD
     subgraph COMPLIANCE DASHBOARD
-        Score[Overall Score: 94% | SOC2: 96% | PCI: 91% | HIPAA: 95%]
+        Score["Overall Score: 94% | SOC2: 96% | PCI: 91% | HIPAA: 95%"]
         
         Score --> Cloud[Cloud Layer: 12/12 pass, 0 crit]
         Score --> K8s[K8s Layer: 18/19 pass, 1 warn]
