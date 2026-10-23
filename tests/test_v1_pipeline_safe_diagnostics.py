@@ -148,8 +148,10 @@ def test_malformed_yaml_does_not_persist_source(diagnostic_env, capsys, surface)
 def test_checker_metadata_stays_in_allowlist(tmp_path):
     content = "ы э ё ъ 😀\n" + " ".join(pipeline.ukrainian.RUSSICISMS)
     content += " " + " ".join(pipeline.ukrainian.CONTEXTUAL_RUSSICISMS)
+    content += "\n<details><summary>q</summary>a</details>"
     results = pipeline.structural.run_all(content, tmp_path / "module-1.1-test.md")
     results += pipeline.ukrainian.run_all(content, tmp_path / "uk" / "module-1.1-test.md")
     assert results
+    assert {result.check for result in results} == set(pipeline._SAFE_CHECK_IDS)
     for result in results:
         assert pipeline._safe_check_summary(result) == f"[{result.severity}] {result.check}"
