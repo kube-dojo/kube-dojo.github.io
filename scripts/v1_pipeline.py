@@ -2780,8 +2780,8 @@ def _probe_url(url: str) -> int | None:
                 if method == "GET":
                     try:
                         response.read(1024)
-                    except (OSError, http.client.HTTPException):
-                        print("  ⚠ Link probe body read failed; retaining HTTP status")
+                    except Exception:
+                        logger.exception("Link probe body read failed; retaining HTTP status", exc_info=False)
                 return int(response.getcode())
         except urllib.error.HTTPError as e:
             return int(e.code)
@@ -3427,8 +3427,8 @@ def run_module(module_path: Path, state: dict, max_retries: int | None = None,
                         timeout=30,
                     )
                     print("  Committed draft")
-                except (OSError, subprocess.SubprocessError, UnicodeError):
-                    print("  ⚠ Draft commit failed; continuing with saved draft")
+                except Exception:
+                    logger.exception("Draft commit failed; continuing with saved draft", exc_info=False)
                 return True
 
         if ms["phase"] == "citation":
