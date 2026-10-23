@@ -74,11 +74,11 @@ def test_step_check_keeps_results_without_persisting_diagnostics(
     assert f"{2 if include_errors else 0} errors, 1 warnings" in console
     text = console if surface == "console" else log.read_text(encoding="utf-8")
     assert_safe(text)
-    assert "LINE_COUNT" in text and "WARNING" in text
-    assert "CODE_LANG" in text and "INFO" in text
+    assert "[WARNING] LINE_COUNT" in text
+    assert "[INFO] CODE_LANG" in text
     assert "QUIZ_DEPTH" not in text
     if include_errors:
-        assert "FRONTMATTER" in text and "ERROR" in text
+        assert "[ERROR] FRONTMATTER" in text
 
 
 @pytest.mark.parametrize("surface", ["console", "log", "report"])
@@ -99,6 +99,7 @@ def test_audit_all_keeps_counts_without_persisting_diagnostics(
     assert entry["errors"] == 2
     assert len(entry["error_details"]) == 2
     assert all(isinstance(detail, str) for detail in entry["error_details"])
+    assert entry["error_details"] == ["[ERROR] FRONTMATTER", "[ERROR] UNKNOWN"]
     assert "0/1 modules pass deterministic checks" in console
     text = {
         "console": console,
@@ -106,7 +107,7 @@ def test_audit_all_keeps_counts_without_persisting_diagnostics(
         "report": report_file.read_text(encoding="utf-8"),
     }[surface]
     assert_safe(text)
-    assert "FRONTMATTER" in text and "ERROR" in text
+    assert "[ERROR] FRONTMATTER" in text
 
 
 def test_check_fail_markdown_does_not_persist_diagnostics(diagnostic_env, monkeypatch):
@@ -121,6 +122,34 @@ def test_check_fail_markdown_does_not_persist_diagnostics(diagnostic_env, monkey
 
     text = audit_file.read_text(encoding="utf-8")
     assert_safe(text)
-    assert "FRONTMATTER" in text and "ERROR" in text
-    assert "LINE_COUNT" in text and "WARNING" in text
+    assert "\n- [ERROR] FRONTMATTER\n" in text
+    assert "\n- [WARNING] LINE_COUNT\n" in text
     assert "QUIZ_DEPTH" not in text
+
+
+@pytest.mark.parametrize("value", [[], {}, None, 42])
+def test_non_string_check_metadata_is_unknown(value):
+    result = CheckResult(value, False, MESSAGE, value)
+    assert pipeline._safe_check_summary(result) == "[UNKNOWN] UNKNOWN"
+
+
+@pytest.mark.parametrize("surface", ["console", "log"])
+def test_malformed_yaml_does_not_persist_source(diagnostic_env, capsys, surface):
+    module, log, _ = diagnostic_env
+    content = f"---\ntitle: {MESSAGE}: invalid\n---\n"
+    assert pipeline.step_check(content, module) == (False, [])
+    console = capsys.readouterr().out
+    text = console if surface == "console" else log.read_text(encoding="utf-8")
+    assert MESSAGE not in text
+    assert "broken YAML frontmatter" in text
+    assert f"(line 2, column {len(MESSAGE) + 8})" in text
+
+
+def test_checker_metadata_stays_in_allowlist(tmp_path):
+    content = "ы э ё ъ 😀\n" + " ".join(pipeline.ukrainian.RUSSICISMS)
+    content += " " + " ".join(pipeline.ukrainian.CONTEXTUAL_RUSSICISMS)
+    results = pipeline.structural.run_all(content, tmp_path / "module-1.1-test.md")
+    results += pipeline.ukrainian.run_all(content, tmp_path / "uk" / "module-1.1-test.md")
+    assert results
+    for result in results:
+        assert pipeline._safe_check_summary(result) == f"[{result.severity}] {result.check}"
