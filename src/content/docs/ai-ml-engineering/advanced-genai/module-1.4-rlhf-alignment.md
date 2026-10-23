@@ -318,16 +318,16 @@ policy, which is typically the SFT model checkpoint from before RL training bega
 ```mermaid
 sequenceDiagram
     participant User Prompt
-    participant Policy Model (Active)
-    participant Reference Model (Frozen)
-    participant Reward Model (Frozen)
+    participant PM as Policy Model (Active)
+    participant Ref as Reference Model (Frozen)
+    participant RM as Reward Model (Frozen)
 
-    User Prompt->>Policy Model: Generate Response
-    User Prompt->>Reference Model: Generate Base Logits
-    Policy Model->>Reward Model: Submit Response for Scoring
-    Reward Model-->>Policy Model: Return Scalar Reward
-    Reference Model-->>Policy Model: Return base logits (for KL vs policy)
-    Note over Policy Model: Compute KL of policy vs reference#59;<br/>Update Weights: Maximize (Reward - beta*KL)
+    User Prompt->>PM: Generate Response
+    User Prompt->>Ref: Generate Base Logits
+    PM->>RM: Submit Response for Scoring
+    RM-->>PM: Return Scalar Reward
+    Ref-->>PM: Return base logits (for KL vs policy)
+    Note over PM: Compute KL of policy vs reference#59;<br/>Update Weights: Maximize (Reward - beta*KL)
 ```
 
 ### Why the KL Penalty Matters
