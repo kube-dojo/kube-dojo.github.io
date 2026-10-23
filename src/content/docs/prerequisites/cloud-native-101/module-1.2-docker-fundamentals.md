@@ -377,7 +377,7 @@ docker rm -f $(docker ps -q --filter ancestor=hello-flask:v1)
 
 Add a `.dockerignore` file before you trust `COPY . .` in a real project. The file uses patterns to remove development-only files from the build context, which speeds builds and reduces the chance of accidentally embedding credentials or host-specific artifacts. It is the container equivalent of packing only what you need for a trip instead of dumping your entire apartment into the suitcase.
 
-```gitignore
+```text
 .git
 .venv
 node_modules

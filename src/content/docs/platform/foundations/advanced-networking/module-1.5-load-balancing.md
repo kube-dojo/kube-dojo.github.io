@@ -404,7 +404,7 @@ server {
 ```
 
 **HAProxy Configuration**
-```haproxy
+```text
 # Receiving Proxy Protocol
 frontend web
     bind *:443 accept-proxy ssl crt /etc/ssl/cert.pem

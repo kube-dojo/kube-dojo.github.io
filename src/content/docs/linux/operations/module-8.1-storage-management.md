@@ -324,7 +324,7 @@ sudo vi /etc/fstab
 
 The fstab format is compact, so read it as a contract between device identity, mount location, filesystem type, mount policy, and boot-time checking behavior:
 
-```fstab
+```text
 # <device>                                 <mountpoint>  <type>  <options>       <dump> <pass>
 UUID=a1b2c3d4-5678-90ab-cdef-1234567890ab  /data         ext4    defaults        0      2
 /dev/vg_storage/lv_logs                    /var/log/app  xfs     defaults,noatime 0     2
@@ -372,7 +372,7 @@ sudo vi /etc/exports
 
 The `/etc/exports` file describes which directories are shared, which clients may reach them, and which server-side safety choices apply to each export:
 
-```exports
+```text
 # Format: <directory> <client>(options)
 
 # Share with specific network
