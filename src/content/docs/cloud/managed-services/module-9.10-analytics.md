@@ -805,7 +805,7 @@ query = "SELECT trip_id, fare_amount FROM analytics.trips WHERE date = '2025-11-
 result = client.query(query, job_config=job_config).result()
 ```
 
-Hypothetical scenario: an analyst runs `SELECT *` on a 200 TB unpartitioned transactions table in BigQuery. At ~\$6.25/TiB, that single query approaches **\$1,250** before egress. Adding a `WHERE transaction_date = '2025-11-15'` partition filter on a daily-partitioned table might reduce scanned data to ~100 GB (~\$0.60). The engineering work to partition at table creation pays for itself the first time someone forgets a WHERE clause.
+Hypothetical scenario: an analyst runs `SELECT *` on a 200 TB unpartitioned transactions table in BigQuery. At ~\$6.25/TiB, that single query approaches **\$1,250** before egress. Adding a `WHERE transaction_date = '2025-11-15'` partition filter on a daily-partitioned table might reduce scanned data to \~100 GB (\~\$0.60). The engineering work to partition at table creation pays for itself the first time someone forgets a WHERE clause.
 
 ### Provisioned Cluster Costs: Redshift and Synapse Dedicated
 

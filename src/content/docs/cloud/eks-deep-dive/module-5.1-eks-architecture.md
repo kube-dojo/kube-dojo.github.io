@@ -624,7 +624,7 @@ EKS billing splits cleanly into **cluster hours** (Kubernetes version support ti
 
 ### Control plane and version support
 
-During [standard Kubernetes version support](https://aws.amazon.com/eks/pricing/) — the first 14 months after a version is available in EKS — each cluster costs **\$0.10 per hour** (~\$73 per 730-hour month) regardless of node count. After standard support ends, clusters on that minor version enter **extended support** at **\$0.60 per hour** (~\$438/month) for up to 12 additional months unless you upgrade. That sixfold jump is pure policy: identical APIs, different support tier. IaC defaults sometimes enable extended support automatically; aligning `upgradePolicy` with your tested upgrade cadence avoids silent invoice surprises.
+During [standard Kubernetes version support](https://aws.amazon.com/eks/pricing/) — the first 14 months after a version is available in EKS — each cluster costs **\$0.10 per hour** (\~\$73 per 730-hour month) regardless of node count. After standard support ends, clusters on that minor version enter **extended support** at **\$0.60 per hour** (\~\$438/month) for up to 12 additional months unless you upgrade. That sixfold jump is pure policy: identical APIs, different support tier. IaC defaults sometimes enable extended support automatically; aligning `upgradePolicy` with your tested upgrade cadence avoids silent invoice surprises.
 
 | Cost driver | Typical monthly impact | Knobs that reduce it |
 | :--- | :--- | :--- |
