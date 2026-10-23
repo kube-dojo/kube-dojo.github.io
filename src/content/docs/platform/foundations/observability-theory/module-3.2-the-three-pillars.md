@@ -12,7 +12,7 @@ sidebar:
 >
 > **Track**: Foundations
 
-### What You'll Be Able to Do
+## What You'll Be Able to Do
 
 After completing this module, you will be able to:
 
@@ -58,7 +58,7 @@ The goal of this module is not to make you a Prometheus or Jaeger expert; later 
 
 ---
 
-## What You'll Learn
+## Module Roadmap
 
 - What each pillar provides, what it costs, and where its blind spots are
 - When to reach for logs, metrics, or traces first, and why the wrong choice burns time
@@ -420,6 +420,42 @@ The five steps — alert, scope, sample, detail, test — provide a starting pat
 >
 > Success means identifying the missing evidence and testing a hypothesis. [OpenTelemetry's sampling guidance](https://opentelemetry.io/docs/concepts/sampling/#head-sampling) explains why a head-sampling decision cannot use the request's eventual outcome. A correlation contract should therefore include what is retained and what may be missing, not just which identifiers exist.
 
+### 4.5 Worked Evidence Packet: Which Timeout Belongs Here?
+
+Use this deliberately small synthetic packet to practice a join before interpreting its meaning. All durations are invented inputs in milliseconds, measured relative to one request's start. The labels `T1` and `T2` stand for distinct trace IDs; they are not valid wire-format identifiers. No live service, incident, or successful remediation is represented.
+
+Assume a histogram observation of 900 milliseconds carries an exemplar referencing `T1`. Its retained parent span also lasts 900 milliseconds. Two instrumented child operations occur sequentially: acquiring a database connection takes 700 milliseconds, then executing a query takes 100 milliseconds. Two logs occur in the same dashboard window, but only one belongs to this request.
+
+The following local check makes the association and arithmetic reproducible without a telemetry backend. Run it from this repository root using its Python environment. The assertions verify the supplied records only; they do not validate an exporter, a dashboard integration, or any production diagnosis.
+
+```bash
+.venv/bin/python - <<'PY'
+observation = {"trace_id": "T1", "duration_ms": 900}
+spans = {"T1": {"total_ms": 900, "pool_wait_ms": 700, "query_ms": 100}}
+logs = [{"trace_id": "T1", "event": "connection_acquired"}, {"trace_id": "T2", "event": "query_timeout"}]
+matched = [log for log in logs if log["trace_id"] == observation["trace_id"]]
+span = spans[observation["trace_id"]]
+unattributed = span["total_ms"] - span["pool_wait_ms"] - span["query_ms"]
+assert matched == [{"trace_id": "T1", "event": "connection_acquired"}]
+assert unattributed == 100
+print(matched[0]["event"], unattributed)
+PY
+```
+
+The expected output is `connection_acquired 100`. Start by explaining the join: the exemplar names `T1`, the retained spans are indexed by that identifier, and the matching log carries it too. The timeout belongs to `T2`. Its presence in the same window does not turn it into an explanation for `T1`.
+
+Next, interpret the measured intervals under the stated assumptions. Connection acquisition accounts for 700 of the request's 900 milliseconds, while the query accounts for 100. This supports investigating waiting before execution for this request. It does not support calling the query timeout its cause, because that log was excluded by the identifier match.
+
+The remaining 100 milliseconds are unattributed by these child spans. Do not subtract child durations blindly in another trace: overlapping child operations would make that arithmetic misleading. Here the sequential, non-overlapping assumption makes subtraction valid. The remainder could contain local processing or uninstrumented waiting; this packet cannot distinguish them.
+
+A pool-wait hypothesis now deserves a targeted check. Inspect how the acquisition span is defined, then seek pool occupancy and pending-acquisition measurements over the same interval. A long acquisition operation does not by itself show why capacity was unavailable. Connections could be held by other work, or acquisition instrumentation could include connection establishment.
+
+A database-execution hypothesis needs different evidence. Inspect query spans from other affected requests and corresponding database telemetry rather than borrowing `T2`'s timeout. Compare a retained faster request with similar service and operation attributes. If the difference lies in execution rather than acquisition, revise the hypothesis instead of choosing a larger pool automatically.
+
+Now consider coverage. A valid join establishes an association among these retained records, not the proportion of requests with this behavior. The histogram describes a population; this exemplar names one observation. Check additional samples and sampling policy before generalizing. If `T1` has expired, the exemplar remains a reference whose target cannot be inspected.
+
+For transfer, change the matching log's identifier to `T2` and predict which assertion fails before rerunning. Then remove `T1` from the span mapping and explain why lookup failure is not proof of a healthy request. Success means separating a broken join, absent evidence, and evidence contradicting a hypothesis, while stating what you would measure next.
+
 ---
 
 ## Part 5: Beyond the Three Pillars
@@ -562,35 +598,35 @@ The benefits compound: instrumentation is vendor-neutral so you can change backe
 
 ### Three Pillars Essentials Checklist
 
-**Understanding Each Pillar**
+#### Understanding Each Pillar
 - [x] **Logs** — detailed events, high cardinality welcome, best for "what exactly happened?"
 - [x] **Metrics** — numeric aggregates, low cardinality required, best for "how much, how often, what's the trend?"
 - [x] **Traces** — recorded request relationships and timing, best for "where did the time go?"; causal explanations still need testing
 
-**When To Use What**
+#### When To Use What
 - [x] Debugging one specific request → traces, then logs scoped by `trace_id`
 - [x] Alerting on thresholds → metrics
 - [x] Finding patterns across many users → logs with structured fields, queried in a log database
 - [x] Identifying which service is slow → traces
 - [x] Capacity planning and trend analysis → metrics over long windows
 
-**The Correlation Imperative**
+#### The Correlation Imperative
 - [x] Trace and span IDs in request-scoped logs when context is available
 - [x] Exemplars on useful metrics, with tested dashboard links and compatible trace retention
 - [x] Same timestamp format and timezone across all signals
 - [x] Unified UI or deep-linked navigation between tools
 
-**Cardinality Rules**
+#### Cardinality Rules
 - [x] **Metrics** — bounded dimensions only (`endpoint`, `region`, `status_code`, `method`)
 - [x] **Logs** — high-cardinality fields are fine (`user_id`, `request_id`, `session_id`)
 - [x] **Traces** — sample for volume control; always keep errors and slow traces
 
-**Sampling**
+#### Sampling
 - [x] Head-based — cheap, stateless, decided upfront, blind to outcome
 - [x] Tail-based — precise, stateful, decided after the fact, more expensive to operate
 - [x] Hybrid is usually right at scale
 
-**The Events Perspective**
+#### The Events Perspective
 - [x] Pillars are views of a single event stream, not three separate data types
 - [x] OpenTelemetry collapses the instrumentation story into one SDK and one wire format
 - [x] The goal is to answer questions you did not anticipate — that is what "observability" actually means
