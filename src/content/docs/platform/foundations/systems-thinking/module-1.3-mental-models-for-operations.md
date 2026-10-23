@@ -17,7 +17,7 @@ sidebar:
 
 1. **Apply** the three core operational mental models — leverage points, stock-and-flow diagrams, and causal loop diagrams — to decisions during live incidents
 2. **Evaluate** which mental model best fits a given incident scenario and explain why others fall short
-3. **Diagnose** production incidents faster by selecting the appropriate reasoning framework before diving into logs
+3. **Diagnose** queue growth by comparing entries and completions over the same observation window, including simultaneous changes in both rates
 4. **Compare** competing hypotheses during incidents using structured mental models rather than intuition alone
 
 ---
@@ -237,11 +237,27 @@ The stock-and-flow lens provides a systematic approach to diagnosing the most co
 
 ### Stock-and-Flow Incident Diagnosis
 
-When a stock is growing—queue depth expanding, latency climbing, memory consumption trending upward—the diagnosis always reduces to a single question with exactly two possibilities. The symptom is straightforward: queue depth (the stock) is growing, and latency equals queue depth divided by processing rate, so a growing queue means growing latency. The diagnosis is equally straightforward: inflow exceeds outflow. This framework guarantees there are no other branches to consider, which means you can eliminate entire categories of hypotheses rapidly and focus your investigation on the remaining possibilities.
+When a measured stock grows, entries have exceeded exits over that interval. Define its boundary before comparing rates: a waiting-only queue loses an item when service starts, while a stock including work in service loses it on completion or another exit. Increased entries and reduced exits can occur together. Check both against baseline, including retries, cancellations and drops, before choosing between hypotheses. Queue depth alone does not establish end-to-end latency or identify the cause of the imbalance.
 
 **Possibility A: Inflow has increased.** The rate at which work arrives has gone up. Check whether there has been a traffic spike by consulting the load balancer request rate and comparing it to the baseline for this time of day—common causes include a marketing campaign driving unexpected traffic, viral content sharing, or a deliberate attack. Check for a retry storm by examining error rate and retry rate metrics simultaneously; if errors triggered retries which triggered more errors, the inflow increase is being generated internally rather than externally. Check whether a scheduled batch job has started by examining cron schedules and job queue metrics; nightly ETL jobs and report generation are frequent culprits in periodic latency spikes. Check whether the system is catching up after a period of downtime by looking for a recent gap in processing metrics; recovering systems often face a backlog that looks like an inflow spike.
 
 **Possibility B: Outflow has decreased.** The rate at which work is being processed has dropped. Check whether there are fewer workers available by examining pod counts, node status, and recent deployment events—evictions, failed deployments, and node failures all reduce processing capacity. Check whether individual requests are taking longer to process by examining request latency breakdowns; a slow database, a degraded dependency, or CPU throttling will increase per-request duration, which reduces effective throughput even if no workers are lost. Check for resource contention by examining CPU, memory, network, and disk I/O saturation; a noisy neighbor on shared infrastructure or a resource limit being hit can throttle processing without triggering a clear failure signal. Check for lock contention by examining database lock metrics and mutex wait times; blocking queries and deadlocks can stall processing at near-zero throughput while every metric except the lock wait time looks normal.
+
+**Hypothetical calculation:** Start with 50 requests waiting or in service. Before the incident, entries and completions both average 200 requests/minute. Assume constant rates for the next four minutes, no other entries or exits, and enough waiting work to sustain the stated completion rates. Predict the final stock for each case before opening the answer.
+
+| Case | Entries (requests/minute) | Completions (requests/minute) |
+|---|---:|---:|
+| More entries only | 250 | 200 |
+| Fewer completions only | 200 | 80 |
+| Both changes | 250 | 80 |
+
+<details>
+<summary>Check the calculation and your diagnosis</summary>
+
+Final stock = initial stock + (entry rate − completion rate) × elapsed time. The three results are **250**, **530**, and **730 requests**. In the combined case, `50 + (250 − 80) × 4 = 730`: the observed growth is compatible with both changes together. These invented rates illustrate the calculation; they do not identify the cause of an incident. If your measured flows do not explain the stock change, recheck the boundary, missing flows and aligned sampling intervals before choosing a repair.
+
+Source for the accumulation relationship: [MIT OpenCourseWare, Systems Thinking, slide 28 (PDF page 29)](https://ocw.mit.edu/courses/res-15-004-system-dynamics-systems-thinking-and-modeling-for-a-complex-world-january-iap-2020/65a2dc7433fcb6cce64b55da0342f0c0_MITRES15_004IAP20_slides.pdf#page=29). The request counts above are a teaching example, not MIT measurements.
+</details>
 
 > **Hypothetical scenario: The Invisible Stock**
 >
@@ -474,29 +490,13 @@ Build a dedicated database observability dashboard showing active connections, q
    The incident commander is operating at level 7 by breaking the reinforcing loop that is likely causing the outage—a retry storm or contention spiral where each failed request generates additional load that causes more failures. The circuit breaker inserts a negative link into this reinforcing loop, immediately reducing the effective load on the system and giving it space to recover. The engineer's approach of quadrupling the connection pool operates at level 11 (buffer sizing), which is a weak intervention in Meadows' hierarchy. Worse, it can be actively harmful: if the root cause is a contention spiral, more concurrent connections will increase lock contention inside the database, making every query slower and accelerating the death spiral rather than stopping it. This counterintuitive property—that the obvious fix worsens the problem—is characteristic of reinforcing loops and is precisely why the leverage hierarchy ranks parameter changes at the bottom.
    </details>
 
-2. **Your monitoring alerts for a payment processing service: the active request queue has grown from a steady baseline of approximately 50 items to over 700 items in the span of four minutes, and latency is climbing in proportion. Diagnose this incident faster by selecting the appropriate reasoning framework before diving into the logs: walk through the complete stock-and-flow diagnostic branching process you would use to determine the root cause, specifying which metrics you would check for each branch and what each finding would imply.**
+2. **Your monitoring alerts for a payment processing service: the active request queue has grown from a steady baseline of approximately 50 items to over 700 items in the span of four minutes, and latency is climbing in proportion. Diagnose this queue growth by comparing entries and completions over the same observation window: which measurements would distinguish increased arrivals, reduced processing, or both changes together, and what would remain unknown about the cause?**
    <details>
    <summary>Answer</summary>
 
    Use stock-and-flow analysis, but measure inflow and outflow together: more arrivals and fewer departures can happen at the same time. First define the stock. If it counts waiting requests, starting service is an exit; if it includes requests in service, completion is an exit. Compare entries and exits across that same boundary and time window. Include retries that re-enter it and cancellations or dropped requests that leave it. Queue growth establishes a net imbalance over the interval, not its cause.
 
    Compare arrival and retry rates with baseline, then inspect departures even if arrivals have increased. Check available workers, deployment changes and per-request dependency latency for evidence of reduced processing capacity. A load balancer's request count is useful only if you account for requests that never enter this queue. Use both measurements to test combined explanations rather than ruling out a slowdown after finding a traffic spike.
-   </details>
-
-   **Hypothetical calculation:** Start with 50 requests waiting or in service. Before the incident, entries and completions both average 200 requests/minute. Assume constant rates for the next four minutes, no other entries or exits, and enough waiting work to sustain the stated completion rates. Predict the final stock for each case before opening the answer.
-
-   | Case | Entries (requests/minute) | Completions (requests/minute) |
-   |---|---:|---:|
-   | More entries only | 250 | 200 |
-   | Fewer completions only | 200 | 80 |
-   | Both changes | 250 | 80 |
-
-   <details>
-   <summary>Check the calculation and your diagnosis</summary>
-
-   Final stock = initial stock + (entry rate − completion rate) × elapsed time. The three results are **250**, **530**, and **730 requests**. In the combined case, `50 + (250 − 80) × 4 = 730`: the observed growth is compatible with both changes together. These invented rates illustrate the calculation; they do not identify the cause of the quiz's incident. If your measured flows do not explain the stock change, recheck the boundary, missing flows and aligned sampling intervals before choosing a repair.
-
-   Source for the accumulation relationship: [MIT OpenCourseWare, Systems Thinking, slide 28 (PDF page 29)](https://ocw.mit.edu/courses/res-15-004-system-dynamics-systems-thinking-and-modeling-for-a-complex-world-january-iap-2020/65a2dc7433fcb6cce64b55da0342f0c0_MITRES15_004IAP20_slides.pdf#page=29). The request counts above are a teaching example, not MIT measurements.
    </details>
 
 3. **Your team implements a new caching layer in front of a database. During normal operation, cache hit rates are high, which reduces database load, which speeds up cache population queries, which encourages even more cache usage. However, after a cache flush, the database is immediately overwhelmed, which makes cache population queries fail, which keeps the cache cold, which means all queries continue to hit the overloaded database. Classify this feedback structure using causal loop notation: draw the links, count the polarities, and determine whether the loop is reinforcing or balancing. Explain what makes the system stable in one direction and fragile in the other.**
@@ -561,8 +561,8 @@ set -euo pipefail
 : "${STOCKS_CONTEXT:?Set this to your disposable lab context}"
 command -v jq >/dev/null
 ctx="$STOCKS_CONTEXT"
-k() { kubectl --context="$ctx" --request-timeout=20s "$@"; }
-k get namespace default -o name >/dev/null
+stocks_kubectl() { kubectl --context="$ctx" --request-timeout=20s "$@"; }
+stocks_kubectl get namespace default -o name >/dev/null
 ns="stocks-lab-$RANDOM-$RANDOM"
 uid=""
 cleanup() {
@@ -572,9 +572,9 @@ cleanup() {
     echo "No ownership proof; inspect $ctx / $ns if creation was uncertain." >&2
     exit "$rc"
   fi
-  if actual=$(k get namespace "$ns" -o jsonpath='{.metadata.uid}') && [ "$actual" = "$uid" ]; then
-    k delete namespace "$ns" --wait=true --timeout=90s || exit 1
-    remaining=$(k get namespace "$ns" --ignore-not-found -o name) || exit 1
+  if actual=$(stocks_kubectl get namespace "$ns" -o jsonpath='{.metadata.uid}') && [ "$actual" = "$uid" ]; then
+    stocks_kubectl delete namespace "$ns" --wait=true --timeout=90s || exit 1
+    remaining=$(stocks_kubectl get namespace "$ns" --ignore-not-found -o name) || exit 1
     [ -z "$remaining" ] || exit 1
   else
     echo "Cleanup refused: inspect $ctx / $ns; ownership could not be confirmed." >&2
@@ -585,18 +585,18 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-uid=$(k create namespace "$ns" -o jsonpath='{.metadata.uid}')
+uid=$(stocks_kubectl create namespace "$ns" -o jsonpath='{.metadata.uid}')
 [ -n "$uid" ]
 echo "Context=$ctx namespace=$ns UID=$uid"
 submit() {
   name=$1; result=$2
-  k create job "$name" -n "$ns" --image=busybox:1.37.0 --dry-run=client -o json -- \
+  stocks_kubectl create job "$name" -n "$ns" --image=busybox:1.37.0 --dry-run=client -o json -- \
     sh -c "sleep 8; exit $result" |
     jq '.spec.suspend=true | .spec.backoffLimit=0' |
-    k create -f - >/dev/null
+    stocks_kubectl create -f - >/dev/null
 }
 snapshot() {
-  k get --raw "/apis/batch/v1/namespaces/$ns/jobs" | jq '
+  stocks_kubectl get --raw "/apis/batch/v1/namespaces/$ns/jobs" | jq '
     def has($c): any(.status.conditions[]?; .type==$c and .status=="True");
     if (.metadata.resourceVersion | type)!="string" or .metadata.resourceVersion==""
       then error("missing list resourceVersion") else . end |
@@ -616,9 +616,9 @@ snapshot
 submit task-4 0
 submit task-5 0
 snapshot
-k get pods -n "$ns" -o wide
+stocks_kubectl get pods -n "$ns" -o wide
 for i in 1 2 3 4 5; do
-  k patch job "task-$i" -n "$ns" --type=merge -p '{"spec":{"suspend":false}}' >/dev/null
+  stocks_kubectl patch job "task-$i" -n "$ns" --type=merge -p '{"spec":{"suspend":false}}' >/dev/null
 done
 finished=false
 for attempt in {1..30}; do
@@ -630,8 +630,8 @@ for attempt in {1..30}; do
   fi
   sleep 5
 done
-k get pods -n "$ns" -o 'custom-columns=NAME:.metadata.name,PHASE:.status.phase,EXIT:.status.containerStatuses[*].state.terminated.exitCode'
-k logs -n "$ns" job/task-3
+stocks_kubectl get pods -n "$ns" -o 'custom-columns=NAME:.metadata.name,PHASE:.status.phase,EXIT:.status.containerStatuses[*].state.terminated.exitCode'
+stocks_kubectl logs -n "$ns" job/task-3
 [ "$finished" = true ] || { echo "Observation limit reached; inspect the reports." >&2; exit 1; }
 jq -e '.complete==4 and .failed==1' <<<"$report" >/dev/null
 )
@@ -660,7 +660,7 @@ flowchart LR
     API --> Redis["Redis Cache"]
 ```
 
-**Section 1: Stock-and-Flow Diagram (10 minutes).** Draw a diagram that includes at least two stocks—consider the request queue, the database connection pool, and the cache entry set—along with their inflows and outflows, and show how these stocks are connected through the request processing path. Then answer two diagnostic questions: which stock is most likely related to the hourly latency spikes (think about what resets on an hourly cycle), and what happens to each stock when traffic spikes?
+**Section 1: Stock-and-Flow Diagram (10 minutes).** Draw a diagram that includes at least two stocks—consider the request queue, the database connection pool, and the cache entry set—along with their inflows and outflows, and show how these stocks are connected through the request processing path. Predict what happens to each stock during a traffic spike, then propose two explanations for the hourly latency spikes and identify measurements that would distinguish them.
 
 **Section 2: Causal Loop Diagram (10 minutes).** Draw a diagram that includes at least three feedback loops: the retry storm loop (reinforcing), the autoscaling loop (balancing), and the cache behavior loop that explains the hit rate fluctuations. Mark each link as (+) or (−) and label each loop as R or B. Then identify which loop interactions explain the cascading failures—specifically, how a reinforcing loop can overwhelm the protective balancing loops.
 
@@ -674,13 +674,13 @@ flowchart LR
 | 6 | | |
 | 5 | | |
 
-**Success criteria for this exercise.** Complete Part A by creating the job queue, observing it drain, and watching what happens when inflow exceeds outflow capacity. For Part B, produce a stock-and-flow diagram with clearly labeled accumulation points, a causal loop diagram with at least two identified loops and correct polarity markings, a leverage point analysis with interventions ranked at the correct levels, and an explanation of why the hourly latency spikes occur—the hint is that cache entries have a time-to-live that expires on a regular cycle.
-- [ ] Part A: Created and observed job queue draining
-- [ ] Part A: Observed what happens when inflow > outflow
+**Success criteria for this exercise.** In Part A, compare the two suspended-Job counts and distinguish successful from failed terminal exits after release. Explain why these independent Jobs do not establish a shared processing capacity or demonstrate overload. In Part B, use your diagrams to compare hypotheses for the hourly latency spikes: synchronized cache expiry is one candidate, while scheduled batch work is another. Name the observations that would support or challenge each before choosing an intervention; the supplied symptoms do not establish a cause.
+- [ ] Part A: Compared nonterminal Job counts before release and successful/failed exits afterward
+- [ ] Part A: Verified owned-namespace cleanup and explained the experiment's capacity limits
 - [ ] Part B: Stock-and-flow diagram with clear accumulation points
 - [ ] Part B: Causal loop diagram with at least 2 loops identified
 - [ ] Part B: Leverage point interventions ranked correctly
-- [ ] Part B: Can explain why the hourly spikes happen (hint: cache TTL)
+- [ ] Part B: Compared cache-expiry and batch-work hypotheses, with evidence needed to distinguish them
 
 ---
 
