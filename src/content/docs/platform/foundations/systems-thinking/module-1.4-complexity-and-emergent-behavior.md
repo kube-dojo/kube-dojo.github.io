@@ -17,10 +17,10 @@ revision_pending: false
 
 After completing this module, you will be able to apply complexity thinking to production systems in four concrete ways:
 
-1. **Distinguish** between complicated systems (predictable, decomposable) and complex systems (emergent, non-linear) in real infrastructure
+1. **Distinguish** complicated and complex investigative approaches using evidence about component behavior and interactions, without treating a domain as a permanent system label
 2. **Analyze** how simple component interactions produce emergent behaviors that cannot be predicted from specifications alone
 3. **Design** observability that connects service symptoms with retry, queue, and resource interactions, and propose safeguards to test
-4. **Evaluate** architectural decisions through the lens of complexity theory to reduce the blast radius of unexpected interactions
+4. **Evaluate** checkout design choices against correctness requirements and dependency failure behavior, including the limits of proposed isolation and fallback mechanisms
 
 ---
 
@@ -582,18 +582,18 @@ Before running, predict two things separately: what will happen to Pod identitie
 #!/usr/bin/env bash
 set -euo pipefail
 context=${1:?Pass the name of your disposable Kubernetes context}
-k() { kubectl --context="$context" --request-timeout=15s "$@"; }
+recovery_kubectl() { kubectl --context="$context" --request-timeout=15s "$@"; }
 ns="kd-recovery-$(date +%s)-$$"
 logs=$(mktemp -d "${TMPDIR:-/tmp}/kubedojo-recovery.XXXXXX")
 printf 'Context=%s namespace=%s evidence=%s\n' "$context" "$ns" "$logs"
-k version -o yaml > "$logs/version.yaml"
-uid=$(k create namespace "$ns" -o jsonpath='{.metadata.uid}')
+recovery_kubectl version -o yaml > "$logs/version.yaml"
+uid=$(recovery_kubectl create namespace "$ns" -o jsonpath='{.metadata.uid}')
 cleanup() {
   rc=$?
   trap - EXIT
   printf '{"apiVersion":"v1","kind":"DeleteOptions","preconditions":{"uid":"%s"}}' "$uid" |
-    k delete --raw "/api/v1/namespaces/$ns" -f - > "$logs/cleanup.json" || rc=1
-  k wait --for=delete "namespace/$ns" --timeout=120s || rc=1
+    recovery_kubectl delete --raw "/api/v1/namespaces/$ns" -f - > "$logs/cleanup.json" || rc=1
+  recovery_kubectl wait --for=delete "namespace/$ns" --timeout=120s || rc=1
   printf 'Cleanup exit=%s; retain evidence in %s\n' "$rc" "$logs"
   exit "$rc"
 }
@@ -601,14 +601,14 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 printf '%s\n' "$uid" > "$logs/namespace-uid.txt"
-k -n "$ns" create deployment resilience-test --image=nginx:1.28-alpine --replicas=3
-k -n "$ns" patch deployment resilience-test --type=strategic -p '{"spec":{"template":{"spec":{"containers":[{"name":"nginx","readinessProbe":{"httpGet":{"path":"/","port":80},"periodSeconds":3}}]}}}}'
-k -n "$ns" expose deployment resilience-test --port=80 --target-port=80
-k -n "$ns" run observer --image=busybox:1.36 --restart=Never --command -- sleep 600
-k -n "$ns" wait --for=condition=Ready pod/observer --timeout=120s
+recovery_kubectl -n "$ns" create deployment resilience-test --image=nginx:1.28-alpine --replicas=3
+recovery_kubectl -n "$ns" patch deployment resilience-test --type=strategic -p '{"spec":{"template":{"spec":{"containers":[{"name":"nginx","readinessProbe":{"httpGet":{"path":"/","port":80},"periodSeconds":3}}]}}}}'
+recovery_kubectl -n "$ns" expose deployment resilience-test --port=80 --target-port=80
+recovery_kubectl -n "$ns" run observer --image=busybox:1.36 --restart=Never --command -- sleep 600
+recovery_kubectl -n "$ns" wait --for=condition=Ready pod/observer --timeout=120s
 ready_three() {
   for attempt in $(seq 1 30); do
-    states=$(k -n "$ns" get pods -l app=resilience-test -o jsonpath='{range .items[*]}{.metadata.uid}{" "}{.metadata.deletionTimestamp}{" "}{.status.containerStatuses[0].ready}{"\n"}{end}')
+    states=$(recovery_kubectl -n "$ns" get pods -l app=resilience-test -o jsonpath='{range .items[*]}{.metadata.uid}{" "}{.metadata.deletionTimestamp}{" "}{.status.containerStatuses[0].ready}{"\n"}{end}')
     if printf '%s\n' "$states" | awk 'NF==2 && $2=="true" {n++} END {exit !(NR==3 && n==3)}'; then return; fi
     sleep 2
   done
@@ -617,13 +617,13 @@ ready_three() {
 }
 snapshot() {
   date -u '+%Y-%m-%dT%H:%M:%SZ'
-  k -n "$ns" get deployment,replicaset,pods -o json
+  recovery_kubectl -n "$ns" get deployment,replicaset,pods -o json
 }
 ready_three
-k -n "$ns" get pods -o json > "$logs/images-and-owners.json"
+recovery_kubectl -n "$ns" get pods -o json > "$logs/images-and-owners.json"
 for round in 1 2; do
   snapshot > "$logs/before-$round.json.txt"
-  k --request-timeout=90s -n "$ns" exec observer -- sh -c '
+  recovery_kubectl --request-timeout=90s -n "$ns" exec observer -- sh -c '
     for i in $(seq 1 20); do
       date -u +%Y-%m-%dT%H:%M:%SZ
       if wget -q -T 2 -O /dev/null http://resilience-test; then echo HTTP_OK; else echo HTTP_FAILED; fi
@@ -631,11 +631,11 @@ for round in 1 2; do
     done' > "$logs/http-$round.txt" 2>&1 &
   observer_pid=$!
   sleep 2
-  pods=$(k -n "$ns" get pods -l app=resilience-test -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+  pods=$(recovery_kubectl -n "$ns" get pods -l app=resilience-test -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
   selected=()
   while IFS= read -r pod; do selected+=("$pod"); done < <(printf '%s\n' "$pods" | head -n "$round")
   date -u '+%Y-%m-%dT%H:%M:%SZ' > "$logs/delete-$round.txt"
-  k -n "$ns" delete pod "${selected[@]}" --wait=true --timeout=120s >> "$logs/delete-$round.txt"
+  recovery_kubectl -n "$ns" delete pod "${selected[@]}" --wait=true --timeout=120s >> "$logs/delete-$round.txt"
   ready_three
   snapshot > "$logs/after-$round.json.txt"
   wait "$observer_pid"
