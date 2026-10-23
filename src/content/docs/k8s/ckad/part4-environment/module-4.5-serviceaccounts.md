@@ -212,7 +212,7 @@ The full identity path is easiest to remember as a sequence rather than as disco
 
 ```mermaid
 flowchart TD
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef default fill:#f9f9f9,color:#111,stroke:#333,stroke-width:2px;
     A["1. Create ServiceAccount\n<code>kubectl create serviceaccount my-app-sa</code>"] --> B["2. Assign to Pod\n<code>spec:</code>\n<code>  serviceAccountName: my-app-sa</code>"]
     B --> C["3. Token Mounted Automatically\n<code>/var/run/secrets/kubernetes.io/serviceaccount/</code>\n<code>├── token     ← JWT token</code>\n<code>├── ca.crt    ← API CA cert</code>\n<code>└── namespace ← Pod namespace</code>"]
     C --> D["4. Pod Uses Token for API Access\n<code>curl -H #quot;Authorization: Bearer $(cat /var/run/...)#quot;</code>\n<code>https://kubernetes/api/v1/...</code>"]

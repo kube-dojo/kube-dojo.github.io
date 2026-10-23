@@ -73,7 +73,7 @@ flowchart TD
 
     Internet --> Host
 
-    classDef danger fill:#ffcccc,stroke:#ff0000,stroke-width:2px;
+    classDef danger fill:#ffcccc,color:#111,stroke:#ff0000,stroke-width:2px;
     class KubeletRO,Pod danger;
 ```
 
@@ -146,7 +146,7 @@ flowchart LR
         InsecureAPI[8080 - Insecure API server deprecated]
     end
 
-    classDef disabled fill:#ffcccc,stroke:#ff0000,stroke-width:2px;
+    classDef disabled fill:#ffcccc,color:#111,stroke:#ff0000,stroke-width:2px;
     class KubeletRO,InsecureAPI disabled;
 ```
 

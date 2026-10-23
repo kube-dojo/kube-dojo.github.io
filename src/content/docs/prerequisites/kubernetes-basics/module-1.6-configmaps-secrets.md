@@ -56,9 +56,9 @@ There is also a practical incident-response reason to separate configuration fro
 
 ```mermaid
 graph TD
-    classDef configMap fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    classDef secret fill:#ffebee,stroke:#c62828,stroke-width:2px
-    classDef note fill:#fff9c4,stroke:#fbc02d,stroke-width:2px
+    classDef configMap fill:#e3f2fd,color:#111,stroke:#1565c0,stroke-width:2px
+    classDef secret fill:#ffebee,color:#111,stroke:#c62828,stroke-width:2px
+    classDef note fill:#fff9c4,color:#111,stroke:#fbc02d,stroke-width:2px
 
     CM[ConfigMap]:::configMap
     SEC[Secret]:::secret
@@ -292,9 +292,9 @@ When mounted as files, Secret payloads are delivered on the node through memory-
 
 ```mermaid
 graph TD
-    classDef source fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef env fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef vol fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef source fill:#f3e5f5,color:#111,stroke:#7b1fa2,stroke-width:2px
+    classDef env fill:#e8f5e9,color:#111,stroke:#388e3c,stroke-width:2px
+    classDef vol fill:#fff3e0,color:#111,stroke:#f57c00,stroke-width:2px
 
     CS["ConfigMap / Secret<br><br>data:<br>KEY1: value1<br>KEY2: value2"]:::source
     

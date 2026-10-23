@@ -64,7 +64,7 @@ graph TD
     ESO -->|K8s Auth / KV API| V1
     KMS -->|Transit Engine API| V1
     
-    classDef active fill:#2b7a42,stroke:#1a4d29,stroke-width:2px;
+    classDef active fill:#2b7a42,color:#fff,stroke:#1a4d29,stroke-width:2px;
     classDef standby fill:#545454,stroke:#333,stroke-width:2px;
     class V1 active;
     class V2,V3 standby;

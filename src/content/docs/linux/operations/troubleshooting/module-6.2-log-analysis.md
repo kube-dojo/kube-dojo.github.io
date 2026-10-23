@@ -50,8 +50,8 @@ Think of log sources as witnesses standing in different rooms. The web server mi
 
 ```mermaid
 graph TD
-    classDef category fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef item fill:#fff,stroke:#666,stroke-width:1px;
+    classDef category fill:#f9f9f9,color:#111,stroke:#333,stroke-width:2px;
+    classDef item fill:#fff,color:#111,stroke:#666,stroke-width:1px;
 
     ROOT[Log Sources]
     

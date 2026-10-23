@@ -434,7 +434,7 @@ flowchart LR
 
     ScaleUp ~~~ ScaleDown
 
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef default fill:#f9f9f9,color:#111,stroke:#333,stroke-width:2px;
 ```
 
 The ordered default can also make failures look confusing. If `web-0` cannot become Ready, `web-1` and `web-2` may never appear during initial creation. That is not because the scheduler forgot about them; it is because the controller is honoring `OrderedReady`. In a real incident, this is useful information. You inspect the earliest missing or unready ordinal first because later ordinals may simply be waiting for it rather than failing independently.

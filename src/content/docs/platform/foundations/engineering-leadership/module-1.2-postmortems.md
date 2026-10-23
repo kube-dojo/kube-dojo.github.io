@@ -108,8 +108,8 @@ graph TD
     B --- B_Desc
     C --- C_Desc
     
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    classDef target fill:#e6f4ea,stroke:#28a745,stroke-width:2px;
+    classDef default fill:#f9f9f9,color:#111,stroke:#333,stroke-width:1px;
+    classDef target fill:#e6f4ea,color:#111,stroke:#28a745,stroke-width:2px;
     class B,B_Desc target;
 ```
 
@@ -170,9 +170,9 @@ graph TD
     Q5 --> A5["Answer: Platform team had no resource governance.<br/><i>Evidence: Reviewed 23 deployments across 6 teams.</i>"]
     A5 --> RC["Primary systemic gap: Absence of resource governance"]
     
-    classDef question fill:#f3f4f6,stroke:#333,stroke-width:1px;
-    classDef answer fill:#ffffff,stroke:#333,stroke-width:1px;
-    classDef root fill:#fee2e2,stroke:#d32f2f,stroke-width:2px;
+    classDef question fill:#f3f4f6,color:#111,stroke:#333,stroke-width:1px;
+    classDef answer fill:#ffffff,color:#111,stroke:#333,stroke-width:1px;
+    classDef root fill:#fee2e2,color:#111,stroke:#d32f2f,stroke-width:2px;
     
     class Q1,Q2,Q3,Q4,Q5 question;
     class A1,A2,A3,A4,A5 answer;

@@ -62,8 +62,8 @@ FinOps also makes cost changes safer. A blanket mandate to reduce spend by 20 pe
 
 ```mermaid
 graph TD
-    classDef pillar fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef header fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    classDef pillar fill:#f9f9f9,color:#111,stroke:#333,stroke-width:2px;
+    classDef header fill:#e1f5fe,color:#111,stroke:#0288d1,stroke-width:2px;
 
     title[COST OPTIMIZATION FRAMEWORK]:::header
 
@@ -132,8 +132,8 @@ Chargeback fights usually start when finance receives one node invoice and engin
 
 ```mermaid
 flowchart TD
-    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px;
-    classDef core fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef external fill:#fff3e0,color:#111,stroke:#e65100,stroke-width:2px;
+    classDef core fill:#e8f5e9,color:#111,stroke:#2e7d32,stroke-width:2px;
 
     B["Cloud Billing API<br/>(AWS CUR / GCP Billing / Azure Cost Export)"]:::external
     M["Kubernetes Metrics<br/>(Prometheus / metrics-server)"]:::external
@@ -328,9 +328,9 @@ Rightsizing is a measurement problem before it is a YAML problem. The next secti
 
 ```mermaid
 graph TD
-    classDef before fill:#ffebee,stroke:#c62828,stroke-width:2px,text-align:left;
-    classDef after fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,text-align:left;
-    classDef note fill:#fff9c4,stroke:#fbc02d,stroke-width:1px;
+    classDef before fill:#ffebee,color:#111,stroke:#c62828,stroke-width:2px,text-align:left;
+    classDef after fill:#e8f5e9,color:#111,stroke:#2e7d32,stroke-width:2px,text-align:left;
+    classDef note fill:#fff9c4,color:#111,stroke:#fbc02d,stroke-width:1px;
 
     subgraph Before["Before VPA analysis"]
         B_CPU["Request: 4 CPU<br/>████<br/>████<br/>████<br/>Actual: 600m"]:::before
@@ -488,8 +488,8 @@ Rate shopping only pays off when the committed baseline is something you still e
 
 ```mermaid
 graph TD
-    classDef provider fill:#eceff1,stroke:#607d8b,stroke-width:2px;
-    classDef strategy fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef provider fill:#eceff1,color:#111,stroke:#607d8b,stroke-width:2px;
+    classDef strategy fill:#e3f2fd,color:#111,stroke:#1565c0,stroke-width:2px;
 
     subgraph AWS ["AWS (m7i.xlarge, representative)"]
         A1["On-Demand: ~$0.19/hr"]

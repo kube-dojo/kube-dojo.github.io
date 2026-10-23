@@ -88,8 +88,8 @@ flowchart TD
     LogAudit --> ReturnDeny
     MACCheck -->|Allowed| Execute[Execute Action]
     
-    classDef secure fill:#d4edda,stroke:#28a745,stroke-width:2px;
-    classDef danger fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
+    classDef secure fill:#d4edda,color:#111,stroke:#28a745,stroke-width:2px;
+    classDef danger fill:#f8d7da,color:#111,stroke:#dc3545,stroke-width:2px;
     class Execute secure;
     class ReturnDeny danger;
 ```

@@ -87,8 +87,8 @@ flowchart TD
         A5[SCMP_ACT_LOG - Log and allow]
     end
 
-    classDef allow fill:#d4edda,stroke:#28a745,stroke-width:2px;
-    classDef block fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
+    classDef allow fill:#d4edda,color:#111,stroke:#28a745,stroke-width:2px;
+    classDef block fill:#f8d7da,color:#111,stroke:#dc3545,stroke-width:2px;
     class Allow allow;
     class Block block;
 ```

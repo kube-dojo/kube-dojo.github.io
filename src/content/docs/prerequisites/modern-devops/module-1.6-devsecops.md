@@ -73,7 +73,7 @@ flowchart LR
     D -- "$$$$" --> E[Production]
     E -- "$$$$$$$" --> F[Breach!]
 
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef default fill:#f9f9f9,color:#111,stroke:#333,stroke-width:2px;
     style F fill:#ff9999,stroke:#cc0000,stroke-width:3px;
 ```
 

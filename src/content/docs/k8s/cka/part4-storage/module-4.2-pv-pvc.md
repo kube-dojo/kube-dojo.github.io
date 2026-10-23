@@ -222,7 +222,7 @@ flowchart LR
     B -->|PVC Deleted| R[Released]
     R -->|Retain/Delete/Recycle| REC[Reclaim]
 
-    classDef phase fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef phase fill:#f9f,color:#111,stroke:#333,stroke-width:2px;
     class A,B,R,REC phase;
 ```
 
