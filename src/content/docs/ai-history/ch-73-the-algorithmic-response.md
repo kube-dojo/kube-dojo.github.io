@@ -43,8 +43,7 @@ Countries and firms at the top of the value chain do not share the same depth of
 That asymmetry matters for long-context systems because memory pressure compounds with every extra layer:
 chip supply, memory supplier choice, package-level bandwidth, and operating discipline.
 
-Chapter 71's account of uneven access raises a corresponding systems question: who can run and maintain a memory-efficient design?
-Per-request latency and per-token memory footprint are measurable parts of that question. Connecting them to export policy requires a deployment history, not just a similar pattern of constraints.
+Chapter 71's account of uneven access raises a corresponding systems question: who can run and maintain a memory-efficient design? Per-request latency and per-token memory footprint are measurable parts of that question. Connecting them to export policy requires a deployment history, not just a similar pattern of constraints.
 
 In practical terms, long-context inference has a hidden fixed cost before one adds model depth.
 The larger the token budget and the larger the concurrency, the more the model spends keeping past context in a representable state.
@@ -192,12 +191,12 @@ In the DeepSeek-V2 case, the design is presented as doing so.
 
 The section that matters for the book's argument is not only that a memory claim exists.
 It is that MLA is offered as an architectural response, with public implementation options whose model and version compatibility still need checking.
-That is where constraints stop sounding like policy prose and start sounding like production reality.
+The next step is to inspect compatibility requirements and test an implementation in a specified environment.
 
 ## Open implementation half: what became materially shared
 
 DeepSeek's open publication path matters because it changes how a mechanism exits the paper.
-The [pinned FlashMLA README](https://github.com/deepseek-ai/FlashMLA/blob/0f11e178da1f67becb087a324b400854931ec3e3/README.md) describes the repository's attention kernels, available for inspection and possible integration. Public availability does not establish the authors' reuse intent or actual adoption by other teams.
+The [pinned FlashMLA README](https://github.com/deepseek-ai/FlashMLA/blob/0f11e178da1f67becb087a324b400854931ec3e3/README.md) describes the repository's attention kernels, available for inspection and possible integration. Public availability does not establish actual adoption by other teams.
 
 At runtime, the value is where memory geometry and kernel layout meet.
 The inspected README distinguishes prefill and decode kernels and documents hardware/software requirements. Its 2026.09.30 notice reports removal of Hopper and earlier-model support and changes to KV-cache formats. It names V3/V3.2/V4.0, not V2; neither that list nor its historical-commit link establishes V2 compatibility here.
@@ -207,7 +206,7 @@ Claims about tiling, shared memory or warp-level reductions need inspection of t
 The concrete next layer is framework integration.
 The [pinned vLLM guide](https://github.com/vllm-project/vllm/blob/f3871c3cbf8a608f7ee833ec4c2c5277f77bee41/docs/design/attention_backends.md), MLA Backends, documents separate prefill and decode selection. The [pinned SGLang guide](https://github.com/sgl-project/sglang/blob/74c08f3dc5d98dddf052ba03122fc084a31a0269/docs/docs/advanced_features/attention_backend.mdx) explicitly makes support dependent on model, platform and backend, including page-size constraints. These are configuration paths where supported, not unrestricted portability guarantees.
 
-An operator would still need to validate model support, precision, hardware, traffic conditions and recovery behavior. The inspected backend menus do not demonstrate an equivalent fallback, an observability setup or successful production switching.
+An operator would still need to validate model support, precision, hardware, traffic conditions and recovery behavior. The inspected guides describe selection-time priority and fallback order, not runtime failover, an observability setup or successful production switching.
 
 In this sense, vLLM and SGLang illustrate the same pattern with different mechanics:
 backend abstractions offer one route to evaluate compatible kernels. They are neither the only integration route nor evidence that a particular stack has standardized the method.
@@ -222,7 +221,7 @@ Public code lets maintainers investigate integration. Whether the same model and
 
 The practical consequence is an expanded candidate set, not universal equivalence.
 The model family that published the optimization is not the only site that can benefit.
-But each adopter still inherits migration cost: compiler flags, backend versioning, and observability policy.
+A prospective integration needs checks of compiler flags, backend versions and observability requirements before its cost can be assessed.
 So the chapter should explicitly state that “open” is a lower entry barrier, not a guaranteed outcome.
 
 For this chapter, the strongest claim is narrower and more defensible:
@@ -257,19 +256,13 @@ The inspected record contains the MLA paper and public kernel/backend documentat
 Everything else belongs to a different research note unless supported directly.
 That is the discipline this chapter is trying to restore.
 
-For governance, that means two layers at once.
-One layer says policy can influence what architectures are financially and operationally plausible.
-The second says architecture can then diffuse through open kernels and widen who can benefit from those same constraints.
-The direction is not a single line.
-It is a loop.
+For governance, what evidence would connect a policy change to an architectural choice and then to a documented deployment?
 
 ## Limits and counter-examples: where adaptation is not automatic
 
 The previous sections stay close to what the public record supports, but they also need a reverse edge.
 Algorithmic substitution does not erase constraints; it reorders them.
-Chapter 71’s uneven adaptation frame predicts this shape:
-actors with more mature tooling and integration depth can often convert policy pressure into architectural advantage,
-while others face a longer lag even if the idea is visible.
+Chapter 71's uneven-adaptation frame suggests asking how tooling and integration capacity affect the options available to particular teams.
 
 The direct counter-example in the same direction is simple: reducing KV cache does not solve compute-bound or bandwidth-bound deployment.
 If a stack is already dominated by scheduler contention, quantization overhead, network latency, or I/O bottlenecks, a cache reduction alone does not produce proportional gains.
@@ -278,7 +271,7 @@ MLA is an optimization design with explicit quality-preservation assumptions.
 It is not a free option for every precision target, training stage, or evaluation regime.
 
 There are also policy-level limits.
-Policy making an architectural response more likely or valuable remains a historical hypothesis here.
+This chapter treats a causal link between policy and architectural choice as a hypothesis.
 It cannot prove a one-to-one causal line from every legal control to every design detail.
 The stronger claim would be stronger than the sources can bear, and it would become deterministic where history should remain structural.
 
@@ -318,12 +311,11 @@ That sequence is why this chapter is intentionally modest, and why it aligns wit
 
 So the chapter's thesis remains modest and strong.
 The mechanism and implementation options are documented; successful integration must be established for the chosen model and stack.
-Chapter 71's uneven-adaptation frame suggests asking which teams can use an architectural option, and how long integration takes.
-Answering that requires evidence about particular stacks and deployments, beyond the availability of a paper or repository.
+Chapter 71's uneven-adaptation frame suggests asking which teams can use an architectural option, and how long integration takes. Answering that requires evidence about particular stacks and deployments, beyond the availability of a paper or repository.
 
 The historical question is where a constraint changes design choices, and how we could establish that change.
 Here the paper makes an attention-layer design inspectable; whether policy moved capability formation into that layer remains unproved.
-If this pattern generalizes, then future constraint episodes will also show design moves at the infrastructure margin.
+If later evidence establishes such a pattern and it generalizes, future constraint episodes may also show design moves at the infrastructure margin.
 That is not a deterministic prediction.
 It is a pattern-level prediction conditioned on where bottlenecks sit and which actors can afford compatibility work.
 
@@ -340,20 +332,20 @@ This technical epilogue documents a memory strategy and asks how hardware constr
 
 MLA marks a new frontier in the chapter's larger arc.
 The chip war made the stack visible by showing where export and hardware controls bind.
-MLA shows that, once memory bottlenecks are severe, binding can move upward into model-level memory strategy.
+MLA gives us a design to inspect: under what conditions could a memory strategy change a deployment's hardware requirements?
 The “where” of competition becomes less about only which die can be bought and more about which memory strategy can be run under constrained batch and context conditions.
 
-The asymmetry from Chapter 71 appears again here.
+Would the uneven access described in Chapter 71 affect who can use this design?
 Actors with access to advanced packaging and high-performance memory supply still enjoy a lower-friction path.
 Actors constrained in those layers can still compete if a memory strategy is open, portable, and integrated into tooling they can operate.
-But in practice, adoption is mediated by stack maturity and local ecosystem support.
+Which model, hardware and maintenance requirements would a candidate deployment need to meet?
 This is not a universal equalizer.
 It is an unequal redistribution of design surface.
 
 The policy implication is therefore subtle.
 We are no longer watching only “restrictions” and “substitutes” as macroeconomic abstractions.
 We are watching the micro-structure of where substitution is expensive and where it is cheap.
-An architecture that stores memory differently can be one form of structural adaptation, and that adaptation can spread through open repos with less institutional friction than an entire toolchain replacement.
+Would public code actually reduce integration work in a particular deployment compared with changing toolchains?
 
 The chapter connects to the book's export-control arc by posing a testable question about adaptation. DeepSeek-V2 documents a response to KV-cache pressure; the inspected sources do not establish that legal controls produced it. Tracing that historical link would require evidence beyond the architecture and benchmark.
 
@@ -361,8 +353,7 @@ The next historical question now follows naturally.
 If HBM scarcity can make inference kernels more valuable than raw parameter count, then infrastructure policy will remain a research variable, not only a commercial one.
 The AI system will continue to evolve in the space between laws, materials, and memory equations.
 And in this space, Chapter 73 leaves us with one durable lesson.
-An architectural option can be inspected before its historical consequences are known.
-The next task is to trace how that option becomes usable capability, and for whom.
+An architectural option can be inspected before its historical consequences are known. The next task is to trace whether and how that option becomes usable capability, and for whom.
 
 At the same time, this chapter's own limits should be read forward.
 We do not claim exhaustive impact.
@@ -383,8 +374,7 @@ If future histories keep this thread explicit, they will avoid the common failur
 ### Why this is the right kind of example for the series
 
 Some historical claims fail because they confuse an innovation with an outcome.
-MLA is a useful anchor because the paper links the mechanism to the memory bottleneck directly, and the mechanism is then carried into a public repository.
-That gives us two kinds of documentation: a paper's result and public implementation options whose compatibility needs checking.
+The paper links MLA to an inference-memory problem; public kernel documentation describes implementation options. Those are two kinds of evidence to inspect, rather than a documented sequence of integration and use.
 The book can use both without overstretching.
 
 A second strength is that this is not framed as a miracle optimization.
@@ -417,8 +407,7 @@ That is why design responses are easier to trace than policy rhetoric.
 ## What this technical epilogue changes for the book's closure
 
 The chapter's title says “algorithmic response” on purpose.
-The closing chapters pose three connected questions: which hardware can be obtained, what infrastructure can support it, and what a model must retain while it runs.
-Chapter 71 examines supply-chain permission; Chapter 72 examines physical capacity.
+The closing chapters pose three connected questions: which hardware can be obtained, what infrastructure can support it, and what a model must retain while it runs. Chapter 71 examines supply-chain permission; Chapter 72 examines physical capacity.
 This coda adds a specific memory design to investigate alongside those constraints.
 
 That clarifies the infrastructure close in Chapter 72.
