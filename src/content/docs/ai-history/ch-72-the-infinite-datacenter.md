@@ -248,4 +248,4 @@ Then it looked like a model.
 
 By the end of this arc, it also looked like a construction site.
 
-One technical coda remains. [Chapter 73: The Algorithmic Response](./ch-73-the-algorithmic-response/) follows the same export-control and memory-scarcity pressures inward to the attention layer, where KV-cache bottlenecks and Multi-head Latent Attention show infrastructure pressure turning back into model architecture.
+One technical coda remains. [Chapter 73: The Algorithmic Response](./ch-73-the-algorithmic-response/) turns to KV-cache memory pressure and Multi-head Latent Attention. It examines a documented design while asking what evidence would connect that architectural choice to the wider hardware and policy constraints.
