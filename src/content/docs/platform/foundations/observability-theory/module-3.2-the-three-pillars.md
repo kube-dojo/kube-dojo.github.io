@@ -1,5 +1,4 @@
 ---
-citations_verified: true
 title: "Module 3.2: The Three Pillars of Observability"
 slug: platform/foundations/observability-theory/module-3.2-the-three-pillars
 sidebar:
@@ -18,56 +17,44 @@ sidebar:
 After completing this module, you will be able to:
 
 1. **Analyze** any debugging scenario and decide whether logs, metrics, traces, or a combination is the right starting tool, and explain why the others would fail or waste time.
-2. **Design** a correlated observability pipeline where a single shared identifier (`trace_id`) lets you pivot from a metric anomaly to a sampled trace to the specific log line that explains the failure.
+2. **Design** a correlated observability pipeline that supports navigation from a metric observation to a retained trace and associated logs, and identify where missing context limits the investigation.
 3. **Evaluate** an existing observability stack and identify the specific correlation gaps that would extend mean-time-to-resolution during a real incident.
 4. **Compare** head-based and tail-based sampling for a given workload and justify which one (or which hybrid) keeps the diagnostic data an on-call engineer actually needs.
 5. **Implement** an instrumentation contract — log fields, metric labels, span attributes — that makes the three pillars reinforce each other instead of becoming three siloed data lakes.
 
 ---
 
-## The Engineer Who Had Everything and Nothing
+## Start with a Question, Then Connect the Evidence
 
-**October 2015. A Major Rideshare Company. 7:43 PM on New Year's Eve.**
+**Synthetic investigation exercise:** assume a pricing service's latency dashboard shows an increase during a chosen five-minute window. A retained trace includes a slow database span, and a log in that window reports a connection timeout but has no request identifier. These are teaching inputs, not a reported outage or an observed experiment; no cause or resolution has been established.
 
-The platform is about to handle 440% of normal traffic. The engineering team has prepared for months. They have comprehensive Prometheus metrics on every service. They have Elasticsearch with 2 TB of logs per day. They have distributed tracing through Jaeger. All three pillars, best-in-class tooling, and a war room full of engineers who built the systems themselves.
+The dashboard identifies a population and time window. The trace describes one recorded request. The log describes an event that may belong to a different request. Matching their timestamps is a useful search strategy, but it does not establish that the timeout explains the slow span or the population-wide latency change.
 
-At 11:52 PM, surge pricing stops working.
+| Evidence available | Next decision | Limit to check |
+|--------------------|---------------|----------------|
+| Latency histogram | Select the affected service and time window | An aggregate does not identify each request |
+| Retained slow trace | Inspect recorded spans and compare other requests | Sampling and missing instrumentation limit coverage |
+| Timeout log without a trace ID | Inspect context propagation and logger integration | Timestamp overlap alone does not establish request identity |
 
-The on-call engineer opens Grafana. The latency on the pricing service spikes — p99 jumps from 150 ms to eight seconds. Great, the metrics show *that* something is wrong, but they do not show *which* requests are slow, *which* customers are affected, or *what* the slow code path actually did.
+[OpenTelemetry context propagation](https://opentelemetry.io/docs/concepts/context-propagation/#context-propagation) explains how trace context connects work across services. Its [log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/#trace-context-fields) provides optional `TraceId` and `SpanId` fields for logs associated with request processing. Recording those fields when context exists provides a stronger join than guessing from timestamps; background logs need not have request context.
 
-She switches to Jaeger to find slow traces, but the trace UI only lets her search by trace ID or service name. She does not have a trace ID. She searches for `pricing-service` and gets two million results in the last hour. There is no way to filter by duration. There is no way to find the slow ones inside the haystack.
+An absent exemplar does not make trace search impossible. [Jaeger's documented search URL](https://www.jaegertracing.io/docs/2.22/deployment/frontend-ui/#search-page) includes service, time-range, and minimum/maximum duration parameters. Use those filters to find candidates; use an exemplar when available to navigate to a particular observation's trace. Neither route guarantees that the trace was retained or that it explains the broader anomaly.
 
-She pivots to Elasticsearch. Searches for "pricing" and "error." 800,000 results. None of the log lines have trace IDs because the team never instrumented their loggers to add them. She can see that errors happened, but she cannot connect a particular error to a particular trace, or to the latency spike on the dashboard, or to the actual customer who is currently sitting in a freezing parking lot watching the surge multiplier flicker.
+> **Stop and think:** What would let you associate the timeout log with the slow span? After establishing that association, what additional evidence would distinguish connection-pool waiting from slow database execution?
 
-**Ninety minutes.** That is how long it took to find the root cause: a database connection pool exhaustion that only manifested at New Year's Eve traffic levels. The fix was a single config change. But finding it required manually correlating timestamps across three disconnected tools, on the busiest night of the year, while every minute of downtime burned hundreds of thousands of dollars.
-
-**Cost**: $12.4 million in lost surge pricing revenue. 340,000 customer complaints. A PR crisis that took weeks to contain. Three best-in-class observability tools, and not one of them could answer the only question that mattered: *which specific requests are failing right now, and why?*
-
-> **Stop and think**: If the team had all three tools running perfectly, why couldn't they solve the problem quickly? What specific piece of metadata, present in every log line and every span, would have collapsed those ninety minutes into ten?
-
-### The Three Pillars Paradox
-
-| What the Team Had | What They Could Do |
-|-------------------|--------------------|
-| Prometheus metrics (2M series) | Could not find which specific requests failed |
-| Elasticsearch logs (2 TB/day) | Could not connect a log to its trace |
-| Jaeger traces (100M spans/day) | Could not find traces matching a metric spike, query logs by `trace_id`, or drill from aggregate to specific |
-
-The reality the team learned that night is the most important sentence in this entire module: **having the pillars is not the same as having observability.** Three sources of data that cannot be cross-referenced are three separate forensic projects, not one coherent investigation. The pillars give you raw material; correlation turns raw material into answers.
-
-What they added after the incident — and what every team that has lived through this lesson now considers table-stakes — was almost embarrassingly small in scope: every log line gained a `trace_id` field, every latency histogram gained an exemplar pointing to a sample trace, the trace UI gained a duration-based search, and the dashboards learned to deep-link into the trace tool by carrying the trace ID through the query string. **Same data, same volume, same tools — ten-minute resolution time on the next incident of the same shape.** The expensive part was not buying tools; it was choosing to make them talk to each other.
+**Having the pillars is not the same as having an answer.** Correlation helps assemble evidence for a hypothesis. Confirming that hypothesis requires checking instrumentation coverage, comparing affected and unaffected requests, and testing the proposed mechanism rather than treating a shared identifier as proof of cause.
 
 ---
 
 ## Why This Module Matters
 
-You learned in Module 3.1 what observability is and why it matters. This module answers the next question every team has to answer: *how do you actually achieve it?* The industry has converged on three complementary data types — logs, metrics, and traces — each with sharply different storage profiles, query patterns, and blind spots. Used together with proper correlation, they let you move from "something is wrong" to "this specific line of code, on this specific server, for this specific customer, at this specific timestamp." Used in isolation, they give you the New Year's Eve experience above.
+You learned in Module 3.1 what observability is and why it matters. This module asks how logs, metrics, and traces support an investigation. Each has different query patterns and blind spots: aggregates help locate a change, traces expose recorded request structure, and logs supply event detail. Correlation lets you test whether those observations belong together, while missing instrumentation or dropped data can still leave the explanation unresolved.
 
 The goal of this module is not to make you a Prometheus or Jaeger expert; later modules go deep on the tools. The goal is to give you the conceptual scaffolding that lets you look at any observability stack — yours, a vendor demo, a job interview's whiteboard — and immediately see whether it is genuinely correlated or just three expensive silos in a trench coat.
 
 > **The Crime Scene Analogy**
 >
-> Investigating an incident is like investigating a crime. **Logs** are witness statements — long, detailed, particular accounts of what happened to one observer. **Metrics** are statistics — how many cars passed, how often the alarm tripped, what the trend has been over the last quarter. **Traces** are the timeline — minute-by-minute reconstruction of the sequence of events that links the witnesses to the statistics. A competent investigator uses all three: statistics to spot the anomaly, witnesses to learn the texture of what happened, and the timeline to prove which event caused which other event. Drop any one of those three, and either the case takes ten times longer or it never closes at all.
+> Logs resemble witness statements, metrics resemble population statistics, and traces resemble a recorded timeline. The analogy is useful for choosing questions, but each record is partial: a timeline can show ordering without establishing why an event happened. Use the signals to form and challenge explanations, not to promise a fixed investigation time or a complete account of every request.
 
 ---
 
@@ -240,7 +227,7 @@ Metrics are the right tool when the answer to your question is a number that sum
 
 A **trace** captures the complete journey of a single request as it travels through every service in your distributed system. It is structured as a tree of **spans**, where each span represents one unit of work — an HTTP handler running, a database query executing, a queue write completing — and each span knows its own start time, end time, parent span, and any tags or events attached to it during execution. The trace as a whole is identified by a single `trace_id` that is generated when the request enters the system and propagated to every service it touches.
 
-If a log line answers "what happened?" and a metric answers "how often?", a trace answers "where did the time go, and what called what?" That last question is genuinely impossible to answer from logs alone in a system with more than two or three services, because reconstructing causality from timestamps is fragile, and reconstructing it across machines with imperfectly synchronized clocks is worse than fragile.
+If a log line answers "what happened?" and a metric answers "how often?", a trace helps answer "where did the recorded time go, and what work was related?" [OpenTelemetry spans](https://opentelemetry.io/docs/concepts/signals/traces/#spans) carry timing and parent relationships. Those relationships describe instrumented execution; timestamps alone, especially across unsynchronized clocks, do not prove why a delay or failure occurred.
 
 ```mermaid
 gantt
@@ -257,7 +244,7 @@ gantt
     External Payment API (5ms) : 00:00:00.040, 00:00:00.045
 ```
 
-Reading the gantt chart top-to-bottom, you can immediately see two things that no amount of logs would have told you: the API Gateway holds the request for the entire fifty milliseconds, and the Payment Service does not start its work until twenty-seven milliseconds in because it is blocked behind Inventory Service. That second observation — a forced sequential dependency where parallelism would have been possible — is the kind of insight traces uniquely surface.
+In this illustrative chart, the gateway interval spans fifty milliseconds and payment starts twenty-seven milliseconds after it begins. The ordering suggests a question about sequential work, but it does not establish that inventory blocked payment or that parallel execution would be correct. Inspect parent relationships and application dependencies before changing execution order.
 
 ### 3.2 Trace Components
 
@@ -265,7 +252,7 @@ Reading the gantt chart top-to-bottom, you can immediately see two things that n
 |-----------|------------|---------|
 | **Trace** | The full request journey, identified by `trace_id` | `trace_id=abc-123` |
 | **Span** | A single timed unit of work, identified by `span_id` | "Database query", "HTTP call" |
-| **Parent Span** | The span that triggered this one (nested causality) | Order Service is parent of Payment Service |
+| **Parent Span** | The recorded parent operation; child spans represent sub-operations | Order Service is parent of Payment Service |
 | **Tags / Attributes** | Key-value metadata attached to a span | `http.status_code=200`, `db.statement="SELECT ..."` |
 | **Events / Span Logs** | Timestamped annotations that happened *inside* a span | "Cache miss", "Retry attempt 2 succeeded" |
 
@@ -368,11 +355,11 @@ Each pillar in isolation tells you something that the other two cannot. That is 
 
 **Traces alone**: you can see *that* request `abc-123` took 500 ms, with 400 ms spent in the database, but you cannot tell whether this is normal latency or a regression, how many other requests are similarly affected, or what the database actually said when it returned the slow row.
 
-Connected — *only* connected — the same three pillars give you the full forensic picture. The metric alert fires telling you the error rate is up, you click an exemplar in the latency histogram and land on a sample failed trace, you click a span in the trace and see the log lines that the same `trace_id` produced inside that span, and within ninety seconds you have moved from "something is wrong" to "the database connection pool is exhausted because we forgot to raise its size after last week's traffic increase, affecting 5% of checkout requests in the US-West region." The correlation is not optional decoration; it is the entire point.
+Connecting these signals creates a path for investigation, not a guaranteed diagnosis. A metric can identify an affected population; a retained exemplar-linked trace can show one request; associated logs can add event detail. Check whether that request resembles others in the affected population before generalizing its failure mode. A latency exemplar need not represent a failed request.
 
 ### 4.2 Correlation via IDs
 
-The mechanism that turns three silos into one investigation is almost embarrassingly simple: **shared identifiers**. Every log line, every span, and every metric exemplar carries the same `trace_id` (and ideally the same `span_id` for finer-grained pivots). Whatever query interface you use — Grafana, Honeycomb, Datadog, Splunk, Elastic — can then take a `trace_id` from one signal type and use it to look up the others.
+The join mechanism is **shared identifiers**. Spans belonging to one trace share its trace ID; request-scoped logs can record that ID and the active span ID. Exemplars can reference trace IDs without making them metric labels. Configure the tools' links and queries explicitly, and test them with retained data: shared fields alone do not create navigation or ensure matching retention windows.
 
 ```mermaid
 graph TD
@@ -381,30 +368,32 @@ graph TD
     T --> M[METRICS<br/>exemplar: trace_id=abc-123]
 ```
 
-The query "show me everything for trace `abc-123`" becomes a single navigation: logs from every service that touched the request, the trace tree showing timing and call structure, and the metrics that were happening at the time the request was in flight. Compared with the "manually correlate timestamps across three tools" workflow that produced the New Year's Eve outage, this is the difference between investigating with a search engine and investigating with a magnifying glass.
+The diagram uses `abc-123` as a shortened teaching identifier. Querying a real trace ID can retrieve the retained spans and logs carrying that ID. Metrics remain aggregates: select a compatible time window and service dimensions rather than treating them as measurements of only that request. Missing matches can indicate sampling, retention, export failures, or missing context, not absence of an event.
 
 ### 4.3 Exemplars: Connecting Metrics to Traces
 
-A latency histogram tells you that p99 is 1.5 seconds; it does not tell you *which* requests were the slow ones. **Exemplars** solve exactly this gap. An exemplar is a single representative trace ID attached to a metric data point at the moment the data point was recorded, so when you see a spike on the dashboard you can click it and land directly in a trace that exemplifies the spike.
+A latency histogram can estimate a percentile but does not enumerate the requests behind it. [Prometheus documents exemplars](https://prometheus.io/docs/prometheus/latest/feature_flags/#exemplars-storage) as references to data outside the metrics, commonly trace IDs. An exemplar links a particular observation to additional context; it is not necessarily representative of the percentile or population. The following shortened ID and values are illustrative OpenMetrics exposition, not captured output.
 
 ```text
 # Prometheus Exemplar format:
 http_request_duration_seconds_bucket{path="/checkout",le="0.5"} 12483 # {trace_id="abc-123"} 0.48 1705320735
 ```
 
-Without exemplars, the workflow is "alert fires, engineer guesses a time window, manually queries the trace backend with a duration filter, sifts through results." With exemplars, the workflow is "alert fires, engineer clicks the spike, lands in a trace, debugging starts." Cutting that handoff out of an incident saves the most expensive minutes of any outage — the ones at the start when nobody knows where to look.
+Without an exemplar, search retained traces using the alert's service, time window, and duration criteria. With one, a configured dashboard link can open the referenced trace directly. This requires compatible instrumentation, exemplar storage, trace retention, and UI configuration. Prometheus's documented exemplar storage uses a bounded in-memory buffer and also writes exemplars to the WAL; budget that overhead rather than assuming the link is free.
 
 ### 4.4 The Correlation Workflow
+
+The following synthetic workflow illustrates navigation. Its final step is a hypothesis to verify against maintenance records and failover telemetry; the preceding timeout and connection-refused observations alone do not establish that explanation.
 
 ```mermaid
 graph TD
     A["1. ALERT (Metrics)<br/>Error rate above 1% for /api/checkout"] --> B["2. SCOPE (Metrics)<br/>Break down by region, version<br/>Errors concentrated in US-West, v2.3.1"]
     B --> C["3. SAMPLE (Traces via Exemplar)<br/>Click exemplar in p99 histogram<br/>Trace abc-123 shows timeout to payment service"]
     C --> D["4. DETAIL (Logs)<br/>Filter logs by trace_id=abc-123<br/>'Connection refused: payment-db-03.us-west'"]
-    D --> E["5. ROOT CAUSE<br/>payment-db-03 was down for maintenance<br/>Failover did not engage as expected"]
+    D --> E["5. TEST HYPOTHESIS<br/>Was payment-db-03 under maintenance?<br/>Did failover engage as expected?"]
 ```
 
-The five-step pattern — alert, scope, sample, detail, root-cause — is the same regardless of vendor or stack. What changes between mature and immature observability is the friction at each transition. Each handoff that requires copy-pasting a timestamp into a different tool is friction that gets paid in minutes during an outage and in customer trust over the long run.
+The five steps — alert, scope, sample, detail, test — provide a starting pattern. Investigations may loop back when a sample is unrepresentative or evidence contradicts a hypothesis. Evaluate each transition by whether it preserves service, time, and request context, then measure its usability in an exercise rather than promising a universal resolution time.
 
 > **Try This (3 minutes)**
 >
@@ -417,38 +406,19 @@ The five-step pattern — alert, scope, sample, detail, root-cause — is the sa
 > | Sample | | |
 > | Detail | | |
 >
-> Anywhere a transition takes more than one click is a correlation gap. Add it to your team's backlog with a number on it: how many minutes does each manual hop add to a real incident?
+> Record transitions where context is lost or matching data cannot be retrieved. Prioritize fixes using observed exercise results; multiple clicks alone do not prove an instrumentation defect or quantify incident cost.
 
-> **War Story: The $6.7 Million Investigation Gap**
+> **Decision exercise: a link is not a diagnosis**
 >
-> **2018. A major trading platform. Monday morning, market open.**
+> Synthetic inputs: an exemplar references a trace that is no longer retained; a timeout log has a trace ID; another slow trace contains a long database-client span. Decide what each observation permits you to conclude before proposing a fix. No incident outcome or financial impact is assumed.
 >
-> At 9:31 AM Eastern, order execution latency jumped from 3 ms to 400 ms. For a high-frequency trading platform, this was catastrophic; every millisecond of delay translated into lost arbitrage opportunities. Customers were losing money in real-time and switching to competitors before the on-call team had even finished reading the alert.
+> | Observation | Defensible next step | Conclusion to avoid |
+> |-------------|-----------------------|---------------------|
+> | Exemplar target is absent | Check trace sampling, export, and retention | The request never happened |
+> | Timeout log carries a trace ID | Retrieve matching spans if retained | This timeout explains all slow requests |
+> | Database-client span is long | Inspect pool-wait instrumentation and database telemetry | Increasing the connection pool must fix it |
 >
-> The platform had genuinely excellent tooling: Prometheus with 50,000 active series, Elasticsearch ingesting 500 GB of logs daily, and Zipkin handling 10 million spans per hour. On paper, world-class observability. On the ground, three completely siloed tools with no shared identifiers between them.
->
-> - **9:31 AM** — Alert fires. P99 latency above threshold.
-> - **9:34 AM** — Engineer opens Grafana, confirms the spike, can see *which* services are slow but not *why*.
-> - **9:41 AM** — Switches to Zipkin, searches for "order-execution" service, gets 800,000 traces. No way to filter by latency, no way to land on the slow ones.
-> - **9:52 AM** — Opens Elasticsearch, searches for "order" and "slow." 2.3 million matches. Logs have timestamps but no trace IDs, so correlation by hand is the only option.
-> - **10:14 AM** — Resorts to manually comparing timestamps across all three tools, tab by tab.
-> - **10:52 AM** — Root cause finally identified: a Redis primary failover during a vendor maintenance window was not announced; connections were timing out during reconnection.
-> - **10:54 AM** — Fix deployed (raise the connection pool retry budget by one).
->
-> **Time to resolution: 83 minutes. The fix took 2 minutes. The investigation took 81.**
->
-> | What They Had | What They Could Not Do |
-> |---|---|
-> | 50,000 Prometheus metrics | Find the slow traces from the metric spike |
-> | 500 GB/day logs in Elasticsearch | Search logs by `trace_id` |
-> | 10M spans/hour in Zipkin | Filter traces by duration |
-> | Three world-class tools | Navigate between them in less than ten minutes |
->
-> **Financial impact**: $847,000 in lost trading volume during the outage; $5.8M in annual revenue lost when three major clients churned within the week; $120,000 regulatory fine for execution delay. Total: roughly $6.77 million on a single 81-minute investigation.
->
-> **What they built afterwards**: `trace_id` injected into every log line at the logger layer (two hours of work), exemplars wired into every latency histogram (four hours), a unified search UI that linked all three tools by ID (two engineering weeks). The very next incident of the same shape — a Redis connection timeout cascade three months later — was resolved in nine minutes.
->
-> **The arithmetic**: $6.77 M cost ÷ two engineering-weeks of correlation work = the highest-ROI infrastructure project in that team's history.
+> Success means identifying the missing evidence and testing a hypothesis. [OpenTelemetry's sampling guidance](https://opentelemetry.io/docs/concepts/sampling/#head-sampling) explains why a head-sampling decision cannot use the request's eventual outcome. A correlation contract should therefore include what is retained and what may be missing, not just which identifiers exist.
 
 ---
 
@@ -456,7 +426,7 @@ The five-step pattern — alert, scope, sample, detail, root-cause — is the sa
 
 ### 5.1 The Pillars Critique
 
-The "three pillars" framing is so widely repeated that it is easy to forget it has serious critics, and that the critics have a point. The critique, advanced most prominently by Charity Majors and the Honeycomb team, is that talking about logs, metrics, and traces as three separate disciplines encourages teams to buy three separate products, hire three separate sub-teams to operate them, and instrument them through three separate libraries — and that this organisational shape is exactly what produced the New Year's Eve and trading-platform outages described above.
+The three-pillar framing is useful for choosing signals, but it is insufficient as a purchasing checklist. Evaluate how a proposed stack preserves context across services, retrieves related records, and exposes missing data. Separate products can support those capabilities; a unified interface still needs correct instrumentation, propagation, and retention. The exercises above test those requirements without assuming a particular vendor arrangement causes outages.
 
 The critique's positive claim is more interesting than the negative one. The argument is that systems do not really emit "logs" or "metrics" or "traces"; they emit **events** — structured records of something that happened — and the three pillars are simply three different *projections* of the same underlying event stream. View an event in isolation and it is a log. Aggregate events over time into counts and percentiles and they are metrics. Connect events together by trace ID and they are a trace. The pillars are lenses, not data types, and treating them as data types creates the silos the lenses were supposed to eliminate.
 
@@ -544,18 +514,18 @@ The benefits compound: instrumentation is vendor-neutral so you can change backe
    The missing concept is **trace context propagation** between services. When a request first enters the system, the Gateway generates a `trace_id`, but for the trace to be reconstructed end-to-end that ID must be forwarded to every downstream service via the `traceparent` HTTP header. Because the Gateway is not forwarding the header, the Auth and Data services believe they are the start of brand-new requests and generate their own `trace_id` values, producing three logically unrelated trace trees. The smallest fix is to install (or correctly configure) the OpenTelemetry HTTP client instrumentation on the Gateway so that outbound calls automatically inject `traceparent`; that one change reconnects the entire chain without touching application logic.
    </details>
 
-3. **Your on-call engineer gets paged because p99 latency on the inventory service has crossed two seconds. They open Grafana, see the spike, and then spend twenty minutes manually searching Jaeger for traces longer than two seconds in that window. What feature would have eliminated that twenty-minute hop, how does it work mechanically, and what does it cost to enable?**
+3. **In a synthetic exercise, inventory-service p99 latency exceeds two seconds. You can search Jaeger by service, time window, and duration, but want a direct link from a recorded metric observation to a trace. What feature supports that link, what must be configured, and why might the target trace be unavailable?**
    <details>
    <summary>Answer</summary>
 
-   The missing feature is **exemplars** on the latency histogram. An exemplar is a representative `trace_id` attached to a histogram bucket at the moment a high-latency observation lands in that bucket. When the dashboard renders the spike, the visualization can attach a clickable link directly to a slow trace — no time-window guessing, no manual filter construction. Mechanically, the application's metrics SDK reads the active trace context at the time it records the latency observation and writes the trace ID alongside the bucket (Prometheus stores this as a `# {trace_id="..."}` annotation on the line). The cost is small extra storage per histogram (one trace ID per bucket per scrape) and a one-time wiring change in the metrics SDK; the saved time-to-resolution typically pays it back on the first incident.
+   **Exemplars** can carry a trace reference alongside a metric observation. Configure compatible instrumentation to emit them, Prometheus to store them, and the dashboard to link their trace IDs to the trace backend. Budget storage and verify the link with a retained trace. Sampling, export failure, or expired trace retention can leave an exemplar without a retrievable target. Even a working link describes one observation; compare it with other requests before attributing the p99 change to its failure mode. No fixed time saving or payback follows from enabling this feature.
    </details>
 
-4. **A newly hired Director of Engineering insists on buying three separate best-in-class enterprise tools — one strictly for logs, one for metrics, one for traces — and argues this satisfies the "three pillars" of observability. Based on what you have learned about correlation, why is this purchase plan likely to underperform a single integrated stack during a real incident, and what concrete capability would you ask the Director to add to the requirements list?**
+4. **A Director of Engineering proposes buying separate tools for logs, metrics, and traces, arguing that this satisfies the "three pillars" of observability. Why is that requirement incomplete, and what demonstration would you request to evaluate either separate tools or an integrated stack?**
    <details>
    <summary>Answer</summary>
 
-   The plan is likely to underperform because it optimises each silo in isolation while ignoring the bottleneck that actually drives MTTR: the cost of pivoting between signals. During a high-pressure incident, engineers must move from a metric alert to a sample trace to a specific log line in seconds, and three best-in-class tools that do not share identifiers force them to copy-paste timestamps and guess at correlations across browser tabs — the exact failure mode that produced the 81-minute trading-platform outage and the 90-minute rideshare outage in this module. The capability you must add to the requirements list is **shared identifiers and deep-linking**: every log line must carry a `trace_id`, every metric histogram must support exemplars pointing at trace IDs, and the UI must let an engineer jump from any one signal to the related signals by ID with a single click. Without that, the pillars are three lakes, not one ocean.
+   The purchase plan does not establish investigation capability: product count alone says nothing about context propagation or data retrieval. Require **shared identifiers and tested navigation** for request-scoped logs and traces, exemplar support where useful, and compatible retention policies. Demonstrate both a successful pivot and the behavior when a target trace is missing. Separate tools can satisfy these requirements, while an integrated stack can fail them if instrumentation is incomplete. Judge the demonstrated workflow rather than assuming either arrangement guarantees faster diagnosis.
    </details>
 
 5. **Your high-traffic e-commerce platform processes 10,000 requests per second. To save tracing costs the team enabled a strict 1% probabilistic head-based sampling policy. During a major outage 0.5% of all checkout requests fail with a critical database error, but engineers complain they cannot find traces of the failures. Explain why head-based sampling produced this gap, and design a sampling strategy that keeps the diagnostic data you need without abandoning cost control.**
@@ -576,7 +546,7 @@ The benefits compound: instrumentation is vendor-neutral so you can change backe
    <details>
    <summary>Answer</summary>
 
-   Structured logging alone is insufficient because it provides excellent **per-event detail** but no built-in **causality between events.** JSON logs make it easy to filter by service or severity, but when a transaction touches eight services, you still have to reconstruct the order in which the events happened, which event triggered which other event, and where time was spent waiting versus working — and the only signal logs give you for that is timestamps, which are unreliable across machines with imperfectly synchronised clocks and which lie outright when work happens in parallel. The minimum additions to deliver real observability are: **trace context propagation** across every service boundary so a `trace_id` exists, **automatic injection of that `trace_id` into every log line** so log queries can be scoped to a single request, and a **tracing backend** that reassembles the spans into a tree so engineers can see the timeline visually. With those three additions the same Elasticsearch logs become enormously more useful, because every grep can be scoped to a single request and every timeline can be cross-referenced with the surrounding events.
+   JSON formatting provides queryable event fields, but does not itself establish relationships between operations. Inspect whether request-scoped logs carry trace context and whether instrumentation propagates that context across service boundaries. Add missing propagation, logger integration, and span export, then verify that a retained trace retrieves the expected logs. Parent relationships and timing make the recorded execution easier to inspect; they do not guarantee complete coverage or prove the cause of a failure. The required additions depend on which of these capabilities already exist.
    </details>
 
 8. **You are analysing a distributed trace for a checkout request that took 850 ms. The trace shows five child spans for downstream calls (inventory, pricing, payment, shipping, notification) that add up to 675 ms of execution. There is a 175 ms gap on the timeline where no child spans are active. What does that gap most likely represent, what are two plausible causes inside the parent service, and what is the next instrumentation step?**
@@ -595,7 +565,7 @@ The benefits compound: instrumentation is vendor-neutral so you can change backe
 **Understanding Each Pillar**
 - [x] **Logs** — detailed events, high cardinality welcome, best for "what exactly happened?"
 - [x] **Metrics** — numeric aggregates, low cardinality required, best for "how much, how often, what's the trend?"
-- [x] **Traces** — request journey, shows causality and dependencies, best for "where did the time go?"
+- [x] **Traces** — recorded request relationships and timing, best for "where did the time go?"; causal explanations still need testing
 
 **When To Use What**
 - [x] Debugging one specific request → traces, then logs scoped by `trace_id`
@@ -605,8 +575,8 @@ The benefits compound: instrumentation is vendor-neutral so you can change backe
 - [x] Capacity planning and trend analysis → metrics over long windows
 
 **The Correlation Imperative**
-- [x] `trace_id` in every log line — non-negotiable
-- [x] Exemplars on every histogram so dashboards deep-link into traces
+- [x] Trace and span IDs in request-scoped logs when context is available
+- [x] Exemplars on useful metrics, with tested dashboard links and compatible trace retention
 - [x] Same timestamp format and timezone across all signals
 - [x] Unified UI or deep-linked navigation between tools
 
@@ -766,9 +736,9 @@ graph TD
 ```
 
 - Total checkout: roughly 280 ms expected at p50, 800 ms at p99
-- The dominant span at p99 is **`process_payment`**, because it depends on a third-party payment gateway whose tail latency you do not control. This is also why you separated `payment_gateway_latency_seconds` into its own histogram in Part 2 — it gives you a defensible "this is the gateway's fault, not ours" signal during incidents.
+- Treat **`process_payment`** as a candidate for investigation, not an assumed dominant span. Compare recorded payment durations across requests and use the separate gateway histogram to characterize the population. A slow client call can include network or local waiting; attributing fault to the gateway requires additional evidence.
 
-Two further design notes worth understanding: `send_confirmation` is shown as part of the trace tree but is typically dispatched asynchronously after the response returns to the user, so it should not count toward the p99 latency budget. The `validate_inventory` span has a `cache_hit` boolean tag so a slow inventory call can immediately be attributed to a cache miss rather than to genuine downstream latency.
+Two further design notes: if `send_confirmation` runs after the response, exclude it from user-facing response latency while measuring it separately. The `validate_inventory` span's `cache_hit` attribute lets you compare cache hits and misses; a slow miss is a starting observation, not proof that caching explains the delay.
 
 #### Part 4 — Worked Correlation Plan
 
@@ -777,18 +747,18 @@ Two further design notes worth understanding: `send_confirmation` is shown as pa
 | Find logs for a known trace | Inject `trace_id` into every log line via the logger's MDC / context (OpenTelemetry's logs SDK handles this automatically when correctly wired). |
 | Find traces for a metric spike | Enable Prometheus exemplars on `checkout_duration_seconds` and `payment_gateway_latency_seconds`; configure Grafana panels to render the exemplars as clickable trace links. |
 | Find metrics for a time window | Query by timestamp range filtered by `service`, `region`, and `deploy_version` labels so the metric view matches the trace view. |
-| **Find the deploy that caused a regression** | Add a `deploy_version` label to your top-level metrics and a `deploy.version` resource attribute to spans so you can group both by release. |
+| **Compare releases when investigating a regression** | Record release metadata in metrics and spans; compare affected requests and test whether the deployment explains the change. |
 | **Find the customer affected by a known failed trace** | Pull `user_id` from the root span's tags or from any log line carrying that `trace_id`; never put it on a metric. |
 
 This plan satisfies the original success criteria, but more importantly it satisfies the underlying question those criteria are testing for: **for every signal you produce, can you state which other signals it lets you pivot to, and how?** If yes, you have observability. If no, you have three lakes and a lot of dashboards.
 
 ---
-## Next Module
-
-[Module 3.3: Instrumentation Principles](../module-3.3-instrumentation-principles/) — having decided what to collect, how do you actually add observability to your code without drowning in boilerplate or destroying performance? We cover what to instrument, where to put the spans, how to keep cardinality safe, and how to make instrumentation a first-class part of feature work rather than an afterthought.
-
 ## Sources
 
+- [OpenTelemetry log trace-context fields](https://opentelemetry.io/docs/specs/otel/logs/data-model/#trace-context-fields) — Optional trace and span IDs associate request-scoped logs with their context; not all logs have that context.
+- [OpenTelemetry spans](https://opentelemetry.io/docs/concepts/signals/traces/#spans) — Span timing and parent relationships describe recorded execution, used here to distinguish observations from causal hypotheses.
+- [Prometheus exemplar storage](https://prometheus.io/docs/prometheus/latest/feature_flags/#exemplars-storage) — External references, enabling exemplar storage, its bounded buffer, and WAL overhead underpin the workflow and quiz.
+- [Jaeger search-page configuration](https://www.jaegertracing.io/docs/2.22/deployment/frontend-ui/#search-page) — Documents service, time-range, and duration query parameters; trace search does not require knowing a trace ID first.
 - [prometheus.io: data model](https://prometheus.io/docs/concepts/data_model/) — Prometheus's data model explicitly states that changing any label value creates a new time series.
 - [opentelemetry.io: sampling](https://opentelemetry.io/docs/concepts/sampling/) — OpenTelemetry's sampling guidance directly describes tail sampling as a post-completion decision and gives error, latency, and attribute-based criteria.
 - [cncf.io: opentelemetry](https://www.cncf.io/projects/opentelemetry/) — As of May 11, 2026, the CNCF project page lists OpenTelemetry as graduated.
@@ -796,3 +766,7 @@ This plan satisfies the original success criteria, but more importantly it satis
 - [opentelemetry.io: logs](https://opentelemetry.io/docs/concepts/signals/logs/) — The OpenTelemetry logs docs explicitly state that activating the SDK or autoinstrumentation can automatically correlate logs with active traces and spans.
 - [OpenTelemetry Context Propagation](https://opentelemetry.io/docs/concepts/context-propagation/) — Explains how `traceparent`, trace IDs, and span IDs move across service boundaries and enable correlation.
 - [OpenMetrics Exemplars Specification](https://prometheus.io/docs/specs/om/open_metrics_spec/) — Shows how exemplars attach `trace_id` metadata to histogram observations, which is central to the module's correlation workflow.
+
+## Next Module
+
+[Module 3.3: Instrumentation Principles](../module-3.3-instrumentation-principles/) — having decided what to collect, how do you actually add observability to your code without drowning in boilerplate or destroying performance? We cover what to instrument, where to put the spans, how to keep cardinality safe, and how to make instrumentation a first-class part of feature work rather than an afterthought.
