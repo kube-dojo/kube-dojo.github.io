@@ -206,7 +206,7 @@ Claims about tiling, shared memory or warp-level reductions need inspection of t
 The concrete next layer is framework integration.
 The [pinned vLLM guide](https://github.com/vllm-project/vllm/blob/f3871c3cbf8a608f7ee833ec4c2c5277f77bee41/docs/design/attention_backends.md), MLA Backends, documents separate prefill and decode selection. The [pinned SGLang guide](https://github.com/sgl-project/sglang/blob/74c08f3dc5d98dddf052ba03122fc084a31a0269/docs/docs/advanced_features/attention_backend.mdx) explicitly makes support dependent on model, platform and backend, including page-size constraints. These are configuration paths where supported, not unrestricted portability guarantees.
 
-An operator would still need to validate model support, precision, hardware, traffic conditions and recovery behavior. The inspected guides describe selection-time priority and fallback order, not runtime failover, an observability setup or successful production switching.
+An operator would still need to validate model support, precision, hardware, traffic conditions and recovery behavior. The inspected guides describe selection-time priority and fallback order, not failure recovery during serving, an observability setup or successful production switching.
 
 In this sense, vLLM and SGLang illustrate the same pattern with different mechanics:
 backend abstractions offer one route to evaluate compatible kernels. They are neither the only integration route nor evidence that a particular stack has standardized the method.
@@ -222,7 +222,7 @@ Public code lets maintainers investigate integration. Whether the same model and
 The practical consequence is an expanded candidate set, not universal equivalence.
 The model family that published the optimization is not the only site that can benefit.
 A prospective integration needs checks of compiler flags, backend versions and observability requirements before its cost can be assessed.
-So the chapter should explicitly state that “open” is a lower entry barrier, not a guaranteed outcome.
+Whether public availability lowers the entry barrier is one of the questions those checks must answer.
 
 For this chapter, the strongest claim is narrower and more defensible:
 Public kernel and framework documentation identify implementation options. Establishing V2 reuse or adoption requires a compatible historical version and evidence of actual integration.
@@ -298,8 +298,7 @@ The evidence supports that sequence and does not support a more sweeping determi
 
 A useful way to keep this chapter honest is to treat this as a structured claim set with explicit boundaries.
 The chapter's first claim is empirical and narrow: MLA compresses KV state through a low-rank decomposition and the paper reports strong cache gains.
-The second claim concerns implementation: public kernels and backend documentation offer paths whose compatibility must be checked. The proposed historical link to constrained teams' adoption remains a research question, not a measured outcome.
-The temptation is to collapse the documented mechanism and the historical hypothesis into a single political causation sentence.
+The second claim concerns implementation: public kernels and backend documentation offer paths whose compatibility must be checked. The proposed historical link to constrained teams' adoption remains a research question, not a measured outcome. The temptation is to collapse the documented mechanism and the historical hypothesis into a single political causation sentence.
 The stronger argument avoids that collapse.
 
 So the case does not license a simple timeline where policy pressure directly writes a kernel architecture, and architecture then instantly levels global capability.
@@ -330,22 +329,7 @@ This technical epilogue documents a memory strategy and asks how hardware constr
 
 ## What this coda changes in the series narrative
 
-MLA marks a new frontier in the chapter's larger arc.
-The chip war made the stack visible by showing where export and hardware controls bind.
-MLA gives us a design to inspect: under what conditions could a memory strategy change a deployment's hardware requirements?
-The “where” of competition becomes less about only which die can be bought and more about which memory strategy can be run under constrained batch and context conditions.
-
-Would the uneven access described in Chapter 71 affect who can use this design?
-Actors with access to advanced packaging and high-performance memory supply still enjoy a lower-friction path.
-Actors constrained in those layers can still compete if a memory strategy is open, portable, and integrated into tooling they can operate.
-Which model, hardware and maintenance requirements would a candidate deployment need to meet?
-This is not a universal equalizer.
-It is an unequal redistribution of design surface.
-
-The policy implication is therefore subtle.
-We are no longer watching only “restrictions” and “substitutes” as macroeconomic abstractions.
-We are watching the micro-structure of where substitution is expensive and where it is cheap.
-Would public code actually reduce integration work in a particular deployment compared with changing toolchains?
+MLA brings the infrastructure story down to a concrete design question: what must a model keep in memory while it runs, and what alternatives can be tested? To understand who can use such a design, a history would need compatibility records, integration effort and documented deployments. Those records could then be compared across teams with different hardware access. Whether public code lowers costs or widens access is part of that investigation. A useful comparison would examine the work required to make a particular model, backend and hardware configuration operate together.
 
 The chapter connects to the book's export-control arc by posing a testable question about adaptation. DeepSeek-V2 documents a response to KV-cache pressure; the inspected sources do not establish that legal controls produced it. Tracing that historical link would require evidence beyond the architecture and benchmark.
 
@@ -407,16 +391,10 @@ That is why design responses are easier to trace than policy rhetoric.
 ## What this technical epilogue changes for the book's closure
 
 The chapter's title says “algorithmic response” on purpose.
-The closing chapters pose three connected questions: which hardware can be obtained, what infrastructure can support it, and what a model must retain while it runs. Chapter 71 examines supply-chain permission; Chapter 72 examines physical capacity.
-This coda adds a specific memory design to investigate alongside those constraints.
+The closing chapters pose three connected questions: which hardware can be obtained, what infrastructure can support it, and what a model must retain while it runs. Chapter 71 examines supply-chain permission; Chapter 72 examines physical capacity. This coda adds a specific memory design to investigate alongside those constraints.
 
-That clarifies the infrastructure close in Chapter 72.
-The AI system no longer looks like an either/or sequence of “policy then compute.”
-It is a closed loop where policy shifts what is worth computing,
-hardware shifts what is affordable to compute,
-and architecture shifts which forms of that computation remain usable.
+One analytical frame for the closing chapters is a feedback loop: policy may change which computations are feasible, hardware may change their cost, and architecture may change their resource needs. Testing that frame requires tracing each link in a particular case.
 
-The practical result is still uneven.
 A compatible stack may be able to adopt an MLA implementation, but these sources do not establish adoption speed or success for either advanced or constrained teams.
 This is not a tidy leveling story.
 The distribution and timing of any benefit remain questions for deployment evidence.
