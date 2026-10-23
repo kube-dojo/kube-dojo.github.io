@@ -2,11 +2,11 @@
 
 ## Status Board
 
-This directory contains the operational research files for the 73-chapter AI History book. The English chapter sources and public index each contain Chapters 1–73; research contracts currently cover Chapters 1–72 only.
+This directory contains the operational research files for the 73-chapter AI History book. The English chapter sources, public index and research-contract directories each contain Chapters 1–73; the Chapter 73 contract is an unaccepted research draft.
 
-Chapter 73, **The Algorithmic Response**, is the book's technical coda. Its prose and index entry exist, but its research contract and contract-backed readiness remain pending under #2288. Inventory inclusion does not establish accepted status or review clearance.
+Chapter 73, **The Algorithmic Response**, is the book's technical coda. Its prose and index entry exist; its new contract remains `researching`, with source/editorial clearance and readiness pending under #2288. Inventory inclusion does not establish accepted status or review clearance.
 
-The 72 existing contracts currently record **40 `accepted`, 11 `prose_ready`, and 21 `capacity_plan_anchored`** top-level statuses. These are recorded workflow labels, not fresh source or editorial acceptance. Reconciliation of the supporting review records remains open under #2288; this inventory does not promote any chapter.
+The 73 contracts currently record **40 `accepted`, 11 `prose_ready`, 21 `capacity_plan_anchored`, and 1 `researching`** top-level statuses. These are recorded workflow labels, not fresh source or editorial acceptance. Reconciliation of the supporting review records remains open under #2288; this inventory does not promote any chapter.
 
 <details>
 <summary>Earlier era-specific status notes (historical; not the current status board)</summary>
@@ -30,7 +30,7 @@ The team workflow is maintained in `TEAM_WORKFLOW.md`. It defines the gates betw
 *   `source-catalog.md`: Shared bibliography for recurring sources (e.g., Hodges, Gleick, Dyson).
 *   `comprehensive-roadmap-72-chapters.md`: Current 73-chapter roadmap; the historical filename is retained.
 *   `modern-coverage-matrix.md`: Routing table for late-era themes added during the modern coverage pass.
-*   `chapters/`: The 72 research-contract directories for Chapters 1–72, each containing the eight standard contract files. Chapter 73 has no contract directory yet. File presence alone does not establish readiness: each contract must hit the KubeDojo sourcing standard (claim-level anchors, page/section references, independent confirmation) before unlocking for prose drafting.
+*   `chapters/`: The 73 research-contract directories for Chapters 1–73, each containing the eight standard contract files; Chapter 73 is a provisional draft. File presence alone does not establish readiness: each contract must hit the KubeDojo sourcing standard (claim-level anchors, page/section references, independent confirmation) before unlocking for prose drafting.
 
 ## Role Split (effective 2026-04-29 — prose pipeline pivot)
 
@@ -71,4 +71,4 @@ Coordination happens across 9 Part Tracking issues linked to Epic #394. The "Res
 | 8 | [#406](https://github.com/kube-dojo/kube-dojo.github.io/issues/406) | The Transformer, Scale & Open Source (Ch 50-58) | **Codex** | **Codex** |
 | 9 | [#407](https://github.com/kube-dojo/kube-dojo.github.io/issues/407) | The Product Shock & Physical Limits (Ch 59-72) | **Codex** (was Claude — transferred 2026-04-29) | **Codex** |
 
-Note: The 630 changed files in the original PR included automatically generated placeholder directories for the first 68 chapters to ensure proper boundaries. The modern-era coverage pass later expanded the roadmap to 72 chapters so RAG/tool use, multimodal systems, benchmark politics, and data labor/copyright are not forced into unrelated chapters. The current inventory also includes Chapter 73's coda; the tracking table above covers Chapters 1–72 and does not assign or clear its missing contract.
+Note: The 630 changed files in the original PR included automatically generated placeholder directories for the first 68 chapters to ensure proper boundaries. The modern-era coverage pass later expanded the roadmap to 72 chapters so RAG/tool use, multimodal systems, benchmark politics, and data labor/copyright are not forced into unrelated chapters. The current inventory also includes Chapter 73's coda; the historical tracking table above covers Chapters 1–72. Its new draft contract is tracked under #2288 and is not cleared by that table.

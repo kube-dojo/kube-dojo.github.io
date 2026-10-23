@@ -4,7 +4,7 @@ This document outlines the roadmap for the AI History book. Following a critical
 
 The current book has 73 English chapter source files and 73 public-index entries across nine parts. Part 9 concludes with Chapter 73's technical coda. The arc demonstrates that AI is not a sudden bubble, but the result of a century of intertwined scientific, mathematical, and engineering milestones.
 
-The historical filename is retained. Research contracts currently cover Chapters 1–72 only; Chapter 73's contract and contract-backed readiness remain pending under #2288. This inventory does not grant review clearance or accepted status.
+The historical filename is retained. Research-contract directories now cover Chapters 1–73; Chapter 73 is an unaccepted `researching` draft, with contract-backed readiness pending under #2288. This inventory does not grant review clearance or accepted status.
 
 ---
 
@@ -118,4 +118,4 @@ The historical filename is retained. Research contracts currently cover Chapters
 
 ### Technical Coda
 
-73. **The Algorithmic Response:** Long-context inference, KV-cache memory pressure, and DeepSeek-V2's Multi-head Latent Attention as an architectural response, with open kernels and serving backends carrying the implementation outward. This describes the existing coda's scope; its research contract and applicable reviews remain pending.
+73. **The Algorithmic Response:** Long-context inference, KV-cache memory pressure, and DeepSeek-V2's Multi-head Latent Attention as an architectural response, with open kernels and serving backends carrying the implementation outward. This describes the existing coda's scope; its provisional contract exists, but research/source and editorial reviews remain pending.

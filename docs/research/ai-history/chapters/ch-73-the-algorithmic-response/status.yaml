@@ -1,0 +1,38 @@
+status: researching
+owner: Codex
+part: 9
+chapter: 73
+review_state: unreviewed_contract_draft
+last_updated: 2026-10-23
+green_claims: 0
+yellow_claims: 7
+red_claims: 2
+guardrail_count: 6
+prose_word_cap_recommendation: 3000
+word_count_range: "2000-3000"
+capacity_plan_status: provisional_anchored_not_approved
+stretch_word_count_range: "4000-5000"
+prose_drafting_unlocked: false
+verdicts:
+  source_fidelity: {model: null, date: null, verdict: null, review_url: null}
+  gap_capacity: {model: null, date: null, verdict: null, review_url: null}
+  resolved: null
+  resolved_word_cap: null
+prose_review:
+  status: unreviewed_against_this_contract
+  source_fidelity: {model: null, date: null, verdict: null, review_url: null}
+  editorial: {model: null, date: null, verdict: null, review_url: null}
+prose_state: published_on_main
+prose_path: src/content/docs/ai-history/ch-73-the-algorithmic-response.md
+reader_aids: incomplete_pending_reviews
+lifecycle_updated: 2026-10-23
+review_coverage:
+  research: {source_fidelity: pending, gap_capacity: pending}
+  prose: {source_fidelity: pending, editorial: pending}
+  cross_family_satisfied: {research: false, prose: false, overall: false}
+  backfill_pending: true
+  last_audited: null
+notes: >-
+  First provisional contract under #3460/#2288. Published prose is recorded,
+  not accepted. Source-visible Yellow claims await independent review;
+  Red claims cannot be drafted. No benchmark execution or reader-aid clearance.
