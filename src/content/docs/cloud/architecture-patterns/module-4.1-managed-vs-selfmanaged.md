@@ -233,7 +233,7 @@ Control-plane request throttling introduces subtle operational challenges in man
 
 | Feature | EKS | GKE | AKS |
 |---------|-----|-----|-----|
-| Control Plane Cost | $0.10/hr ($73/mo) | $0.10/hr (all modes); 1 free zonal/Autopilot cluster/mo via $74.40 credit | Free (no SLA) or $0.10/hr (SLA) |
+| Control Plane Cost | \$0.10/hr (\$73/mo) | \$0.10/hr (all modes); 1 free zonal/Autopilot cluster/mo via \$74.40 credit | Free (no SLA) or \$0.10/hr (SLA) |
 | Control Plane SLA | 99.95% | 99.95% (Regional) | 99.95% (Standard tier) |
 | Max Pods per Node | 110 (default ENI limits) | 110 (default), 256 (GKE) | 250 |
 | K8s Version Lag | ~2-3 months behind upstream | ~1-2 months behind upstream | ~2-3 months behind upstream |
@@ -248,15 +248,15 @@ When comparing max Pods per node, remember ENI/IP limits on AWS VPC CNI, GKE ali
 
 Managed Kubernetes is not one SKU—it is a **tier ladder** plus worker spend. Compare tiers before you compare instance types.
 
-**EKS** charges **$0.10 per cluster per hour** for Kubernetes versions in [standard support](https://aws.amazon.com/eks/pricing/) (roughly $73/month per cluster). After standard support ends, [extended support](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html) raises the control-plane rate to **$0.60 per cluster per hour** until you upgrade—an easy budget spike when many clusters linger on old minors. [EKS Provisioned Control Plane](https://aws.amazon.com/eks/pricing/) adds XL–8XL tiers ($1.65–$13.90/hr and above) when API-server throughput or large-scale etcd performance needs predictable headroom beyond the default plane.
+**EKS** charges **\$0.10 per cluster per hour** for Kubernetes versions in [standard support](https://aws.amazon.com/eks/pricing/) (roughly \$73/month per cluster). After standard support ends, [extended support](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html) raises the control-plane rate to **\$0.60 per cluster per hour** until you upgrade—an easy budget spike when many clusters linger on old minors. [EKS Provisioned Control Plane](https://aws.amazon.com/eks/pricing/) adds XL–8XL tiers (\$1.65–\$13.90/hr and above) when API-server throughput or large-scale etcd performance needs predictable headroom beyond the default plane.
 
-**GKE** applies a **$0.10 per cluster per hour** [cluster management fee](https://cloud.google.com/kubernetes-engine/pricing) to every cluster mode (zonal, regional, Autopilot). The [free tier](https://cloud.google.com/kubernetes-engine/pricing) credits **$74.40 per billing account per month**, equivalent to one zonal Standard or Autopilot cluster hour-bank—regional clusters still pay the full management fee. Extended channel clusters past standard support pay an additional **$0.50/hr** management surcharge (total **$0.60/hr**) until upgraded. SLAs: **99.95%** regional Standard/Autopilot control planes, **99.5%** zonal Standard control planes per the same pricing page.
+**GKE** applies a **\$0.10 per cluster per hour** [cluster management fee](https://cloud.google.com/kubernetes-engine/pricing) to every cluster mode (zonal, regional, Autopilot). The [free tier](https://cloud.google.com/kubernetes-engine/pricing) credits **\$74.40 per billing account per month**, equivalent to one zonal Standard or Autopilot cluster hour-bank—regional clusters still pay the full management fee. Extended channel clusters past standard support pay an additional **\$0.50/hr** management surcharge (total **\$0.60/hr**) until upgraded. SLAs: **99.95%** regional Standard/Autopilot control planes, **99.5%** zonal Standard control planes per the same pricing page.
 
 **AKS** splits [Free, Standard, and Premium tiers](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers). **Free** has no financially backed API-server SLA—fine for labs, hazardous for revenue workloads. **Standard** enables the [uptime SLA](https://learn.microsoft.com/en-us/azure/aks/uptime-sla) (**99.95%** with availability zones, **99.9%** without). **Premium** pairs with Long-Term Support (`AKSLongTermSupport`) for regulated fleets that must stay on a minor longer than community support. Cluster management fees for Standard/Premium are documented on Azure's AKS pricing pages; worker VMs, load balancers, and egress remain pay-as-you-go.
 
 | Provider | Production-oriented control plane | SLA (API server) | Cost spike triggers |
 |----------|-----------------------------------|------------------|---------------------|
-| EKS | Standard + optional Provisioned CP | 99.95% (documented SLA) | Extended support $0.60/hr; many clusters × $0.10/hr; cross-AZ ENI traffic |
+| EKS | Standard + optional Provisioned CP | 99.95% (documented SLA) | Extended support \$0.60/hr; many clusters × \$0.10/hr; cross-AZ ENI traffic |
 | GKE | Regional Standard or Autopilot | 99.95% regional / 99.5% zonal | Extended channel surcharge; exceeding free-tier credit; Autopilot pod requests vs actual need |
 | AKS | Standard or Premium (LTS) | 99.9–99.95% by AZ layout | Running Free in prod; Premium + LTS; outbound data from Azure Load Balancer |
 
@@ -315,7 +315,7 @@ The most devastating mistake engineering teams make is comparing only the raw in
 | Key person dependency | $7,000 |
 | **Risk subtotal:** | **$20,000/yr** |
 
-Self-managed total for this profile: **$73,560/yr** (infrastructure $10,560 + labor $43,000 + risk $20,000).
+Self-managed total for this profile: **\$73,560/yr** (infrastructure \$10,560 + labor \$43,000 + risk \$20,000).
 
 ---
 
@@ -349,7 +349,7 @@ Self-managed total for this profile: **$73,560/yr** (infrastructure $10,560 + la
 | Upgrade compatibility issues | $2,000 |
 | **Risk subtotal:** | **$5,000/yr** |
 
-Managed total for this profile: **$30,276/yr** (service $12,276 + labor $13,000 + risk $5,000). NAT Gateway and VPC endpoint line items marked with * exist in both models but disappear from napkin math when teams compare "free kubeadm" to a monthly EKS fee.
+Managed total for this profile: **\$30,276/yr** (service \$12,276 + labor \$13,000 + risk \$5,000). NAT Gateway and VPC endpoint line items marked with * exist in both models but disappear from napkin math when teams compare "free kubeadm" to a monthly EKS fee.
 
 The managed option is roughly sixty percent cheaper when you accurately account for labor and enterprise risk. That advantage shrinks at fleet scale: organizations running dozens or hundreds of clusters sometimes fund a dedicated platform team and Cluster API automation so per-cluster control-plane fees stop dominating the budget.
 
@@ -387,11 +387,11 @@ Cross-availability-zone networking charges represent one of the most frequently 
 
 ### Engineer-hours, botched upgrades, and control-plane HA you build yourself
 
-Labor is the line item spreadsheets hide. A conservative model for self-managed production assumes **two senior engineers** spending partial quarters on: reading [Kubernetes release notes](https://kubernetes.io/releases/), running deprecated API discovery, etcd backup/restore drills, certificate rotation, and post-upgrade soak tests. At fully loaded $150–$200/hr, four upgrade cycles plus CVE firefighting easily exceed **$40k/year** before anyone touches application features—matching the labor subtotal in the tables above.
+Labor is the line item spreadsheets hide. A conservative model for self-managed production assumes **two senior engineers** spending partial quarters on: reading [Kubernetes release notes](https://kubernetes.io/releases/), running deprecated API discovery, etcd backup/restore drills, certificate rotation, and post-upgrade soak tests. At fully loaded \$150–\$200/hr, four upgrade cycles plus CVE firefighting easily exceed **\$40k/year** before anyone touches application features—matching the labor subtotal in the tables above.
 
 A **botched minor upgrade** costs more than the successful upgrade would have saved. Symptoms include: etcd quorum loss (cluster read-only), a control plane that cannot take the next minor because kubelets already sit at the skew ceiling, or admission webhooks rejecting workloads on new defaults. Recovery often means emergency consultants, weekend war rooms, and revenue loss while Deployments cannot roll forward. Managed providers absorb etcd and API-server choreography, but **you still pay** if worker groups lag and pods crash on deprecated APIs—managed is not immunity, it is narrower blast radius.
 
-Self-managed **control-plane HA** means three (or five) API servers, etcd on low-latency SSD, load balancers, and monitoring—roughly the **$10k+/year infrastructure** slice in the self-managed table. Managed bundles that HA into the per-cluster fee. At **ten clusters**, EKS control-plane fees alone are ~$8,760/year at standard pricing—still often cheaper than one engineer-week per cluster per upgrade.
+Self-managed **control-plane HA** means three (or five) API servers, etcd on low-latency SSD, load balancers, and monitoring—roughly the **\$10k+/year infrastructure** slice in the self-managed table. Managed bundles that HA into the per-cluster fee. At **ten clusters**, EKS control-plane fees alone are ~\$8,760/year at standard pricing—still often cheaper than one engineer-week per cluster per upgrade.
 
 ### Node pool levers: spot, sizing, and autoscaler bounds
 
@@ -725,7 +725,7 @@ When you facilitate the review, ask teams to cite **provider documentation** for
 
 | Mistake | Why It Happens | How to Fix It |
 |---------|---------------|---------------|
-| Comparing only control plane costs | EKS "$73/mo" vs kubeadm "$0" seems obvious | Calculate full TCO including labor, risk, and data transfer |
+| Comparing only control plane costs | EKS "\$73/mo" vs kubeadm "\$0" seems obvious | Calculate full TCO including labor, risk, and data transfer |
 | Running self-managed without etcd expertise | "How hard can a database be?" | Very hard. etcd quorum loss = total cluster outage. Get trained or go managed |
 | Ignoring managed node groups | Teams manage nodes manually on EKS/GKE | Use managed node groups (EKS) or node auto-provisioning (GKE) to reduce toil |
 | Skipping upgrade testing | "It worked in staging" (staging was 3 versions behind) | Maintain version parity across environments; test upgrades in a disposable cluster first |
@@ -755,7 +755,7 @@ The etcd database has likely lost quorum. etcd stores all cluster state -- every
 <details>
 <summary>3. A global enterprise runs 150 Kubernetes clusters across various regions. The CFO suggests moving all of them to managed services (like EKS or GKE) to reduce the burden on the platform team. As the lead architect, you argue that staying self-managed is actually more cost-effective at this massive scale. What specific operational economies of scale support your argument?</summary>
 
-At 150 clusters, managed control plane fees alone cost roughly $131,400/year (150 x $876). But the real savings come from economies of scale in operations: a dedicated platform team of 4-5 engineers can automate upgrades, monitoring, and incident response across all 150 clusters using tools like Cluster API. The per-cluster operational cost drops dramatically. Additionally, at this scale, the team can optimize control plane sizing (using smaller VMs for non-critical clusters), share etcd infrastructure where appropriate, and negotiate better raw compute pricing. The fixed cost of a highly skilled platform team is amortized across many clusters, making the per-cluster cost lower than the managed fee plus the inevitable per-cluster managed operations overhead.
+At 150 clusters, managed control plane fees alone cost roughly \$131,400/year (150 x \$876). But the real savings come from economies of scale in operations: a dedicated platform team of 4-5 engineers can automate upgrades, monitoring, and incident response across all 150 clusters using tools like Cluster API. The per-cluster operational cost drops dramatically. Additionally, at this scale, the team can optimize control plane sizing (using smaller VMs for non-critical clusters), share etcd infrastructure where appropriate, and negotiate better raw compute pricing. The fixed cost of a highly skilled platform team is amortized across many clusters, making the per-cluster cost lower than the managed fee plus the inevitable per-cluster managed operations overhead.
 </details>
 
 <details>
@@ -1022,7 +1022,7 @@ Any of these alone is concerning. Together, they represent a material risk to se
 | Year 1 | $110,100 | $55,976 |
 | Year 2+ | $73,560 | $35,976 |
 
-The managed path saves approximately $50,000 in Year 1 and $38,000 annually thereafter, primarily through reduced engineering labor and risk.
+The managed path saves approximately \$50,000 in Year 1 and \$38,000 annually thereafter, primarily through reduced engineering labor and risk.
 
 **Recommendation**
 
@@ -1090,11 +1090,11 @@ When you present recommendations to leadership, lead with **risk reduction** (CV
 
 - [Kubernetes Version Skew Policy](https://kubernetes.io/releases/version-skew-policy) — Supported version window and kubelet/control-plane compatibility that drives upgrade sequencing.
 - [Kubernetes Patch Releases](https://kubernetes.io/releases/patch-releases/) — CVE and patch cadence context for planning node and control-plane upgrades.
-- [Amazon EKS Pricing](https://aws.amazon.com/eks/pricing/) — Standard ($0.10/hr) and extended ($0.60/hr) cluster fees, Provisioned Control Plane tiers, Hybrid Nodes.
+- [Amazon EKS Pricing](https://aws.amazon.com/eks/pricing/) — Standard (\$0.10/hr) and extended (\$0.60/hr) cluster fees, Provisioned Control Plane tiers, Hybrid Nodes.
 - [Amazon EKS Cluster Endpoint Access](https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html) — Public vs private API server endpoints and VPC DNS requirements.
 - [Amazon EKS Managed Node Groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html) — Node AMI lifecycle and update configuration for worker patching.
 - [Amazon EKS VPC and Subnet Considerations](https://docs.aws.amazon.com/eks/latest/best-practices/subnets.html) — ENI injection and subnet IP planning for EKS clusters.
-- [GKE Pricing and Free Tier](https://cloud.google.com/kubernetes-engine/pricing) — $0.10/hr management fee, $74.40 monthly credit, Autopilot billing, SLA percentages.
+- [GKE Pricing and Free Tier](https://cloud.google.com/kubernetes-engine/pricing) — \$0.10/hr management fee, \$74.40 monthly credit, Autopilot billing, SLA percentages.
 - [GKE Release Channels](https://cloud.google.com/kubernetes-engine/docs/concepts/release-channels) — Rapid, Regular, Stable, Extended channel behavior for version lifecycle.
 - [GKE Private Clusters](https://cloud.google.com/kubernetes-engine/docs/concepts/private-cluster-concept) — Private control-plane endpoints and connectivity patterns.
 - [AKS Free, Standard, and Premium Pricing Tiers](https://learn.microsoft.com/en-us/azure/aks/free-standard-pricing-tiers) — Tier capabilities, LTS on Premium, and when Free is inappropriate for production.

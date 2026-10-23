@@ -911,7 +911,7 @@ Portal views expose **idle** charges (capacity no workload uses), **system** cha
 
 ## Production Cost Lens
 
-Hypothetical scenario: a platform team budgets $18,000/month for a three-node production AKS footprint and discovers a $31,000 invoice. The overrun is rarely one line item — it is stacked leaks across storage, logs, metrics, and scheduler behavior.
+Hypothetical scenario: a platform team budgets \$18,000/month for a three-node production AKS footprint and discovers a \$31,000 invoice. The overrun is rarely one line item — it is stacked leaks across storage, logs, metrics, and scheduler behavior.
 
 **Disk and PVC economics.** Managed disks bill for provisioned GiB whether the filesystem fills them or not. Premium SSD v1 forces larger disks when you need IOPS, so a 50 GiB database on P30-sized storage pays for 1 TiB of provisioned capacity. Premium SSD v2 and Ultra let you pay for performance dimensions directly, but Ultra VM reservation fees apply when nodes enable Ultra capability without attached Ultra volumes. Orphan PVCs with `Retain` policies leave premium disks billing after the workload namespace was deleted.
 

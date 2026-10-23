@@ -130,7 +130,7 @@ When Route 53 creates a public hosted zone, [it automatically assigns four name 
 
 **Delegation is the handoff you own:** buying a domain does not automatically use Route 53 unless registrar name servers point to those four NS records (or you register the domain with Route 53 and accept its delegation). Until delegation propagates, your meticulously crafted A and ALIAS records are invisible to the internet. Cutover runbooks should list: create zone → copy NS to registrar → wait for parent TTL → verify with `dig NS example.com` → only then create customer-facing records.
 
-**Hosted zone limits and hygiene:** the first 25 public zones cost $0.50/month each; beyond that, $0.10/month applies per [AWS pricing](https://aws.amazon.com/route53/pricing/). Sandbox environments accumulate orphaned zones from automated tests — FinOps reviews often find dozens of `$0.50` leaks. AWS waives the monthly hosted-zone charge if you delete a zone within 12 hours of creation (queries during that window still bill), which helps CI pipelines that create ephemeral zones.
+**Hosted zone limits and hygiene:** the first 25 public zones cost \$0.50/month each; beyond that, \$0.10/month applies per [AWS pricing](https://aws.amazon.com/route53/pricing/). Sandbox environments accumulate orphaned zones from automated tests — FinOps reviews often find dozens of `$0.50` leaks. AWS waives the monthly hosted-zone charge if you delete a zone within 12 hours of creation (queries during that window still bill), which helps CI pipelines that create ephemeral zones.
 
 **SOA and NS records** at the zone apex are managed for you in Route 53; do not delete them to "clean up" the console. The SOA serial influences secondary DNS semantics if you ever export zones; NS records must match what the registrar publishes.
 
@@ -201,24 +201,24 @@ Route 53 pricing is straightforward at small scale but compounds quietly: hosted
 
 | Component | Cost (US Regions, per [AWS Route 53 pricing](https://aws.amazon.com/route53/pricing/)) |
 |-----------|------|
-| Public hosted zone | $0.50/month each for the first 25 zones; $0.10/month for additional zones |
+| Public hosted zone | \$0.50/month each for the first 25 zones; \$0.10/month for additional zones |
 | Private hosted zone | Same hosted-zone fee; **queries against private zones are not charged** |
 | Records beyond 10,000 per zone | $0.0015/month per extra record |
 | Standard queries (Simple, Weighted, Failover, Multivalue) | $0.40 per million queries (first 1B/month) |
 | Latency-based routing queries | $0.60 per million |
 | Geolocation / Geoproximity queries | $0.70 per million |
 | ALIAS to supported AWS targets (ALB, CloudFront, S3 website, API GW, etc.) | **$0** query charge |
-| Basic health check (AWS or non-AWS endpoint) | $0.50/month (AWS) / $0.75/month (non-AWS) |
-| Optional features (HTTPS, string match, fast interval, latency measurement) | +$1.00/month per feature (AWS) / +$2.00/month (non-AWS) |
+| Basic health check (AWS or non-AWS endpoint) | \$0.50/month (AWS) / \$0.75/month (non-AWS) |
+| Optional features (HTTPS, string match, fast interval, latency measurement) | +\$1.00/month per feature (AWS) / +\$2.00/month (non-AWS) |
 | First 50 health checks on AWS endpoints (same account) | Often $0 under AWS's published DNS failover offer — verify current terms on the pricing page |
 
-**What spikes cost unexpectedly:** (1) **TTL set to 60 seconds globally** on high-traffic names — every resolver refresh becomes a billable query at the standard or geo/latency tier. (2) **Geolocation or geoproximity** on hot domains — $0.70/M vs $0.40/M adds up at billions of queries. (3) **Health checks with fast interval + HTTPS + string matching** — each optional feature is a separate monthly line item per check. (4) **Chains of non-alias CNAMEs** to AWS resources — you pay standard queries and add resolver round trips. (5) **Orphan hosted zones** after environment teardown — $0.50 each adds up across dozens of sandboxes.
+**What spikes cost unexpectedly:** (1) **TTL set to 60 seconds globally** on high-traffic names — every resolver refresh becomes a billable query at the standard or geo/latency tier. (2) **Geolocation or geoproximity** on hot domains — \$0.70/M vs \$0.40/M adds up at billions of queries. (3) **Health checks with fast interval + HTTPS + string matching** — each optional feature is a separate monthly line item per check. (4) **Chains of non-alias CNAMEs** to AWS resources — you pay standard queries and add resolver round trips. (5) **Orphan hosted zones** after environment teardown — \$0.50 each adds up across dozens of sandboxes.
 
 **Knobs that reduce cost:** prefer **ALIAS** to ELB/CloudFront/S3 website endpoints; use **private zones** for internal names (no query charge); raise TTL on stable records after migrations complete; delete unused zones; right-size health-check features (30-second interval is enough for many DR plans); use **calculated health checks** to combine signals instead of duplicating twelve overlapping endpoint checks.
 
 Domain registration is separate from DNS hosting — annual TLD fees appear on the registrar line, not the per-query table above.
 
-**Capacity planning sketch:** one million standard queries per month costs about $0.40 — modest. One billion standard queries costs about $400 before volume discounts on the second billion. Alias-heavy architectures fronting CloudFront or ALB often erase the query line entirely for apex traffic while health checks and hosted zones remain the steady-state bill. Model both steady and failover-state costs: during an incident you might lower TTL (more queries) and run extra calculated checks until stability returns.
+**Capacity planning sketch:** one million standard queries per month costs about \$0.40 — modest. One billion standard queries costs about \$400 before volume discounts on the second billion. Alias-heavy architectures fronting CloudFront or ALB often erase the query line entirely for apex traffic while health checks and hosted zones remain the steady-state bill. Model both steady and failover-state costs: during an incident you might lower TTL (more queries) and run extra calculated checks until stability returns.
 
 ---
 
@@ -881,7 +881,7 @@ A warning: enabling DNSSEC is easy, but getting it wrong can make your domain un
 
 2. **The name "Route 53" is a double reference.** DNS runs on port 53, and the service's routing policies steer users to healthy endpoints — naming that reflects both protocol and traffic engineering ([AWS Route 53 features](https://aws.amazon.com/route53/features/)).
 
-3. **Geoproximity and geolocation queries are billed at a higher per-million rate than simple or weighted records** ($0.70 vs $0.40 per million in standard US Regions), which matters when a high-QPS domain uses country-based steering for every lookup ([AWS Route 53 pricing](https://aws.amazon.com/route53/pricing/)).
+3. **Geoproximity and geolocation queries are billed at a higher per-million rate than simple or weighted records** (\$0.70 vs \$0.40 per million in standard US Regions), which matters when a high-QPS domain uses country-based steering for every lookup ([AWS Route 53 pricing](https://aws.amazon.com/route53/pricing/)).
 
 4. **Multivalue answer routing returns up to eight healthy records per query**, unlike simple routing which may return multiple values without health filtering — a subtle distinction that changes how clients experience partial outages ([AWS multivalue routing policy](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-multivalue.html)).
 

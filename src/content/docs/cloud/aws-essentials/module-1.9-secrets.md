@@ -277,7 +277,7 @@ aws ssm get-parameter-history \
 <details>
 <summary>Check your prediction</summary>
 
-Parameter Store is significantly more cost-effective for high-read, rarely changing credentials. Parameter Store standard tier provides free parameter storage, whereas Secrets Manager charges $0.40 per secret monthly plus $0.05 per 10,000 API calls. At thousands of reads per second without caching, Secrets Manager API interaction charges quickly generate substantial recurring costs.
+Parameter Store is significantly more cost-effective for high-read, rarely changing credentials. Parameter Store standard tier provides free parameter storage, whereas Secrets Manager charges \$0.40 per secret monthly plus \$0.05 per 10,000 API calls. At thousands of reads per second without caching, Secrets Manager API interaction charges quickly generate substantial recurring costs.
 
 </details>
 
@@ -765,11 +765,11 @@ flowchart LR
 
 Secrets spending is usually three line items — **storage**, **API calls**, and **KMS** — not the headline service name alone.
 
-**AWS Secrets Manager** charges $0.40 per secret per month (prorated hourly if deleted mid-month) plus $0.05 per 10,000 API calls. Every API operation counts, including metadata calls like `ListSecretVersionIds`, so chatty SDK loops show up on the bill. Example: 25 rotating database secrets cost $10/month in storage; if each secret is read 20 times per day across 10 services, that is roughly 150,000 calls/month (~$0.75 API) before KMS charges.
+**AWS Secrets Manager** charges \$0.40 per secret per month (prorated hourly if deleted mid-month) plus \$0.05 per 10,000 API calls. Every API operation counts, including metadata calls like `ListSecretVersionIds`, so chatty SDK loops show up on the bill. Example: 25 rotating database secrets cost \$10/month in storage; if each secret is read 20 times per day across 10 services, that is roughly 150,000 calls/month (~\$0.75 API) before KMS charges.
 
-**Parameter Store** standard parameters have no storage fee (up to 10,000 per Region). Advanced parameters cost $0.05 per parameter per month. If you enable higher throughput, Parameter Store API interactions bill at $0.05 per 10,000 calls for standard and advanced alike — a hidden multiplier when microservices call `GetParameter` on every request.
+**Parameter Store** standard parameters have no storage fee (up to 10,000 per Region). Advanced parameters cost \$0.05 per parameter per month. If you enable higher throughput, Parameter Store API interactions bill at \$0.05 per 10,000 calls for standard and advanced alike — a hidden multiplier when microservices call `GetParameter` on every request.
 
-**KMS** customer managed keys cost approximately $1 per key per month plus about $0.03 per 10,000 requests (varies slightly by operation type and Region). Automatic rotation stores prior key material versions; AWS bills for the first and second rotation storage tranche, then caps further rotation storage charges on that key. Using one shared `alias/app-secrets-key` for dozens of SecureStrings is cheaper than dozens of CMKs, but concentrates blast radius — many teams use one CMK per environment or per data class.
+**KMS** customer managed keys cost approximately \$1 per key per month plus about \$0.03 per 10,000 requests (varies slightly by operation type and Region). Automatic rotation stores prior key material versions; AWS bills for the first and second rotation storage tranche, then caps further rotation storage charges on that key. Using one shared `alias/app-secrets-key` for dozens of SecureStrings is cheaper than dozens of CMKs, but concentrates blast radius — many teams use one CMK per environment or per data class.
 
 | Cost spike trigger | What happens | Mitigation |
 |--------------------|--------------|------------|
@@ -781,7 +781,7 @@ Secrets spending is usually three line items — **storage**, **API calls**, and
 
 Hypothetical scenario: a fleet of 80 Lambda functions each calls `GetSecretValue` twice per invocation at 500 invocations per minute. That is tens of millions of API calls per month — far more expensive than storing the same JSON in Parameter Store with a five-minute extension cache. The fix is architectural (cache, extension, or env injection at launch), not switching Regions.
 
-FinOps reviewers should ask two questions on every secrets design review: how many **distinct secrets** exist (storage line item), and how many **reads per minute** hit the API (interaction line item). A microservice with twelve environment variables backed by twelve Secrets Manager secrets costs $4.80/month before a single request — the same values under one JSON secret cost $0.40 plus parse logic in code. Consolidation is not always correct (rotation granularity may require separation), but the trade-off should be explicit in architecture notes rather than discovered on the monthly invoice.
+FinOps reviewers should ask two questions on every secrets design review: how many **distinct secrets** exist (storage line item), and how many **reads per minute** hit the API (interaction line item). A microservice with twelve environment variables backed by twelve Secrets Manager secrets costs \$4.80/month before a single request — the same values under one JSON secret cost \$0.40 plus parse logic in code. Consolidation is not always correct (rotation granularity may require separation), but the trade-off should be explicit in architecture notes rather than discovered on the monthly invoice.
 
 ---
 

@@ -919,20 +919,20 @@ A migration that hasn't been tested is a migration that will fail. Before produc
 Stateful migration is not free — and the costs are routinely underestimated. Understanding them upfront prevents budget surprises that can stall a migration mid-flight.
 
 **Double-running infrastructure**: During the migration window (2–6 weeks for large databases), you run both source and target systems simultaneously. For a production-grade database cluster (3-node primary + replica, 16 vCPU, 128 GB RAM, 1 TB SSD storage), approximate double-running costs:
-- AWS RDS for PostgreSQL (`db.r6g.4xlarge`, Multi-AZ): ~$1.50/hour per instance → ~$3,200/month for source + ~$3,200 for target = ~$6,400/month in compute alone.
-- GCP Cloud SQL for PostgreSQL (`db-custom-16-131072`, HA): ~$1.20/hour → ~$2,600/month each.
-- Azure Database for PostgreSQL Flexible Server (16 vCPU, 128 GB, HA): ~$1.40/hour → ~$3,000/month each.
+- AWS RDS for PostgreSQL (`db.r6g.4xlarge`, Multi-AZ): ~\$1.50/hour per instance → ~\$3,200/month for source + ~\$3,200 for target = ~\$6,400/month in compute alone.
+- GCP Cloud SQL for PostgreSQL (`db-custom-16-131072`, HA): ~\$1.20/hour → ~\$2,600/month each.
+- Azure Database for PostgreSQL Flexible Server (16 vCPU, 128 GB, HA): ~\$1.40/hour → ~\$3,000/month each.
 
-Add storage costs (typically $0.10–$0.20/GB-month for SSD), backup storage, and data transfer charges. Tag resources with a decommission date and set budget alerts to prevent these costs from persisting beyond the migration window.
+Add storage costs (typically \$0.10–\$0.20/GB-month for SSD), backup storage, and data transfer charges. Tag resources with a decommission date and set budget alerts to prevent these costs from persisting beyond the migration window.
 
 **Cross-region data transfer**: Copying a 10 TB database across regions for migration incurs egress charges that differ sharply by provider:
-- AWS: inter-region data transfer is ~$0.02/GB → ~$200 for 10 TB. However, if traffic traverses a NAT Gateway or crosses Availability Zones within the source region first, add ~$0.045/GB for NAT processing and ~$0.01/GB for cross-AZ data.
-- GCP: inter-region egress is ~$0.01–$0.12/GB, varying by source and destination region pair. A typical US-to-Europe transfer costs ~$0.08/GB → ~$800 for 10 TB.
-- Azure: inter-region data transfer is ~$0.02–$0.087/GB depending on zone/region pairing → ~$200–$870 for 10 TB.
+- AWS: inter-region data transfer is ~\$0.02/GB → ~\$200 for 10 TB. However, if traffic traverses a NAT Gateway or crosses Availability Zones within the source region first, add ~\$0.045/GB for NAT processing and ~\$0.01/GB for cross-AZ data.
+- GCP: inter-region egress is ~\$0.01–\$0.12/GB, varying by source and destination region pair. A typical US-to-Europe transfer costs ~\$0.08/GB → ~\$800 for 10 TB.
+- Azure: inter-region data transfer is ~\$0.02–\$0.087/GB depending on zone/region pairing → ~\$200–\$870 for 10 TB.
 
-For 50+ TB datasets, data transfer charges alone can exceed $5,000 — which is why physical data transfer appliances (AWS Snowball Edge, GCP Transfer Appliance, Azure Data Box) become cost-competitive at this scale. These charge a flat per-device fee (~$200–$400) plus shipping, avoiding per-GB egress charges for the bulk data copy.
+For 50+ TB datasets, data transfer charges alone can exceed \$5,000 — which is why physical data transfer appliances (AWS Snowball Edge, GCP Transfer Appliance, Azure Data Box) become cost-competitive at this scale. These charge a flat per-device fee (~\$200–\$400) plus shipping, avoiding per-GB egress charges for the bulk data copy.
 
-**Snapshot storage**: During an active migration, CSI snapshots and database dumps stored in object storage incur monthly charges. At ~$0.02–$0.03/GB-month, a 10 TB snapshot costs ~$200–$300/month per copy. If you retain multiple snapshots (pre-migration baseline, mid-migration checkpoint, post-migration archival), costs multiply. Delete snapshots after confirming migration stability unless they serve a specific compliance or rollback purpose.
+**Snapshot storage**: During an active migration, CSI snapshots and database dumps stored in object storage incur monthly charges. At ~\$0.02–\$0.03/GB-month, a 10 TB snapshot costs ~\$200–\$300/month per copy. If you retain multiple snapshots (pre-migration baseline, mid-migration checkpoint, post-migration archival), costs multiply. Delete snapshots after confirming migration stability unless they serve a specific compliance or rollback purpose.
 
 **In-cluster cost visibility**: For teams running migration tooling inside Kubernetes (Velero, Debezium, Strimzi Kafka), tools like Kubecost or OpenCost provide real-time cost allocation by namespace, deployment, or custom label. Tag all migration resources with `migration=true` and `decommission-after=YYYY-MM-DD` to track the fully loaded migration cost separately from steady-state operations, and to prevent orphaned resources from accumulating charges after migration completes.
 

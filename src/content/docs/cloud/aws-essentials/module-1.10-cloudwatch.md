@@ -132,7 +132,7 @@ Dimensions are the most common source of both power and billing accidents. Each 
 
 ### Resolution: Standard, Detailed, and High-Resolution Custom Metrics
 
-**Resolution** defines how granular the data points are. AWS service metrics are standard resolution by default (one data point per minute for most services, five minutes for EC2 basic monitoring). EC2 **detailed monitoring** changes the collection interval to one minute and is billed as custom metrics — AWS documents an example of seven detailed EC2 metrics at $0.30 each, roughly $2.10 per instance per month in US East. That cost is usually worth it for production instances where a five-minute average can hide a sixty-second CPU spike that triggers autoscaling too late.
+**Resolution** defines how granular the data points are. AWS service metrics are standard resolution by default (one data point per minute for most services, five minutes for EC2 basic monitoring). EC2 **detailed monitoring** changes the collection interval to one minute and is billed as custom metrics — AWS documents an example of seven detailed EC2 metrics at \$0.30 each, roughly \$2.10 per instance per month in US East. That cost is usually worth it for production instances where a five-minute average can hide a sixty-second CPU spike that triggers autoscaling too late.
 
 When **you** publish custom metrics, you choose standard resolution (stored at one-minute granularity, retained fifteen days at full resolution) or **high resolution** (one-second granularity, retained three hours at full resolution). High-resolution metrics support alarm periods of 10 or 30 seconds for faster detection, but each `PutMetricData` call is billed and high-resolution alarms carry a higher charge than standard alarms. Use high resolution only for metrics where sub-minute reaction time justifies the cost — queue depth on a trading system, perhaps; daily batch job counters, almost never.
 
@@ -181,7 +181,7 @@ aws cloudwatch put-metric-data \
 
 ### Pricing Reality Check
 
-Custom metrics cost **$0.30 per metric per month** for the first 10,000 metrics, dropping to $0.10 at scale. A "metric" is uniquely defined by its combination of namespace, metric name, and dimensions.
+Custom metrics cost **\$0.30 per metric per month** for the first 10,000 metrics, dropping to \$0.10 at scale. A "metric" is uniquely defined by its combination of namespace, metric name, and dimensions.
 
 Billing treats each unique namespace + metric name + dimension set as its own time series. For instance, the following represent three separate billable metrics even though the human-readable metric name repeats:
 
@@ -472,7 +472,7 @@ The table below lists the most common Logs Insights query clauses teams combine 
 <details>
 <summary>Check your prediction</summary>
 
-No, the query cost will remain exactly $15. CloudWatch Logs Insights pricing is determined entirely by the volume of data scanned ($0.005 per GB scanned in standard regions), completely independent of the number of log events returned to your console or client.
+No, the query cost will remain exactly \$15. CloudWatch Logs Insights pricing is determined entirely by the volume of data scanned (\$0.005 per GB scanned in standard regions), completely independent of the number of log events returned to your console or client.
 - **Scan semantics**: A `limit 10` clause only restricts the number of matching records displayed after the query engine reads and evaluates the target log data. Because the engine must still decompress and scan through the entire 30-day log history to locate matching lines, the scanned byte count remains identical.
 - **Cost reduction strategy**: To reduce query costs, you must decrease the volume of scanned data by narrowing the `@timestamp` range (for example, searching 2 hours instead of 30 days) or scoping the query to specific log streams rather than the entire log group.
 
@@ -517,7 +517,7 @@ aws logs put-subscription-filter \
 
 ### Live Tail: Real-Time Log Tailing in the Console
 
-**CloudWatch Logs Live Tail** streams matching log events to the console or CLI in real time, similar to `tail -f` but without SSH access to instances. The [pricing page](https://aws.amazon.com/cloudwatch/pricing/) includes 1,800 minutes per month in the free tier; beyond that, Live Tail costs $0.01 per minute in US East. Live Tail is ideal for debugging a deploy during the first ten minutes, not for leaving a session open all day — a twenty-thousand-minute month would cost on the order of $180 in Live Tail charges alone. Use narrow filter patterns and close sessions when triage ends.
+**CloudWatch Logs Live Tail** streams matching log events to the console or CLI in real time, similar to `tail -f` but without SSH access to instances. The [pricing page](https://aws.amazon.com/cloudwatch/pricing/) includes 1,800 minutes per month in the free tier; beyond that, Live Tail costs \$0.01 per minute in US East. Live Tail is ideal for debugging a deploy during the first ten minutes, not for leaving a session open all day — a twenty-thousand-minute month would cost on the order of \$180 in Live Tail charges alone. Use narrow filter patterns and close sessions when triage ends.
 
 ---
 
@@ -929,12 +929,12 @@ CloudWatch pricing is pay-per-use with no upfront commitment; rates vary by Regi
 
 ### Cost Lens: What Scales Quietly vs What Spikes
 
-At moderate scale — dozens of EC2 instances, a few Lambda services, central log groups — expect **custom metrics** and **logs** to dominate. Ten application metrics across five environments might cost roughly $15/month in metrics alone before any instances. Fifty instances with seven detailed EC2 metrics each land near **$105/month** just for EC2 detailed monitoring (50 × 7 × $0.30). That is predictable and budgetable.
+At moderate scale — dozens of EC2 instances, a few Lambda services, central log groups — expect **custom metrics** and **logs** to dominate. Ten application metrics across five environments might cost roughly \$15/month in metrics alone before any instances. Fifty instances with seven detailed EC2 metrics each land near **\$105/month** just for EC2 detailed monitoring (50 × 7 × \$0.30). That is predictable and budgetable.
 
 **Surprise spikes** usually come from four knobs turned the wrong way, and finance often notices them before engineering does because CloudWatch line items are fragmented across metrics, logs, and API usage rather than a single "monitoring" SKU.
 
 1. **Cardinality** — A dimension that multiplies metrics per user, request, or host creates linear or worse cost growth. Fixing it is a code change, not a support ticket.
-2. **Log volume without retention** — Ingestion at $0.50/GB plus storage at $0.03/GB/month with default forever retention. Doubling traffic doubles ingestion; retention multiplies storage indefinitely.
+2. **Log volume without retention** — Ingestion at \$0.50/GB plus storage at \$0.03/GB/month with default forever retention. Doubling traffic doubles ingestion; retention multiplies storage indefinitely.
 3. **GetMetricData-heavy tooling** — Third-party dashboards and misconfigured autoscaling can poll huge metric sets. Prefer metric streams or embedded dashboards with bounded metric counts.
 4. **Incident querying** — Logs Insights during a multi-hour war room across hundreds of gigabytes. The $0.005/GB rate sounds small until you scan 500 GB forty times.
 
@@ -945,7 +945,7 @@ At moderate scale — dozens of EC2 instances, a few Lambda services, central lo
 ## Did You Know?
 
 - **CloudWatch ingests an enormous volume of metrics globally** across all AWS customers (AWS does not publish a precise daily rate). Launched in May 2009 — about three years after EC2 (2006) — it has grown from a simple CPU-monitoring tool into a massive, globally distributed observability platform.
-- **EC2 standard metrics have a 5-minute resolution** by default and are completely free. Enabling "detailed monitoring" bumps this to 1-minute resolution but costs approximately $2.10 per instance per month (7 metrics at $0.30 each). Most production workloads strictly require 1-minute resolution to catch transient spikes.
+- **EC2 standard metrics have a 5-minute resolution** by default and are completely free. Enabling "detailed monitoring" bumps this to 1-minute resolution but costs approximately \$2.10 per instance per month (7 metrics at \$0.30 each). Most production workloads strictly require 1-minute resolution to catch transient spikes.
 - **CloudWatch Logs Insights can query terabytes of logs in seconds** using a purpose-built query language. It was released in November 2018 and has largely eliminated the need for teams to ship logs to complex external search clusters just for ad-hoc querying. You only pay $0.005 per GB of data scanned.
 - **The CloudWatch Agent replaced three older tools**: the CloudWatch Monitoring Scripts (Perl-based `mon-put-instance-data.pl`), the SSM CloudWatch Plugin (on Windows), and the older CloudWatch Logs Agent (`awslogs`). If you encounter legacy tutorials referencing these components, they are outdated.
 
