@@ -2394,7 +2394,7 @@ def _render_review_failed_evidence(checks: list[dict]) -> str:
 
 
 def _render_check_failures(results: list) -> list[str]:
-    """Extract failing deterministic check labels/messages from CHECK results."""
+    """Extract safe metadata for failing deterministic CHECK results."""
     failures: list[str] = []
     if not isinstance(results, list):
         return failures
@@ -2402,14 +2402,7 @@ def _render_check_failures(results: list) -> list[str]:
         passed = getattr(result, "passed", None)
         if passed is not False:
             continue
-        check_name = getattr(result, "check", None)
-        message = getattr(result, "message", None)
-        if check_name and message:
-            failures.append(f"{check_name}: {message}")
-        elif check_name:
-            failures.append(str(check_name))
-        elif message:
-            failures.append(str(message))
+        failures.append(_safe_check_summary(result))
     return failures
 
 
@@ -3052,6 +3045,21 @@ def step_check_integrity(content: str, fact_ledger: dict) -> tuple[bool, list[st
     return len(errors) == 0, errors + warnings
 
 
+_SAFE_CHECK_IDS = {name: name for name in (
+    "FRONTMATTER", "SECTION_OUTCOMES", "SECTION_QUIZ", "INLINE_PROMPTS",
+    "QUIZ_FORMAT", "QUIZ_DEPTH", "LINE_COUNT", "CODE_LANG", "NO_EMOJI",
+    "K8S_API", "LEAKED_SECRET", "RUSSIAN_CHAR", "RUSSICISM", "RUSSICISM_CONTEXTUAL",
+)}
+_SAFE_CHECK_SEVERITIES = {"ERROR": "ERROR", "WARNING": "WARNING", "INFO": "INFO"}
+
+
+def _safe_check_summary(result: structural.CheckResult) -> str:
+    """Persist only canonical metadata; messages can contain source content."""
+    check = _SAFE_CHECK_IDS.get(getattr(result, "check", None), "UNKNOWN")
+    severity = _SAFE_CHECK_SEVERITIES.get(getattr(result, "severity", None), "UNKNOWN")
+    return f"[{severity}] {check}"
+
+
 def step_check(content: str, path: Path) -> tuple[bool, list]:
     """Run all deterministic checks on the improved content."""
     print("\n  CHECK: running deterministic checks")
@@ -3111,7 +3119,7 @@ def step_check(content: str, path: Path) -> tuple[bool, list]:
 
     for r in results:
         if not r.passed:
-            print(r)
+            print(_safe_check_summary(r))
 
     passed = len(errors) == 0
     print(f"  {'✓' if passed else '✗'} CHECK: {len(errors)} errors, "
@@ -4087,12 +4095,12 @@ def cmd_audit_all(args):
 
         report["modules"][key] = {
             "errors": len(errors),
-            "error_details": [r.message for r in errors],
+            "error_details": [_safe_check_summary(r) for r in errors],
         }
 
         if errors:
             for r in errors:
-                print(r)
+                print(_safe_check_summary(r))
 
     # Save report
     REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
