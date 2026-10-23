@@ -57,11 +57,11 @@ graph TD
     H --> I[Kubernetes Node]
     I --> J[Pod / Container]
     
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style B fill:#bbf,stroke:#333,stroke-width:2px
-    style C fill:#bbf,stroke:#333,stroke-width:2px
-    style D fill:#dfd,stroke:#333,stroke-width:2px
-    style E fill:#dfd,stroke:#333,stroke-width:2px
+    style A fill:#f9f,stroke:#333,stroke-width:2px,color:#111
+    style B fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style C fill:#bbf,stroke:#333,stroke-width:2px,color:#111
+    style D fill:#dfd,stroke:#333,stroke-width:2px,color:#111
+    style E fill:#dfd,stroke:#333,stroke-width:2px,color:#111
 ```
 
 When deploying a Kubernetes cluster, the control plane components (API server, controller manager, scheduler, and most importantly, etcd) dictate your logical failure domain. If the control plane fails, the entire cluster -- regardless of how many physical availability zones it spans -- becomes unmanageable. 

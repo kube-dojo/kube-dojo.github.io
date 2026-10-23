@@ -183,9 +183,9 @@ flowchart LR
     end
     Container_Memory --> OOM["If usage reaches 512MB → OOM KILL"]
     
-    style U fill:#ff9999,stroke:#333,stroke-width:2px
-    style A fill:#99ff99,stroke:#333,stroke-width:2px
-    style OOM fill:#ff4444,color:white,stroke:#333,stroke-width:2px
+    style U fill:#ff9999,stroke:#333,stroke-width:2px,color:#111
+    style A fill:#99ff99,stroke:#333,stroke-width:2px,color:#111
+    style OOM fill:#ff4444,color:#111,stroke:#333,stroke-width:2px
 ```
 
 The most common beginner mistake is thinking that an application memory setting and a container memory limit describe the same thing. A Java heap, Python object graph, Go heap target, or database buffer pool is only part of the process footprint. Native allocations, thread stacks, memory-mapped files, shared memory, TLS buffers, JIT metadata, page cache charged to the cgroup, and kernel memory can all contribute to the cgroup's current usage. If the limit equals the application heap, the real workload may have no room to breathe.
@@ -268,8 +268,8 @@ flowchart LR
     end
     CFS_Bandwidth --> Note["After using 50ms in 100ms period → throttled until next period"]
     
-    style R fill:#99ff99,stroke:#333,stroke-width:2px
-    style T fill:#ff9999,stroke:#333,stroke-width:2px
+    style R fill:#99ff99,stroke:#333,stroke-width:2px,color:#111
+    style T fill:#ff9999,stroke:#333,stroke-width:2px,color:#111
 ```
 
 The quota-period model explains why a single-threaded service with a half-CPU limit can suffer high tail latency during bursts. If it needs more than its allotted runtime early in the period, the kernel can pause it even though other cores are physically idle. For batch jobs, that may be acceptable because total throughput is intentionally capped. For latency-sensitive request handlers, a CPU limit can create sawtooth execution where the process runs, stalls, runs again, and produces long response-time outliers.

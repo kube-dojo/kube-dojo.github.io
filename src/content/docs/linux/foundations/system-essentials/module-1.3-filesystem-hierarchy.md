@@ -347,13 +347,13 @@ graph TD
     subgraph Hard Link
         A[filename1] -- links to --> I1(INODE #12345)
         B[filename2] -- links to --> I1
-        style I1 fill:#f9f,stroke:#333,stroke-width:2px
+        style I1 fill:#f9f,stroke:#333,stroke-width:2px,color:#111
     end
 
     subgraph Symbolic Link
         C[symlink] -- "points to /path/to/target" --> T[target]
         T -- links to --> I2(INODE #67890)
-        style I2 fill:#f9f,stroke:#333,stroke-width:2px
+        style I2 fill:#f9f,stroke:#333,stroke-width:2px,color:#111
     end
 
     I1 -- "Same inode, same data" --> S1[Delete one, other remains]

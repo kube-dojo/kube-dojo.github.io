@@ -72,8 +72,8 @@ flowchart LR
     A["Source Code<br/>main.go"] -->|Compiler| B(Translation Phase)
     B -->|Machine Code| C["Binary Executable<br/>./my-program"]
 
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style C fill:#bbf,stroke:#333,stroke-width:2px
+    style A fill:#f9f,stroke:#333,stroke-width:2px,color:#111
+    style C fill:#bbf,stroke:#333,stroke-width:2px,color:#111
 ```
 
 Once the binary exists, execution is much simpler from the user's point of view. The operating system checks whether the file is executable, loads it, and starts the process. That is why many tools can be run by typing a path or command name after installation.
@@ -174,7 +174,7 @@ flowchart TD
     B --> D[Core Network Library]
     C --> D
 
-    style A fill:#dfd,stroke:#333,stroke-width:2px
+    style A fill:#dfd,stroke:#333,stroke-width:2px,color:#111
 ```
 
 A package manager reads dependency metadata and builds an installation plan. If you ask for one program, the plan may include several libraries, helper tools, certificates, language runtimes, or data packages. Beginners sometimes worry that the package manager is doing something suspicious because it downloads more than they typed. In many cases, that extra work is exactly the reason you are using the package manager in the first place.

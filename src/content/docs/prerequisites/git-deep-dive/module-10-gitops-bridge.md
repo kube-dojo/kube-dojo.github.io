@@ -309,8 +309,8 @@ graph TD
         Attacker2[Attacker] -.->|Cannot access| Operator
     end
 
-    style CIServer fill:#f9a8d4,stroke:#be185d,stroke-width:2px
-    style Operator fill:#a7f3d0,stroke:#065f46,stroke-width:2px
+    style CIServer fill:#f9a8d4,stroke:#be185d,stroke-width:2px,color:#111
+    style Operator fill:#a7f3d0,stroke:#065f46,stroke-width:2px,color:#111
 ```
 
 The operational differences are stark when you compare the two models across common security vectors.
