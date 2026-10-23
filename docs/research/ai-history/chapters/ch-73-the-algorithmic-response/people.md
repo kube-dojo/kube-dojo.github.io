@@ -2,8 +2,9 @@
 
 | Name / institution | Supported role | Locator / limits |
 |---|---|---|
-| DeepSeek-AI | Collective author of DeepSeek-V2. | S1 byline; no individual invention credit inferred. |
-| Aixin Liu | Named paper co-author. | S1 author list; lifespan and individual contribution unverified. |
+| DeepSeek-AI | Collective author of DeepSeek-V2. | S1 byline; individual acknowledgments below are C10, not independently verified credit. |
+| Huazuo Gao and Wangding Zeng | Credited by the authors with key innovations in MLA research. | S1 Appendix A final paragraph; Yellow author-reported acknowledgment, not independent invention history. |
+| Jianlin Su | Thanked by the authors for position-embedding discussion. | S1 Appendix A final paragraph; Yellow acknowledgment, not a claim of MLA authorship. |
 | Alan Estevez | Under Secretary of Commerce for Industry and Security quoted in the announcement. | S2 opening; no relationship to DeepSeek inferred. |
 | FlashMLA, vLLM, SGLang project contributors | Public implementation/documentation participants. | S3–S5; individual roles and adoption histories not established. |
 

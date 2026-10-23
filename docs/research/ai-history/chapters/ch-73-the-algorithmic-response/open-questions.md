@@ -5,5 +5,5 @@
 3. Is there an independently inspectable reproduction of C2 with matching precision, hardware, lengths and batching? Until then retain author-reported attribution.
 4. Which documented integrations support a limited diffusion history? Repository presence and backend menus alone do not quantify use.
 5. Is there direct author or archival evidence connecting export controls to MLA design? Without it C8 remains Red; chronology cannot fill the gap.
-6. Review the existing published chapter against C1–C9, especially benchmark scope and implementation claims; then assess the provisional 2,000–3,000-word core and conditional stretch. Existing length does not override evidence.
+6. Review published prose against C1–C10 and assess the provisional core/stretch. Its cited DeepSeek-R1 (arXiv:2501.12948), TileKernels, TileLang, Chris Miller's *Chip War*, arXiv:2402.05964 and 87 FR 62186 are not registered/verified here; reconcile each claim before relying on them. Existing length does not override evidence.
 7. Obtain distinct research/source-fidelity and editorial verdicts before prose or reader-aid clearance. Reconcile status records under #2288; retain sourcing under #2289 and prose under #2290.
