@@ -70,7 +70,7 @@ The landing zone shapes your Kubernetes posture before you provision a single cl
 
 - **Networking**: a shared VPC (GCP) or Transit Gateway (AWS) ready for new clusters to attach to (see Module 8.2 for the full transit-hub design).
 - **Identity**: an IAM Identity Center (AWS) / Workforce Identity Federation (GCP) / Entra ID (Azure) integration so that cluster RBAC maps to organizational SSO on day one.
-- **Logging**: cluster provisioning must configure Kubernetes audit export and forwarding to the archive. An organization CloudTrail trail does not enable EKS control-plane audit logging; that requires a per-cluster setting, as described below.
+- **Logging for EKS**: configure control-plane audit export per cluster and forwarding to the archive. An organization CloudTrail trail does not enable EKS control-plane audit logging; the EKS-specific delivery path is described below.
 
 Without a landing zone, each of these integrations becomes a manual bootstrapping step performed by whoever happens to create the cluster—and almost certainly skipped the first time.
 
@@ -675,7 +675,7 @@ flowchart TD
     Forward --> S3
 ```
 
-**Choose retention deliberately.** [S3 Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html#object-lock-retention-modes) protects individual object versions. Governance retention can be bypassed with `s3:BypassGovernanceRetention` and an explicit bypass request. Compliance retention prevents deletion or shortening retention of a protected version, including by root, until its retain-until date; AWS documents account deletion as an escape from this protection. Do not select Compliance casually: mistakes can retain unwanted data and its storage costs for the full period.
+**Choose retention deliberately.** [S3 Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html#object-lock-retention-modes) protects individual object versions. Governance retention can be bypassed with `s3:BypassGovernanceRetention` and the `x-amz-bypass-governance-retention:true` request header. The S3 console includes this header by default, so a permitted user need not add it manually. Compliance retention prevents deletion or shortening retention of a protected version, including by root, until its retain-until date; AWS documents account deletion as an escape from this protection. Do not select Compliance casually: mistakes can retain unwanted data and its storage costs for the full period.
 
 A bucket default applies to new versions, not retroactively to existing ones, and explicit per-version retention can override the default. Uploading the same key creates another version; a simple delete can add a delete marker while the protected version survives. Verify the version's mode and retain-until date, not just the bucket setting. Governance is useful where controlled bypass is required; a deny policy is a separate, changeable control and does not turn Governance into Compliance.
 
@@ -763,36 +763,40 @@ CloudTrail records AWS API activity; Kubernetes audit logs describe Kubernetes A
 
 **Configuration prerequisite:** an authorized operator must enable audit export, wait for the configuration update to succeed, and allow delivery time. EKS may need up to five available IP addresses in each subnet for the update. Delivery normally takes minutes but is best effort. CloudWatch ingestion, storage, and scanning charges apply; enabling export does not establish complete historical coverage.
 
-**Read-only inspection example, not recorded output:** use an existing cluster, the correct AWS profile/account and Region, and permissions for `eks:DescribeCluster` and `logs:FilterLogEvents`. Replace the example values and choose a recent interval containing known Kubernetes API activity; these commands do not enable logging or create resources.
+**Read-only inspection example, not recorded output:** use Bash and AWS CLI v2, an existing cluster, the correct AWS profile/account and Region, and permissions for `eks:DescribeCluster` and `logs:FilterLogEvents`. Replace the example identifiers; the query covers the preceding hour. Choose an interval containing known Kubernetes API activity. These commands do not enable logging or create resources.
 
 ```bash
-AWS_PROFILE=workload-readonly
-AWS_REGION=us-east-1
-CLUSTER=team-a-prod
-# Replace with the start of your investigation interval, in epoch milliseconds.
-START_MS=1792713600000
+eks_audit_profile=workload-readonly
+eks_audit_region=us-east-1
+eks_audit_cluster=team-a-prod
+# Bound the preceding hour using epoch milliseconds (BSD/GNU date compatible).
+eks_audit_end_ms=$(( $(date +%s) * 1000 ))
+eks_audit_start_ms=$(( eks_audit_end_ms - 3600000 ))
 
 aws eks describe-cluster \
-  --profile "$AWS_PROFILE" --region "$AWS_REGION" --name "$CLUSTER" \
+  --profile "$eks_audit_profile" --region "$eks_audit_region" --name "$eks_audit_cluster" \
   --query 'cluster.logging.clusterLogging' --output json --no-cli-pager
 
 aws logs filter-log-events \
-  --profile "$AWS_PROFILE" --region "$AWS_REGION" \
-  --log-group-name "/aws/eks/$CLUSTER/cluster" \
+  --profile "$eks_audit_profile" --region "$eks_audit_region" \
+  --log-group-name "/aws/eks/$eks_audit_cluster/cluster" \
   --log-stream-name-prefix kube-apiserver-audit- \
-  --start-time "$START_MS" --max-items 20 --output json --no-cli-pager
+  --start-time "$eks_audit_start_ms" --end-time "$eks_audit_end_ms" \
+  --max-items 20 --output json --no-cli-pager
 ```
 
 **Expected verification:** [`describe-cluster`](https://docs.aws.amazon.com/cli/latest/reference/eks/describe-cluster.html) should show `audit` in an enabled entry. [`filter-log-events`](https://docs.aws.amazon.com/cli/latest/reference/logs/filter-log-events.html) should return audit events for the selected interval once delivered. The 20-item limit produces a sample, not an exhaustive audit. An empty sample does not prove inactivity: check account, Region, interval, export state, and delivery delay. A missing log group or access denial is a failed inspection, not evidence that the cluster had no activity. These provider calls have not been executed for this lesson.
 
 For archival, configure a [cross-account CloudWatch subscription](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CrossAccountSubscriptions.html) to a receiving destination, such as a Firehose delivery pipeline to S3. This requires a receiver destination and access policy, delivery-role permissions, a sender subscription and permission to use the destination, plus working S3/encryption permissions downstream. The log group and subscription destination must share a Region. Verify arrival and retention on the resulting S3 versions separately; seeing CloudWatch events proves neither cross-account delivery nor Object Lock protection.
 
+The [Firehose destination settings](https://docs.aws.amazon.com/firehose/latest/dev/create-destination.html) describe S3 delivery, but do not establish Object Lock compatibility for this example. [S3 uploads with retention require a checksum header](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-managing.html). Validate the chosen delivery configuration against the archive's retention settings before relying on it; this lesson has not demonstrated that end-to-end path.
+
 > **Pause and predict:** Audit export is enabled and CloudWatch contains yesterday's EKS events, but the archive contains none. Would switching the archive from Governance to Compliance recover those events? Which boundary should you inspect first?
 
 <details>
 <summary>Check your prediction</summary>
 
-No. Retention protects versions that reached S3; it cannot repair missing delivery. Inspect the source subscription, receiver permissions and delivery failures, then check destination objects and their retention metadata. Recovering available CloudWatch events requires a separate delivery or export action, not a retention-mode change.
+No. Retention protects versions that reached S3; it cannot repair missing delivery. Check when the subscription was created, receiver permissions and delivery failures, then destination objects and retention metadata. [Subscriptions are real-time feeds](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions.html), not automatic backfills of prior events. Non-retryable errors such as AccessDenied disable forwarding temporarily, and events are skipped during that period. Fixing permissions does not automatically recover those skipped or pre-subscription events; recovering retained CloudWatch data requires a separately validated recovery path.
 </details>
 
 ---
@@ -1127,7 +1131,7 @@ Failure layer: Data-plane packet filtering boundaries versus control-plane API a
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: Cloud control-plane policy enforcement versus in-guest runtime compute observability. An attacker controlling local compute can stop telemetry agents, alter local logs, or use data-plane actions absent from the trail's event selection. Combine configuration guardrails, runtime monitoring, centralized delivery, and version retention, then test each boundary. Compliance retention protects delivered versions for their retention period; it cannot guarantee complete collection or end-to-end auditability.
+Failure layer: Cloud control-plane policy enforcement versus in-guest runtime compute observability. An attacker controlling local compute can stop telemetry agents, alter local logs, or use data-plane actions absent from the trail's event selection. Next action: combine configuration guardrails, runtime monitoring, centralized delivery, and version retention, then test each boundary. Compliance retention protects delivered versions for their retention period; it cannot guarantee complete collection or end-to-end auditability.
 </details>
 
 **Success Criteria**:
@@ -1319,7 +1323,7 @@ The organization condition is generally superior because you typically do not ne
 
 ### Task 4: Codify Centralized Logging Infrastructure
 
-In `shared/logging.tf`, model an S3 archive with Governance retention and a workload writer role. This configuration example demonstrates storage controls; it is not the EKS control-plane delivery pipeline. Retaining Governance permits authorized bypass, unlike Compliance. Review the organization's retention requirements and storage-cost consequences before applying either mode; local validation does not prove delivery or retention enforcement.
+In `shared/logging.tf`, model an S3 archive with Governance retention and a workload writer role. This configuration example demonstrates storage controls; it is not the EKS control-plane delivery pipeline. Governance intrinsically permits authorized bypass, unlike Compliance, but the solution's explicit deny policy separately blocks deletion even for bypass holders while that policy remains in force. Changing that policy does not change the retention mode. Review retention requirements and storage-cost consequences before applying either mode; local validation does not prove delivery or retention enforcement.
 
 **Success Criteria**:
 - [ ] S3 bucket has `object_lock_enabled = true`
