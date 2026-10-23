@@ -723,7 +723,7 @@ Blob economics are four meters: **capacity (GB-month by tier)**, **transactions 
 
 **Cost control knobs** that actually work: lifecycle and prefix filters; right-sizing redundancy (do not use RA-GZRS for disposable logs); user delegation SAS instead of wide-open containers; monitoring **capacity by tier** in Cost Management; alerting on Archive read spikes; versioning lifecycle for overwrite-heavy apps; and reserving Hot only for data touched in the last week.
 
-Hypothetical scenario: A 20 TB log bucket stays in Hot for a year at roughly $360/month storage in East US (illustrative—verify current rates). The same data in Cool might land near $120/month storage but fails if operators run weekly grep jobs across all objects because retrieval and read operations climb. Lifecycle to Cold after 90 days without reads, plus blocking scans on archived prefixes, aligns spend with the original "write once, read never" intent.
+Hypothetical scenario: A 20 TB log bucket stays in Hot for a year at roughly \$360/month storage in East US (illustrative—verify current rates). The same data in Cool might land near \$120/month storage but fails if operators run weekly grep jobs across all objects because retrieval and read operations climb. Lifecycle to Cold after 90 days without reads, plus blocking scans on archived prefixes, aligns spend with the original "write once, read never" intent.
 
 Monitor **Capacity** metrics in Azure Monitor and Cost Management views split by tier when available. Review those charts monthly with application owners. A sudden jump in Hot capacity after enabling versioning usually means overwrite-heavy apps without version lifecycle rules. A jump in Archive capacity with flat Hot often means lifecycle is working; a matching jump in transaction costs may mean something is reading archived data too often.
 
@@ -764,7 +764,7 @@ Monitor **Capacity** metrics in Azure Monitor and Cost Management views split by
 
 *[Maps to Learning Outcome: Configure Azure Blob Storage with access tiers and lifecycle management policies]*
 
-They should be in Cold tier. Hot tier costs $0.018/GB/month (illustrative), leading to $10,800/year, whereas Cold tier reduces this to $2,700/year (illustrative), saving approximately $8,100 annually. Cool tier would also offer significant savings, but since the data is accessed only quarterly, Cold tier's 90-day minimum retention perfectly aligns with the access pattern. Archive tier would save even more on storage, but the steep $5 per 10,000 read operations and hours-long rehydration time make it operationally impractical for data that still requires guaranteed quarterly access.
+They should be in Cold tier. Hot tier costs \$0.018/GB/month (illustrative), leading to \$10,800/year, whereas Cold tier reduces this to \$2,700/year (illustrative), saving approximately \$8,100 annually. Cool tier would also offer significant savings, but since the data is accessed only quarterly, Cold tier's 90-day minimum retention perfectly aligns with the access pattern. Archive tier would save even more on storage, but the steep \$5 per 10,000 read operations and hours-long rehydration time make it operationally impractical for data that still requires guaranteed quarterly access.
 </details>
 
 <details>

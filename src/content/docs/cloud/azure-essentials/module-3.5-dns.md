@@ -708,9 +708,9 @@ DNS looks inexpensive until query volume, health probes, and hybrid resolver end
 
 ### Public and Private Zone Hosting
 
-[Azure DNS bills per hosted zone and per query](https://azure.microsoft.com/en-us/pricing/details/dns/). The first 25 zones in a subscription cost **$0.50 per zone per month**, with additional zones at **$0.10 per zone per month**, prorated daily. Public and private zones share the same hosted-zone pricing table. A microservice team that creates one private zone per VNet can accidentally spend more on zone fees than on the VMs inside those VNets.
+[Azure DNS bills per hosted zone and per query](https://azure.microsoft.com/en-us/pricing/details/dns/). The first 25 zones in a subscription cost **\$0.50 per zone per month**, with additional zones at **\$0.10 per zone per month**, prorated daily. Public and private zones share the same hosted-zone pricing table. A microservice team that creates one private zone per VNet can accidentally spend more on zone fees than on the VMs inside those VNets.
 
-Queries for the first billion per month cost **$0.40 per million**, dropping to **$0.20 per million** beyond that threshold, aggregated at subscription scope. Private zone queries inside linked VNets count toward the same totals as public internet queries against your authoritative zones.
+Queries for the first billion per month cost **\$0.40 per million**, dropping to **\$0.20 per million** beyond that threshold, aggregated at subscription scope. Private zone queries inside linked VNets count toward the same totals as public internet queries against your authoritative zones.
 
 ### TTL and Query Volume
 
@@ -718,13 +718,13 @@ TTL is a cost knob. Cutting TTL from 300 seconds to 30 seconds can multiply recu
 
 ### Private Resolver Endpoints
 
-Hybrid designs using [Azure DNS Private Resolver](https://azure.microsoft.com/en-us/pricing/details/dns/) pay **$180 per month per inbound endpoint** and **$180 per month per outbound endpoint**, prorated hourly, plus **$2.50 per month per forwarding ruleset** (verify current pricing on the Azure DNS pricing page). A hub with one inbound and one outbound endpoint therefore starts near **$362.50/month** before VNet data transfer. That is often cheaper than operating highly available BIND pairs, but it is not free compared with simple conditional forwarders to 168.63.129.16 on a single custom DNS VM.
+Hybrid designs using [Azure DNS Private Resolver](https://azure.microsoft.com/en-us/pricing/details/dns/) pay **\$180 per month per inbound endpoint** and **\$180 per month per outbound endpoint**, prorated hourly, plus **\$2.50 per month per forwarding ruleset** (verify current pricing on the Azure DNS pricing page). A hub with one inbound and one outbound endpoint therefore starts near **\$362.50/month** before VNet data transfer. That is often cheaper than operating highly available BIND pairs, but it is not free compared with simple conditional forwarders to 168.63.129.16 on a single custom DNS VM.
 
 Scale resolver endpoints when you approach the documented **10,000 QPS per endpoint** limit. Additional inbound endpoints add monthly fixed cost but increase headroom for on-premises forwarders during peak login storms.
 
 ### Traffic Manager Charges
 
-[Traffic Manager pricing](https://azure.microsoft.com/en-us/pricing/details/traffic-manager/) includes **$0.54 per million DNS queries** for the first billion each month, then **$0.375 per million** above that. Endpoint health monitoring adds **$0.36 per Azure endpoint per month** or **$0.54 per external endpoint per month** for basic probes. Fast 10-second probing adds **$1.00 or $2.00 per endpoint per month** depending on endpoint type.
+[Traffic Manager pricing](https://azure.microsoft.com/en-us/pricing/details/traffic-manager/) includes **\$0.54 per million DNS queries** for the first billion each month, then **\$0.375 per million** above that. Endpoint health monitoring adds **\$0.36 per Azure endpoint per month** or **\$0.54 per external endpoint per month** for basic probes. Fast 10-second probing adds **\$1.00 or \$2.00 per endpoint per month** depending on endpoint type.
 
 A profile with four external endpoints on fast probing can exceed **$8/month in probe fees alone**, before counting millions of client DNS lookups during an launch. Nested profiles bill queries once at the parent level, which avoids double-charging DNS lookups but still bills health checks for child endpoints normally.
 

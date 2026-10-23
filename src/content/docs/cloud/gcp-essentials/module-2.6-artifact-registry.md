@@ -655,7 +655,7 @@ Artifact Registry billing has three independent components—storage, data trans
 
 [Artifact Registry storage](https://cloud.google.com/artifact-registry/pricing) costs **$0.10 per GB per month** for usage above the **0.5 GB free tier** (aggregated across all projects attached to a billing account). Regional and multi-regional repositories use the same storage rate. Remote repository caches count toward storage because every upstream artifact you pull through the cache persists locally until a cleanup policy or manual deletion removes it.
 
-At moderate scale—say 200 GB of container images and cached upstream packages across production and staging repositories—storage alone runs roughly $20/month after the free tier. That sounds modest until you realize a single team pushing unique `:sha-${GIT_COMMIT}` tags on every build without cleanup policies can add 5–10 GB per week of mostly-untagged digests that nobody pulls again.
+At moderate scale—say 200 GB of container images and cached upstream packages across production and staging repositories—storage alone runs roughly \$20/month after the free tier. That sounds modest until you realize a single team pushing unique `:sha-${GIT_COMMIT}` tags on every build without cleanup policies can add 5–10 GB per week of mostly-untagged digests that nobody pulls again.
 
 ### Data Transfer
 
@@ -663,7 +663,7 @@ Pulling images from Artifact Registry to GKE nodes, Cloud Run, or Compute Engine
 
 ### Vulnerability Scanning Costs
 
-Each unique image digest scanned costs **$0.26** on first push; rescans of the same digest are free. A pipeline that builds 50 distinct images per day across five microservices generates roughly 1,500 initial scans per month, or about **$390/month** in scanning alone. Mitigations include scanning only release-candidate tags (not every feature-branch build), using a dedicated scanning project, and relying on continuous rescanning of stored digests rather than pushing duplicate builds with identical content under new tags.
+Each unique image digest scanned costs **\$0.26** on first push; rescans of the same digest are free. A pipeline that builds 50 distinct images per day across five microservices generates roughly 1,500 initial scans per month, or about **\$390/month** in scanning alone. Mitigations include scanning only release-candidate tags (not every feature-branch build), using a dedicated scanning project, and relying on continuous rescanning of stored digests rather than pushing duplicate builds with identical content under new tags.
 
 ### Cost Control Knobs
 
@@ -677,7 +677,7 @@ Each unique image digest scanned costs **$0.26** on first push; rescans of the s
 
 ### What Makes Costs Spike Unexpectedly
 
-Hypothetical scenario: A data platform team enables vulnerability scanning project-wide, then a monorepo CI job starts building 200 Docker variants nightly—one per combination of base image, Python version, and CUDA driver. Within a month, storage crosses 2 TB ($200/month) and scanning adds $1,300/month because each variant is a new digest. The fix is not disabling scanning; it is restructuring the build matrix to reuse base layers, applying cleanup policies to ephemeral tags, and gating scans on merge-to-main rather than every pull request build.
+Hypothetical scenario: A data platform team enables vulnerability scanning project-wide, then a monorepo CI job starts building 200 Docker variants nightly—one per combination of base image, Python version, and CUDA driver. Within a month, storage crosses 2 TB (\$200/month) and scanning adds \$1,300/month because each variant is a new digest. The fix is not disabling scanning; it is restructuring the build matrix to reuse base layers, applying cleanup policies to ephemeral tags, and gating scans on merge-to-main rather than every pull request build.
 
 ---
 
