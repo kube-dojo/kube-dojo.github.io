@@ -122,7 +122,7 @@ The API server being the only Kubernetes component that directly stores API obje
 
 At this point the Pod may exist only as desired state. Nothing in the sequence above guarantees that a container is already running. The scheduler still has to bind the Pod to a node, the kubelet on that node still has to observe the assignment, and the container runtime still has to pull the image and create the container. This gap between "accepted by the API" and "running on a node" is where many control plane troubleshooting scenarios live.
 
-**Pause and predict:** If the API server is unavailable but a worker node already has healthy containers running, decide which activities can continue locally and which activities must wait for the control plane path to recover. Make your prediction before reading the answer, because this boundary is the fastest way to separate an application process failure from a cluster coordination failure.
+> **Pause and predict:** If the API server is unavailable but a worker node already has healthy containers running, decide which activities can continue locally and which activities must wait for the control plane path to recover. Make your prediction before reading the answer, because this boundary is the fastest way to separate an application process failure from a cluster coordination failure.
 
 <details>
 <summary>Check your prediction</summary>
@@ -221,7 +221,7 @@ kubectl logs -n kube-system etcd-<control-plane-node>
 
 Hypothetical scenario: `kubectl get pods -A` works slowly, `kubectl apply` often times out, and API server logs show repeated storage latency warnings.
 
-**Pause and predict:** Which component should you suspect first, and why is this not primarily a scheduler investigation? Commit to one owner before opening logs, because broad read and write latency across many resources tests the shared API storage path before it tests later placement decisions.
+> **Pause and predict:** Which component should you suspect first, and why is this not primarily a scheduler investigation? Commit to one owner before opening logs, because broad read and write latency across many resources tests the shared API storage path before it tests later placement decisions.
 
 <details>
 <summary>Check your prediction</summary>
@@ -279,7 +279,7 @@ kubectl describe pod <pod-name>
 #  2 node(s) didn't match Pod's node affinity/selector"
 ```
 
-**Pause and predict:** A Pod requests 4 CPU cores and 8Gi of memory, but no single node currently has that much allocatable capacity available. Predict the Pod phase, the kind of message you expect in `kubectl describe pod`, and whether restarting the scheduler would repair the situation.
+> **Pause and predict:** A Pod requests 4 CPU cores and 8Gi of memory, but no single node currently has that much allocatable capacity available. Predict the Pod phase, the kind of message you expect in `kubectl describe pod`, and whether restarting the scheduler would repair the situation.
 
 <details>
 <summary>Check your prediction</summary>
