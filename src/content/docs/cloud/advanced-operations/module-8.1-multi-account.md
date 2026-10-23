@@ -1001,7 +1001,7 @@ Multi-account isolation has a real financial tradeoff, and it is the one bill li
 
 The upshot: multi-account isolation is not free. If you run heavy data pipelines that pull from S3 in a data-lake account into an EMR cluster in a compute account, every byte crossing that boundary incurs a transfer charge. This is where the landing-zone networking design (Module 8.2) becomes a cost decision, not just a connectivity decision: placing the compute cluster and the data lake in the same account and using VPC endpoints can eliminate egress charges entirely.
 
-> **Hypothetical scenario**: A machine-learning platform stores feature data in a centralized "data-lake" account (`us-east-1`) and runs training jobs in a separate "ml-compute" account (`us-west-2`). Each training epoch pulls 5 TB via cross-region S3 access and replication paths that bill at roughly $0.02/GB—about $100 in transfer per run. Over 200 training runs per month, that is $20,000 in egress charges that a same-account, same-region layout could largely avoid. The fix: align data locality with compute (same account and region where possible), or architect replication and endpoints deliberately. The landing zone should encode these data-locality rules—don't let workload teams discover them on the bill.
+> **Hypothetical scenario**: A machine-learning platform stores feature data in a centralized "data-lake" account (`us-east-1`) and runs training jobs in a separate "ml-compute" account (`us-west-2`). Each training epoch pulls 5 TB via cross-region S3 access and replication paths that bill at roughly \$0.02/GB—about \$100 in transfer per run. Over 200 training runs per month, that is \$20,000 in egress charges that a same-account, same-region layout could largely avoid. The fix: align data locality with compute (same account and region where possible), or architect replication and endpoints deliberately. The landing zone should encode these data-locality rules—don't let workload teams discover them on the bill.
 
 ---
 
@@ -1466,22 +1466,22 @@ Your advanced vending pipeline automatically assigns granular tags to all genera
 <details>
 <summary>Solution: Cost Allocation Logic</summary>
 
-Shared infrastructure: $3,200 + $4,100 = $7,300
+Shared infrastructure: \$3,200 + \$4,100 = \$7,300
 
 Allocation method: proportional to direct workload spend.
 
-Total workload spend: $12,000 + $2,400 + $8,000 + $1,600 = $24,000
+Total workload spend: \$12,000 + \$2,400 + \$8,000 + \$1,600 = \$24,000
 
-Team Alpha direct: $12,000 + $2,400 = $14,400 (60% of workload spend)
-Team Beta direct: $8,000 + $1,600 = $9,600 (40% of workload spend)
+Team Alpha direct: \$12,000 + \$2,400 = \$14,400 (60% of workload spend)
+Team Beta direct: \$8,000 + \$1,600 = \$9,600 (40% of workload spend)
 
-Team Alpha shared allocation: $7,300 x 0.60 = $4,380
-Team Beta shared allocation: $7,300 x 0.40 = $2,920
+Team Alpha shared allocation: \$7,300 x 0.60 = \$4,380
+Team Beta shared allocation: \$7,300 x 0.40 = \$2,920
 
-**Team Alpha total: $14,400 + $4,380 = $18,780/month**
-**Team Beta total: $9,600 + $2,920 = $12,520/month**
+**Team Alpha total: \$14,400 + \$4,380 = \$18,780/month**
+**Team Beta total: \$9,600 + \$2,920 = \$12,520/month**
 
-Grand total: $18,780 + $12,520 = $31,300 (matches $24,000 + $7,300)
+Grand total: \$18,780 + \$12,520 = \$31,300 (matches \$24,000 + \$7,300)
 
 This specific proportional model is overwhelmingly the most common enterprise approach. Standard alternatives include an equal split (which is structurally unfair if teams operate at wildly different scale profiles) or strict usage-based allocation (which is flawlessly accurate but historically incredibly complex to accurately measure and consistently enforce without robust custom tooling).
 </details>

@@ -688,7 +688,7 @@ Active-active is expensive in dollars and in cognitive load, and understanding t
 
 ### Active-Active Cost Breakdown
 
-Use the two tables below as a structured comparison: the first models a single-region baseline of roughly **$15,000/month**, and the second models an active-active footprint across two regions at roughly **$38,000/month (+153%)**.
+Use the two tables below as a structured comparison: the first models a single-region baseline of roughly **\$15,000/month**, and the second models an active-active footprint across two regions at roughly **\$38,000/month (+153%)**.
 
 | Component | Cost |
 |-----------|------|
@@ -741,7 +741,7 @@ The list below is how teams keep active-active financially defensible without pr
 4. **Compress cross-region replication**
    - Database WAL compression: 60-70% reduction
    - Application-level compression for event streams
-   - Saves: $1,000-$2,000/month on data transfer
+   - Saves: \$1,000-\$2,000/month on data transfer
 
 ### Multi-Cloud Cost Gotchas (AWS vs GCP vs Azure)
 

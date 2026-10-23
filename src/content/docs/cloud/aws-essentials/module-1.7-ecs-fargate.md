@@ -1074,7 +1074,7 @@ A service with 10 such tasks on Fargate Spot costs roughly $54 per month for com
 
 When does it make financial sense to manage EC2 instances instead of using Fargate? The breakeven depends on utilization — what percentage of your allocated EC2 capacity your tasks actually consume.
 
-Hypothetical scenario: You run 20 tasks, each needing 1 vCPU and 2 GB. On Fargate, this costs approximately $785 per month. On EC2, you need roughly 5 `c5.xlarge` instances (4 vCPU each, accounting for ECS agent and OS overhead). At on-demand pricing, those instances cost about $680 per month — Fargate is roughly 15 percent more expensive at 100 percent utilization.
+Hypothetical scenario: You run 20 tasks, each needing 1 vCPU and 2 GB. On Fargate, this costs approximately \$785 per month. On EC2, you need roughly 5 `c5.xlarge` instances (4 vCPU each, accounting for ECS agent and OS overhead). At on-demand pricing, those instances cost about \$680 per month — Fargate is roughly 15 percent more expensive at 100 percent utilization.
 
 But at 60 percent utilization — the more common scenario where you over-provision EC2 instances for burst headroom — you need 8 instances at $1,088 per month. Fargate is now roughly 28 percent *cheaper* because you only pay for the tasks you run, not idle instance capacity.
 
@@ -1084,9 +1084,9 @@ But at 60 percent utilization — the more common scenario where you over-provis
 
 **Inter-AZ data transfer**: Fargate tasks in private subnets that communicate across Availability Zones incur data transfer charges of $0.01 per GB in each direction. A chatty microservice architecture with 10 services exchanging data across AZs can generate hundreds of dollars per month in inter-AZ data transfer alone. Mitigation: use Service Connect with connection pooling to reduce cross-AZ chatter, or design services to prefer same-AZ communication where latency is not critical.
 
-**NAT Gateway**: Fargate tasks in private subnets without VPC endpoints route all AWS API traffic (ECR pulls, CloudWatch log uploads, Secrets Manager fetches) through a NAT Gateway. A single NAT Gateway costs roughly $33 per month just for existing, plus data processing charges of $0.045 per GB. Mitigation: deploy VPC endpoints for ECR, CloudWatch Logs, Secrets Manager, and SSM — these cost approximately $7.20 per month each but eliminate NAT Gateway data charges for those services.
+**NAT Gateway**: Fargate tasks in private subnets without VPC endpoints route all AWS API traffic (ECR pulls, CloudWatch log uploads, Secrets Manager fetches) through a NAT Gateway. A single NAT Gateway costs roughly \$33 per month just for existing, plus data processing charges of \$0.045 per GB. Mitigation: deploy VPC endpoints for ECR, CloudWatch Logs, Secrets Manager, and SSM — these cost approximately \$7.20 per month each but eliminate NAT Gateway data charges for those services.
 
-**CloudWatch Logs**: The `awslogs` driver sends every line of container stdout and stderr to CloudWatch. At scale, log ingestion at $0.50 per GB, storage at $0.03 per GB-month, and Insights queries can add up. Mitigation: set aggressive log retention policies (7 days for dev, 30 days for staging), use FireLens to filter verbose log levels before shipping, and avoid `awslogs` in development environments.
+**CloudWatch Logs**: The `awslogs` driver sends every line of container stdout and stderr to CloudWatch. At scale, log ingestion at \$0.50 per GB, storage at \$0.03 per GB-month, and Insights queries can add up. Mitigation: set aggressive log retention policies (7 days for dev, 30 days for staging), use FireLens to filter verbose log levels before shipping, and avoid `awslogs` in development environments.
 
 ### Cost Optimization Checklist
 
@@ -1101,8 +1101,8 @@ But at 60 percent utilization — the more common scenario where you over-provis
 
 While Fargate compute dominates the monthly bill, several supporting resources add meaningful cost at scale — and teams are often surprised by how quickly these ancillary charges accumulate when running more than a handful of services:
 
-- **Application Load Balancer**: Approximately $22 per month base fee plus $0.008 per LCU-hour (Load Balancer Capacity Unit). A single ALB can front dozens of ECS services via host-based or path-based routing rules, so consolidating services behind fewer ALBs is often the largest cost lever after right-sizing tasks.
-- **CloudWatch Container Insights**: Enabled per-cluster, Container Insights ingests custom metrics that cost roughly $0.30 per metric per month. For a cluster with 10 services each exposing the default set of task-level metrics, expect roughly $15 to $30 per month. This is almost always worth it — the observability pays for itself the first time you diagnose a memory leak from the aggregated metrics dashboard instead of SSHing into individual containers.
+- **Application Load Balancer**: Approximately \$22 per month base fee plus \$0.008 per LCU-hour (Load Balancer Capacity Unit). A single ALB can front dozens of ECS services via host-based or path-based routing rules, so consolidating services behind fewer ALBs is often the largest cost lever after right-sizing tasks.
+- **CloudWatch Container Insights**: Enabled per-cluster, Container Insights ingests custom metrics that cost roughly \$0.30 per metric per month. For a cluster with 10 services each exposing the default set of task-level metrics, expect roughly \$15 to \$30 per month. This is almost always worth it — the observability pays for itself the first time you diagnose a memory leak from the aggregated metrics dashboard instead of SSHing into individual containers.
 - **ECS Exec auditing**: Every command executed via ECS Exec is logged to CloudWatch or S3 (depending on your cluster configuration). The S3 storage cost for audit logs is negligible (fractions of a cent per gigabyte), but you must configure an S3 bucket with SSE-KMS encryption if your compliance policy requires encrypted exec audit logs, adding KMS key charges of $1 per key per month.
 
 ## Patterns for Production ECS

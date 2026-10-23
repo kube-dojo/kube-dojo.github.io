@@ -952,7 +952,7 @@ flowchart TD
 | **Approval gates** | Built-in Manual Approval action, SNS notification | Environment protection rules, required reviewers | Manual job per environment, protected branches |
 | **Build compute** | Managed (2-72 vCPU, x86 or ARM), VPC-capable | GitHub-hosted (2-4 vCPU) or self-hosted runners | SaaS runners (2-4 vCPU) or self-hosted on EC2/K8s |
 | **Secrets management** | SSM Parameter Store + Secrets Manager natively | GitHub Secrets + OIDC for AWS access | GitLab CI Variables + OIDC for AWS access |
-| **Cost (small team)** | ~$1/pipeline/month + ~$0.005/build-minute (SMALL) | 2,000 min/month free, then $0.008/min (Linux) | 400 min/month free, then $0.01/min |
+| **Cost (small team)** | ~\$1/pipeline/month + ~\$0.005/build-minute (SMALL) | 2,000 min/month free, then \$0.008/min (Linux) | 400 min/month free, then \$0.01/min |
 | **Cost (large team)** | Scales linearly with build minutes; pipelines are flat $1/mo each | Can get expensive on private repos beyond free tier | Requires paid tier for advanced features; runner cost extra |
 | **Visibility** | AWS Console only | Native GitHub PR integration, status checks | Native GitLab MR integration, merge train support |
 | **Compliance boundary** | All within AWS account — CloudTrail everywhere | GitHub side audited via GitHub audit log; AWS side via CloudTrail | GitLab audit events; AWS side via CloudTrail |
@@ -1035,11 +1035,11 @@ CI/CD costs on AWS are driven primarily by build minutes and pipeline count. Und
 
 ARM-based compute types are roughly 32% cheaper per minute than equivalent x86 types. If your application builds on ARM (increasingly common with Graviton-based ECS tasks), switching your CodeBuild environment to ARM reduces your build spend by nearly a third with no change to your pipeline logic.
 
-A team running 200 builds per month, each averaging 4 minutes on SMALL x86: 200 x 4 x $0.005 = $4.00/month on CodeBuild. The same team on MEDIUM: 200 x 4 x $0.010 = $8.00/month. Batch builds multiply this by the number of parallel tasks; a 3-task batch build on SMALL for 4 minutes costs 3 x 4 x $0.005 = $0.06 per push.
+A team running 200 builds per month, each averaging 4 minutes on SMALL x86: 200 x 4 x \$0.005 = \$4.00/month on CodeBuild. The same team on MEDIUM: 200 x 4 x \$0.010 = \$8.00/month. Batch builds multiply this by the number of parallel tasks; a 3-task batch build on SMALL for 4 minutes costs 3 x 4 x \$0.005 = \$0.06 per push.
 
 **CodePipeline (V1)** charges $1.00 per **active** pipeline per month. A pipeline is active when it has existed for more than 30 days **and** had at least one source change or manual execution during that calendar month — merely creating a pipeline or running it once in its first month does not automatically make it billable under this definition. Pipelines that exist but have never qualified as active incur no V1 charge.
 
-**CodePipeline (V2)** — the recommended default for new pipelines — bills per **action execution minute** at approximately **$0.002/minute**, with a free tier that covers a baseline of action minutes each month (see [CodePipeline pricing](https://aws.amazon.com/codepipeline/pricing/) for current free-tier limits). V2 cost scales with how many stage actions run and how long they take, not with a flat per-pipeline fee. A team with 15 V2 pipelines pays primarily for build/deploy action minutes across those pipelines, not $15/month flat regardless of activity.
+**CodePipeline (V2)** — the recommended default for new pipelines — bills per **action execution minute** at approximately **\$0.002/minute**, with a free tier that covers a baseline of action minutes each month (see [CodePipeline pricing](https://aws.amazon.com/codepipeline/pricing/) for current free-tier limits). V2 cost scales with how many stage actions run and how long they take, not with a flat per-pipeline fee. A team with 15 V2 pipelines pays primarily for build/deploy action minutes across those pipelines, not \$15/month flat regardless of activity.
 
 **CodeDeploy** is free for deployments to EC2, on-premises instances, and Lambda. There is no per-deployment charge for these compute platforms. For ECS blue/green deployments, there is also no additional charge beyond the underlying ECS and ALB costs. The compute resources for the green fleet during the deployment window are the primary cost driver — you temporarily double your task count, which doubles your Fargate or EC2 cost for the duration of the deployment plus the termination wait period.
 
