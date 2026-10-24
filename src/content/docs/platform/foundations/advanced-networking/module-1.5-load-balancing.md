@@ -415,11 +415,14 @@ backend servers
 ```
 
 **The Health Check Gotcha**
-A notorious production failure involves AWS Network Load Balancers and Proxy Protocol.
-When you enable Proxy Protocol on an NLB target group, the NLB prepends the header to all actual client traffic.
-However, the NLB's internal health checker *does not* send the Proxy Protocol header.
-If your backend strictly enforces the protocol, the health checks will fail, and the NLB will remove all servers from rotation.
-To bypass this, you must configure a dedicated port exclusively for health checks that does not enforce Proxy Protocol.
+When you enable Proxy Protocol v2 on an NLB target group, the header is included in health check connections as well as client connections.
+The health check header does not carry client connection information, so parsing the header and obtaining a client's identity are separate concerns.
+[AWS documents this behavior under "Health check connections"](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-target-group-attributes.html#proxy-protocol).
+
+The failure occurs when the health check listener cannot parse that binary header before handling the probe payload.
+For an HTTP health check, the target can reject the connection with `HTTP 400: Bad request` before the readiness handler runs.
+Configure the receiver to parse Proxy Protocol v2 on the health check path, and check that the probe protocol matches the listener's configuration.
+A separate health check port does not, by itself, remove the NLB's Proxy Protocol header; verify that endpoint's parsing behavior too.
 
 ---
 
@@ -757,7 +760,7 @@ The dimensional matrix below captures the tradeoffs for the three major LB tiers
 | Mistake | Problem | Solution |
 |---------|---------|----------|
 | No connection draining configured | Active requests dropped during deployments | Set deregistration delay (at least 30s for API, 60s for web apps, 300s for WebSockets) |
-| Proxy Protocol mismatch | Backend expects PP but LB doesn't send (or vice versa) → connection failures | Enable/disable on BOTH sides simultaneously; use a separate health check port if NLB health probes don't send PP |
+| Proxy Protocol mismatch | Backend expects PP but LB doesn't send (or vice versa) → connection failures | Configure sender and receiver consistently; with NLB PPv2 enabled, the health check listener must also parse the header |
 | Sticky sessions hiding backend failures | Unhealthy server keeps receiving sticky traffic | Always combine stickiness with health checks; prefer shared session store over affinity |
 | Cross-zone off with uneven target distribution | Some targets get 3-4x more traffic than others, creating hotspots | Either enable cross-zone or ensure equal targets per AZ through topology-aware scheduling |
 | Not setting `externalTrafficPolicy: Local` | Client IP lost due to SNAT on the second hop | Set to Local (but ensure pods exist on all receiving nodes, or use pod anti-affinity) |
@@ -1201,6 +1204,7 @@ kind delete cluster --name lb-lab
 - [Proxy Protocol Specification](https://www.haproxy.org/download/2.9/doc/proxy-protocol.txt) — Willy Tarreau, HAProxy
 - [Cloudflare Learning Center — What Is Load Balancing?](https://www.cloudflare.com/learning/performance/what-is-load-balancing/)
 - [AWS Elastic Load Balancing — How Elastic Load Balancing Works](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html)
+- [AWS Network Load Balancer — Proxy Protocol and Health Check Connections](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-target-group-attributes.html#proxy-protocol)
 - [Google Cloud — Load Balancing Overview](https://cloud.google.com/load-balancing/docs/load-balancing-overview)
 - [Azure Load Balancer Documentation](https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-overview)
 - [Envoy Proxy — Load Balancing Architecture Overview](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancing)
