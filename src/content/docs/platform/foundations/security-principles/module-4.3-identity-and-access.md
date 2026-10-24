@@ -102,13 +102,13 @@ Examples include OTP authenticators, cryptographic security keys and smart cards
 
 #### Something You Are
 
-Fingerprint and facial comparisons are examples of biometric checks. Their outcomes are probabilistic, and biometric characteristics are not secrets that can simply be replaced like a password. Protect biometric data and account for comparison errors and recovery. Within [NIST's framework, §3.2.3](https://pages.nist.gov/800-63-4/sp800-63b.html#biometric_use), biometrics are permitted only as part of MFA with a physical authenticator, rather than as a standalone remote authentication secret.
+Fingerprint and facial comparisons are examples of biometric checks. Their outcomes are probabilistic. Biometric characteristics are not secrets and cannot simply be replaced like a password. Protect biometric data and account for comparison errors and recovery. Within [NIST's framework, §3.2.3](https://pages.nist.gov/800-63-4/sp800-63b.html#biometric_use), biometrics are permitted only as part of MFA with a physical authenticator, rather than as a standalone authenticator.
 
 #### Multi-Factor Authentication (MFA)
 
 [MFA combines distinct factor categories](https://pages.nist.gov/800-63-4/sp800-63b.html#authentication-assurance-level-2). A password plus TOTP can stop an attacker who has only the password, but a relay attack can capture both proofs in one interaction. Their compromise probabilities are therefore not automatically independent and cannot be multiplied without a justified model. Phishing-resistant authentication addresses that relay threat; it does not establish that the endpoint, recovery process or an already authorized session is uncompromised.
 
-One authenticator can supply multiple factors. A cryptographic authenticator may require a PIN or biometric activation in addition to possession of its key. For WebAuthn, a touch indicating user presence is different from user verification: the relying party must require and validate user verification when its assurance policy depends on that additional factor ([WebAuthn: authenticator factor capabilities](https://www.w3.org/TR/webauthn-3/#sctn-authentication-factor-capability)). Passwordless does not by itself mean either single-factor or multi-factor.
+One authenticator can supply multiple factors. A cryptographic authenticator may require a PIN or biometric activation in addition to possession of its key ([WebAuthn: authenticator factor capabilities](https://www.w3.org/TR/webauthn-3/#sctn-authentication-factor-capability)). A touch indicating user presence is different from user verification: the relying party must [require user verification](https://www.w3.org/TR/webauthn-3/#enum-userVerificationRequirement) and check its result when its assurance policy depends on that additional factor. Passwordless does not by itself mean either single-factor or multi-factor.
 
 ### 1.3 Authentication Methods
 
@@ -121,7 +121,7 @@ One authenticator can supply multiple factors. A cryptographic authenticator may
 | **SSO/OIDC** | Delegated | Depends on IdP | High |
 | **Passwordless (WebAuthn)** | Have; Know or Are when user verification is enforced | Phishing-resistant protocol; validate the required verification | Medium-High |
 
-Choosing a method is a trade-off between security, usability, and deployability. Hardware keys and mTLS are excellent on security but introduce friction: hardware keys cost money and can be lost, and mTLS demands a working PKI with rotation, revocation, and trust-store management — three non-trivial sub-systems. SSO/OIDC offloads identity to a dedicated provider, which is usually a strict improvement because identity providers do nothing but authenticate users and have invested heavily in the problem, but it concentrates risk: a breach of your IdP is a breach of every downstream system that trusts it. [Passwordless WebAuthn](https://www.w3.org/TR/webauthn-3/) is rapidly becoming the default recommendation for new consumer-facing systems because it combines a phishing-resistant factor with strong usability, but its adoption depends on the user's browser and platform supporting it.
+Choose a method against the attack and operational constraints. WebAuthn can provide phishing-resistant authentication, but the browser and relying party must perform the protocol's origin, relying-party and signature checks; the relying party must also validate the required user verification. A hardware OTP token does not provide the same verifier binding. mTLS requires certificate issuance, key protection and trust-store management. SSO/OIDC centralizes authentication at an identity provider, so assess that provider's controls and recovery alongside the downstream application's token checks and authorization. For WebAuthn, also plan supported devices, enrollment and recovery. No method name alone establishes that an application meets its assurance policy.
 
 > **Try This (2 minutes)**
 >
@@ -666,7 +666,7 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
 | Mistake | Problem | Solution |
 |---------|---------|----------|
 | Same password everywhere | One breach compromises all accounts | Unique passwords plus password manager |
-| No MFA on critical systems | Single factor easily bypassed by phishing or credential stuffing | MFA everywhere possible, hardware keys for admin |
+| No MFA on critical systems | Password-only login is exposed to credential reuse and phishing | MFA; phishing-resistant authentication such as WebAuthn for admins; protect recovery |
 | Overly broad roles ("admin for convenience") | More access than needed, large blast radius on compromise | Granular, purpose-specific roles |
 | Long-lived tokens or API keys | Large exposure window if leaked, manual rotation pain | Short-lived tokens with automatic refresh |
 | Shared service accounts across workloads | Cannot attribute actions, coupled blast radius | One ServiceAccount per workload |
@@ -685,7 +685,7 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    Under those assumptions, investigate authorization: how the caller's roles or scopes map to the requested administrative action, and where that policy is enforced. Signature verification alone would not establish the required claims, a legitimate bearer-token presenter, or permission for this endpoint. The gateway must enforce the action-and-resource policy before forwarding a request to the backend. Validate the policy with both allowed and denied test cases. Successful authentication and token validation supply inputs to authorization; they do not replace that decision.
    </details>
 
-2. **Synthetic comparison: An attacker knows a user's password but has no authenticator output, session cookie or endpoint access. Compare a password-plus-TOTP login with WebAuthn requiring user verification. What does each stop under those assumptions, what changes if the attacker relays a phishing login, and what evidence would you need before declaring the account protected?**
+2. **Synthetic comparison: An attacker knows a user's password but has no authenticator output, session cookie or endpoint access. Compare a password-plus-TOTP login with passwordless WebAuthn requiring PIN or biometric user verification. What does each stop under those assumptions, what changes if the attacker relays a phishing login, and what evidence would you need before declaring the account protected?**
    <details>
    <summary>Answer</summary>
 
@@ -719,7 +719,7 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    <details>
    <summary>Answer</summary>
 
-   The report describes phishing and employees approving application-based MFA, then recommends stronger authentication and access controls (printed pp. 5 and 16). Propose phishing-resistant authentication, narrower job-based access with periodic reviews, and second-employee approval for high-risk operations. The report identifies those controls as protective directions, rather than documenting a complete permission scheme for each Twitter action. Evaluate where authentication is enforced, which operations each role can perform, how approvals are bound to the intended action, and how sessions are protected and monitored. A hardware key can resist the described phishing route; it does not establish that malware cannot misuse an already authorized session. Treat the proposals as risk reduction and test their enforcement before claiming containment.
+   The report describes phishing and employees approving application-based MFA, then recommends stronger authentication and access controls (printed pp. 5 and 16). Propose phishing-resistant authentication, narrower job-based access with periodic reviews, and second-employee approval for high-risk operations. The report identifies those controls as protective directions, rather than documenting a complete permission scheme for each Twitter action. Evaluate where authentication is enforced, which operations each role can perform, how approvals are bound to the intended action, and how sessions are protected and monitored. A phishing-resistant protocol such as WebAuthn can resist credential relay; it does not establish that malware cannot misuse an already authorized session. Treat the proposals as risk reduction and test their enforcement before claiming containment.
 
    A strong answer also uses the reported access for more than 1,000 employees and the operational cost of reducing it (printed p. 16) to motivate reviewing privilege scope. The report concludes that access management and authentication failed to keep the attackers from powerful internal tools, but the access count alone does not prove that a particular employee role was excessive. The cited pages do not establish that missing audit trails or password reuse caused the attack. Printed p. 17 argues that stronger monitoring would have enabled faster detection and discusses audit-trail requirements; it does not inventory which Twitter logs existed. Request role-to-operation mappings, access-review records, authentication and sensitive-action logs, and session evidence to test those hypotheses; do not label an unexamined control as absent. Distinguish stolen credentials from an unsupported claim that an employee reused a password across systems.
    </details>
@@ -834,8 +834,8 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 
 - [New York State Department of Financial Services: Twitter Investigation Report (October 2020)](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report) — Employee credential attack, account impact and access-management findings; see printed pp. 5, 7 and 16.
 - [NIST SP800-63B: Authentication and Lifecycle Management, archived revision](https://pages.nist.gov/800-63-3/sp800-63b.html) — Retained for the historical 2017 password-policy discussion; superseded by SP800-63B-4.
-- [NIST SP800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Current factor categories, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.2.3 and 3.2.5.
-- [W3C WebAuthn: Authenticator Factor Capabilities](https://www.w3.org/TR/webauthn-3/#sctn-authentication-factor-capability) — Possession, user presence, user verification and multi-factor capability.
+- [NIST SP800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Current factor categories, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.1.7, 3.2.3 and 3.2.5.
+- [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3) and relying-party checks (§§7.1–7.2).
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
 - [Managing Kubernetes ServiceAccounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) — Covers ServiceAccount identity, token projection, TokenRequest, and legacy token behavior.
