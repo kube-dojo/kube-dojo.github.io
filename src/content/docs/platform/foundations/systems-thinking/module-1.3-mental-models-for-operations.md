@@ -652,7 +652,7 @@ Immediately after the complete Bash block finishes, run `echo $?` before another
 
 ### Part B: Analyze a System Using All Three Models (25 minutes)
 
-This part asks you to work through a realistic operational scenario using all three frameworks from the module in sequence. You operate a web application with users routed through a load balancer to API pods managed by a Horizontal Pod Autoscaler, backed by a database and a Redis cache. The system exhibits three recurring issues: latency spikes that occur every hour on the hour, occasional cascading failures during traffic spikes, and periodic drops in cache hit rate from 95% down to 60%.
+**Synthetic scenario:** You operate a web application with users routed through a load balancer to API pods managed by a Horizontal Pod Autoscaler, backed by a database and a Redis cache. The exercise models hourly latency spikes, cascading failures during some traffic spikes, and cache hit rates falling from 95% to 60%. These are invented conditions for analysis, not a production incident or an executed cluster experiment.
 
 ```mermaid
 flowchart LR
@@ -662,9 +662,20 @@ flowchart LR
     API --> Redis["Redis Cache"]
 ```
 
-**Section 1: Stock-and-Flow Diagram (10 minutes).** Draw a diagram that includes at least two stocks—consider the request queue, the database connection pool, and the cache entry set—along with their inflows and outflows, and show how these stocks are connected through the request processing path. Predict what happens to each stock during a traffic spike, then propose two explanations for the hourly latency spikes and identify measurements that would distinguish them.
+**Observation card for the hourly spike.** Compare the 60 seconds before the hour with the first 60 seconds afterward. All timestamps share a clock. For this calculation only, each cache miss admits one database request; cache hits admit none. There are no retries, cancellations or failed database requests in either window, and each listed mean rate is constant within its window. The database's supplied service-capacity limit stays at 300 completions per second. At the start of the after-hour window, 20 database requests are unfinished, counting both waiting and executing requests.
 
-**Section 2: Causal Loop Diagram (10 minutes).** Draw a diagram that includes at least three feedback loops: the retry storm loop (reinforcing), the autoscaling loop (balancing), and the cache behavior loop that explains the hit rate fluctuations. Mark each link as (+) or (−) and label each loop as R or B. Then identify which loop interactions explain the cascading failures—specifically, how a reinforcing loop can overwhelm the protective balancing loops.
+| Synthetic signal | Before the hour | First minute after the hour |
+|------------------|-----------------|-----------------------------|
+| External request rate | 1,200 requests/s | 1,200 requests/s |
+| Cache hit rate | 95% | 60% |
+| Database completions | 60 requests/s | 300 requests/s |
+| Database service-capacity limit | 300 requests/s | 300 requests/s |
+| Sampled cache-key expiry times | Concentrated at the hour boundary | That sampled cohort has expired |
+| Scheduled batch work | Next start is two minutes after the hour | Has not started yet |
+
+**Section 1: Stock-and-Flow Diagram (10 minutes).** Draw at least two stocks and their inflows/outflows, including unfinished database requests and the cache entry set. Calculate database admissions in both windows and the unfinished stock after the first minute. Then compare synchronized cache expiry with a batch-induced loss of database capacity: which is better supported by this card, which observation matters most, and what new observation would challenge your choice? Do not infer the full system's behavior from one sampled cache cohort.
+
+**Section 2: Causal Loop Diagram (10 minutes).** Draw three candidate feedback loops: retry amplification, autoscaling and cache behavior. Mark each link as (+) or (−) and each loop as R or B. Distinguish supplied observations from assumed links. Retries are absent in the card's calculation window, so a later retry storm is a hypothesis to investigate, not an observed explanation. State what measurements would show whether a reinforcing loop overwhelms a protective balancing loop during a later traffic spike.
 
 **Section 3: Leverage Point Analysis (5 minutes).** For the cascading failure scenario, list at least one intervention at each of the following leverage levels and explain the expected impact of each:
 
@@ -676,13 +687,30 @@ flowchart LR
 | 6 | | |
 | 5 | | |
 
-**Success criteria for this exercise.** In Part A, compare the two suspended-Job counts and distinguish successful from failed terminal exits after release. Explain why these independent Jobs do not establish a shared processing capacity or demonstrate overload. In Part B, compare at least two hypotheses for the hourly latency spikes, such as synchronized cache expiry and scheduled batch work. Other justified candidates are welcome. Name observations that would support or challenge each before choosing an intervention; the supplied symptoms do not establish a cause.
+For your first intervention, distinguish immediate protection from prevention of the next hourly spike. Predict which inflow or outflow it changes, name its cost, and choose a measurement that would justify continuing or reversing it. Defend the leverage-level classification by its mechanism; a label alone does not establish that an intervention will help.
+
+<details>
+<summary>Decision rubric: check evidence, arithmetic and uncertainty</summary>
+
+The supplied miss fractions admit `1,200 × 0.05 = 60` and `1,200 × 0.40 = 480` database requests per second. In the after-hour window, admissions exceed completions by `480 − 300 = 180 requests/s`. The unfinished stock therefore becomes `20 + 180 × 60 = 10,820 requests`. This boundary includes waiting and executing requests; a waiting-only queue would need separate service-start accounting. Both admissions and completions increased, yet unfinished work accumulated faster. The calculation depends on the card's explicit assumptions, not on a claim that real workloads maintain constant rates.
+
+Synchronized expiry is better supported than the stated batch-capacity explanation: misses rise at the expiry boundary while external demand and the supplied capacity limit remain unchanged, and batch work starts later. This does not prove that every cache key shares that expiry or that cache behavior explains later cascades. A clock-aligned observation showing latency rising before the miss burst, for example, would challenge the proposed ordering and require another explanation.
+
+Immediate protection might bound database admissions below the supplied capacity long enough for the unfinished stock to drain, with rejected or deferred work as an explicit cost. Matching admissions to 300/s only stops further growth; it does not drain the existing stock in this model. Staggering expiry is a candidate prevention experiment for the next cycle, not a guarantee that the current backlog disappears. Increasing API replicas alone does not raise the supplied database-capacity limit. Other interventions are defensible if they explain the affected boundary, side effects, predicted observation and reversal condition.
+
+For leverage analysis, changing a TTL value can be a parameter intervention, while changing admission policy can be a rule intervention. Explain what actually changes rather than assuming that a numerically higher leverage category is always the best first incident action. A successful response preserves the distinction between the card's observations, model assumptions and evidence still needed.
+
+</details>
+
+**Success criteria for this exercise.** In Part A, compare the two suspended-Job counts and distinguish successful from failed terminal exits after release. Explain why these independent Jobs do not establish a shared processing capacity or demonstrate overload. In Part B, use the synthetic observation card to compare hypotheses, calculate accumulation, and defend an intervention without treating an untested feedback loop as an observed cause.
 - [ ] Part A: Compared nonterminal Job counts before release and successful/failed exits afterward
 - [ ] Part A: Verified owned-namespace cleanup and explained the experiment's capacity limits
 - [ ] Part B: Stock-and-flow diagram with clear accumulation points
 - [ ] Part B: Causal loop diagram with at least 3 loops identified and link polarities marked
 - [ ] Part B: Explained the placement and expected impact of interventions at the five requested leverage levels
-- [ ] Part B: Compared at least two justified hypotheses, with evidence needed to distinguish them
+- [ ] Part B: Compared two hypotheses using the card and named an observation that would challenge the preferred explanation
+- [ ] Part B: Calculated admissions and unfinished work with explicit units, boundaries and assumptions
+- [ ] Part B: Separated immediate protection from prevention, with an intervention cost and a continuation/reversal measurement
 
 ---
 
