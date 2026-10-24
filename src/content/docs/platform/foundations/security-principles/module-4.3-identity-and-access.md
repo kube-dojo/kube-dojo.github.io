@@ -657,13 +657,13 @@ The trust idea transfers to other providers, but the integration details differ.
 
 ## Did You Know?
 
-- **OAuth was invented in 2006** by Blaine Cook while building Twitter's API. He needed a way to let third-party apps post tweets without giving them user passwords. The first specification was assembled at a meeting in a San Francisco coffee shop, and what became OAuth 1.0 was published a year later — a reminder that load-bearing internet protocols sometimes start as one team's pragmatic hack.
+- **An OIDC ID token is not automatically an API access token.** [OpenID Connect Core, §2](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) defines the ID token's authentication claims for the client; its audience must include that client's identifier. An OAuth access token has the resource-access role described in [RFC 6750, §1.3](https://www.rfc-editor.org/rfc/rfc6750#section-1.3). Each consumer must validate the token expected by its protocol and endpoint. Merely decoding a JWT does not establish that it has the right purpose, audience or permissions.
 
-- **[TOTP codes change every 30 seconds](https://www.rfc-editor.org/rfc/rfc6238)** by design. The server and your phone share a secret, and both compute HMAC(secret, time/30) on the fly with no network round-trip required. This is why TOTP works on a phone in airplane mode and why the codes drift if your phone's clock disagrees with the server by more than a minute or two — the underlying math depends on synchronized time, not synchronized state.
+- **TOTP's time step and acceptance window are distinct settings.** [RFC 6238, §§3–6](https://www.rfc-editor.org/rfc/rfc6238.html#section-3) defines a configurable time-step parameter with a 30-second default. The authenticator and verifier must agree on that parameter. The step size contributes to the validity window, while verifier policy determines which time steps are accepted for delay and clock drift. The RFC recommends allowing at most one time step for network delay; its drift examples are not a universal tolerance. The verifier must also reject replay of an OTP after successful validation, so a time-based code is not an unrestricted reusable password throughout its acceptance window.
 
 - **Projected tokens need refresh and application reload.** In [Kubernetes 1.35 token projection](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#serviceaccount-token-volume-projection), the kubelet refreshes the token file and the application must reload it. The [`--service-account-extend-token-expiration` compatibility flag](https://v1-35.docs.kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/#options), enabled by default in 1.35, can extend the default Pod-bound API-access token added by the ServiceAccount admission controller up to a year. That extension is [conditional on the request and API-server audiences](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/registry/core/serviceaccount/storage/token.go#L229-L237); it does not apply to every projected token or automatically to an IRSA token for the STS audience. Inspect the actual request, issuer settings and token claims rather than assuming a universal one-hour validity or refresh interval. [Secret-backed legacy tokens can still exist](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#manual-secret-management-for-serviceaccounts), so inspect the actual credential source.
 
-- **Password complexity rules often backfire.** [NIST's 2017 guidelines](https://pages.nist.gov/800-63-3/sp800-63b.html) reversed decades of advice by recommending long passphrases over complex passwords and explicitly discouraging mandatory rotation. The security mathematics says "Tr0ub4dor&3" is weaker than "correct horse battery staple" because the complex password is hard for humans to remember (driving reuse and sticky-note storage) but easy for cracking rigs to enumerate, while the four-word phrase has more entropy and is genuinely memorable.
+- **NIST's current password policy prohibits mandatory scheduled changes.** For centrally verified passwords used as authentication factors, [NIST SP 800-63B-4, §3.1.1](https://pages.nist.gov/800-63-4/sp800-63b.html#password) prohibits conforming verifiers from imposing character-composition rules or mandatory periodic password changes, while requiring a forced change when there is evidence of compromise. It also requires checking prospective passwords against a blocklist of commonly used, expected or compromised values. Local authenticator activation secrets have separate requirements.
 
 ---
 
@@ -816,7 +816,7 @@ Write a ServiceAccount, Role, and RoleBinding for the Order Service. Apply the w
 
 - **"OAuth 2.0 Simplified"** — Aaron Parecki. The clearest available explanation of OAuth flows, written by an author who has been involved in the standards work for a decade.
 - **"Identity and Data Security for Web Development"** — Jonathan LeBlanc. A practical, code-first guide to implementing authentication and authorization in real systems.
-- **NIST SP800-63B-4** — Current Authentication and Authenticator Management guidance. Use it for assurance levels, factor requirements and phishing resistance; the 2017 password-policy discussion above refers to the superseded revision.
+- **NIST SP800-63B-4** — Current Authentication and Authenticator Management guidance. Use it for assurance levels, factor requirements, password-verifier policy and phishing resistance.
 
 ---
 
@@ -841,8 +841,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 ## Sources
 
 - [New York State Department of Financial Services: Twitter Investigation Report (October 2020)](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report) — Employee credential attack, account impact and access-management findings; see printed pp. 5, 7 and 16.
-- [NIST SP800-63B: Authentication and Lifecycle Management, archived revision](https://pages.nist.gov/800-63-3/sp800-63b.html) — Retained for the historical 2017 password-policy discussion; superseded by SP800-63B-4.
-- [NIST SP800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Current factor categories, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.1.7, 3.2.3 and 3.2.5.
+- [NIST SP 800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Factor categories, password-verifier policy, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.1.1, 3.1.7, 3.2.3 and 3.2.5.
 - [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3) and relying-party checks (§§7.1–7.2).
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
@@ -851,7 +850,9 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [RFC 7515: JSON Web Signature, §3.1](https://www.rfc-editor.org/rfc/rfc7515#section-3.1) — Compact serialization and the bytes protected by a signature or MAC.
 - [RFC 7518: JSON Web Algorithms, §§3.2–3.4](https://www.rfc-editor.org/rfc/rfc7518#section-3.2) — HMAC comparison and RSA/ECDSA public-key verification.
 - [RFC 7519: JSON Web Token](https://www.rfc-editor.org/rfc/rfc7519) — JWT representations, the public example and expiration semantics.
-- [RFC 6750: Bearer Token Usage, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2) — Possession-based bearer-token semantics.
+- [RFC 6750: Bearer Token Usage, §§1.2–1.3](https://www.rfc-editor.org/rfc/rfc6750#section-1.2) — Possession-based bearer-token semantics and protected-resource access.
+- [OpenID Connect Core 1.0, §§2 and 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) — ID-token purpose, audience and client validation.
+- [RFC 6238: Time-Based One-Time Passwords, §§3–6](https://www.rfc-editor.org/rfc/rfc6238.html#section-3) — Configured time step, default value, verifier delay/drift windows and replay rejection.
 - [AWS STS AssumeRoleWithWebIdentity: Session Duration](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html) — Default and configurable lifetime of the returned role-session credentials.
 - [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
 - [RFC 9700: Best Current Practice for OAuth 2.0 Security, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1) — PKCE requirements for public clients and recommendations for confidential clients.
