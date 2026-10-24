@@ -36,7 +36,7 @@ class ParseResult:
             contents on error) for debugging. None if no diagnostic output.
         rate_limited: True iff the adapter's rate-limit pattern matched
             stderr or output_file contents. Drives runner's RateLimitedError.
-        session_id: Provider session ID parsed from stdout, if the CLI
+        session_id: Provider session ID parsed from trusted CLI metadata, if it
             exposes one. Claude and Codex do; Gemini doesn't. None otherwise.
         tokens: Prompt+completion token count if the CLI reports it. We
             deliberately leave this None when the CLI doesn't expose tokens,

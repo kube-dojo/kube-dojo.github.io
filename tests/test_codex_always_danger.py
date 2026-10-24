@@ -63,6 +63,7 @@ def test_dispatch_smart_codex_forces_danger_mode():
         capture_output=True,
         text=True,
         timeout=15,
+        check=False,
     )
     assert result.returncode == 0, (
         f"dispatch_smart.py exited {result.returncode}\n"
@@ -342,8 +343,12 @@ def test_dispatch_smart_codex_sets_search_for_draft():
     assert observed["search"] == "1"
 
 
-def test_dispatch_smart_codex_clears_search_for_review():
-    """dispatch_smart sets search OFF for review class dispatches."""
+def test_dispatch_smart_codex_enables_search_for_review(monkeypatch):
+    """Reviewers can verify volatile facts; routing restores the caller's env."""
+    import os
+
+    monkeypatch.setenv("KUBEDOJO_CODEX_SEARCH", "caller-search")
+    monkeypatch.setenv("KUBEDOJO_CODEX_EFFORT", "caller-effort")
     dispatch_smart = _load_dispatch_smart()
 
     observed: dict[str, str] = {}
@@ -370,7 +375,9 @@ def test_dispatch_smart_codex_clears_search_for_review():
             task_id="t2",
             timeout_s=1,
         )
-    assert observed["search"] == "0"
+    assert observed["search"] == "1"
+    assert os.environ["KUBEDOJO_CODEX_SEARCH"] == "caller-search"
+    assert os.environ["KUBEDOJO_CODEX_EFFORT"] == "caller-effort"
 
 
 def test_dispatch_codex_includes_search():

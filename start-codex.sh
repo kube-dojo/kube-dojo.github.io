@@ -19,7 +19,9 @@ CODEX_ARGS=()
 CODEX_FLAGS=(--dangerously-bypass-approvals-and-sandbox)
 
 if [ "${CODEX_ENABLE_MULTI_AGENT:-1}" != "0" ]; then
-    CODEX_FLAGS+=(--enable multi_agent)
+    CODEX_FLAGS+=(--enable multi_agent -c features.multi_agent_v2.enabled=true)
+else
+    CODEX_FLAGS+=(--disable multi_agent -c features.multi_agent_v2.enabled=false)
 fi
 
 while [ "$#" -gt 0 ]; do
@@ -33,8 +35,8 @@ KubeDojo Codex launcher:
   - use --worktree to run in .worktrees/codex-interactive instead
   - --epic N  bind drive-epic (SESSION_EPIC + KUBEDOJO_ISSUE); CodexBar + fleet
   - always adds --dangerously-bypass-approvals-and-sandbox
-  - enables Codex multi-agent support by default
-  - set CODEX_ENABLE_MULTI_AGENT=0 to disable multi-agent support
+  - enables Codex multi-agent v2 by default
+  - set CODEX_ENABLE_MULTI_AGENT=0 to disable both multi-agent and v2
   - forwards all other arguments to codex unchanged
 EOF
             exit 0

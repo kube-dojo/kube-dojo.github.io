@@ -32,8 +32,8 @@ DESIGN PRINCIPLES:
   surfaces per-agent + per-entrypoint cost data automatically.
 - Resume policy is data-driven. See docs/design/agent-runtime.md § 6.3.
   Claude/Gemini bridge paths keep resume for cache warmth (cost economics);
-  Codex always fresh-session (coherence footgun); delegate/dispatch always
-  fresh (worktree is the isolation boundary).
+  Codex bridge paths may resume with matching cwd/mode; delegate/dispatch
+  always fresh (worktree is the isolation boundary).
 
 HOW TO ADD A NEW AGENT:
 

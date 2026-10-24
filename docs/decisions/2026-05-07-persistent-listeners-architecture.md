@@ -139,6 +139,13 @@ These caveats are locked from the issue #983 deliberation.
 
 ### Codex
 
+**Superseded policy:** commit `6c31de20d` changed Codex to `bridge_only`
+resume and added discussion continuity. The legacy message bridge now also
+honors scoped resume: task, cwd, and mode must match; `discuss:` rows remain
+owned by discussions. Delegate/dispatch/consult calls still start fresh. The
+cold-only statements below, D3, and the later per-agent ceiling check describe
+the original decision, not the current registry policy.
+
 Codex is intentionally cold-only.
 
 - `scripts/agent_runtime/registry.py:13-15` says Codex uses `resume_policy="never"` because its "quota is per-message" and "session-across-worktree contamination is the #1 footgun".

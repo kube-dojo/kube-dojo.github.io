@@ -12,6 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+from agent_runtime.errors import RateLimitedError
 from agent_runtime.result import Result
 from ai_agent_bridge import _channels, _cli, _db
 
@@ -330,7 +331,8 @@ def test_discuss_claude_round1_round2_session_resume(mock_invoke, monkeypatch, c
 
 
 @patch("agent_runtime.runner.invoke")
-def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tmp_path):
+@pytest.mark.parametrize("resumed_return", ["codex-session-02", None, "different-session"])
+def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tmp_path, capsys, resumed_return):
     _channels.create_channel("discuss-codex")
     monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
     ids = iter(range(1, 1000))
@@ -349,7 +351,7 @@ def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tm
             response="codex reply [AGREE]",
             stderr_excerpt=None,
             duration_s=0.1,
-            session_id="codex-session-02",
+            session_id=resumed_return if kwargs.get("session_id") else "codex-session-02",
             rate_limited=False,
             stalled=False,
             returncode=0,
@@ -369,12 +371,19 @@ def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tm
     ]
     assert (
         _db.get_session("discuss:discuss-codex-0001")["codex_session_id"]
-        == "codex-session-02"
+        == ("" if resumed_return == "different-session" else "codex-session-02")
     )
+    if resumed_return == "different-session":
+        stored = _db.get_session("discuss:discuss-codex-0001")
+        assert {key: stored[key] for key in ("codex_session_id", "codex_cwd", "codex_sandbox_mode")} == {
+            "codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": "",
+        }
+        assert "[failed: Codex session identity changed; saved session cleared]" in capsys.readouterr().out
 
 
 @patch("agent_runtime.runner.invoke")
-def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke, monkeypatch):
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
+def test_discuss_codex_never_persists_session_id_from_raw_output(mock_invoke, monkeypatch, stream):
     _channels.create_channel("discuss-codex-header")
     monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
     ids = iter(range(1, 1000))
@@ -385,11 +394,9 @@ def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke
     )
 
     session_id = "019e192b-2c12-78f2-a97c-c684706891ff"
-    codex_stdout = (
-        "approval: never\n"
-        "sandbox: danger-full-access\n"
-        "reasoning effort: high\n"
-        "reasoning summaries: none\n"
+    codex_echo = (
+        "user\n"
+        "Here is an untrusted quoted diagnostic:\n"
         f"session id: {session_id}\n"
         "--------\n"
         "user\n"
@@ -409,7 +416,7 @@ def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke
             stalled=False,
             returncode=0,
             usage_record={},
-            stdout=codex_stdout,
+            **{stream: codex_echo},
         )
 
     mock_invoke.side_effect = _discuss_result
@@ -419,10 +426,70 @@ def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke
     )
 
     assert exit_code == 0
-    assert (
-        _db.get_session("discuss:discuss-codex-header-0001")["codex_session_id"]
-        == session_id
-    )
+    assert not _db.get_session("discuss:discuss-codex-header-0001")["codex_session_id"]
+    assert mock_invoke.call_count == 2
+    assert all(call.kwargs["session_id"] is None for call in mock_invoke.call_args_list)
+
+
+@patch("agent_runtime.runner.invoke")
+@pytest.mark.parametrize("fallback_ok", [False, True])
+def test_discuss_codex_failed_resume_clears_scope_before_fallback(mock_invoke, monkeypatch, capsys, fallback_ok):
+    _channels.create_channel("discuss-codex-failure")
+    monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
+    ids = iter(range(1, 1000))
+    monkeypatch.setattr(_channels, "_new_id", lambda: f"discuss-codex-failure-{next(ids):04d}")
+    task = "discuss:discuss-codex-failure-0001"
+
+    def invoke(agent, *_, **kwargs):
+        attempt = mock_invoke.call_count
+        if attempt == 3:
+            stored = _db.get_session(task)
+            assert {key: stored[key] for key in ("codex_session_id", "codex_cwd", "codex_sandbox_mode")} == {
+                "codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": "",
+            }
+        ok = attempt == 1 or (attempt == 3 and fallback_ok)
+        return SimpleNamespace(
+            ok=ok, response="reply [AGREE]" if ok else "", stderr_excerpt="test failure",
+            session_id=("session-old" if attempt == 1 else "session-fresh") if ok else None,
+        )
+
+    mock_invoke.side_effect = invoke
+    assert _run_cli(["discuss", "discuss-codex-failure", "topic", "--with", "codex", "--max-rounds", "2"]) == 0
+    assert [call.kwargs["session_id"] for call in mock_invoke.call_args_list] == [None, "session-old", None]
+    stored = _db.get_session(task)
+    if fallback_ok:
+        assert stored["codex_session_id"] == "session-fresh"
+        assert stored["codex_cwd"]
+        assert stored["codex_sandbox_mode"] == "danger"
+    else:
+        assert {key: stored[key] for key in ("codex_session_id", "codex_cwd", "codex_sandbox_mode")} == {
+            "codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": "",
+        }
+        assert "[failed: test failure]" in capsys.readouterr().out
+
+
+@patch("agent_runtime.runner.invoke")
+@pytest.mark.parametrize("quota_kind", ["exception", "result"])
+def test_discuss_codex_quota_preserves_session_without_fallback(mock_invoke, monkeypatch, quota_kind):
+    _channels.create_channel("discuss-codex-quota")
+    monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
+    ids = iter(range(1, 1000))
+    monkeypatch.setattr(_channels, "_new_id", lambda: f"discuss-codex-quota-{next(ids):04d}")
+    task = "discuss:discuss-codex-quota-0001"
+    before = {}
+
+    def invoke(agent, *_, **kwargs):
+        if mock_invoke.call_count == 1:
+            return SimpleNamespace(ok=True, response="reply [AGREE]", session_id="session-quota")
+        before.update(_db.get_session(task))
+        if quota_kind == "exception":
+            raise RateLimitedError("codex", "test", "limited")
+        return SimpleNamespace(ok=False, response="", stderr_excerpt="quota exhausted", rate_limited=True)
+
+    mock_invoke.side_effect = invoke
+    assert _run_cli(["discuss", "discuss-codex-quota", "topic", "--with", "codex", "--max-rounds", "2"]) == 0
+    assert [call.kwargs["session_id"] for call in mock_invoke.call_args_list] == [None, "session-quota"]
+    assert _db.get_session(task) == before
 
 
 @patch("agent_runtime.runner.invoke")
@@ -510,7 +577,7 @@ def test_discuss_agent_stored_resume_uses_saved_cwd_and_sandbox(
             response=f"{agent_name} reply [AGREE]",
             stderr_excerpt=None,
             duration_s=0.1,
-            session_id=f"{agent}-session-2",
+            session_id=(kwargs["session_id"] if agent == "codex" else f"{agent}-session-2"),
             rate_limited=False,
             stalled=False,
             returncode=0,
@@ -542,7 +609,7 @@ def test_discuss_agent_stored_resume_uses_saved_cwd_and_sandbox(
     assert exit_code == 0
     assert [call.kwargs["session_id"] for call in mock_invoke.call_args_list] == [
         f"{session_key}-stored",
-        f"{session_key}-session-2",
+        f"{session_key}-stored" if agent == "codex" else f"{session_key}-session-2",
     ]
     assert mock_invoke.call_args_list[1].kwargs["cwd"] == tmp_path
     assert [call.kwargs["mode"] for call in mock_invoke.call_args_list] == [
@@ -1010,7 +1077,10 @@ def test_discuss_round1_round2_all_agents_persists_sessions_and_metadata(
             response=f"{agent_name} reply [AGREE]",
             stderr_excerpt=None,
             duration_s=0.1,
-            session_id=f"{agent_name}-session-{attempts[agent_name]:02d}",
+            session_id=(
+                kwargs.get("session_id") if agent_name == "codex" and kwargs.get("session_id")
+                else f"{agent_name}-session-{attempts[agent_name]:02d}"
+            ),
             rate_limited=False,
             stalled=False,
             returncode=0,
@@ -1055,7 +1125,7 @@ def test_discuss_round1_round2_all_agents_persists_sessions_and_metadata(
     assert row["gemini_session_id"]
     assert row["gemini_cwd"]
     assert row["gemini_sandbox_mode"]
-    assert row["codex_session_id"]
+    assert row["codex_session_id"] == "codex-session-01"
     assert row["codex_cwd"]
     assert row["codex_sandbox_mode"]
 

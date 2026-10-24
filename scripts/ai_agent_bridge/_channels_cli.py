@@ -35,23 +35,25 @@ commands handle the agent-calling side.
 from __future__ import annotations
 
 import json
-import re
-import tempfile
+import logging
 import os
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from agent_runtime.result import Result
+
 from . import _channels
 from ._channels_watch import watch_channel_events
 from ._config import REPO_ROOT
 
-from agent_runtime.result import Result
+_LOGGER = logging.getLogger(__name__)
 
 # ── argparse registration ────────────────────────────────────────────
 
@@ -85,12 +87,6 @@ _DISCUSSION_MCP_EXCLUDE_TOKENS: tuple[str, ...] = (
     "drive",
     "claude-in-chrome",
 )
-
-_CODEX_HEADER_SESSION_ID_RE = re.compile(
-    r"^session id:\s+([0-9a-f-]{36})",
-    re.MULTILINE,
-)
-
 
 def _normalize_mcp_server_name(server_name: str) -> str:
     return server_name.lower().replace("_", "-")
@@ -865,7 +861,7 @@ def _handle_channel_context(args) -> int:
         # respecting POSIX quoting so "nvim -R" and similar work.
         editor_argv = shlex.split(editor) if editor else ["vi"]
         try:
-            result = subprocess.run([*editor_argv, str(path)])
+            result = subprocess.run([*editor_argv, str(path)], check=False)
         except FileNotFoundError:
             print(
                 f"❌ editor '{editor_argv[0]}' not found on PATH "
@@ -945,6 +941,7 @@ def _handle_channel_backfill_events(args) -> int:
     try:
         inserted = _channels.backfill_message_posted_events()
     except Exception as exc:
+        _LOGGER.exception("Bridge channel event backfill failed")
         print(f"❌ backfill failed: {exc}", file=sys.stderr)
         return 1
     print(f"backfill-events: inserted {inserted} message_posted event(s)")
@@ -1121,7 +1118,9 @@ def _handle_discuss(args) -> int:
             RateLimitedError,
         )
         from agent_runtime.runner import invoke as runtime_invoke
-        from ._db import get_session as _get_session, set_session as _set_session
+
+        from ._db import get_session as _get_session
+        from ._db import set_session as _set_session
         from ._gemini import (
             _should_switch_after_rate_limit_exception,
             _should_switch_to_subscription,
@@ -1280,7 +1279,7 @@ def _handle_discuss(args) -> int:
     mcp_cleanup_paths: list[Path] = []
     mcp_config_path: Path | None = None
     mcp_server_names: list[str] = []
-    if any(agent in with_agents for agent in {"claude", "gemini"}):
+    if any(agent in with_agents for agent in ("claude", "gemini")):
         mcp_config_path, mcp_server_names = _prepare_discuss_mcp_artifacts(
             REPO_ROOT,
             cleanup_paths=mcp_cleanup_paths,
@@ -1315,7 +1314,7 @@ def _handle_discuss(args) -> int:
         attempt_sandbox_mode = default_sandbox_mode
         attempt_cwd = default_agent_cwd
 
-        if stored_session_id is not None:
+        if stored_session_id:
             if stored_cwd is None:
                 print(
                     f"bridge: stored session for {agent_name}/{task_key} has no cwd; "
@@ -1512,6 +1511,7 @@ def _handle_discuss(args) -> int:
                     except AgentUnavailableError as retry_exc:
                         return None, f"[unavailable: {retry_exc}]"
                     except Exception as retry_exc:
+                        _LOGGER.exception("Bridge discussion subscription retry failed")
                         return None, f"[error: {type(retry_exc).__name__}: {retry_exc}]"
                 else:
                     return None, f"[rate-limited: {exc}]"
@@ -1523,6 +1523,7 @@ def _handle_discuss(args) -> int:
                 # crash take down the whole discussion. KeyboardInterrupt
                 # is BaseException, not Exception, so Ctrl+C still bubbles
                 # up to the pool-shutdown branch in the main loop.
+                _LOGGER.exception("Bridge discussion invocation failed")
                 return None, f"[error: {type(exc).__name__}: {exc}]"
 
             if (
@@ -1561,6 +1562,7 @@ def _handle_discuss(args) -> int:
                 except AgentUnavailableError as exc:
                     return None, f"[unavailable: {exc}]"
                 except Exception as exc:
+                    _LOGGER.exception("Bridge discussion fallback invocation failed")
                     return None, f"[error: {type(exc).__name__}: {exc}]"
 
             if not result.ok:
@@ -1577,6 +1579,10 @@ def _handle_discuss(args) -> int:
         )
 
         if use_resume and err is not None:
+            if agent_name == "codex":
+                if err.startswith("[rate-limited:") or getattr(result, "rate_limited", False):
+                    return (agent_name, f"[failed: {err}]", False)
+                _set_session(task_key, agent="codex", session_id="", codex_cwd="", codex_sandbox_mode="")
             print(
                 f"bridge: stored session {attempt_session} for {agent_name}/{task_key} "
                 f"failed: {err}; starting fresh"
@@ -1619,18 +1625,16 @@ def _handle_discuss(args) -> int:
 
         if result is not None and session_field is not None:
             persist_session_id = result.session_id
-            if agent_name == "codex" and not persist_session_id:
-                header_payload = getattr(result, "stdout", None) or getattr(
-                    result,
-                    "stderr",
-                    None,
-                )
-                if isinstance(header_payload, str):
-                    match = _CODEX_HEADER_SESSION_ID_RE.search(header_payload)
-                    if match is not None:
-                        persist_session_id = match.group(1)
+            if agent_name == "codex":
+                if use_resume and persist_session_id and persist_session_id != attempt_session:
+                    _set_session(task_key, agent="codex", session_id="", codex_cwd="", codex_sandbox_mode="")
+                    return (agent_name, "[failed: Codex session identity changed; saved session cleared]", False)
+                # Only the adapter may supply a fresh ID. Raw stderr includes
+                # prompt echoes and answers, so it cannot authorize a resume.
+                persist_session_id = attempt_session if use_resume else persist_session_id
                 if not persist_session_id:
-                    print("bridge: codex session id not in stdout header; not persisting")
+                    _set_session(task_key, agent="codex", session_id="", codex_cwd="", codex_sandbox_mode="")
+                    return (agent_name, result.response.strip(), True)
 
             _set_session(
                 task_key,
