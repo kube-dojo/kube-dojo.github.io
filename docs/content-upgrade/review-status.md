@@ -6,7 +6,7 @@ The user reiterated that ALL content must be reviewed, including previously fixe
 
 ## Corpus accounted for
 
-The existing inventory CLI enumerates 1,651 tracked Markdown/MDX pages: 1,089 English and 562 Ukrainian. English-first remains the execution priority; Ukrainian is included in inventory and remains parked under #2291. Every unlisted page below is still awaiting full-page review, regardless of metadata, historical status or closed tickets.
+The existing inventory CLI enumerates 1,651 tracked Markdown/MDX pages: 1,089 English and 562 Ukrainian. The user confirmed: finish English readiness first, then do Ukrainian. No Ukrainian review, revision or translation starts now; its unfinished status does not block English readiness. Ukrainian stays inventoried and parked under #2291. Every unlisted English page below still requires full-page review regardless of metadata, historical status or closed tickets.
 
 | English portfolio | Pages | Owner | Current full-coverage acceptance |
 |---|---:|---|---|
@@ -18,7 +18,7 @@ The existing inventory CLI enumerates 1,651 tracked Markdown/MDX pages: 1,089 En
 | On-premises | 67 | #2285 | Unestablished |
 | AI | 44 | #2286 | Unestablished |
 | AI/ML Engineering | 142 | #2287 | Unestablished |
-| AI History | 74 (73 chapters + hub) | #2288–#2290 | Unestablished; historical accepted labels require review |
+| AI History | 74 (73 chapters + hub) | #2288–#2290 | Open; Chapter1/hub re-review below; historical accepted labels require review |
 | Shared pages | 5 | #2300 | Unestablished |
 
 Git history since the program baseline `8dd9bbd4cccffdef62b426cf987a0e4c5a8c92cb` touches 449 current English pages; 640 have no changes in that interval. Both groups require review. The two existing cumulative receipt sets plus #3532 identify scoped repairs on 161 English pages; that mapping is incomplete historical context, not a count of accepted pages.
@@ -46,8 +46,9 @@ All 828 English modules were structurally rescanned: 753 pass enabled gates, 75 
 |---|---|---|---|
 | Deployments module + Kubernetes Basics hub; Kubernetes introduction + Cloud Native hub | Read-only Astra high red team, **revise all four**; [exact findings/digests](reviews/2026-10-24-prerequisites.md) | #2306's kind1.35 lab execution and scoped independent review | Coherent four-file correction #3534, then new-head independent review and applicable checks |
 | Systematic Troubleshooting module + hub | Independent-provider Claude Opus5.5 full-page review, **revise both**; [findings/digests and lead verification](reviews/2026-10-24-linux.md) | #2629's bounded evidence record; current guarded storage experiment read, not re-executed | Correct confirmed findings together under #2279; retain unrun-layer limits |
+| AI History Chapter1 + book hub, with contract inspected | Read-only Astra high red team, **revise prose/hub and reconcile contract**; [findings/digests](reviews/2026-10-24-book-ch01.md) | #2341's scoped Claude/Google correction; current chapter digest still matches its delivery receipt | Correct math/chronology and reconcile superseded contract instructions under #2288–#2290; preserve book phase/review gates |
 
-This checkpoint records six pages reviewed with findings, zero newly fully accepted pages, and 1,083 of the current 1,089 English plus all 562 Ukrainian pages not covered by these full-page reviews. A `revise` disposition records a demonstrated defect; it does not assert that every other claim was checked. D1–D8 remain unassessed while citation gates are unresolved. Same-provider red-team dissent is distinguished from cross-provider review.
+This checkpoint records eight pages reviewed with findings, zero newly fully accepted pages, and 1,081 of the current 1,089 English plus all 562 Ukrainian pages not covered by these full-page reviews. A `revise` disposition records a demonstrated defect; it does not assert that every other claim was checked. Curriculum D1–D8 remain unassessed while citation gates are unresolved; book acceptance follows its separate source/prose/multi-family/human requirements. Same-provider red-team dissent is distinguished from cross-provider review.
 
 ## Reproducibility and continuation
 
