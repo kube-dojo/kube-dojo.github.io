@@ -13,7 +13,7 @@ lab:
   environment: ubuntu
 ---
 
-> **Complexity**: `[MEDIUM]` — Systematic Linux troubleshooting
+> **Complexity**: `[MEDIUM]`
 
 > **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 
@@ -31,7 +31,7 @@ Before starting this module:
 
 After this module, you will be able to:
 
-- **Diagnose** Linux service failures by applying the scientific method from observation through conclusion.
+- **Evaluate** Linux service-failure hypotheses using scenario evidence and bounded local probes, distinguishing observations from an established cause.
 - **Triage** severity and resource scope using first minute checks for CPU, memory, disk, network, and failed services.
 - **Compare** affected and control evidence, and design safe reproduction checks across users, hosts, pods, or time windows.
 - **Evaluate** hypotheses with read-only tests, one change at a time, and recorded evidence.
@@ -98,7 +98,7 @@ Test each:
 6. kubectl -n app rollout status deployment/api --timeout=30s  # Example target
 ```
 
-Here `db-server:5432` is the example remote PostgreSQL endpoint; substitute the affected application's actual endpoint and run from its host. `pg_isready` checks server connection status, not successful application authentication or query correctness. Replace the example namespace and Deployment too. Kernel logs may require authorized elevated access; a limited journal or denied `dmesg` read is missing evidence, not proof that no error occurred. The test list is not a script to run blindly. It is a set of questions with expected implications. If `df -h` shows the relevant filesystem at full capacity, you have a plausible explanation for failed writes, but you still need to connect that evidence to the symptom. If `dmesg` shows the kernel OOM killer terminated the database, the next question becomes why memory pressure grew, not merely how quickly you can start the process again.
+Here `db-server:5432` is the example remote PostgreSQL endpoint; substitute the affected application's actual endpoint and run from its host. `pg_isready` checks server connection status, not successful application authentication or query correctness. Replace the example namespace and Deployment too. Kernel logs may require authorized elevated access; a limited journal or denied `dmesg` read is missing evidence, not proof that no error occurred. The broad `oom` search can also match unrelated words: inspect each complete message before treating it as an OOM event. The test list is not a script to run blindly. It is a set of questions with expected implications. If `df -h` shows the relevant filesystem at full capacity, you have a plausible explanation for failed writes, but you still need to connect that evidence to the symptom. If `dmesg` shows the kernel OOM killer terminated the database, the next question becomes why memory pressure grew, not merely how quickly you can start the process again.
 
 The scientific method also protects teams from status games during an incident. Instead of saying "I think the database is fine," you can say "The database accepts TCP connections from the API host, the service account can authenticate, and the slow query log did not spike during the incident window." That is more useful because another engineer can inspect the same evidence and build the next test from it.
 
@@ -147,7 +147,7 @@ This table is a triage map, not a law of nature. "Can't connect" might be a serv
 
 Before running a full diagnostic script, decide what result would force escalation. If `systemctl --failed` shows a critical database unit down, you may need the database owner immediately. If `df -h` shows the root filesystem full on every node in a pool, you may need incident command and a coordinated cleanup. If only one noncritical worker is unhealthy and traffic has drained away, you can proceed more quietly while preserving evidence.
 
-In Kubernetes environments, inspect `kubectl get events -o yaml` for the affected namespace and incident window. Event `lastTimestamp` records the latest occurrence when populated; other records may use `eventTime` or series timestamps. A sort on one potentially absent field is not a complete incident chronology. Events complement host evidence: distinguish a container restart from replacement of its Pod, then connect memory pressure, image failures, rollout changes, or crashes to the actual symptom.
+In Kubernetes environments, replace the example namespace `app` in `kubectl -n app get events -o yaml` with the affected namespace and inspect the incident window. Event `lastTimestamp` records the latest occurrence when populated; other records may use `eventTime` or series timestamps. A sort on one potentially absent field is not a complete incident chronology. Events complement host evidence: distinguish a container restart from replacement of its Pod, then connect memory pressure, image failures, rollout changes, or crashes to the actual symptom.
 
 ## Reproduce and Compare Symptoms Across Boundaries
 
@@ -263,7 +263,7 @@ last -10                                      # Recent logins
 git log --oneline --since="2 hours ago"
 
 # Kubernetes changes
-kubectl get events -o yaml  # Inspect populated timestamps against the incident window
+kubectl -n app get events -o yaml  # Inspect populated timestamps against the incident window
 ```
 
 Timeline analysis complements divide and conquer because most failures have a trigger. "It worked yesterday" is not a complaint to dismiss; it is a clue that some state changed. That state might be code, config, certificates, package versions, traffic, data size, disk usage, credentials, permissions, network policy, or a scheduled job that only appears under certain timing.
@@ -289,7 +289,7 @@ cat /var/log/apt/history.log | tail -50  # Debian
 cat /var/log/dnf.log | tail -50           # RHEL
 ```
 
-Choose an incident window (the Debian query uses the last 24 hours) and correlate package-log timestamps, retained ReplicaSet creation times, rollout revisions, and deployment records within it. A Deployment's creation time does not date an update; rollout history alone does not supply a complete timestamped audit trail. RPM install listings and file mtimes are candidate clues, not complete update histories; rotated or inaccessible logs leave gaps. The danger in "what changed?" is confirmation bias. If you personally deployed something, you may overfocus on that deployment because it is vivid and embarrassing. If another team changed a dependency, you may underweight it because it feels outside your area. A timeline is useful because it lists candidate changes in time order and lets evidence, not ownership, drive priority.
+Choose an incident window (the Debian query uses the last 24 hours) and correlate package-log timestamps, retained ReplicaSet creation times, rollout revisions, and deployment records within it. A Deployment's creation time does not date an update; rollback can reuse an older ReplicaSet, so its creation time does not date that rollback either. The namespace listing includes other workloads: verify each ReplicaSet's `ownerReferences` identifies the intended Deployment before correlating it. Rollout history alone does not supply a complete timestamped audit trail. RPM install listings and file mtimes are candidate clues, not complete update histories; rotated or inaccessible logs leave gaps. Syslog tails are unwindowed candidates; compare their dates manually. A journal fallback may expose only the current user's records, even when its query succeeds. The danger in "what changed?" is confirmation bias. If you personally deployed something, you may overfocus on that deployment because it is vivid and embarrassing. If another team changed a dependency, you may underweight it because it feels outside your area. A timeline is useful because it lists candidate changes in time order and lets evidence, not ownership, drive priority.
 
 **Hypothetical scenario:** An API team once rolled back three versions because a latency spike started after a release. The real trigger was a cron job that compressed a large log tree and saturated disk I/O on the database host. The release had merely increased traffic enough to reveal the shared bottleneck. Timeline analysis found the overlap; the USE Method explained the resource saturation.
 
@@ -318,7 +318,7 @@ sar -n DEV 1 5
 # Normal local samples leave remote dependencies and intermittent faults open
 ```
 
-The last comment in that block is intentionally cautious. If CPU, memory, disk, and network look normal on one host, the problem might be application-level, but it might also be remote storage, a downstream dependency, a lock in another process, or a problem on only some hosts. "All OK" means "this slice did not explain the symptom," not "Linux is innocent."
+The last comment in that block is intentionally cautious. If CPU, memory, disk, and network look normal on one host, the problem might be application-level, but it might also be remote storage, a downstream dependency, a lock in another process, or a problem on only some hosts. Normal local samples leave the cause unresolved; they do not clear Linux or its dependencies.
 
 Slow systems reward baselines. A one-second response is excellent for a batch export and terrible for a login endpoint. A load average of 8 may be normal for a worker with many CPU cores and alarming for a tiny virtual machine. Without a baseline, you are comparing current behavior against instinct, which is a poor instrument during stress.
 
@@ -380,20 +380,20 @@ TIME        EVENT
 09:06       Observation: "Connection refused to db"; hypothesis: database unavailable
 09:08       SSH to db-server
 09:09       Test: PostgreSQL process absent; supports database-unavailable hypothesis
-09:10       dmesg shows OOM kill
+09:10       Observation: kernel message identifies a PostgreSQL process killed by OOM
 09:12       Combined mitigation chosen: suspend batch job to reduce memory pressure
 09:14       Started PostgreSQL; no measurement between these two actions
-09:15       Result: API recovering; cannot attribute improvement to either action alone
+09:15       Result: API recovering; starting the absent database was necessary, but batch-job suspension has not been tested for preventing recurrence
 09:20       Error rate back to normal
 ```
 
-This synthetic incident timeline explicitly records a combined mitigation rather than proving which action helped. It is small, but it answers the questions that matter later. It shows the first known impact, the observed error, the path from API to database, the evidence of an OOM kill, the recovery action, and the time service returned to normal. A post-incident review can now ask why memory pressure occurred and why the alert fired only after user impact.
+This synthetic timeline records a combined mitigation: starting the absent database was necessary for recovery, while the effect of suspending the batch job on recurrence remains unproven. It is small, but it answers the questions that matter later. It shows the first known impact, the observed error, the path from API to database, the evidence of an OOM kill, the recovery action, and the time service returned to normal. A post-incident review can now ask why memory pressure occurred and why the alert fired only after user impact.
 
 ## Document the Incident Timeline for Handoff and Prevention
 
 Handoff is where many investigations lose their shape. The first responder has context in their head, the second responder arrives with fresh energy, and both people accidentally repeat checks because the evidence is scattered across terminals and chat messages. A written timeline turns the incident from a personal memory into a shared artifact.
 
-The timeline should include observation, hypothesis, test, result, action, and impact. That sounds heavy, but each entry can be one sentence. "09:18, tested PostgreSQL from api-server-1 with `pg_isready -h db-server -p 5432 -t 3`; no response, so inspect both the network path and database service" is more useful than a long paragraph that says the database "seems broken."
+The timeline should include observation, hypothesis, test, result, action, and impact. That sounds heavy, but each entry can be one sentence. "09:07, tested PostgreSQL from api-server-1 with `pg_isready -h db-server -p 5432 -t 3`; no response, so inspect both the network path and database service" is more useful than a long paragraph that says the database "seems broken."
 
 Good incident notes distinguish mitigation from root cause. Starting PostgreSQL may mitigate the outage, but the root cause might be memory pressure from a batch job, a configuration regression, a data growth pattern, or a kernel setting that made the host fragile. If the notes blur mitigation and cause, the post-incident review will produce shallow fixes and the same class of incident will return.
 
@@ -514,13 +514,13 @@ The timeline should record the first known impact, key observations, hypotheses 
 
 **Objective**: Apply troubleshooting methodology to a bounded storage experiment and a synthetic configuration comparison, then record observations and limits.
 
-**Environment**: A disposable Linux workstation or lab VM with Bash, GNU coreutils/date, systemd, and iproute2; optional commands need their own packages and authorized access.
+**Environment**: A disposable Linux workstation or lab VM with Bash, GNU coreutils/date, systemd, iproute2, procps, diffutils, awk, and iputils. Install optional tools through your normal lab setup; unavailable tools or unauthorized queries leave evidence gaps.
 
 This exercise is intentionally local and bounded. You will collect a baseline, test a small storage hypothesis with real write probes, inspect recent changes, and document the session. The commands should run on a normal Linux workstation or lab VM, though service names and permissions can vary by distribution.
 
 #### Part 1: Initial Triage Script
 
-Create a reusable triage script first, because repeatability matters when you are tired or switching between hosts. The script does not diagnose every possible issue; it captures a fast snapshot of load, memory, disk, recent errors, failed services, top processes, and listening sockets so you can choose the next hypothesis from evidence.
+Use this re-runnable triage block first, because repeatability matters when you are tired or switching between hosts. The script does not diagnose every possible issue; it captures a fast snapshot of load, memory, disk, recent errors, failed services, top processes, and listening sockets so you can choose the next hypothesis from evidence.
 
 ```bash
 # Child shell owns and cleans up only its unique script file.
@@ -541,10 +541,10 @@ echo "--- Disk ---"
 df -h | grep -v tmpfs
 echo ""
 echo "--- Recent Errors ---"
-journalctl -p err --since "1 hour ago" -n 10 --no-pager || dmesg | tail -10
+journalctl -p err --since "1 hour ago" -n 10 --no-pager || { echo "Fallback: kernel buffer tail, not time/priority filtered"; dmesg | tail -10; }
 echo ""
 echo "--- Failed Services ---"
-systemctl --failed || echo "Service query unavailable; record the error"
+systemctl --failed --no-pager || echo "Service query unavailable; record the error"
 echo ""
 echo "--- Top Processes ---"
 ps aux --sort=-%cpu | head -5
@@ -552,7 +552,7 @@ echo ""
 echo "--- Network Listeners ---"
 ss -tuln | head -10
 EOF
-# Run it; any access errors remain visible.
+# Run it
 bash "$triage_file"
 TRIAGE
 ```
@@ -729,7 +729,9 @@ if listeners=$(ss -H -ltn 'sport = :22'); then
 else echo "H3: Socket query failed; state unknown" >&2; fi
 
 # Hypothesis 4: Firewall blocking
-iptables -L INPUT -n 2>/dev/null | grep -qE "dpt:22([[:space:]]|$)" && echo "H4: Port 22 rule found; inspect action and ordering" || echo "H4: Check firewall"
+if rules=$(iptables -L INPUT -n); then
+  printf '%s\n' "$rules" | grep -qE 'dpt:22([[:space:]]|$)' && echo "H4: Exact port token found; inspect action and ordering" || echo "H4: No exact token; firewall effect unknown (other chains, multiport, or nftables may apply)"
+else echo "H4: Firewall query failed; state unknown" >&2; fi
 ```
 
 <details><summary>Solution notes for Part 4</summary>
@@ -740,19 +742,20 @@ The exact output depends on whether SSH is installed and running on your system.
 
 #### Part 5: Document Your Process
 
-Finish by documenting the investigation as it happens. This small logging function is enough to model the incident habit: timestamp, observation, hypothesis, test, action, and result. In a real incident, share the timeline where responders can see it.
+Before running this block, write your own prediction of the initial diff, the effect of copying the control file, and what that result cannot prove. Export that text as `COMPARISON_PREDICTION` in the same terminal. The block refuses an empty prediction, records it before comparison, and prints a timeline you can save in your notes. This is a file-comparison exercise, not an induced service failure.
 
 ```bash
 # Start logging
 bash <<'SESSION'
 set -eu
+: "${COMPARISON_PREDICTION:?Export your written comparison prediction before running this block}"
 session_dir=$(mktemp -d "${TMPDIR:-/tmp}/kubedojo-notes.XXXXXX") || exit 1
 trap 'rm -rf -- "$session_dir"' EXIT
 LOGFILE="$session_dir/timeline.log"
 
 # Function to log with timestamp
 log() {
-  echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOGFILE"
+  printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" >> "$LOGFILE"
 }
 
 # Example session
@@ -766,14 +769,14 @@ log "Action: None yet, gathering more info"
 # Synthetic control comparison: files only, no service reconfiguration.
 printf 'timeout=2\n' > "$session_dir/affected.conf"
 printf 'timeout=5\n' > "$session_dir/control.conf"
-log "Hypothesis: the two prepared configs differ in timeout; predict diff output first"
+log "Written prediction: $COMPARISON_PREDICTION"
 diff -u "$session_dir/control.conf" "$session_dir/affected.conf" > "$session_dir/before.diff" || [ "$?" -eq 1 ]
 cat "$session_dir/before.diff" >> "$LOGFILE"
 log "One change: copy the control timeout into the affected fixture"
 cp -- "$session_dir/control.conf" "$session_dir/affected.conf"
 diff -u "$session_dir/control.conf" "$session_dir/affected.conf" >> "$LOGFILE"
 log "Result: configs now match; no service was run, so recovery is unproven"
-# Review/capture the printed record before this child shell cleans its files.
+# Review log
 cat "$LOGFILE"
 SESSION
 ```
@@ -830,7 +833,7 @@ Failure layer: missing observation window, not a cleared fault. Next action: kee
 - [ ] Capture the triage snapshot and label any unavailable commands or restricted log views as evidence gaps.
 - [ ] Save the synthetic configuration diff and explain why this control isolates one difference but does not prove a production cause.
 - [ ] Record the one fixture change and its comparison result, plus a safe next test for an actual affected service.
-- [ ] Document an incident timeline that supports handoff, post-incident review, and prevention work.
+- [ ] Save the printed timeline with your written prediction, comparison output, change, result, evidence gaps, and a proposed next test.
 - [ ] Classify each synthetic scenario by evidence layer and next action, distinguishing mitigation from proven cause.
 
 ## Key Takeaways
@@ -856,10 +859,10 @@ Next, continue to [Module 6.2: Log Analysis](/linux/operations/troubleshooting/m
 - [Rubber Duck Debugging](https://rubberduckdebugging.com/)
 - [systemd journalctl manual](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html)
 - [systemd systemctl manual](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)
-- [PostgreSQL pg_isready](https://www.postgresql.org/docs/current/app-pg-isready.html) — Connection status, host/port options, and exit codes.
+- [PostgreSQL pg_isready](https://www.postgresql.org/docs/18/app-pg-isready.html) — Connection status, host/port options, and exit codes.
 - [ss socket filters](https://man7.org/linux/man-pages/man8/ss.8.html) and [systemd socket activation](https://www.freedesktop.org/software/systemd/man/latest/systemd.socket.html).
 - [Debian dpkg logging](https://manpages.debian.org/bookworm/dpkg/dpkg.1.en.html) and [kubectl rollout history](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_history/).
-- [Linux 6.12 OOM logging implementation](https://github.com/torvalds/linux/blob/v6.12/mm/oom_kill.c#L889-L895) — An example of kernel process-kill diagnostics; available records depend on retention and access.
+- [Linux 6.12 OOM logging implementation](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/mm/oom_kill.c#L949-L955) — An example of kernel process-kill diagnostics; available records depend on retention and access.
 - [Linux man-pages: dmesg](https://man7.org/linux/man-pages/man1/dmesg.1.html)
 - [Kubernetes docs: Debug Running Pods](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/)
 - [Kubernetes docs: Events](https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/)

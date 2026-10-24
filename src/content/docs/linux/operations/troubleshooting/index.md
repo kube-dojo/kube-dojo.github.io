@@ -25,7 +25,7 @@ These are planning estimates copied from the four module headers, not measured l
 Production issues may come with symptoms and error messages, but rarely with a proven root cause. Systematic debugging skills help you:
 
 - **Investigate root causes** — Distinguish evidence from symptoms and hypotheses
-- **Debug Kubernetes issues** — Many have Linux causes
+- **Debug Kubernetes issues** — Check Linux resource and process evidence alongside cluster state
 - **Handle incidents** — Record tests and decisions so responders can coordinate recovery
 - **Learn from failures** — Understand what actually happened
 

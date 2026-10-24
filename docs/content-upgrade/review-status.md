@@ -50,6 +50,8 @@ All 828 English modules were structurally rescanned: 753 pass enabled gates, 75 
 
 This checkpoint records eight pages reviewed with findings, zero newly fully accepted pages, and 1,081 of the current 1,089 English plus all 562 Ukrainian pages not covered by these full-page reviews. A `revise` disposition records a demonstrated defect; it does not assert that every other claim was checked. Curriculum D1–D8 remain unassessed while citation gates are unresolved; book acceptance follows its separate source/prose/multi-family/human requirements. Same-provider red-team dissent is distinguished from cross-provider review.
 
+Correction disposition after this checkpoint: [PR #3536](https://github.com/kube-dojo/kube-dojo.github.io/pull/3536) delivers the four-page Kubernetes corrections with independent review, 26 guard fixtures and merged build/render checks; named editorial residuals stay under #2278. [PR #3538](https://github.com/kube-dojo/kube-dojo.github.io/pull/3538) supplies the Linux module/hub corrections, including the independent review's source-locator and assessment fixes. The linked reports retain their original reviewed digests; these scoped corrections do not promote any page to full acceptance. Chapter 1 contract/prose work and wider English coverage remain open; Ukrainian follows English readiness.
+
 ## Reproducibility and continuation
 
 - At the pinned revision, run `.venv/bin/python scripts/quality/content_inventory.py`; its documented schema/receipt contract remains [unchanged](inventory.md). Inspect all current paths, including newly added pages.
