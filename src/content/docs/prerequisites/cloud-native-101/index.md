@@ -8,7 +8,7 @@ Cloud native practices help teams automate deployment, recovery, and scaling whe
 
 This section serves as the foundational prerequisite for KubeDojo. Whether you are transitioning from a traditional systems administration background or you are a developer looking to understand the platform your code runs on, these modules will demystify the core concepts. You will build a strong mental model of the infrastructure and architecture patterns that power modern technology companies.
 
-Our journey begins at the lowest level of abstraction by exploring containers and how they isolate processes. We then examine Docker, the tool that popularized containerization, before moving up a layer to understand when orchestration systems like Kubernetes justify their operational cost. Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem and explore the architectural shift from monoliths to microservices that makes this entire ecosystem valuable.
+Our journey begins at the lowest level of abstraction by exploring containers and how they isolate processes. We then examine Docker, the tool that popularized containerization, before moving up a layer to understand when orchestration systems like Kubernetes justify their operational cost. Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem and explore the trade-offs between monoliths and microservices when choosing application architecture.
 
 ## Modules
 

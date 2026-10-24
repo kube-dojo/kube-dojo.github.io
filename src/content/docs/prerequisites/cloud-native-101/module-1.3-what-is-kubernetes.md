@@ -59,7 +59,7 @@ The shared API is more important than it first appears. When every team invents 
 
 That common vocabulary also lets platform teams build guardrails without taking over every application. They can define default resource limits, admission checks, network rules, image policies, and observability conventions around Kubernetes resources. Application teams still own their code and manifests, but the platform can enforce baseline safety at the API boundary. This is one reason Kubernetes became more than a scheduler: it is also a policy and integration point for operating many services consistently.
 
-> **Stop and think**: You have 200 containers running across 15 servers. One server's hard drive fails at 3 AM. In a manual setup, someone gets paged, SSHs in, figures out what was running on that server, and manually redeploys those containers elsewhere. With Kubernetes, the system detects the failure, knows exactly what was running, and automatically reschedules those containers to healthy servers, often before your on-call engineer has opened the laptop.
+> **Stop and think**: You have 200 containers running across 15 servers. One server's hard drive fails at 3 AM. In a manual setup, someone gets paged, SSHs in, figures out what was running on that server, and manually redeploys those containers elsewhere. With Kubernetes, node-health detection and eviction delays precede replacement of controller-managed Pods; the scheduler can place replacements on healthy nodes only when suitable capacity exists. Bare Pods have no controller to replace them.
 
 That example also shows the trade-off. Kubernetes is not magic resilience sprinkled over any application; it is a control system with opinions, resource models, and failure modes of its own. You gain a powerful reconciler, but you also agree to learn its API, model your applications as Kubernetes resources, and operate or rent the platform that runs those resources. The right question is not "is Kubernetes powerful?" The right question is "does this workload need the kind of operational contract Kubernetes provides?"
 
@@ -332,7 +332,7 @@ The sequence diagram preserves a key operational truth: each component has a bou
 
 Desired state also explains self-healing. Suppose a junior engineer deletes the only running pod for a payment service, but the service is owned by a Deployment with one desired replica. The API records that the pod is gone. The ReplicaSet controller observes that actual replicas are below desired replicas. It creates a replacement pod, the scheduler places it, and kubelet starts it. No person had to remember the original command because the desired state still existed.
 
-Node failure follows the same pattern with more delay and more caution. If a worker node loses power, the kubelet on that node stops sending heartbeats. The Node controller eventually marks the node unhealthy, and controllers responsible for affected pods create replacements where appropriate. The scheduler then places replacement pods on healthy nodes, subject to available capacity and constraints. Kubernetes can automate the response, but it cannot create capacity from nothing, so cluster sizing still matters.
+Node failure follows the same pattern with more delay and more caution. If a worker node loses power, the kubelet on that node stops sending heartbeats. The Node controller eventually marks the node unhealthy; after the affected Pods are evicted subject to their tolerations, workload controllers create replacements where appropriate. The scheduler then places replacement pods on healthy nodes, subject to available capacity and constraints. Kubernetes can automate the response, but it cannot create capacity from nothing, so cluster sizing still matters.
 
 Rolling updates are another form of controlled reconciliation. A Deployment does not usually destroy all old pods at once and then start all new pods. It selects a matching retained ReplicaSet or creates one for the updated template and gradually shifts replicas while respecting availability rules. If the new pods fail readiness checks, the rollout can stall instead of sending traffic to broken instances. This is why health probes and sensible rollout settings matter even in an introductory application.
 
@@ -357,7 +357,7 @@ Docker and Kubernetes are not enemies, and Kubernetes did not make container ima
 | Load balancing | Manual | Built-in |
 | Service discovery | Compose service-name DNS on its network | Services and cluster DNS |
 | Secrets management | Compose can mount supplied secrets | Secret API objects and access controls |
-| Resource limits | Per container | Cluster-wide |
+| Resource limits | Per container | Per-container requests/limits plus namespace quotas |
 
 The comparison table can look one-sided, but the honest answer is more nuanced. Docker on one host is simpler, cheaper to reason about, and often enough for a small internal tool, a prototype, or a service with modest availability requirements. Kubernetes adds moving parts, YAML resources, cluster upgrades, security policy, monitoring needs, and a new failure vocabulary. You should earn that complexity with real operational needs.
 
@@ -373,7 +373,7 @@ Security has a similar trade-off. Kubernetes gives teams strong primitives such 
 
 Kubernetes can run in cloud-managed services, self-managed clusters, local development environments, and specialized edge distributions. The API model is portable enough that a Deployment and Service look similar across providers, but the operational responsibility changes dramatically depending on where the control plane lives. That responsibility boundary is one of the most important production decisions a team makes.
 
-Cloud-managed Kubernetes is the usual starting point for production teams because the provider operates much of the control plane. AWS offers Amazon EKS, Google Cloud offers GKE, and Microsoft Azure offers AKS. You still own workloads, access policy, and application readiness; node and upgrade duties depend on the service mode. Standard node pools need customer choices, while modes such as GKE Autopilot manage node provisioning and configuration, but the provider takes on core control plane availability and a large part of the operational burden.
+Cloud-managed Kubernetes is the usual starting point for production teams because the provider operates much of the control plane. AWS offers Amazon EKS, Google Cloud offers GKE, and Microsoft Azure offers AKS. You still own workloads, access policy, and application readiness; node and upgrade duties depend on the service mode. Standard node pools need customer choices, while modes such as GKE Autopilot manage node provisioning and configuration. The provider takes on core control plane availability and a large part of the operational burden.
 
 Self-managed Kubernetes gives more control and often more responsibility than beginners expect. kubeadm can bootstrap conformant clusters, k3s provides a lightweight distribution that is popular for edge and lab environments, and OpenShift packages Kubernetes with additional enterprise platform features. These options can be the right choice for regulated environments, unusual infrastructure, or teams with strong platform engineering expertise, but they are not free just because the software is open source.
 
@@ -429,7 +429,7 @@ Choose a simpler container service, virtual machine, or managed app platform whe
 
 - **"Kubernetes" is Greek for "helmsman"** (one who steers a ship). The logo is a ship's wheel with 7 spokes, reflecting the project's early history and steering metaphor.
 - **K8s is a numeronym.** The abbreviation keeps the first and last letters of Kubernetes and replaces the middle 8 letters, like i18n for internationalization or a11y for accessibility.
-- **Kubernetes began at Google in 2014.** Its design drew on Borg and Omega. It is now hosted by CNCF; its origin in Google's cluster-management work helps explain its focus on declarative scheduling and reconciliation.
+- **Kubernetes' first public commit was in June 2014.** Its Google founders drew on Borg and Omega experience. It is now hosted by CNCF; its origin in Google's cluster-management work helps explain its focus on declarative scheduling and reconciliation.
 - **A Pod can contain more than one container.** Containers in a Pod share its network namespace, including its IP address and port space; use separate Pods when components need independent scaling or replacement.
 
 ## Common Mistakes
@@ -439,7 +439,7 @@ Choose a simpler container service, virtual machine, or managed app platform whe
 | Treating Kubernetes as a direct Docker replacement | Teams learn containers first and assume the next tool merely starts containers in another place | Explain that Kubernetes orchestrates desired state across nodes, while container tools still build and run OCI images underneath |
 | Deploying standalone Pods for applications that should survive deletion | Bare Pod examples are short and easy to copy from tutorials | Use a Deployment for replicated stateless applications so controllers can replace Pods and coordinate rollouts |
 | Connecting services directly to Pod IP addresses | Pod IPs are visible in command output, so they look like stable endpoints | Put a Service in front of replaceable Pods and route by labels instead of direct Pod addresses |
-| Assuming managed Kubernetes means no operations work | Providers run much of the control plane, but workloads, access, nodes, costs, and upgrades still need ownership | Define a platform responsibility matrix that separates provider duties from team duties before production launch |
+| Assuming managed Kubernetes means no operations work | Providers run much of the control plane, but workloads, access, and costs still need ownership; node and upgrade duties depend on the service mode | Define a platform responsibility matrix that separates provider duties from team duties before production launch |
 | Self-managing a control plane to save money without counting risk | The software is open source, so the visible license cost looks lower than a managed service fee | Include etcd backup, high availability, certificates, upgrades, monitoring, and incident response in the cost model |
 | Diagnosing every failure from application logs first | Logs are familiar, while Kubernetes events and resource status are new | Start with the resource lifecycle: API access, scheduling events, kubelet status, image pulls, readiness, then application logs |
 | Believing Kubernetes makes stateful systems easy by default | The platform supports persistent storage, but data availability has stricter rules than stateless replicas | Use managed databases until you can design storage classes, backups, disruption handling, and recovery tests confidently |
@@ -467,7 +467,7 @@ The API records that the Pod was deleted, and the ReplicaSet controller observes
 <details>
 <summary>Scenario: Worker Node 3 loses power while running several web Pods. Users see a brief capacity drop, but the control plane remains reachable. Which components are involved in recovery?</summary>
 
-The Node controller notices missing heartbeats and marks the node unhealthy after the configured grace period. Controllers responsible for the affected replicated workloads then create replacement Pods if the desired replica count is no longer satisfied. The scheduler chooses healthy nodes with enough capacity, and kubelet on those nodes asks the container runtime to start the containers. This recovery depends on spare cluster capacity; Kubernetes can reschedule work, but it cannot run Pods on resources that do not exist.
+The Node controller notices missing heartbeats and marks the node unhealthy after the configured grace period. After affected Pods are evicted subject to their tolerations, controllers for replicated workloads create replacement Pods if the desired count is no longer satisfied. The scheduler chooses healthy nodes with enough capacity, and kubelet on those nodes asks the container runtime to start the containers. This recovery depends on spare cluster capacity; Kubernetes can reschedule work, but it cannot run Pods on resources that do not exist.
 </details>
 
 <details>
@@ -486,7 +486,7 @@ A Service fixes the design by providing a stable virtual IP and DNS name that se
 
 **Task**: Explore a Kubernetes cluster and connect each observation to the architecture you just learned. This is a preview exercise, so it is fine if some output still feels unfamiliar. The point is to see that Kubernetes exposes an API for nodes, namespaces, system components, Pods, and events rather than asking you to SSH into machines and manage containers one by one.
 
-**Setup**: Complete [Your First Cluster](/prerequisites/kubernetes-basics/module-1.1-first-cluster/) if needed, then independently confirm that the selected context is a dedicated disposable cluster. The commands below use the full `kubectl` binary name so they work when copied into scripts, CI jobs, and non-interactive shells.
+**Setup**: Complete [Your First Cluster](/prerequisites/kubernetes-basics/module-1.1-first-cluster/) if needed, then independently confirm that the selected context is a dedicated disposable cluster. Run setup once per fresh Bash terminal; after failure, clean up any owned namespace there, then retry in a fresh terminal. Re-pasting disables mutations but preserves cleanup ownership. If you lose the terminal, delete only the printed namespace with `--context` set explicitly, after confirming creation succeeded. The commands below use the full `kubectl` binary name so they work when copied into scripts, CI jobs, and non-interactive shells.
 
 ```bash
 kubectl version
@@ -534,12 +534,12 @@ Most clusters include namespaces such as `default`, `kube-system`, and `kube-pub
 
 ```bash
 # In a fresh Bash terminal, export KUBEDOJO_LAB_CONTEXT with the verified context name first.
-EXAMPLE_READY=no
-readonly EXAMPLE_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" EXAMPLE_NS="intro-example-$(date +%s)-$$"
+EXAMPLE_READY=no EXAMPLE_SETUP_NEW=no
+readonly EXAMPLE_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" EXAMPLE_NS="intro-example-$(date +%s)-$$" && EXAMPLE_OWNED=no && EXAMPLE_SETUP_NEW=yes
 kubectl() { [ "$EXAMPLE_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }; command kubectl --context "$EXAMPLE_CONTEXT" --namespace "$EXAMPLE_NS" "$@"; }
-if [ -n "$EXAMPLE_CONTEXT" ] && [ "$EXAMPLE_CONTEXT" != default ] && [ "$(command kubectl config current-context)" = "$EXAMPLE_CONTEXT" ]; then
+if [ "$EXAMPLE_SETUP_NEW" = yes ] && [ -n "$EXAMPLE_CONTEXT" ] && [ "$EXAMPLE_CONTEXT" != default ] && [ "$(command kubectl config current-context)" = "$EXAMPLE_CONTEXT" ]; then
   printf 'Example context/namespace: %s / %s\n' "$EXAMPLE_CONTEXT" "$EXAMPLE_NS"
-  command kubectl --context "$EXAMPLE_CONTEXT" create namespace "$EXAMPLE_NS" && EXAMPLE_READY=yes
+  command kubectl --context "$EXAMPLE_CONTEXT" create namespace "$EXAMPLE_NS" && EXAMPLE_READY=yes && EXAMPLE_OWNED=yes
 fi
 POD_CREATED=no
 kubectl run hello --image=nginx:1.27 --restart=Never && POD_CREATED=yes
@@ -581,8 +581,8 @@ The Pod should disappear and stay gone because you created a standalone Pod with
 After completion or interruption, run this in the same terminal. It deletes only the namespace successfully created above. If cleanup fails, retain the printed context/namespace and retry after restoring access; do not switch contexts or broaden deletion. These guards establish scope, not cluster disposability.
 
 ```bash
-if [ "$EXAMPLE_READY" = yes ]; then
-  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --wait=true --timeout=120s && EXAMPLE_READY=no
+if [ "${EXAMPLE_OWNED:-}" = yes ]; then
+  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --wait=true --timeout=120s && EXAMPLE_READY=no && EXAMPLE_OWNED=no
 fi
 ```
 
