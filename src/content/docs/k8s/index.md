@@ -153,16 +153,19 @@ These are best treated as specialization tracks, not replacements for a first Ku
 
 ## Exam Tips
 
-All exams share these characteristics:
-- **PSI Bridge proctoring** — Strict environment, webcam required
-- **kubernetes.io allowed** — Official docs are your friend
-- **Time pressure** — Speed matters as much as knowledge
+Match your practice to the exam format and its resource policy:
+- **KCNA / KCSA** — Multiple-choice exams; documentation lookup and other external resources are not permitted during the exam.
+- **CKA / CKAD / CKS** — Hands-on exams; use only the documentation and tools permitted for that specific exam, through the exam environment.
+- **Proctoring and timing** — Prepare for the proctored environment and practice completing work within the exam's time limit.
 
-Typical pacing:
-- `KCNA` / `KCSA`: 4-8 weeks if you are already in the curriculum about `5-8 h/week`
-- `CKAD` / `CKA`: 2-4 months at about `8-10 h/week`
-- `CKS` after `CKA`: usually another `4-8 weeks`
-- full Kubestronaut path: commonly `3-6 months` for already-technical learners at roughly `10 h/week`
+The [Linux Foundation's exam-specific allowed-resources policy](https://docs.linuxfoundation.org/tc-docs/certification/certification-resources-allowed) distinguishes these rules. Use documentation freely while learning, then rehearse the resource constraints of your target exam.
+
+Illustrative study budgets, to adjust using practice-test or self-assessment results:
+- `KCNA` or `KCSA`: `4-8 weeks per exam` at about `5-8 h/week`
+- `CKAD` or `CKA`: `2-4 months per exam` at about `8-10 h/week`
+- `CKS` after `CKA`: another `4-8 weeks`
+
+Plan the full Kubestronaut route individually rather than treating these examples as a guaranteed total. Shared fundamentals, prior experience and the need to keep all five certifications active affect the schedule.
 
 For hands-on exams (CKAD, CKA, CKS):
 - Practice with `kubectl` until it's muscle memory
