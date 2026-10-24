@@ -32,7 +32,7 @@ After completing this module, you will be able to:
 
 Hypothetical scenario: a payment startup runs its checkout processor as a single naked Pod because the team wants the smallest possible manifest while preparing for a product launch. At 2 PM on a Friday, an operator deletes that Pod during a partner promotion, and nothing in the cluster recreates it because no controller owns the workload. For 23 minutes, every payment request fails until an on-call engineer manually applies a replacement, then another 15 minutes disappear when the replacement uses the wrong image tag and needs a second emergency fix.
 
-In this scenario, the immediate failed payment transactions certainly matter, but the longer-term damage is deeply operational and cultural. Engineers stop trusting their own deploys, customer support burns hours handling angry merchants, and the next scheduled release is delayed indefinitely because the team has no reliable, repeatable way to replace failing application instances safely. A Deployment controller would not magically make the underlying application defect vanish. However, its ReplicaSet would request replacement Pods, subject to scheduling capacity and readiness. A container crash is different: kubelet normally restarts that container within the same Pod under `restartPolicy: Always`, even without a Deployment.
+In this scenario, the immediate failed payment transactions certainly matter, but the longer-term damage is deeply operational and cultural. Engineers stop trusting their own deploys, customer support burns hours handling angry merchants, and the next scheduled release is delayed indefinitely because the team has no reliable, repeatable way to replace failing application instances safely. A Deployment controller would not magically make the risk of accidental deletion vanish. However, its ReplicaSet would request replacement Pods, subject to scheduling capacity; readiness then governs whether they serve traffic. A container crash is different: kubelet normally restarts that container within the same Pod under `restartPolicy: Always`, even without a Deployment.
 
 That operational resilience is exactly why Deployments are the first Kubernetes workload controller worth treating as far more than just YAML syntax. While Pods strictly describe one running, ephemeral copy of a containerized process, Deployments describe the long-term strategic intent: how many identical copies must exist, exactly how they should be updated when the template changes, and precisely how the Kubernetes control plane should violently recover when physical reality drifts away from the desired declarative state. The core practical skill here is absolutely not memorizing the `kubectl create deployment` flags. The true engineering skill is learning to dynamically read the Deployment, the intermediate ReplicaSets, and the underlying Pod layers as one cohesive, continuous control system that aggressively protects user availability while still safely allowing you to iterate and change your software.
 
@@ -61,7 +61,7 @@ graph TD
     end
 ```
 
-The important difference in the diagram is not that Deployments are more complicated; it is that they preserve intent after the first successful start. A naked Pod can be running perfectly at noon and still leave you exposed at noon-thirty because there is no ReplicaSet obligated to replace a deleted Pod. A Deployment keeps asking whether the expected number of ready Pods exists, so a one-time launch becomes a continuing contract between your manifest and the cluster.
+The important difference in the diagram is not that Deployments are more complicated; it is that they preserve intent after the first successful start. A naked Pod can be running perfectly at noon and still leave you exposed at noon-thirty because there is no ReplicaSet obligated to replace a deleted Pod. A Deployment keeps asking whether the expected number of matching Pods exists and, during a rollout, how many are available, so a one-time launch becomes a continuing contract between your manifest and the cluster.
 
 This contract is especially valuable because failure rarely arrives in one neat category. A node can drain during unexpected hardware maintenance, an image can fail to pull in one specific geographic region, a poorly tuned resource request can make new Pods unschedulable, or a readiness probe can reveal that a new version starts cleanly but completely fails to serve application traffic. Deployments give you a single, unified control plane to observe all those disparate situations. Crucially, they make the default operational response deeply conservative: the controller limits rollout-driven removal of old capacity; unrelated failures or misleading readiness signals can still interrupt service.
 
@@ -82,15 +82,15 @@ The Deployment is therefore both a safety mechanism and a debugging map. When an
 
 There are two normal ways to create a Deployment, and they serve different purposes. Imperative commands are fast when you are exploring a cluster, testing a small image, or generating a starter manifest. Declarative YAML is the production habit because it can be reviewed, versioned, repeated, and compared against the live cluster without relying on whoever happened to type the original command.
 
-**Before any mutation:** independently confirm a dedicated disposable cluster and export its name as `KUBEDOJO_LAB_CONTEXT`. Use a fresh Bash terminal and empty scratch directory for these examples, in order. The wrapper below refuses commands unless namespace creation succeeds, then pins them to that context and namespace; it cannot prove disposability. If setup fails, stop. Keep this terminal for cleanup after completion or interruption; do not redefine these variables or bypass the wrapper.
+**Before any mutation:** independently confirm a dedicated disposable cluster and export its name as `KUBEDOJO_LAB_CONTEXT`. Use a fresh Bash terminal and empty scratch directory for these examples, in order. The wrapper below refuses commands unless namespace creation succeeds, then pins them to that context and namespace; it cannot prove disposability. Run setup once per terminal; after failure, clean up any owned namespace here, then retry in a fresh terminal. Re-pasting disables mutations but preserves cleanup ownership. If you lose the terminal, delete only the printed namespace with `--context` set explicitly, after confirming creation succeeded. Do not redefine these variables or bypass the wrapper.
 
 ```bash
-EXAMPLE_READY=no
-readonly EXAMPLE_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" EXAMPLE_NS="deploy-example-$(date +%s)-$$"
+EXAMPLE_READY=no EXAMPLE_SETUP_NEW=no
+readonly EXAMPLE_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" EXAMPLE_NS="deploy-example-$(date +%s)-$$" && EXAMPLE_OWNED=no && EXAMPLE_SETUP_NEW=yes
 kubectl() { [ "$EXAMPLE_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }; command kubectl --context "$EXAMPLE_CONTEXT" --namespace "$EXAMPLE_NS" "$@"; }
-if [ -n "$EXAMPLE_CONTEXT" ] && [ "$EXAMPLE_CONTEXT" != default ] && [ "$(command kubectl config current-context)" = "$EXAMPLE_CONTEXT" ]; then
+if [ "$EXAMPLE_SETUP_NEW" = yes ] && [ -n "$EXAMPLE_CONTEXT" ] && [ "$EXAMPLE_CONTEXT" != default ] && [ "$(command kubectl config current-context)" = "$EXAMPLE_CONTEXT" ]; then
   printf 'Example context/namespace: %s / %s\n' "$EXAMPLE_CONTEXT" "$EXAMPLE_NS"
-  command kubectl --context "$EXAMPLE_CONTEXT" create namespace "$EXAMPLE_NS" && EXAMPLE_READY=yes
+  command kubectl --context "$EXAMPLE_CONTEXT" create namespace "$EXAMPLE_NS" && EXAMPLE_READY=yes && EXAMPLE_OWNED=yes
 fi
 [ "$EXAMPLE_READY" = yes ] || echo 'Setup failed; do not continue' >&2
 ```
@@ -496,8 +496,8 @@ The Deployment must be able to identify the Pods created from its own template, 
 Before starting the separate guarded exercise below, clean up in the same terminal, including after an interruption. Delete only the namespace this setup successfully created. If deletion fails, keep the variables and retry after restoring access; do not switch contexts or broaden deletion. After success, use a fresh terminal for the guarded exercise.
 
 ```bash
-if [ "$EXAMPLE_READY" = yes ]; then
-  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --wait=true --timeout=120s && EXAMPLE_READY=no
+if [ "${EXAMPLE_OWNED:-}" = yes ]; then
+  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --wait=true --timeout=120s && EXAMPLE_READY=no && EXAMPLE_OWNED=no
 fi
 ```
 
@@ -739,7 +739,7 @@ Failure layer: the new Pod cannot pull its image, so progress is bounded. Next a
 
 - **Exercise references (Kubernetes v1.35):** [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/), [kubectl create namespace](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_namespace/), [kubectl rollout status](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_status/), and [kubectl rollout undo](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/).
 - [Pod lifecycle and container restarts (v1.35)](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
-- [ReplicaSet selection (v1.35 source)](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/controller/deployment/sync.go#L128-L177) and [synchronization retry handling](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/controller/deployment/deployment_controller.go#L470-L488).
+- [ReplicaSet selection (v1.35 source)](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/controller/deployment/sync.go#L128-L177) and [synchronization retry handling](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/controller/deployment/deployment_controller.go#L506-L526).
 - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 - [Kubernetes ReplicaSet](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/)
 - [Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/)
