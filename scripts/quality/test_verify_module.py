@@ -574,7 +574,40 @@ def test_common_mistakes_prefix_heading_is_detected() -> None:
     assert metrics["common_mistakes_rows"] == 6
 
 
-def test_further_reading_heading_is_detected_as_sources() -> None:
+def test_explicit_sources_wins_when_after_further_reading() -> None:
+    metrics = verify_module.sources_metrics(
+        """
+## Further Reading
+- https://example.com/optional-reading
+## Sources
+- https://example.com/canonical-source
+## Next Module
+- https://example.com/next-module
+""",
+        skip_source_check=True,
+        max_workers=1,
+    )
+    assert metrics["urls"] == ["https://example.com/canonical-source"]
+    assert metrics["count"] == 1
+
+
+def test_empty_explicit_sources_does_not_fallback() -> None:
+    metrics = verify_module.sources_metrics(
+        """
+## Further Reading
+- https://example.com/optional-reading
+## Sources
+## Next Module
+- https://example.com/next-module
+""",
+        skip_source_check=True,
+        max_workers=1,
+    )
+    assert metrics["urls"] == []
+    assert metrics["count"] == 0
+
+
+def test_legacy_further_reading_fallback_without_sources() -> None:
     metrics = verify_module.sources_metrics(
         """
 ## Further Reading
@@ -584,6 +617,7 @@ def test_further_reading_heading_is_detected_as_sources() -> None:
         max_workers=1,
     )
     assert metrics["count"] == 1
+    assert metrics["urls"] == ["https://example.com/source"]
 
 
 def test_did_you_know_question_mark_heading_is_detected() -> None:

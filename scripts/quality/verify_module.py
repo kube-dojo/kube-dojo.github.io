@@ -1192,7 +1192,13 @@ def _check_url(url: str) -> str:
 
 
 def sources_metrics(text: str, skip_source_check: bool, max_workers: int) -> dict[str, object]:
-    section = _extract_matching_section_text(text, SOURCES_HEADINGS)
+    _, body = _strip_frontmatter(text)
+    canonical = _find_matching_h2(body, ("Sources",))
+    section = (
+        str(canonical["content"])
+        if canonical is not None
+        else _extract_matching_section_text(text, SOURCES_HEADINGS)
+    )
     urls = extract_urls(section)
     if skip_source_check:
         statuses: dict[str, int] = {"skipped": len(urls)}
