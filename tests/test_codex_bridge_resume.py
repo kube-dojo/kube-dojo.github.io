@@ -250,11 +250,24 @@ def test_review_flag_is_fresh_and_preserves_the_implementation_session(bridge, m
     assert _stored() == before
 
 
-def test_resumed_id_is_retained_on_mismatched_returned_id(bridge, caplog):
+def test_resumed_id_mismatch_invalidates_scope_without_retry(bridge, caplog):
     _seed(bridge.repo)
-    _codex.process_for_codex(bridge.message())
-    assert _stored()["codex_session_id"] == "session-old"
-    assert "retaining the requested session" in caplog.text
+    assert _codex.process_for_codex(bridge.message()) == "failed"
+    assert _stored()["codex_session_id"] == ""
+    assert bridge.invoke.call_count == 1
+    assert "clearing the saved session" in caplog.text
+
+
+@pytest.mark.parametrize("blocked_by", ["lock", "quota"])
+def test_self_addressed_ask_reports_explicit_retry_when_it_cannot_run(bridge, capsys, monkeypatch, blocked_by):
+    if blocked_by == "quota":
+        monkeypatch.setattr(_codex, "has_codex_headroom", lambda _model: (False, "limited"))
+        message_id = _codex.ask_codex("question", task_id="task-1", from_llm="codex")
+    else:
+        with _codex._codex_task_lock("task-1"):
+            message_id = _codex.ask_codex("question", task_id="task-1", from_llm="codex")
+    bridge.invoke.assert_not_called()
+    assert f"ab process-codex {message_id} --force" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("model", ["bad\nsession id: injected", "bad model", [], 123])

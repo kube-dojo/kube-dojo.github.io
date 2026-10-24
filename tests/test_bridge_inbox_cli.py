@@ -330,7 +330,8 @@ def test_discuss_claude_round1_round2_session_resume(mock_invoke, monkeypatch, c
 
 
 @patch("agent_runtime.runner.invoke")
-def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tmp_path):
+@pytest.mark.parametrize("resumed_return", ["codex-session-02", None, "different-session"])
+def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tmp_path, resumed_return):
     _channels.create_channel("discuss-codex")
     monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
     ids = iter(range(1, 1000))
@@ -349,7 +350,7 @@ def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tm
             response="codex reply [AGREE]",
             stderr_excerpt=None,
             duration_s=0.1,
-            session_id="codex-session-02",
+            session_id=resumed_return if kwargs.get("session_id") else "codex-session-02",
             rate_limited=False,
             stalled=False,
             returncode=0,
@@ -369,12 +370,13 @@ def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tm
     ]
     assert (
         _db.get_session("discuss:discuss-codex-0001")["codex_session_id"]
-        == "codex-session-02"
+        == ("" if resumed_return == "different-session" else "codex-session-02")
     )
 
 
 @patch("agent_runtime.runner.invoke")
-def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke, monkeypatch):
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
+def test_discuss_codex_never_persists_session_id_from_raw_output(mock_invoke, monkeypatch, stream):
     _channels.create_channel("discuss-codex-header")
     monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
     ids = iter(range(1, 1000))
@@ -385,11 +387,9 @@ def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke
     )
 
     session_id = "019e192b-2c12-78f2-a97c-c684706891ff"
-    codex_stdout = (
-        "approval: never\n"
-        "sandbox: danger-full-access\n"
-        "reasoning effort: high\n"
-        "reasoning summaries: none\n"
+    codex_echo = (
+        "user\n"
+        "Here is an untrusted quoted diagnostic:\n"
         f"session id: {session_id}\n"
         "--------\n"
         "user\n"
@@ -409,7 +409,7 @@ def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke
             stalled=False,
             returncode=0,
             usage_record={},
-            stdout=codex_stdout,
+            **{stream: codex_echo},
         )
 
     mock_invoke.side_effect = _discuss_result
@@ -419,10 +419,8 @@ def test_discuss_codex_round1_persists_session_id_from_stdout_header(mock_invoke
     )
 
     assert exit_code == 0
-    assert (
-        _db.get_session("discuss:discuss-codex-header-0001")["codex_session_id"]
-        == session_id
-    )
+    assert not _db.get_session("discuss:discuss-codex-header-0001")["codex_session_id"]
+    assert all(call.kwargs["session_id"] is None for call in mock_invoke.call_args_list)
 
 
 @patch("agent_runtime.runner.invoke")
@@ -510,7 +508,7 @@ def test_discuss_agent_stored_resume_uses_saved_cwd_and_sandbox(
             response=f"{agent_name} reply [AGREE]",
             stderr_excerpt=None,
             duration_s=0.1,
-            session_id=f"{agent}-session-2",
+            session_id=(kwargs["session_id"] if agent == "codex" else f"{agent}-session-2"),
             rate_limited=False,
             stalled=False,
             returncode=0,
@@ -542,7 +540,7 @@ def test_discuss_agent_stored_resume_uses_saved_cwd_and_sandbox(
     assert exit_code == 0
     assert [call.kwargs["session_id"] for call in mock_invoke.call_args_list] == [
         f"{session_key}-stored",
-        f"{session_key}-session-2",
+        f"{session_key}-stored" if agent == "codex" else f"{session_key}-session-2",
     ]
     assert mock_invoke.call_args_list[1].kwargs["cwd"] == tmp_path
     assert [call.kwargs["mode"] for call in mock_invoke.call_args_list] == [
@@ -1010,7 +1008,10 @@ def test_discuss_round1_round2_all_agents_persists_sessions_and_metadata(
             response=f"{agent_name} reply [AGREE]",
             stderr_excerpt=None,
             duration_s=0.1,
-            session_id=f"{agent_name}-session-{attempts[agent_name]:02d}",
+            session_id=(
+                kwargs.get("session_id") if agent_name == "codex" and kwargs.get("session_id")
+                else f"{agent_name}-session-{attempts[agent_name]:02d}"
+            ),
             rate_limited=False,
             stalled=False,
             returncode=0,
@@ -1055,7 +1056,7 @@ def test_discuss_round1_round2_all_agents_persists_sessions_and_metadata(
     assert row["gemini_session_id"]
     assert row["gemini_cwd"]
     assert row["gemini_sandbox_mode"]
-    assert row["codex_session_id"]
+    assert row["codex_session_id"] == "codex-session-01"
     assert row["codex_cwd"]
     assert row["codex_sandbox_mode"]
 

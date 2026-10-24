@@ -194,9 +194,9 @@ class AgentAdapter(Protocol):
     # Adapters MAY implement ``check_early_reap(plan, call_start_time)
     # -> bool``. If present, the runner calls it periodically in its
     # poll loop. A True return value means "the response is on disk,
-    # kill the subprocess NOW" — used by CodexAdapter to work around
-    # the 0.118 post-completion hang where Codex writes task_complete
-    # to the rollout file then hangs in Tokio runtime shutdown.
+    # kill the subprocess NOW". The readiness signal must belong to that
+    # exact invocation. Codex disables early reap because shared rollout
+    # files do not establish ownership across resume and child agents.
     #
     # Not declared on the Protocol because structural typing would
     # then require EVERY adapter to implement it, including the ones

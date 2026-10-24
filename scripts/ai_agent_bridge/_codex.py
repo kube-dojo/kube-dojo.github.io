@@ -64,7 +64,9 @@ def ask_codex(content: str, task_id: str | None = None, msg_type: str = "query",
     print(f"\n🚀 Invoking Codex to process message #{msg_id}...")
     # Self-addressed messages are auto-acknowledged at insertion and never
     # enter the batch queue. This explicit ask still owns its new message.
-    process_for_codex(msg_id, new_session, force=from_llm == "codex")
+    status = process_for_codex(msg_id, new_session, force=from_llm == "codex")
+    if from_llm == "codex" and status in {"skipped", "deferred"}:
+        print(f"Self-addressed request did not run. Retry explicitly: ab process-codex {msg_id} --force")
     return msg_id
 
 
@@ -226,7 +228,10 @@ def _process_codex_message(
     # The adapter explicitly passes -m on both paths; model selection remains
     # per-call. Session continuity is scoped by task, cwd, and sandbox mode.
     if session_id and result.session_id and result.session_id != session_id:
-        _LOGGER.warning("Codex returned a different session ID; retaining the requested session")
+        _LOGGER.warning("Codex session identity changed; clearing the saved session")
+        clear_session()
+        _handle_codex_error(msg, message_id, "Session identity changed; saved session cleared. This call was not retried.")
+        return "failed"
     returned_session_id = session_id or result.session_id
     if task_key and returned_session_id:
         set_session(
@@ -315,13 +320,18 @@ def _handle_codex_rate_limited(msg: dict, message_id: int, reason: str) -> None:
     """Defer a rate-limited message without acknowledging the inbound row."""
     print(f"\n⛔ Codex rate limited - message {message_id} deferred")
     print(f"   Reason: {reason}")
+    retry_hint = (
+        f"This self-addressed message is already acknowledged. Once headroom returns, "
+        f"retry explicitly: ab process-codex {message_id} --force"
+        if msg["from"] == "codex" else
+        f"The incoming message (id={message_id}) remains in Codex's inbox and will be retried "
+        "automatically when headroom returns. Sender should NOT retry manually."
+    )
     err_id = send_message(
         content=(
             "[Codex rate limited] Usage limit hit.\n"
             f"Reason: {reason}\n\n"
-            f"The incoming message (id={message_id}) remains in Codex's "
-            "inbox and will be retried automatically when headroom returns. "
-            "Sender should NOT retry manually."
+            f"{retry_hint}"
         ),
         task_id=msg["task_id"],
         msg_type="error",

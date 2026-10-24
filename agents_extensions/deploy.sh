@@ -93,7 +93,7 @@ deploy_config() {
             fi
             local backup
             backup=$(mktemp "${target_file}.bak.XXXXXX") || return 1
-            cp -p "$target_file" "$backup" || return 1
+            cp -p "$target_file" "$backup" || { rm -f "$backup"; return 1; }
             log "   Backup: $backup"
         fi
         mkdir -p "$(dirname "$target_file")" || return 1

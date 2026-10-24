@@ -75,6 +75,7 @@ def test_backup_failure_never_replaces_config(deployment, tmp_path, monkeypatch,
     monkeypatch.setenv("PATH", str(commands) + os.pathsep + os.environ["PATH"])
     assert run("--force-config").returncode == 1
     assert target.read_text() == 'model = "preserve-me"\n'
+    assert not list(target.parent.glob("config.toml.bak.*"))
 
 
 def test_default_deploy_refuses_config_drift_before_other_agents(deployment):
