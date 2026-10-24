@@ -31,7 +31,7 @@ Before starting this module:
 
 After this module, you will be able to:
 
-- **Evaluate** Linux service-failure hypotheses using scenario evidence and bounded local probes, distinguishing observations from an established cause.
+- **Analyze** Linux service-failure hypotheses using scenario evidence and bounded local probes, distinguishing observations from an established cause.
 - **Triage** severity and resource scope using first minute checks for CPU, memory, disk, network, and failed services.
 - **Compare** affected and control evidence, and design safe reproduction checks across users, hosts, pods, or time windows.
 - **Evaluate** hypotheses with read-only tests, one change at a time, and recorded evidence.
@@ -742,7 +742,7 @@ The exact output depends on whether SSH is installed and running on your system.
 
 #### Part 5: Document Your Process
 
-Before running this block, write your own prediction of the initial diff, the effect of copying the control file, and what that result cannot prove. Export that text as `COMPARISON_PREDICTION` in the same terminal. The block refuses an empty prediction, records it before comparison, and prints a timeline you can save in your notes. This is a file-comparison exercise, not an induced service failure.
+Before running this block, write your own prediction of the initial diff, the effect of copying the control file, and what that result cannot prove. Export that text as `COMPARISON_PREDICTION` in the same terminal. The block refuses an empty prediction, records it before comparison, and prints a timeline you can save in your notes. Its opening high-load/runaway-process notes are illustrative labels, not a diagnosis of your host. This is a file-comparison exercise, not an induced service failure.
 
 ```bash
 # Start logging
@@ -750,7 +750,7 @@ bash <<'SESSION'
 set -eu
 : "${COMPARISON_PREDICTION:?Export your written comparison prediction before running this block}"
 session_dir=$(mktemp -d "${TMPDIR:-/tmp}/kubedojo-notes.XXXXXX") || exit 1
-trap 'rm -rf -- "$session_dir"' EXIT
+trap 'cat "${LOGFILE:-/dev/null}" 2>/dev/null || :; rm -rf -- "$session_dir"' EXIT
 LOGFILE="$session_dir/timeline.log"
 
 # Function to log with timestamp
@@ -776,8 +776,7 @@ log "One change: copy the control timeout into the affected fixture"
 cp -- "$session_dir/control.conf" "$session_dir/affected.conf"
 diff -u "$session_dir/control.conf" "$session_dir/affected.conf" >> "$LOGFILE"
 log "Result: configs now match; no service was run, so recovery is unproven"
-# Review log
-cat "$LOGFILE"
+# The EXIT trap prints the record, including after failures.
 SESSION
 ```
 
