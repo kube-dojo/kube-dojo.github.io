@@ -13,7 +13,7 @@ lab:
   environment: ubuntu
 ---
 
-**Linux Troubleshooting** | Complexity: `[MEDIUM]`
+> **Complexity**: `[MEDIUM]` — Systematic Linux troubleshooting
 
 > **Time to Complete**: 70–100 minutes (long-form read + hands-on exercise)
 
@@ -33,17 +33,17 @@ After this module, you will be able to:
 
 - **Diagnose** Linux service failures by applying the scientific method from observation through conclusion.
 - **Triage** severity and resource scope using first minute checks for CPU, memory, disk, network, and failed services.
-- **Reproduce** and compare symptoms across users, hosts, pods, and time windows before making changes.
+- **Compare** affected and control evidence, and design safe reproduction checks across users, hosts, pods, or time windows.
 - **Evaluate** hypotheses with read-only tests, one change at a time, and recorded evidence.
 - **Document** an incident timeline that supports handoff, post-incident review, and prevention work.
 
 ## Why This Module Matters
 
-**Hypothetical scenario:** At 03:12 one Saturday, a regional retailer lost checkout across its web and mobile properties during a promotion that finance had expected to drive heavy same-day revenue. The first responder saw 500 errors, restarted the checkout service, flushed a cache, and rolled back the most recent deployment within the first few minutes. Each action looked reasonable in isolation, but the combined effect erased the logs that showed database connection refusals, caused a cache stampede against an already memory-starved database, and made the later post-incident review depend on guesses instead of evidence.
+**Hypothetical scenario:** At 03:12 one Saturday, a regional retailer lost checkout across its web and mobile properties during a promotion that finance had expected to drive heavy same-day revenue. The first responder saw 500 errors, restarted the checkout service, flushed a cache, and rolled back the most recent deployment within the first few minutes. Each action looked reasonable in isolation, but the rollback removed containers whose local connection-refusal logs had not been collected centrally, while the cache flush caused a stampede against an already memory-starved database. These combined actions made the later post-incident review depend on guesses instead of evidence.
 
 The incident did not last because the team lacked Linux commands. It lasted because the team lacked a shared method for deciding which command came next and what decision the output should drive. The final root cause was ordinary: a database process had been killed under memory pressure after a batch job consumed more memory than expected. The expensive part was not the bug itself; the expensive part was the unstructured response that destroyed the trail, hid the trigger, and made every engineer argue from a different partial story.
 
-Systematic troubleshooting is the opposite of heroic guessing. It gives you a repeatable loop: observe the real symptom, form a hypothesis, predict what else must be true if that hypothesis is correct, test with the least destructive command available, and update the timeline before you act. That loop is useful on a single Linux server, across a fleet of hosts, and inside a Kubernetes 1.35+ cluster where you should define `alias k=kubectl` once and then use `k` for routine checks.
+Systematic troubleshooting is the opposite of heroic guessing. It gives you a repeatable loop: observe the real symptom, form a hypothesis, predict what else must be true if that hypothesis is correct, test with the least destructive command available, and update the timeline before you act. That loop is useful on a single Linux server, across a fleet of hosts, and inside Kubernetes clusters. The examples use full `kubectl` commands; check the available API fields and your client/server versions rather than assuming a minimum version establishes compatibility.
 
 The goal is not to make incidents feel calm. Production failures are stressful because customers, teammates, and business impact are real. The goal is to keep your thinking inspectable while the pressure is high, so each person joining the response can see what is known, what is merely suspected, what changed, and which next test has the best chance of reducing uncertainty.
 
@@ -63,7 +63,7 @@ flowchart TD
     F -.-> B
 ```
 
-This loop is slower than panic for the first minute and much faster for the next hour. Random changes create a confusing system where you no longer know whether the original fault still exists, whether your fix helped, or whether a new symptom was introduced by the response. A good hypothesis narrows the search space, and a good prediction tells you exactly what result would confirm or reject it.
+This loop makes the response testable instead of relying on the speed or confidence of the first guess. Random changes create a confusing system where you no longer know whether the original fault still exists, whether your fix helped, or whether a new symptom was introduced by the response. A good hypothesis narrows the search space, and a good prediction tells you exactly what result would confirm or reject it.
 
 For example, suppose checkout requests return 500 errors. One hypothesis is that the service cannot reach its database. If that is true, you would expect application logs to show connection failures, local health checks to fail when they touch database-backed endpoints, and network tests from the service host to the database port to fail or time out. Another hypothesis is that the process is restarting under memory pressure; that would predict recent OOM messages in `dmesg`, changing process start times, and perhaps failed readiness checks.
 
@@ -72,11 +72,11 @@ For example, suppose checkout requests return 500 errors. One hypothesis is that
 <details>
 <summary>Check your prediction</summary>
 
-In-memory counters, recent stderr that was not flushed to a journal, open file handles, temporary files owned by the process, and a distinctive process state visible in `systemctl status` all vanish or reset when the process exits cleanly and starts again.
+In-memory counters, open file handles, and the old PID's live state disappear when that process exits; stderr not yet flushed to a journal may also be lost. Process-owned temporary files disappear only if the application or its cleanup policy removes them. A restart changes runtime fields in `systemctl status`, but does not inherently erase retained journal entries; systemd normally routes service stdout and stderr to the journal.
 
 </details>
 
-A practical way to improve your hypotheses is to list them by likelihood and risk, not by drama. Ordinary causes deserve early checks because they are common, cheap to verify, and often fixable without broad change. Disk full, service not running, wrong configuration, expired certificate, blocked network path, exhausted memory, and permission mismatch are not glamorous, but they explain a large share of real outages.
+A practical way to improve your hypotheses is to list them by likelihood and risk. Disk full, a stopped service, wrong configuration, an expired certificate, a blocked network path, exhausted memory, and permission mismatch are useful candidates when they fit the symptoms and can be checked without broad changes. This is a prioritization habit, not a claim about outage prevalence.
 
 ```text
 Symptom: "API returns 500 errors"
@@ -90,15 +90,15 @@ Hypotheses (by likelihood):
 6. Bad deployment
 
 Test each:
-1. nc -zv localhost 5432  # Can reach DB? (or pg_isready)
+1. pg_isready -h db-server -p 5432 -t 3  # From API host: PostgreSQL accepting connections?
 2. systemctl status api   # Service running?
 3. df -h                  # Disk space?
-4. dmesg | grep oom       # OOM events?
-5. ping db-server         # Network?
-6. k rollout status       # Deployment?
+4. journalctl -k --since "1 hour ago" | grep -iE "oom|out of memory|killed process"
+5. ping -c 3 db-server    # ICMP path only; failure does not prove TCP is blocked
+6. kubectl -n app rollout status deployment/api --timeout=30s  # Example target
 ```
 
-Notice that the test list is not a script to run blindly. It is a set of questions with expected implications. If `df -h` shows the relevant filesystem at full capacity, you have a plausible explanation for failed writes, but you still need to connect that evidence to the symptom. If `dmesg` shows the kernel OOM killer terminated the database, the next question becomes why memory pressure grew, not merely how quickly you can start the process again.
+Here `db-server:5432` is the example remote PostgreSQL endpoint; substitute the affected application's actual endpoint and run from its host. `pg_isready` checks server connection status, not successful application authentication or query correctness. Replace the example namespace and Deployment too. Kernel logs may require authorized elevated access; a limited journal or denied `dmesg` read is missing evidence, not proof that no error occurred. The test list is not a script to run blindly. It is a set of questions with expected implications. If `df -h` shows the relevant filesystem at full capacity, you have a plausible explanation for failed writes, but you still need to connect that evidence to the symptom. If `dmesg` shows the kernel OOM killer terminated the database, the next question becomes why memory pressure grew, not merely how quickly you can start the process again.
 
 The scientific method also protects teams from status games during an incident. Instead of saying "I think the database is fine," you can say "The database accepts TCP connections from the API host, the service account can authenticate, and the slow query log did not spike during the incident window." That is more useful because another engineer can inspect the same evidence and build the next test from it.
 
@@ -113,8 +113,8 @@ The fastest path to resolution is often a fast path to the right boundary. If on
 ```bash
 # 1. What's happening now?
 uptime                    # Load, uptime
-dmesg | tail -20          # Kernel messages
-journalctl -p err -n 20   # Recent errors
+dmesg | tail -20          # Kernel buffer; access may be restricted
+journalctl -p err --since "1 hour ago" -n 20 --no-pager # Visible journal only
 
 # 2. Resource state
 free -h                   # Memory
@@ -147,7 +147,7 @@ This table is a triage map, not a law of nature. "Can't connect" might be a serv
 
 Before running a full diagnostic script, decide what result would force escalation. If `systemctl --failed` shows a critical database unit down, you may need the database owner immediately. If `df -h` shows the root filesystem full on every node in a pool, you may need incident command and a coordinated cleanup. If only one noncritical worker is unhealthy and traffic has drained away, you can proceed more quietly while preserving evidence.
 
-In Kubernetes 1.35+ environments, the same triage habit applies at a different layer. Use `k get events --sort-by='.lastTimestamp' | tail -20` after defining the alias, but do not let Kubernetes events replace host-level thinking. A pod restart can be a symptom of Linux memory pressure, disk pressure, image pull failures, a bad rollout, or an application crash loop; you still need a hypothesis that connects the cluster event to the underlying mechanism.
+In Kubernetes environments, inspect `kubectl get events -o yaml` for the affected namespace and incident window. Event `lastTimestamp` records the latest occurrence when populated; other records may use `eventTime` or series timestamps. A sort on one potentially absent field is not a complete incident chronology. Events complement host evidence: distinguish a container restart from replacement of its Pod, then connect memory pressure, image failures, rollout changes, or crashes to the actual symptom.
 
 ## Reproduce and Compare Symptoms Across Boundaries
 
@@ -239,8 +239,8 @@ Divide and conquer is the operational version of binary search. Instead of testi
 
 # Step 1: Test middle of path
 curl -I http://internal-lb/health
-# If this works: problem is before LB (client, DNS, network)
-# If this fails: problem is after LB (pod, app, db)
+# Success establishes only this endpoint from this vantage point
+# Failure can involve DNS, transport, LB, or dependencies used by this endpoint
 
 # Step 2: Test half of remaining path
 # Continue until isolated
@@ -250,11 +250,9 @@ This technique works only when the test is chosen carefully. A health endpoint t
 
 Before running this, what output do you expect if DNS is broken for clients but the internal load balancer and application are healthy? You should expect direct tests from inside the network to succeed while client-side name resolution, public routing, or edge-layer tests fail. That expectation keeps you from treating every failed user request as an application bug.
 
-In Kubernetes, divide and conquer usually means moving across layers deliberately. Start outside the cluster if the user sees a public failure, then test the ingress or load balancer, then the service, then the endpoints, then the pod, then the application dependency. With the `k` alias in place, commands such as `k get events`, `k describe pod`, and `k logs` are useful, but they should answer a question rather than become a reflexive sequence.
+In Kubernetes, divide and conquer usually means moving across layers deliberately. Start outside the cluster if the user sees a public failure, then test the ingress or load balancer, then the service, then the endpoints, then the pod, then the application dependency. Commands such as `kubectl get events`, `kubectl describe pod`, and `kubectl logs` are useful, but they should answer a question rather than become a reflexive sequence.
 
 ```bash
-alias k=kubectl
-
 # Recent system changes
 rpm -qa --last | head -20                    # Package installs
 ls -lt /etc/*.conf | head -10                # Config changes
@@ -265,7 +263,7 @@ last -10                                      # Recent logins
 git log --oneline --since="2 hours ago"
 
 # Kubernetes changes
-k get events --sort-by='.lastTimestamp' | tail -20
+kubectl get events -o yaml  # Inspect populated timestamps against the incident window
 ```
 
 Timeline analysis complements divide and conquer because most failures have a trigger. "It worked yesterday" is not a complaint to dismiss; it is a clue that some state changed. That state might be code, config, certificates, package versions, traffic, data size, disk usage, credentials, permissions, network policy, or a scheduled job that only appears under certain timing.
@@ -274,24 +272,24 @@ Timeline analysis complements divide and conquer because most failures have a tr
 # Find what changed
 # 1. Package changes
 rpm -qa --last | head -20           # RHEL/CentOS
-dpkg -l --no-pager | head -20       # Debian/Ubuntu
+awk -v since="$(date -d '1 day ago' '+%F %T')" '($1 " " $2) >= since' /var/log/dpkg.log | tail -20
 
 # 2. Config file changes
 find /etc -mtime -1 -type f 2>/dev/null
 
-# 3. Recent deployments
-k get deployments -A -o json | \
-  jq -r '.items[] | select(.metadata.creationTimestamp > "2026-01-01") | .metadata.name'
+# 3. Existing Deployment updates (example namespace/name)
+kubectl -n app rollout history deployment/api
+kubectl -n app get rs --sort-by=.metadata.creationTimestamp
 
 # 4. Cron jobs that ran
-grep CRON /var/log/syslog | tail -20
+if [ -r /var/log/syslog ]; then grep -i CRON /var/log/syslog | tail -20; else journalctl -u cron -u crond --since "1 day ago" -n 20 --no-pager; fi
 
 # 5. System updates
 cat /var/log/apt/history.log | tail -50  # Debian
 cat /var/log/dnf.log | tail -50           # RHEL
 ```
 
-The danger in "what changed?" is confirmation bias. If you personally deployed something, you may overfocus on that deployment because it is vivid and embarrassing. If another team changed a dependency, you may underweight it because it feels outside your area. A timeline is useful because it lists candidate changes in time order and lets evidence, not ownership, drive priority.
+Choose an incident window (the Debian query uses the last 24 hours) and correlate package-log timestamps, retained ReplicaSet creation times, rollout revisions, and deployment records within it. A Deployment's creation time does not date an update; rollout history alone does not supply a complete timestamped audit trail. RPM install listings and file mtimes are candidate clues, not complete update histories; rotated or inaccessible logs leave gaps. The danger in "what changed?" is confirmation bias. If you personally deployed something, you may overfocus on that deployment because it is vivid and embarrassing. If another team changed a dependency, you may underweight it because it feels outside your area. A timeline is useful because it lists candidate changes in time order and lets evidence, not ownership, drive priority.
 
 **Hypothetical scenario:** An API team once rolled back three versions because a latency spike started after a release. The real trigger was a cron job that compressed a large log tree and saturated disk I/O on the database host. The release had merely increased traffic enough to reveal the shared bottleneck. Timeline analysis found the overlap; the USE Method explained the resource saturation.
 
@@ -317,7 +315,7 @@ iostat -x 1 5
 ss -s
 sar -n DEV 1 5
 
-# If all OK, it's application-level
+# Normal local samples leave remote dependencies and intermittent faults open
 ```
 
 The last comment in that block is intentionally cautious. If CPU, memory, disk, and network look normal on one host, the problem might be application-level, but it might also be remote storage, a downstream dependency, a lock in another process, or a problem on only some hosts. "All OK" means "this slice did not explain the symptom," not "Linux is innocent."
@@ -379,25 +377,25 @@ TIME        EVENT
 09:00       First alert: API errors
 09:02       Checked dashboard: error rate 50%
 09:05       SSH to api-server-1
-09:06       Checked logs: "Connection refused to db"
+09:06       Observation: "Connection refused to db"; hypothesis: database unavailable
 09:08       SSH to db-server
-09:09       MySQL not running
+09:09       Test: PostgreSQL process absent; supports database-unavailable hypothesis
 09:10       dmesg shows OOM kill
-09:12       Increased memory limit
-09:14       Started MySQL
-09:15       API recovering
+09:12       Combined mitigation chosen: suspend batch job to reduce memory pressure
+09:14       Started PostgreSQL; no measurement between these two actions
+09:15       Result: API recovering; cannot attribute improvement to either action alone
 09:20       Error rate back to normal
 ```
 
-This incident timeline is small, but it answers the questions that matter later. It shows the first known impact, the observed error, the path from API to database, the evidence of an OOM kill, the recovery action, and the time service returned to normal. A post-incident review can now ask why memory pressure occurred and why the alert fired only after user impact.
+This synthetic incident timeline explicitly records a combined mitigation rather than proving which action helped. It is small, but it answers the questions that matter later. It shows the first known impact, the observed error, the path from API to database, the evidence of an OOM kill, the recovery action, and the time service returned to normal. A post-incident review can now ask why memory pressure occurred and why the alert fired only after user impact.
 
 ## Document the Incident Timeline for Handoff and Prevention
 
 Handoff is where many investigations lose their shape. The first responder has context in their head, the second responder arrives with fresh energy, and both people accidentally repeat checks because the evidence is scattered across terminals and chat messages. A written timeline turns the incident from a personal memory into a shared artifact.
 
-The timeline should include observation, hypothesis, test, result, action, and impact. That sounds heavy, but each entry can be one sentence. "09:18, tested DB TCP from api-server-1 with `curl localhost:5432`; connection refused, supports database-down hypothesis" is more useful than a long paragraph that says the database "seems broken."
+The timeline should include observation, hypothesis, test, result, action, and impact. That sounds heavy, but each entry can be one sentence. "09:18, tested PostgreSQL from api-server-1 with `pg_isready -h db-server -p 5432 -t 3`; no response, so inspect both the network path and database service" is more useful than a long paragraph that says the database "seems broken."
 
-Good incident notes distinguish mitigation from root cause. Starting MySQL may mitigate the outage, but the root cause might be memory pressure from a batch job, a configuration regression, a data growth pattern, or a kernel setting that made the host fragile. If the notes blur mitigation and cause, the post-incident review will produce shallow fixes and the same class of incident will return.
+Good incident notes distinguish mitigation from root cause. Starting PostgreSQL may mitigate the outage, but the root cause might be memory pressure from a batch job, a configuration regression, a data growth pattern, or a kernel setting that made the host fragile. If the notes blur mitigation and cause, the post-incident review will produce shallow fixes and the same class of incident will return.
 
 Documentation also protects against cognitive bias. When people are tired, they remember the final theory and forget rejected alternatives. A timeline that records rejected hypotheses is valuable because it prevents the team from revisiting the same dead ends during the incident and helps reviewers understand why the response path was reasonable from the evidence available at the time.
 
@@ -449,8 +447,8 @@ If you feel stuck, return to boundaries instead of adding more commands. Ask whe
 
 ## Did You Know?
 
-- **Google's SRE guidance treats troubleshooting as hypothesis testing**: the effective troubleshooting chapter emphasizes observing, theorizing, testing, and treating false leads as useful information rather than wasted effort.
-- **The Linux OOM killer leaves evidence in kernel logs**: `dmesg` and the journal can show which process was killed, which is why restarting before checking kernel messages can erase the most useful context.
+- **Google's SRE guidance treats troubleshooting as hypothesis testing**: its “Test and Treat” section recommends testing from the application's vantage point, considering risks, and recording ideas, tests, and results. The separate negative-results discussion concerns experiments and designs; it does not establish that every incident false lead is useful.
+- **A service restart does not clear the kernel ring buffer.** `dmesg -c` explicitly reads and clears it; reboot and buffer overwrite also limit what remains. The journal may retain kernel messages separately: use `journalctl -k` within your access rights, and remember that volatile journal storage is lost on reboot.
 - **The `script` command has existed for decades**: it remains useful because a terminal transcript can preserve exact commands and outputs during stressful incidents, provided sensitive data is handled carefully.
 - **Rubber duck debugging works because explanation exposes assumptions**: saying the problem aloud forces your brain to make hidden leaps explicit, which often reveals the next useful test before anyone else replies.
 
@@ -470,7 +468,7 @@ If you feel stuck, return to boundaries instead of adding more commands. Ask whe
 
 <details><summary>Question 1: Your payment service crashes during peak traffic, and the team lead asks for an immediate restart. How do you diagnose the Linux service failure without losing the most important evidence?</summary>
 
-First capture volatile state with read-only commands such as `systemctl status`, `journalctl -u`, `dmesg`, `free -h`, and `df -h` before restarting. The reason is that a restart can clear process state, rotate logs, change timestamps, and hide whether the process was killed by memory pressure or failed on its own. If customer impact requires a restart, record that tradeoff explicitly and measure whether the symptom returns after the service starts.
+First capture volatile state with read-only commands such as `systemctl status`, `journalctl -u`, `dmesg`, `free -h`, and `df -h` before restarting. The reason is that a restart replaces the old PID and live process state, while retained journal entries normally survive. An application that truncates its own log at startup has a separate loss mechanism; record it rather than assuming every restart removes logs. If customer impact requires a restart, record that tradeoff explicitly and measure whether the symptom returns after the service starts.
 
 </details>
 
@@ -514,9 +512,9 @@ The timeline should record the first known impact, key observations, hypotheses 
 
 ### Practicing Systematic Troubleshooting
 
-**Objective**: Apply troubleshooting methodology to a bounded storage experiment.
+**Objective**: Apply troubleshooting methodology to a bounded storage experiment and a synthetic configuration comparison, then record observations and limits.
 
-**Environment**: Any Linux system
+**Environment**: A disposable Linux workstation or lab VM with Bash, GNU coreutils/date, systemd, and iproute2; optional commands need their own packages and authorized access.
 
 This exercise is intentionally local and bounded. You will collect a baseline, test a small storage hypothesis with real write probes, inspect recent changes, and document the session. The commands should run on a normal Linux workstation or lab VM, though service names and permissions can vary by distribution.
 
@@ -525,8 +523,11 @@ This exercise is intentionally local and bounded. You will collect a baseline, t
 Create a reusable triage script first, because repeatability matters when you are tired or switching between hosts. The script does not diagnose every possible issue; it captures a fast snapshot of load, memory, disk, recent errors, failed services, top processes, and listening sockets so you can choose the next hypothesis from evidence.
 
 ```bash
-# Create a triage script
-cat > /tmp/triage.sh << 'EOF'
+# Child shell owns and cleans up only its unique script file.
+bash <<'TRIAGE'
+triage_file=$(mktemp "${TMPDIR:-/tmp}/kubedojo-triage.XXXXXX") || exit 1
+trap 'rm -f -- "$triage_file"' EXIT
+cat > "$triage_file" << 'EOF'
 #!/bin/bash
 echo "=== System Triage $(date) ==="
 echo ""
@@ -540,10 +541,10 @@ echo "--- Disk ---"
 df -h | grep -v tmpfs
 echo ""
 echo "--- Recent Errors ---"
-journalctl -p err -n 10 --no-pager 2>/dev/null || dmesg | tail -10
+journalctl -p err --since "1 hour ago" -n 10 --no-pager || dmesg | tail -10
 echo ""
 echo "--- Failed Services ---"
-systemctl --failed 2>/dev/null || echo "N/A"
+systemctl --failed || echo "Service query unavailable; record the error"
 echo ""
 echo "--- Top Processes ---"
 ps aux --sort=-%cpu | head -5
@@ -551,15 +552,14 @@ echo ""
 echo "--- Network Listeners ---"
 ss -tuln | head -10
 EOF
-chmod +x /tmp/triage.sh
-
-# Run it
-/tmp/triage.sh
+# Run it; any access errors remain visible.
+bash "$triage_file"
+TRIAGE
 ```
 
 <details><summary>Solution notes for Part 1</summary>
 
-The expected result is a readable system snapshot. If some commands require privileges or are unavailable, note that as part of the environment rather than treating it as exercise failure. The important behavior is that you collect read-only state before changing anything.
+The expected result is a readable system snapshot. An empty or successful `journalctl` result can still represent only the current user's visible records; it does not establish full system-journal access. If some commands require privileges or are unavailable, note that as part of the environment rather than treating it as exercise failure. The important behavior is that you collect read-only state before changing anything.
 
 </details>
 
@@ -668,7 +668,7 @@ EOF
 
 <details><summary>Solution notes for Part 2</summary>
 
-Record the actual `df -P`, `du -sh`, exit-status, and stderr output; do not replace it with an expected transcript. A successful baseline and post-allocation probe means this bounded test did not support the hypothesis that this path could not accept a write during this run. It does not prove that a service's path, user, quota, inode availability, or filesystem state is healthy. A failed probe is evidence to investigate, not proof by itself that the filesystem is full: compare the relevant `df` result with permissions, read-only state, quotas, inode state, and the service's own error logs. The filesystem-wide `df` result and this run's directory `du` result answer different questions. Explain what additional service-path evidence would be needed before naming a production root cause. The trap removes only resources created under `probe_dir`.
+GNU `dd` writes normal record counts and transfer statistics to stderr even on success. Interpret that text together with `write_exit` or `allocation_exit`; nonempty stderr alone is not a failed write. Record the actual `df -P`, `du -sh`, exit-status, and stderr output; do not replace it with an expected transcript. A successful baseline and post-allocation probe means this bounded test did not support the hypothesis that this path could not accept a write during this run. It does not prove that a service's path, user, quota, inode availability, or filesystem state is healthy. A failed probe is evidence to investigate, not proof by itself that the filesystem is full: compare the relevant `df` result with permissions, read-only state, quotas, inode state, and the service's own error logs. The filesystem-wide `df` result and this run's directory `du` result answer different questions. Explain what additional service-path evidence would be needed before naming a production root cause. The trap removes only resources created under `probe_dir`.
 
 </details>
 
@@ -683,7 +683,7 @@ Recent changes are not limited to application deployments. Package changes, conf
 if command -v rpm &>/dev/null; then
   rpm -qa --last | head -10
 elif command -v dpkg &>/dev/null; then
-  ls -lt /var/lib/dpkg/info/*.list | head -10
+  awk -v since="$(date -d '1 day ago' '+%F %T')" '($1 " " $2) >= since' /var/log/dpkg.log | tail -10
 fi
 
 # 2. Recent config changes
@@ -693,8 +693,11 @@ find /etc -type f -mtime -7 2>/dev/null | head -10
 last -10
 
 # 4. Recent cron runs
-grep CRON /var/log/syslog 2>/dev/null | tail -10 || \
-journalctl -u cron -n 10 --no-pager 2>/dev/null
+if [ -r /var/log/syslog ]; then
+  grep -i CRON /var/log/syslog | tail -10
+else
+  journalctl -u cron -u crond --since "1 day ago" -n 10 --no-pager
+fi
 ```
 
 <details><summary>Solution notes for Part 3</summary>
@@ -705,25 +708,28 @@ You should produce a short list of candidate changes, not a final root cause. Th
 
 #### Part 4: Hypothesis Testing Practice
 
-This practice scenario is "can't SSH to server." The commands test reachability, service state, listening port, and firewall hints in separate steps. Even though localhost is used for safety, the structure mirrors a real remote investigation.
+This practice scenario is "can't SSH to server." Localhost probes only the local host; it does not test the client-to-server network path. The commands separate loopback, unit state, exact TCP port, and firewall-rule hints. Socket activation can leave a listener even when the service is inactive, so inspect socket units before interpreting those results as contradictory.
 
 ```bash
 # Scenario: "Can't SSH to server"
 # Let's test hypotheses systematically
 
-# Hypothesis 1: Network unreachable
-ping -c 1 localhost > /dev/null && echo "H1: Network OK" || echo "H1: Network problem"
+# Hypothesis 1: Local loopback ICMP fails
+ping -c 1 localhost > /dev/null && echo "H1: Loopback ICMP replied" || echo "H1: Loopback probe failed"
 
 # Hypothesis 2: SSH not running
 systemctl is-active sshd 2>/dev/null || \
   systemctl is-active ssh 2>/dev/null || \
   echo "SSH service check (verify manually)"
+systemctl list-sockets --all --no-pager  # Check whether a socket unit owns the listener
 
 # Hypothesis 3: Port not listening
-ss -tuln | grep :22 > /dev/null && echo "H3: Port 22 listening" || echo "H3: Port 22 not listening"
+if listeners=$(ss -H -ltn 'sport = :22'); then
+  [ -n "$listeners" ] && echo "H3: TCP 22 listening" || echo "H3: No TCP 22 listener"
+else echo "H3: Socket query failed; state unknown" >&2; fi
 
 # Hypothesis 4: Firewall blocking
-iptables -L INPUT -n 2>/dev/null | grep -q "dpt:22" && echo "H4: SSH in firewall rules" || echo "H4: Check firewall"
+iptables -L INPUT -n 2>/dev/null | grep -qE "dpt:22([[:space:]]|$)" && echo "H4: Port 22 rule found; inspect action and ordering" || echo "H4: Check firewall"
 ```
 
 <details><summary>Solution notes for Part 4</summary>
@@ -738,41 +744,56 @@ Finish by documenting the investigation as it happens. This small logging functi
 
 ```bash
 # Start logging
-LOGFILE=/tmp/troubleshooting-$(date +%Y%m%d-%H%M).log
+bash <<'SESSION'
+set -eu
+session_dir=$(mktemp -d "${TMPDIR:-/tmp}/kubedojo-notes.XXXXXX") || exit 1
+trap 'rm -rf -- "$session_dir"' EXIT
+LOGFILE="$session_dir/timeline.log"
 
 # Function to log with timestamp
 log() {
-  echo "[$(date +%H:%M:%S)] $*" | tee -a $LOGFILE
+  echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOGFILE"
 }
 
 # Example session
 log "Starting investigation: high load average"
 log "Current load: $(uptime)"
 log "Checking top processes..."
-ps aux --sort=-%cpu | head -5 >> $LOGFILE
+ps aux --sort=-%cpu | head -5 >> "$LOGFILE"
 log "Hypothesis: runaway process"
 log "Action: None yet, gathering more info"
 
-# Review log
-cat $LOGFILE
+# Synthetic control comparison: files only, no service reconfiguration.
+printf 'timeout=2\n' > "$session_dir/affected.conf"
+printf 'timeout=5\n' > "$session_dir/control.conf"
+log "Hypothesis: the two prepared configs differ in timeout; predict diff output first"
+diff -u "$session_dir/control.conf" "$session_dir/affected.conf" > "$session_dir/before.diff" || [ "$?" -eq 1 ]
+cat "$session_dir/before.diff" >> "$LOGFILE"
+log "One change: copy the control timeout into the affected fixture"
+cp -- "$session_dir/control.conf" "$session_dir/affected.conf"
+diff -u "$session_dir/control.conf" "$session_dir/affected.conf" >> "$LOGFILE"
+log "Result: configs now match; no service was run, so recovery is unproven"
+# Review/capture the printed record before this child shell cleans its files.
+cat "$LOGFILE"
+SESSION
 ```
 
 <details><summary>Solution notes for Part 5</summary>
 
-Your log should show a clear sequence rather than a pile of unrelated output. If another engineer can read it and understand what you observed, what you suspected, what you tested, and what you did not change, it is doing its job.
+Your log should show the initial config difference, the predicted effect of one file change, the comparison after that change, and the limit that matching files do not demonstrate service recovery. Capture the printed record in your exercise notes; the child shell removes only its unique directory on exit. If another engineer can read it and understand what you observed, what you suspected, what you tested, and what you did not change, it is doing its job.
 
 </details>
 
-- [ ] I named a failure layer and a next action for each frozen evidence-layer card before opening the reveal.
+A restart, a sibling host, a green dashboard, and a failure you cannot reproduce can each look like the end of the incident and still leave important questions open. These synthetic scenario cards are not recorded transcripts. Write the relevant evidence layer and next action in your notes before opening each reveal.
 
-A restart, a sibling host, a green dashboard, and a failure you cannot reproduce can each look like the end of the incident and still be the wrong layer. These cards freeze four transcripts so you can name the layer before you look. Write the layer in the timeline before you open the reveal.
+- [ ] I recorded an evidence layer and next action for each scenario card before reading the answer.
 
-**Card A: Restart first.** The service is down. The fastest mitigation is a restart. You have not copied `systemctl status`, the last stderr, or the process start time.
+**Card A: Restart first.** The service is down. The fastest mitigation is a restart. You have not recorded the old PID's runtime status or process start time; retained journal entries are still available.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: evidence that dies with the process, not the restart button. Next action: capture status, recent logs, and start time, then restart if you still must.
+Failure layer: volatile PID state differs from retained journal history. Next action: capture runtime status and start time before replacement, then inspect retained logs as well. Unflushed stderr may be lost, but a service restart does not itself erase the journal.
 
 </details>
 
@@ -805,12 +826,12 @@ Failure layer: missing observation window, not a cleared fault. Next action: kee
 
 ### Success Criteria
 
-- [ ] Diagnose a storage hypothesis by applying the scientific method to the guided experiment and recording actual observations.
-- [ ] Triage severity and resource scope using the first minute checks for CPU, memory, disk, network, and failed services.
-- [ ] Reproduce and compare symptoms across users, hosts, pods, or time windows before making changes.
-- [ ] Evaluate hypotheses with read-only tests, one change at a time, and recorded evidence.
+- [ ] Record the storage prediction, actual exit codes, stderr interpretation, and the limits of this path/user/time sample.
+- [ ] Capture the triage snapshot and label any unavailable commands or restricted log views as evidence gaps.
+- [ ] Save the synthetic configuration diff and explain why this control isolates one difference but does not prove a production cause.
+- [ ] Record the one fixture change and its comparison result, plus a safe next test for an actual affected service.
 - [ ] Document an incident timeline that supports handoff, post-incident review, and prevention work.
-- [ ] Classified each frozen evidence-layer card by failure layer and next action.
+- [ ] Classify each synthetic scenario by evidence layer and next action, distinguishing mitigation from proven cause.
 
 ## Key Takeaways
 
@@ -835,7 +856,10 @@ Next, continue to [Module 6.2: Log Analysis](/linux/operations/troubleshooting/m
 - [Rubber Duck Debugging](https://rubberduckdebugging.com/)
 - [systemd journalctl manual](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html)
 - [systemd systemctl manual](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)
-- [Linux kernel OOM documentation](https://docs.kernel.org/mm/oom.html)
+- [PostgreSQL pg_isready](https://www.postgresql.org/docs/current/app-pg-isready.html) — Connection status, host/port options, and exit codes.
+- [ss socket filters](https://man7.org/linux/man-pages/man8/ss.8.html) and [systemd socket activation](https://www.freedesktop.org/software/systemd/man/latest/systemd.socket.html).
+- [Debian dpkg logging](https://manpages.debian.org/bookworm/dpkg/dpkg.1.en.html) and [kubectl rollout history](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_history/).
+- [Linux 6.12 OOM logging implementation](https://github.com/torvalds/linux/blob/v6.12/mm/oom_kill.c#L889-L895) — An example of kernel process-kill diagnostics; available records depend on retention and access.
 - [Linux man-pages: dmesg](https://man7.org/linux/man-pages/man1/dmesg.1.html)
 - [Kubernetes docs: Debug Running Pods](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/)
 - [Kubernetes docs: Events](https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/)

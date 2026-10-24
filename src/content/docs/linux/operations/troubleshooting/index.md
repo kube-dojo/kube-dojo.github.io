@@ -22,11 +22,11 @@ These are planning estimates copied from the four module headers, not measured l
 
 ## Why This Section Matters
 
-Production issues don't come with error messages. Systematic debugging skills help you:
+Production issues may come with symptoms and error messages, but rarely with a proven root cause. Systematic debugging skills help you:
 
-- **Find root causes faster** — Not just symptoms
+- **Investigate root causes** — Distinguish evidence from symptoms and hypotheses
 - **Debug Kubernetes issues** — Many have Linux causes
-- **Handle incidents** — Methodical approach reduces MTTR
+- **Handle incidents** — Record tests and decisions so responders can coordinate recovery
 - **Learn from failures** — Understand what actually happened
 
 ## Prerequisites
@@ -48,4 +48,3 @@ After completing this section, you'll understand:
 
 - **Previous**: [Performance](../performance/)
 - **Next**: [Shell Scripting](../shell-scripting/)
-- **CKA**: Cluster troubleshooting domain
