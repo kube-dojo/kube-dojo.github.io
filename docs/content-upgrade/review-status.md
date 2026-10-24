@@ -45,9 +45,9 @@ All 828 English modules were structurally rescanned: 753 pass enabled gates, 75 
 | Reviewed pages | Reviewer and result | Preserved delivery | Required follow-through |
 |---|---|---|---|
 | Deployments module + Kubernetes Basics hub; Kubernetes introduction + Cloud Native hub | Read-only Astra high red team, **revise all four**; [exact findings/digests](reviews/2026-10-24-prerequisites.md) | #2306's kind1.35 lab execution and scoped independent review | Coherent four-file correction #3534, then new-head independent review and applicable checks |
-| Systematic Troubleshooting module + hub | Independent-provider Claude Opus5.5 full-page review, **revise both**; [findings/digests and lead verification](reviews/2026-10-24-linux.md) | #2629's bounded evidence dispositions and guarded storage experiment | Correct confirmed findings together under #2279; retain unrun-layer limits |
+| Systematic Troubleshooting module + hub | Independent-provider Claude Opus5.5 full-page review, **revise both**; [findings/digests and lead verification](reviews/2026-10-24-linux.md) | #2629's bounded evidence record; current guarded storage experiment read, not re-executed | Correct confirmed findings together under #2279; retain unrun-layer limits |
 
-This checkpoint records six pages reviewed with findings, zero newly fully accepted pages, and 1,083 English plus 562 Ukrainian pages not covered by these full-page reviews. A `revise` disposition records a demonstrated defect; it does not assert that every other claim was checked. D1–D8 remain unassessed while citation gates are unresolved. Same-provider red-team dissent is distinguished from cross-provider review.
+This checkpoint records six pages reviewed with findings, zero newly fully accepted pages, and 1,083 of the current 1,089 English plus all 562 Ukrainian pages not covered by these full-page reviews. A `revise` disposition records a demonstrated defect; it does not assert that every other claim was checked. D1–D8 remain unassessed while citation gates are unresolved. Same-provider red-team dissent is distinguished from cross-provider review.
 
 ## Reproducibility and continuation
 
