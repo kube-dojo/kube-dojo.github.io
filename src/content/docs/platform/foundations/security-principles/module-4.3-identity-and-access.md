@@ -81,7 +81,7 @@ flowchart TD
 
 #### What Authentication Is Not
 
-A successful authentication does not authorize deleting the production database or changing a billing address. Auditing records relevant events and their identity context; authentication success alone is not an action log or proof of the human operator. Transport protection is another concern. [TLS provides a protected channel and endpoint authentication](https://datatracker.ietf.org/doc/html/rfc8446#section-1), with certificate-based authentication described in §4.4.2. These functions can be combined in one protocol without becoming the same decision.
+A successful authentication does not authorize deleting the production database or changing a billing address. Auditing records relevant events and their identity context; authentication success alone is not an action log or proof of the human operator. Transport protection is another concern. [TLS 1.3 defines a protected channel with server authentication and optional client authentication](https://datatracker.ietf.org/doc/html/rfc8446#section-1); §§4.4.2–4.4.3 describe the certificate and proof-of-key messages. These functions can be combined in one protocol without becoming the same decision.
 
 | Concern | Question Answered | Subsystem |
 |---------|-------------------|-----------|
@@ -316,7 +316,7 @@ Deny task-specific access unless a reviewed policy grants it, and document the b
 
 #### Scope Permissions Narrowly
 
-Scope permissions by action, resource and supported context conditions. For a release job, start with `get` and `patch` on Deployments, restrict the resource to `api` in namespace `shop`, and add a time condition only where the policy engine supports and enforces it. A role name such as `orders-editor` does not establish its actual grants: inspect the rules and exceptions. Maintain the policy as tasks, data and dependencies change; initial scoping alone does not establish lasting containment.
+Scope permissions by action, resource and supported context conditions. As a synthetic scoping example, a reporting identity might need `get` on Jobs, restricted to `daily-report` in namespace `analytics`, with a time condition only where the policy engine supports and enforces it. A role name such as `orders-editor` does not establish its actual grants: inspect the rules and exceptions. Maintain the policy as tasks, data and dependencies change; initial scoping alone does not establish lasting containment.
 
 #### Time-Bound Elevated Access
 
@@ -845,7 +845,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [ ] Can you describe the three factor categories, distinguish OTP relay from phishing-resistant authentication, and explain why factor counting alone does not prove account security?
 - [ ] Do you understand RBAC versus ACL versus ABAC and the conditions under which each one is the right choice?
 - [ ] Can you walk through the diagnostic process for fixing an over-permissioned binding (action → scope → eliminate → minimum YAML → verify)?
-- [ ] Can you implement the principle of least privilege across its four layers (default deny, scope narrowly, time-bound, separate concerns)?
+- [ ] Can you apply the four checks in §3.2 (default access, permission scope, elevated-access duration and separate identities) and explain how they interact?
 - [ ] Can you distinguish a stolen token's remaining acceptance window from persistent effects and access to replacement credentials?
 - [ ] Can you explain OAuth 2.0 and OIDC flows, and specifically why the auth-code-then-tokens two-step exists?
 - [ ] Do you understand Kubernetes ServiceAccounts well enough to know when to disable `automountServiceAccountToken` and when to leave it on?
@@ -862,7 +862,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [NIST: RBAC Frequently Asked Questions](https://csrc.nist.gov/projects/role-based-access-control/faqs) — User–role and permission–role assignments, group/ACL relationships and constraints evaluated when access is requested; see “How Are Roles Different From Groups?”, “What About Complex Relationships And Constraints?” and Component summary.
 - [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3), relying-party checks (§§7.1–7.2) and local biometric recognition (§14.3).
 - [Saltzer and Schroeder: The Protection of Information in Computer Systems, §I.A.3(f)](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html) — Least privilege's rationale for limiting accident/error damage and reducing opportunities for improper use.
-- [RFC 8446: TLS 1.3, §§1 and 4.4.2](https://datatracker.ietf.org/doc/html/rfc8446#section-1) — Protected-channel properties and certificate-based endpoint authentication.
+- [RFC 8446: TLS 1.3, §§1 and 4.4.2–4.4.3](https://datatracker.ietf.org/doc/html/rfc8446#section-1) — Protected-channel properties, server/optional client authentication and certificate/private-key proof messages.
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
 - [Managing Kubernetes ServiceAccounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) — Covers ServiceAccount identity, token projection, TokenRequest, and legacy token behavior.
