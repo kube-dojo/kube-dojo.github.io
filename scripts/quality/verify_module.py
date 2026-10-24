@@ -1164,11 +1164,11 @@ def _check_url(url: str) -> str:
             try:
                 response = session.get(url, timeout=10, allow_redirects=True, stream=True)
                 response.close()
-            except requests.RequestException:
-                # GET also failed (tarpit, drop, timeout) — fall through to lightpanda.
+            except (requests.RequestException, ValueError):
+                # Transport or redirect parsing failed — fall through to lightpanda.
                 response = None
-    except requests.RequestException:
-        # HEAD itself raised — treat as network failure, no lightpanda attempt.
+    except (requests.RequestException, ValueError):
+        # HEAD transport/redirect parsing failed — no lightpanda attempt.
         return "fetch_failed"
     if response is not None and 200 <= response.status_code <= 299:
         return "redirect" if response.history else "200"
