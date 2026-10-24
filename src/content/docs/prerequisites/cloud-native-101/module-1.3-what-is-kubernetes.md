@@ -582,7 +582,7 @@ After completion or interruption, run this in the same terminal. It deletes only
 
 ```bash
 if [ "${EXAMPLE_OWNED:-}" = yes ]; then
-  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --wait=true --timeout=120s && EXAMPLE_READY=no && EXAMPLE_OWNED=no
+  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --ignore-not-found=true --wait=true --timeout=120s && EXAMPLE_READY=no && EXAMPLE_OWNED=no
 fi
 ```
 
