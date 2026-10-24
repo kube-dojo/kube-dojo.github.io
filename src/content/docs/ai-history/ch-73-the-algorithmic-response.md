@@ -143,7 +143,7 @@ KB-level KV state and token-level reuse.
 MLA reduces one pressure channel by changing what must be kept hot.
 A smaller cache does not establish every deployment's performance; the need to test integration and remaining bottlenecks is this chapter's engineering inference.
 
-The paper's abstract reports **93.3% KV-cache reduction** and **5.76× maximum generation throughput** compared with DeepSeek 67B. This compares a V2 mixture-of-experts model with 236B total parameters and 21B active per token against the dense 67B baseline (abstract; §3.2.3, Training Costs).
+The paper's abstract reports **93.3% KV-cache reduction** and **5.76× maximum generation throughput** compared with DeepSeek 67B. The abstract also gives V2's mixture-of-experts parameter counts: 236B total and 21B active per token. The dense 67B baseline is identified in §3.2.3, Training Costs.
 The throughput setup matters: §3.2.3, Inference Efficiency, specifies one node with eight H800 GPUs for V2's measurement and the prompt/generation-length distribution from the DeepSeek 67B service. It does not specify the 67B comparison hardware there. V2 deployment also uses FP8 parameters and KV-cache quantization averaging six bits per element. The result therefore cannot be attributed to MLA alone.
 
 As an engineering inference, reducing per-token cache can leave room for longer sequences or more concurrent requests when memory is the limiting resource. The reported percentage is a model comparison, not a controlled measurement holding every architecture and serving choice fixed. Its full accounting needs attention dimensions, layer counts and precision; §3.2.3 does not state whether quantization contributes to the 93.3% figure.
@@ -397,13 +397,8 @@ policy regime, hardware constraint, memory pressure, architectural choice, open 
 
 ### Primary
 
-- [DeepSeek-AI. "DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model." arXiv:2405.04434v5, 2024.](https://arxiv.org/html/2405.04434v5) — §§2.1.2–2.1.4 and Table 1 for cache accounting; abstract for the ratios; §3.2.3 Training Costs/Inference Efficiency for baseline and setup.
-- [DeepSeek-AI. "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning." arXiv:2501.12948, 2025.](https://arxiv.org/abs/2501.12948)
+- [DeepSeek-AI. "DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model." arXiv:2405.04434v5, 2024.](https://arxiv.org/html/2405.04434v5) — §§2.1.2–2.1.4 and Table 1 for cache accounting; abstract for both ratios and parameter counts; §3.2.3 Training Costs for the dense baseline and Inference Efficiency for the throughput setup.
 - [DeepSeek-AI. FlashMLA README, commit 0f11e178da1f67becb087a324b400854931ec3e3.](https://github.com/deepseek-ai/FlashMLA/blob/0f11e178da1f67becb087a324b400854931ec3e3/README.md) — Introduction, breaking-change notice and Requirements; inspected October 23, 2026. This snapshot does not establish historical V2 compatibility.
-- [DeepSeek-AI. TileKernels repository (GPU kernel project using TileLang).](https://github.com/deepseek-ai/TileKernels)
-- [TileLang. TileLang DSL repository.](https://github.com/tile-ai/tilelang)
 - [SGLang. Attention backend guide, commit 74c08f3dc5d98dddf052ba03122fc084a31a0269.](https://github.com/sgl-project/sglang/blob/74c08f3dc5d98dddf052ba03122fc084a31a0269/docs/docs/advanced_features/attention_backend.mdx) — introduction, MLA Backends and page-size constraints; inspected October 23, 2026, without runtime validation.
 - [vLLM. Attention backends, commit f3871c3cbf8a608f7ee833ec4c2c5277f77bee41.](https://github.com/vllm-project/vllm/blob/f3871c3cbf8a608f7ee833ec4c2c5277f77bee41/docs/design/attention_backends.md) — MLA prefill/decode selection; inspected October 23, 2026. Generated table includes were not expanded.
-- [BIS. Export Controls for Certain Electronic Devices, Computers, and Advanced Computing Items.](https://www.federalregister.gov/citation/87-FR-62186)
-- [Chris Miller, *Chip War: The Fight for the World's Most Critical Technology* (Scribner, 2022).](https://books.google.com/books/about/Chip_War.html?id=fUVdEAAAQBAJ)
-- [A Survey on Transformer Compression (arXiv:2402.05964).](https://arxiv.org/abs/2402.05964v2)
+- [BIS. "Commerce Implements New Export Controls on Advanced Computing and Semiconductor Manufacturing Items to the People's Republic of China (PRC)." October 7, 2022.](https://www.bis.gov/press-release/commerce-implements-new-export-controls-advanced-computing-semiconductor-manufacturing-items-peoples) — dated heading and opening paragraphs for the historical policy context; not evidence of MLA's design motives.
