@@ -8,6 +8,8 @@ The user's governing instruction is that content must be backed by facts. Do not
 
 Accountable lead: the current Codex task. GitHub is the work-status authority. Local plans explain scope and evidence; worker reports and heuristic dashboards do not independently prove completion.
 
+Current [review results and recommendation reconciliation](review-status.md) record examined revisions, findings, repairs and remaining coverage. Previously fixed pages remain in the full-page review scope; a closed repair ticket does not exempt its surrounding content.
+
 ## Baseline and scope
 
 Initial inventory at commit `8dd9bbd4cccffdef62b426cf987a0e4c5a8c92cb`: 1,639 Markdown/MDX files; 1,083 English pages and 556 Ukrainian pages. English curriculum contains 828 module files, plus 73 book chapters. Counts must be regenerated when the checkout changes. The earlier [audit](../content-review-and-expansion-plan-2026-09-04.md) contains sample findings and methodological limits.
