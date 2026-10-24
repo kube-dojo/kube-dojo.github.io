@@ -423,7 +423,20 @@ sequenceDiagram
     App-->>User: 7. User is logged in
 ```
 
-The two-step exchange (auth code, then tokens) exists for a specific reason: the auth code is delivered through the user's browser, which is an untrusted channel where browser extensions, history, and referrer headers can leak it; the tokens are delivered through a direct server-to-server call where the channel is trusted. A code is useless without the client secret needed to exchange it, so a leaked code is recoverable; a leaked access token is immediately usable. The flow is engineered to put the dangerous artifact on the safe channel.
+The two-step flow keeps access tokens out of the authorization redirect: the browser carries a short-lived, single-use code, and tokens return in the token endpoint's TLS-protected response ([RFC 6749, §§4.1.2–4.1.3](https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2)). The separate redemption request is where the server checks PKCE and, for confidential clients, client authentication. That exchange is not always server-to-server. Native and browser-only applications are public-client profiles that cannot safely keep a client secret; a protected server component can act as a confidential client and authenticate using its registered method. A client identifier is not a secret ([§§2.1–2.2](https://www.rfc-editor.org/rfc/rfc6749#section-2.1)). Codes can still leak through the browser path, so a leaked code is not automatically harmless ([§10.5](https://www.rfc-editor.org/rfc/rfc6749#section-10.5)).
+
+Proof Key for Code Exchange (PKCE) binds redemption to a transaction-specific verifier. The client generates a fresh, cryptographically random `code_verifier`, sends its derived `code_challenge` and `code_challenge_method=S256` with the authorization request, and supplies the verifier when exchanging the code. The authorization server recomputes the challenge and rejects a mismatch. Under [RFC 9700, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1), public clients must use PKCE; it is also recommended for confidential clients.
+
+Explicitly select `S256` so the authorization request does not expose the verifier; omitting `code_challenge_method` defaults to `plain` in [RFC 7636, §4.3](https://www.rfc-editor.org/rfc/rfc7636#section-4.3). PKCE complements confidential-client authentication; it does not turn a public client into one that can keep a secret. The overview diagram omits these checks, redirect-URI validation and other protocol protections; it is not a complete implementation recipe.
+
+**Apply the distinction:** Compare a server-rendered web application with a native app using the authorization-code flow. Which can authenticate with a protected client credential? For the native app, suppose the authorization request used `S256` with verifier A. An attacker intercepts the code and knows the client identifier but not A; the attacker submits verifier B whose derived challenge differs. The code and client identifier are otherwise valid. Predict a conforming token endpoint's response and explain why knowing the client identifier is insufficient before revealing the answer.
+
+<details>
+<summary>Check the client boundary and failed exchange</summary>
+
+The server component can protect a client credential; a secret distributed inside a native app cannot provide the same assurance. The native app must use PKCE. In the supplied mismatch case, a conforming server must return `invalid_grant`, as specified in [RFC 7636, §4.6](https://www.rfc-editor.org/rfc/rfc7636#section-4.6), rather than issue tokens. A matching client identifier does not satisfy the verifier check. Confidential clients still need their configured authentication, and a correct verifier alone does not waive the other token-endpoint checks.
+
+</details>
 
 > **Try This (3 minutes)**
 >
@@ -813,4 +826,6 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Managing Kubernetes ServiceAccounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) — Covers ServiceAccount identity, token projection, TokenRequest, and legacy token behavior.
 - [RFC 6749: OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749) — Defines OAuth 2.0 roles and authorization-code flow used in the module.
+- [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
+- [RFC 9700: Best Current Practice for OAuth 2.0 Security, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1) — PKCE requirements for public clients and recommendations for confidential clients.
 - [Amazon EKS Identity and Access Management Best Practices](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) — Explains IRSA, projected service account tokens, trust-policy scoping, and injected AWS identity environment variables.
