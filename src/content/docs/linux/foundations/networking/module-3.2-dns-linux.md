@@ -391,13 +391,18 @@ k logs -n kube-system -l k8s-app=kube-dns
 # 3. Verify the kube-dns service exists and has a ClusterIP
 k get svc -n kube-system kube-dns
 
-# 4. Verify that the pod can reach the CoreDNS service IP (typically 10.96.0.10) on port 53 (UDP/TCP)
+# 4. Inspect the DNS Service's backend addresses, ports, and readiness conditions
+kubectl get endpointslice -n kube-system \
+  -l kubernetes.io/service-name=kube-dns -o yaml
+
+# 5. Test the DNS Service's TCP port using the actual ClusterIP from step 3
 # This uses netcat (nc) from a busybox pod to test connectivity
+# Replace 10.96.0.10 below if your Service uses a different IP
 k run test --image=busybox --rm -it -- \
   nc -zv 10.96.0.10 53
 ```
 
-This sequence separates control-plane state, CoreDNS workload health, service discovery for the DNS service itself, and network reachability to port 53. The port test has a subtle limitation: many `nc` builds test TCP more naturally than UDP, while most DNS queries use UDP unless responses are large or truncated. Still, proving basic reachability to the service IP is useful because a completely unreachable DNS service causes broader symptoms than a single missing Service record.
+This sequence separates CoreDNS workload health, the DNS Service, its advertised backends, and network reachability to port 53. An existing Service does not establish that it has ready backend endpoints. Inspect every matching EndpointSlice: missing addresses or explicitly unready endpoints direct attention to Service selection, Pod readiness and endpoint reconciliation. Ready endpoints alone do not prove that a query reaches CoreDNS or receives a valid answer. The port test has a subtle limitation: many `nc` builds test TCP more naturally than UDP, while most DNS queries use UDP unless responses are large or truncated. A successful TCP connection therefore does not establish that UDP DNS works. The official [DNS debugging sequence](https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/#are-dns-endpoints-exposed) includes the EndpointSlice check.
 
 ```bash
 # Option 1: Exec into the pod and check its resolv.conf
@@ -616,7 +621,7 @@ The likely cause is `ndots:5` combined with Kubernetes search domains in the pod
 
 <details><summary>A pod cannot resolve `kubernetes.default.svc.cluster.local`, but it can reach an external IP address. What sequence separates DNS from general networking?</summary>
 
-First inspect the pod's `/etc/resolv.conf` to confirm the nameserver points at the `kube-dns` Service ClusterIP. Then check CoreDNS pods, CoreDNS logs, and the `kube-dns` Service in `kube-system`. Finally test lookup from a temporary pod and, if needed, basic reachability to port 53 on the DNS service. This sequence matters because raw IP connectivity proves the pod has some network path, while DNS failure can still come from resolver configuration, CoreDNS health, or service routing.
+First inspect the pod's `/etc/resolv.conf` and identify its configured DNS path: directly to the `kube-dns` Service or through a node-local cache. Check CoreDNS Pod readiness and logs, the Service, and its EndpointSlices with `kubectl get endpointslice -n kube-system -l kubernetes.io/service-name=kube-dns -o yaml`. Compare backend addresses, ports and readiness conditions; a Service ClusterIP alone is not backend evidence. Test lookup from a temporary pod, then investigate the DNS transport path if endpoints appear ready but queries still fail. Raw external-IP connectivity does not prove the DNS path works, and a TCP port-53 connection does not establish a successful UDP query.
 
 </details>
 
@@ -697,10 +702,15 @@ If `systemd-resolved` is active, `resolvectl status` usually gives better operat
 - [ ] Define `alias k=kubectl` in your shell if you have not already.
 - [ ] Start a temporary BusyBox pod and resolve `kubernetes` and `kubernetes.default.svc.cluster.local`.
 - [ ] Read the pod's `/etc/resolv.conf` and compare the nameserver to the `kube-dns` Service ClusterIP.
+- [ ] Record CoreDNS Pod readiness, the DNS Service and all its EndpointSlices, including backend addresses, ports and readiness conditions. State what this evidence establishes and what remains untested.
 
 <details><summary>Solution notes</summary>
 
 Use a command such as `k run dnstest --image=busybox --rm -it --restart=Never -- sh`, then run `nslookup kubernetes`, `nslookup kubernetes.default.svc.cluster.local`, and `cat /etc/resolv.conf` inside the pod. In another shell, `k get svc -n kube-system kube-dns -o wide` should show the ClusterIP that appears as the pod nameserver. If short and fully qualified lookups differ, focus on search domains and `ndots`.
+
+Use `k get pods -n kube-system -l k8s-app=kube-dns` and the EndpointSlice command from the troubleshooting sequence to collect backend evidence even when lookups succeed. If a lookup fails, compare the resolver configuration, Service and endpoint evidence before choosing the next test; do not infer a unique cause from any one of them. An authorization error means the evidence is unavailable, not that endpoints are missing. Record that limit and request the output from someone with access.
+
+The nameserver comparison above assumes pods query CoreDNS through its Service. With [NodeLocal DNSCache](https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/), a node-local nameserver can be intentional. Record the configured cache-to-CoreDNS path before treating an address difference as a fault. Neither matching addresses nor ready endpoints establish end-to-end resolution; the lookup results are separate evidence.
 
 </details>
 
@@ -759,7 +769,7 @@ Failure layer: search-suffix attempts, not upstream latency. Next action: compar
 - [ ] You can explain the difference between `dig` and `getent hosts` using evidence from your own host.
 - [ ] Classified each frozen DNS-layer card before opening the reveal.
 - [ ] You can identify the active nameserver, search domains, and `ndots` setting for a Linux host or pod.
-- [ ] You can test Kubernetes DNS from inside a pod and compare the pod nameserver with the `kube-dns` Service (cluster fork — Task 4; optional for host-only learners).
+- [ ] You can test Kubernetes DNS from inside a pod, identify its resolver path, and interpret Service/EndpointSlice evidence or record access limits (cluster fork — Task 4; optional for host-only learners).
 - [ ] You can describe a stale-cache scenario without blaming authoritative DNS prematurely.
 - [ ] You can write a DNS incident note that names the resolver layer still under investigation.
 
@@ -778,6 +788,8 @@ Next, continue to **[Module 3.3: Network Namespaces & veth](../module-3.3-networ
 - [Linux man-pages: getent](https://man7.org/linux/man-pages/man1/getent.1.html)
 - [Kubernetes DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 - [Kubernetes Debugging DNS Resolution](https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/)
+- [Kubernetes EndpointSlices](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/)
+- [Kubernetes NodeLocal DNSCache](https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/)
 - [Kubernetes Pod DNS Config](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-dns-config)
 - [CoreDNS Kubernetes Plugin](https://coredns.io/plugins/kubernetes/)
 - [systemd-resolved service documentation](https://www.freedesktop.org/software/systemd/man/latest/systemd-resolved.service.html)
