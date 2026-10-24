@@ -386,12 +386,13 @@ Here we use the [compact JWS form](https://www.rfc-editor.org/rfc/rfc7515#sectio
 }
 ```
 
-The header declares the algorithm and token type, but it is untrusted input until verification succeeds. The application must configure acceptable algorithms and bind keys to their intended algorithm; it must not select an arbitrary verification method merely because the token requests it. [RFC 8725, §§2.1 and 3.1](https://www.rfc-editor.org/rfc/rfc8725#section-3.1), describes algorithm-confusion risks and these verification requirements. For the integrity-protected tokens in this lesson, an unexpected `alg: none` must not bypass the configured cryptographic checks.
+The header declares the algorithm and token type, but it is untrusted input until verification succeeds. The application configures acceptable algorithms and the verification library enforces that policy, binding keys to their intended algorithm; it must not select an arbitrary verification method merely because the token requests it. [RFC 8725, §§2.1 and 3.1–3.2](https://www.rfc-editor.org/rfc/rfc8725#section-3.1), describes algorithm-confusion risks and these verification requirements. For the integrity-protected tokens in this lesson, an unexpected `alg: none` must not bypass the configured cryptographic checks.
 
 #### Payload (Claims)
 
 ```json
 {
+  "iss": "https://issuer.example.com",
   "sub": "alice@example.com",
   "aud": "api.example.com",
   "iat": 1700000000,
@@ -400,7 +401,7 @@ The header declares the algorithm and token type, but it is untrusted input unti
 }
 ```
 
-The payload contains claims about the subject. Standard claims include `sub` (the subject — who the token is about), `aud` (the audience — who the token is for), `iat` (issued at), `exp` (expires at), and `iss` (issuer — who minted the token). Custom claims can carry application-specific information like roles or tenant IDs. A correct verifier checks `iss` matches an expected issuer, `aud` matches the current service, and `exp` is in the future — skipping any of these is a hole.
+The payload contains claims about the subject. Registered names include `sub` (subject), `aud` (audience), `iat` (issued at), `exp` (expiration) and `iss` (issuer). The example uses illustrative identities and historical timestamps, not a live credential. Custom claims can carry application-specific information like roles or tenant IDs. [RFC 7519, §4](https://www.rfc-editor.org/rfc/rfc7519#section-4), leaves required claims to the application profile. For the API profile used here, require an expected issuer and audience plus an acceptable expiration; reject missing or mismatched required claims after cryptographic verification.
 
 #### Signature
 
@@ -640,7 +641,7 @@ metadata:
     eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/payments-api-s3-reader
 ```
 
-When a Pod uses this ServiceAccount, the EKS Pod Identity webhook [injects environment variables (`AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE`)](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) into the container, and the AWS SDK automatically calls `sts:AssumeRoleWithWebIdentity` to swap the projected ServiceAccount token for short-lived AWS credentials — typically valid for one hour. The Pod never sees a static AWS access key, and an attacker who somehow extracts the token from the Pod gets one hour of access scoped to one IAM role's permissions, then nothing.
+With IRSA configured, its mutating webhook [injects environment variables (`AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE`)](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) into Pods using this ServiceAccount. A compatible AWS SDK credential provider can use them to exchange the projected token through `sts:AssumeRoleWithWebIdentity`. The returned credentials default to a one-hour session, but the requested duration and role settings can change that ([STS Session Duration](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html)). This flow needs no static AWS access key, but it still handles a projected token and temporary AWS credentials with distinct lifetimes. A stolen token that continues to satisfy the trust checks may obtain another role session; continuing Pod compromise may also expose refreshed tokens. Expiration alone therefore does not establish that access or all effects of misuse stop after one hour. Review credential exposure, trust conditions, role permissions and containment separately.
 
 The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.google.com/iam/docs/workload-identity-federation) and Azure (Workload Identity) follows the same shape: annotate a Kubernetes ServiceAccount with the cloud identity it should map to, configure the cloud IAM side to trust the cluster's OIDC issuer for that specific ServiceAccount, and let the SDK's credential chain handle the token exchange. The trust-policy condition is the central security artifact in all three; if you understand the AWS example above, the GCP and Azure equivalents will read as variations on the same theme.
 
@@ -675,11 +676,11 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
 
 ## Quiz
 
-1. **Scenario: A developer configures an API gateway to verify JWT signatures from Okta, but users report they can access administrative endpoints they shouldn't. Is this a failure of authentication or authorization, and what is the difference between the two in this context?**
+1. **An API gateway accepts access tokens issued by Okta. For this case, assume the caller's session is authenticated and the token's cryptographic and required-claim checks succeed. The caller has no administrative permission but reaches an administrative endpoint. Which decision must you investigate, and why would signature verification alone be insufficient evidence?**
    <details>
    <summary>Answer</summary>
 
-   The failure is in authorization, not authentication. Authentication answers "Who are you?" — the API gateway successfully verified the JWT signature, confirming the users' identities via Okta. Authorization answers "What can you do?" — the system failed to check whether those authenticated users had the specific permissions required to reach administrative endpoints. Because the two processes are distinct, a system must explicitly enforce authorization rules after successfully authenticating a user, otherwise anyone with a valid Okta account can call any endpoint the gateway forwards. The fix is to add a per-endpoint authorization check (claims-based, RBAC, or policy-based) that runs after signature verification and before the request is proxied to the backend.
+   Under those assumptions, investigate authorization: how the caller's roles or scopes map to the requested administrative action, and where that policy is enforced. Signature verification alone would not establish the required claims, a legitimate bearer-token presenter, or permission for this endpoint. Inspect the route's policy and test an allowed request and a denied request before forwarding to the backend. Successful authentication and token validation supply inputs to authorization; they do not replace the action-and-resource decision.
    </details>
 
 2. **Scenario: An attacker manages to steal a database containing all user passwords for your application. If your application enforces MFA, why are the user accounts still secure? Explain how the different authentication factors work together.**
@@ -721,7 +722,7 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    <details>
    <summary>Answer</summary>
 
-   The expiration calculation is `1700003600 − 1700000000 = 3,600 seconds`, or one hour. That is the remaining window under the stated expiration assumptions, not a promise of uninterrupted access: revocation, changed authorization policy or other checks can reject a request earlier. A bearer token's possession is sufficient to present it ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)). Signature verification checks token integrity under the configured key; it does not authenticate the current presenter. Applications can still use session state, revocation data and request telemetry to detect or respond to suspicious use. A JWT format does not make detection impossible, and refresh-token rotation does not itself require the user to authenticate again.
+   The expiration calculation is `1700003600 − 1700000000 = 3,600 seconds`, or one hour. That is the remaining window under the stated expiration assumptions, not a promise of uninterrupted access: revocation, changed authorization policy or other checks can reject a request earlier. A bearer token's possession is sufficient to use it in the same ways as another holder, subject to the application's checks ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)). Signature verification checks token integrity under the configured key; it does not authenticate the current presenter. Applications can still use session state, revocation data and request telemetry to detect or respond to suspicious use. A JWT format does not make detection impossible, and refresh-token rotation does not itself require the user to authenticate again ([RFC 9700, §4.14.2](https://www.rfc-editor.org/rfc/rfc9700#section-4.14.2)).
    </details>
 
 8. **Scenario: During a penetration test, the red team exploits a remote code execution vulnerability in a simple Nginx web pod. They immediately pivot to query the Kubernetes API and list all secrets in the namespace. What specific ServiceAccount configuration enabled this lateral movement, why is it a risk, and what is the correct remediation?**
@@ -837,6 +838,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [RFC 7518: JSON Web Algorithms, §§3.2–3.4](https://www.rfc-editor.org/rfc/rfc7518#section-3.2) — HMAC comparison and RSA/ECDSA public-key verification.
 - [RFC 7519: JSON Web Token](https://www.rfc-editor.org/rfc/rfc7519) — JWT representations, the public example and expiration semantics.
 - [RFC 6750: Bearer Token Usage, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2) — Possession-based bearer-token semantics.
+- [AWS STS AssumeRoleWithWebIdentity: Session Duration](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html) — Default and configurable lifetime of the returned role-session credentials.
 - [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
 - [RFC 9700: Best Current Practice for OAuth 2.0 Security, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1) — PKCE requirements for public clients and recommendations for confidential clients.
 - [Amazon EKS Identity and Access Management Best Practices](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) — Explains IRSA, projected service account tokens, trust-policy scoping, and injected AWS identity environment variables.
