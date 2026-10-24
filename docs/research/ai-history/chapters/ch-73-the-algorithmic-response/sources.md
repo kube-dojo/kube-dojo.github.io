@@ -34,7 +34,7 @@ This is conditional arithmetic, not a benchmark reproduction or C1/C2 clearance.
 | Evidence class | Input or calculation | Locator and limit |
 |---|---|---|
 | Source-visible | S1 counts MLA as `(d_c + d_h^R) l` and GQA as `2 n_g d_h l`, in elements per token across layers, independent of storage precision. V2 uses `l=60`, `d_c=512`, `d_h^R=64`. | S1 Table 1/caption and §3.1.2 Model Hyper-Parameters. |
-| Source-visible | Figure 1(b) labels the cache-for-generation axis `KB/Token` and annotates a 93.3% reduction. | Original S1 SVG visually inspected. It does not print exact per-bar values, cache dtype or a KB-versus-KiB definition; bar positions are not used as exact numerical data here. |
+| Source-visible | Figure 1(b)'s cache-for-generation panel title gives units `KB/Token` and the plot annotates a 93.3% reduction. | Original S1 SVG visually inspected. It does not print exact per-bar values, cache dtype or a KB-versus-KiB definition; bar positions are not used as exact numerical data here. |
 | Source-visible | The 67B baseline has 95 layers, width 8192, 64 attention heads and 8 KV heads. | S7 Table 2 and §2.2; the inference-comparison cache dtype is not given by these architecture anchors. |
 | Derived working input | Use head dimension `8192 / 64 = 128` under the conventional model-width/query-head split, and eight GQA KV groups. | Architecture-based calculation, not a measured cache layout or separately stated benchmark setting. |
 | Derived element accounting | V2: `(512 + 64) × 60 = 34,560`; baseline GQA: `2 × 8 × 128 × 95 = 194,560` elements/token. Equal-bit-width reduction: `1 − 34,560 / 194,560 ≈ 82.2368%`. | Applying S1's formulas to the stated/derived inputs; not the paper's reported deployment-memory calculation. |
