@@ -321,9 +321,9 @@ def _handle_codex_rate_limited(msg: dict, message_id: int, reason: str) -> None:
     print(f"\n⛔ Codex rate limited - message {message_id} deferred")
     print(f"   Reason: {reason}")
     retry_hint = (
-        f"This self-addressed message is already acknowledged. Once headroom returns, "
+        f"This message is already acknowledged. Once headroom returns, "
         f"retry explicitly: ab process-codex {message_id} --force"
-        if msg["from"] == "codex" else
+        if msg["acknowledged"] else
         f"The incoming message (id={message_id}) remains in Codex's inbox and will be retried "
         "automatically when headroom returns. Sender should NOT retry manually."
     )

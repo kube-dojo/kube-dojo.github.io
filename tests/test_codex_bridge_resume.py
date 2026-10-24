@@ -253,7 +253,7 @@ def test_review_flag_is_fresh_and_preserves_the_implementation_session(bridge, m
 def test_resumed_id_mismatch_invalidates_scope_without_retry(bridge, caplog):
     _seed(bridge.repo)
     assert _codex.process_for_codex(bridge.message()) == "failed"
-    assert _stored()["codex_session_id"] == ""
+    assert _stored() == {"codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": ""}
     assert bridge.invoke.call_count == 1
     assert "clearing the saved session" in caplog.text
 
@@ -268,6 +268,28 @@ def test_self_addressed_ask_reports_explicit_retry_when_it_cannot_run(bridge, ca
             message_id = _codex.ask_codex("question", task_id="task-1", from_llm="codex")
     bridge.invoke.assert_not_called()
     assert f"ab process-codex {message_id} --force" in capsys.readouterr().out
+    if blocked_by == "quota":
+        _assert_acknowledged_retry_notice(message_id)
+
+
+def _assert_acknowledged_retry_notice(message_id):
+    conn = _db.get_db()
+    try:
+        content = conn.execute("SELECT content FROM messages WHERE message_type = 'error' ORDER BY id DESC").fetchone()[0]
+        assert "already acknowledged" in content
+        assert "retried automatically" not in content
+        assert f"ab process-codex {message_id} --force" in content
+    finally:
+        conn.close()
+
+
+def test_forced_acknowledged_sender_gets_explicit_quota_retry_notice(bridge, monkeypatch):
+    message_id = bridge.message()
+    _messaging.acknowledge(message_id)
+    monkeypatch.setattr(_codex, "has_codex_headroom", lambda _model: (False, "limited"))
+    assert _codex.process_for_codex(message_id, force=True) == "deferred"
+    bridge.invoke.assert_not_called()
+    _assert_acknowledged_retry_notice(message_id)
 
 
 @pytest.mark.parametrize("model", ["bad\nsession id: injected", "bad model", [], 123])

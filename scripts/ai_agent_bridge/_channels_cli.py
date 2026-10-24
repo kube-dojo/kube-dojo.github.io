@@ -1579,6 +1579,8 @@ def _handle_discuss(args) -> int:
         )
 
         if use_resume and err is not None:
+            if agent_name == "codex":
+                _set_session(task_key, agent="codex", session_id="", codex_cwd="", codex_sandbox_mode="")
             print(
                 f"bridge: stored session {attempt_session} for {agent_name}/{task_key} "
                 f"failed: {err}; starting fresh"

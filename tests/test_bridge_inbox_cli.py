@@ -331,7 +331,7 @@ def test_discuss_claude_round1_round2_session_resume(mock_invoke, monkeypatch, c
 
 @patch("agent_runtime.runner.invoke")
 @pytest.mark.parametrize("resumed_return", ["codex-session-02", None, "different-session"])
-def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tmp_path, resumed_return):
+def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tmp_path, capsys, resumed_return):
     _channels.create_channel("discuss-codex")
     monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
     ids = iter(range(1, 1000))
@@ -372,6 +372,12 @@ def test_discuss_codex_round1_round2_session_resume(mock_invoke, monkeypatch, tm
         _db.get_session("discuss:discuss-codex-0001")["codex_session_id"]
         == ("" if resumed_return == "different-session" else "codex-session-02")
     )
+    if resumed_return == "different-session":
+        stored = _db.get_session("discuss:discuss-codex-0001")
+        assert {key: stored[key] for key in ("codex_session_id", "codex_cwd", "codex_sandbox_mode")} == {
+            "codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": "",
+        }
+        assert "[failed: Codex session identity changed; saved session cleared]" in capsys.readouterr().out
 
 
 @patch("agent_runtime.runner.invoke")
@@ -420,7 +426,45 @@ def test_discuss_codex_never_persists_session_id_from_raw_output(mock_invoke, mo
 
     assert exit_code == 0
     assert not _db.get_session("discuss:discuss-codex-header-0001")["codex_session_id"]
+    assert mock_invoke.call_count == 2
     assert all(call.kwargs["session_id"] is None for call in mock_invoke.call_args_list)
+
+
+@patch("agent_runtime.runner.invoke")
+@pytest.mark.parametrize("fallback_ok", [False, True])
+def test_discuss_codex_failed_resume_clears_scope_before_fallback(mock_invoke, monkeypatch, capsys, fallback_ok):
+    _channels.create_channel("discuss-codex-failure")
+    monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
+    ids = iter(range(1, 1000))
+    monkeypatch.setattr(_channels, "_new_id", lambda: f"discuss-codex-failure-{next(ids):04d}")
+    task = "discuss:discuss-codex-failure-0001"
+
+    def invoke(agent, *_, **kwargs):
+        attempt = mock_invoke.call_count
+        if attempt == 3:
+            stored = _db.get_session(task)
+            assert {key: stored[key] for key in ("codex_session_id", "codex_cwd", "codex_sandbox_mode")} == {
+                "codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": "",
+            }
+        ok = attempt == 1 or (attempt == 3 and fallback_ok)
+        return SimpleNamespace(
+            ok=ok, response="reply [AGREE]" if ok else "", stderr_excerpt="test failure",
+            session_id=("session-old" if attempt == 1 else "session-fresh") if ok else None,
+        )
+
+    mock_invoke.side_effect = invoke
+    assert _run_cli(["discuss", "discuss-codex-failure", "topic", "--with", "codex", "--max-rounds", "2"]) == 0
+    assert [call.kwargs["session_id"] for call in mock_invoke.call_args_list] == [None, "session-old", None]
+    stored = _db.get_session(task)
+    if fallback_ok:
+        assert stored["codex_session_id"] == "session-fresh"
+        assert stored["codex_cwd"]
+        assert stored["codex_sandbox_mode"] == "danger"
+    else:
+        assert {key: stored[key] for key in ("codex_session_id", "codex_cwd", "codex_sandbox_mode")} == {
+            "codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": "",
+        }
+        assert "[failed: test failure]" in capsys.readouterr().out
 
 
 @patch("agent_runtime.runner.invoke")
