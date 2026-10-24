@@ -30,9 +30,9 @@ After completing this module, you will be able to:
 
 ## Why This Module Matters
 
-Hypothetical scenario: a payment startup runs its checkout processor as a single naked Pod because the team wants the smallest possible manifest while preparing for a product launch. At 2 PM on a Friday, a memory leak kills that Pod during a partner promotion, and nothing in the cluster recreates it because no controller owns the workload. For 23 minutes, every payment request fails until an on-call engineer manually applies a replacement, then another 15 minutes disappear when the replacement uses the wrong image tag and needs a second emergency fix.
+Hypothetical scenario: a payment startup runs its checkout processor as a single naked Pod because the team wants the smallest possible manifest while preparing for a product launch. At 2 PM on a Friday, an operator deletes that Pod during a partner promotion, and nothing in the cluster recreates it because no controller owns the workload. For 23 minutes, every payment request fails until an on-call engineer manually applies a replacement, then another 15 minutes disappear when the replacement uses the wrong image tag and needs a second emergency fix.
 
-In this scenario, the immediate failed payment transactions certainly matter, but the longer-term damage is deeply operational and cultural. Engineers stop trusting their own deploys, customer support burns hours handling angry merchants, and the next scheduled release is delayed indefinitely because the team has no reliable, repeatable way to replace failing application instances safely. A Deployment controller would not magically make the underlying application memory leak vanish. However, it would recreate the failed Pods automatically without human intervention, stubbornly maintain the desired replica count through the outage, and provide a heavily controlled rolling update path for the eventual fix, entirely avoiding a late-Friday manual rebuild under intense pressure.
+In this scenario, the immediate failed payment transactions certainly matter, but the longer-term damage is deeply operational and cultural. Engineers stop trusting their own deploys, customer support burns hours handling angry merchants, and the next scheduled release is delayed indefinitely because the team has no reliable, repeatable way to replace failing application instances safely. A Deployment controller would not magically make the underlying application defect vanish. However, its ReplicaSet would request replacement Pods, subject to scheduling capacity and readiness. A container crash is different: kubelet normally restarts that container within the same Pod under `restartPolicy: Always`, even without a Deployment.
 
 That operational resilience is exactly why Deployments are the first Kubernetes workload controller worth treating as far more than just YAML syntax. While Pods strictly describe one running, ephemeral copy of a containerized process, Deployments describe the long-term strategic intent: how many identical copies must exist, exactly how they should be updated when the template changes, and precisely how the Kubernetes control plane should violently recover when physical reality drifts away from the desired declarative state. The core practical skill here is absolutely not memorizing the `kubectl create deployment` flags. The true engineering skill is learning to dynamically read the Deployment, the intermediate ReplicaSets, and the underlying Pod layers as one cohesive, continuous control system that aggressively protects user availability while still safely allowing you to iterate and change your software.
 
@@ -42,28 +42,28 @@ Think of a Deployment as a restaurant manager rather than an individual server. 
 
 Pods are useful for learning because they expose the smallest schedulable unit in Kubernetes, but they are the wrong abstraction for long-running applications. A Pod has no memory of how many peers should exist, no update strategy, and no owner that can rebuild it after deletion. If a node disappears, the scheduler can place replacement Pods only when a higher-level controller asks for them, which means a naked Pod is closer to a hand-started process than a managed service.
 
-Deployments solve this by adding a durable intent above individual Pods. The Deployment controller stores the desired replica count, the Pod template, the selector that identifies managed Pods, and the strategy for changing that template over time. When the cluster differs from that intent, Kubernetes creates, deletes, or scales ReplicaSets, and those ReplicaSets create, delete, or replace Pods until the live workload matches the requested shape. This continuous effort is powered by the Kubernetes reconciliation loop, a core control theory pattern. Instead of executing imperative "start pod" commands, the Deployment controller watches a shared informer cache that streams real-time state changes from the API server. When it observes a drift between the desired state (your YAML) and the observed state (the actual cluster reality), it enqueues a sync operation in a workqueue. This mechanism is level-triggered, not edge-triggered: if a sync fails or the controller crashes, the next loop reads the absolute current state rather than relying on a missed historical event. The workqueue employs rate-limiting to prevent a flapping Pod from overloading the API server, ensuring that a continuously crashing application slows down the controller's retry attempts exponentially rather than consuming all control plane resources.
+Deployments solve this by adding a durable intent above individual Pods. The Deployment controller stores the desired replica count, the Pod template, the selector that identifies managed Pods, and the strategy for changing that template over time. When the cluster differs from that intent, Kubernetes creates, deletes, or scales ReplicaSets, and those ReplicaSets create, delete, or replace Pods until the live workload matches the requested shape. This continuous effort is powered by the Kubernetes reconciliation loop, a core control theory pattern. Instead of executing imperative "start pod" commands, the Deployment controller watches a shared informer cache that streams real-time state changes from the API server. When it observes a drift between the desired state (your YAML) and the observed state (the actual cluster reality), it enqueues a sync operation in a workqueue. This mechanism is level-triggered, not edge-triggered: if a sync fails or the controller crashes, the next loop reads the absolute current state rather than relying on a missed historical event. The workqueue rate-limits retries after synchronization errors. Application crash backoff belongs to kubelet's container restart logic, not this Deployment queue.
 
 ```mermaid
 graph TD
     subgraph Naked Pods
-        NP1[Pod dies] -->|Result| NP2[Stays dead]
+        NP1[Pod deleted] -->|Result| NP2[Stays dead]
         NP3[Node fails] -->|Result| NP4[Pod is lost]
         NP5[Updates] -->|Result| NP6[Manual delete/create]
         NP7[Scaling] -->|Result| NP8[Can't scale easily]
     end
     subgraph With Deployment
-        D1[Pod dies] -->|Result| D2[Automatically recreated]
-        D3[Node fails] -->|Result| D4[Rescheduled elsewhere]
-        D5[Updates] -->|Result| D6[Rolling updates with zero downtime]
+        D1[Pod deleted] -->|Result| D2[Automatically recreated]
+        D3[Node fails] -->|Result| D4[Replacement scheduled if capacity permits]
+        D5[Updates] -->|Result| D6[Rollouts with readiness and capacity limits]
         D7[Scaling] -->|Result| D8[Scale with one command]
         D9[Rollback] -->|Result| D10[Rollback to previous versions]
     end
 ```
 
-The important difference in the diagram is not that Deployments are more complicated; it is that they preserve intent after the first successful start. A naked Pod can be running perfectly at noon and still leave you exposed at noon-thirty because there is no controller obligated to notice a crash. A Deployment keeps asking whether the expected number of ready Pods exists, so a one-time launch becomes a continuing contract between your manifest and the cluster.
+The important difference in the diagram is not that Deployments are more complicated; it is that they preserve intent after the first successful start. A naked Pod can be running perfectly at noon and still leave you exposed at noon-thirty because there is no ReplicaSet obligated to replace a deleted Pod. A Deployment keeps asking whether the expected number of ready Pods exists, so a one-time launch becomes a continuing contract between your manifest and the cluster.
 
-This contract is especially valuable because failure rarely arrives in one neat category. A node can drain during unexpected hardware maintenance, an image can fail to pull in one specific geographic region, a poorly tuned resource request can make new Pods unschedulable, or a readiness probe can reveal that a new version starts cleanly but completely fails to serve application traffic. Deployments give you a single, unified control plane to observe all those disparate situations. Crucially, they make the default operational response deeply conservative: the controller will obstinately keep enough old Pods available to serve users while repeatedly trying to move the cluster toward the new requested version.
+This contract is especially valuable because failure rarely arrives in one neat category. A node can drain during unexpected hardware maintenance, an image can fail to pull in one specific geographic region, a poorly tuned resource request can make new Pods unschedulable, or a readiness probe can reveal that a new version starts cleanly but completely fails to serve application traffic. Deployments give you a single, unified control plane to observe all those disparate situations. Crucially, they make the default operational response deeply conservative: the controller limits rollout-driven removal of old capacity; unrelated failures or misleading readiness signals can still interrupt service.
 
 **Pause and predict:** if you manually delete two Pods from a five-replica Deployment, what exact object notices first, and what object creates the replacements?
 
@@ -74,7 +74,7 @@ Operators casually say "the Deployment recreated my Pods," but the Deployment de
 
 </details>
 
-Write which object notices first, and which object creates the replacements, before you continue. The next paragraph is a debugging map. It does not name the creator.
+Predict which layer you would inspect if replacements exist but remain unready; explain what its status can tell you that the replica count cannot.
 
 The Deployment is therefore both a safety mechanism and a debugging map. When an application is healthy, you mostly interact with the Deployment because it is the source of truth. When it is unhealthy, you walk down the hierarchy: Deployment conditions explain rollout progress, ReplicaSet counts explain old-versus-new balancing, and Pod status explains scheduling, image, readiness, or crash behavior.
 
@@ -82,14 +82,27 @@ The Deployment is therefore both a safety mechanism and a debugging map. When an
 
 There are two normal ways to create a Deployment, and they serve different purposes. Imperative commands are fast when you are exploring a cluster, testing a small image, or generating a starter manifest. Declarative YAML is the production habit because it can be reviewed, versioned, repeated, and compared against the live cluster without relying on whoever happened to type the original command.
 
-The first command block preserves the quick testing workflow from the original module while using the full `kubectl` binary name. That small bit of verbosity is intentional because the same command can be pasted into a shell, a lab note, or a script without depending on interactive alias expansion. The dry-run command is especially useful because it lets you convert a correct one-line experiment into YAML without pretending that hand-written manifests are always the fastest first step.
+**Before any mutation:** independently confirm a dedicated disposable cluster and export its name as `KUBEDOJO_LAB_CONTEXT`. Use a fresh Bash terminal and empty scratch directory for these examples, in order. The wrapper below refuses commands unless namespace creation succeeds, then pins them to that context and namespace; it cannot prove disposability. If setup fails, stop. Keep this terminal for cleanup after completion or interruption; do not redefine these variables or bypass the wrapper.
+
+```bash
+EXAMPLE_READY=no
+readonly EXAMPLE_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" EXAMPLE_NS="deploy-example-$(date +%s)-$$"
+kubectl() { [ "$EXAMPLE_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }; command kubectl --context "$EXAMPLE_CONTEXT" --namespace "$EXAMPLE_NS" "$@"; }
+if [ -n "$EXAMPLE_CONTEXT" ] && [ "$EXAMPLE_CONTEXT" != default ] && [ "$(command kubectl config current-context)" = "$EXAMPLE_CONTEXT" ]; then
+  printf 'Example context/namespace: %s / %s\n' "$EXAMPLE_CONTEXT" "$EXAMPLE_NS"
+  command kubectl --context "$EXAMPLE_CONTEXT" create namespace "$EXAMPLE_NS" && EXAMPLE_READY=yes
+fi
+[ "$EXAMPLE_READY" = yes ] || echo 'Setup failed; do not continue' >&2
+```
+
+The first two commands below are mutually exclusive creation alternatives shown with client dry-run. Neither creates an object; the declarative apply that follows creates the single `nginx` Deployment used throughout these examples.
 
 ```bash
 # Create deployment
-kubectl create deployment nginx --image=nginx
+kubectl create deployment nginx --image=nginx --dry-run=client
 
 # With replicas
-kubectl create deployment nginx --image=nginx --replicas=3
+kubectl create deployment nginx --image=nginx --replicas=3 --dry-run=client
 
 # Dry run to see YAML
 kubectl create deployment nginx --image=nginx --dry-run=client -o yaml
@@ -145,7 +158,7 @@ graph TD
     RS --> P3["<b>POD</b><br/>nginx"]
 ```
 
-The ReplicaSet layer exists because rollout history needs stable snapshots. When you update a Deployment's Pod template, Kubernetes creates a new ReplicaSet for the new template while keeping older ReplicaSets around with zero or fewer replicas. A rollback can then scale an older ReplicaSet back up because its template still describes the previous version. Without that middle layer, Kubernetes would need to reconstruct old Pod templates from less reliable history.
+The ReplicaSet layer exists because rollout history needs stable snapshots. When you update a Deployment's Pod template, Kubernetes creates a ReplicaSet for a new template or reuses a retained matching ReplicaSet while keeping older ReplicaSets around with zero or fewer replicas. A rollback can then scale an older ReplicaSet back up because its template still describes the previous version. Without that middle layer, Kubernetes would need to reconstruct old Pod templates from less reliable history.
 
 You can observe the hierarchy without learning any hidden API. The `deploy,rs,pods` resource list is one of the most useful beginner commands because it shows the parent, the template revision, and the live instances in one view. The names are intentionally related: a Deployment named `nginx` produces ReplicaSets with generated suffixes, and Pods inherit another suffix so you can trace ownership by eye before using labels or owner references.
 
@@ -174,7 +187,7 @@ The next reconciliation loop adjusts the ReplicaSet to match the Deployment's de
 
 </details>
 
-Write what happens to that manual replica count before you continue. The next section is about scaling. It does not resolve this edit.
+Predict whether scaling the Deployment changes the Pod template or merely the desired count, then check which ReplicaSet receives the additional replicas.
 
 ## Scaling, Self-Healing, and Day-Two Operations
 
@@ -191,27 +204,28 @@ kubectl patch deployment nginx -p '{"spec": {"replicas": 5}}'
 kubectl get pods -w
 ```
 
-When you scale from three replicas to five, the Deployment controller updates its own intent, which cascades down to the active ReplicaSet. The ReplicaSet then observes the drift between its observed 3 Pods and its desired 5, and creates two new Pods from the exact same template. This is where the shared informer cache and the level-triggered workqueue shine: if a network partition temporarily hides a node, the controller might think a Pod is missing and create a replacement. When the partition heals, the controller suddenly observes 6 Pods and calmly scales back down to 5. When you scale back down, Kubernetes chooses Pods to terminate according to specific controller logic and scheduling hints—it tends to prefer deleting unready Pods or Pods co-located on the same node to maintain topological balance. Because you cannot perfectly predict which Pod will be terminated, you should completely avoid storing unique local state in any one Pod. A Deployment structurally assumes replicas are identical and interchangeable, which is perfect for horizontally scalable stateless web services, but incredibly dangerous for single-writer databases that need stronger identity guarantees and ordered startup sequences.
+When you scale from three replicas to five, the Deployment controller updates its own intent, which cascades down to the active ReplicaSet. The ReplicaSet then observes the drift between its observed 3 Pods and its desired 5, and creates two new Pods from the exact same template. A network partition does not simply hide Pod objects from the API. Replacement after node loss depends on node-health detection and eviction timing; controllers request new Pods when the old ones no longer count toward the desired replicas, and scheduling still requires suitable capacity. When you scale back down, Kubernetes chooses Pods to terminate according to specific controller logic and scheduling hints—it tends to prefer deleting unready Pods or Pods co-located on the same node to maintain topological balance. Because you cannot perfectly predict which Pod will be terminated, you should completely avoid storing unique local state in any one Pod. A Deployment structurally assumes replicas are identical and interchangeable, which is perfect for horizontally scalable stateless web services, but incredibly dangerous for single-writer databases that need stronger identity guarantees and ordered startup sequences.
 
 Self-healing uses the same count logic. If one Pod disappears, the ReplicaSet observes fewer live Pods than desired and creates a replacement. If a node fails, Pods on that node vanish from the healthy set, and replacement Pods can be scheduled elsewhere as long as the cluster has capacity and the Pod template can be scheduled. The Deployment does not promise magic capacity; it promises continuous effort toward the declared state.
 
 ```bash
-# Create deployment
-kubectl create deployment nginx --image=nginx --replicas=3
+# Reuse the Deployment created above
+kubectl scale deployment nginx --replicas=3
+kubectl rollout status deployment/nginx --timeout=90s
 
 # See pods
 kubectl get pods
 
 # Delete a pod (using label selector to target the first one)
-kubectl delete pod $(kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}')
+kubectl delete pod "$(kubectl get pods -l app=nginx -o jsonpath='{.items[0].metadata.name}')"
 
 # Immediately check again
 kubectl get pods
-# A new pod is already being created!
+# Expected: a replacement appears as reconciliation proceeds.
 
 # The deployment maintains desired state
 kubectl get deployment nginx
-# READY shows 3/3
+# Expected after recovery: READY shows 3/3
 ```
 
 **Pause and predict:** if you delete the underlying ReplicaSet instead of just one Pod, what will the Deployment do, and why might the workload briefly look more disrupted?
@@ -223,15 +237,15 @@ The Deployment owns the ReplicaSet, so it recreates a suitable ReplicaSet, which
 
 </details>
 
-Write what you expect the workload to do before you continue. The next paragraph is about hidden restarts. It does not name the rebuilt object.
+Predict whether a repeatedly crashing container changes the Pod name or increases its restart count; use that distinction when you inspect unhealthy replicas.
 
-The operational tradeoff is that self-healing can hide repeated failure if you only look at the final READY count. A Pod that crashes every few minutes may be replaced quickly enough that casual checks look fine, while logs and restart counts tell a different story. Good Deployment operations therefore combine count checks with event checks, rollout checks, and application-level metrics so reconciliation does not become a mask for a broken release.
+The operational tradeoff is that self-healing can hide repeated failure if you only look at the final READY count. A container that crashes every few minutes may restart quickly enough that casual checks look fine, while logs and restart counts tell a different story. Good Deployment operations therefore combine count checks with event checks, rollout checks, and application-level metrics so reconciliation does not become a mask for a broken release.
 
 Another day-two concern is autoscaling. If a HorizontalPodAutoscaler manages the replica count, your Deployment manifest and your autoscaler can fight if both keep asserting different counts. Many teams omit `.spec.replicas` from the Deployment manifest once an HPA becomes authoritative, or they manage replica changes through the autoscaler configuration rather than through repeated Deployment applies. The principle is the same as with ReplicaSets: decide which object owns the intent, then avoid competing writers.
 
 ## Rolling Updates and Rollbacks
 
-Rolling updates are where Deployments become release machinery instead of just restart machinery. A template change, such as a new container image, causes the Deployment to create a new ReplicaSet and gradually move replicas from the old ReplicaSet to the new one. The default strategy tries to preserve availability by allowing limited extra Pods and limited unavailable Pods during the transition.
+Rolling updates are where Deployments become release machinery instead of just restart machinery. A template change, such as a new container image, causes an unpaused Deployment to select a matching retained ReplicaSet or create one, then gradually move replicas toward that template. The default strategy tries to preserve availability by allowing limited extra Pods and limited unavailable Pods during the transition.
 
 ```bash
 # Update image
@@ -276,7 +290,7 @@ spec:
 
 Those two values form a capacity contract that governs exactly how proportional scaling behaves during a transition. When a Deployment is midway through a rolling update, you might have both an old ReplicaSet scaling down and a new ReplicaSet scaling up. If an autoscaler or human operator changes the overall Deployment replica count during this window, the controller performs proportional scaling: it distributes the new total desired replicas across the existing ReplicaSets based on their current sizes. 
 
-To make this concrete, consider a Deployment with 10 replicas, `maxSurge: 3`, and `maxUnavailable: 2`. When an update begins, the Deployment can immediately create up to 3 extra Pods on the new ReplicaSet (reaching 13 total Pods in the cluster) and can simultaneously terminate up to 2 Pods on the old ReplicaSet (dropping the old serving capacity to 8). If the new Pods take time to become ready, the math dictates the floor: the cluster will maintain at least 8 available Pods throughout the operation, while temporarily consuming resources for up to 13. If you suddenly scale the entire Deployment from 10 to 20 while it is mid-rollout, the controller distributes the new desired total of 20 across the existing old and new ReplicaSets in proportion to their current sizes, so the rollout keeps progressing toward the new baseline. Note how the constraints themselves behave: `maxSurge` and `maxUnavailable` expressed as percentages are recomputed against the new desired count, whereas absolute integer values like the `3` and `2` in this example stay fixed. A high surge with zero unavailable Pods favors availability and speed, but it requires spare CPU, memory, IP addresses, and scheduling room for temporary extra Pods. A low surge with some unavailability favors constrained clusters, but it may reduce live serving capacity during the rollout. Setting both to zero is impossible because Kubernetes would have no permission to create a new Pod or remove an old one.
+To make this concrete, consider a Deployment with 10 replicas, `maxSurge: 3`, and `maxUnavailable: 2`. When an update begins, the Deployment can immediately create up to 3 extra Pods on the new ReplicaSet (targeting 13 non-terminating replicas for this Deployment) and can simultaneously terminate up to 2 Pods on the old ReplicaSet (dropping the old serving capacity to 8). The rollout targets at least 8 available replicas, but unrelated failures can reduce actual availability. Terminating Pods can still consume resources beyond the 13-replica surge budget until their termination completes. If you suddenly scale the entire Deployment from 10 to 20 while it is mid-rollout, the controller distributes the new desired total of 20 across the existing old and new ReplicaSets in proportion to their current sizes, so the rollout keeps progressing toward the new baseline. Note how the constraints themselves behave: `maxSurge` and `maxUnavailable` expressed as percentages are recomputed against the new desired count, whereas absolute integer values like the `3` and `2` in this example stay fixed. A high surge with zero unavailable Pods favors availability and speed, but it requires spare CPU, memory, IP addresses, and scheduling room for temporary extra Pods. A low surge with some unavailability favors constrained clusters, but it may reduce live serving capacity during the rollout. Setting both to zero is impossible because Kubernetes would have no permission to create a new Pod or remove an old one.
 
 ```mermaid
 graph TD
@@ -291,7 +305,7 @@ The diagram shows a friendly case where new Pods become ready quickly. Real roll
 
 Which approach would you choose here and why: `maxSurge: 1, maxUnavailable: 0` for a customer-facing web app, or `maxSurge: 0, maxUnavailable: 1` for a small internal worker? The web app often deserves extra temporary capacity to avoid dropping requests, while the worker may accept slower replacement if the cluster has little headroom. The right answer follows the workload's availability promise, not a universal setting.
 
-Some applications cannot safely run old and new versions at the same time. A legacy single-writer process that performs a one-way database migration may need the `Recreate` strategy, which stops old Pods before starting new ones. That strategy creates downtime by design, but it can be the honest choice when concurrent versions would corrupt shared state. Kubernetes gives you the tool; your job is to match it to application semantics.
+Some applications cannot safely run old and new versions together. `Recreate` waits for old Pods to terminate before creating new-version Pods during an upgrade, at the cost of downtime. It is not a universal single-writer guarantee: manual Pod deletion can trigger a ReplicaSet replacement while the old Pod is still terminating. Exclusive writers also need suitable identity, fencing, and storage semantics.
 
 ## Deployment YAML Explained
 
@@ -356,7 +370,7 @@ Anti-patterns usually appear when a team treats Kubernetes objects as independen
 
 | Anti-Pattern | What Goes Wrong | Better Alternative |
 |---|---|---|
-| Running naked Pods for services | Crashes, node loss, and updates require manual intervention | Use Deployments for stateless replicated applications |
+| Running naked Pods for services | Deletion and node loss have no replica controller to request replacements | Use Deployments for stateless replicated applications |
 | Using `latest` for release images | Rollback and audit become ambiguous because the tag can move | Use immutable tags or digests tied to a build |
 | Ignoring rollout progress | The API accepts a bad manifest while users remain on an old or broken version | Gate releases on `kubectl rollout status` and inspect events on failure |
 | Changing selectors after launch | The selector is immutable and wrong ownership can create orphaned workloads | Design labels before creation or migrate with a new Deployment |
@@ -371,7 +385,7 @@ Choose a Deployment when the application replicas are interchangeable, the Pod t
 | One-off troubleshooting container | Pod or Job | A controller for long-running desired state is unnecessary |
 | Batch task that should complete once | Job | Success is completion, not continuous availability |
 | Database with stable identity and storage | StatefulSet | Pod names, storage, and rollout ordering matter |
-| Legacy app that cannot run two versions together | Deployment with Recreate, or redesign before scaling | Availability is traded for correctness during replacement |
+| Legacy app that cannot run two versions together | Deployment with Recreate, or redesign before scaling | Avoid version overlap during upgrades; separately enforce exclusive access |
 
 The rollout strategy decision is a separate layer from the workload kind decision. After you decide that a Deployment is appropriate, decide whether the application can run old and new versions side by side, how much spare capacity the cluster has, and how long a new Pod takes to become ready. Those answers guide `maxSurge`, `maxUnavailable`, readiness probes, and whether a release should be automatic or require a human checkpoint.
 
@@ -385,7 +399,7 @@ Start at the Deployment because it records the rollout story. The desired replic
 
 Next, read the ReplicaSets as revision snapshots. One ReplicaSet represents the old template and another represents the new template, and their replica counts show how far the rollout moved before it stopped. If the old ReplicaSet still has most of the available replicas, the Deployment protected serving capacity while the new version failed. If both ReplicaSets have few or no ready replicas, the problem may be broader than a bad image, and you should inspect scheduling, shared configuration, or cluster capacity before assuming rollback will fully restore service.
 
-Then inspect the Pods owned by the new ReplicaSet. Pod status gives concrete causes that the parent objects intentionally summarize away. `ImagePullBackOff` points toward a tag, registry, or credential issue. `Pending` points toward scheduling constraints, missing resources, taints, affinity, or unavailable nodes. `CrashLoopBackOff` points toward a container that starts and exits, so logs and application configuration become more useful than Deployment fields. `Running` without readiness points toward probes, startup time, dependencies, or application health checks.
+Then inspect the Pods owned by the new ReplicaSet. Pod status gives concrete causes that the parent objects intentionally summarize away. `ImagePullBackOff` points toward a tag, registry, or credential issue. For `Pending`, check `.spec.nodeName` and `PodScheduled` first: unassigned Pods need scheduling diagnosis; assigned Pods may be pulling images, mounting volumes, or running init containers. `CrashLoopBackOff` points toward a container that starts and exits, so logs and application configuration become more useful than Deployment fields. `Running` without readiness points toward probes, startup time, dependencies, or application health checks.
 
 The discipline is to avoid mixing symptoms from different layers. A Deployment condition can tell you a rollout is not progressing, but it cannot tell you whether the container has a missing environment variable. A Pod event can tell you an image pull failed, but it cannot tell you whether rollback history exists. A ReplicaSet count can tell you how much of each revision is active, but it cannot tell you whether users are still reaching enough healthy endpoints. Each layer answers a different question, and reliable operators ask those questions in order.
 
@@ -401,11 +415,11 @@ That is why Deployment design and application health design belong together. A D
 
 The same reasoning applies to scaling during an incident. Scaling up a Deployment with a broken new template may create more broken Pods if the active rollout points at the bad revision. Scaling up a healthy old revision may be exactly what you need if the problem is traffic pressure, but proportional scaling during a rollout can distribute replicas across old and new ReplicaSets. Before changing replica counts, check which ReplicaSet is active, which one is healthy, and whether extra Pods will land on the version you actually want.
 
-A mature team turns these observations into deployment policy. They may require immutable image tags, resource requests, readiness probes, and rollout status checks before a change is considered complete. They may set conservative surge values for clusters with limited spare capacity and more aggressive values for customer-facing services with proven headroom. They may also reserve the `Recreate` strategy for applications whose correctness depends on never running two versions at once, while treating downtime as a documented tradeoff rather than a surprise.
+A mature team turns these observations into deployment policy. They may require immutable image tags, resource requests, readiness probes, and rollout status checks before a change is considered complete. They may set conservative surge values for clusters with limited spare capacity and more aggressive values for customer-facing services with proven headroom. They may also reserve the `Recreate` strategy for upgrades that cannot overlap versions, while documenting downtime and separately enforcing any single-writer requirement.
 
 The most important habit is to describe the failure in controller language before naming a fix. "The new ReplicaSet has zero ready Pods because every Pod is in ImagePullBackOff" leads to a different response than "the Deployment is broken." "The Deployment is available but not fully updated" leads to a different response than "the service is down." Precise language reduces guesswork, and Kubernetes gives you enough structured status to be precise if you read from parent to child.
 
-As you work through the lab, narrate each command this way. Creating the Deployment establishes desired state. Scaling changes the replica count on the active intent. Deleting a Pod tests ReplicaSet reconciliation. Updating the image creates a new template revision and ReplicaSet. Rolling back restores a previous template. Cleanup removes the parent, which removes the managed children. That narration is the difference between running a recipe and learning the operating model.
+As you work through the lab, narrate each command this way. Creating the Deployment establishes desired state. Scaling changes the replica count on the active intent. Deleting a Pod tests ReplicaSet reconciliation. Updating the image changes the template; reconciliation may create or reuse a ReplicaSet. Rolling back restores a previous template. Cleanup removes the parent, which removes the managed children. That narration is the difference between running a recipe and learning the operating model.
 
 One final operational detail: Deployments are excellent for stateless applications, but they do not replace release discipline. They will not validate business logic, migrate databases safely, choose good image tags, or write meaningful readiness probes for you. What they provide is a reliable controller loop for maintaining and changing interchangeable replicas. Once you understand that boundary, you can use Deployments confidently without expecting them to solve problems that belong in application design, testing, or platform policy.
 
@@ -418,7 +432,7 @@ Over time, these checks become routine. You will see a Deployment name and immed
 ## Did You Know?
 
 - **Deployments do not directly manage Pods.** They manage ReplicaSets, which manage Pods, and the generated `pod-template-hash` label is what lets Kubernetes distinguish one template revision from another during rollouts and rollbacks.
-- **Every template update creates a new ReplicaSet.** Older ReplicaSets are kept for rollback history according to `.spec.revisionHistoryLimit`, which defaults to ten, and setting that limit to zero removes normal rollback history.
+- **Template changes can reuse retained ReplicaSets.** A matching template, such as during rollback, can reuse an existing ReplicaSet; paused changes wait for resume. `.spec.revisionHistoryLimit` defaults to ten old ReplicaSets; zero removes normal rollback history after cleanup.
 - **`maxSurge: 0` and `maxUnavailable: 0` cannot work together.** A rollout needs permission either to create a new Pod before deleting an old one or to remove an old Pod before creating a replacement.
 - **`progressDeadlineSeconds` defaults to 600 seconds.** If a rollout fails to make progress before that deadline, the Deployment condition changes to `Progressing=False` with reason `ProgressDeadlineExceeded`, and rollout status exits unsuccessfully.
 
@@ -457,7 +471,7 @@ The Deployment is protecting availability by refusing to remove too much old cap
 
 <details><summary>Scenario: A developer edits a ReplicaSet to raise memory limits because Pods are being killed. Why is this not the durable fix?</summary>
 
-A ReplicaSet owned by a Deployment is a managed child, not the source of truth for future Pods. The Deployment template will continue to define the desired Pod specification, and a new rollout can replace or override the directly edited ReplicaSet. The durable fix is to update the Deployment's Pod template resources, apply the manifest, and watch the rollout so the corrected template creates a new ReplicaSet.
+A ReplicaSet owned by a Deployment is a managed child, not the source of truth for future Pods. The Deployment template will continue to define the desired Pod specification, and a new rollout can replace or override the directly edited ReplicaSet. The durable fix is to update the Deployment's Pod template resources, apply the manifest, and watch the rollout so the controller selects or creates the ReplicaSet matching the corrected template.
 
 </details>
 
@@ -469,7 +483,7 @@ That strategy may try to run a full temporary duplicate of the workload while ke
 
 <details><summary>Scenario: A legacy application corrupts shared state if two versions run together. Which Deployment strategy should you choose, and what tradeoff are you accepting?</summary>
 
-Use the `Recreate` strategy or redesign the application before attempting concurrent rolling updates. Recreate stops old Pods before starting new ones, which prevents overlapping versions but creates downtime. The decision is a correctness tradeoff: accepting a planned service interruption is better than preserving availability while corrupting shared data.
+Use the `Recreate` strategy or redesign the application before attempting concurrent rolling updates. Recreate prevents overlap during upgrades by waiting for old Pods to terminate, creating downtime. It does not prevent overlap after manual Pod deletion; use separate fencing or appropriate workload semantics for exclusive writers. The decision is a correctness tradeoff: accepting a planned service interruption is better than preserving availability while corrupting shared data.
 
 </details>
 
@@ -478,6 +492,14 @@ Use the `Recreate` strategy or redesign the application before attempting concur
 The Deployment must be able to identify the Pods created from its own template, and mismatched labels break that ownership relationship. In `apps/v1`, Kubernetes validates the selector against the template labels and prevents unsafe ownership patterns. Fix the labels before creation; after a Deployment exists, selector changes require a replacement and a controlled migration.
 
 </details>
+
+Before starting the separate guarded exercise below, clean up in the same terminal, including after an interruption. Delete only the namespace this setup successfully created. If deletion fails, keep the variables and retry after restoring access; do not switch contexts or broaden deletion. After success, use a fresh terminal for the guarded exercise.
+
+```bash
+if [ "$EXAMPLE_READY" = yes ]; then
+  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --wait=true --timeout=120s && EXAMPLE_READY=no
+fi
+```
 
 ## Hands-On Exercise
 
@@ -668,7 +690,7 @@ The namespace is the exercise boundary, so deleting it removes the Deployment an
 
 </details>
 
-**Card A: Two of five Pods disappear.** A five-replica Deployment is healthy. Someone deletes two Pods. New Pods appear within seconds. The incident note says "the Deployment recreated them."
+**Synthetic decision cards:** these are practice situations, not recorded incidents. **Card A: Two of five Pods disappear.** A five-replica Deployment is healthy. Someone deletes two Pods. New Pods appear within seconds. The incident note says "the Deployment recreated them."
 
 <details>
 <summary>Check your prediction</summary>
@@ -716,6 +738,8 @@ Failure layer: the new Pod cannot pull its image, so progress is bounded. Next a
 ## Sources
 
 - **Exercise references (Kubernetes v1.35):** [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/), [kubectl create namespace](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_namespace/), [kubectl rollout status](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_status/), and [kubectl rollout undo](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_rollout/kubectl_rollout_undo/).
+- [Pod lifecycle and container restarts (v1.35)](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
+- [ReplicaSet selection (v1.35 source)](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/controller/deployment/sync.go#L128-L177) and [synchronization retry handling](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/controller/deployment/deployment_controller.go#L470-L488).
 - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 - [Kubernetes ReplicaSet](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/)
 - [Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/)
