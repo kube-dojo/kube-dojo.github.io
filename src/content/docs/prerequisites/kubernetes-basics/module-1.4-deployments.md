@@ -497,7 +497,7 @@ Before starting the separate guarded exercise below, clean up in the same termin
 
 ```bash
 if [ "${EXAMPLE_OWNED:-}" = yes ]; then
-  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --wait=true --timeout=120s && EXAMPLE_READY=no && EXAMPLE_OWNED=no
+  command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --ignore-not-found=true --wait=true --timeout=120s && EXAMPLE_READY=no && EXAMPLE_OWNED=no
 fi
 ```
 
