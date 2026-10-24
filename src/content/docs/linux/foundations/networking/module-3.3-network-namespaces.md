@@ -647,7 +647,7 @@ Run this lab in a disposable Ubuntu 24.04 VM. It uses realistic pod CIDR address
 
 ### Step-by-step narrative
 
-**Step 1 — Reset the lab footprint.** Delete any previous `kd-blue`, `kd-green`, or `kd-br0` objects so names and addresses do not collide. This mirrors production hygiene after a failed CNI `ADD`: you want a known-empty starting point before you rebuild topology.
+**Step 1 — Reset the lab footprint.** In your disposable VM, reserve the script's namespace, bridge and veth names for this exercise. Delete previous `kd-blue`, `kd-green`, `kd-br0`, `veth-blue-host` and `veth-green-host` objects so names and addresses do not collide. A failed move can leave both veth ends in the host namespace; deleting the named namespace will not remove that host-owned pair. This mirrors production hygiene after a failed CNI `ADD`: you want a known-empty starting point before you rebuild topology.
 
 **Step 2 — Create the bridge gateway.** Add `kd-br0`, assign `10.244.50.1/24`, and bring it up. This address is the default gateway for both namespaces, similar to how a node-local bridge carries the first hop for a pod subnet on many CNIs.
 
@@ -661,7 +661,7 @@ Run this lab in a disposable Ubuntu 24.04 VM. It uses realistic pod CIDR address
 
 **Step 7 — Add controlled egress.** Record `net.ipv4.ip_forward`, enable forwarding, and append a single MASQUERADE rule scoped to `10.244.50.0/24` on the host default interface. Verify planning with `ip route get 1.1.1.1` inside `kd-blue` before you interpret ping success or failure.
 
-**Step 8 — Restore the host.** The lab script registers `trap cleanup EXIT` so sysctl, NAT, namespaces, and the bridge are removed even when a ping fails under `set -euo pipefail`. After the script exits, confirm `ip link show kd-br0` fails and that `ip netns list` no longer shows lab names.
+**Step 8 — Restore the host.** The lab script registers `trap cleanup EXIT` to attempt restoration of sysctl and removal of NAT, namespaces, veth pairs and the bridge even when setup or a ping fails under `set -euo pipefail`. After the script exits, use `ip link show` for `kd-br0` and all four veth names from the script, and `ip netns list` for both lab namespaces, to verify absence. Investigate unexpected command errors separately; a trap running is not evidence that every cleanup operation succeeded.
 
 ### Verification commands between steps
 
@@ -752,6 +752,8 @@ cleanup() {
   sudo sysctl -w net.ipv4.ip_forward="$ORIG_FWD" >/dev/null 2>&1 || true
   sudo ip netns del kd-blue 2>/dev/null || true
   sudo ip netns del kd-green 2>/dev/null || true
+  sudo ip link del veth-blue-host 2>/dev/null || true
+  sudo ip link del veth-green-host 2>/dev/null || true
   sudo ip link del kd-br0 2>/dev/null || true
 }
 
@@ -760,6 +762,8 @@ trap cleanup EXIT
 # --- reset from any previous attempt ---
 sudo ip netns del kd-blue 2>/dev/null || true
 sudo ip netns del kd-green 2>/dev/null || true
+sudo ip link del veth-blue-host 2>/dev/null || true
+sudo ip link del veth-green-host 2>/dev/null || true
 sudo ip link del kd-br0 2>/dev/null || true
 
 if [ -z "$OUT_IF" ]; then
