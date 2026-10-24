@@ -607,6 +607,29 @@ def test_empty_explicit_sources_does_not_fallback() -> None:
     assert metrics["count"] == 0
 
 
+def test_final_sources_heading_variants_ignore_frontmatter_and_reading_links() -> None:
+    for heading in ("## SOURCES", "## Sources: Citations", "## Sources ##"):
+        metrics = verify_module.sources_metrics(
+            f"""---
+title: Demo
+description: |
+  ## Sources
+  https://example.com/frontmatter-decoy
+---
+## Further Reading
+- https://example.com/optional-reading
+## Next Module
+- https://example.com/next-module
+{heading}
+- https://example.com/canonical-source
+""",
+            skip_source_check=True,
+            max_workers=1,
+        )
+        assert metrics["urls"] == ["https://example.com/canonical-source"]
+        assert metrics["count"] == 1
+
+
 def test_legacy_further_reading_fallback_without_sources() -> None:
     metrics = verify_module.sources_metrics(
         """
