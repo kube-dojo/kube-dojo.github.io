@@ -586,27 +586,31 @@ These checks sample three authorization requests; they do not prove that the Pod
 
 ### 5.3 Workload Identity
 
-The hardest version of service authentication is "the service runs in Kubernetes but needs to call a cloud API like S3 or Cloud Storage." The naive solution is to bake an AWS access key (or GCP service account JSON) into a Kubernetes Secret and mount it into the Pod. That solution leaks credentials in a dozen ways: anyone with read access to Secrets in that namespace can exfiltrate them, the credentials are long-lived so leaks are catastrophic, and rotation requires coordinating across every Pod that holds them. [Workload identity replaces this entire pattern with a federated trust model](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html).
+Consider a service running in Kubernetes that needs a cloud API such as S3. Storing a static cloud credential in a Kubernetes Secret makes its distribution, access and rotation part of your design. Access may be direct or indirect through permission to create a workload that mounts the Secret. The credential's permissions and lifetime determine the exposure if it leaks. [Workload federation can avoid distributing a static cloud credential](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html), while still requiring protection of workload tokens and temporary credentials. The following diagram shows the AWS IRSA path. EKS also offers Pod Identity with a different agent-based credential flow; compare the integrations rather than treating IRSA as the only option.
 
 ```mermaid
 sequenceDiagram
-    participant Pod as Pod (ServiceAcct)
-    participant K8s as Kubernetes OIDC
-    participant IAM as Cloud IAM
-    participant Services as Cloud Services (S3, RDS)
+    participant Kubelet as Kubelet
+    participant API as Kubernetes API server
+    participant Pod as Pod and AWS SDK
+    participant STS as AWS STS
+    participant S3 as S3
 
-    Pod->>K8s: 1. Pod presents K8s token
-    K8s->>IAM: 2. K8s OIDC signs token
-    Note over IAM: 3. Cloud IAM trusts K8s OIDC
-    IAM-->>Pod: 4. Pod gets temporary cloud credentials
-    Pod->>Services: 5. Access cloud resources
+    Kubelet->>API: 1. TokenRequest for the Pod's ServiceAccount
+    API-->>Kubelet: 2. Signed token with intended audience
+    Kubelet-->>Pod: 3. Project token into the Pod's file system
+    Pod->>STS: 4. AssumeRoleWithWebIdentity with token and role
+    Note over STS: Validate token and role trust conditions
+    STS-->>Pod: 5. Temporary role-session credentials
+    Pod->>S3: 6. Sign API request with temporary credentials
+    Note over S3: Authorize the operation under applicable policies
 ```
 
-The mechanism in plain language: the Kubernetes API server acts as an OIDC issuer that mints short-lived JWTs identifying each Pod's ServiceAccount. The cloud's IAM service is configured to trust that OIDC issuer for specific identities, and when a Pod presents its JWT, the cloud exchanges it for short-lived cloud credentials scoped to a cloud IAM role. No long-lived secret ever touches the Pod, the Kubernetes Secret, or the Pod's image.
+For a [projected ServiceAccount token](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#serviceaccount-token-volume-projection), the kubelet requests the token from the API server on the Pod's behalf and makes it available through a projected volume. The application or compatible SDK then uses that already-issued token in the cloud exchange. In IRSA, STS validates the token against the configured issuer and role trust conditions before returning temporary credentials. Permission to assume a role is distinct from permission to perform an S3 operation; review the role's permissions and applicable policies separately.
 
 #### Concrete Example: AWS IRSA Trust Policy
 
-The piece that makes the federation work is an IAM trust policy on the AWS side that says "trust tokens from this specific Kubernetes cluster, but only for this specific ServiceAccount in this specific namespace." Without that policy, the federation does nothing; with it, an attacker who steals a token from the wrong namespace cannot use it to assume the role.
+The IAM role's trust policy constrains which federated identity may assume it. In this example, the issuer, audience and exact namespace/ServiceAccount subject must match. A token with a different subject fails these conditions, but a stolen token that satisfies them may still be exchanged. Inspect the complete policy for other allowed principals or statements, and check who can obtain tokens for the trusted ServiceAccount; this one statement does not prove that every route to the role is constrained.
 
 Here is the trust policy for an IAM role named `payments-api-s3-reader`, intended to be assumed only by the `payments-api` ServiceAccount in the `production` namespace of an EKS cluster:
 
@@ -647,7 +651,7 @@ metadata:
 
 With IRSA configured, its mutating webhook [injects environment variables (`AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE`)](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) into Pods using this ServiceAccount. A compatible AWS SDK credential provider can use them to exchange the projected token through `sts:AssumeRoleWithWebIdentity`. The returned credentials default to a one-hour session, but the requested duration and role settings can change that ([STS Session Duration](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html)). This flow needs no static AWS access key, but it still handles a projected token and temporary AWS credentials with distinct lifetimes. A stolen token that continues to satisfy the trust checks may obtain another role session; continuing Pod compromise may also expose refreshed tokens. Expiration alone therefore does not establish that access or all effects of misuse stop after one hour. Review credential exposure, trust conditions, role permissions and containment separately.
 
-The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.google.com/iam/docs/workload-identity-federation) and Azure (Workload Identity) follows the same shape: annotate a Kubernetes ServiceAccount with the cloud identity it should map to, configure the cloud IAM side to trust the cluster's OIDC issuer for that specific ServiceAccount, and let the SDK's credential chain handle the token exchange. The trust-policy condition is the central security artifact in all three; if you understand the AWS example above, the GCP and Azure equivalents will read as variations on the same theme.
+The trust idea transfers to other providers, but the integration details differ. [Workload Identity Federation for GKE](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/workload-identity#credential-flow) uses the GKE metadata server and can grant access directly to a Kubernetes workload principal or use IAM service account impersonation. GKE can treat matching namespace and ServiceAccount names across clusters in one project's workload identity pool as the same identity, so check that cross-cluster trust boundary. [Microsoft Entra Workload ID on AKS](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) uses projected ServiceAccount tokens, federated identity credentials and supported Azure Identity or MSAL libraries. Follow the provider's credential flow and authorization model rather than copying an IRSA annotation. In each design, check both which workload identity is trusted and which operations it can authorize.
 
 ---
 
@@ -657,7 +661,7 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
 
 - **[TOTP codes change every 30 seconds](https://www.rfc-editor.org/rfc/rfc6238)** by design. The server and your phone share a secret, and both compute HMAC(secret, time/30) on the fly with no network round-trip required. This is why TOTP works on a phone in airplane mode and why the codes drift if your phone's clock disagrees with the server by more than a minute or two — the underlying math depends on synchronized time, not synchronized state.
 
-- **[Kubernetes historically auto-generated long-lived secret tokens](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/)** for every ServiceAccount until v1.24. Modern versions (including v1.35) use the TokenRequest API to project short-lived, automatically rotating tokens directly into Pods, so the credential a Pod actually uses is never written to a Secret object and rotates roughly every hour by default. The change quietly removed an entire class of "I found a Kubernetes ServiceAccount token in a logfile from 2019" incidents.
+- **Projected tokens need refresh and application reload.** In [Kubernetes 1.35 token projection](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#serviceaccount-token-volume-projection), the kubelet refreshes the token file and the application must reload it. The [`--service-account-extend-token-expiration` compatibility flag](https://v1-35.docs.kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/#options), enabled by default in 1.35, can extend the default Pod-bound API-access token added by the ServiceAccount admission controller up to a year. That extension is [conditional on the request and API-server audiences](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/registry/core/serviceaccount/storage/token.go#L229-L237); it does not apply to every projected token or automatically to an IRSA token for the STS audience. Inspect the actual request, issuer settings and token claims rather than assuming a universal one-hour validity or refresh interval. [Secret-backed legacy tokens can still exist](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#manual-secret-management-for-serviceaccounts), so inspect the actual credential source.
 
 - **Password complexity rules often backfire.** [NIST's 2017 guidelines](https://pages.nist.gov/800-63-3/sp800-63b.html) reversed decades of advice by recommending long passphrases over complex passwords and explicitly discouraging mandatory rotation. The security mathematics says "Tr0ub4dor&3" is weaker than "correct horse battery staple" because the complex password is hard for humans to remember (driving reuse and sticky-note storage) but easy for cracking rigs to enumerate, while the four-word phrase has more entropy and is genuinely memorable.
 
@@ -825,7 +829,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [ ] Do you understand RBAC versus ACL versus ABAC and the conditions under which each one is the right choice?
 - [ ] Can you walk through the diagnostic process for fixing an over-permissioned binding (action → scope → eliminate → minimum YAML → verify)?
 - [ ] Can you implement the principle of least privilege across its four layers (default deny, scope narrowly, time-bound, separate concerns)?
-- [ ] Do you understand JWT structure and why short-lived tokens limit exposure even when stolen?
+- [ ] Can you distinguish a stolen token's remaining acceptance window from persistent effects and access to replacement credentials?
 - [ ] Can you explain OAuth 2.0 and OIDC flows, and specifically why the auth-code-then-tokens two-step exists?
 - [ ] Do you understand Kubernetes ServiceAccounts well enough to know when to disable `automountServiceAccountToken` and when to leave it on?
 - [ ] Can you read an AWS IRSA trust policy and identify which clauses bind it to a specific ServiceAccount in a specific namespace?
@@ -852,6 +856,11 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
 - [RFC 9700: Best Current Practice for OAuth 2.0 Security, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1) — PKCE requirements for public clients and recommendations for confidential clients.
 - [Amazon EKS Identity and Access Management Best Practices](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) — Explains IRSA, projected service account tokens, trust-policy scoping, and injected AWS identity environment variables.
+- [Kubernetes 1.35: ServiceAccount Token Projection](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#serviceaccount-token-volume-projection) — Kubelet requests, projection, rotation and application reload responsibilities.
+- [Kubernetes 1.35: kube-apiserver options](https://v1-35.docs.kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/#options) — Configured token lifetime and compatibility expiration extension.
+- [Kubernetes v1.35.0: Bound TokenRequest Expiration Handling](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/registry/core/serviceaccount/storage/token.go#L229-L237) — Pod binding, requested-duration and API-audience conditions for compatibility extension.
+- [Google Cloud: Workload Identity Federation for GKE](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/workload-identity#credential-flow) — Metadata-server credential flow and direct workload access versus impersonation.
+- [Microsoft: Entra Workload ID on AKS](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) — Projected-token federation and supported authentication libraries.
 
 ## Next Module
 
