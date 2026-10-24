@@ -34,7 +34,7 @@ The report records 130 compromised accounts, of which 45 were used to send tweet
 
 For your own IAM design, ask which identities need sensitive operations, how that access is reviewed, and what happens if one identity is compromised. The report discusses stronger authentication and second-employee approval for high-risk functions as protective measures. Treat those as design options to evaluate against the workflow, rather than assuming an internal tool is safe because its users have already logged in.
 
-This module teaches identity and access management — how to authenticate who someone is, authorize what they can do, scope every permission to the smallest useful surface, and ensure the principle of least privilege limits the damage when (not if) a credential is compromised. By the end you will be able to read an existing IAM design and explain how it reduces the risk and impact of compromised employee access.
+This module teaches how to evaluate authentication evidence, authorize operations and scope permissions to the task. By the end you will be able to examine an IAM design and explain how its controls can reduce the risk and impact of compromised employee access, including where additional evidence is needed.
 
 ---
 
@@ -48,7 +48,7 @@ This module teaches authentication (checking evidence for a claimed identity) an
 
 > **The Bouncer Analogy**
 >
-> A nightclub bouncer checks evidence of identity (authentication) and decides whether entry is permitted (authorization). A valid ID need not grant access to a VIP room. The analogy separates the decisions, but a server may receive only a credential, without seeing its human presenter. Login can establish a session used for later requests; session policy can also require reauthentication ([NIST SP800-63B-4, §5.2](https://pages.nist.gov/800-63-4/sp800-63b.html#sessionreauthn)). Authorization still checks the requested action and resource.
+> A nightclub bouncer checks evidence of identity (authentication) and decides whether entry is permitted (authorization). A valid ID need not grant access to a VIP room. The analogy separates the decisions, but a server may receive only a credential, without seeing its human presenter. Login can establish a session used for later requests; [NIST SP800-63B-4, §5.2](https://pages.nist.gov/800-63-4/sp800-63b.html#sessionreauthn), requires periodic reauthentication for conforming sessions. Authorization still checks the requested action and resource.
 
 ---
 
@@ -64,9 +64,9 @@ This module progresses from individual concepts to integrated patterns. Part 1 c
 
 Authentication asks: **"What evidence supports this claimed identity?"** For user authentication, [NIST SP800-63B-4's Introduction](https://pages.nist.gov/800-63-4/sp800-63b.html#introduction) describes checking control of authenticators associated with a subscriber account. Success provides assurance under the method's assumptions, rather than certainty about the actual human operating a compromised device or credential. Authorization separately decides which actions the accepted principal may perform.
 
-For a claimed account such as `alice@example.com`, the verifier might check a password against its stored verifier or validate a cryptographic authenticator's challenge response with the registered public key. Later requests may carry a session identifier or access token instead. A signed JWT needs the key, claim and application-policy checks taught in Part 4. For a bearer access token, possession permits use subject to the resource server's checks; accepting it does not distinguish its intended holder from a thief ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)).
+For a claimed account such as `alice@example.com`, the verifier might check a password against its stored salted hash or validate a cryptographic authenticator's challenge response with the registered public key. Later requests may carry a session identifier or access token instead. A signed JWT needs the key, claim and application-policy checks taught in Part 4. For a bearer access token, possession permits use subject to the resource server's checks; accepting it does not distinguish its intended holder from a thief ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)).
 
-A fingerprint is not interchangeable with a token sent to a server. In [WebAuthn, §14.3](https://www.w3.org/TR/webauthn-3/#sctn-biometric-privacy), biometric comparison happens locally to authorize use of a public-key credential; the relying party receives a signed assertion and verification result, not the biometric data. Within NIST's framework, biometrics require a physical authenticator as part of MFA (§1.2 below). Check what evidence actually crosses each trust boundary.
+In [WebAuthn, §14.3](https://www.w3.org/TR/webauthn-3/#sctn-biometric-privacy), fingerprint comparison happens locally to authorize use of a public-key credential. The relying party receives a signed assertion whose user-verification (UV) flag reports the local check's result, not the biometric data. The flag alone does not distinguish biometric verification from a PIN. Within NIST's framework, biometrics require a physical authenticator as part of MFA (§1.2 below). Check what evidence actually crosses each trust boundary.
 
 #### Authentication Flow
 
@@ -81,16 +81,23 @@ flowchart TD
 
 #### What Authentication Is Not
 
-A successful authentication does not authorize deleting the production database or changing a billing address. Auditing records relevant events and their identity context; authentication success alone is not an action log or proof of the human operator. Transport protection is another concern. TLS protects data in transit, and certificate-based TLS can also authenticate endpoints, so these functions may be combined in one protocol without becoming the same decision.
+A successful authentication does not authorize deleting the production database or changing a billing address. Auditing records relevant events and their identity context; authentication success alone is not an action log or proof of the human operator. Transport protection is another concern. [TLS provides a protected channel and endpoint authentication](https://datatracker.ietf.org/doc/html/rfc8446#section-1), with certificate-based authentication described in §4.4.2. These functions can be combined in one protocol without becoming the same decision.
 
 | Concern | Question Answered | Subsystem |
 |---------|-------------------|-----------|
 | Authentication | What evidence supports the claimed identity? | Identity provider, verifier, authenticator |
-| Authorization | What can you do? | RBAC engine, policy engine (OPA), IAM |
+| Authorization | May this principal perform this action on this resource? | RBAC engine, policy engine (OPA), IAM |
 | Auditing | What did you do? | Log pipeline, SIEM, audit log |
 | Encryption | Can someone read this in transit? | TLS, mTLS, application-layer encryption |
 
 > **Stop and think**: In a synthetic API scenario, a thief presents Alice's stolen bearer token and all configured token checks pass. Does that establish that Alice sent the request, or that the caller may delete data? Explain the missing evidence for attribution and the separate authorization decision before continuing.
+
+<details>
+<summary>Check the evidence and permission boundaries</summary>
+
+Accepting the token establishes that the request meets those token checks, not that Alice sent it. Investigate session issuance, credential exposure, device and request records; the evidence may still leave the operator unknown. Separately check whether the applicable policy allows deletion of that specific resource. Neither token acceptance nor a familiar account name supplies that permission.
+
+</details>
 
 ### 1.2 Authentication Factors
 
@@ -289,9 +296,9 @@ If any of those answers were wrong, you would catch it in seconds rather than du
 
 ### 3.1 What is Least Privilege?
 
-The principle of least privilege states that every identity — human or machine — should hold only the permissions needed for its task. [Saltzer and Schroeder's 1975 paper, §I.A.3(f)](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html), explains how minimizing privilege limits damage from accidents, errors and misuse. Apply that reasoning to the complete effective access, including shared grants and operations that can change other permissions.
+The principle of least privilege states that every identity — human or machine — should hold only the permissions needed for its task. [Saltzer and Schroeder's 1975 paper, §I.A.3(f)](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html), explains that minimizing privilege limits damage from accidents and errors and makes improper uses of privilege less likely. Apply that reasoning to the complete effective access, including shared grants and operations that can change other permissions.
 
-Consider a stolen credential, an honest mistake and deliberate insider misuse. Narrower grants reduce the operations each can directly authorize, but do not guarantee small damage: a permitted read may expose a valuable secret, and permission to create workloads can enable indirect access. Review those paths and the data at risk, then test required and prohibited operations. An insider need not request more access if existing grants already permit the harmful action.
+Consider a stolen credential, an honest mistake and deliberate insider misuse. Narrower grants reduce the operations directly available in each case, but do not guarantee small damage: a permitted read may expose a valuable secret, and permission to create workloads can enable indirect access. Review those paths and the data at risk, then test required and prohibited operations. An insider need not request more access if existing grants already permit the harmful action.
 
 | Scenario | Without Least Privilege | With Least Privilege |
 |----------|------------------------|----------------------|
@@ -301,7 +308,7 @@ Consider a stolen credential, an honest mistake and deliberate insider misuse. N
 
 ### 3.2 Implementing Least Privilege
 
-Least privilege is not a setting you toggle; it is a discipline that must be applied at four distinct layers, and skipping any layer leaves a hole that the others cannot patch.
+This module groups least-privilege practice into four checks: default access, permission scope, elevated-access duration and separation of identities. Review their interactions rather than assuming that any single check establishes least privilege; for example, a short-lived administrative grant can still authorize a destructive action while it is active.
 
 #### Default Deny for Task Access
 
@@ -309,7 +316,7 @@ Deny task-specific access unless a reviewed policy grants it, and document the b
 
 #### Scope Permissions Narrowly
 
-Scope permissions by action, resource and supported context conditions. A role name such as `orders-editor` does not establish its actual grants: inspect the allowed operations and resources. Where the policy engine supports region or time conditions, verify their enforcement and exceptions. Maintain the policy as tasks, data and dependencies change; initial scoping alone does not establish lasting containment.
+Scope permissions by action, resource and supported context conditions. For a release job, start with `get` and `patch` on Deployments, restrict the resource to `api` in namespace `shop`, and add a time condition only where the policy engine supports and enforces it. A role name such as `orders-editor` does not establish its actual grants: inspect the rules and exceptions. Maintain the policy as tasks, data and dependencies change; initial scoping alone does not establish lasting containment.
 
 #### Time-Bound Elevated Access
 
@@ -834,7 +841,7 @@ Write a ServiceAccount, Role, and RoleBinding for the Order Service. Apply the w
 
 Before moving on, verify you can answer these from memory rather than by scrolling back:
 
-- [ ] Can you explain the difference between authentication (who are you?) and authorization (what can you do?) in one sentence each?
+- [ ] Can you explain authentication (what evidence supports the claimed identity?) and authorization (may this principal perform this action on this resource?) in one sentence each?
 - [ ] Can you describe the three factor categories, distinguish OTP relay from phishing-resistant authentication, and explain why factor counting alone does not prove account security?
 - [ ] Do you understand RBAC versus ACL versus ABAC and the conditions under which each one is the right choice?
 - [ ] Can you walk through the diagnostic process for fixing an over-permissioned binding (action → scope → eliminate → minimum YAML → verify)?
@@ -851,10 +858,11 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 ## Sources
 
 - [New York State Department of Financial Services: Twitter Investigation Report (October 2020)](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report) — Employee credential attack, account impact and access-management findings; see printed pp. 5, 7 and 16.
-- [NIST SP 800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Factor categories, password-verifier policy, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.1.1, 3.1.7, 3.2.3 and 3.2.5.
+- [NIST SP 800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Authentication assurance (Introduction), factor categories, password-verifier policy, biometric use, phishing resistance, authenticator activation and session reauthentication; see §§2.2, 3.1.1, 3.1.7, 3.2.3, 3.2.5 and 5.2.
 - [NIST: RBAC Frequently Asked Questions](https://csrc.nist.gov/projects/role-based-access-control/faqs) — User–role and permission–role assignments, group/ACL relationships and constraints evaluated when access is requested; see “How Are Roles Different From Groups?”, “What About Complex Relationships And Constraints?” and Component summary.
 - [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3), relying-party checks (§§7.1–7.2) and local biometric recognition (§14.3).
-- [Saltzer and Schroeder: The Protection of Information in Computer Systems, §I.A.3](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html) — Least privilege (f) and complete mediation (c); inspect effective access and changes to authority.
+- [Saltzer and Schroeder: The Protection of Information in Computer Systems, §I.A.3(f)](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html) — Least privilege's rationale for limiting accident/error damage and reducing opportunities for improper use.
+- [RFC 8446: TLS 1.3, §§1 and 4.4.2](https://datatracker.ietf.org/doc/html/rfc8446#section-1) — Protected-channel properties and certificate-based endpoint authentication.
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
 - [Managing Kubernetes ServiceAccounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) — Covers ServiceAccount identity, token projection, TokenRequest, and legacy token behavior.
