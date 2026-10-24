@@ -110,7 +110,7 @@ sequenceDiagram
 L4 load balancers do not all share the same internal forwarding model.
 AWS Network Load Balancer is a Hyperplane-based flow-hash load balancer.
 It tracks TCP and UDP flows by 5-tuple and forwards packets to targets.
-It can preserve the client's source IP when supported and configured; Proxy Protocol v2 separately conveys the original connection information to a receiver that parses it.
+Its source-address behavior depends on target type, protocol and target-group settings; Proxy Protocol v2 separately conveys the original connection information to a receiver that parses it.
 NLB does not use GENEVE encapsulation — that pattern belongs to AWS Gateway Load Balancer (GWLB), which wraps traffic for inline network appliances such as firewalls and IDS sensors.
 
 Separately, software load balancers at hyper-scale — such as Google Maglev — may encapsulate the original packet inside a new outer IP header (GRE/GUE) destined for the backend.
@@ -339,7 +339,7 @@ flowchart LR
 
 ## Part 4: Proxy Protocol
 
-> **Stop and think**: If an L4 load balancer simply forwards TCP packets by rewriting destination IP addresses (DNAT), what happens to the source IP address by the time the packet reaches your backend application?
+> **Stop and think**: If a backend sees an NLB node as its connection's peer, does that establish that the original client address is unavailable? What would you verify before using Proxy Protocol metadata in access logs?
 
 ### 4.1 The Client IP Problem
 
@@ -355,10 +355,10 @@ NLB can also preserve the client's source IP under supported conditions; Proxy P
 ```mermaid
 flowchart LR
     Client["Client\n203.0.113.5"] -- TCP --> NLB["NLB"]
-    NLB -- TCP --> Backend
+    NLB -- "Source = NLB node IP when preservation is disabled" --> Backend
 ```
 
-When the target sees an NLB address, logging only the connection's peer address groups different clients under the same load-balancer address. This weakens client-address-based logging and rate limiting. The receiver must deliberately select the original address from a trusted source, such as parsed Proxy Protocol metadata, rather than treating the socket's peer address as the client's address.
+When the target sees an NLB address, logging only the connection's peer address groups different clients under load-balancer node addresses. This weakens client-address-based logging and rate limiting. The receiver must deliberately select the original address from a trusted source, such as parsed Proxy Protocol metadata, rather than treating the socket's peer address as the client's address.
 
 **The Solution: Proxy Protocol**
 To solve this, the industry adopted the Proxy Protocol, originally authored by the creators of HAProxy.
@@ -386,7 +386,7 @@ sequenceDiagram
 ### 4.2 Proxy Protocol Configuration
 
 Implementing Proxy Protocol requires extreme caution: both the sender (the load balancer) and the receiver (the backend proxy) must be explicitly configured to expect it.
-If the load balancer sends a Proxy Protocol header, but the backend application is not configured to decode it, the application will interpret the binary header as a malformed HTTP request and instantly drop the connection.
+If the load balancer sends a Proxy Protocol header but an HTTP receiver cannot decode it, the receiver can reject the request before it reaches the application handler.
 
 **NGINX Configuration (Receiving Proxy Protocol)**
 To configure NGINX to accept the protocol and extract the real IP:
@@ -794,13 +794,13 @@ The dimensional matrix below captures the tradeoffs for the three major LB tiers
    Sticky sessions are considered an anti-pattern in modern cloud-native architectures because they tightly couple a user's session state to a specific ephemeral pod, undermining the fundamental principle of statelessness. When scaling events occur, sticky sessions create severe operational risks such as uneven load distribution, where popular users become trapped on a single overloaded pod while newly provisioned pods sit idle. Furthermore, if a pod crashes or restarts, all users pinned to that pod immediately lose their session data (like their shopping carts) and must re-establish their connections on a new pod. A far more resilient and scalable approach is to store session state in an external, distributed datastore like Redis, enabling any backend pod to safely handle any user's request.
    </details>
 
-4. **An NLB target group has client IP preservation disabled and Proxy Protocol v2 enabled. NGINX successfully receives a request: `$proxy_protocol_addr` contains the client address, but the access log records the NLB address from `$remote_addr`. NGINX has not been configured to rewrite the remote address with RealIP. What does this evidence establish, and what should you change?**
+4. **An NLB target group has client IP preservation disabled and Proxy Protocol v2 enabled. A standalone NGINX reverse proxy successfully receives a request: `$proxy_protocol_addr` contains the client address, but the access log records the NLB address from `$remote_addr`. What does this evidence establish, and which logging or address-handling configuration would you inspect?**
    <details>
    <summary>Answer</summary>
 
-   The client address in `$proxy_protocol_addr` establishes that NGINX received and parsed the header; this is a logging or address-selection problem. Without RealIP rewriting, `$remote_addr` still identifies the connection's peer, which is an NLB node in this scenario. Log `$proxy_protocol_addr` explicitly, or configure the RealIP module to use Proxy Protocol and trust only the intended upstream proxy addresses. If NGINX forwards the request to another application, deliberately pass the parsed address in the configured forwarding header and make that application's trust policy match the proxy chain. [NGINX documents the variables, RealIP rewriting and logging separately](https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol/).
+   The client address in `$proxy_protocol_addr` establishes that NGINX received and parsed the header; this is a logging or address-selection problem. RealIP rewriting has not changed `$remote_addr` for this connection, so the log still records its peer, an NLB node. Log `$proxy_protocol_addr` explicitly, or check that the RealIP module is available and that its Proxy Protocol and trusted-proxy settings apply to this connection. Trust only the intended upstream proxy addresses. If NGINX forwards the request to another application, deliberately pass the parsed address in the configured forwarding header and make that application's trust policy match the proxy chain. [NGINX documents the variables, RealIP rewriting and logging separately](https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol/).
 
-   If the client-address variable were absent instead, verify the receiver's `listen ... proxy_protocol` configuration and the NLB target group's `proxy_protocol_v2.enabled` attribute. AWS enables the feature on the target group. A receiver that cannot parse the binary header may reject the request; successful fallback to ordinary HTTP parsing is not guaranteed.
+   If the client-address variable were absent instead, verify the receiver's `listen ... proxy_protocol` configuration and the NLB target group's `proxy_protocol_v2.enabled` attribute. Enable Proxy Protocol v2 through that target-group attribute. A receiver that cannot parse the binary header may reject the request; successful fallback to ordinary HTTP parsing is not guaranteed.
    </details>
 
 5. **You have deployed an application across two Availability Zones: 2 pods in AZ-A and 6 pods in AZ-B. Your Network Load Balancer has cross-zone load balancing disabled to save on data transfer costs. Suddenly, the pods in AZ-A start crashing from CPU exhaustion while AZ-B pods are mostly idle. What percentage of the total traffic is each pod receiving, and why did this configuration cause the outage?**
