@@ -6,11 +6,13 @@ sidebar:
 ---
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 35-40 minutes
+> **Time to Complete**: 90-120 minutes (planning estimate)
 >
 > **Prerequisites**: [Module 4.2: Defense in Depth](../module-4.2-defense-in-depth/)
 >
 > **Track**: Foundations
+
+Plan 35–50 minutes for reading, worked examples and inline checks, 15–30 minutes for the scenario quiz and reflection, and 40 minutes for the four-part design exercise. These are suggested allocations, not measured completion times; your background and any tool setup can change the time you need.
 
 ## What You'll Be Able to Do
 
