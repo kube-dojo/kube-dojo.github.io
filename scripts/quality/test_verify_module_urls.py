@@ -92,16 +92,19 @@ def test_url_check_does_not_mask_programming_errors(method, error) -> None:
 @pytest.mark.parametrize("method,expected", [("head", "fetch_failed"), ("get", "200")])
 def test_malformed_redirect_is_remote_input_failure(method, expected) -> None:
     session = requests.Session()
+    session.send = Mock(side_effect=AssertionError("unexpected network boundary"))
     response = requests.Response()
     response.status_code = 302
     response.headers["Location"] = "http://[bad/"
     response.url = "https://example.com"
     response._content = b""
-    prepared = requests.Request("HEAD", response.url).prepare()
+    prepared = requests.Request(method.upper(), response.url).prepare()
 
     def malformed_redirect(*args, **kwargs):
         return list(session.resolve_redirects(response, prepared))
 
+    with pytest.raises(ValueError, match="Invalid IPv6"):
+        malformed_redirect()
     with patch("requests.Session") as factory, patch("subprocess.run") as browser:
         factory.return_value.head.return_value.status_code = 403
         getattr(factory.return_value, method).side_effect = malformed_redirect
