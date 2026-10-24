@@ -40,21 +40,21 @@ This module teaches identity and access management — how to authenticate who s
 
 ## Why This Module Matters
 
-Every security incident eventually reduces to a single question: "Who did this, and why were they allowed to?" Forensics teams trace the answer through logs that depend entirely on identity being meaningful, and remediation depends on access being scoped tightly enough that the answer to "why were they allowed to" isn't simply "because everyone was allowed to do everything." If you cannot answer that question crisply for any action in your system, you do not have an IAM system; you have a logging system that records mysteries.
+For an access-related incident, ask which principal the system accepted and which permissions enabled the action. A principal is the user or workload identity to which the system assigns access. Logs can associate a request with that principal, but a stolen credential or shared account can make the actual operator uncertain. Investigate authentication, authorization and audit evidence together before attributing an action to a person.
 
-Identity and Access Management (IAM) is the foundation of security. Network controls, encryption, and runtime protections all rest on the assumption that the system can tell who is making a request and decide whether they should be granted it. Get IAM wrong and the strongest network perimeter only delays the attacker; get it right and even a compromised credential triggers a small, contained, auditable blast.
+Identity and Access Management (IAM) connects accepted identities to permitted operations. Stronger authentication and narrower permissions can reduce risk, alongside network, encryption and runtime controls. They do not guarantee containment: permitted reads can still expose sensitive data, and workload permissions can enable indirect access, as the later Kubernetes examples explain. Evaluate the effective access and consequences of compromise rather than inferring safety from the presence of IAM controls.
 
-This module teaches you the principles of authentication (proving identity) and authorization (granting access), then builds those principles into concrete patterns: RBAC in Kubernetes, OAuth and OIDC for web applications, ServiceAccount scoping for workloads, and federated workload identity for cloud access. The same conceptual framework applies whether you are securing a Kubernetes cluster, an AWS account, a SaaS admin panel, or an internal microservice — the names of the primitives change, but the questions you must answer about each request do not.
+This module teaches authentication (checking evidence for a claimed identity) and authorization (deciding permitted access), then builds those principles into concrete patterns: RBAC in Kubernetes, OAuth and OIDC for web applications, ServiceAccount scoping for workloads, and federated workload identity for cloud access. In each design, identify what evidence is accepted, what operations it enables, and what remains exposed if that evidence is stolen.
 
 > **The Bouncer Analogy**
 >
-> A nightclub bouncer does two jobs at the door: check your ID (authentication) and decide if you can enter (authorization). They are different questions handled in sequence. You might present a valid ID and still be turned away because you are not on the guest list, dressed appropriately, or because the venue is at capacity. Inside, a second layer of authorization might decide whether you can enter the VIP room — same person, different resource, different decision. In systems, authentication proves who you are once; authorization decides what you can do many times, on every request.
+> A nightclub bouncer checks evidence of identity (authentication) and decides whether entry is permitted (authorization). A valid ID need not grant access to a VIP room. The analogy separates the decisions, but a server may receive only a credential, without seeing its human presenter. Login can establish a session used for later requests; session policy can also require reauthentication ([NIST SP800-63B-4, §5.2](https://pages.nist.gov/800-63-4/sp800-63b.html#sessionreauthn)). Authorization still checks the requested action and resource.
 
 ---
 
 ## What You'll Learn
 
-This module is organized as a progression from individual concepts to integrated patterns. Part 1 covers authentication factors and the methods used to prove identity. Part 2 covers authorization models — ACL, RBAC, ABAC — and shows how to debug a real over-privileged Kubernetes binding. Part 3 grounds least privilege in concrete implementation steps. Part 4 explores token-based authentication, JWTs, and OAuth/OIDC. Part 5 covers service identity, ServiceAccount design, and workload identity federation including a concrete IAM trust policy example. Each part builds on the previous one; do not skip ahead, because Part 5 quietly assumes you can already read RBAC fluently.
+This module progresses from individual concepts to integrated patterns. Part 1 covers authentication factors and the evidence they provide. Part 2 covers authorization models — ACL, RBAC, ABAC — and a worked Kubernetes access decision. Part 3 grounds least privilege in concrete implementation steps. Part 4 explores tokens, JWTs and OAuth/OIDC. Part 5 combines those concepts in ServiceAccount design and workload identity federation. Read the RBAC worked example before designing workload access; the later examples rely on its action-and-scope reasoning.
 
 ---
 
@@ -62,33 +62,35 @@ This module is organized as a progression from individual concepts to integrated
 
 ### 1.1 What is Authentication?
 
-Authentication answers exactly one question: **"Who are you?"** It is the process of verifying that an entity making a request is actually the entity it claims to be. Authentication does not decide whether the request should succeed, what data the entity can see, or whether the action is wise — it only confirms identity. Conflating it with the other security concerns is one of the most common architectural mistakes in early-career engineers, and untangling that confusion is half the work of becoming senior in this area.
+Authentication asks: **"What evidence supports this claimed identity?"** For user authentication, [NIST SP800-63B-4's Introduction](https://pages.nist.gov/800-63-4/sp800-63b.html#introduction) describes checking control of authenticators associated with a subscriber account. Success provides assurance under the method's assumptions, rather than certainty about the actual human operating a compromised device or credential. Authorization separately decides which actions the accepted principal may perform.
 
-Authentication is a yes/no decision based on a presented claim and a presented proof. The claim is "I am alice@example.com." The proof might be a password, a TLS client certificate, a signed JWT, a fingerprint, or a hardware token's response to a challenge. The system compares the proof to a stored expectation — a hashed password, a public key, a trusted issuer's signature — and either accepts or rejects the claim.
+For a claimed account such as `alice@example.com`, the verifier might check a password against its stored verifier or validate a cryptographic authenticator's challenge response with the registered public key. Later requests may carry a session identifier or access token instead. A signed JWT needs the key, claim and application-policy checks taught in Part 4. For a bearer access token, possession permits use subject to the resource server's checks; accepting it does not distinguish its intended holder from a thief ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)).
+
+A fingerprint is not interchangeable with a token sent to a server. In [WebAuthn, §14.3](https://www.w3.org/TR/webauthn-3/#sctn-biometric-privacy), biometric comparison happens locally to authorize use of a public-key credential; the relying party receives a signed assertion and verification result, not the biometric data. Within NIST's framework, biometrics require a physical authenticator as part of MFA (§1.2 below). Check what evidence actually crosses each trust boundary.
 
 #### Authentication Flow
 
 ```mermaid
 flowchart TD
     A["1. CLAIM: 'I am alice@example.com'"] --> B["2. PROOF: Provide password, certificate, or token"]
-    B --> C["3. VERIFY: System checks proof against stored credential"]
+    B --> C["3. VERIFY: Check evidence under the authentication policy"]
     C --> D{"4. RESULT"}
-    D -->|Success| E["Authenticated (identity confirmed)"]
+    D -->|Success| E["Claimed principal accepted under this policy"]
     D -->|Failure| F["Rejected"]
 ```
 
 #### What Authentication Is Not
 
-A successful authentication does not imply a successful action. The system has confirmed Alice is Alice; it has not confirmed Alice may delete the production database, view another user's medical records, or change the company's billing address. A successful authentication also does not log what Alice did — that is auditing, a separate subsystem that consumes the authenticated identity as input. And it does not protect the data in transit between Alice and the server — that is transport encryption, typically TLS, which runs orthogonally to authentication.
+A successful authentication does not authorize deleting the production database or changing a billing address. Auditing records relevant events and their identity context; authentication success alone is not an action log or proof of the human operator. Transport protection is another concern. TLS protects data in transit, and certificate-based TLS can also authenticate endpoints, so these functions may be combined in one protocol without becoming the same decision.
 
 | Concern | Question Answered | Subsystem |
 |---------|-------------------|-----------|
-| Authentication | Who are you? | Identity provider, password store, certificate authority |
+| Authentication | What evidence supports the claimed identity? | Identity provider, verifier, authenticator |
 | Authorization | What can you do? | RBAC engine, policy engine (OPA), IAM |
 | Auditing | What did you do? | Log pipeline, SIEM, audit log |
 | Encryption | Can someone read this in transit? | TLS, mTLS, application-layer encryption |
 
-> **Stop and think**: If a user is successfully authenticated, does that mean they can modify any data in the system? Why or why not? Sketch one sentence justifying your answer before reading on. The answer should reference the table above.
+> **Stop and think**: In a synthetic API scenario, a thief presents Alice's stolen bearer token and all configured token checks pass. Does that establish that Alice sent the request, or that the caller may delete data? Explain the missing evidence for attribution and the separate authorization decision before continuing.
 
 ### 1.2 Authentication Factors
 
@@ -141,7 +143,7 @@ Choose a method against the attack and operational constraints. WebAuthn can pro
 
 ### 2.1 What is Authorization?
 
-Authorization answers a different question: **"What can you do?"** Once authentication has confirmed an identity, authorization runs on every request and decides whether that identity may perform the requested action on the requested resource. Authentication is rare and expensive (it might involve a network call to an IdP); authorization is frequent and cheap (it should be a fast in-memory check against a precomputed policy). Strong authentication does not replace scoped authorization. The Twitter investigation identified weaknesses in both access management and authentication, including employees being persuaded to approve MFA requests (printed p. 16).
+Authorization answers a different question: **"May this principal perform this action on this resource?"** Each request needs an authorization decision using the applicable identity and policy context. Login may involve an identity provider, while later requests may use session or token checks; neither authentication nor authorization has a universal frequency or cost. Strong authentication does not replace scoped authorization. The Twitter investigation identified weaknesses in both access management and authentication, including employees being persuaded to approve MFA requests (printed p. 16).
 
 Every authorization decision takes four inputs and produces one output. The inputs are the authenticated identity (who), the action (what), the resource (which), and the context (additional factors like time, IP address, or device posture). The output is allow or deny. Designing an authorization system means deciding, for every (who, what, which) triple your system supports, what the answer should be — and how that answer is encoded so that it can be reviewed, audited, and changed without bringing down the system.
 
@@ -287,15 +289,15 @@ If any of those answers were wrong, you would catch it in seconds rather than du
 
 ### 3.1 What is Least Privilege?
 
-The principle of least privilege states that every identity — human or machine — should hold the minimum set of permissions required to perform its function, and no more. The principle is older than computing; [it appears in Saltzer and Schroeder's 1975 paper on protection](https://ieeexplore.ieee.org/document/1451869), where they listed it as one of eight design principles for secure systems. Half a century later it remains the most violated principle in operational practice, because granting permissions is fast and revoking them is uncomfortable, so permissions accumulate by default.
+The principle of least privilege states that every identity — human or machine — should hold only the permissions needed for its task. [Saltzer and Schroeder's 1975 paper, §I.A.3(f)](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html), explains how minimizing privilege limits damage from accidents, errors and misuse. Apply that reasoning to the complete effective access, including shared grants and operations that can change other permissions.
 
-Least privilege matters across three failure scenarios that play out in production every week. When an identity is compromised by an attacker, the blast radius is bounded by what that identity could do — a developer account that can only read its own team's resources cannot exfiltrate the whole company's data even if the attacker holds it for a year. When an authenticated user makes an honest mistake, least privilege limits the mistake's reach: a typo cannot delete what the user could not have deleted on purpose. When an insider acts maliciously, least privilege forces them to either work within their granted scope (limited damage) or visibly request more access (creating an audit trail and an opportunity to intervene).
+Consider a stolen credential, an honest mistake and deliberate insider misuse. Narrower grants reduce the operations each can directly authorize, but do not guarantee small damage: a permitted read may expose a valuable secret, and permission to create workloads can enable indirect access. Review those paths and the data at risk, then test required and prohibited operations. An insider need not request more access if existing grants already permit the harmful action.
 
 | Scenario | Without Least Privilege | With Least Privilege |
 |----------|------------------------|----------------------|
 | Compromised credential | Broad grants can enable wider access | Narrow direct grants; review group grants and indirect powers |
-| Honest mistake | Mistake can affect any resource | Mistake is bounded by granted scope |
-| Insider threat | Insider can quietly access anything | Insider must request more access, creating evidence |
+| Honest mistake | Broad grants enable more unintended operations | Narrower operations; assess downstream effects |
+| Insider threat | Broad grants enable more misuse | Fewer permitted operations; granted reads can still be harmful |
 
 ### 3.2 Implementing Least Privilege
 
@@ -307,7 +309,7 @@ Deny task-specific access unless a reviewed policy grants it, and document the b
 
 #### Scope Permissions Narrowly
 
-Narrow permissions along three axes simultaneously: action, resource, and context. "Admin" is too broad in every direction. "Editor" narrows the action axis. "Orders-editor" narrows the resource axis as well. "Orders-editor in EU region during business hours" narrows the context axis too. Each axis you narrow shrinks the blast radius further, and the cost of narrowing is one-time design work that pays off forever.
+Scope permissions by action, resource and supported context conditions. A role name such as `orders-editor` does not establish its actual grants: inspect the allowed operations and resources. Where the policy engine supports region or time conditions, verify their enforcement and exceptions. Maintain the policy as tasks, data and dependencies change; initial scoping alone does not establish lasting containment.
 
 #### Time-Bound Elevated Access
 
@@ -851,7 +853,8 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [New York State Department of Financial Services: Twitter Investigation Report (October 2020)](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report) — Employee credential attack, account impact and access-management findings; see printed pp. 5, 7 and 16.
 - [NIST SP 800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Factor categories, password-verifier policy, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.1.1, 3.1.7, 3.2.3 and 3.2.5.
 - [NIST: RBAC Frequently Asked Questions](https://csrc.nist.gov/projects/role-based-access-control/faqs) — User–role and permission–role assignments, group/ACL relationships and constraints evaluated when access is requested; see “How Are Roles Different From Groups?”, “What About Complex Relationships And Constraints?” and Component summary.
-- [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3) and relying-party checks (§§7.1–7.2).
+- [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3), relying-party checks (§§7.1–7.2) and local biometric recognition (§14.3).
+- [Saltzer and Schroeder: The Protection of Information in Computer Systems, §I.A.3](https://web.mit.edu/Saltzer/www/publications/protection/Basic.html) — Least privilege (f) and complete mediation (c); inspect effective access and changes to authority.
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
 - [Managing Kubernetes ServiceAccounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) — Covers ServiceAccount identity, token projection, TokenRequest, and legacy token behavior.
