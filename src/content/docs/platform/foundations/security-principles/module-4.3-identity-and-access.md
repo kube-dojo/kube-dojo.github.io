@@ -156,7 +156,7 @@ Concretely, when Alice issues `DELETE /api/users/123`, the authorization layer m
 
 ### 2.2 Authorization Models
 
-Three models dominate real-world systems, and you should be able to draw the trade-offs between them on a whiteboard from memory by the end of this section. The models differ in where permissions live, how they scale with user count, and how readable the resulting policies are when an auditor asks "who can delete production secrets?"
+Compare these three authorization models by where permissions live, how grants are shared, and how you would answer an auditor asking "who can delete production secrets?" The model's name is a starting point; inspect the actual grants, constraints and implementation before judging its suitability.
 
 #### Access Control List (ACL)
 
@@ -169,7 +169,7 @@ An ACL records access entries on a resource for specified principals, which may 
     carol: read, write, delete
 ```
 
-Direct-user ACLs make a resource's grants visible, but repeated grants across many resources can make joiner, mover and leaver changes harder to review. Count the actual user–permission relationships before comparing approaches: user and application totals alone do not determine that count. Group-based ACLs can also share grants; ACLs and RBAC are not mutually exclusive implementation choices.
+Direct-user ACLs make a resource's grants visible, but repeated grants across many resources can make joiner, mover and leaver changes harder to review. Count the actual user–permission relationships before comparing approaches: user and application totals alone do not determine that count. Group-based ACLs can also share grants; ACLs and RBAC are not mutually exclusive implementation choices. Using groups alone does not establish all RBAC features.
 
 #### Role-Based Access Control (RBAC)
 
@@ -197,12 +197,12 @@ Policies evaluate attributes of the user, the resource, and the context, and del
 Policy: "Allow if user.department == resource.owner.department AND time.hour >= 9 AND time.hour < 17"
 ```
 
-ABAC expresses decisions through attributes, such as a request's time or network context, and policy rules that combine them. More conditions can increase the cases an auditor must inspect. RBAC systems can also impose constraints: NIST's FAQ explicitly permits additional access-time constraints. Inspect the implementation's supported rules and test representative decisions rather than assuming a model name proves which conditions it can enforce.
+ABAC expresses decisions through attributes, such as a request's time or network context, and policy rules that combine them. More conditions can increase the cases an auditor must inspect. NIST's FAQ allows additional RBAC constraints evaluated when access is requested, without specifying their implementation. This does not guarantee a product supports business-hours or network conditions; inspect its supported rules and test representative decisions.
 
 | Model | Best For | Worst At | Typical Use |
 |-------|----------|----------|-------------|
-| ACL | Small systems with few resources | Scaling user count | Filesystems, S3 bucket ACLs |
-| RBAC | Organizations with stable role catalog | Conditional logic | Kubernetes, enterprise apps |
+| ACL | Small systems with few resources | Repeated direct-user entries | Filesystems, S3 bucket ACLs |
+| RBAC | Organizations with stable role catalog | Governing many specialized roles | Kubernetes, enterprise apps |
 | ABAC | Fine-grained, conditional policies | Human auditability | AWS IAM conditions, OPA |
 
 > **Hypothetical scenario — pause and predict:** Divide 500 people evenly into five job roles. Each role needs ten specified application-permission bundles across a catalog of 50 applications; a bundle fixes the allowed actions within one application. Every person has exactly one role, with no hierarchy or exceptional grants. How many direct user–bundle relationships would you maintain, compared with user–role plus role–bundle relationships? Count before reading on.
@@ -846,7 +846,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 
 - [New York State Department of Financial Services: Twitter Investigation Report (October 2020)](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report) — Employee credential attack, account impact and access-management findings; see printed pp. 5, 7 and 16.
 - [NIST SP 800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Factor categories, password-verifier policy, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.1.1, 3.1.7, 3.2.3 and 3.2.5.
-- [NIST: RBAC Frequently Asked Questions](https://csrc.nist.gov/projects/role-based-access-control/faqs) — User–role and permission–role assignments, group/ACL relationships and additional access-time constraints; see General and Component summary.
+- [NIST: RBAC Frequently Asked Questions](https://csrc.nist.gov/projects/role-based-access-control/faqs) — User–role and permission–role assignments, group/ACL relationships and constraints evaluated when access is requested; see “How Are Roles Different From Groups?”, “What About Complex Relationships And Constraints?” and Component summary.
 - [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3) and relying-party checks (§§7.1–7.2).
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
