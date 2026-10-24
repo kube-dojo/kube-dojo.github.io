@@ -360,7 +360,7 @@ The misunderstanding is treating the landscape as a certification or maturity gu
 The checklist should include the problem category, the Kubernetes or runtime path touched, CNCF relationship, maturity signal, alternatives considered, expected failure mode, owner, support route, and rollback step. Network policy affects traffic behavior, so the team should also identify how the tool interacts with the CNI, observability, and existing security controls. A good checklist keeps the adoption discussion grounded in operational risk rather than feature excitement. It also gives future reviewers a concise record of why the choice was made.</details>
 
 <details><summary>After KCNA, a developer wants to continue toward hands-on Kubernetes certifications and eventually earn all five major CNCF Kubernetes credentials. Which path makes sense, and why does CKS require CKA first?</summary>
-A developer often takes CKAD next because it focuses on application deployment, configuration, and troubleshooting, then CKA to deepen cluster administration, and then CKS for security specialization. KCSA can be taken independently because it is an associate security exam rather than a hands-on administration prerequisite. CKS requires CKA because security hardening depends on administrator-level cluster skills such as RBAC, audit logging, admission control, and control-plane configuration. The path should match the learner's role, but the prerequisite reflects the operational depth needed for security work.</details>
+One developer-oriented route is `KCNA → CKAD → KCSA → CKA → CKS`: CKAD develops application skills, KCSA introduces security concepts, CKA develops cluster-administration skills, and CKS applies security specialization. This includes all five credentials named in the [CNCF Kubestronaut requirements](https://www.cncf.io/training/kubestronaut/kubestronaut-faq/). It is a suggested study sequence, not a mandatory order for every learner; KCSA can be taken independently. The [Linux Foundation requires candidates to have passed CKA before attempting CKS](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks). That prerequisite distinguishes CKS's practitioner focus from an associate-level security route.</details>
 
 ## Hands-On Exercise
 
@@ -398,6 +398,8 @@ A solid answer starts with the problem, not the tool. For missing metrics, the p
 - [CNCF Landscape](https://landscape.cncf.io/)
 - [CNCF project proposal process](https://github.com/cncf/toc/blob/main/process/project_proposals.adoc)
 - [CNCF graduation criteria](https://github.com/cncf/toc/blob/main/process/graduation_criteria.adoc)
+- [CNCF Kubestronaut FAQ](https://www.cncf.io/training/kubestronaut/kubestronaut-faq/)
+- [Linux Foundation CKA, CKAD and CKS FAQ](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks)
 - [Kubernetes overview](https://kubernetes.io/docs/concepts/overview/)
 - [Prometheus overview](https://prometheus.io/docs/introduction/overview/)
 - [OpenTelemetry documentation](https://opentelemetry.io/docs/what-is-opentelemetry/)
