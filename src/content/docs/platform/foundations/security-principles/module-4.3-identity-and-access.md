@@ -375,7 +375,7 @@ Sessions are simple to reason about and easy to revoke — delete the session ro
 
 ### 4.2 JSON Web Tokens (JWT)
 
-[A JWT is three base64url-encoded JSON segments separated by dots](https://www.rfc-editor.org/rfc/rfc7519): `HEADER.PAYLOAD.SIGNATURE`. Each segment serves a specific purpose, and understanding them lets you read a JWT off the wire and tell at a glance whether the system using it is configured safely.
+Here we use the [compact JWS form](https://www.rfc-editor.org/rfc/rfc7515#section-3.1) of a JWT: `HEADER.PAYLOAD.SIGNATURE`. The first two segments encode JSON as base64url; the third encodes signature or MAC bytes, not another JSON object. JWTs can also use an encrypted JWE representation ([RFC 7519, §3](https://www.rfc-editor.org/rfc/rfc7519#section-3)). Decoding a token lets you inspect its fields, but does not establish authenticity or show that the application validates it safely.
 
 #### Header
 
@@ -386,7 +386,7 @@ Sessions are simple to reason about and easy to revoke — delete the session ro
 }
 ```
 
-The header declares the signing algorithm and token type. The single most important field is `alg`, and the single most dangerous historical bug in JWT implementations was libraries that accepted `alg: none` and treated unsigned tokens as valid. [A safe verifier pins the expected algorithm and rejects anything else](https://www.rfc-editor.org/rfc/rfc8725).
+The header declares the algorithm and token type, but it is untrusted input until verification succeeds. The application must configure acceptable algorithms and bind keys to their intended algorithm; it must not select an arbitrary verification method merely because the token requests it. [RFC 8725, §§2.1 and 3.1](https://www.rfc-editor.org/rfc/rfc8725#section-3.1), describes algorithm-confusion risks and these verification requirements. For the integrity-protected tokens in this lesson, an unexpected `alg: none` must not bypass the configured cryptographic checks.
 
 #### Payload (Claims)
 
@@ -404,9 +404,9 @@ The payload contains claims about the subject. Standard claims include `sub` (th
 
 #### Signature
 
-The signature is HMAC-SHA256 (symmetric) or RSA/ECDSA (asymmetric) over the header-and-payload bytes. The verifier recomputes the signature from the bytes it received and compares to the signature in the token; any tampering with header or payload changes the bytes and fails the comparison. Asymmetric signatures are preferred when the verifier and issuer are different services, because they let the verifier hold only the public key — even a full compromise of the verifier cannot mint new tokens.
+The third segment can carry an HMAC, such as `HS256`, or a digital signature, such as `RS256` or `ES256`, over the JWS Signing Input. For HMAC, the verifier recomputes a MAC using the shared secret and compares it in constant time. For RSA or ECDSA, it verifies the supplied signature with the corresponding public key; it does not recreate the signature ([RFC 7518, §§3.2–3.4](https://www.rfc-editor.org/rfc/rfc7518#section-3.2)). This distinction controls key distribution: an HMAC verifier has a key that can also produce MACs, while possession of an asymmetric public verification key does not grant signing authority. Compromising the verifier can still defeat that service's own decisions; asymmetric keys do not make the service immune to compromise.
 
-> **CRITICAL**: Never trust claims without verifying the signature. A JWT whose signature you have not checked is a piece of attacker-controlled JSON.
+> **CRITICAL**: For the integrity-protected JWT shown here, verify the MAC or signature before trusting claims, then enforce the expected issuer, audience, lifetime and application policy. Decoding the JSON alone performs none of those checks.
 
 ### 4.3 OAuth 2.0 and OpenID Connect
 
@@ -444,11 +444,12 @@ The server component can protect a client credential; a secret distributed insid
 
 > **Try This (3 minutes)**
 >
-> Decode a JWT at jwt.io. Examine:
+> Decode only the public example JWT from [RFC 7519, §3.1](https://www.rfc-editor.org/rfc/rfc7519#section-3.1), for example at jwt.io. Remove the RFC's display line breaks before decoding. This historical example is expired; do not paste a live credential into a third-party tool. Decoding is inspection, not cryptographic verification. Examine:
 > - What's in the header?
 > - What claims are in the payload?
 > - When does it expire?
 > - What would happen if you changed a claim without re-signing?
+> - Which trusted key, algorithm and claim checks would you need before accepting it?
 
 ---
 
@@ -699,7 +700,7 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    <details>
    <summary>Answer</summary>
 
-   A long-lived API key gives the attacker permanent access until a human discovers the leak and revokes the key — typically hours to days, sometimes never. A short-lived token (such as a 15-minute JWT or an STS credential with a one-hour TTL) gives the attacker only the remaining lifetime of that specific token. Even if exploitation begins instantly, the damage is bounded by the TTL and the attacker cannot replay the same token tomorrow. Short-lived credentials shift the security model from "depend on humans noticing leaks quickly" to "the credential becomes worthless on its own schedule," which is mathematically more reliable than any process built on human alertness.
+   A shorter lifetime reduces the remaining acceptance window of that particular credential if expiry is enforced. It does not bound all resulting damage: an attacker may perform a persistent action or obtain another credential if the granted permissions allow it. A long-lived key remains exposed according to its lifetime and revocation policy, so revoke either leaked credential promptly and investigate what it authorized. Short lifetimes complement narrow permissions, revocation and monitoring; they do not replace them. For a JWT with an `exp` claim, [RFC 7519, §4.1.4](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4), defines the expiration check, not a guarantee that all effects of misuse disappear at that time.
    </details>
 
 5. **Scenario: Your company is rapidly growing and adding new internal applications every week. The IT team is overwhelmed managing access for each new hire across dozens of systems using direct user-to-resource ACLs. How would migrating to Role-Based Access Control reduce this operational burden, and what is the mathematical difference in permission management?**
@@ -716,11 +717,11 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    The report describes phishing and employees approving application-based MFA, then recommends stronger authentication and access controls (printed pp. 5 and 16). Propose phishing-resistant authentication, narrower job-based access with periodic reviews, and second-employee approval for high-risk operations. The report identifies those controls as protective directions, rather than documenting a complete permission scheme for each Twitter action. Evaluate where authentication is enforced, which operations each role can perform, how approvals are bound to the intended action, and how sessions are protected and monitored. A hardware key can resist the described phishing route; it does not establish that malware cannot misuse an already authorized session. Treat the proposals as risk reduction and test their enforcement before claiming containment.
    </details>
 
-7. **Scenario: While analyzing network traffic, you discover an attacker has intercepted a JWT token with `exp: 1700003600` (Unix timestamp). It is currently `1700000000`. How long does the attacker have to use this token, what actions can they perform, and why can't the server immediately detect the theft?**
+7. **An attacker obtains a JWT bearer access token with `exp: 1700003600`; the current Unix time is `1700000000`. Assume its signature, issuer and audience are valid, and ignore clock skew. What is its remaining lifetime under the expiration check? Does a valid signature prove the presenter is legitimate, or prevent earlier rejection and detection?**
    <details>
    <summary>Answer</summary>
 
-   The attacker has 3,600 seconds — exactly one hour — before the token's expiration time arrives and the server begins rejecting it. During that window the attacker can perform any action the token's claims and the server's authorization policies allow for that subject, indistinguishably from the legitimate user. The server cannot detect the theft because the token is stateless: there is no session row to flag as suspicious, and the signature is genuinely valid because the legitimate issuer signed it. Mitigations are layered: short token lifetimes shrink the window, refresh-token rotation forces periodic re-authentication, and out-of-band signals (sudden source IP change, impossible-travel patterns) can trigger forced revocation through a small denylist that the verifier consults.
+   The expiration calculation is `1700003600 − 1700000000 = 3,600 seconds`, or one hour. That is the remaining window under the stated expiration assumptions, not a promise of uninterrupted access: revocation, changed authorization policy or other checks can reject a request earlier. A bearer token's possession is sufficient to present it ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)). Signature verification checks token integrity under the configured key; it does not authenticate the current presenter. Applications can still use session state, revocation data and request telemetry to detect or respond to suspicious use. A JWT format does not make detection impossible, and refresh-token rotation does not itself require the user to authenticate again.
    </details>
 
 8. **Scenario: During a penetration test, the red team exploits a remote code execution vulnerability in a simple Nginx web pod. They immediately pivot to query the Kubernetes API and list all secrets in the namespace. What specific ServiceAccount configuration enabled this lateral movement, why is it a risk, and what is the correct remediation?**
@@ -832,6 +833,10 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
 - [Managing Kubernetes ServiceAccounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) — Covers ServiceAccount identity, token projection, TokenRequest, and legacy token behavior.
 - [RFC 6749: OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749) — Defines OAuth 2.0 roles and authorization-code flow used in the module.
+- [RFC 7515: JSON Web Signature, §3.1](https://www.rfc-editor.org/rfc/rfc7515#section-3.1) — Compact serialization and the bytes protected by a signature or MAC.
+- [RFC 7518: JSON Web Algorithms, §§3.2–3.4](https://www.rfc-editor.org/rfc/rfc7518#section-3.2) — HMAC comparison and RSA/ECDSA public-key verification.
+- [RFC 7519: JSON Web Token](https://www.rfc-editor.org/rfc/rfc7519) — JWT representations, the public example and expiration semantics.
+- [RFC 6750: Bearer Token Usage, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2) — Possession-based bearer-token semantics.
 - [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
 - [RFC 9700: Best Current Practice for OAuth 2.0 Security, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1) — PKCE requirements for public clients and recommendations for confidential clients.
 - [Amazon EKS Identity and Access Management Best Practices](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) — Explains IRSA, projected service account tokens, trust-policy scoping, and injected AWS identity environment variables.
