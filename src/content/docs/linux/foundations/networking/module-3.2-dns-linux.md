@@ -621,7 +621,7 @@ The likely cause is `ndots:5` combined with Kubernetes search domains in the pod
 
 <details><summary>A pod cannot resolve `kubernetes.default.svc.cluster.local`, but it can reach an external IP address. What sequence separates DNS from general networking?</summary>
 
-First inspect the pod's `/etc/resolv.conf` and identify its configured DNS path: directly to the `kube-dns` Service or through a node-local cache. Check CoreDNS Pod readiness and logs, the Service, and its EndpointSlices with `kubectl get endpointslice -n kube-system -l kubernetes.io/service-name=kube-dns -o yaml`. Compare backend addresses, ports and readiness conditions; a Service ClusterIP alone is not backend evidence. Test lookup from a temporary pod, then investigate the DNS transport path if endpoints appear ready but queries still fail. Raw external-IP connectivity does not prove the DNS path works, and a TCP port-53 connection does not establish a successful UDP query.
+First inspect the pod's `/etc/resolv.conf`, then check the cluster's DNS configuration for a node-local cache, such as the `node-local-dns` DaemonSet. A nameserver matching the `kube-dns` ClusterIP does not identify the complete path. Check CoreDNS Pod readiness and logs, the Service, and its EndpointSlices with `kubectl get endpointslice -n kube-system -l kubernetes.io/service-name=kube-dns -o yaml`. Compare backend addresses, ports and readiness conditions; a Service ClusterIP alone is not backend evidence. Test lookup from a temporary pod, then investigate the DNS transport path if endpoints appear ready but queries still fail. Raw external-IP connectivity does not prove the DNS path works, and a TCP port-53 connection does not establish a successful UDP query.
 
 </details>
 
@@ -701,16 +701,16 @@ If `systemd-resolved` is active, `resolvectl status` usually gives better operat
 
 - [ ] Define `alias k=kubectl` in your shell if you have not already.
 - [ ] Start a temporary BusyBox pod and resolve `kubernetes` and `kubernetes.default.svc.cluster.local`.
-- [ ] Read the pod's `/etc/resolv.conf` and compare the nameserver to the `kube-dns` Service ClusterIP.
+- [ ] Read the pod's `/etc/resolv.conf`, compare its nameserver to the `kube-dns` Service ClusterIP, and check whether a node-local cache is configured; record any access limits.
 - [ ] Record CoreDNS Pod readiness, the DNS Service and all its EndpointSlices, including backend addresses, ports and readiness conditions. State what this evidence establishes and what remains untested.
 
 <details><summary>Solution notes</summary>
 
-Use a command such as `k run dnstest --image=busybox --rm -it --restart=Never -- sh`, then run `nslookup kubernetes`, `nslookup kubernetes.default.svc.cluster.local`, and `cat /etc/resolv.conf` inside the pod. In another shell, `k get svc -n kube-system kube-dns -o wide` should show the ClusterIP that appears as the pod nameserver. If short and fully qualified lookups differ, focus on search domains and `ndots`.
+Use a command such as `k run dnstest --image=busybox --rm -it --restart=Never -- sh`, then run `nslookup kubernetes`, `nslookup kubernetes.default.svc.cluster.local`, and `cat /etc/resolv.conf` inside the pod. In another shell, `k get svc -n kube-system kube-dns -o wide` gives the ClusterIP for comparison. Check the configured DNS path, including any node-local cache, before interpreting that comparison. If short and fully qualified lookups differ, focus on search domains and `ndots`.
 
 Use `k get pods -n kube-system -l k8s-app=kube-dns` and the EndpointSlice command from the troubleshooting sequence to collect backend evidence even when lookups succeed. If a lookup fails, compare the resolver configuration, Service and endpoint evidence before choosing the next test; do not infer a unique cause from any one of them. An authorization error means the evidence is unavailable, not that endpoints are missing. Record that limit and request the output from someone with access.
 
-The nameserver comparison above assumes pods query CoreDNS through its Service. With [NodeLocal DNSCache](https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/), a node-local nameserver can be intentional. Record the configured cache-to-CoreDNS path before treating an address difference as a fault. Neither matching addresses nor ready endpoints establish end-to-end resolution; the lookup results are separate evidence.
+With [NodeLocal DNSCache](https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/), a node-local nameserver can be intentional. In iptables mode the cache can also answer on the `kube-dns` ClusterIP, including the TCP port test above. Check for a node-local DNS DaemonSet and its configuration even when addresses match, and record the cache-to-CoreDNS path before treating an address difference as a fault. Neither matching addresses nor ready endpoints establish end-to-end resolution; the lookup results are separate evidence.
 
 </details>
 
