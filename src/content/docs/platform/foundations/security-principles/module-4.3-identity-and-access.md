@@ -156,11 +156,11 @@ Concretely, when Alice issues `DELETE /api/users/123`, the authorization layer m
 
 ### 2.2 Authorization Models
 
-Three models dominate real-world systems, and you should be able to draw the trade-offs between them on a whiteboard from memory by the end of this section. The models differ in where permissions live, how they scale with user count, and how readable the resulting policies are when an auditor asks "who can delete production secrets?"
+Compare these three authorization models by where permissions live, how grants are shared, and how you would answer an auditor asking "who can delete production secrets?" The model's name is a starting point; inspect the actual grants, constraints and implementation before judging its suitability.
 
 #### Access Control List (ACL)
 
-Permissions are attached directly to each resource. The resource carries the answer to "who may touch me," and an authorization decision is a lookup on that list.
+An ACL records access entries on a resource for specified principals, which may be users or groups. In this direct-user example, each entry identifies a user and the actions allowed on the resource:
 
 ```text
 /api/users:
@@ -169,11 +169,11 @@ Permissions are attached directly to each resource. The resource carries the ans
     carol: read, write, delete
 ```
 
-ACLs are simple to reason about for a small system because each resource visibly lists its allowed users. They become unmanageable at scale: with 500 users and 50 applications, the worst case is 25,000 individual entries, and changing one user's role across the organization means editing every resource they touch. ACLs are still common inside small services and on filesystems precisely because the simplicity wins when the entry count is low.
+Direct-user ACLs make a resource's grants visible, but repeated grants across many resources can make joiner, mover and leaver changes harder to review. Count the actual user–permission relationships before comparing approaches: user and application totals alone do not determine that count. Group-based ACLs can also share grants; ACLs and RBAC are not mutually exclusive implementation choices. Using groups alone does not establish all RBAC features.
 
 #### Role-Based Access Control (RBAC)
 
-Permissions are attached to roles, and users are assigned to roles. The authorization decision becomes two lookups: which roles does the user have, and what permissions do those roles grant?
+Permissions are attached to roles, and users are assigned to roles. Reason about both relationships: which roles may the user use, and which permissions do those roles grant? This is a logical model, not a requirement for two database lookups on every request.
 
 ```text
 Roles:
@@ -187,7 +187,7 @@ Assignments:
     carol → admin
 ```
 
-[RBAC scales because changes happen in two layers](https://csrc.nist.gov/Projects/Role-Based-Access-Control) that grow at different rates: roles change rarely and are designed by humans, while user-to-role assignments change frequently as people join, leave, and switch teams. Promote alice to admin and her permissions update instantly, everywhere. The trade-off is role explosion: in a large organization you may end up with hundreds of fine-grained roles ("orders-editor-eu," "orders-viewer-eu," "orders-editor-us") and the role catalog itself becomes a thing that needs governance.
+[NIST's RBAC model](https://csrc.nist.gov/projects/role-based-access-control/faqs) separates user–role and permission–role assignments. Sharing a role can reduce repeated administration when people need the same permissions. A job change still requires removing obsolete memberships, granting the new ones and checking effective access in the affected systems; do not assume every application or existing session updates immediately. A large catalog of specialized roles can itself become difficult to govern, so review both memberships and role permissions.
 
 #### Attribute-Based Access Control (ABAC)
 
@@ -197,15 +197,17 @@ Policies evaluate attributes of the user, the resource, and the context, and del
 Policy: "Allow if user.department == resource.owner.department AND time.hour >= 9 AND time.hour < 17"
 ```
 
-ABAC is the most expressive model — anything you can compute from request attributes can be encoded in a policy, including conditions that RBAC cannot express like "only during business hours" or "only from corporate network." The cost is comprehension: a policy that combines five attributes with boolean logic is harder for a human to audit than a role with a list of permissions, and the entire authorization state is implicit in the policy rather than enumerable. Most production systems use a hybrid — RBAC for the coarse structure and ABAC conditions to refine it.
+ABAC expresses decisions through attributes, such as a request's time or network context, and policy rules that combine them. More conditions can increase the cases an auditor must inspect. NIST's FAQ allows additional RBAC constraints evaluated when access is requested, without specifying their implementation. This does not guarantee a product supports business-hours or network conditions; inspect its supported rules and test representative decisions.
 
 | Model | Best For | Worst At | Typical Use |
 |-------|----------|----------|-------------|
-| ACL | Small systems with few resources | Scaling user count | Filesystems, S3 bucket ACLs |
-| RBAC | Organizations with stable role catalog | Conditional logic | Kubernetes, enterprise apps |
+| ACL | Small systems with few resources | Repeated direct-user entries | Filesystems, S3 bucket ACLs |
+| RBAC | Organizations with stable role catalog | Governing many specialized roles | Kubernetes, enterprise apps |
 | ABAC | Fine-grained, conditional policies | Human auditability | AWS IAM conditions, OPA |
 
-> **Pause and predict**: If you have 500 users and 50 applications, how many permission assignments would you need to manage with ACLs compared to RBAC? Write down both numbers before scrolling. The answer is roughly 25,000 versus 1,000, and the order-of-magnitude gap is the entire reason RBAC won.
+> **Hypothetical scenario — pause and predict:** Divide 500 people evenly into five job roles. Each role needs ten specified application-permission bundles across a catalog of 50 applications; a bundle fixes the allowed actions within one application. Every person has exactly one role, with no hierarchy or exceptional grants. How many direct user–bundle relationships would you maintain, compared with user–role plus role–bundle relationships? Count before reading on.
+
+Direct grants require `500 × 10 = 5,000` relationships. RBAC requires `500` memberships plus `5 × 10 = 50` role–bundle grants: `550` relationships for the same effective permissions. These are logical administrative relationships, not API-object counts, measured labor or request latency. Multiple memberships, exceptions and a changing role catalog alter the comparison; fewer relationships alone do not prove least privilege.
 
 ### 2.3 RBAC in Practice — A Worked Example
 
@@ -716,11 +718,11 @@ The trust idea transfers to other providers, but the integration details differ.
    A shorter lifetime reduces the remaining acceptance window of that particular credential if expiry is enforced. It does not bound all resulting damage: an attacker may perform a persistent action if granted permissions allow it, or obtain another session while a leaked projected token still satisfies the trust checks. Continued Pod compromise may expose replacement tokens, as the IRSA example explains. Revoke or restrict compromised access using the relevant provider's controls, remove the compromise, and investigate what was authorized. Token expiry and access already granted to a cloud session are different boundaries. For a JWT with an `exp` claim, [RFC 7519, §4.1.4](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4), defines the expiration check, not a guarantee that all effects of misuse disappear at that time.
    </details>
 
-5. **Scenario: Your company is rapidly growing and adding new internal applications every week. The IT team is overwhelmed managing access for each new hire across dozens of systems using direct user-to-resource ACLs. How would migrating to Role-Based Access Control reduce this operational burden, and what is the mathematical difference in permission management?**
+5. **In §2.2's hypothetical scenario, compare direct grants with RBAC for 500 people, five job roles and ten application-permission bundles per role. Which assumptions make the counts valid? When someone changes jobs, what must you change and verify before claiming their access is correct?**
    <details>
    <summary>Answer</summary>
 
-   With direct ACLs, 500 users across 50 applications can require up to 25,000 individual permission entries, and every role change forces IT to manually update entries on every system the user touches. RBAC introduces an abstraction layer where permissions are attached to roles, not users, and users are attached to roles. With ten standard roles you maintain about 500 user-to-role mappings plus roughly 500 role-to-permission mappings — roughly 1,000 total entries instead of 25,000. When a user changes jobs, IT updates a single role assignment and the change propagates across all 50 applications instantly, eliminating both the manual workload and the permission drift that comes from forgetting to update one of the systems.
+   With one role per person and no hierarchy or exceptions, direct user–bundle grants total `500 × 10 = 5,000`. RBAC stores `500` user–role memberships and `5 × 10 = 50` role–bundle grants, totaling `550` logical relationships for the same permissions. This illustrates shared administration, not an automatic security or performance improvement. Remove obsolete role memberships and add only the required new ones; inspect other grants and check effective allowed and denied actions in the affected systems. Account for application-specific session, token and policy-update behavior before declaring old access gone. Additional memberships or exceptions change both the count and the review work.
    </details>
 
 6. **Using the NYDFS investigation's findings on the 2020 Twitter attack, separate documented observations from hypotheses about excessive permissions, missing audit trails or credential reuse. Propose controls that reduce the risk of stolen employee access reaching or misusing sensitive internal tools. Which findings support your choices, and what additional evidence would you request before claiming protection?**
@@ -844,6 +846,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 
 - [New York State Department of Financial Services: Twitter Investigation Report (October 2020)](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report) — Employee credential attack, account impact and access-management findings; see printed pp. 5, 7 and 16.
 - [NIST SP 800-63B-4: Authentication and Authenticator Management](https://pages.nist.gov/800-63-4/sp800-63b.html) — Factor categories, password-verifier policy, biometric use, phishing resistance and authenticator activation; see §§2.2, 3.1.1, 3.1.7, 3.2.3 and 3.2.5.
+- [NIST: RBAC Frequently Asked Questions](https://csrc.nist.gov/projects/role-based-access-control/faqs) — User–role and permission–role assignments, group/ACL relationships and constraints evaluated when access is requested; see “How Are Roles Different From Groups?”, “What About Complex Relationships And Constraints?” and Component summary.
 - [W3C WebAuthn](https://www.w3.org/TR/webauthn-3/) — User presence and verification (§4), verification requirements (§5.8.6), factor capability (§6.2.3) and relying-party checks (§§7.1–7.2).
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
 - [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
