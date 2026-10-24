@@ -299,7 +299,7 @@ Least privilege is not a setting you toggle; it is a discipline that must be app
 
 #### Start With Zero (Default Deny)
 
-A new identity should arrive with no permissions and acquire each one through a deliberate request. The opposite — granting an admin role on creation and trimming back later — never works in practice because nobody trims back. Every system that supports it should be configured to default-deny, including [Kubernetes RBAC (the default)](https://kubernetes.io/docs/reference/access-authn-authz/authorization/), AWS IAM (the default), and any custom application authorization layer you build. If your system's default is "permit," that is the first bug to fix.
+Deny task-specific access unless a reviewed policy grants it, and document the baseline permissions a new identity receives through platform defaults or shared groups. With [Kubernetes RBAC](https://kubernetes.io/docs/reference/access-authn-authz/authorization/), evaluate all applicable grants rather than treating the absence of a binding named for one identity as proof of zero access. Avoid using an admin role as a placeholder for permissions you have not identified. Review and test the required operations before granting them.
 
 #### Scope Permissions Narrowly
 
@@ -311,14 +311,14 @@ Standing privileges are a permanent attack surface. Every permission an engineer
 
 #### Separate Concerns
 
-A workload that does many things should not be one identity with many permissions; it should be many identities, each with the permissions for one thing. The web frontend gets one ServiceAccount with one set of permissions. The background job runner gets a different ServiceAccount with a different set. The metrics exporter gets a third. If any of them is compromised, only that workload's surface is exposed — not all of them at once.
+Separate workload identities let you review and change their grants independently. For example, give the frontend, background job runner and metrics exporter their own ServiceAccounts. This separation can reduce shared access, but it does not by itself isolate every effect of compromise: group grants, workload-creation powers or other credentials can cross the intended boundary. Evaluate the effective permissions and indirect capabilities of each identity.
 
 ### 3.3 Common Violations
 
 | Violation | Risk | Fix |
 |-----------|------|-----|
-| Everyone is admin | No accountability, full blast radius | Role-based access |
-| Shared credentials | Cannot attribute actions | Individual accounts |
+| Everyone is admin | Excess privileges across identities | Role-based access |
+| Shared credentials | Shared identity weakens individual attribution | Individual accounts and audit context |
 | Permanent elevated access | Ongoing exposure | Just-in-time access |
 | Over-provisioned service accounts | Broad access on compromise | Minimal permissions per service |
 | Forgotten accounts | Dormant attack vector | Regular access reviews |
@@ -493,11 +493,11 @@ Two suggestions appear in the chat:
 - "Add `cluster-admin` to the default ServiceAccount, just for tonight."
 - "Use the same ServiceAccount as the `orders-api` Pod — that one already works."
 
-Both will get the Pod running. Both are wrong. Walk through the diagnostic process.
+Both suggestions change access before establishing the required scope, and reusing another ServiceAccount may not even permit this read. Walk through the diagnostic process before choosing a grant.
 
 #### Step 1 — What Is the Pod Actually Asking For?
 
-Read the error before changing anything. This scenario reports a denied `get` for the named ConfigMap `payments-config`. Match the request's identity and namespace to the workload before changing grants; a denial describes that request, not the identity's entire permission set. The required operation is one verb on one resource by one name, so establish why a broad administrative grant would exceed the application's needs.
+Read the error before changing anything. It reports a forbidden request for the named ConfigMap `payments-config`; confirm the actual verb, identity and namespace from the request or audit evidence. The intended operation in this example is a `get` for that named object. A denial describes the checked request, not the identity's entire permission set, so establish the required scope before considering a broad administrative grant.
 
 #### Step 2 — What ServiceAccount Is the Pod Currently Using?
 
@@ -510,7 +510,7 @@ The Pod selects the [namespace's `default` ServiceAccount](https://kubernetes.io
 
 #### Step 3 — What Are the Two Suggestions Doing Wrong?
 
-Granting `cluster-admin` exceeds the named ConfigMap read by granting broad resource and RBAC access. Reusing the `orders-api` ServiceAccount may also grant unrelated permissions and couples the workloads' access changes. Its shared name alone cannot distinguish the workloads in an audit record; look for Pod binding and audit metadata rather than assuming attribution is impossible or relying only on the ServiceAccount name. A dedicated identity makes it easier to review the payments workload's grants independently.
+Binding `cluster-admin` to the default ServiceAccount exceeds the named ConfigMap read and expands grants for other workloads using that same identity. Reusing the `orders-api` ServiceAccount may also grant unrelated permissions and couples the workloads' access changes. Its shared name alone cannot distinguish the workloads in an audit record; look for Pod binding and audit metadata rather than assuming attribution is impossible or relying only on the ServiceAccount name. A dedicated identity makes it easier to review the payments workload's grants independently.
 
 #### Step 4 — Build the Minimum Viable ServiceAccount
 
@@ -569,7 +569,7 @@ Three choices in this YAML express the intended access. `resourceNames: ["paymen
 
 #### Step 5 — Verify
 
-Run the following as an operator authorized to impersonate this ServiceAccount. The comments show expected authorization answers for the scoped example, not a recorded cluster execution. An impersonation error or failed review request is an evidence gap, not the expected `no` answer.
+Run the following as an operator authorized to impersonate this ServiceAccount. The comments show expected answers for these resources when no other grants expand the example's scope, not a recorded cluster execution. An impersonation error or failed review request is an evidence gap, not the expected `no` answer.
 
 ```bash
 kubectl auth can-i get configmap/payments-config -n production --as system:serviceaccount:production:payments-api
@@ -675,7 +675,7 @@ The trust idea transfers to other providers, but the integration details differ.
 | No MFA on critical systems | Password-only login is exposed to credential reuse and phishing | MFA; phishing-resistant authentication such as WebAuthn for admins; protect recovery |
 | Overly broad roles ("admin for convenience") | More access than needed, large blast radius on compromise | Granular, purpose-specific roles |
 | Long-lived tokens or API keys | Large exposure window if leaked, manual rotation pain | Short-lived tokens with automatic refresh |
-| Shared service accounts across workloads | Cannot attribute actions, coupled blast radius | One ServiceAccount per workload |
+| Shared service accounts across workloads | Shared names weaken workload attribution; coupled permission changes | One ServiceAccount per workload; review group grants and audit context |
 | No periodic access review | Permissions accumulate, dormant accounts persist | Quarterly reviews, automated unused-permission detection |
 | Wildcards in role rules (`verbs: ["*"]`) | Hidden capabilities granted by future API additions | Explicit verb and resource lists |
 | Static cloud credentials in Pods | Long-lived secret in a high-blast-radius location | Workload identity federation |
@@ -702,7 +702,7 @@ The trust idea transfers to other providers, but the integration details differ.
    <details>
    <summary>Answer</summary>
 
-   Inventory the pipeline's actual requests and map each to its verb, API group, resource and namespace before writing YAML. Remove the cluster-admin binding and any other unwanted broad grants; adding narrower Roles does not subtract existing access. Propose a Role and RoleBinding for each namespace with the permissions that the observed workflow requires, then test both required operations and prohibited actions. Creating a Deployment in `frontend` and creating a Role in `kube-system` are useful allowed/denied samples, not proof of a minimal configuration. Review every effective binding and consider indirect powers such as choosing Pod templates or ServiceAccounts through workload permissions. Explain what each check establishes and what still needs evidence.
+   Inventory the pipeline's actual requests and map each to its verb, API group, resource and namespace before writing YAML. Prepare and test narrower grants using a separate test identity or a coordinated cutover. Remove unwanted broad bindings before evaluating the final identity's restricted access; adding narrower Roles does not subtract existing permissions. Propose a Role and RoleBinding for each namespace with the permissions that the observed workflow requires, then test both required operations and prohibited actions. Creating a Deployment in `frontend` and creating a Role in `kube-system` are useful allowed/denied samples, not proof of a minimal configuration. Review every effective binding and consider indirect powers such as choosing Pod templates or ServiceAccounts through workload permissions. Explain what each check establishes and what still needs evidence.
    </details>
 
 4. **Synthetic decision: An order-processing Pod needs read access only to an archive bucket's `orders/` prefix. Option A stores a static cloud credential in a Kubernetes Secret with a planned 90-day rotation. Option B exchanges a projected ServiceAccount token for temporary cloud credentials through a supported federation integration. Assume both options grant exactly the required bucket permissions. Which would you choose, what trust configuration must you check, and what changes if a credential leaks or the Pod remains compromised?**
@@ -737,13 +737,13 @@ The trust idea transfers to other providers, but the integration details differ.
    The expiration calculation is `1700003600 − 1700000000 = 3,600 seconds`, or one hour. That is the remaining window under the stated expiration assumptions, not a promise of uninterrupted access: revocation, changed authorization policy or other checks can reject a request earlier. A bearer token's possession is sufficient to use it in the same ways as another holder, subject to the application's checks ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)). Signature verification checks token integrity under the configured key; it does not authenticate the current presenter. Applications can still use session state, revocation data and request telemetry to detect or respond to suspicious use. A JWT format does not make detection impossible. Ordinary refresh-token rotation does not itself require user re-authentication, but detected replay can trigger refresh-token revocation and require a fresh authorization grant ([RFC 9700, §4.14.2](https://www.rfc-editor.org/rfc/rfc9700#section-4.14.2)).
    </details>
 
-8. **Synthetic scenario: A compromised Nginx Pod lists Secrets through the Kubernetes API. Audit evidence identifies its ServiceAccount as the caller in this RBAC-controlled scenario. Which authentication and authorization conditions enabled the request, what evidence would you inspect, and how would you reduce exposure without assuming token automount alone granted the access?**
+8. **Synthetic scenario: A compromised Nginx Pod lists Secrets in its own namespace through the Kubernetes API. Audit evidence identifies its ServiceAccount as the caller in this RBAC-controlled scenario. Which authentication and authorization conditions enabled the request, what evidence would you inspect, and how would you reduce exposure without assuming token automount alone granted the access?**
    <details>
    <summary>Answer</summary>
 
    A usable credential authenticated the ServiceAccount, and its effective authorization allowed `list` on Secrets in that namespace. A mounted token alone does not grant that permission. Inspect the Pod's ServiceAccount and actual credential sources, the audit request, and applicable bindings for the account and its groups. Trace and remove the excessive grant instead of merely adding a narrower Role. Listing Secrets can expose their contents, so treat this as credential exposure and investigate which data and downstream access were affected.
 
-   If the workload needs no Kubernetes API access, disable default token automount and verify the resulting Pod configuration. The Pod setting can override the ServiceAccount setting, and explicit projected tokens or other credentials may still be present. This change does not revoke an already exposed credential or remove the running compromise: address both separately. If API access is needed, grant only the required operations and scope, then test representative allowed and denied requests and review indirect privileges. Use `resourceNames` where the operation supports it; it is not a universal restriction for every verb.
+   If the workload needs no Kubernetes API access, disable default token automount and verify newly created replacement Pods; changing the template or ServiceAccount setting does not remove the volume from an existing Pod. The Pod setting can override the ServiceAccount setting, and explicit projected tokens or other credentials may still be present. This change does not revoke an already exposed credential or remove the running compromise: address both separately. If API access is needed, grant only the required operations and scope, then test representative allowed and denied requests and review indirect privileges. Use `resourceNames` where the operation supports it; it is not a universal restriction for every verb.
    </details>
 
 ---
