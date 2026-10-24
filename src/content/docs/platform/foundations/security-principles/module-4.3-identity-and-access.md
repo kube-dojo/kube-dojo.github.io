@@ -401,7 +401,7 @@ The header declares the algorithm and token type, but it is untrusted input unti
 }
 ```
 
-The payload contains claims about the subject. Registered names include `sub` (subject), `aud` (audience), `iat` (issued at), `exp` (expiration) and `iss` (issuer). The example uses illustrative identities and historical timestamps, not a live credential. Custom claims can carry application-specific information like roles or tenant IDs. [RFC 7519, §4](https://www.rfc-editor.org/rfc/rfc7519#section-4), leaves required claims to the application profile. For the API profile used here, require an expected issuer and audience plus an acceptable expiration; reject missing or mismatched required claims after cryptographic verification.
+The payload contains claims about the subject. Registered names include `sub` (subject), `aud` (audience), `iat` (issued at), `exp` (expiration) and `iss` (issuer). The example uses illustrative identities and historical timestamps, not a live credential. Custom claims can carry application-specific information like roles or tenant IDs. [RFC 7519, §4](https://www.rfc-editor.org/rfc/rfc7519#section-4), leaves required claims to the application profile. For the API profile used here, require an expected issuer and audience plus an acceptable expiration; reject missing or mismatched required claims after cryptographic verification. Bind the verification keys to the expected issuer, as [RFC 8725, §§3.8–3.9](https://www.rfc-editor.org/rfc/rfc8725#section-3.8), requires; matching an `iss` string alone is insufficient.
 
 #### Signature
 
@@ -445,7 +445,7 @@ The server component can protect a client credential; a secret distributed insid
 
 > **Try This (3 minutes)**
 >
-> Decode only the public example JWT from [RFC 7519, §3.1](https://www.rfc-editor.org/rfc/rfc7519#section-3.1), for example at jwt.io. Remove the RFC's display line breaks before decoding. This historical example is expired; do not paste a live credential into a third-party tool. Decoding is inspection, not cryptographic verification. Examine:
+> Decode only the public example JWT from [RFC 7519, §3.1](https://www.rfc-editor.org/rfc/rfc7519#section-3.1), for example at jwt.io or by decoding its first two segments with an offline base64url decoder. Remove the RFC's display line breaks first. This historical example is expired; do not paste a live credential into a third-party tool. Decoding is inspection, not cryptographic verification. Examine:
 > - What's in the header?
 > - What claims are in the payload?
 > - When does it expire?
@@ -676,11 +676,11 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
 
 ## Quiz
 
-1. **An API gateway accepts access tokens issued by Okta. For this case, assume the caller's session is authenticated and the token's cryptographic and required-claim checks succeed. The caller has no administrative permission but reaches an administrative endpoint. Which decision must you investigate, and why would signature verification alone be insufficient evidence?**
+1. **An API gateway accepts access tokens issued by Okta. For this case, assume the application has authenticated the caller and the token's cryptographic and required-claim checks succeed. The caller has no administrative permission but reaches an administrative endpoint. Which decision must you investigate, and why would signature verification alone be insufficient evidence?**
    <details>
    <summary>Answer</summary>
 
-   Under those assumptions, investigate authorization: how the caller's roles or scopes map to the requested administrative action, and where that policy is enforced. Signature verification alone would not establish the required claims, a legitimate bearer-token presenter, or permission for this endpoint. Inspect the route's policy and test an allowed request and a denied request before forwarding to the backend. Successful authentication and token validation supply inputs to authorization; they do not replace the action-and-resource decision.
+   Under those assumptions, investigate authorization: how the caller's roles or scopes map to the requested administrative action, and where that policy is enforced. Signature verification alone would not establish the required claims, a legitimate bearer-token presenter, or permission for this endpoint. The gateway must enforce the action-and-resource policy before forwarding a request to the backend. Validate the policy with both allowed and denied test cases. Successful authentication and token validation supply inputs to authorization; they do not replace that decision.
    </details>
 
 2. **Scenario: An attacker manages to steal a database containing all user passwords for your application. If your application enforces MFA, why are the user accounts still secure? Explain how the different authentication factors work together.**
@@ -722,7 +722,7 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    <details>
    <summary>Answer</summary>
 
-   The expiration calculation is `1700003600 − 1700000000 = 3,600 seconds`, or one hour. That is the remaining window under the stated expiration assumptions, not a promise of uninterrupted access: revocation, changed authorization policy or other checks can reject a request earlier. A bearer token's possession is sufficient to use it in the same ways as another holder, subject to the application's checks ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)). Signature verification checks token integrity under the configured key; it does not authenticate the current presenter. Applications can still use session state, revocation data and request telemetry to detect or respond to suspicious use. A JWT format does not make detection impossible, and refresh-token rotation does not itself require the user to authenticate again ([RFC 9700, §4.14.2](https://www.rfc-editor.org/rfc/rfc9700#section-4.14.2)).
+   The expiration calculation is `1700003600 − 1700000000 = 3,600 seconds`, or one hour. That is the remaining window under the stated expiration assumptions, not a promise of uninterrupted access: revocation, changed authorization policy or other checks can reject a request earlier. A bearer token's possession is sufficient to use it in the same ways as another holder, subject to the application's checks ([RFC 6750, §1.2](https://www.rfc-editor.org/rfc/rfc6750#section-1.2)). Signature verification checks token integrity under the configured key; it does not authenticate the current presenter. Applications can still use session state, revocation data and request telemetry to detect or respond to suspicious use. A JWT format does not make detection impossible. Ordinary refresh-token rotation does not itself require user re-authentication, but detected replay can trigger refresh-token revocation and require a fresh authorization grant ([RFC 9700, §4.14.2](https://www.rfc-editor.org/rfc/rfc9700#section-4.14.2)).
    </details>
 
 8. **Scenario: During a penetration test, the red team exploits a remote code execution vulnerability in a simple Nginx web pod. They immediately pivot to query the Kubernetes API and list all secrets in the namespace. What specific ServiceAccount configuration enabled this lateral movement, why is it a risk, and what is the correct remediation?**
