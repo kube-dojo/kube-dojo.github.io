@@ -12,14 +12,14 @@ sidebar:
 >
 > **Track**: Foundations
 
-### What You'll Be Able to Do
+## What You'll Be Able to Do
 
 After completing this module, you will be able to:
 
 1. **Design** identity and access management architectures that enforce least privilege across human users, service accounts, and machine identities
 2. **Implement** authentication and authorization patterns (OIDC, RBAC, ABAC, short-lived credentials) appropriate for different trust levels
-3. **Evaluate** whether an IAM configuration prevents lateral movement by auditing permission scope, credential lifetime, and access review processes
-4. **Analyze** access-related incidents to identify where over-permissioning, missing audit trails, or credential reuse enabled the breach
+3. **Evaluate** how an IAM configuration reduces lateral-movement risk by auditing permission scope, credential lifetime, and access review processes
+4. **Analyze** access-related incidents by separating documented credential and privilege failures from unverified hypotheses, then identifying the evidence needed to assess proposed controls
 5. **Compare** workload identity federation against static cloud credentials and justify which to use for a given workload
 
 ---
@@ -697,11 +697,13 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    Start by listing what the pipeline actually does — apply Deployments, Services, ConfigMaps, and HorizontalPodAutoscalers in two named namespaces — and write that down before touching YAML. Map each action to verbs and resources: `create`, `update`, `patch`, and `get` on the relevant resources. Next, eliminate cluster-admin because it grants every verb on every resource cluster-wide, vastly exceeding the needed scope. Replace it with two `Role` objects (one per namespace) listing only the required verbs and resources, plus two `RoleBinding` objects binding those Roles to the pipeline's ServiceAccount in each namespace. Verify with `kubectl auth can-i` for both an allowed action (creating a Deployment in `frontend`) and a denied action (creating a Role in `kube-system`); if both answers are correct, the configuration is minimal and correct.
    </details>
 
-4. **Scenario: A developer accidentally commits a credential to a public GitHub repository. Within minutes, bots scan it and attempt to use it. If the credential was a short-lived token versus a long-lived API key, how does the impact differ and why are short-lived tokens preferred?**
+4. **Synthetic decision: An order-processing Pod needs read access only to an archive bucket's `orders/` prefix. Option A stores a static cloud credential in a Kubernetes Secret with a planned 90-day rotation. Option B exchanges a projected ServiceAccount token for temporary cloud credentials through a supported federation integration. Assume both options grant exactly the required bucket permissions. Which would you choose, what trust configuration must you check, and what changes if a credential leaks or the Pod remains compromised?**
    <details>
    <summary>Answer</summary>
 
-   A shorter lifetime reduces the remaining acceptance window of that particular credential if expiry is enforced. It does not bound all resulting damage: an attacker may perform a persistent action or obtain another credential if the granted permissions allow it. A long-lived key remains exposed according to its lifetime and revocation policy, so revoke either leaked credential promptly and investigate what it authorized. Short lifetimes complement narrow permissions, revocation and monitoring; they do not replace them. For a JWT with an `exp` claim, [RFC 7519, §4.1.4](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4), defines the expiration check, not a guarantee that all effects of misuse disappear at that time.
+   Prefer B when the platform and application support the integration: it avoids distributing a static cloud credential and obtains temporary credentials for an identified workload. Verify the trusted issuer and signing keys, intended audience, and subject binding to the exact namespace and ServiceAccount. Check the resulting cloud permissions independently; federation does not make an overly broad role safe. Also check how the integration refreshes credentials and what happens when the exchange fails. A may be a constrained fallback for an unsupported integration, but the design must then account for secret distribution, rotation and revocation. Planned rotation after 90 days is not a reason to wait after a leak.
+
+   A shorter lifetime reduces the remaining acceptance window of that particular credential if expiry is enforced. It does not bound all resulting damage: an attacker may perform a persistent action or obtain another credential if the granted permissions allow it. Continued Pod compromise may allow new projected tokens or temporary sessions, as the IRSA example explains. Revoke or restrict compromised access using the relevant provider's controls, remove the compromise, and investigate what was authorized. Token expiry and access already granted to a cloud session are different boundaries. For a JWT with an `exp` claim, [RFC 7519, §4.1.4](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.4), defines the expiration check, not a guarantee that all effects of misuse disappear at that time.
    </details>
 
 5. **Scenario: Your company is rapidly growing and adding new internal applications every week. The IT team is overwhelmed managing access for each new hire across dozens of systems using direct user-to-resource ACLs. How would migrating to Role-Based Access Control reduce this operational burden, and what is the mathematical difference in permission management?**
@@ -711,11 +713,13 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    With direct ACLs, 500 users across 50 applications can require up to 25,000 individual permission entries, and every role change forces IT to manually update entries on every system the user touches. RBAC introduces an abstraction layer where permissions are attached to roles, not users, and users are attached to roles. With ten standard roles you maintain about 500 user-to-role mappings plus roughly 500 role-to-permission mappings — roughly 1,000 total entries instead of 25,000. When a user changes jobs, IT updates a single role assignment and the change propagates across all 50 applications instantly, eliminating both the manual workload and the permission drift that comes from forgetting to update one of the systems.
    </details>
 
-6. **Using the NYDFS investigation's findings on the 2020 Twitter attack, propose controls that reduce the risk of stolen employee access reaching or misusing sensitive internal tools. Which findings support your choices, and what would you still need to assess before claiming the tool is protected?**
+6. **Using the NYDFS investigation's findings on the 2020 Twitter attack, separate documented observations from hypotheses about excessive permissions, missing audit trails or credential reuse. Propose controls that reduce the risk of stolen employee access reaching or misusing sensitive internal tools. Which findings support your choices, and what additional evidence would you request before claiming protection?**
    <details>
    <summary>Answer</summary>
 
    The report describes phishing and employees approving application-based MFA, then recommends stronger authentication and access controls (printed pp. 5 and 16). Propose phishing-resistant authentication, narrower job-based access with periodic reviews, and second-employee approval for high-risk operations. The report identifies those controls as protective directions, rather than documenting a complete permission scheme for each Twitter action. Evaluate where authentication is enforced, which operations each role can perform, how approvals are bound to the intended action, and how sessions are protected and monitored. A hardware key can resist the described phishing route; it does not establish that malware cannot misuse an already authorized session. Treat the proposals as risk reduction and test their enforcement before claiming containment.
+
+   A strong answer also uses the reported access for more than 1,000 employees and the operational cost of reducing it (printed p. 16) to motivate reviewing privilege scope. Those facts alone do not prove that a particular employee role was excessive. The cited account does not establish that missing audit trails or password reuse caused the attack. Request role-to-operation mappings, access-review records, authentication and sensitive-action logs, and session evidence to test those hypotheses; do not label an unexamined control as absent. Distinguish the report's stolen credentials from an unsupported claim that the victim reused a password across systems.
    </details>
 
 7. **An attacker obtains a JWT bearer access token with `exp: 1700003600`; the current Unix time is `1700000000`. Assume its signature, issuer and audience are valid, and ignore clock skew. What is its remaining lifetime under the expiration check? Does a valid signature prove the presenter is legitimate, or prevent earlier rejection and detection?**
@@ -819,12 +823,10 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [ ] Can you explain OAuth 2.0 and OIDC flows, and specifically why the auth-code-then-tokens two-step exists?
 - [ ] Do you understand Kubernetes ServiceAccounts well enough to know when to disable `automountServiceAccountToken` and when to leave it on?
 - [ ] Can you read an AWS IRSA trust policy and identify which clauses bind it to a specific ServiceAccount in a specific namespace?
+- [ ] Can you justify federation or a static credential for a workload, including trust scope, permissions, refresh behavior and compromise response?
+- [ ] Can you separate documented incident findings from hypotheses and name the records needed to evaluate a proposed control?
 
 ---
-
-## Next Module
-
-[Module 4.4: Secure by Default](../module-4.4-secure-by-default/) — Building security into systems from the start, not bolting it on later.
 
 ## Sources
 
@@ -842,3 +844,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
 - [RFC 9700: Best Current Practice for OAuth 2.0 Security, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1) — PKCE requirements for public clients and recommendations for confidential clients.
 - [Amazon EKS Identity and Access Management Best Practices](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) — Explains IRSA, projected service account tokens, trust-policy scoping, and injected AWS identity environment variables.
+
+## Next Module
+
+[Module 4.4: Secure by Default](../module-4.4-secure-by-default/) — Building security into systems from the start, not bolting it on later.
