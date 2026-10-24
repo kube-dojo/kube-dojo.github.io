@@ -772,7 +772,7 @@ The trust idea transfers to other providers, but the integration details differ.
 
 The exercise has four parts and an explicit success criteria checklist. Work through them in order — the later parts depend on decisions you make in the earlier ones.
 
-**Part 1: User Authentication (10 minutes)**
+### Part 1: User Authentication (10 minutes)
 
 Design the user authentication flow. For each component, decide which method and how many factors. Justify your choices in a sentence.
 
@@ -782,7 +782,7 @@ Design the user authentication flow. For each component, decide which method and
 | API access | | |
 | Admin panel | | |
 
-**Part 2: Service Authorization (10 minutes)**
+### Part 2: Service Authorization (10 minutes)
 
 Design service-to-service permissions. For each row, write the minimum set of calls required and explicitly note one thing each service must NOT be able to do.
 
@@ -793,7 +793,7 @@ Design service-to-service permissions. For each row, write the minimum set of ca
 | Inventory Service | | | |
 | Payment Service | | | |
 
-**Part 3: Database Access (10 minutes)**
+### Part 3: Database Access (10 minutes)
 
 Design database access. Each service should have its own database role with the smallest possible grant.
 
@@ -803,7 +803,7 @@ Design database access. Each service should have its own database role with the 
 | | | | |
 | | | | |
 
-**Part 4: Kubernetes RBAC (10 minutes)**
+### Part 4: Kubernetes RBAC (10 minutes)
 
 Write a ServiceAccount, Role, and RoleBinding for the Order Service. Apply the worked-example diagnostic from Part 2.3: name the actions first, scope them, and only then write YAML. Include a comment on `automountServiceAccountToken` justifying your choice.
 
@@ -811,7 +811,7 @@ Write a ServiceAccount, Role, and RoleBinding for the Order Service. Apply the w
 # Your YAML here
 ```
 
-**Success Criteria**:
+### Success Criteria:
 - [ ] User authentication uses MFA for any operation that can move money or change account ownership
 - [ ] Each service has only the permissions it needs, expressed as explicit verb/resource lists
 - [ ] No service has more database access than required, and the Payment service does not share a database role with Order
