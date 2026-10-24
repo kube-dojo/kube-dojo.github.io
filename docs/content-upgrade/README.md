@@ -49,13 +49,15 @@ The companion [track program](track-program.md), [book program](book-program.md)
 
 ## Sequencing and dependencies
 
+User priority (2026-10-24): finish English readiness before starting Ukrainian review, revision or translation. This replaces the earlier Wave B/D translation timing; Ukrainian stays inventoried and deferred, and does not block English readiness. The full bilingual program's completion requirements remain below.
+
 **Wave A — foundations of the program:** inventory, standards/evidence contract, source and lab audit formats, and the known route defects. Start concrete verified fixes while inventory proceeds; do not turn governance into an indefinite prerequisite for useful work.
 
-**Wave B — entry and continuity:** prerequisites and Linux, introductory AI, certification objective mapping, Ukrainian audience drift, book contract reconciliation. Independently verify chapter sources and cloud setup requirements in parallel. First batches calibrate the workflow; all remaining pages stay in the required queue.
+**Wave B — entry and continuity:** prerequisites and Linux, introductory AI, certification objective mapping, book contract reconciliation. Independently verify chapter sources and cloud setup requirements in parallel. First batches calibrate the workflow; all remaining English pages stay in the required queue.
 
 **Wave C — breadth:** complete Kubernetes, cloud, on-premises, platform, and AI/ML section batches; all book parts move through fact-checking and editorial work. Sequence prerequisite concepts before their dependent lessons, but independent sections can progress concurrently.
 
-**Wave D — full integration:** cross-track projects, stabilized-section translations, route/accessibility validation, whole-site regression and maintenance. Translation can follow completed sections throughout earlier waves; it does not wait for the entire English site to finish.
+**Wave D — full integration:** cross-track projects, route/accessibility validation, English-site regression and maintenance. Ukrainian work follows English readiness under the user priority above.
 
 **Wave E — closeout:** reconcile every current page, new addition, linked issue, PR, review, execution receipt, translation counterpart and deployed route. Do not close merely because a sample, dashboard, build, or model review is green.
 
