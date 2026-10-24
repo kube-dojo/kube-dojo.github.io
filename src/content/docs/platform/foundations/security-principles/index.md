@@ -4,7 +4,7 @@ sidebar:
   order: 0
   label: "Security Principles"
 ---
-> **Foundation Track** | 4 Modules | ~2 hours total
+> **Foundation Track** | 4 Modules | 190–240 minutes total (planning estimate)
 
 The mindset and principles of building secure systems. Concepts that apply regardless of which tools, languages, or platforms you use.
 
@@ -29,9 +29,11 @@ This isn't about memorizing checklists. It's about developing the security minds
 | # | Module | Time | Description |
 |---|--------|------|-------------|
 | 4.1 | [The Security Mindset](module-4.1-security-mindset/) | 25-30 min | Attacker thinking, security principles, trust |
-| 4.2 | [Defense in Depth](module-4.2-defense-in-depth/) | 30-35 min | Layered security, network/app/data layers |
-| 4.3 | [Identity and Access Management](module-4.3-identity-and-access/) | 30-35 min | Authentication, authorization, least privilege |
+| 4.2 | [Defense in Depth](module-4.2-defense-in-depth/) | 45-55 min | Layered security, network/app/data layers |
+| 4.3 | [Identity and Access Management](module-4.3-identity-and-access/) | 90-120 min | Authentication, authorization, least privilege |
 | 4.4 | [Secure by Default](module-4.4-secure-by-default/) | 30-35 min | Secure defaults, guardrails, configuration |
+
+Times are planning estimates. The total adds the module ranges; your background and any tool setup can change the time you need.
 
 ---
 
