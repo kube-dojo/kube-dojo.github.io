@@ -4,11 +4,11 @@ sidebar:
   order: 0
 ---
 
-The world of software development and deployment has fundamentally changed. Gone are the days of manual server provisioning, monolithic applications running on single servers, and infrequent, highly risky deployments. In their place is the cloud native paradigm—a modern approach to building and running applications that fully exploits the advantages of the cloud computing model.
+Cloud native practices help teams automate deployment, recovery, and scaling when those needs justify the complexity. Single-server applications, monoliths, and simpler managed services remain valid choices; the goal is to match operational tools to the workload rather than adopt every available platform.
 
 This section serves as the foundational prerequisite for KubeDojo. Whether you are transitioning from a traditional systems administration background or you are a developer looking to understand the platform your code runs on, these modules will demystify the core concepts. You will build a strong mental model of the infrastructure and architecture patterns that power modern technology companies.
 
-Our journey begins at the lowest level of abstraction by exploring containers and how they isolate processes. We then examine Docker, the tool that popularized containerization, before moving up a layer to understand why orchestration systems like Kubernetes are necessary at scale. Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem and explore the architectural shift from monoliths to microservices that makes this entire ecosystem valuable.
+Our journey begins at the lowest level of abstraction by exploring containers and how they isolate processes. We then examine Docker, the tool that popularized containerization, before moving up a layer to understand when orchestration systems like Kubernetes justify their operational cost. Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem and explore the architectural shift from monoliths to microservices that makes this entire ecosystem valuable.
 
 ## Modules
 
