@@ -59,6 +59,35 @@ def test_differing_config_is_preserved_unless_explicitly_backed_up(deployment):
     assert run("--check").returncode == 0
 
 
+@pytest.mark.parametrize("failed_command", ["mktemp", "cp"])
+def test_backup_failure_never_replaces_config(deployment, tmp_path, monkeypatch, failed_command):
+    _source, target, run = deployment
+    target.parent.mkdir()
+    target.write_text('model = "preserve-me"\n')
+    commands = tmp_path / "bin"
+    commands.mkdir()
+    command = commands / failed_command
+    command.write_text(
+        "#!/bin/sh\nexit 1\n" if failed_command == "mktemp" else
+        '#!/bin/sh\ncase "$*" in *".bak."*) exit 1;; esac\nexec /bin/cp "$@"\n'
+    )
+    command.chmod(0o755)
+    monkeypatch.setenv("PATH", str(commands) + os.pathsep + os.environ["PATH"])
+    assert run("--force-config").returncode == 1
+    assert target.read_text() == 'model = "preserve-me"\n'
+
+
+def test_default_deploy_refuses_config_drift_before_other_agents(deployment):
+    source, target, run = deployment
+    target.parent.mkdir()
+    target.write_text('model = "preserve-me"\n')
+    hook = source.parent.parent / "claude/hooks/probe.sh"
+    hook.parent.mkdir(parents=True)
+    hook.write_text("#!/bin/sh\nexit 0\n")
+    assert run("--target", "all").returncode == 1
+    assert not (target.parent.parent / ".claude/hooks/probe.sh").exists()
+
+
 @pytest.mark.parametrize("enabled", ["1", "0"])
 def test_launcher_sets_v2_and_honors_multi_agent_opt_out(tmp_path, enabled):
     binary_dir = tmp_path / ".local/bin"

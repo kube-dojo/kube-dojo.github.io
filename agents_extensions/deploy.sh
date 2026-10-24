@@ -92,12 +92,12 @@ deploy_config() {
                 return 1
             fi
             local backup
-            backup=$(mktemp "${target_file}.bak.XXXXXX")
-            cp -p "$target_file" "$backup"
+            backup=$(mktemp "${target_file}.bak.XXXXXX") || return 1
+            cp -p "$target_file" "$backup" || return 1
             log "   Backup: $backup"
         fi
-        mkdir -p "$(dirname "$target_file")"
-        cp "$source_file" "$target_file"
+        mkdir -p "$(dirname "$target_file")" || return 1
+        cp "$source_file" "$target_file" || return 1
         log "   📄 config.toml"
     fi
     echo 1
@@ -322,6 +322,18 @@ deploy_agent() {
 
 case "$TARGET" in
     all)
+        # Refuse config replacement before deploying any agent, so the default
+        # all-target operation cannot stop after already changing Claude.
+        if [[ "$CHECK" == "false" && "$FORCE_CONFIG" == "false" ]]; then
+            for agent in claude codex cursor gemini; do
+                source_config="$SOURCE_ROOT/$agent/config.toml"
+                target_config="$PROJECT_ROOT/$(agent_hidden_dir "$agent")/config.toml"
+                if [[ -f "$source_config" && -e "$target_config" ]] && ! cmp -s "$source_config" "$target_config"; then
+                    echo "Refusing to overwrite $target_config; inspect the diff and use --force-config to back it up and replace it." >&2
+                    exit 1
+                fi
+            done
+        fi
         for agent in claude codex cursor gemini; do
             deploy_agent "$agent"
         done

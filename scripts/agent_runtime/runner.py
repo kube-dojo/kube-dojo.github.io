@@ -530,16 +530,9 @@ def invoke(
         # (see watchdog.py::should_kill docstring). Hard timeout is the
         # wall-clock safety net.
         #
-        # Early reap (2026-04-10): adapters MAY implement
-        # check_early_reap(plan, call_start_time) -> bool. If present
-        # and True, the runner kills the subprocess immediately and
-        # falls through to parse_response, which is expected to recover
-        # the response from the adapter's persistent state file. This
-        # is the fix for Codex 0.118 post-completion hangs — the CLI
-        # writes its answer to the rollout file then sits in Tokio
-        # cond_wait forever. CodexAdapter returns True the moment a
-        # task_complete event appears in the rollout JSONL, which
-        # unblocks the call in ~10s instead of the full hard_timeout.
+        # Adapters may reap only when their own invocation's answer is ready.
+        # Codex deliberately disables this: shared rollout files can belong to
+        # resumed conversations, child agents, or another user's live session.
         early_reap_check = getattr(adapter, "check_early_reap", None)
         kill_reason: str | None = None
         while True:
@@ -568,6 +561,7 @@ def invoke(
                     # crash the whole invocation. Fall through to
                     # normal poll/kill logic.
                     _LOGGER.exception("Adapter early-reap probe failed")
+                    early_reap_check = None  # report a broken probe once per invocation
 
             kill_reason = should_kill(watchdog_state, stall_timeout, hard_timeout)
             if kill_reason is not None:

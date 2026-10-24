@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,6 +19,7 @@ from ._codex import (
     process_for_codex,
 )
 from ._config import GEMINI_DEFAULT_MODEL, GEMINI_REVIEW_MODEL
+from ._cursor import ask_cursor
 from ._db import get_db
 from ._deepseek import ask_deepseek
 from ._gemini import ask_gemini, converse_gemini, process_and_respond
@@ -32,9 +34,10 @@ from ._messaging import (
 )
 from ._model import check_model
 from ._opencode import ask_opencode
-from ._cursor import ask_cursor
 from ._prompts import build_review_message
 from ._qwen import ask_qwen
+
+_LOGGER = logging.getLogger(__name__)
 
 try:
     from dispatch import GEMINI_WRITER_MODEL
@@ -78,6 +81,7 @@ def interactive_mode():
             print("\nBye!")
             break
         except Exception as e:
+            _LOGGER.exception("Bridge interactive command failed")
             print(f"Error: {e}")
 
 
@@ -136,6 +140,7 @@ def process_all_gemini(model: str = GEMINI_DEFAULT_MODEL):
             success += 1
             print("    ✅ Done\n")
         except Exception as e:
+            _LOGGER.exception("Bridge Gemini batch message failed")
             failed += 1
             print(f"    ❌ Failed: {e}\n")
 
@@ -177,6 +182,7 @@ def process_all_claude(new_session: bool = False):
             success += 1
             print("    ✅ Done\n")
         except Exception as e:
+            _LOGGER.exception("Bridge Claude batch message failed")
             failed += 1
             print(f"    ❌ Failed: {e}\n")
 
@@ -413,6 +419,8 @@ def _build_parser() -> argparse.ArgumentParser:
                                    help="Force new session even if one exists")
     proc_codex_parser.add_argument("--no-timeout", dest="no_timeout", action="store_true",
                                    help="Run sync without timeout")
+    proc_codex_parser.add_argument("--force", action="store_true",
+                                   help="Reprocess an already acknowledged message")
 
     # ask-claude
     ask_claude_parser = subparsers.add_parser("ask-claude", help="Send message AND invoke Claude (one-step)")
@@ -802,7 +810,7 @@ def _dispatch_command(args):
     elif args.command == "process-claude":
         process_for_claude(args.message_id, args.new_session, args.fire_and_forget, args.no_timeout)
     elif args.command == "process-codex":
-        process_for_codex(args.message_id, args.new_session, args.no_timeout)
+        process_for_codex(args.message_id, args.new_session, args.no_timeout, force=args.force)
     elif args.command == "ask-claude":
         _handle_ask_claude(args)
     elif args.command == "ask-codex":
@@ -923,8 +931,8 @@ def _handle_ask_codex(args):
         data = Path(args.data).read_text()
     content = sys.stdin.read() if args.content == "-" else args.content
     content = build_review_message(content) if args.review else content
-    ask_codex(content, args.task_id, args.type, data,
-              args.new_session, args.from_llm, args.from_model, args.to_model)
+    ask_codex(content, args.task_id, "review" if args.review else args.type, data,
+              args.new_session or args.review, args.from_llm, args.from_model, args.to_model)
 
 
 def _handle_ask_gemini(args):

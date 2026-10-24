@@ -15,7 +15,7 @@ from agent_runtime.errors import (
     AgentUnavailableError,
     RateLimitedError,
 )
-from ai_agent_bridge import _codex, _config, _db, _messaging
+from ai_agent_bridge import _cli, _codex, _config, _db, _messaging
 
 
 @pytest.fixture
@@ -193,3 +193,77 @@ def test_task_key_is_never_used_as_a_lock_path(bridge):
         assert acquired
         assert len(list(_codex.PID_DIR.glob("codex-*.lock"))) == 1
     assert not (bridge.repo.parent / "outside").exists()
+
+
+def test_acknowledged_message_is_skipped_unless_force_is_explicit(bridge):
+    message_id = bridge.message()
+    assert _codex.process_for_codex(message_id) == "done"
+    assert _codex.process_for_codex(message_id) == "skipped"
+    assert bridge.invoke.call_count == 1
+    assert _codex.process_for_codex(message_id, force=True) == "done"
+    assert bridge.invoke.call_count == 2
+
+
+def test_explicit_self_addressed_ask_still_runs_once(bridge):
+    message_id = _codex.ask_codex("question", task_id="task-1", from_llm="codex")
+    assert bridge.invoke.call_count == 1
+    assert _codex.process_for_codex(message_id) == "skipped"
+    assert bridge.invoke.call_count == 1
+
+
+def test_cli_force_explicitly_reprocesses_an_acknowledged_message(bridge, monkeypatch):
+    message_id = bridge.message()
+    _codex.process_for_codex(message_id)
+    monkeypatch.setattr(sys, "argv", ["ab", "process-codex", str(message_id), "--force"])
+    _cli.main()
+    assert bridge.invoke.call_count == 2
+
+
+def test_batch_reports_a_locked_message_as_skipped(bridge, capsys):
+    bridge.message()
+    with _codex._codex_task_lock("task-1"):
+        _codex.process_all_codex()
+    bridge.invoke.assert_not_called()
+    assert "0 succeeded, 0 failed, 1 skipped, 0 deferred" in capsys.readouterr().out
+
+
+def test_acknowledgment_is_rechecked_inside_the_task_lock(bridge, monkeypatch):
+    message_id = bridge.message()
+    fetch = _codex._fetch_codex_message
+
+    def racing_fetch(mid):
+        msg = fetch(mid)
+        _messaging.acknowledge(mid)
+        return msg
+
+    monkeypatch.setattr(_codex, "_fetch_codex_message", racing_fetch)
+    assert _codex.process_for_codex(message_id) == "skipped"
+    bridge.invoke.assert_not_called()
+
+
+def test_review_flag_is_fresh_and_preserves_the_implementation_session(bridge, monkeypatch):
+    _seed(bridge.repo)
+    before = _stored()
+    monkeypatch.setattr(sys, "argv", ["ab", "ask-codex", "review this", "--review", "--task-id", "task-1"])
+    _cli.main()
+    assert bridge.invoke.call_args.kwargs["session_id"] is None
+    assert _stored() == before
+
+
+def test_resumed_id_is_retained_on_mismatched_returned_id(bridge, caplog):
+    _seed(bridge.repo)
+    _codex.process_for_codex(bridge.message())
+    assert _stored()["codex_session_id"] == "session-old"
+    assert "retaining the requested session" in caplog.text
+
+
+@pytest.mark.parametrize("model", ["bad\nsession id: injected", "bad model", [], 123])
+def test_invalid_model_metadata_is_rejected_before_invocation(bridge, model):
+    import json
+
+    message_id = _messaging.send_message(
+        "question", task_id="task-1", from_llm="claude", to_llm="codex",
+        data=json.dumps({"to_model": model}), quiet=True,
+    )
+    assert _codex.process_for_codex(message_id) == "failed"
+    bridge.invoke.assert_not_called()

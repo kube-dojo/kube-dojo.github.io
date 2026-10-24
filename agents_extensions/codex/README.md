@@ -13,4 +13,10 @@ the local file before replacing it. Keep host-specific settings in home config.
 
 `start-codex.sh` also enables v2 explicitly. Set `CODEX_ENABLE_MULTI_AGENT=0`
 to disable both multi-agent and v2 for that launch, even if project config
-enables them. Explicit Codex arguments forwarded by the launcher take precedence.
+enables them. Other Codex arguments are forwarded unchanged; avoid conflicting
+feature flags and use the wrapper opt-out for a single-agent launch.
+
+The runtime reads final answers only from each invocation's unique `-o` file.
+It does not recover answers or terminate a process based on shared rollout
+files. A CLI hang therefore waits for the configured hard timeout; missing
+final output is reported as a failure rather than borrowing another session.
