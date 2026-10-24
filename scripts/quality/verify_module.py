@@ -11,8 +11,9 @@ import shlex
 import statistics
 import sys
 from collections import Counter
+from collections.abc import Iterable
+from itertools import pairwise
 from pathlib import Path
-from typing import Iterable
 
 _HERE = str(Path(__file__).resolve().parent)
 sys.path = [p for p in sys.path if p not in ("", _HERE)]
@@ -865,7 +866,7 @@ def _heading_matches(line: str, candidates: Iterable[str], prefix: bool = False)
         expected = candidate.casefold()
         if title == expected or title.startswith(f"{expected}:"):
             return True
-        if prefix and (title.startswith(f"{expected} ") or title.startswith(f"{expected}:")):
+        if prefix and title.startswith((f"{expected} ", f"{expected}:")):
             return True
     return False
 
@@ -954,8 +955,7 @@ def _practice_question_blocks(text: str) -> list[tuple[str, str, int | None]]:
     quiz = _find_matching_h2(body, QUIZ_HEADINGS) or _find_matching_h2(body, QUIZ_PREFIX_HEADINGS, prefix=True)
     raw_content = str(quiz["content"]) if quiz else body
     content_start = body.find(raw_content, int(quiz["start"])) if quiz else 0
-    if content_start < 0:
-        content_start = 0
+    content_start = max(content_start, 0)
     content = raw_content
     content = _strip_code_blocks(content, "\n")
     details = list(
@@ -1152,7 +1152,9 @@ def _check_url(url: str) -> str:
     head_was_botblock_pattern = False
     try:
         import requests
-
+    except ImportError:
+        return "fetch_failed"
+    try:
         session = requests.Session()
         session.max_redirects = 5
         response = session.head(url, timeout=10, allow_redirects=True)
@@ -1162,10 +1164,10 @@ def _check_url(url: str) -> str:
             try:
                 response = session.get(url, timeout=10, allow_redirects=True, stream=True)
                 response.close()
-            except Exception:
+            except requests.RequestException:
                 # GET also failed (tarpit, drop, timeout) — fall through to lightpanda.
                 response = None
-    except Exception:
+    except requests.RequestException:
         # HEAD itself raised — treat as network failure, no lightpanda attempt.
         return "fetch_failed"
     if response is not None and 200 <= response.status_code <= 299:
@@ -1180,6 +1182,7 @@ def _check_url(url: str) -> str:
                 capture_output=True,
                 text=True,
                 timeout=15,
+                check=False,
             )
             if result.returncode == 0 and len(result.stdout.strip()) > 0:
                 return "200"
@@ -1510,7 +1513,7 @@ def source_h1_metrics(text: str) -> dict[str, object]:
 
     for line_number, line in enumerate(body.splitlines(), start=body_start_line):
         stripped = line.strip()
-        if not stripped or stripped.startswith(">") or stripped == "---" or stripped.startswith("<!--"):
+        if not stripped or stripped.startswith((">", "<!--")) or stripped == "---":
             continue
         if stripped.startswith("# "):
             return {
@@ -1560,7 +1563,7 @@ def _count_ascii_diagrams(lines: list[str]) -> int:
     if not indexes:
         return 0
     groups = 1
-    for prev, current in zip(indexes, indexes[1:]):
+    for prev, current in pairwise(indexes):
         if current != prev + 1:
             groups += 1
     return groups
@@ -1876,7 +1879,9 @@ def _run_snapshot(path: Path, *, quiet: bool) -> None:
     _root = str(REPO_ROOT)
     if _root not in sys.path:
         sys.path.insert(0, _root)
-    from scripts.quality import verifier_snapshots  # local import to keep default path fast
+    from scripts.quality import (
+        verifier_snapshots,  # local import to keep default path fast
+    )
 
     snap = verifier_snapshots.snapshot_module(path)
     if snap and not quiet:
