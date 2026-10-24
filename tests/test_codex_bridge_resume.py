@@ -252,10 +252,18 @@ def test_review_flag_is_fresh_and_preserves_the_implementation_session(bridge, m
 
 def test_resumed_id_mismatch_invalidates_scope_without_retry(bridge, caplog):
     _seed(bridge.repo)
-    assert _codex.process_for_codex(bridge.message()) == "failed"
+    message_id = bridge.message()
+    assert _codex.process_for_codex(message_id) == "failed"
     assert _stored() == {"codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": ""}
     assert bridge.invoke.call_count == 1
     assert "clearing the saved session" in caplog.text
+    conn = _db.get_db()
+    try:
+        content = conn.execute("SELECT content FROM messages WHERE message_type = 'error' ORDER BY id DESC").fetchone()[0]
+        assert "Session identity changed; saved session cleared. This call was not retried." in content
+        assert conn.execute("SELECT acknowledged FROM messages WHERE id = ?", (message_id,)).fetchone()[0] == 1
+    finally:
+        conn.close()
 
 
 @pytest.mark.parametrize("blocked_by", ["lock", "quota"])

@@ -12,6 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+from agent_runtime.errors import RateLimitedError
 from agent_runtime.result import Result
 from ai_agent_bridge import _channels, _cli, _db
 
@@ -465,6 +466,30 @@ def test_discuss_codex_failed_resume_clears_scope_before_fallback(mock_invoke, m
             "codex_session_id": "", "codex_cwd": "", "codex_sandbox_mode": "",
         }
         assert "[failed: test failure]" in capsys.readouterr().out
+
+
+@patch("agent_runtime.runner.invoke")
+@pytest.mark.parametrize("quota_kind", ["exception", "result"])
+def test_discuss_codex_quota_preserves_session_without_fallback(mock_invoke, monkeypatch, quota_kind):
+    _channels.create_channel("discuss-codex-quota")
+    monkeypatch.setattr(_channels, "fetch_monitor_state", lambda: None)
+    ids = iter(range(1, 1000))
+    monkeypatch.setattr(_channels, "_new_id", lambda: f"discuss-codex-quota-{next(ids):04d}")
+    task = "discuss:discuss-codex-quota-0001"
+    before = {}
+
+    def invoke(agent, *_, **kwargs):
+        if mock_invoke.call_count == 1:
+            return SimpleNamespace(ok=True, response="reply [AGREE]", session_id="session-quota")
+        before.update(_db.get_session(task))
+        if quota_kind == "exception":
+            raise RateLimitedError("codex", "test", "limited")
+        return SimpleNamespace(ok=False, response="", stderr_excerpt="quota exhausted", rate_limited=True)
+
+    mock_invoke.side_effect = invoke
+    assert _run_cli(["discuss", "discuss-codex-quota", "topic", "--with", "codex", "--max-rounds", "2"]) == 0
+    assert [call.kwargs["session_id"] for call in mock_invoke.call_args_list] == [None, "session-quota"]
+    assert _db.get_session(task) == before
 
 
 @patch("agent_runtime.runner.invoke")
