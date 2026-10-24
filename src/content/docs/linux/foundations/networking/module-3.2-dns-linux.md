@@ -13,7 +13,9 @@ lab:
   environment: "ubuntu"
 ---
 
-> **Linux Foundations** | Complexity: `[HIGH]`
+> **Linux Foundations**
+>
+> **Complexity**: `[MEDIUM]`
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 
