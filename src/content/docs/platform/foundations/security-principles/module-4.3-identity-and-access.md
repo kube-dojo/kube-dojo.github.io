@@ -1,5 +1,4 @@
 ---
-citations_verified: true
 title: "Module 4.3: Identity and Access Management"
 slug: platform/foundations/security-principles/module-4.3-identity-and-access
 sidebar:
@@ -25,15 +24,15 @@ After completing this module, you will be able to:
 
 ---
 
-**July 2020. Twitter's internal admin tools become a weapon.**
+**July 2020. Stolen employee access reaches Twitter's internal tools.**
 
-A 17-year-old from Florida convinces Twitter employees to surrender access to internal systems through a phone-based social engineering attack. With those credentials, the teenager gains entry to Twitter's admin panel — a tool designed for customer support that can take over any account on the platform without the owner's password, second factor, or recovery email being involved. The tool was trusted because it was internal; that trust became the breach.
+The [New York State Department of Financial Services investigation, October 2020](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report), describes attackers impersonating Twitter's IT help desk by phone to steal employee credentials. The report also explains how attackers persuaded employees to complete application-based MFA during the fraudulent login. Authentication controls existed, but those controls did not prevent access to powerful internal tools (printed pp. 5 and 16).
 
-Within hours, the accounts of Barack Obama, Elon Musk, Bill Gates, Apple, Uber, and dozens of other high-profile users tweeted the same message: send Bitcoin to this address and get double back. A classic scam, but with unprecedented reach. 130 accounts compromised. $120,000 in Bitcoin stolen. Twitter's stock dropped four percent the next day. The reputational damage dwarfed the financial loss — the world saw that Twitter's identity and access controls allowed a teenager with a phone to hijack any account on the platform, and regulators in three countries opened investigations.
+The report records 130 compromised accounts, of which 45 were used to send tweets (printed p. 7). Its access-management discussion says more than 1,000 employees had access to the internal tools and that Twitter reduced that access after the attack, at an operational cost (printed p. 16). Those observations support examining both authentication strength and the reach of employee privileges; they do not supply a complete permission model for every internal action.
 
-The vulnerability wasn't technical in the way most engineers think about vulnerabilities. Twitter had authentication; employees logged in with credentials and a second factor. The problem was authorization: too many employees held access to an admin tool that could control any account, the tool offered no graduated permissions for sensitive actions, and there was no separate approval flow for high-risk operations like resetting a verified user's email. Least privilege wasn't enforced. Access wasn't audited in real time. One compromised support engineer became, effectively, root for the entire platform.
+For your own IAM design, ask which identities need sensitive operations, how that access is reviewed, and what happens if one identity is compromised. The report discusses stronger authentication and second-employee approval for high-risk functions as protective measures. Treat those as design options to evaluate against the workflow, rather than assuming an internal tool is safe because its users have already logged in.
 
-This module teaches identity and access management — how to authenticate who someone is, authorize what they can do, scope every permission to the smallest useful surface, and ensure the principle of least privilege limits the damage when (not if) a credential is compromised. By the end you will be able to read an existing IAM design and tell whether it prevents a Twitter-style failure or invites one.
+This module teaches identity and access management — how to authenticate who someone is, authorize what they can do, scope every permission to the smallest useful surface, and ensure the principle of least privilege limits the damage when (not if) a credential is compromised. By the end you will be able to read an existing IAM design and explain how it reduces the risk and impact of compromised employee access.
 
 ---
 
@@ -138,7 +137,7 @@ Choosing a method is a trade-off between security, usability, and deployability.
 
 ### 2.1 What is Authorization?
 
-Authorization answers a different question: **"What can you do?"** Once authentication has confirmed an identity, authorization runs on every request and decides whether that identity may perform the requested action on the requested resource. Authentication is rare and expensive (it might involve a network call to an IdP); authorization is frequent and cheap (it should be a fast in-memory check against a precomputed policy). Confusing the two leads to systems that authenticate carefully and then authorize carelessly — which is exactly the failure mode at Twitter in 2020.
+Authorization answers a different question: **"What can you do?"** Once authentication has confirmed an identity, authorization runs on every request and decides whether that identity may perform the requested action on the requested resource. Authentication is rare and expensive (it might involve a network call to an IdP); authorization is frequent and cheap (it should be a fast in-memory check against a precomputed policy). Strong authentication does not replace scoped authorization. The Twitter investigation identified weaknesses in both access management and authentication, including employees being persuaded to approve MFA requests (printed p. 16).
 
 Every authorization decision takes four inputs and produces one output. The inputs are the authenticated identity (who), the action (what), the resource (which), and the context (additional factors like time, IP address, or device posture). The output is allow or deny. Designing an authorization system means deciding, for every (who, what, which) triple your system supports, what the answer should be — and how that answer is encoded so that it can be reviewed, audited, and changed without bringing down the system.
 
@@ -323,17 +322,22 @@ A workload that does many things should not be one identity with many permission
 | Forgotten accounts | Dormant attack vector | Regular access reviews |
 | Wildcard permissions | Hidden capabilities, surprise on audit | Explicit verb and resource lists |
 
-> **War Story: The $4.2 Million CI/CD Catastrophe**
->
-> **March 2021.** A fast-growing e-commerce company gave their CI/CD pipeline broad Kubernetes admin access. "It needs to deploy, and sometimes fix things," the DevOps lead explained to anyone who asked, and the permissions accumulated over two years of "just add this one thing." Nobody had ever subtracted from the pipeline's role.
->
-> A junior engineer submitted a pull request to update deployment scripts. A typo changed `kubectl apply -f deployment.yaml` to `kubectl delete -f deployment.yaml`. Code review missed it because the diff looked tiny and the PR was marked low-risk. CI/CD merged the change and ran the script against production.
->
-> **In under a minute, the pipeline deleted twenty-three production services, three databases, and two years of customer order history.**
->
-> The team had backups, but restoration took fourteen hours because the backup process itself depended on services the pipeline had deleted. The outage occurred on the second-busiest sales day of the quarter. **Total impact: \$4.2 million in lost sales plus \$800,000 in emergency recovery costs.**
->
-> Post-incident analysis revealed the pipeline had permissions to delete any resource in any namespace — permissions it had never legitimately needed because production deletes were always done manually by the SRE team. After the incident, they implemented least privilege: CI/CD can create and update deployments in specific namespaces, it cannot delete, it cannot access databases, and it cannot modify networking or RBAC. The recovery took fourteen hours, but the redesign that prevented every future incident of this class took six. They wished, painfully and publicly, that they had done it first.
+**Synthetic decision exercise: constrain a release identity.** This is a supplied permission model, not an incident report. A release job must read and patch the existing Deployment `api` in namespace `shop`. It needs no other API operations. Compare these proposed grants for its ServiceAccount:
+
+| Candidate | Grant |
+|-----------|-------|
+| A | A ClusterRoleBinding to `cluster-admin` |
+| B | A RoleBinding in `shop` to a Role allowing `get` and `patch` on `apps`/`deployments`, restricted by `resourceNames: ["api"]` |
+| C | A RoleBinding in `shop` to a Role allowing every verb on every resource in every API group |
+
+Choose the smallest grant that meets the stated task. Name two requests it should allow and three it should not authorize. Then consider whether adding that grant would remove access from an existing `cluster-admin` binding. State your reasoning before opening the feedback.
+
+<details>
+<summary>Check the grant and its limits</summary>
+
+B meets the supplied requirement: reading and patching `shop/api` are authorized by B. Direct API requests to delete that Deployment, read Secrets, or access a Deployment in another namespace are not authorized by B. This conclusion assumes no other grants: [Kubernetes RBAC permissions are additive](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#role-and-clusterrole), so adding B does not revoke an existing broad binding. Review and remove the unwanted grant separately. The `resourceNames` restriction and namespace scope matter as much as the two verbs; a different release workflow may need a different reviewed permission set. This card checks API authorization reasoning, not whether a patch passes admission or succeeds at runtime. As an engineering inference, patching the Deployment's Pod template can cause its controllers to create Pods that mount Secrets or run as ServiceAccounts in `shop`; review those indirect powers and admission controls too ([RBAC good practices: workload creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation)).
+
+</details>
 
 ---
 
@@ -705,11 +709,11 @@ The equivalent on [Google Cloud (Workload Identity Federation)](https://cloud.go
    With direct ACLs, 500 users across 50 applications can require up to 25,000 individual permission entries, and every role change forces IT to manually update entries on every system the user touches. RBAC introduces an abstraction layer where permissions are attached to roles, not users, and users are attached to roles. With ten standard roles you maintain about 500 user-to-role mappings plus roughly 500 role-to-permission mappings — roughly 1,000 total entries instead of 25,000. When a user changes jobs, IT updates a single role assignment and the change propagates across all 50 applications instantly, eliminating both the manual workload and the permission drift that comes from forgetting to update one of the systems.
    </details>
 
-6. **Scenario: A support engineer's laptop is compromised via malware, giving attackers access to their active session in an internal admin tool. Based on the 2020 Twitter breach case study, what specific IAM authorization controls should have been in place to limit the blast radius of this compromised identity?**
+6. **Using the NYDFS investigation's findings on the 2020 Twitter attack, propose controls that reduce the risk of stolen employee access reaching or misusing sensitive internal tools. Which findings support your choices, and what would you still need to assess before claiming the tool is protected?**
    <details>
    <summary>Answer</summary>
 
-   Even with a compromised active session, the blast radius could have been contained by stacking three controls on top of authentication. First, scoped permissions: the support tool should partition actions into tiers, where standard support staff can access ordinary user accounts but high-value targets (verified accounts, large followings, admin users) require a separate, much smaller permission set. Second, just-in-time elevation with multi-person approval for any sensitive action such as resetting a verified user's email or password — a two-person rule turns a single compromise into an attacker who must compromise two identities simultaneously. Third, step-up authentication that re-prompts for a hardware key on critical operations, which a session-hijacking malware cannot satisfy because the hardware key is physically attached to the legitimate user.
+   The report describes phishing and employees approving application-based MFA, then recommends stronger authentication and access controls (printed pp. 5 and 16). Propose phishing-resistant authentication, narrower job-based access with periodic reviews, and second-employee approval for high-risk operations. The report identifies those controls as protective directions, rather than documenting a complete permission scheme for each Twitter action. Evaluate where authentication is enforced, which operations each role can perform, how approvals are bound to the intended action, and how sessions are protected and monitored. A hardware key can resist the described phishing route; it does not establish that malware cannot misuse an already authorized session. Treat the proposals as risk reduction and test their enforcement before claiming containment.
    </details>
 
 7. **Scenario: While analyzing network traffic, you discover an attacker has intercepted a JWT token with `exp: 1700003600` (Unix timestamp). It is currently `1700000000`. How long does the attacker have to use this token, what actions can they perform, and why can't the server immediately detect the theft?**
@@ -822,8 +826,10 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 
 ## Sources
 
+- [New York State Department of Financial Services: Twitter Investigation Report (October 2020)](https://www.dfs.ny.gov/reports-and-publications/other-reports/Twitter_Report) — Employee credential attack, account impact and access-management findings; see printed pp. 5, 7 and 16.
 - [NIST SP 800-63B: Authentication and Lifecycle Management](https://pages.nist.gov/800-63-3/sp800-63b.html) — Authoritative guidance for MFA, authenticators, and password policy.
 - [Kubernetes RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — Primary upstream reference for Roles, RoleBindings, subresources, and least-privilege Kubernetes access.
+- [Kubernetes RBAC Good Practices: Workload Creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation) — Workload permissions can expose mounted resources and ServiceAccount privileges indirectly.
 - [Managing Kubernetes ServiceAccounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/) — Covers ServiceAccount identity, token projection, TokenRequest, and legacy token behavior.
 - [RFC 6749: OAuth 2.0 Authorization Framework](https://www.rfc-editor.org/rfc/rfc6749) — Defines OAuth 2.0 roles and authorization-code flow used in the module.
 - [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
