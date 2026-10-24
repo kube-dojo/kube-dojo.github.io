@@ -351,33 +351,37 @@ B meets the supplied requirement: reading and patching `shop/api` are authorized
 
 ### 4.1 How Tokens Work
 
-A web request happens far from the login event that authenticated the user, often on a different server, sometimes minutes or hours later. The system needs a way to remember "this request is from Alice, who logged in earlier." Two patterns dominate: server-side sessions and signed tokens. They differ in where the trust state lives — on the server or in the request itself — and that difference cascades into different operational properties at scale.
+A request may arrive long after login and reach a different server. Compare two simplified designs for carrying authentication state: a reference to a server-held session, and a self-contained signed JWT. A session identifier is also a token, and JWTs can coexist with session tracking; these are not exclusive categories. The diagram shows successful request paths, not a complete login protocol. Both designs still need authorization.
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Server
-    participant DB as Database
+    participant Store as Session Store
 
-    Note over User,DB: TRADITIONAL (Session-based)
+    Note over User,Store: REFERENCE SESSION EXAMPLE
     User->>Server: 1. Logs in
-    Server->>DB: 2. Creates session & stores in DB
+    Server->>Store: 2. Creates session state
     Server-->>User: 3. Sends session ID (cookie)
     User->>Server: 4. Sends session ID with each request
-    Server->>DB: 5. Looks up session in DB
-    Note over Server,DB: Stateful. Server must store sessions.
+    Server->>Store: 5. Looks up session
+    Store-->>Server: 6. Returns session state
+    Server->>Server: 7. Checks session policy and authorization
 
-    Note over User,DB: TOKEN-BASED (Stateless)
+    Note over User,Server: SELF-CONTAINED JWT EXAMPLE
     User->>Server: 1. Logs in
     Server-->>User: 2. Creates & sends signed token (JWT)
     User->>Server: 3. Sends token with each request
-    Server->>Server: 4. Validates signature & reads claims
-    Note over Server: Stateless. Scales easily.
+    Server->>Server: 4. Checks trusted issuer key and allowed algorithm<br/>Verifies signature and required claims
+    Server->>Server: 5. Checks resource authorization
+    Note over Server: Revocation may require additional state or communication
 ```
 
-Sessions are simple to reason about and easy to revoke — delete the session row and the user is logged out everywhere. They scale poorly because every request requires a database lookup and because the database becomes a coordination point across all your application servers. Signed tokens flip the trade-off: the token carries its own authenticity proof (a signature), so any server can validate it without a database lookup, but revoking a token before it expires is hard precisely because there is no central record to delete. Most production systems pick tokens for their scaling properties and accept the revocation pain — short token lifetimes plus a small revocation list cover most cases.
+In the reference-session design, the identifier points to [server-held session state](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#session-id-content-or-value), without requiring a particular database technology. [OWASP's expiration guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#session-expiration) requires server-side invalidation on logout or expiration. Verify that all consumers reject the invalidated identifier. Removing one session record does not by itself establish that other device sessions or independently issued access tokens are invalid.
 
-> **Stop and think**: If a stateless JWT is stolen, can the server invalidate it by simply deleting a session in the database? Why or why not? Sketch your reasoning before reading the next section, which will give you the precise answer.
+A self-contained JWT can support local cryptographic and required-claim checks when the verifier has the trusted key and validation policy. The resource server still applies its own authorization policy. If that policy must reflect changes since issuance, define how verifiers learn them. For OAuth access tokens, [RFC 7009, §3](https://www.rfc-editor.org/rfc/rfc7009#section-3), distinguishes self-contained tokens from reference tokens and explains that revocation choices trade state and communication against required security properties. Enforced expiry limits that token's remaining acceptance window; earlier rejection may need additional state or communication. Its [§2.1](https://www.rfc-editor.org/rfc/rfc7009#section-2.1) also notes propagation delays and policy-dependent effects on related tokens. Choose and test the required logout scope and revocation behavior; a format alone proves neither scalability nor immediate invalidation.
+
+> **Hypothetical scenario — stop and think:** A portal keeps a server-side session and obtains a separate self-contained JWT for an API. The API accepts that JWT using local key/claim checks and its authorization policy, with no session or revocation lookup. If the JWT is stolen, which check would notice a deleted portal-session record? Explain what must change for earlier rejection, and how you would verify it at every accepting server.
 
 ### 4.2 JSON Web Tokens (JWT)
 
@@ -855,6 +859,8 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [RFC 7515: JSON Web Signature, §3.1](https://www.rfc-editor.org/rfc/rfc7515#section-3.1) — Compact serialization and the bytes protected by a signature or MAC.
 - [RFC 7518: JSON Web Algorithms, §§3.2–3.4](https://www.rfc-editor.org/rfc/rfc7518#section-3.2) — HMAC comparison and RSA/ECDSA public-key verification.
 - [RFC 7519: JSON Web Token](https://www.rfc-editor.org/rfc/rfc7519) — JWT representations, the public example and expiration semantics.
+- [RFC 7009: OAuth 2.0 Token Revocation, §§2.1 and 3](https://www.rfc-editor.org/rfc/rfc7009#section-3) — Reference/self-contained tokens, revocation design, propagation and related-token policy.
+- [OWASP: Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#session-expiration) — Server-held session state, expiration and server-side logout invalidation; see Session ID Content (or Value) and Session Expiration.
 - [RFC 6750: Bearer Token Usage, §§1.2–1.3](https://www.rfc-editor.org/rfc/rfc6750#section-1.2) — Possession-based bearer-token semantics and protected-resource access.
 - [OpenID Connect Core 1.0, §§2 and 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) — ID-token purpose, audience and client validation.
 - [RFC 6238: Time-Based One-Time Passwords, §§3–6](https://www.rfc-editor.org/rfc/rfc6238.html#section-3) — Configured time step, default value, verifier delay/drift windows and replay rejection.
