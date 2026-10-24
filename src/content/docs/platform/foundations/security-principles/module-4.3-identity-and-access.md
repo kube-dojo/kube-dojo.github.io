@@ -289,7 +289,7 @@ Least privilege matters across three failure scenarios that play out in producti
 
 | Scenario | Without Least Privilege | With Least Privilege |
 |----------|------------------------|----------------------|
-| Compromised credential | Attacker has broad access, can pivot freely | Attacker is contained to one role's surface |
+| Compromised credential | Broad grants can enable wider access | Narrow direct grants; review group grants and indirect powers |
 | Honest mistake | Mistake can affect any resource | Mistake is bounded by granted scope |
 | Insider threat | Insider can quietly access anything | Insider must request more access, creating evidence |
 
@@ -297,7 +297,7 @@ Least privilege matters across three failure scenarios that play out in producti
 
 Least privilege is not a setting you toggle; it is a discipline that must be applied at four distinct layers, and skipping any layer leaves a hole that the others cannot patch.
 
-#### Start With Zero (Default Deny)
+#### Default Deny for Task Access
 
 Deny task-specific access unless a reviewed policy grants it, and document the baseline permissions a new identity receives through platform defaults or shared groups. With [Kubernetes RBAC](https://kubernetes.io/docs/reference/access-authn-authz/authorization/), evaluate all applicable grants rather than treating the absence of a binding named for one identity as proof of zero access. Avoid using an admin role as a placeholder for permissions you have not identified. Review and test the required operations before granting them.
 
@@ -506,7 +506,7 @@ kubectl get pod payments-api -n production -o jsonpath='{.spec.serviceAccountNam
 # default
 ```
 
-The Pod selects the [namespace's `default` ServiceAccount](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/). That name does not establish its permissions: bindings may grant access to this ServiceAccount or its groups, including built-in discovery permissions. Inspect applicable RoleBindings and ClusterRoleBindings and confirm the actual request identity. The observed denial concerns `get` on this ConfigMap; it does not prove the account has no other grants.
+The Pod selects the [namespace's `default` ServiceAccount](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/). That name does not establish its permissions: bindings may grant access to this ServiceAccount or its groups, including built-in discovery permissions. Inspect applicable RoleBindings and ClusterRoleBindings and confirm the actual request identity. The reported error for this ConfigMap does not establish the account's other grants.
 
 #### Step 3 — What Are the Two Suggestions Doing Wrong?
 
@@ -702,7 +702,7 @@ The trust idea transfers to other providers, but the integration details differ.
    <details>
    <summary>Answer</summary>
 
-   Inventory the pipeline's actual requests and map each to its verb, API group, resource and namespace before writing YAML. Prepare and test narrower grants using a separate test identity or a coordinated cutover. Remove unwanted broad bindings before evaluating the final identity's restricted access; adding narrower Roles does not subtract existing permissions. Propose a Role and RoleBinding for each namespace with the permissions that the observed workflow requires, then test both required operations and prohibited actions. Creating a Deployment in `frontend` and creating a Role in `kube-system` are useful allowed/denied samples, not proof of a minimal configuration. Review every effective binding and consider indirect powers such as choosing Pod templates or ServiceAccounts through workload permissions. Explain what each check establishes and what still needs evidence.
+   Inventory the pipeline's actual requests and map each to its verb, API group, resource and namespace before writing YAML. Propose a Role and RoleBinding for each namespace with the permissions that the observed workflow requires. Prepare and test these narrower grants using a separate test identity or a coordinated cutover. Remove unwanted broad bindings before evaluating the final identity's restricted access; adding narrower Roles does not subtract existing permissions. Then test required operations and prohibited actions on that final identity. Creating a Deployment in `frontend` and creating a Role in `kube-system` are useful allowed/denied samples, not proof of a minimal configuration. Review every effective binding and consider indirect powers such as choosing Pod templates or ServiceAccounts through workload permissions. Explain what each check establishes and what still needs evidence.
    </details>
 
 4. **Synthetic decision: An order-processing Pod needs read access only to an archive bucket's `orders/` prefix. Option A stores a static cloud credential in a Kubernetes Secret with a planned 90-day rotation. Option B exchanges a projected ServiceAccount token for temporary cloud credentials through a supported federation integration. Assume both options grant exactly the required bucket permissions. Which would you choose, what trust configuration must you check, and what changes if a credential leaks or the Pod remains compromised?**
