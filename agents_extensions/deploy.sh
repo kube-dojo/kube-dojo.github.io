@@ -21,6 +21,7 @@ SOURCE_ROOT="$SCRIPT_DIR"
 
 QUIET=false
 CHECK=false
+FORCE_CONFIG=false
 TARGET="all"
 DRIFT_TOTAL=0
 
@@ -34,6 +35,10 @@ while [[ $# -gt 0 ]]; do
             CHECK=true
             shift
             ;;
+        --force-config)
+            FORCE_CONFIG=true
+            shift
+            ;;
         --target)
             TARGET="${2:-}"
             if [[ -z "$TARGET" ]]; then
@@ -44,7 +49,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: $0 [--quiet] [--check] [--target claude|codex|cursor|gemini|all]" >&2
+            echo "Usage: $0 [--quiet] [--check] [--force-config] [--target claude|codex|cursor|gemini|all]" >&2
             exit 1
             ;;
     esac
@@ -67,6 +72,35 @@ agent_hidden_dir() {
             return 1
             ;;
     esac
+}
+
+# Project configs can contain operator settings: never overwrite a differing
+# deployed file implicitly, even though skills/hooks are fully source-managed.
+deploy_config() {
+    local source_file="$1" target_file="$2"
+    [[ -f "$source_file" ]] || { echo 0; return 0; }
+    if [[ -f "$target_file" ]] && cmp -s "$source_file" "$target_file"; then
+        echo 0
+        return 0
+    fi
+    if [[ "$CHECK" == "true" ]]; then
+        log "   ✗ DRIFT config.toml"
+    else
+        if [[ -e "$target_file" ]]; then
+            if [[ "$FORCE_CONFIG" != "true" ]]; then
+                echo "Refusing to overwrite $target_file; inspect the diff and use --force-config to back it up and replace it." >&2
+                return 1
+            fi
+            local backup
+            backup=$(mktemp "${target_file}.bak.XXXXXX")
+            cp -p "$target_file" "$backup"
+            log "   Backup: $backup"
+        fi
+        mkdir -p "$(dirname "$target_file")"
+        cp "$source_file" "$target_file"
+        log "   📄 config.toml"
+    fi
+    echo 1
 }
 
 # Echo number of files copied (stdout); logs go through log().
@@ -231,6 +265,10 @@ deploy_agent() {
     local agents_changed=0
     local hooks_changed=0
     local statusline_changed=0
+    local config_changed=0
+
+    n=$(deploy_config "$agent_dir/config.toml" "$target_dir/config.toml")
+    config_changed=$((config_changed + n))
 
     n=$(deploy_flat "$shared_dir/commands" "$target_dir/commands" "commands" "*.md" "no")
     commands_changed=$((commands_changed + n))
@@ -267,7 +305,7 @@ deploy_agent() {
         skills_changed=$((skills_changed + n))
     fi
 
-    local total_changed=$((commands_changed + skills_changed + agents_changed + hooks_changed + statusline_changed))
+    local total_changed=$((commands_changed + skills_changed + agents_changed + hooks_changed + statusline_changed + config_changed))
     DRIFT_TOTAL=$((DRIFT_TOTAL + total_changed))
     if [[ "$CHECK" == "true" ]]; then
         if [[ $total_changed -gt 0 ]]; then

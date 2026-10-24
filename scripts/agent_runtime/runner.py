@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import logging
 import subprocess
 import time
 from datetime import UTC, datetime
@@ -54,6 +55,9 @@ from .watchdog import (
     stop_watchdog,
     tail_liveness_file_for_debug,
 )
+
+_LOGGER = logging.getLogger(__name__)
+
 try:
     from scripts.lib.git_verify import verify_current_branch_pushed
 except ImportError:  # pragma: no cover - depends on invocation style
@@ -200,9 +204,8 @@ def _enforce_resume_policy(
 ) -> None:
     """Enforce resume policy from the registry.
 
-    Design doc § 6.3: Codex is always fresh-session. Claude/Gemini bridge
-    paths may keep resume (cache economics). delegate/dispatch never use
-    resume (worktree is the isolation boundary).
+    Bridge-only agents, including Codex, may resume scoped conversations.
+    Delegate/dispatch/consult never resume; each task gets fresh context.
 
     If a caller tries to pass ``session_id`` when policy forbids it, we
     raise ValueError. This is a hard invariant — we'd rather crash loudly
@@ -564,7 +567,7 @@ def invoke(
                     # An adapter bug in check_early_reap must never
                     # crash the whole invocation. Fall through to
                     # normal poll/kill logic.
-                    pass
+                    _LOGGER.exception("Adapter early-reap probe failed")
 
             kill_reason = should_kill(watchdog_state, stall_timeout, hard_timeout)
             if kill_reason is not None:

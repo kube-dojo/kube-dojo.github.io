@@ -1,13 +1,18 @@
 """Codex interaction: ask_codex and process_for_codex.
 
-Phase 4 of #1184 migrated the bridge subprocess path onto
-scripts.agent_runtime. Codex bridge calls now always start fresh,
-consistent with the runtime's resume_policy="never" for Codex.
+Legacy task messages may resume a session only within the same cwd and mode.
+Discussion sessions have their own owner; delegate/dispatch remain fresh.
 """
 
+import fcntl
+import hashlib
 import json
+import logging
 import os
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 from agent_runtime import runner as agent_runner
 from agent_runtime.errors import (
@@ -17,10 +22,13 @@ from agent_runtime.errors import (
     RateLimitedError,
 )
 
-from ._config import REPO_ROOT
-from ._db import get_db, set_session
+from ._config import PID_DIR, REPO_ROOT
+from ._db import get_db, get_session, set_session
 from ._messaging import acknowledge, send_message
 from ._prompts import build_codex_prompt
+
+_LOGGER = logging.getLogger(__name__)
+
 
 def _codex_bridge_mode() -> str:
     """Resolve Codex sandbox mode for ai_agent_bridge calls.
@@ -65,19 +73,45 @@ def has_codex_headroom(model: str | None = None) -> tuple[bool, str]:
     return has_headroom("codex", effective_model)
 
 
-def process_for_codex(message_id: int, new_session: bool = False, no_timeout: bool = False):
-    """Read message addressed to Codex, invoke via agent_runtime, send response.
+@contextmanager
+def _codex_task_lock(task_key: str) -> Iterator[bool]:
+    """Serialize a task across processes without interpreting its key as a path."""
+    PID_DIR.mkdir(parents=True, exist_ok=True)
+    lock_name = hashlib.sha256(task_key.encode()).hexdigest()
+    # Retain the inode after unlocking: unlinking could let another process
+    # acquire a new file while a waiter still holds the original inode.
+    with (PID_DIR / f"codex-{lock_name}.lock").open("a") as lock_file:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
 
-    Phase 4: routes through scripts.agent_runtime.runner.invoke(). Resume
-    is dropped (Codex resume_policy="never" in the registry); new_session
-    parameter is accepted for backward compatibility but now always True
-    in effect.
-    """
+
+def process_for_codex(message_id: int, new_session: bool = False, no_timeout: bool = False):
+    """Process a task message with scoped bridge-only resume, unless forced new."""
     msg = _fetch_codex_message(message_id)
     if not msg:
         return
 
-    _ = new_session  # No-op: Codex always starts fresh (resume_policy="never")
+    task_key = (msg["task_id"] or "").strip()
+    with _codex_task_lock(task_key or f"message:{message_id}") as acquired:
+        if not acquired:
+            print(f"⏸️  Codex task for message {message_id} is already being processed.")
+            return
+        # Discussions own their session rows even if a legacy message borrows
+        # the task name. Never read or overwrite those sessions here.
+        session_key = task_key if task_key and not task_key.startswith("discuss:") else None
+        _process_codex_message(msg, message_id, session_key, new_session, no_timeout)
+
+
+def _process_codex_message(
+    msg: dict, message_id: int, task_key: str | None, new_session: bool, no_timeout: bool,
+) -> None:
     timeout_val = 1800 if no_timeout else 900  # runner has its own hard_timeout
     model = _extract_target_model(msg)
     has_room, reason = has_codex_headroom(model)
@@ -85,23 +119,49 @@ def process_for_codex(message_id: int, new_session: bool = False, no_timeout: bo
         _handle_codex_rate_limited(msg, message_id, reason)
         return
 
+    cwd = REPO_ROOT.resolve()
+    mode = _codex_bridge_runtime_mode()
+    session_id = None
+    stored = get_session(task_key) if task_key else {}
+    stored_cwd = stored.get("codex_cwd")
+    if (
+        not new_session
+        and stored.get("codex_session_id")
+        and stored_cwd
+        and stored.get("codex_sandbox_mode") == mode
+        and Path(stored_cwd).is_dir()
+        and Path(stored_cwd).resolve() == cwd
+    ):
+        session_id = stored["codex_session_id"]
+
+    def clear_session() -> None:
+        if task_key:
+            # set_session ignores None, so explicit empty strings invalidate
+            # the ID and its scope atomically, including on a failed fresh run.
+            set_session(task_key, codex_session_id="", codex_cwd="", codex_sandbox_mode="")
+            if session_id:
+                print("Saved Codex session cleared; the next call will start fresh.")
+
+    if session_id is None:
+        clear_session()
+
     prompt = build_codex_prompt(msg)
 
     print(f"📨 Message #{msg['id']}")
     print(f"   From: {msg['from']} → To: {msg['to']}")
     print(f"   Type: {msg['type']}")
     print(f"   Task: {msg['task_id'] or 'N/A'}")
-    print("   Session: NEW (Codex runtime always fresh)")
+    print(f"   Session: {session_id[:8] + '...' if session_id else 'NEW'}")
 
     try:
         result = agent_runner.invoke(
             "codex",
             prompt,
-            mode=_codex_bridge_runtime_mode(),
-            cwd=REPO_ROOT,
+            mode=mode,
+            cwd=cwd,
             model=model,
             task_id=msg["task_id"],
-            session_id=None,  # Codex resume_policy="never"
+            session_id=session_id,
             tool_config=None,
             entrypoint="bridge",
             hard_timeout=timeout_val,
@@ -117,16 +177,27 @@ def process_for_codex(message_id: int, new_session: bool = False, no_timeout: bo
         _handle_codex_rate_limited(msg, message_id, f"Rate limited: {exc}")
         return
     except AgentStalledError as exc:
+        clear_session()
         _handle_codex_error(msg, message_id, f"Codex stalled: {exc}")
         return
     except AgentTimeoutError as exc:
+        clear_session()
         _handle_codex_error(msg, message_id, f"Codex hard timeout: {exc}")
         return
     except AgentUnavailableError as exc:
+        clear_session()
         _handle_codex_error(msg, message_id, f"Codex unavailable: {exc}")
         return
+    except Exception:
+        clear_session()
+        _LOGGER.exception("Codex bridge runtime invocation failed")
+        raise
 
     if not result.ok:
+        if getattr(result, "rate_limited", False):
+            _handle_codex_rate_limited(msg, message_id, result.stderr_excerpt or "Rate limited")
+            return
+        clear_session()
         _handle_codex_error(
             msg,
             message_id,
@@ -134,14 +205,20 @@ def process_for_codex(message_id: int, new_session: bool = False, no_timeout: bo
         )
         return
 
-    # Persist session ID for observability (though we never reuse it).
-    if result.session_id and msg["task_id"]:
-        set_session(msg["task_id"], "codex", result.session_id)
-
     response = result.response
     if not response:
+        clear_session()
         _handle_codex_error(msg, message_id, "Codex returned no final message")
         return
+
+    # The adapter explicitly passes -m on both paths; model selection remains
+    # per-call. Session continuity is scoped by task, cwd, and sandbox mode.
+    returned_session_id = result.session_id or session_id
+    if task_key and returned_session_id:
+        set_session(
+            task_key, "codex", returned_session_id,
+            codex_cwd=str(cwd), codex_sandbox_mode=mode,
+        )
 
     print(f"\n✅ Codex finished ({len(response)} chars)")
     reply_id = send_message(
@@ -261,6 +338,7 @@ def process_all_codex(new_session: bool = False):
             success += 1
             print("    ✅ Done\n")
         except Exception as e:
+            _LOGGER.exception("Codex bridge batch message failed")
             failed += 1
             print(f"    ❌ Failed: {e}\n")
 

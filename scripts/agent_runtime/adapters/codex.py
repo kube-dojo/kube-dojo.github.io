@@ -27,16 +27,19 @@ Issue: #1184
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 import shutil
-import os
 import tempfile
 from pathlib import Path
 
 from ..result import ParseResult
 from .base import InvocationPlan
 
-# Matches the session id line in Codex stdout. Case-insensitive.
+_LOGGER = logging.getLogger(__name__)
+
+# Matches the session id line in Codex startup metadata. Case-insensitive.
 _SESSION_RE = re.compile(r"session id:\s*([0-9a-f-]{8,})", re.IGNORECASE)
 _UUID_RE = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 
@@ -336,11 +339,19 @@ class CodexAdapter:
             call_failed = returncode != 0 or not durable_output
             rate_limited = pattern_hit and call_failed
 
-        # Session id comes from stdout in Codex.
+        # With -o, Codex prints startup metadata on stderr, including on resume
+        # where no new rollout exists. Limit this lookup to the banner, never
+        # the echoed user prompt or model output, which may quote other IDs.
         session_id: str | None = None
         session_match = _SESSION_RE.search(stdout or "")
         if session_match:
             session_id = session_match.group(1)
+        if session_id is None:
+            banner = (stderr or "").split("\n--------\n", 2)
+            if len(banner) == 3 and banner[0].startswith("OpenAI Codex v"):
+                session_match = _SESSION_RE.search(banner[1])
+                if session_match and _UUID_RE.fullmatch(session_match.group(1)):
+                    session_id = session_match.group(1)
         if session_id is None and plan is not None:
             session_id = self._read_latest_rollout_session_id(
                 plan,
@@ -580,6 +591,7 @@ class CodexAdapter:
 
             return last_message
         except Exception:
+            _LOGGER.debug("Could not read Codex rollout response", exc_info=True)
             # Last-resort fallback: never let a rollout-parse error
             # bubble out of parse_response. Swallow everything and
             # fall back to the primary code path.
@@ -620,6 +632,7 @@ class CodexAdapter:
             self._bound_rollout = rollout_to_scan
             return rollout_to_scan
         except Exception:
+            _LOGGER.debug("Could not locate Codex invocation rollout", exc_info=True)
             return None
 
     def _read_latest_rollout_session_id(
@@ -662,6 +675,7 @@ class CodexAdapter:
             if filename_match:
                 return filename_match.group(0)
         except Exception:
+            _LOGGER.debug("Could not read Codex rollout session ID", exc_info=True)
             return None
         return None
 

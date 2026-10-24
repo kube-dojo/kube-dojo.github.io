@@ -1,0 +1,9 @@
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+ENABLE_PROMPT_CACHING_1H = "1"
+
+[features.multi_agent_v2]
+enabled = true
+tool_namespace = "agents"
