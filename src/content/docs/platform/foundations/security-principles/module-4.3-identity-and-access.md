@@ -307,7 +307,7 @@ Narrow permissions along three axes simultaneously: action, resource, and contex
 
 #### Time-Bound Elevated Access
 
-Standing privileges are a permanent attack surface. Every permission an engineer "might need someday" is a permission an attacker definitely has today if they steal that engineer's session. Modern teams replace standing privileges with just-in-time access: the engineer requests elevated permissions for a specific task, the system grants them for a short window (often four hours, never more than a day), and they expire automatically. The friction of requesting access feels worse than standing privileges for about a week, and after that the team forgets it was ever a problem.
+Choose an elevated-access window from the task and risk requirements, including who approves it, how renewal works and how access ends. A just-in-time workflow reduces standing permissions only when grant issuance and expiry are enforced at the relevant control points. An authorization grant's lifetime is not necessarily the credential or session lifetime; verify both, including what happens to already issued credentials. Limit permitted operations as well as duration, and plan compromise response separately: expiry does not undo the effects of actions already accepted.
 
 #### Separate Concerns
 
@@ -468,11 +468,11 @@ Human authentication and service authentication look superficially similar — b
 | Cardinality | One person, multiple sessions | One service, many replicas |
 | Verification | Can verify manually if confused | Must be deterministic |
 | Credential type | Password + MFA | API key, certificate, federated token |
-| Lifetime | Hours to weeks | Minutes to hours, ideally |
+| Lifetime to verify | Authenticator and session policies | Credential, token and role-session policies |
 
 #### Service Authentication Methods
 
-**API Keys** are long-lived secret strings. They are simple to issue and simple for services to use, but they are risky because a leaked key can be used by anyone who finds it, rotation across many running instances is painful, and there is no built-in expiration. API keys are appropriate for prototypes and for systems where the surrounding ecosystem cannot do better; they are not appropriate for new production designs.
+**API Keys** have provider-defined permissions and lifecycle controls. Inspect those controls instead of assuming a key cannot expire or is unsuitable for production. [Stripe's key documentation](https://docs.stripe.com/keys), for example, distinguishes publishable keys intended for client code from server-side keys. Restricted keys allow controlled permissions, and secret or restricted keys can be expired or rotated. A payment integration may require the provider's API credential, so choose the permitted scope, protection, rotation and incident-response process for that integration. A publishable key is not a substitute for a server credential that authorizes secret-key operations.
 
 **Client Certificates (mTLS)** give each service a cryptographic identity tied to a private key that should never leave the service. They are strong because the key is hard to exfiltrate from a properly configured service, and they support fine-grained revocation through a CRL or OCSP. The cost is operational: you need a working PKI with issuance, rotation, revocation, and trust-store distribution — four sub-systems that fail in interesting ways at scale.
 
@@ -854,6 +854,7 @@ Before moving on, verify you can answer these from memory rather than by scrolli
 - [OpenID Connect Core 1.0, §§2 and 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDToken) — ID-token purpose, audience and client validation.
 - [RFC 6238: Time-Based One-Time Passwords, §§3–6](https://www.rfc-editor.org/rfc/rfc6238.html#section-3) — Configured time step, default value, verifier delay/drift windows and replay rejection.
 - [AWS STS AssumeRoleWithWebIdentity: Session Duration](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html) — Default and configurable lifetime of the returned role-session credentials.
+- [Stripe: API Key Types and Lifecycle](https://docs.stripe.com/keys) — Publishable versus server-side keys, restricted permissions, expiry and rotation.
 - [RFC 7636: Proof Key for Code Exchange](https://www.rfc-editor.org/rfc/rfc7636) — Authorization-code interception threat, verifier/challenge binding and token-endpoint verification.
 - [RFC 9700: Best Current Practice for OAuth 2.0 Security, §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1) — PKCE requirements for public clients and recommendations for confidential clients.
 - [Amazon EKS Identity and Access Management Best Practices](https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html) — Explains IRSA, projected service account tokens, trust-policy scoping, and injected AWS identity environment variables.
