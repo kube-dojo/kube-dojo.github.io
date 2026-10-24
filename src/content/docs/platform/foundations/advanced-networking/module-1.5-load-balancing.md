@@ -416,12 +416,12 @@ backend servers
 
 **The Health Check Gotcha**
 When you enable Proxy Protocol v2 on an NLB target group, the header is included in health check connections as well as client connections.
-The health check header does not carry client connection information, so parsing the header and obtaining a client's identity are separate concerns.
+The health check header does not carry client connection information; the receiver must accept it without requiring an original client's address.
 [AWS documents this behavior under "Health check connections"](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-target-group-attributes.html#proxy-protocol).
 
-The failure occurs when the health check listener cannot parse that binary header before handling the probe payload.
-For an HTTP health check, the target can reject the connection with `HTTP 400: Bad request` before the readiness handler runs.
-Configure the receiver to parse Proxy Protocol v2 on the health check path, and check that the probe protocol matches the listener's configuration.
+An HTTP health check can fail when its listener cannot parse the binary header before handling the HTTP request.
+The target may return `HTTP 400: Bad request` before the readiness handler runs.
+Configure Proxy Protocol v2 parsing on whichever listener or port receives the health checks, and check that the probe protocol matches that listener's configuration.
 A separate health check port does not, by itself, remove the NLB's Proxy Protocol header; verify that endpoint's parsing behavior too.
 
 ---
