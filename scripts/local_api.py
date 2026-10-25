@@ -106,6 +106,37 @@ _SEARCH_ROUTES = _load_search_routes_module()
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+_CONTENT_COVERAGE_CACHE: dict[str, tuple[tuple, dict]] = {}
+_CONTENT_COVERAGE_LOCK = threading.Lock()
+
+
+def _content_coverage_report(repo_root: Path, *, compact: bool = False) -> dict:
+    """Isolate optional coverage dependencies and reuse unchanged evidence scans."""
+    try:
+        from quality.content_coverage import build_coverage, coverage_summary
+        dependencies = [repo_root / "docs/content-upgrade/page-reviews.json"]
+        dependencies.extend(sorted((repo_root / "docs/citation-seeds").glob("*.json")))
+        versions = []
+        for dependency in dependencies:
+            stat = dependency.stat() if dependency.exists() else None
+            versions.append((str(dependency), stat.st_mtime_ns if stat else None, stat.st_size if stat else None))
+        version = (_v_uk_board(repo_root), tuple(versions))
+        key = str(repo_root.resolve())
+        with _CONTENT_COVERAGE_LOCK:
+            cached = _CONTENT_COVERAGE_CACHE.get(key)
+            if cached is None or cached[0] != version:
+                report = build_coverage(repo_root)
+                if len(_CONTENT_COVERAGE_CACHE) >= 8:
+                    _CONTENT_COVERAGE_CACHE.pop(next(iter(_CONTENT_COVERAGE_CACHE)))
+                _CONTENT_COVERAGE_CACHE[key] = (version, report)
+            else:
+                report = cached[1]
+        return {**coverage_summary(report), "errors": report["errors"], "receipt_errors": report["receipt_errors"]} if compact else report
+    except (OSError, UnicodeError, TypeError, ValueError, AttributeError, KeyError, ImportError, RuntimeError) as exc:
+        return {"status": "unavailable", "coverage_health": "unknown", "errors": [f"coverage unavailable: {type(exc).__name__}"], "endpoint": "/api/content/coverage"}
+
+
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8768
 DOCS_ROOT = REPO_ROOT / "src" / "content" / "docs"
@@ -4160,6 +4191,8 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         "duration_ms": round(1000.0 * (time.perf_counter() - started_at), 3),
         "errors": errors,
         "totals": grand,
+        "readiness_pct_metric": "legacy_frontmatter_flags",
+        "content_coverage": {"endpoint": "/api/content/coverage"},
         "tracks": out_tracks,
     }
 
@@ -5835,7 +5868,7 @@ def build_state_manifest() -> dict[str, Any]:
                     {
                         "name": "Track readiness",
                         "path": "/api/tracks/readiness",
-                        "purpose": "Per-track cleared, in-flight, dead-letter, and pending counts.",
+                        "purpose": "Legacy module flags and bound sources; page reviews use /api/content/coverage.",
                         "type": "api",
                     },
                 ],
@@ -8745,6 +8778,7 @@ def build_session_briefing(repo_root: Path) -> dict[str, Any]:
             "generator": "local_api.build_session_briefing",
             "version": 1,
         },
+        "content_coverage": _content_coverage_report(repo_root, compact=True),
         "workspace": {
             "primary_branch": worktree.get("branch") if worktree.get("ok") else None,
             "dirty": worktree.get("dirty") if worktree.get("ok") else None,
@@ -8982,9 +9016,10 @@ def build_api_schema() -> dict[str, Any]:
             },
             {"path": "/api/navigation/status", "desc": "Top-level route coverage and candidate-stale index pages"},
             {"path": "/api/delivery/status", "desc": "Build freshness and site-health status"},
+            {"path": "/api/content/coverage", "desc": "All-page review records by locale, track and section; records are not exhaustive clearance"},
             {
                 "path": "/api/tracks/readiness",
-                "desc": "Per-track, per-section production-readiness grid (cleared/in_flight/dead_letter/not_yet_enqueued/source_accepted)",
+                "desc": "Legacy frontmatter flags plus bound source counts; use /api/content/coverage for page reviews",
             },
             {
                 "path": "/api/runtime/services",
@@ -9347,6 +9382,8 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         return 200, build_delivery_status(repo_root), "application/json; charset=utf-8"
     if path == "/api/tracks/readiness":
         return 200, build_tracks_readiness(repo_root), "application/json; charset=utf-8"
+    if path == "/api/content/coverage":
+        return 200, _content_coverage_report(repo_root), "application/json; charset=utf-8"
     if path == "/api/runtime/services":
         return 200, build_runtime_services_status(repo_root), "application/json; charset=utf-8"
     if path == "/api/build/status":

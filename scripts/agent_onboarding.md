@@ -99,7 +99,10 @@ curl -s "http://127.0.0.1:8768/api/reviews?module=k8s/cka/module-2.8-scheduler"
 ## 5. Situational awareness
 
 ```bash
-# Per-track, per-section production-readiness grid.
+# Whole-page review records and acceptance assertions; all page types/locales.
+curl -s http://127.0.0.1:8768/api/content/coverage
+
+# Legacy module frontmatter flags plus bound source counts, not full acceptance.
 curl -s http://127.0.0.1:8768/api/tracks/readiness
 
 # Merged 24-h feed: commits + pipeline v2 events + bridge messages.
