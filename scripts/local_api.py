@@ -25,8 +25,6 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from quality.content_coverage import build_coverage, coverage_summary
-
 
 def _load_local_api_submodule(short_name: str, filename: str) -> Any:
     """Generic loader for local_api/ submodules (routes + repo_guard).
@@ -4162,8 +4160,6 @@ def build_tracks_readiness(repo_root: Path) -> dict[str, Any]:
         "duration_ms": round(1000.0 * (time.perf_counter() - started_at), 3),
         "errors": errors,
         "totals": grand,
-        "metric": "legacy_frontmatter_flags",
-        "content_coverage": {"endpoint": "/api/content/coverage"},
         "tracks": out_tracks,
     }
 
@@ -8752,7 +8748,6 @@ def build_session_briefing(repo_root: Path) -> dict[str, Any]:
             "generator": "local_api.build_session_briefing",
             "version": 1,
         },
-        "content_coverage": coverage_summary(repo_root),
         "workspace": {
             "primary_branch": worktree.get("branch") if worktree.get("ok") else None,
             "dirty": worktree.get("dirty") if worktree.get("ok") else None,
@@ -8990,7 +8985,6 @@ def build_api_schema() -> dict[str, Any]:
             },
             {"path": "/api/navigation/status", "desc": "Top-level route coverage and candidate-stale index pages"},
             {"path": "/api/delivery/status", "desc": "Build freshness and site-health status"},
-            {"path": "/api/content/coverage", "desc": "All-page receipt coverage by locale, track, section; recorded review is not clearance"},
             {
                 "path": "/api/tracks/readiness",
                 "desc": "Per-track, per-section production-readiness grid (cleared/in_flight/dead_letter/not_yet_enqueued/source_accepted)",
@@ -9356,8 +9350,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         return 200, build_delivery_status(repo_root), "application/json; charset=utf-8"
     if path == "/api/tracks/readiness":
         return 200, build_tracks_readiness(repo_root), "application/json; charset=utf-8"
-    if path == "/api/content/coverage":
-        return 200, build_coverage(repo_root), "application/json; charset=utf-8"
     if path == "/api/runtime/services":
         return 200, build_runtime_services_status(repo_root), "application/json; charset=utf-8"
     if path == "/api/build/status":

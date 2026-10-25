@@ -1,4 +1,3 @@
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -16,7 +15,8 @@ def setup_pages(root):
         page.write_text("---\ntitle: Test\n---\nBody\n")
     evidence = root / "docs/content-upgrade/page-reviews.json"
     evidence.parent.mkdir(parents=True)
-    receipt = {"path": "linux/index.md", "page_digest": _digest((docs / "linux/index.md").read_bytes()),
+    receipt = {"path": "linux/index.md", "acceptance_refs": ["lead:accepted"],
+               "page_digest": _digest((docs / "linux/index.md").read_bytes()),
                "disposition": "revise", "reviewer_refs": ["review:1"], "evidence_refs": ["evidence:1"],
                "independent_statuses": dict.fromkeys(EVIDENCE_LAYERS, "pass")}
     evidence.write_text(json.dumps({"pages": [receipt]}))
@@ -34,6 +34,7 @@ def test_grouping_and_stale_new_removed(tmp_path):
     (docs / "linux/index.md").write_text("changed")
     report = build_coverage(tmp_path)
     assert report["locales"]["en"]["stale"] == 1
+    assert report["locales"]["en"]["acceptance_recorded"] == 0
     assert report["locales"]["en"]["review_recorded"] == 0
     (docs / "linux/index.md").unlink()
     (docs / "new.md").write_text("new")
@@ -92,18 +93,31 @@ def test_explicit_acceptance_gates(tmp_path, monkeypatch):
     receipt["independent_statuses"]["deployed_smoke"] = "unknown"
     evidence.write_text(json.dumps({"pages": [receipt]}))
     assert build_coverage(tmp_path)["locales"]["en"]["acceptance_recorded"] == 0
+    receipt["independent_statuses"]["deployed_smoke"] = "pass"
+    for disposition in ("revise", "expand"):
+        receipt["disposition"] = disposition
+        evidence.write_text(json.dumps({"pages": [receipt]}))
+        assert build_coverage(tmp_path)["locales"]["en"]["acceptance_recorded"] == 0
 
 
-def test_api_coverage_and_legacy_label(tmp_path):
-    path = Path(__file__).resolve().parents[1] / "scripts/local_api.py"
-    spec = importlib.util.spec_from_file_location("coverage_local_api", path)
-    assert spec is not None and spec.loader is not None
-    local_api = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = local_api
-    spec.loader.exec_module(local_api)
-    setup_pages(tmp_path)
-    code, report, _ = local_api.route_request(tmp_path, "/api/content/coverage")
-    assert code == 200 and report["locales"]["en"]["total"] == 3
-    readiness = local_api.build_tracks_readiness(tmp_path)
-    assert readiness["metric"] == "legacy_frontmatter_flags"
-    assert readiness["content_coverage"]["endpoint"] == "/api/content/coverage"
+def test_malformed_seed_is_unavailable(tmp_path, monkeypatch):
+    from quality import content_coverage
+    docs, evidence, _ = setup_pages(tmp_path)
+    seed = tmp_path / "docs/citation-seeds/linux-index.json"
+    seed.parent.mkdir(parents=True)
+    seed.write_text('{"secret": "do-not-expose"}')
+    report = build_coverage(tmp_path)
+    assert report["locales"]["en"]["acceptance_recorded"] == 0 and "do-not-expose" not in json.dumps(report)
+    assert report["status"] == "unavailable" or all(p["evidence"]["independent_statuses"]["technical_source"] == "unknown" for p in content_coverage.build_inventory(docs, evidence)["pages"])
+    monkeypatch.setattr(content_coverage, "build_inventory", lambda *a, **kw: (_ for _ in ()).throw(TypeError("secret")))
+    report = build_coverage(tmp_path)
+    assert report["status"] == "unavailable" and report["coverage_health"] == "unknown"
+    assert "inventory unavailable: TypeError" in report["errors"] and "secret" not in json.dumps(report)
+
+def test_empty_english_is_unavailable(tmp_path):
+    docs, evidence, _ = setup_pages(tmp_path)
+    for rel in ("index.md", "linux/index.md", "prerequisites/module-one.md"):
+        (docs / rel).unlink()
+    evidence.write_text('{"pages": []}')
+    report = build_coverage(tmp_path)
+    assert report["status"] == "unavailable" and report["coverage_health"] == "unknown"
