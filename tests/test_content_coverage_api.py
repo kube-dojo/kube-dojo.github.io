@@ -7,7 +7,7 @@ from tests.test_local_api import local_api
 
 def test_api_cache_invalidates_pages_ledger_and_seeds(tmp_path, monkeypatch):
     from quality import content_coverage
-    docs, evidence, _ = setup_pages(tmp_path)
+    docs, evidence, receipt = setup_pages(tmp_path)
     calls = []
     original = content_coverage.build_coverage
 
@@ -32,6 +32,9 @@ def test_api_cache_invalidates_pages_ledger_and_seeds(tmp_path, monkeypatch):
     seed.unlink()
     local_api._content_coverage_report(tmp_path)
     assert len(calls) == 5
+    evidence.write_text(json.dumps({"pages": [receipt, receipt]}))
+    duplicate = local_api._content_coverage_report(tmp_path)
+    assert duplicate["locales"]["en"]["invalid"] == 1 and duplicate["coverage_health"] == "unknown"
 
 
 def test_briefing_and_orient_isolate_coverage_failure(tmp_path, monkeypatch):

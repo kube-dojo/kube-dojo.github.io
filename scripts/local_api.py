@@ -114,7 +114,7 @@ _CONTENT_COVERAGE_LOCK = threading.Lock()
 def _content_coverage_report(repo_root: Path, *, compact: bool = False) -> dict:
     """Isolate optional coverage dependencies and reuse unchanged evidence scans."""
     try:
-        from quality.content_coverage import build_coverage, coverage_summary
+        from quality.content_coverage import build_coverage
         dependencies = [repo_root / "docs/content-upgrade/page-reviews.json"]
         dependencies.extend(sorted((repo_root / "docs/citation-seeds").glob("*.json")))
         versions = []
@@ -132,7 +132,10 @@ def _content_coverage_report(repo_root: Path, *, compact: bool = False) -> dict:
                 _CONTENT_COVERAGE_CACHE[key] = (version, report)
             else:
                 report = cached[1]
-        return {**coverage_summary(report), "errors": report["errors"], "receipt_errors": report["receipt_errors"]} if compact else report
+        if compact:
+            keys = ("status", "coverage_health", "locales", "milestones", "caveat", "parked_locales", "errors", "receipt_errors")
+            return {"endpoint": "/api/content/coverage", **{key: report[key] for key in keys}}
+        return report
     except (OSError, UnicodeError, TypeError, ValueError, AttributeError, KeyError, ImportError, RuntimeError) as exc:
         return {"status": "unavailable", "coverage_health": "unknown", "errors": [f"coverage unavailable: {type(exc).__name__}"], "endpoint": "/api/content/coverage"}
 
