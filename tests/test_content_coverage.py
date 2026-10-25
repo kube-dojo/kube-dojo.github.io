@@ -60,11 +60,11 @@ def test_no_automatic_acceptance(tmp_path):
 
 def test_missing_and_malformed_input(tmp_path):
     _, evidence, _ = setup_pages(tmp_path)
-    for value in ("{", '{"pages": false}'):
+    for value in ("{", '{"pages": false}', '{"pages":' + "9" * 5000 + "}", "[" * 2000):
         evidence.write_text(value)
         report = build_coverage(tmp_path)
         assert report["status"] == "unavailable" and report["coverage_health"] == "unknown"
-        assert report["receipt_errors"] and report["locales"]["en"]["review_recorded"] == 0
+        assert (report["receipt_errors"] or report["errors"]) and report["locales"]["en"]["review_recorded"] == 0
     evidence.unlink()
     assert build_coverage(tmp_path)["status"] == "unavailable"
 

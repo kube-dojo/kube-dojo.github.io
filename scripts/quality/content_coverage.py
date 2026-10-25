@@ -9,14 +9,9 @@ CAVEAT = (
     "Review recorded means a current schema/digest-valid supplied disposition, not exhaustive "
     "full-page clearance. acceptance_recorded is a supplied lead assertion; lead references must "
     "cover existing book/source/prose/multiple-family/human gates. This reporter grants none. "
-    "Passing applicable evidence is required; unsupported not-applicable acceptance is not counted. "
+    "Lead references must justify lab not_applicable assertions; other not_applicable layers are not counted. "
     "Program statuses are supplied assertions, not lifecycle or book unlocks."
 )
-
-
-def coverage_summary(report: dict) -> dict:
-    return {"endpoint": "/api/content/coverage", **{key: report[key] for key in
-            ("status", "coverage_health", "locales", "milestones", "caveat", "parked_locales")}}
 
 
 def build_coverage(repo_root: Path) -> dict:
@@ -25,9 +20,10 @@ def build_coverage(repo_root: Path) -> dict:
     errors = []
     try:
         inventory = build_inventory(repo_root / "src/content/docs", evidence_path=evidence_path)
+        receipts, load_errors, unavailable = _load_receipts(evidence_path)
     except (OSError, UnicodeError, TypeError, ValueError, AttributeError, KeyError, ImportError, RuntimeError) as exc:
         inventory = {"pages": [], "errors": [f"inventory unavailable: {type(exc).__name__}"]}
-    receipts, load_errors, unavailable = _load_receipts(evidence_path)
+        receipts, load_errors, unavailable = {}, [], True
     errors.extend(inventory.get("errors", []))
     receipt_errors = sorted(set(inventory.get("receipt_errors", []) + load_errors))
     locales = {locale: dict.fromkeys(FIELDS, 0) for locale in ("en", "uk")}
