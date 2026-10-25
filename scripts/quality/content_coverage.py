@@ -7,13 +7,14 @@ from .content_inventory import _load_receipts, build_inventory
 FIELDS = ("total", "review_recorded", "unreviewed", "needs_revision", "acceptance_recorded", "stale", "invalid")
 CAVEAT = (
     "Review recorded means a current schema/digest-valid supplied disposition, not exhaustive "
-    "full-page clearance. Acceptance requires explicit lead acceptance references and applicable "
-    "passing evidence. Program statuses are supplied assertions, not lifecycle or book unlocks."
+    "full-page clearance. acceptance_recorded is a supplied lead assertion; lead references must "
+    "cover existing book/source/prose/multiple-family/human gates. This reporter grants none. "
+    "Passing applicable evidence is required; unsupported not-applicable acceptance is not counted. "
+    "Program statuses are supplied assertions, not lifecycle or book unlocks."
 )
 
 
-def coverage_summary(repo_root: Path) -> dict:
-    report = build_coverage(repo_root)
+def coverage_summary(report: dict) -> dict:
     return {"endpoint": "/api/content/coverage", **{key: report[key] for key in
             ("status", "coverage_health", "locales", "milestones", "caveat", "parked_locales")}}
 
@@ -24,7 +25,7 @@ def build_coverage(repo_root: Path) -> dict:
     errors = []
     try:
         inventory = build_inventory(repo_root / "src/content/docs", evidence_path=evidence_path)
-    except (OSError, UnicodeError) as exc:
+    except (OSError, UnicodeError, TypeError, ValueError, AttributeError, KeyError, ImportError, RuntimeError) as exc:
         inventory = {"pages": [], "errors": [f"inventory unavailable: {type(exc).__name__}"]}
     receipts, load_errors, unavailable = _load_receipts(evidence_path)
     errors.extend(inventory.get("errors", []))
@@ -59,6 +60,8 @@ def build_coverage(repo_root: Path) -> dict:
             for key, value in values.items():
                 bucket[key] += value
     missing = inventory.get("missing_pages", [])
+    if not locales["en"]["total"]:
+        errors.append("English corpus unavailable or empty")
     unknown = bool(errors or receipt_errors or missing)
     attention = (unknown or locales["en"]["unreviewed"] or locales["en"]["needs_revision"]
                  or locales["en"]["acceptance_recorded"] < locales["en"]["total"])
