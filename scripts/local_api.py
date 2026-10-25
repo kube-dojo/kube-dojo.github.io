@@ -133,10 +133,10 @@ def _content_coverage_report(repo_root: Path, *, compact: bool = False) -> dict:
             else:
                 report = cached[1]
         if compact:
-            keys = ("status", "coverage_health", "locales", "milestones", "caveat", "parked_locales", "errors", "receipt_errors")
-            return {"endpoint": "/api/content/coverage", **{key: report[key] for key in keys}}
+            keys = ("status", "coverage_health", "locales", "milestones", "caveat", "parked_locales")
+            return {"endpoint": "/api/content/coverage", **{key: report[key] for key in keys}, "errors": report["errors"][:5], "receipt_error_count": len(report["receipt_errors"]), "receipt_errors": [item[:200] for item in report["receipt_errors"][:5]]}
         return report
-    except (OSError, UnicodeError, TypeError, ValueError, AttributeError, LookupError, ImportError, RuntimeError) as exc:
+    except (OSError, UnicodeError, TypeError, ValueError, AttributeError, LookupError, ImportError, RuntimeError, ArithmeticError) as exc:
         return {"status": "unavailable", "coverage_health": "unknown", "errors": [f"coverage unavailable: {type(exc).__name__}"], "endpoint": "/api/content/coverage"}
 
 
@@ -8047,7 +8047,7 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
   <main class="main">
     <div class="summary-grid">
       <section class="summary-shell">
-        <div class="summary-head">English review coverage <span id="coverage-badge">Unknown</span></div>
+        <div class="summary-head">English review coverage <span class="panel-badge" id="coverage-badge">Unknown</span></div>
         <a class="quality-summary-card" href="/api/content/coverage"><span><span id="coverage-counts">Waiting for evidence</span><br><span id="coverage-milestone">Prerequisites + Linux</span></span></a>
       </section>
 

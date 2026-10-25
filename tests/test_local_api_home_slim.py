@@ -100,13 +100,20 @@ renderCoverage({content_coverage: {
   milestones:{prerequisites_linux:{total:100,review_recorded:6,acceptance_recorded:0}}
 }});
 const known = JSON.parse(JSON.stringify(nodes));
+renderCoverage({content_coverage: {status:'needs_attention',coverage_health:'unknown',
+  locales:{en:{total:1089,review_recorded:0,needs_revision:0,acceptance_recorded:0,stale:8,invalid:0}},
+  milestones:{prerequisites_linux:{total:100,review_recorded:0,acceptance_recorded:0}},receipt_error_count:8}});
+const stale = JSON.parse(JSON.stringify(nodes));
 renderCoverage({});
-console.log(JSON.stringify({known,unknown:nodes}));
+console.log(JSON.stringify({known,stale,unknown:nodes}));
 """
     result = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True)
     states = json.loads(result.stdout)
     assert "8 / 1089" in states["known"]["#coverage-counts"]["textContent"]
     assert "0 acceptance records" in states["known"]["#coverage-counts"]["textContent"]
     assert "6 / 100" in states["known"]["#coverage-milestone"]["textContent"]
+    assert states["stale"]["#coverage-badge"]["textContent"] == "Health unknown"
+    assert "8 stale" in states["stale"]["#coverage-counts"]["textContent"]
+    assert "8 evidence errors" in states["stale"]["#coverage-counts"]["textContent"]
     assert states["unknown"]["#coverage-badge"]["textContent"] == "Unknown"
     assert states["unknown"]["#coverage-counts"]["textContent"] == "Coverage evidence unavailable"
