@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -77,3 +79,34 @@ def test_home_drops_moved_panel_markers(tmp_path: Path) -> None:
     ]
     for marker in moved_markers:
         assert marker not in html
+
+
+def test_coverage_card_renders_counts_and_unknown_without_false_zero(tmp_path: Path) -> None:
+    html = _home(tmp_path)
+    assert 'href="/api/content/coverage"' in html
+    assert "Legacy pipeline labels, not full-page acceptance" in html
+    assert '<script src="/static/content-coverage.js"></script>' in html
+    status, source, content_type = local_api.route_request(Path(__file__).resolve().parents[1], "/static/content-coverage.js")
+    assert status == 200 and "javascript" in content_type
+    function = source.decode()
+    script = """
+const nodes = {};
+const $ = key => nodes[key] ||= {textContent: ''};
+function tone() {}
+""" + function + """
+renderCoverage({content_coverage: {
+  status:'needs_attention',coverage_health:'known',
+  locales:{en:{total:1089,review_recorded:8,needs_revision:8,acceptance_recorded:0}},
+  milestones:{prerequisites_linux:{total:100,review_recorded:6,acceptance_recorded:0}}
+}});
+const known = JSON.parse(JSON.stringify(nodes));
+renderCoverage({});
+console.log(JSON.stringify({known,unknown:nodes}));
+"""
+    result = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True)
+    states = json.loads(result.stdout)
+    assert "8 / 1089" in states["known"]["#coverage-counts"]["textContent"]
+    assert "0 acceptance records" in states["known"]["#coverage-counts"]["textContent"]
+    assert "6 / 100" in states["known"]["#coverage-milestone"]["textContent"]
+    assert states["unknown"]["#coverage-badge"]["textContent"] == "Unknown"
+    assert states["unknown"]["#coverage-counts"]["textContent"] == "Coverage evidence unavailable"

@@ -8011,13 +8011,18 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
   <main class="main">
     <div class="summary-grid">
       <section class="summary-shell">
+        <div class="summary-head">English review coverage <span id="coverage-badge">Unknown</span></div>
+        <a class="quality-summary-card" href="/api/content/coverage"><span><span id="coverage-counts">Waiting for evidence</span><br><span id="coverage-milestone">Prerequisites + Linux</span></span></a>
+      </section>
+
+      <section class="summary-shell">
         <div class="summary-head"><div class="summary-title"><span class="summary-icon" style="background:var(--accent-muted);color:var(--accent);">O</span>Operator</div><span class="panel-badge" id="op-badge">&nbsp;</span></div>
         <a class="op-summary-card" href="/operator"><span><span class="op-summary-value" id="op-active-count">0</span><span class="op-summary-label">Active</span></span><span><span class="op-summary-value" id="op-blocked-count">0</span><span class="op-summary-label">Blocked</span></span><span><span class="op-summary-value" id="op-next-count">0</span><span class="op-summary-label">Next</span></span><span class="op-summary-link">View &rarr;</span></a>
       </section>
 
       <section class="summary-shell">
         <div class="summary-head"><div class="summary-title"><span class="summary-icon" style="background:var(--accent-muted);color:var(--accent);">Q</span>Quality</div><span class="panel-badge" id="quality-summary-badge">&nbsp;</span></div>
-        <a class="quality-summary-card" href="/quality"><span><span class="quality-summary-title">Aggregate quality</span><span class="quality-summary-counts" id="quality-summary-counts">Loading&hellip;</span></span><span class="quality-summary-link">View board &rarr;</span></a>
+        <a class="quality-summary-card" href="/quality"><span><span class="quality-summary-title">Legacy pipeline labels, not full-page acceptance</span><span class="quality-summary-counts" id="quality-summary-counts">Loading&hellip;</span></span><span class="quality-summary-link">View board &rarr;</span></a>
       </section>
 
       <section class="summary-shell">
@@ -8058,6 +8063,7 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
     </div>
   </main>
 
+  <script src="/static/content-coverage.js"></script>
   <script>
     const ISSUE = {issue_number};
     const $ = (sel) => document.querySelector(sel);
@@ -8123,7 +8129,7 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
         const [missing, pipelineStatus, briefing, qualityBoard, activitySummary] = await Promise.all([
           fetchJson('/api/missing-modules/status'), fetchJson('/api/pipeline/v2/status'), fetchJson('/api/briefing/session?compact=1'), fetchJson('/api/quality/board'), fetchJson('/api/activity?limit=3')
         ]);
-        renderOperator(briefing); renderQuality(qualityBoard); renderPipeline(pipelineStatus); renderActivity(activitySummary); renderHealth(briefing, missing);
+        renderCoverage(briefing); renderOperator(briefing); renderQuality(qualityBoard); renderPipeline(pipelineStatus); renderActivity(activitySummary); renderHealth(briefing, missing);
         setPollTs($('#last-updated'), briefing);
         $('#last-updated').textContent = `Updated ${{new Date().toLocaleTimeString()}}`;
         const pill = $('#conn-status'); pill.innerHTML = '<span class="dot"></span> Connected'; tone(pill, 'green');
