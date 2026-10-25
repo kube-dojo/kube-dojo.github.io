@@ -35,6 +35,10 @@ def test_api_cache_invalidates_pages_ledger_and_seeds(tmp_path, monkeypatch):
     evidence.write_text(json.dumps({"pages": [receipt, receipt]}))
     duplicate = local_api._content_coverage_report(tmp_path)
     assert duplicate["locales"]["en"]["invalid"] == 1 and duplicate["coverage_health"] == "unknown"
+    duplicate["receipt_errors"] = ["x" * 1000] * 12
+    compact = local_api._content_coverage_report(tmp_path, compact=True)
+    assert compact["receipt_error_count"] == 12 and len(compact["receipt_errors"]) == 5
+    assert all(len(item) == 200 for item in compact["receipt_errors"])
 
 
 def test_briefing_and_orient_isolate_coverage_failure(tmp_path, monkeypatch):
