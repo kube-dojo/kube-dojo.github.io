@@ -19,9 +19,9 @@ Six recorded revise dispositions / 100 pages; 94 pages lack a current review rec
 | 1 | prerequisites/zero-to-terminal | 12 | 0 |
 | 2 | prerequisites/cloud-native-101 | 6 | 2 revise |
 | 3 | prerequisites/kubernetes-basics | 9 | 2 revise |
-| 4 | prerequisites/git-deep-dive | 11 | 0 |
-| 5 | prerequisites/modern-devops | 7 | 0 |
-| 6 | prerequisites/philosophy-design | 5 | 0 |
+| 4 | prerequisites/philosophy-design | 5 | 0 |
+| 5 | prerequisites/git-deep-dive | 11 | 0 |
+| 6 | prerequisites/modern-devops | 7 | 0 |
 | 7 | prerequisites | 1 | 0 |
 | 8 | linux/foundations/everyday-use | 6 | 0 |
 | 9 | linux/foundations/system-essentials | 5 | 0 |
@@ -35,6 +35,8 @@ Six recorded revise dispositions / 100 pages; 94 pages lack a current review rec
 | 17 | linux/operations/shell-scripting | 5 | 0 |
 | 18 | linux/operations | 5 | 0 |
 | 19 | linux | 1 | 0 |
+
+Prerequisites follows its published Suggested Route. Linux Operations follows module numbers 5–8; its hub/sidebar currently disagree on order, and the sidebar's omission of 8.x administration pages needs a navigation disposition under #2279/#2293. This is a review queue, not a claim that navigation has been fixed.
 
 First new review packet: `prerequisites/zero-to-terminal/{index.md,module-0.1-what-is-a-computer.md,module-0.2-what-is-a-terminal.md}`. Check novice assumptions, explanation, workload and outcomes against the full pages and actual source evidence; preserve supported material. Use existing rubric/source gates rather than a heading or word-count target. Then continue the remaining nine pages in that section. Record exact findings before changing prose.
 

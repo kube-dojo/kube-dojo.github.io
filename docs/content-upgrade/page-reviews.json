@@ -1,6 +1,6 @@
 {
   "schema": "kubedojo.page_reviews.v1",
-  "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No acceptance_refs or full-page acceptances supplied.",
+  "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No full-page acceptance is recorded; coverage reporting is separate from inventory schema/digest checks.",
   "pages": [
     {
       "path": "prerequisites/kubernetes-basics/module-1.4-deployments.md",
@@ -39,7 +39,7 @@
       "page_digest": "sha256:ecc2f0ced65fc92a5a34a466f59e159584534b7a0233f84f74fdd7defbcec097",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538#issuecomment-6390177972"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3537#issuecomment-6390292971"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3537#issuecomment-6390292971"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
@@ -47,7 +47,7 @@
       "page_digest": "sha256:afdea18437d78124d39bd15a5a844d88777f7c911b5224daaad31c1812962143",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538#issuecomment-6390177972"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3537#issuecomment-6390292971"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3537#issuecomment-6390292971"],
       "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
