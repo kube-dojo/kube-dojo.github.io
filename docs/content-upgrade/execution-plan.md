@@ -2,6 +2,8 @@
 
 Owner: accountable content-upgrade lead; program #2272, reporting #3539, Prerequisites #2278, Linux #2279. User direction 2026-10-25: finish English first, prioritize its first two curriculum tracks, and report learner-visible changes in What's New without operational details. This supersedes the local Chapter 1-first scheduling pointer, not its outstanding findings or book gates.
 
+Follow the [full-program ticket map](ticket-map.md): every English page has an exact issue batch; all Ukrainian scope stays owned. #2278 is now, #2279 next; supporting evidence work follows the selected batch. Ticket assignment never counts as review or acceptance.
+
 ## One durable progress record
 
 The inventory supplies the denominator, including hubs and supporting pages. [page-reviews.json](page-reviews.json) stores revision-bound supplied dispositions; [review-status.md](review-status.md) preserves findings and scoped correction history. Update receipts after every completed review/correction, with the exact digest and stable report/review/delivery references. Never refresh a digest without reviewing the change and reconciling outstanding findings. Stale, missing and invalid records lose current coverage automatically.
@@ -30,13 +32,13 @@ Six recorded revise dispositions / 100 pages; 94 pages lack a current review rec
 | 12 | linux/foundations | 1 | 0 |
 | 13 | linux/security/hardening | 5 | 0 |
 | 14 | linux/security | 1 | 0 |
-| 15 | linux/operations/performance | 5 | 0 |
-| 16 | linux/operations/troubleshooting | 5 | 2 revise |
-| 17 | linux/operations/shell-scripting | 5 | 0 |
-| 18 | linux/operations | 5 | 0 |
+| 15 | linux/operations | 5 | 0 |
+| 16 | linux/operations/performance | 5 | 0 |
+| 17 | linux/operations/troubleshooting | 5 | 2 revise |
+| 18 | linux/operations/shell-scripting | 5 | 0 |
 | 19 | linux | 1 | 0 |
 
-Prerequisites follows its published Suggested Route. Linux Operations follows module numbers 5–8; its hub/sidebar currently disagree on order, and the sidebar's omission of 8.x administration pages needs a navigation disposition under #2279/#2293. This is a review queue, not a claim that navigation has been fixed.
+Prerequisites follows its published Suggested Route. Linux Operations follows its hub's learner route: 8.x administration, performance, troubleshooting, then shell scripting. Its sidebar disagrees and omits the 8.x administration pages; preserve that navigation finding under #2279/#2293. This is a review queue, not a claim that navigation has been fixed.
 
 First new review packet: `prerequisites/zero-to-terminal/{index.md,module-0.1-what-is-a-computer.md,module-0.2-what-is-a-terminal.md}`. Check novice assumptions, explanation, workload and outcomes against the full pages and actual source evidence; preserve supported material. Use existing rubric/source gates rather than a heading or word-count target. Then continue the remaining nine pages in that section. Record exact findings before changing prose.
 
