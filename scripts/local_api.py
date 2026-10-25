@@ -136,7 +136,7 @@ def _content_coverage_report(repo_root: Path, *, compact: bool = False) -> dict:
             keys = ("status", "coverage_health", "locales", "milestones", "caveat", "parked_locales", "errors", "receipt_errors")
             return {"endpoint": "/api/content/coverage", **{key: report[key] for key in keys}}
         return report
-    except (OSError, UnicodeError, TypeError, ValueError, AttributeError, KeyError, ImportError, RuntimeError) as exc:
+    except (OSError, UnicodeError, TypeError, ValueError, AttributeError, LookupError, ImportError, RuntimeError) as exc:
         return {"status": "unavailable", "coverage_health": "unknown", "errors": [f"coverage unavailable: {type(exc).__name__}"], "endpoint": "/api/content/coverage"}
 
 
