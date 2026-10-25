@@ -6,7 +6,7 @@ pass `--docs-root PATH`. It accepts an optional evidence receipt with
 `--evidence PATH` and always writes one JSON report to stdout:
 
 ```bash
-.venv/bin/python scripts/quality/content_inventory.py --evidence evidence.json
+.venv/bin/python scripts/quality/content_inventory.py --evidence docs/content-upgrade/page-reviews.json
 ```
 
 Each `pages[]` record contains the docs-relative `path`, `locale` (`en` or

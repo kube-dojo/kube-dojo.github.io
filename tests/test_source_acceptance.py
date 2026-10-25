@@ -95,6 +95,20 @@ def test_bind_missing_stale_malformed_cannot_accept() -> None:
     assert "seed_malformed" in bind_source_acceptance(bound, page_bytes=page, seed_bytes=b"{")["reasons"]
 
 
+@pytest.mark.parametrize("payload", [{}, {"claims": None}, {"claims": {}}, {"claims": False}, []])
+def test_malformed_seed_shape_rejects_without_raising(payload) -> None:
+    result = bind_source_acceptance(_valid(), page_bytes=b"page", seed_bytes=json.dumps(payload).encode())
+    assert result["accepted"] is False and result["reasons"] == ["seed_malformed"]
+
+
+@pytest.mark.parametrize("verdict", [[], {}, None, True])
+def test_non_string_verdict_rejects_without_raising(verdict) -> None:
+    receipt = _valid()
+    receipt["claims"][0]["verdict"] = verdict
+    result = _eval(receipt)
+    assert result["accepted"] is False and result["reasons"] == ["schema_invalid"]
+
+
 def test_pr_head_recheck_rejects_stale_page_and_seed() -> None:
     page, changed = b"page-at-review", b"page-at-pr-head"
     seed = json.dumps({"claims": [{"claim_id": "C001"}]}).encode()
@@ -126,7 +140,7 @@ def test_held_publication_recheck_uses_pr_head_bytes(tmp_path: Path) -> None:
     (tmp_path / "docs/citation-seeds").mkdir(parents=True)
     (tmp_path / "docs/citation-seeds/k8s-cka-module-1.1-alpha.json").write_bytes(seed)
     ok = _valid(page_digest=_digest(reviewed), seed_digest=_digest(seed))
-    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger = tmp_path / "docs/content-upgrade/page-reviews.json"
     ledger.parent.mkdir(parents=True)
     ledger.write_text(json.dumps({"pages": [{"path": page_rel, "source_acceptance": ok}]}), encoding="utf-8")
     assert recheck_held_publication(tmp_path, page_rel, pr_head_page_bytes=reviewed)["accepted"]
@@ -153,7 +167,7 @@ def test_readiness_source_accepted_fail_closed(tmp_path: Path) -> None:
     assert ready["totals"]["cleared"] == 1 and ready["totals"]["source_accepted"] == 0
     assert k8s["cleared"] == 1 and k8s["source_accepted"] == 0
     assert cka["cleared"] == 1 and cka["source_accepted"] == 0
-    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger = tmp_path / "docs/content-upgrade/page-reviews.json"
     ledger.parent.mkdir(parents=True, exist_ok=True)
     base = {"path": "k8s/cka/module-1.1-alpha.md", "page_digest": "0" * 64,
             "disposition": "retain", "reviewer_refs": ["r"], "evidence_refs": ["e"],
@@ -190,7 +204,7 @@ def test_readiness_source_accepted_section_track_isolation(tmp_path: Path) -> No
     seed = b'{"claims":[{"claim_id":"C001"}]}'
     (tmp_path / "docs/citation-seeds").mkdir(parents=True)
     (tmp_path / "docs/citation-seeds/k8s-cka-module-1.1-alpha.json").write_bytes(seed)
-    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger = tmp_path / "docs/content-upgrade/page-reviews.json"
     ledger.parent.mkdir(parents=True, exist_ok=True)
     base = {"path": "k8s/cka/module-1.1-alpha.md", "page_digest": "0" * 64,
             "disposition": "retain", "reviewer_refs": ["r"], "evidence_refs": ["e"],
