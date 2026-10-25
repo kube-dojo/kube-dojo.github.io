@@ -9815,7 +9815,7 @@ def _v_docs_frontmatter(repo_root: Path) -> tuple:
             continue
         sig.update(rel.encode("utf-8"))
         sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode())
-    extras = [repo_root / "docs/content-upgrade/evidence.json"]
+    extras = [repo_root / "docs/content-upgrade/page-reviews.json"]
     seeds = repo_root / "docs/citation-seeds"
     extras.extend(sorted(seeds.glob("*.json")) if seeds.is_dir() else [])
     for extra in extras:

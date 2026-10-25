@@ -165,7 +165,7 @@ def test_recheck_module_source_acceptance_rejects_stale_pr_head(tmp_path):
     (tmp_path / "docs/citation-seeds").mkdir(parents=True)
     (tmp_path / "docs/citation-seeds/k8s-cka-module-1.json").write_bytes(seed)
     ok = _valid(page_digest=_digest(reviewed), seed_digest=_digest(seed))
-    ledger = tmp_path / "docs/content-upgrade/evidence.json"
+    ledger = tmp_path / "docs/content-upgrade/page-reviews.json"
     ledger.parent.mkdir(parents=True)
     ledger.write_text(json.dumps({"pages": [{"path": "k8s/cka/module-1.md", "source_acceptance": ok}]}))
     assert pilot.recheck_module_source_acceptance(tmp_path, module_path)["accepted"]

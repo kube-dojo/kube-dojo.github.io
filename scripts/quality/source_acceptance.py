@@ -21,7 +21,7 @@ SCHEMA = "kubedojo.source_acceptance.v1"
 SCHEMA_VERSION = 1
 FAILING_VERDICTS = frozenset({"UNSUPPORTED", "CONTRADICTED", "UNREADABLE"})
 UNKNOWN_FAMILIES = frozenset({"", "unknown"})
-EVIDENCE_LEDGER = Path("docs/content-upgrade/evidence.json")
+EVIDENCE_LEDGER = Path("docs/content-upgrade/page-reviews.json")
 SEEDS_DIR = Path("docs/citation-seeds")
 
 
@@ -55,7 +55,9 @@ def bind_source_acceptance(
         payload = json.loads(seed_bytes.decode("utf-8"))
     except (UnicodeError, json.JSONDecodeError):
         return _reject("seed_malformed")
-    claims = payload.get("claims") if isinstance(payload, dict) else []
+    claims = payload.get("claims") if isinstance(payload, dict) else None
+    if not isinstance(claims, list):
+        return _reject("seed_malformed")
     ids = [
         str(c.get("claim_id")).strip()
         for c in claims
@@ -180,6 +182,8 @@ def evaluate_source_acceptance(
             return _reject("schema_invalid")
         seen.add(cid)
         verdict = claim.get("verdict")
+        if not isinstance(verdict, str):
+            return _reject("schema_invalid")
         if verdict in FAILING_VERDICTS:
             return _reject(f"claim_verdict:{verdict}")
         if verdict != "SUPPORTED" or not _source_ok(claim.get("source")):
