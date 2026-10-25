@@ -6,6 +6,11 @@ sidebar:
   label: "What's New"
 ---
 
+## October 2026
+
+- **Clearer Kubernetes basics and safer practice.** The [Kubernetes introduction](/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes/) and [Deployments lesson](/prerequisites/kubernetes-basics/module-1.4-deployments/) now explain failures and recovery more clearly. Practice steps make it easier to keep experiments separate and clean up afterward.
+- **More useful Linux troubleshooting guidance.** [Systematic Troubleshooting](/linux/operations/troubleshooting/module-6.1-systematic-troubleshooting/) now gives clearer guidance for gathering clues, comparing results and deciding what to try next, with better explanations of when commands apply.
+
 ## September 2026
 
 - **Exam-pin verification sources.** The [exam version policy](/k8s/releases/exam-version-policy/) now names the official LF FAQ and CKA/CKAD/CKS product pages to re-check before any exam-pin bump, and the agent playbook is the standing trigger for each new upstream minor. Re-verified 2026-09-13: exam environment still **v1.35**. Workstream #2542.

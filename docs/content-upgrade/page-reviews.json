@@ -1,0 +1,70 @@
+{
+  "schema": "kubedojo.page_reviews.v1",
+  "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No acceptance_refs or full-page acceptances supplied.",
+  "pages": [
+    {
+      "path": "prerequisites/kubernetes-basics/module-1.4-deployments.md",
+      "page_digest": "sha256:722fcd7219f4ddf9a9b3c91f5898ca393e73410e27325d56adad3b9f2a96332c",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+    },
+    {
+      "path": "prerequisites/kubernetes-basics/index.md",
+      "page_digest": "sha256:ae9e84e798334e771865a110e5197adb870e572f5f50fa51a979877e8e1d8d62",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367"],
+      "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+    },
+    {
+      "path": "prerequisites/cloud-native-101/module-1.3-what-is-kubernetes.md",
+      "page_digest": "sha256:0c37314eac6e387b77d4120f2755c4c001bb504dda76b4eba815b38d52335a30",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+    },
+    {
+      "path": "prerequisites/cloud-native-101/index.md",
+      "page_digest": "sha256:b6f17e8296475ca8a49ebe891751f727be60e297753f9fe47b5abf60050f7051",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367"],
+      "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+    },
+    {
+      "path": "linux/operations/troubleshooting/module-6.1-systematic-troubleshooting.md",
+      "page_digest": "sha256:ecc2f0ced65fc92a5a34a466f59e159584534b7a0233f84f74fdd7defbcec097",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538#issuecomment-6390177972"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3537#issuecomment-6390292971"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+    },
+    {
+      "path": "linux/operations/troubleshooting/index.md",
+      "page_digest": "sha256:afdea18437d78124d39bd15a5a844d88777f7c911b5224daaad31c1812962143",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538#issuecomment-6390177972"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3537#issuecomment-6390292971"],
+      "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+    },
+    {
+      "path": "ai-history/ch-01-the-laws-of-thought.md",
+      "page_digest": "sha256:6e6ef29e8115b9f21578690c47f440031b66dacdc01f51c5519ba116a620c40d",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-book-ch01.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-book-ch01.md"],
+      "independent_statuses": {"technical_source": "fail", "editorial_review": "pending"}
+    },
+    {
+      "path": "ai-history/index.md",
+      "page_digest": "sha256:0c816372ec6797c3f651643325c9c97bc3506141bba8432a3e214c2f0589d381",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-book-ch01.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-book-ch01.md"],
+      "independent_statuses": {"technical_source": "fail", "editorial_review": "pending"}
+    }
+  ]
+}
