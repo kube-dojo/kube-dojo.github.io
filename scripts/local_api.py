@@ -8083,15 +8083,6 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
       const b = $('#op-badge'); b.textContent = total ? `${{total}} items` : 'Idle'; tone(b, counts.blocked ? 'red' : total ? 'accent' : 'green');
     }}
 
-    function renderQuality(data) {{
-      const b = $('#quality-summary-badge'), c = $('#quality-summary-counts');
-      if (!data || data.error) {{ b.textContent = 'Unavailable'; c.textContent = 'No quality data'; tone(b, 'red'); return; }}
-      const t = data.totals || {{}};
-      const left = (t.needs_rewrite || 0) + (t.needs_review || 0) + (t.shipped_unreviewed || 0) + (t.both || 0);
-      b.textContent = `${{t.done || 0}} / ${{t.total || 0}} done`; tone(b, left ? 'amber' : 'green');
-      c.textContent = `rewrite=${{t.needs_rewrite || 0}} · review=${{t.needs_review || 0}} · shipped=${{t.shipped_unreviewed || 0}} · both=${{t.both || 0}}`;
-    }}
-
     function renderPipeline(data) {{
       const b = $('#pipeline-summary-badge');
       if (!data || data.error) {{ b.textContent = 'Unknown'; tone(b, 'amber'); return; }}
