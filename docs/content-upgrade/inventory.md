@@ -35,3 +35,14 @@ and stale receipts are emitted as unreviewed with unknown statuses. Without a
 usable evidence input, the inventory remains deterministic but does not label
 pages as new or missing. The command does not write ledgers, caches, state, or
 content files.
+
+## Program coverage ledger
+
+`docs/content-upgrade/page-reviews.json` is the tracked program input; its
+`kubedojo.page_reviews.v1` label identifies the dataset, while inventory validation
+still uses the `pages` receipt format above. The separate coverage reporter counts
+current supplied dispositions, not exhaustive claim clearance. Optional
+`acceptance_refs` is a nonempty list of nonempty explicit lead acceptance links;
+inventory itself ignores this extra field. Coverage may count a supplied acceptance
+only with retain, those references and passing applicable evidence; it never grants
+source, book or human-review acceptance. The existing acceptance contract governs.
