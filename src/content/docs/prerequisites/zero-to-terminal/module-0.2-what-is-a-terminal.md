@@ -120,8 +120,10 @@ Here is the same prompt broken into parts. Treat it like a map label printed at 
 | `yourname` | Your username on this computer | Your name tag in the kitchen |
 | `@` | "at" | The word connecting you to the place |
 | `yourcomputer` | The name of your computer | The name of the restaurant |
-| `~` | Your current location, usually your home directory | Which room of the kitchen you're in |
+| `~` | Your home directory in this example | Which room of the kitchen you're in |
 | `$` or `%` | The shell is ready for your command | The chef saying the station is ready |
+
+PowerShell commonly shows a normal prompt such as `PS C:\Users\Learner>`. Its final `>` is part of that prompt, not automatically an unfinished command. Compare it with the different continuation prompt after an incomplete line: often `>` in Bash, `dquote>` in zsh for an open double quote, or `>>` in PowerShell. Prompt text is customizable, so compare the change with your own starting prompt rather than trusting one symbol alone.
 
 This curriculum sometimes shows a prompt symbol at the start of an example line to distinguish the prompt from the command:
 
@@ -131,7 +133,7 @@ $ echo "Hello"
 
 When you see an example in that style, the `$` is not part of the command. It is a visual cue meaning "type what comes after the prompt." The command is only `echo "Hello"`. Copying the prompt symbol is one of the most common beginner mistakes, and recognizing that convention early will prevent a lot of confusing errors.
 
-The terminal prompt also tells you when a command has finished. If the prompt returns, the shell is ready for the next instruction. If the prompt does not return, a program may still be running, waiting for more input, or stuck. Later modules will give you more diagnostic tools, but for today the simple rule is enough: prompt visible means ready; prompt absent means something is still happening.
+Watch for your usual command prompt to return before typing the next command. If it has not returned, a program may still be running or waiting, or the shell may need more input to finish your line. A continuation prompt is different from the usual prompt: read the preceding command and compare the display before deciding what to do next.
 
 That rule is especially useful when output is quiet. Some commands print a result, some print only errors, and some successful commands print nothing at all. Beginners often expect every successful command to announce success loudly, but command-line tools are commonly designed to stay quiet unless there is something important to report. Watching for the returned prompt is therefore part of reading the output.
 
@@ -157,14 +159,6 @@ Hello, World!
 </details>
 
 The command name is `echo`, and its text argument is `Hello, World!`; the single quotes group that text without becoming part of the output. An argument is information you give to a command. Here we use single quotes for literal text because interactive zsh can treat `!` specially inside double quotes. Later, double quotes let us insert command output into a sentence.
-
-Some older teaching examples include the prompt symbol inside the command block, so keep this protected notation familiar:
-
-```text
-$ echo 'Hello, World!'
-```
-
-If you are typing by hand, that display style is harmless because you naturally start after the prompt. If you are copying and pasting, it can cause trouble because the shell receives the `$` as text. For that reason, this rewrite uses runnable command blocks without the prompt symbol when the intent is copy-paste practice.
 
 Now ask the computer for the date and time. The exact output depends on your operating system, timezone, locale, and shell, so do not worry if yours is formatted differently from the example. What matters is that the command returns a timestamp and then gives you the prompt again. Use the branch that matches the shell you opened:
 
@@ -223,7 +217,7 @@ Exercise scenario: you have two terminal windows open during a practice lab. One
 <details>
 <summary>Check your prediction</summary>
 
-Use the window whose prompt says `alex@training-vm /tmp $`. The hostname portion of the prompt is the decisive evidence because it names the machine this shell session is connected to, so a command typed there executes on the training VM rather than on the laptop. The username and directory add useful context, but the hostname is the part that distinguishes the two machines, and reading it before acting is exactly the habit that prevents wrong-machine mistakes on real systems.
+In this exercise, choose the window labeled `alex@training-vm /tmp $`; the hostname label distinguishes it from the laptop window. In a real session, prompts can be customized or outdated. Use them as orientation clues, confirm which local or remote session you opened, and compare the read-only `whoami` and `hostname` output before changing anything. A prompt label alone does not establish machine identity or permissions.
 
 </details>
 
@@ -291,13 +285,13 @@ This is one reason examples often put human text inside quotes even when a tiny 
 echo "This command is missing its closing quote
 ```
 
-The correct fix is not to panic or close the whole application. You can type the missing quote and press Enter, or you can press Ctrl+C to cancel the unfinished command and return to a fresh prompt. Ctrl+C sends an interrupt signal called SIGINT to the running or waiting foreground program, and most command-line tools respond by stopping.
+You can type the missing quote and press Enter, or cancel the unfinished input with Ctrl+C and return to a fresh prompt. In Unix terminals, Ctrl+C normally generates an interrupt signal, SIGINT. PowerShell and terminal hosts also have cancellation behavior, but keyboard bindings and text selection can change what the key does; check that your normal prompt returned.
 
 ```text
 >
 ```
 
-That `>` is not a normal ready prompt in this situation. It is the shell asking for more input because the previous line was incomplete. PowerShell typically shows `>>` as its continuation prompt instead of `>`, but the meaning is identical: the command is unfinished, and the shell is waiting for the rest. Recognizing the difference between a normal prompt and a continuation prompt turns a confusing moment into a solvable one.
+Here the prompt changed after an unfinished quote, so the shell is asking for more input. Your shell might show `>`, `dquote>`, or `>>`, depending on its language and configuration. The important evidence is the incomplete command and the change from your normal prompt, rather than the presence of a particular angle bracket.
 
 Try one more safe combination. These examples insert command output into a sentence using shell-specific command names. You do not need to master command substitution or subexpressions yet; just notice that terminal commands can be composed.
 
@@ -327,9 +321,9 @@ That role-based reading is exactly what you will need for longer tools. A Kubern
 
 Beginners often worry that one wrong command will break the computer. The safe commands in this module are intentionally boring, and most early mistakes produce an error message rather than damage. Your real first skill is recovery: notice what state the shell is in, stop the current action if needed, and return to a prompt without making the problem bigger.
 
-The first recovery habit is to check whether you still have a prompt. If you see `$` or `%` at the end of a line with a cursor after it, the shell is ready. If text is still printing, the command is running. If you see a continuation prompt like `>`, the shell is waiting for more input because the command line is incomplete.
+The first recovery habit is to compare the display with the normal prompt you saw when you opened this shell. If that prompt has returned, you can enter another command. If output keeps arriving without it, a command may still be running. If an unfinished quote changes the prompt, the shell is waiting for more input. PowerShell's normal prompt can already end in `>`, so that character alone is not a diagnosis.
 
-Ctrl+C is the first emergency stop to try when a normal command is running too long, printing endlessly, or waiting in a way you did not intend. It does not mean "copy" in the terminal context, and it does not close the terminal window. It sends SIGINT to the foreground process, which is a polite but firm request for that process to stop.
+Ctrl+C is a useful first cancellation attempt when a command runs too long or waits unexpectedly. In Unix terminals it normally sends SIGINT to the foreground process group. In PowerShell with common PSReadLine bindings, Ctrl+C can copy selected text instead of canceling input; deselect the text before trying to cancel. Host applications and key bindings vary, so watch for the normal prompt rather than assuming the key always stopped the command.
 
 ```text
 Ctrl+C
@@ -413,7 +407,7 @@ For a beginner, the best choice is often the one that produces the clearest feed
 
 3. **SSH has been standardized for decades as a secure remote-login protocol family.** RFC 4251 describes the Secure Shell architecture, and OpenSSH remains a common implementation used to reach remote systems from a terminal. That is why terminal confidence matters long before you become a server specialist.
 
-4. **Windows Terminal was first released as a modern open source terminal host for Windows in 2019.** It can host PowerShell, Command Prompt, WSL shells, and other profiles in tabs. The application is not the shell itself; it is the window that hosts one or more shells.
+4. **Windows Terminal was announced in 2019; version 1.0 was released in May 2020.** Microsoft's [announcement](https://devblogs.microsoft.com/commandline/introducing-windows-terminal/) and [1.0 release post](https://devblogs.microsoft.com/commandline/windows-terminal-1-0/) distinguish preview history from the stable release. It can host PowerShell, Command Prompt and WSL profiles; the terminal application and the shell are separate programs.
 
 ## Common Mistakes
 
@@ -425,7 +419,7 @@ For a beginner, the best choice is often the one that produces the clearest feed
 | Changing capitalization, such as `Echo` instead of `echo` | Many shells and filesystems treat uppercase and lowercase as different characters | Match the command's capitalization exactly, especially on Linux and WSL |
 | Forgetting a closing quote | The shell thinks the text argument is still unfinished and may show a `>` continuation prompt | Type the missing quote and press Enter, or press Ctrl+C to cancel and start fresh |
 | Panicking when output keeps printing | A running foreground process can temporarily prevent you from typing a new command | Press Ctrl+C once, then wait to see whether the normal prompt returns |
-| Assuming every terminal window is the same machine | Multiple tabs can connect to different local or remote systems | Read the username, hostname, and location in the prompt before running commands |
+| Assuming every terminal window is the same machine | Multiple tabs can connect to different local or remote systems | Confirm which session you opened; compare prompt clues with read-only user and hostname checks |
 | Using a short alias in notes meant for someone else | Aliases only exist if that shell session defines them, so examples can fail on another machine | Write full command names in shared instructions and scripts |
 
 ## Quiz
@@ -435,21 +429,21 @@ Test your understanding by answering each scenario before opening the explanatio
 <details>
 <summary>Question 1: You accidentally start a command that is printing endless lines of text, and you cannot type a new command. What is your immediate next step, and why?</summary>
 
-Press Ctrl+C once and watch for the normal prompt to return. Ctrl+C sends SIGINT to the foreground command, and most command-line tools respond by stopping. This is the right first move because the problem is not that the terminal window is broken; it is that a running program currently owns the foreground. If Ctrl+C does not work because you are inside a full-screen program, then the program may have its own quit key, but Ctrl+C is the beginner-safe first attempt for ordinary commands.
+Press Ctrl+C once, with no text selected, and watch for the normal prompt to return. In Unix terminals this normally sends SIGINT to the foreground process group; other hosts may handle cancellation differently. The command may still control the foreground until it responds. Full-screen programs can have their own quit keys, so consult the program's help if the normal prompt does not return.
 
 </details>
 
 <details>
 <summary>Question 2: You try to echo a paragraph of text, but after pressing Enter the terminal shows `>` on a new line instead of your normal prompt. What likely happened, and how do you recover?</summary>
 
-You most likely opened a quote and did not close it. The shell is showing a continuation prompt because it believes your command is incomplete, so it is waiting for the rest of the quoted text. You can recover by typing the missing quote and pressing Enter, or by pressing Ctrl+C to cancel the unfinished command and return to a fresh prompt. The key is recognizing that `>` is not the same as the normal ready prompt.
+Because the prompt changed immediately after your echo command, check for an opening quote without a closing partner. The shell may be waiting for the rest of the text. Finish the quote and press Enter, or press Ctrl+C with no text selected to cancel. Compare the result with your normal prompt; PowerShell's normal prompt can itself end in `>`.
 
 </details>
 
 <details>
 <summary>Question 3: You are switching between terminal windows and one prompt says `alice@db-primary-main /etc/config $`. What can you infer before running anything?</summary>
 
-The prompt tells you that the current user is `alice`, the machine name is `db-primary-main`, and the current location is `/etc/config`. That information matters because the command you run next will execute in that session, not in whichever window you meant to use mentally. The `$` at the end suggests the shell is ready for a command as a normal user. You should pause before running anything impactful because the hostname and directory both sound like a sensitive system area.
+In this illustration, the labels suggest user `alice`, host `db-primary-main` and directory `/etc/config`. They are reasons to pause before changing anything, not independent proof of location or privilege: the prompt, including `$`, can be customized. Confirm which session you opened and compare its user and hostname checks with your intended training environment before proceeding.
 
 </details>
 
@@ -515,12 +509,6 @@ On macOS, the prompt may end with `%`; on Linux and WSL, it often ends with `$`.
 echo 'Hello, World!'
 ```
 
-The preserved prompt-style example from earlier course notes is shown below so you can recognize the convention without copying it literally:
-
-```text
-$ echo 'Hello, World!'
-```
-
 The expected output is the text inside the quotes, printed without the quote marks because the shell used them only for grouping:
 
 ```text
@@ -548,12 +536,6 @@ date
 Get-Date
 ```
 
-The preserved Bash/zsh/WSL prompt-style example from earlier course notes includes the leading prompt marker for comparison with the runnable command:
-
-```bash
-$ date
-```
-
 The expected output is a timestamp from your own machine, so the following line is only one valid example:
 
 ```text
@@ -572,16 +554,6 @@ Your exact timestamp will differ from the example because your machine has its o
 ```bash
 whoami
 hostname
-```
-
-The preserved prompt-style examples from earlier course notes show these commands one at a time with their prompt markers visible:
-
-```bash
-$ whoami
-```
-
-```bash
-$ hostname
 ```
 
 Possible outputs are shown separately because your username and hostname come from different system settings and answer different questions:
@@ -615,16 +587,6 @@ echo "Today is $(date) and I am $(whoami)"
 ```powershell
 Write-Output 'I just used the terminal!'
 Write-Output "Today is $(Get-Date) and I am $(whoami)"
-```
-
-The preserved Bash/zsh/WSL prompt-style examples from earlier course notes show the same commands with visible prompt markers for recognition practice:
-
-```text
-$ echo 'I just used the terminal!'
-```
-
-```bash
-$ echo "Today is $(date) and I am $(whoami)"
 ```
 
 <details>
@@ -688,7 +650,7 @@ alex@training-vm /tmp $
 <details>
 <summary>Check your diagnosis</summary>
 
-Transcript A shows a continuation prompt: the opening quote was never closed, so the shell is waiting for the rest of the text. The next move is to type the missing quote and press Enter, or press Ctrl+C to cancel and return to a normal prompt. Transcript B shows a command that is still running because output lines keep arriving and no prompt has returned; the next move is to press Ctrl+C once and wait for the prompt to come back. Transcript C shows an error caused by copying the `$` prompt symbol along with the command, and the shell has already returned to a ready prompt; the next move is to retype `echo 'Hello, World!'` without the leading `$`. Transcript D shows two ready prompts on different machines; the next move is to use the `alex@training-vm /tmp $` window, because the hostname portion of the prompt identifies which machine will execute the command.
+Transcript A shows unfinished quoted input; finish the quote or cancel and compare with the normal prompt. Transcript B shows continuing output without a returned prompt; try Ctrl+C once and check the result. Transcript C shows a copied `$` prompt symbol being treated as a command; retype `echo 'Hello, World!'` without it. In the synthetic Transcript D, choose the window labeled `alex@training-vm /tmp $`. In real sessions, confirm the connection you opened and read the user/hostname checks before changing anything; customized labels alone are not proof.
 
 </details>
 
@@ -707,6 +669,10 @@ You've completed this exercise when you can demonstrate each item below without 
 
 ## Sources
 
+- [Apple termios manual: INTR and SIGINT](https://github.com/apple-oss-distributions/xnu/blob/14e3d835ecf9736db9bf15b7bc859981275e1fc0/bsd/man/man4/termios.4#L466-L478)
+- [PowerShell 7.5: Normal and customized prompts](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_prompts?view=powershell-7.5)
+- [PSReadLine: AcceptLine and CopyOrCancelLine](https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline_functions?view=powershell-7.5)
+- [zsh: Prompt expansion and parser-state markers](https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html)
 - [zsh: Interactive history expansion, including `!` inside double quotes](https://zsh.sourceforge.io/Doc/Release/Expansion.html#History-Expansion)
 - [PowerShell 7.5: Single- and double-quoted strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5)
 - [RFC 4251: The Secure Shell (SSH) Protocol Architecture](https://www.rfc-editor.org/info/rfc4251)

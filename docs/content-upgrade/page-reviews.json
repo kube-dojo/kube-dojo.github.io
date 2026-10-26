@@ -7,23 +7,23 @@
       "page_digest": "sha256:5be0298565845a2195e00d413b9b11b34d33d40989fd6e22082801bdccf7af48",
       "disposition": "retain",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
-      "independent_statuses": {"technical_source": "pending", "editorial_review": "pending", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6420001065"],
+      "independent_statuses": {"technical_source": "pending", "editorial_review": "pending", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.1-what-is-a-computer.md",
       "page_digest": "sha256:874310c9e4242183e31a774f857d7562105cbc59b2c75aeaf2783c69e522a153",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6420001065"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal.md",
-      "page_digest": "sha256:5091b850794b52e9c868de2136a321a4cbe76cf3168ca3cff4d8dfa63afa02fb",
+      "page_digest": "sha256:af38fa2b0313c145e9dc1efec008ed68a5ac9e535dd6dfe158f4d2a5ee190573",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01b.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01b.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
@@ -31,24 +31,24 @@
       "page_digest": "sha256:2651d62e3bef45c29495d983e83e30081507b42cff87227056ceb8c6e557c802",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6419306963"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/kubernetes-basics/index.md",
       "page_digest": "sha256:f93884b9b37d89e6d548905f9632a6bc913fe05fd84ca35937caff853821da7f",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md"],
-      "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6419306963"],
+      "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/cloud-native-101/module-1.3-what-is-kubernetes.md",
       "page_digest": "sha256:38eb73d3c5eacb496681bace1fdfb1023f2ae8fe8b0130b10b30ab753d75d98b",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6419306963"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/cloud-native-101/index.md",
