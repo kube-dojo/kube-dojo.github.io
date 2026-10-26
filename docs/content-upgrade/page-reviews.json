@@ -20,7 +20,7 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal.md",
-      "page_digest": "sha256:af38fa2b0313c145e9dc1efec008ed68a5ac9e535dd6dfe158f4d2a5ee190573",
+      "page_digest": "sha256:f3a2215471af37862c399f730adc4265f8a0eeb71a1ea9021e5d38c733f64a73",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01b.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01b.md"],
