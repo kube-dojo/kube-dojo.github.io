@@ -477,9 +477,9 @@ The shared concept is that each package manager searches a configured catalog, r
 
 </details>
 
-<details><summary>Question 3: A new Linux server says `E: Unable to locate package nginx`, but you know `nginx` exists in the configured repositories. What is the most likely package-manager step you missed?</summary>
+<details><summary>Question 3: A new Linux server says `E: Unable to locate package nginx`. What does this establish, and what should you inspect before retrying?</summary>
 
-The most likely missed step is refreshing the local package index with `sudo apt update`. A new or stale machine may not have current metadata, so `apt install` can only search an outdated local catalog. Running the metadata update teaches the package manager which packages and versions are currently available from its repositories. After that, retrying the install has a much better chance of finding the package.
+APT could not locate the package using its available information; the message alone does not establish why. Check spelling and configured sources, refresh metadata on the authorized host, and inspect update errors and package availability before retrying. Refreshing a stale index does not repair every repository or package-name problem.
 
 </details>
 
@@ -649,7 +649,7 @@ You are not expected to memorize every dependency. The success condition is that
 
 ### Task 6: Package Diagnostics (Unguided)
 
-This final task is unguided: rather than following a step-by-step recipe, inspect the three simulated terminal transcripts below. Each snapshot captures a real-world package management problem encountered by engineers on Linux and macOS hosts. For each scenario, analyze the terminal output, identify the underlying root cause, and determine your recommended diagnostic move or operational decision before opening the solution notes.
+This unguided task uses simulated transcripts. Identify what each output establishes, which causes remain hypotheses, and what evidence is needed before recommending a change. Do not infer a unique cause or an official release-version matrix from these limited illustrations.
 
 Transcript A captures a shell session on a newly provisioned Ubuntu cloud server where an engineer attempts to install the Nginx web server immediately after first logging in:
 
@@ -681,11 +681,11 @@ Do you want to continue? [Y/n]
 Transcript C displays terminal outputs from two engineers comparing their local installations of `htop` across two different workstations, observing unexplained differences in output format and available hotkeys:
 
 ```text
-# Engineer Alice (Ubuntu 22.04 LTS workstation):
+# Simulated workstation A; no Ubuntu release-version association is asserted:
 alice@workstation:~$ htop --version
 htop 3.0.5
 
-# Engineer Bob (Ubuntu 24.04 LTS workstation):
+# Simulated workstation B; no Ubuntu release-version association is asserted:
 bob@workstation:~$ htop --version
 htop 3.3.0
 ```
@@ -708,11 +708,9 @@ Transcript C: These simulated outputs show different `htop` versions on two work
 - [ ] Diagnose dependency requirements for an installed package using `apt show`, `apt-cache depends`, or `brew info`.
 - [ ] Run `htop`, quit it with `q`, and confirm its installed version.
 - [ ] Use `tree` to display a directory and explain whether any error is a package problem or a missing-directory problem.
-- [ ] Diagnose unguided package scenarios from terminal transcripts by identifying missing catalog refreshes, evaluating unfamiliar dependency plans, and determining why versions differ across hosts.
+- [ ] Distinguish observed package errors from hypotheses, evaluate dependency plans, and identify evidence needed to explain version differences.
 
 ## Sources
-
-- [Ubuntu Noble apt manual](https://manpages.ubuntu.com/manpages/noble/man8/apt.8.html)
 
 - [OWASP CI/CD-SEC-03: Dependency Chain Abuse](https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse)
 - [MDN: Package management basics](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Client-side_tools/Package_management)
