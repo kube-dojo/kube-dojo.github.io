@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Clearer, safer file-and-directory practice.** [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) now establishes a new workspace before writing files, keeps worked examples and exercises in the same project, and labels examples that need files or system paths you may not have.
 - **Safer first file-command practice.** [First Terminal Commands](/prerequisites/zero-to-terminal/module-0.3-first-commands/) now starts file-changing work in a new disposable workspace and asks you to stop if its name is taken. Practice-tree cleanup stays inside it; the final optional step removes that workspace from home only when this session created it.
 - **More precise memory and computing-history explanations.** The [computer lesson](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) explains storage units and links its memory facts to source documentation and a museum account. The [terminal lesson](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) adds direct sources for punched cards and hardware terminals.
 - **Easier prompt reading and recovery.** [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) now distinguishes normal prompts from unfinished input across shells, explains why a prompt label alone cannot confirm the machine, and keeps practice commands separate from prompt notation.

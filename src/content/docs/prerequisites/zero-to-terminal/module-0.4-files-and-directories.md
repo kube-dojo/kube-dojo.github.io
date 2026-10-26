@@ -303,7 +303,9 @@ Think about it: you need to check the last few lines of a log file that is 10,00
 
 The same choice appears in Kubernetes work. When checking cluster access, reading a short kubeconfig snippet might be reasonable with `cat`, although you should be careful not to expose secrets on a shared screen. When reading node or container logs under `/var/log/`, `tail` is usually safer because the newest entries carry the strongest troubleshooting signal. The command is simple, but the decision behind it is operational judgment.
 
-```bash
+Illustrative log path — use this only on a machine where that log exists and you may read it:
+
+```text
 tail -n 20 /var/log/syslog
 ```
 
@@ -317,6 +319,22 @@ The second command checks that the file exists and shows its permissions without
 
 Navigation becomes more useful when you can create a small structure of your own. `mkdir` creates directories, and `touch` creates an empty file if it does not already exist. These commands are simple, but the distinction matters: applications that expect a directory cannot write logs into a regular file, and scripts that expect a file cannot read useful content from an empty directory.
 
+### Create Your Disposable Workspace First
+
+The earlier navigation ended at `/`; do not create practice files there. For every file-changing example below, use a new directory that you create solely for this lesson and keep under your exclusive control. Being inside your home directory alone does not make existing files disposable.
+
+Run these commands **one line at a time**. After any `mkdir` or `cd` error, stop: do not run the next line or any file-writing command. If `mkdir` reports that the name exists (including a file or symbolic link), leave it untouched, choose an unused name such as `kubedojo-practice-2`, and substitute that name in every later project path. Do not use `mkdir -p` for this workspace root: it would accept an existing directory instead of establishing a fresh one.
+
+```bash
+cd ~
+mkdir kubedojo-practice
+cd kubedojo-practice
+pwd
+ls -a
+```
+
+Continue only when `pwd` identifies the directory you just created and `ls -a` shows only `.` and `..`. Keep this terminal in the workspace through the examples and hands-on tasks. If you lose track of its ownership or contents, stop and create a new workspace using the same procedure; do not reuse an unfamiliar directory or delete it to make the instructions work.
+
 ```bash
 mkdir recipes
 ```
@@ -327,7 +345,7 @@ The `mkdir` command creates one directory at the path you provide. If the parent
 mkdir -p recipes/italian/pasta
 ```
 
-The `-p` option means "create parent directories as needed." It is common in setup scripts and labs because it makes the command safe to run even when part of the structure already exists. Without `-p`, creating `recipes/italian/pasta` would fail if `recipes/` or `recipes/italian/` had not been created first.
+The `-p` option means "create parent directories as needed." Within this owned workspace, it lets you extend the tree even when part of the structure already exists; it does not prove an existing directory is safe to reuse. Without `-p`, creating `recipes/italian/pasta` would fail if `recipes/` or `recipes/italian/` had not been created first.
 
 ```bash
 touch shopping-list.txt
@@ -432,7 +450,9 @@ In this directory example, `d` says the entry is a directory. The owner has `rwx
 
 Permissions are like keys in the kitchen. The head chef may have the key to open, edit, and reorganize every drawer. A sous-chef may be allowed to read the recipe cards but not replace them. Visitors may be allowed to see a posted menu but not enter the storage room. The permission string compresses that policy into a short form you can read quickly during troubleshooting.
 
-```bash
+The appetizer directory is created in the hands-on exercise; this first listing is illustrative until then:
+
+```text
 ls -l recipes/appetizers/
 ```
 
@@ -474,10 +494,11 @@ cat /home/yourname/kubedojo-practice/recipes/appetizers/bruschetta.txt
 
 Neither style is universally better. The relative path is easier to type and clearer when everyone is already working inside the same project. The absolute path is safer in documentation, troubleshooting notes, and scripts where the starting location may be unclear. That tradeoff shows up constantly in cloud engineering because a command copied into a runbook should behave the same way for the next engineer who uses it during an incident.
 
-The same trace method works for `mkdir -p`. When you run `mkdir -p kubedojo-practice/recipes/desserts`, the shell starts from the current directory and asks the filesystem to ensure that each named directory exists in order. If `kubedojo-practice` already exists, it keeps going. If `recipes` exists, it keeps going. If `desserts` is missing, it creates that final directory. The option changes the behavior from "create exactly this one directory" to "make this path usable as a directory tree."
+The same trace method works for `mkdir -p`. Still inside your newly created workspace, run `pwd` and confirm its path before continuing. When you run `mkdir -p recipes/desserts`, the shell starts there and ensures that each named directory exists in order. If `recipes` exists, it keeps going; if `desserts` is missing, it creates it. Adding `kubedojo-practice/` here would incorrectly create a second project inside the first. Stop on any error before continuing to `touch` or `>`.
 
 ```bash
-mkdir -p kubedojo-practice/recipes/desserts
+pwd
+mkdir -p recipes/desserts
 ```
 
 This is why `mkdir -p` is common in setup instructions. It avoids forcing learners to create every parent directory manually, and it makes repeated practice less fragile. If you run the same command again, it should still leave the directory structure in the desired state. That property, where a command can be repeated without causing unnecessary change, is valuable in automation even though this module is only introducing the beginner version of the idea.
@@ -542,11 +563,13 @@ The first command asks about the `.ssh` directory itself, while the second asks 
 
 In Kubernetes work, the filesystem often appears during debugging before the Kubernetes-specific command does. A control-plane node may have static Pod manifests under `/etc/kubernetes/manifests/`, and kubelet-managed logs may appear under `/var/log/pods/` or `/var/log/containers/` depending on the environment. Even when you later use `kubectl logs`, the mental model is the same: logs are records written somewhere, and paths are how the machine names those places.
 
-```bash
+Illustrative node-specific commands; these paths need not exist on your machine:
+
+```text
 ls -l /etc/kubernetes/manifests/
 ```
 
-```bash
+```text
 tail -n 20 /var/log/syslog
 ```
 
@@ -558,7 +581,9 @@ There is one more layer to that translation: every path has checkpoints. For `/v
 
 The first checkpoint is your starting point, so `pwd` is the first repair command when a relative path fails. If the starting point is wrong, every relative path after it is also wrong. The second checkpoint is each parent directory, which you can inspect with `ls` one level at a time. The final checkpoint is the target itself, where you decide whether it should be a file, a directory, or a hidden name that requires `ls -a` to appear in listings.
 
-```bash
+The following checkpoint examples assume the appetizer files from the hands-on exercise already exist:
+
+```text
 pwd
 ls
 ls recipes
@@ -569,7 +594,7 @@ Those four commands are deliberately plain. They do not fix anything by themselv
 
 The same narrowing helps with permission problems. Suppose a path exists, but reading the final file fails with "Permission denied." You can inspect the file with `ls -l` if you can reach it, and you can inspect parent directories with `ls -ld` if entering the path is the problem. A missing read bit on the file is different from a missing execute bit on a parent directory, even though both can stop you from getting useful content.
 
-```bash
+```text
 ls -ld recipes
 ls -ld recipes/appetizers
 ls -l recipes/appetizers/bruschetta.txt
@@ -730,21 +755,23 @@ In this exercise, you will create a small recipe project, navigate through it, r
 
 ### Setup
 
-Start from your home directory so the paths in the exercise are predictable. If the practice directory already exists from an earlier run, you can choose a different name or inspect what is already there before continuing. The commands below are safe for a beginner lab because they stay inside your home directory.
+Continue in the disposable workspace you created above. If you skipped those examples, complete **Create Your Disposable Workspace First** before starting here. If you are repeating the lesson, create a fresh workspace with an unused name; do not adopt an existing project. Run each command separately and stop on any error, especially a failed `mkdir` or `cd`, before creating or overwriting files.
 
 ```bash
-cd ~
 pwd
+ls -a
 ```
+
+Confirm that `pwd` identifies your owned workspace. Following the earlier examples, its top level contains `recipes` and `shopping-list.txt`; a newly created workspace is empty apart from `.` and `..`. Unexpected entries mean stop and establish a fresh workspace. The tasks deliberately reuse only the disposable recipe files you create in this lesson.
 
 ### Tasks
 
 1. **Create the project directories.** Use `mkdir -p` so the command creates every parent directory needed for the nested structure.
 
 ```bash
-mkdir -p kubedojo-practice/recipes/appetizers
-mkdir -p kubedojo-practice/recipes/main-courses
-mkdir -p kubedojo-practice/recipes/desserts
+mkdir -p recipes/appetizers
+mkdir -p recipes/main-courses
+mkdir -p recipes/desserts
 ```
 
 <details>
@@ -754,12 +781,14 @@ The `-p` option allows each command to create parent directories that do not exi
 
 </details>
 
-2. **Navigate into the project and list its top level.** Confirm that the structure begins where you expected.
+2. **Confirm your location in the project and list its top level.** You are already inside the workspace; do not enter a second nested project.
 
 ```bash
-cd kubedojo-practice
+pwd
 ls
 ```
+
+Expected minimum entry (the earlier examples also leave `shopping-list.txt`):
 
 ```text
 recipes
@@ -768,11 +797,11 @@ recipes
 <details>
 <summary>Solution notes for task 2</summary>
 
-The `cd` command changes your working directory to the practice project. Running `ls` afterward should show `recipes` because that is the only top-level item you created. If you see an error, run `pwd` and verify that the practice directory was created under your home directory.
+The `pwd` output should identify your workspace, and `ls` should include `recipes`. The earlier examples also created `shopping-list.txt`, so that extra entry is expected when following the whole page. If the location or entries are unfamiliar, stop before writing files and return to the workspace setup instructions.
 
 </details>
 
-3. **Create recipe files in each category.** These start as empty files, which is exactly what `touch` creates.
+3. **Create recipe files in each category.** New files start empty. If you followed the worked example, `tiramisu.txt` already contains one line; `touch` preserves that content while updating its timestamp.
 
 ```bash
 touch recipes/appetizers/bruschetta.txt
@@ -798,7 +827,7 @@ echo "Ingredients: coffee, mascarpone, ladyfingers, cocoa" > recipes/desserts/ti
 <details>
 <summary>Solution notes for task 4</summary>
 
-The `>` redirect replaces the file's contents with the text produced by `echo`. That is useful here because each file is new. In real work, be careful with `>` because it overwrites existing content; later modules will cover safer editing habits.
+The `>` redirect replaces the file's contents with the text produced by `echo`. Here you are intentionally writing or replacing only your disposable lesson files, including `tiramisu.txt` from the worked example. In real work, be careful with `>` because it overwrites existing content; later modules will cover safer editing habits.
 
 </details>
 
