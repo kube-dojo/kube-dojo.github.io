@@ -4,18 +4,18 @@
   "pages": [
     {
       "path": "prerequisites/zero-to-terminal/module-0.5-editing-files.md",
-      "page_digest": "sha256:3d19a2fa7321a92a8b1f106db86ca1d1e79ce0bacac39ffd50f75768af5257bf",
+      "page_digest": "sha256:8bfbb3608c1abd9e059f5a0cc71095b950d14737a8ea62aba1f29882e0f33115",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md", "docs/content-upgrade/reviews/2026-10-26-permission-diagnosis-p02d.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md", "docs/content-upgrade/reviews/2026-10-26-permission-diagnosis-p02d.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.4-files-and-directories.md",
-      "page_digest": "sha256:2f8c13ca52e0818cb512b7ed1ae20f557323d15a8036430b4dd48ba02a76e701",
+      "page_digest": "sha256:a1ce9dbcf393feeaebd1c9bf7c733fdbd511c940e6531ee4f14f2242f385cfc9",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-files-directories-p02b.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-files-directories-p02b.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-files-directories-p02b.md", "docs/content-upgrade/reviews/2026-10-26-permission-diagnosis-p02d.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-files-directories-p02b.md", "docs/content-upgrade/reviews/2026-10-26-permission-diagnosis-p02d.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {

@@ -422,11 +422,11 @@ The first character tells you the type of entry. A `d` means directory, while `-
 | Letter | Permission | For Files | For Directories |
 |--------|-----------|-----------|-----------------|
 | `r` | Read | Can see the contents | Can list what's inside |
-| `w` | Write | Can change the contents | Can add or remove files |
+| `w` | Write | Can change the contents | Can add or remove entries when `x` also permits traversal |
 | `x` | Execute | Can run it as a program | Can enter the directory with `cd` |
 | `-` | No permission | Cannot do that action | Cannot do that action |
 
-The directory behavior is the part many beginners miss. Execute on a file means "can run it as a program," but execute on a directory means "can enter or traverse it." A directory may be readable but not enterable, or enterable but not listable, depending on the exact bits. You do not need all edge cases today, but you should know that `x` on a directory is not about running the directory.
+The directory behavior is the part many beginners miss. Execute on a file means "can run it as a program," but execute on a directory means "can enter or traverse it." A directory may be readable but not enterable, or enterable but not listable, depending on the exact bits. Adding or removing names normally needs both `w` and `x` on the containing directory. Other restrictions can still block an operation; the Linux [file-creation](https://man7.org/linux/man-pages/man2/open.2.html) and [file-removal](https://man7.org/linux/man-pages/man2/unlink.2.html) error lists distinguish these checks.
 
 ```text
 -rw-r--r--  notes.txt
@@ -443,12 +443,14 @@ In this directory example, `d` says the entry is a directory. The owner has `rwx
 | Permission String | Plain-English Reading | Common Interpretation |
 |-------------------|-----------------------|-----------------------|
 | `-rw-r--r--` | Owner can read and write; group and others can read | Normal non-secret text file |
-| `-rw-------` | Owner can read and write; nobody else has access | Sensitive personal file |
+| `-rw-------` | Owner can read and write; group and others have no ordinary access permissions | Sensitive personal file |
 | `drwxr-xr-x` | Owner controls directory; others can list and enter | Common user-visible directory |
 | `drwx------` | Owner alone can list, write, and enter | Private directory such as some key stores |
 | `-rwxr-xr-x` | Owner can run and edit; others can run and read | Executable script or program |
 
 Permissions are like keys in the kitchen. The head chef may have the key to open, edit, and reorganize every drawer. A sous-chef may be allowed to read the recipe cards but not replace them. Visitors may be allowed to see a posted menu but not enter the storage room. The permission string compresses that policy into a short form you can read quickly during troubleshooting.
+
+These examples describe ordinary permission bits, not an absolute privacy guarantee. On Linux, [privileged capabilities](https://man7.org/linux/man-pages/man7/capabilities.7.html) can bypass some access checks. Keep that distinction when reading a private-looking mode: it describes normal file access, not encryption or protection from an authorized administrator. Shared machines can also have additional access rules that need separate inspection.
 
 The appetizer directory is created in the hands-on exercise; this first listing is illustrative until then:
 
@@ -615,7 +617,7 @@ Everything above gave you the checkpoint method in a guided order. This challeng
 <details>
 <summary>Reveal a worked diagnosis for symptom one</summary>
 
-The error message is the first clue: "No such file or directory" means the path itself failed to resolve, so this is a path problem rather than a permission problem. The two most likely explanations are a wrong starting point (you are not actually inside `~/kubedojo-practice`) and a name mismatch somewhere along the route. `pwd` settles the starting-point question in one step, which is why it is usually the fastest first command. If `pwd` confirms the project directory, walk the checkpoints with `ls recipes` and then `ls recipes/appetizers`; in this scenario that listing shows the file was created as `brushetta.txt`, a one-letter transposition made during the exercise. The fix is to use the name the filesystem actually has, and the lesson is that `ls` at each checkpoint beats retyping the same failing path.
+The error message is the first clue: "No such file or directory" means the path itself failed to resolve, so this is a path problem rather than a permission problem. The two likely explanations to check are a different starting point and a name mismatch somewhere along the route. `pwd` settles the starting-point question in one step. If it confirms your chosen workspace, walk the checkpoints with `ls recipes` and then `ls recipes/appetizers`. For example, if that listing shows `brushetta.txt`, the name is missing the `c` from `bruschetta.txt`; that is a hypothetical typing mistake, not the output of the correctly followed exercise. Use the name the filesystem actually has, and let each listing supply evidence before choosing a diagnosis.
 
 </details>
 
@@ -624,7 +626,7 @@ The error message is the first clue: "No such file or directory" means the path 
 <details>
 <summary>Reveal a worked diagnosis for symptom two</summary>
 
-"Permission denied" redirects the investigation away from spelling and toward access, so the checkpoint list changes: run `ls -l recipes/desserts/tiramisu.txt` to read the file's permission string, owner, and group, and run `ls -ld recipes recipes/desserts` to confirm the parent directories let you traverse them. In this scenario the file shows `-rw-r-----` with the teammate as owner and a group you do not belong to, which means the others segment `---` blocks your read. Because this module only teaches reading permissions, not changing them, the correct outcome is an accurate escalation: you tell the teammate that the file's owner must adjust access, rather than retrying the same command and hoping. Naming the responsible person correctly is real operational skill, not a failed diagnosis.
+"Permission denied" redirects the investigation away from spelling and toward access, so the checkpoint list changes: run `ls -l recipes/desserts/tiramisu.txt` to read the file's permission string, owner, and group, and run `ls -ld recipes recipes/desserts` to inspect parent traversal permissions. Suppose the file shows `-rw-r-----` with the teammate as owner and a group you do not belong to. Under ordinary mode-bit checks, the others segment `---` prevents your read; additional access rules need separate inspection. Because this module teaches reading permissions, not changing them, explain your evidence to the teammate and ask the owner or an authorized administrator to arrange appropriate access. Do not change someone else's permissions or infer the file's mode from the error alone.
 
 </details>
 
@@ -812,7 +814,7 @@ touch recipes/desserts/tiramisu.txt
 <details>
 <summary>Solution notes for task 3</summary>
 
-Each path is relative to `kubedojo-practice`, which is why it starts with `recipes/` instead of `/home/...`. If one command fails with "No such file or directory," inspect the directory names with `ls recipes` and check for a spelling mismatch.
+Each path is relative to your chosen workspace, which is why it starts with `recipes/` instead of `/home/...`. If one command fails with "No such file or directory," inspect the directory names with `ls recipes` and check for a spelling mismatch.
 
 </details>
 
@@ -888,7 +890,7 @@ pwd
 <details>
 <summary>Solution notes for task 8</summary>
 
-The first `pwd` should end in `kubedojo-practice/recipes/desserts`. After `cd ..`, the path should end in `kubedojo-practice/recipes`. After `cd ~`, the path should be your home directory. If any prediction is wrong, pause and explain which relative path assumption changed.
+The first `pwd` should identify `recipes/desserts` inside your chosen workspace. After `cd ..`, it should identify that workspace's `recipes` directory. After `cd ~`, it should identify your home directory. If any prediction is wrong, pause and explain which relative path assumption changed.
 
 </details>
 
@@ -932,6 +934,9 @@ You've completed this exercise when you can:
 
 ## Sources
 
+- [Linux open(2): access and file-creation errors](https://man7.org/linux/man-pages/man2/open.2.html)
+- [Linux unlink(2): directory access and removal restrictions](https://man7.org/linux/man-pages/man2/unlink.2.html)
+- [Linux capabilities(7): privileged access checks](https://man7.org/linux/man-pages/man7/capabilities.7.html)
 - [RHEL Storage Administration Guide: File systems](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/storage_administration_guide/ch-filesystem)
 - [The /proc Virtual Filesystem](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/4/html/reference_guide/ch-proc)
 - [A beginner's guide to navigating the Linux filesystem](https://www.redhat.com/en/blog/navigating-linux-filesystem)
