@@ -84,7 +84,7 @@ flowchart LR
         CP[Control Plane\n- Schedules pods to nodes\n- Tracks cluster state\n- Coordinates Pod replacement]
         Nodes[Worker Nodes\n- Physical/virtual machines\n- Kubelet executes work]
         Pods[Pods\n- Running containers\n- Tracked by control plane]
-        NS[Namespaces\n- Tenant isolation\n- e.g., Team A vs Team B]
+        NS[Namespaces\n- Resource grouping and policy scope\n- e.g., Team A vs Team B]
     end
 
     Tower -.->|"Maps to"| CP
@@ -636,6 +636,7 @@ Failure layer: there is no controller reconciling a replica count. Next action: 
 
 ## Sources
 
+- [Kubernetes 1.35: Namespaces and tenant-isolation requirements](https://v1-35.docs.kubernetes.io/docs/concepts/security/multi-tenancy/#namespaces)
 - [Docker restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/) and [Compose networking and service discovery](https://docs.docker.com/compose/how-tos/networking/).
 - [GKE Autopilot responsibilities](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview), [Kubernetes project history](https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/), and [CNCF project journey](https://www.cncf.io/reports/kubernetes-project-journey-report/).
 - [Pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) and [Compose secrets](https://docs.docker.com/compose/how-tos/use-secrets/).

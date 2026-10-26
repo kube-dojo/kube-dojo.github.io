@@ -7,24 +7,24 @@
       "page_digest": "sha256:74201fe1d9c743f83762922e521f68f547d6c864f9881d64a190cd4e7ab35c91",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6429337191"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.7-what-is-networking.md",
       "page_digest": "sha256:ce9d7b6c46e83424c4aea5741fb4f5cf402880b48b4608be379323029be618c8",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6429337191"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.8-servers-and-ssh.md",
       "page_digest": "sha256:e650ffe8cd4fb9913143fd7c698626b787432491414d1c4df8000ed433052b13",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6429337191"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.5-editing-files.md",
@@ -83,6 +83,22 @@
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
+      "path": "prerequisites/cloud-native-101/module-1.4-cloud-native-ecosystem.md",
+      "page_digest": "sha256:93add807ae29565a2d108986d37d313602e9bb98a5393ee721af117eb13ec253",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-orchestration-evidence-p06.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-orchestration-evidence-p06.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/cloud-native-101/module-1.5-monolith-to-microservices.md",
+      "page_digest": "sha256:281ccc15f2b19736bf0c7c1c5092eedf704e5fce29eb45d696be7d0f026d5bdb",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-orchestration-evidence-p06.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-orchestration-evidence-p06.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
       "path": "prerequisites/kubernetes-basics/index.md",
       "page_digest": "sha256:f93884b9b37d89e6d548905f9632a6bc913fe05fd84ca35937caff853821da7f",
       "disposition": "revise",
@@ -92,11 +108,11 @@
     },
     {
       "path": "prerequisites/cloud-native-101/module-1.3-what-is-kubernetes.md",
-      "page_digest": "sha256:38eb73d3c5eacb496681bace1fdfb1023f2ae8fe8b0130b10b30ab753d75d98b",
+      "page_digest": "sha256:0c93da89924ad0a5a20f568c43058fa9eaf0d9fb6fbc2fd79d7e396cc36622a5",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6419306963"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6419306963", "docs/content-upgrade/reviews/2026-10-27-orchestration-evidence-p06.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
       "path": "prerequisites/cloud-native-101/index.md",
