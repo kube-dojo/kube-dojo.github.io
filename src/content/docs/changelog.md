@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **More precise memory and computing-history explanations.** The [computer lesson](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) explains storage units and links its memory facts to primary documentation. The [terminal lesson](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) adds direct sources for punched cards and hardware terminals.
 - **Easier prompt reading and recovery.** [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) now distinguishes normal prompts from unfinished input across shells, explains why a prompt label alone cannot confirm the machine, and keeps practice commands separate from prompt notation.
 - **More reliable first steps with your computer and terminal.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) now distinguishes resource clues from confirmed bottlenecks and makes the Kubernetes preview optional. [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) uses literal quoting that works with interactive zsh for the first greeting and practice message.
 - **Clearer expectations for beginner Kubernetes practice.** The [Kubernetes Basics overview](/prerequisites/kubernetes-basics/) explains the skills you will practice and why Secrets still need access and storage protections. The introduction and Deployments lesson now use more direct prompts and describe recovery without promising availability.
