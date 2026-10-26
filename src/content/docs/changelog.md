@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Clearer expectations for beginner Kubernetes practice.** The [Kubernetes Basics overview](/prerequisites/kubernetes-basics/) explains the skills you will practice and why Secrets still need access and storage protections. The introduction and Deployments lesson now use more direct prompts and describe recovery without promising availability.
 - **Clearer Kubernetes basics and safer practice.** The [Kubernetes introduction](/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes/) and [Deployments lesson](/prerequisites/kubernetes-basics/module-1.4-deployments/) now explain failures and recovery more clearly. Practice steps make it easier to keep experiments separate and clean up afterward.
 - **More useful Linux troubleshooting guidance.** [Systematic Troubleshooting](/linux/operations/troubleshooting/module-6.1-systematic-troubleshooting/) now gives clearer guidance for gathering clues, comparing results and deciding what to try next, with better explanations of when commands apply.
 

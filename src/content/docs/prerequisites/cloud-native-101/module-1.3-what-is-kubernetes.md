@@ -106,7 +106,7 @@ Existing Pods usually continue running. A laptop-only connectivity failure preve
 
 </details>
 
-Name what keeps running before you try the two client commands below. Those commands are the management path. They do not show a node that has lost the API.
+Before trying the two client commands below, predict what a connection error would tell you about your laptop's access to the cluster. Would that error alone prove that the application containers have stopped? Explain what other evidence you would need.
 
 ```bash
 kubectl version
@@ -163,7 +163,7 @@ flowchart TD
 
 > **Restaurant analogy**: Picture a busy restaurant kitchen. The control plane is the management team that coordinates work without cooking every dish itself. The API Server is the front desk where all orders go, the Scheduler is the floor manager deciding which kitchen station handles which order, etcd is the order log recording the truth, and the Controller Manager is the shift supervisor checking that the right number of staff are working.
 
-The API server is the front door to the cluster. Every create, update, delete, and read operation goes through it, whether the request came from `k`, a CI pipeline, a controller, or a custom operator. This central entry point gives Kubernetes a consistent place to authenticate users, authorize requests, validate resource shape, and store accepted changes. When the API server is unreachable, the cluster becomes hard to manage even if many workloads are still serving traffic.
+The API server is the front door to the cluster. Every create, update, delete, and read operation goes through it, whether the request came from `kubectl`, a CI pipeline, a controller, or a custom operator. This central entry point gives Kubernetes a consistent place to authenticate users, authorize requests, validate resource shape, and store accepted changes. When the API server is unreachable, the cluster becomes hard to manage even if many workloads are still serving traffic.
 
 etcd is the durable database for cluster state. It stores objects such as Pods, Deployments, Services, ConfigMaps, and Secrets, along with metadata about nodes and controller progress. Because etcd is the source of truth, corrupting it or losing quorum is one of the most serious Kubernetes failures. Managed Kubernetes services spend significant engineering effort protecting this layer because an available API server without reliable state storage is not a reliable control plane.
 

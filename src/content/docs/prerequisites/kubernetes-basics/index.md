@@ -7,7 +7,7 @@ Welcome to Kubernetes Basics. In this section, you will dive into the foundation
 
 We will start from the ground up by setting up your first local cluster and learning how to interact with it using the standard command-line tool, kubectl. From there, we will explore the atomic units of Kubernetes, known as Pods, and discover how Deployments maintain replicas and Services provide stable access, subject to readiness signals, healthy nodes, and available capacity.
 
-Finally, you will learn how to manage application configuration and sensitive data securely, organize your cluster resources using Namespaces and Labels, and express your infrastructure's desired state declaratively using YAML manifests. By the end of this module, you will be equipped to deploy and operate containerized applications with confidence.
+Finally, you will separate application configuration from container images using ConfigMaps and Secrets, organize resources using Namespaces and Labels, and describe desired state using YAML manifests. Secrets require additional access controls and storage protections; creating a Secret alone does not secure sensitive data. By the end of this section, you will have practiced deploying, inspecting, updating, and cleaning up example workloads in a disposable cluster.
 
 ## Modules
 
