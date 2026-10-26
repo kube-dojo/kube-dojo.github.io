@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Easier prompt reading and recovery.** [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) now distinguishes normal prompts from unfinished input across shells, explains why a prompt label alone cannot confirm the machine, and keeps practice commands separate from prompt notation.
 - **More reliable first steps with your computer and terminal.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) now distinguishes resource clues from confirmed bottlenecks and makes the Kubernetes preview optional. [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) uses literal quoting that works with interactive zsh for the first greeting and practice message.
 - **Clearer expectations for beginner Kubernetes practice.** The [Kubernetes Basics overview](/prerequisites/kubernetes-basics/) explains the skills you will practice and why Secrets still need access and storage protections. The introduction and Deployments lesson now use more direct prompts and describe recovery without promising availability.
 - **Clearer Kubernetes basics and safer practice.** The [Kubernetes introduction](/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes/) and [Deployments lesson](/prerequisites/kubernetes-basics/module-1.4-deployments/) now explain failures and recovery more clearly. Practice steps make it easier to keep experiments separate and clean up afterward.
