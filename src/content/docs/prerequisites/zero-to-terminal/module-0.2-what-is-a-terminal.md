@@ -142,7 +142,7 @@ The safest first commands are ones that print information and do not change file
 Before running this, what output do you expect from a command named `echo` when the argument is `Hello, World!`? Make a prediction in plain language first. Prediction matters because the terminal can feel less random when you train yourself to compare expected output with actual output.
 
 ```bash
-echo "Hello, World!"
+echo 'Hello, World!'
 ```
 
 <details>
@@ -156,12 +156,12 @@ Hello, World!
 
 </details>
 
-The command name is `echo`, and the argument is `"Hello, World!"`. An argument is information you give to a command so it knows what to act on. In the restaurant analogy, `echo` is the instruction "repeat this order back to me," and the quoted text is the order that should be repeated.
+The command name is `echo`, and its text argument is `Hello, World!`; the single quotes group that text without becoming part of the output. An argument is information you give to a command. Here we use single quotes for literal text because interactive zsh can treat `!` specially inside double quotes. Later, double quotes let us insert command output into a sentence.
 
 Some older teaching examples include the prompt symbol inside the command block, so keep this protected notation familiar:
 
-```bash
-$ echo "Hello, World!"
+```text
+$ echo 'Hello, World!'
 ```
 
 If you are typing by hand, that display style is harmless because you naturally start after the prompt. If you are copying and pasting, it can cause trouble because the shell receives the `$` as text. For that reason, this rewrite uses runnable command blocks without the prompt symbol when the intent is copy-paste practice.
@@ -278,7 +278,7 @@ Here is the same command-structure idea as a static diagram. Read it from left t
 | Command              | Option               | Argument             |
 +----------------------+----------------------+----------------------+
 | date                 | -u                   |                      |
-| echo                 |                      | "Hello, World!"      |
+| echo                 |                      | 'Hello, World!'      |
 | hostname             |                      |                      |
 +----------------------+----------------------+----------------------+
 ```
@@ -512,13 +512,13 @@ On macOS, the prompt may end with `%`; on Linux and WSL, it often ends with `$`.
 2. Run your first `echo` command and compare the output with your prediction.
 
 ```bash
-echo "Hello, World!"
+echo 'Hello, World!'
 ```
 
 The preserved prompt-style example from earlier course notes is shown below so you can recognize the convention without copying it literally:
 
-```bash
-$ echo "Hello, World!"
+```text
+$ echo 'Hello, World!'
 ```
 
 The expected output is the text inside the quotes, printed without the quote marks because the shell used them only for grouping:
@@ -530,7 +530,7 @@ Hello, World!
 <details>
 <summary>Solution guidance</summary>
 
-If you typed only `echo "Hello, World!"`, the terminal should print `Hello, World!` and return to the prompt. If you copied `$ echo "Hello, World!"` and received an error, remove the leading prompt symbol and run the command again. That correction is part of the learning objective, not a sign that you failed.
+If you typed only `echo 'Hello, World!'`, the terminal should print `Hello, World!` and return to the prompt. If you copied `$ echo 'Hello, World!'` and received an error, remove the leading prompt symbol and run the command again. That correction is part of the learning objective, not a sign that you failed.
 
 </details>
 
@@ -606,21 +606,21 @@ your-mac.local
 **Bash, zsh, or WSL:**
 
 ```bash
-echo "My name is [YOUR NAME] and I just used the terminal!"
+echo 'My name is [YOUR NAME] and I just used the terminal!'
 echo "Today is $(date) and I am $(whoami)"
 ```
 
 **PowerShell:**
 
 ```powershell
-Write-Output "My name is [YOUR NAME] and I just used the terminal!"
+Write-Output 'My name is [YOUR NAME] and I just used the terminal!'
 Write-Output "Today is $(Get-Date) and I am $(whoami)"
 ```
 
 The preserved Bash/zsh/WSL prompt-style examples from earlier course notes show the same commands with visible prompt markers for recognition practice:
 
-```bash
-$ echo "My name is [YOUR NAME] and I just used the terminal!"
+```text
+$ echo 'My name is [YOUR NAME] and I just used the terminal!'
 ```
 
 ```bash
@@ -670,7 +670,7 @@ yourname@your-mac ~ % ping example.com
 Transcript C shows what happened after a lesson command was pasted with its prompt symbol included, along with the shell's reply:
 
 ```text
-yourname@your-mac ~ % $ echo "Hello, World!"
+yourname@your-mac ~ % $ echo 'Hello, World!'
 zsh: command not found: $
 yourname@your-mac ~ %
 ```
@@ -688,7 +688,7 @@ alex@training-vm /tmp $
 <details>
 <summary>Check your diagnosis</summary>
 
-Transcript A shows a continuation prompt: the opening quote was never closed, so the shell is waiting for the rest of the text. The next move is to type the missing quote and press Enter, or press Ctrl+C to cancel and return to a normal prompt. Transcript B shows a command that is still running because output lines keep arriving and no prompt has returned; the next move is to press Ctrl+C once and wait for the prompt to come back. Transcript C shows an error caused by copying the `$` prompt symbol along with the command, and the shell has already returned to a ready prompt; the next move is to retype `echo "Hello, World!"` without the leading `$`. Transcript D shows two ready prompts on different machines; the next move is to use the `alex@training-vm /tmp $` window, because the hostname portion of the prompt identifies which machine will execute the command.
+Transcript A shows a continuation prompt: the opening quote was never closed, so the shell is waiting for the rest of the text. The next move is to type the missing quote and press Enter, or press Ctrl+C to cancel and return to a normal prompt. Transcript B shows a command that is still running because output lines keep arriving and no prompt has returned; the next move is to press Ctrl+C once and wait for the prompt to come back. Transcript C shows an error caused by copying the `$` prompt symbol along with the command, and the shell has already returned to a ready prompt; the next move is to retype `echo 'Hello, World!'` without the leading `$`. Transcript D shows two ready prompts on different machines; the next move is to use the `alex@training-vm /tmp $` window, because the hostname portion of the prompt identifies which machine will execute the command.
 
 </details>
 
@@ -698,7 +698,7 @@ You've completed this exercise when you can demonstrate each item below without 
 
 - [ ] Open a terminal window on your operating system.
 - [ ] Identify at least one part of your prompt, such as username, hostname, directory, `$`, or `%`.
-- [ ] Run `echo "Hello, World!"` and see the output.
+- [ ] Run `echo 'Hello, World!'` and see the output.
 - [ ] Run the date/time command for your shell (`date` in Bash/zsh/WSL or `Get-Date` in PowerShell) and explain why your output differs from the example.
 - [ ] Run `whoami` and `hostname` and connect the output to your current session.
 - [ ] Run the combined shell-appropriate example: `echo "Today is $(date) and I am $(whoami)"` in Bash/zsh/WSL, or `Write-Output "Today is $(Get-Date) and I am $(whoami)"` in PowerShell.
@@ -707,6 +707,8 @@ You've completed this exercise when you can demonstrate each item below without 
 
 ## Sources
 
+- [zsh: Interactive history expansion, including `!` inside double quotes](https://zsh.sourceforge.io/Doc/Release/Expansion.html#History-Expansion)
+- [PowerShell 7.5: Single- and double-quoted strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5)
 - [RFC 4251: The Secure Shell (SSH) Protocol Architecture](https://www.rfc-editor.org/info/rfc4251)
 - [OpenSSH manual pages](https://www.openssh.org/manual.html)
 - [Windows Terminal documentation](https://learn.microsoft.com/en-us/windows/terminal/)

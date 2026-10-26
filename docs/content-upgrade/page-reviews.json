@@ -3,6 +3,30 @@
   "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No full-page acceptance is recorded; coverage reporting is separate from inventory schema/digest checks.",
   "pages": [
     {
+      "path": "prerequisites/zero-to-terminal/index.md",
+      "page_digest": "sha256:5be0298565845a2195e00d413b9b11b34d33d40989fd6e22082801bdccf7af48",
+      "disposition": "retain",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
+      "independent_statuses": {"technical_source": "pending", "editorial_review": "pending", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/zero-to-terminal/module-0.1-what-is-a-computer.md",
+      "page_digest": "sha256:a0a8b1c0eb9a3b0b5ced89dfa8c2f6ab80e4c7d8d0ae3ae024cc579ef480f403",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal.md",
+      "page_digest": "sha256:04a8ec2553e4a0741a22bf51af8fa1798221dd6fdb1f48e30386775c1b53e02a",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
       "path": "prerequisites/kubernetes-basics/module-1.4-deployments.md",
       "page_digest": "sha256:2651d62e3bef45c29495d983e83e30081507b42cff87227056ceb8c6e557c802",
       "disposition": "revise",
