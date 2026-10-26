@@ -464,7 +464,7 @@ On each page, try to find the same three categories so your notes compare provid
 
 ### Step 3: Write down what you found
 
-Create a fresh disposable workspace under your exclusive control. Run the whole connected block: `&&` runs the next command only after success, so failed creation or navigation prevents opening the editor. Listings display context and the editor opens automatically. Leave existing names untouched and choose an unused name for later paths; do not use `mkdir -p`. Unexpected contents or uncertain ownership mean exit without saving and start fresh.
+Create a fresh disposable workspace under your exclusive control. Use a Bash-compatible terminal, including an authorized WSL or lab shell on Windows. Run the whole connected block: `&&` runs the next command only after success, so failed creation or navigation prevents opening the editor. Listings display context and the editor opens automatically. Leave existing names untouched and choose an unused name for later paths; do not use `mkdir -p`. Unexpected contents or uncertain ownership mean exit without saving and start fresh.
 
 ```bash
 cd ~ &&
