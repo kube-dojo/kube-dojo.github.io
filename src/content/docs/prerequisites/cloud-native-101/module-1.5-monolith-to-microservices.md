@@ -26,9 +26,9 @@ After this module, you will be able to:
 
 ## Why This Module Matters
 
-Amazon's retail platform famously outgrew a large monolithic application. Engineers could still ship features, but each change required coordination across teams that shared the same deployment unit, the same assumptions, and often the same failure modes. According to widely recounted accounts from Amazon's early 2000s, an internal mandate to communicate only through service interfaces forced stronger boundaries—not because network calls were fashionable, but because the organization needed decoupling before its own software architecture became the bottleneck for every business decision.
+Hypothetical scenario: a retailer deploys checkout, catalog, payment, and fulfillment as one application. Catalog changes are frequent, while payment changes require stricter review. The shared release makes teams coordinate even when their changes are unrelated. They consider extracting payment behind an explicit API so its release schedule and access controls can evolve separately, while leaving the rest of the application together until another concrete bottleneck justifies a split.
 
-That story is useful because it cuts through the simplistic version of microservices: "split the app and everything gets better." Amazon paid for the split with new operational complexity, stricter interface design, and a culture where teams owned services in production. The benefit was not smaller repositories by themselves; the benefit was that a payment team, catalog team, or fulfillment team could move without waiting for every other part of the company to agree on one giant release.
+This hypothetical retailer gains no automatic success from smaller repositories. Extracting payment introduces network failures, versioned contracts, observability needs, and decisions about data ownership and rollback. Independent releases are a potential benefit to test, not an observed result. The team should compare release delays and operational failures before and after a bounded pilot, and retain a modular monolith if the additional coordination costs outweigh the intended improvement.
 
 Kubernetes exists in the shadow of that same trade-off. Services, Deployments, probes, ConfigMaps, Secrets, Ingress, NetworkPolicies, and autoscaling all look ordinary when you see them one at a time, but together they form an operating model for many independently deployed processes. This module helps you judge when that model is worth the cost, when a monolith remains the better engineering choice, and how to connect architecture decisions to the Kubernetes primitives you will use later.
 
@@ -164,7 +164,7 @@ Kubernetes does not magically make microservices simple. It gives you reusable m
 | Configuration | ConfigMaps, Secrets |
 | Health monitoring | Probes |
 | Rolling updates | Deployments |
-| Fault tolerance | ReplicaSets, self-healing |
+| Fault tolerance | Policy-driven container restarts and controller-managed replica replacement |
 | Resource management | Requests/Limits |
 
 The table is short, but every row hides a common production incident. Service discovery matters because Pods get replaced and receive new IP addresses. Health monitoring matters because an instance can be alive as a process while still unable to serve traffic. Rolling updates matter because shipping all replicas at once turns a bad release into a full outage.
@@ -185,7 +185,7 @@ flowchart LR
         K1(Automatic service discovery)
         K2(Built-in load balancing)
         K3(Declarative deployments)
-        K4(Self-healing by default)
+        K4(Policy-driven restarts and replacement)
         K5(Centralized configuration)
     end
     
@@ -198,7 +198,7 @@ flowchart LR
 
 Before Kubernetes, many teams solved these problems with a mix of service registries, hand-edited load balancers, process supervisors, shell scripts, shared configuration directories, and tribal knowledge. Those tools can work, but each new service increases the surface area where manual process fails. Kubernetes standardizes the shape of the solution so each team does not rebuild the same platform from scratch.
 
-A Service gives other workloads a stable name and virtual IP even while backing Pods change. A Deployment describes the desired replica count and update strategy. Probes tell Kubernetes when a container is ready for traffic or needs restarting. ConfigMaps and Secrets separate environment-specific configuration from container images, which matters when each service deploys independently.
+A ClusterIP Service gives callers a stable name and virtual IP while backing Pods change. Deployments and ReplicaSets reconcile owned replicas; kubelet restarts containers according to restart policy and configured health checks. Restoring service also needs schedulable capacity and working dependencies. Readiness probes influence traffic eligibility, not restarts. ConfigMaps and Secrets separate environment configuration from images. These mechanisms support recovery but cannot guarantee that an application becomes healthy.
 
 The important mental model is that Kubernetes manages runtime promises, not business boundaries. If the order service has three replicas and a readiness probe, Kubernetes can keep only ready Pods in the Service endpoints. It cannot decide whether the order service should own inventory reservations, whether an API contract is too chatty, or whether a database boundary is correct.
 
@@ -216,7 +216,7 @@ Resource requests and limits are another place where architecture meets operatio
 
 Observability also changes shape after decomposition. In a monolith, one log stream and one stack trace often tell most of the story, even if the codebase is large. In a microservice system, a single user request may cross a gateway, identity service, order service, payment provider adapter, inventory service, and notification worker, so useful debugging depends on correlation IDs, metrics, traces, and consistent error reporting.
 
-This is why Kubernetes alone is never the whole platform. Kubernetes can restart a failed Pod, but it cannot explain whether the failure came from a bad deployment, a slow database migration, a retry storm, or a downstream dependency. Teams need dashboards, alerting, traces, runbooks, and ownership agreements that match the service boundaries they create.
+This is why Kubernetes alone is never the whole platform. Policy can restart a container, and a workload controller can create a replacement Pod, but repeated recovery attempts do not explain a bad release, failed migration, retry storm, or dependency failure. Teams still need dashboards, alerts, traces, runbooks, and ownership agreements that match the service boundaries they create.
 
 Security boundaries become more explicit too. A monolith often relies on internal function calls and one process boundary, while microservices send traffic across the cluster network. Kubernetes NetworkPolicies, Secrets, service accounts, and admission controls can help reduce blast radius, but only if teams define which services should talk to which dependencies and why those permissions exist.
 
@@ -443,7 +443,7 @@ That habit also prepares you for Kubernetes work. Every manifest you write later
 
 ## Did You Know?
 
-- **Amazon's early-2000s API mandate (widely recounted)**: According to widely recounted accounts, Amazon required teams to communicate through service interfaces—a move that forced decoupling and shaped how many organizations think about service boundaries.
+- **Container restart and Pod replacement are different operations.** Restart policy governs containers within a Pod; a workload controller manages replacement Pods for its desired replicas. Neither operation repairs a broken application dependency or supplies missing cluster capacity.
 - **Segment's U-Turn**: In 2018, Segment described moving away from hundreds of small services because operational overhead and duplicated work were hurting engineering velocity.
 - **The Term "Microservices"**: The architectural style was discussed at a software architects workshop near Venice in May 2011 and was later popularized by James Lewis and Martin Fowler in their March 25, 2014 article.
 - **Conway's Law**: Melvin Conway's 1968 observation still matters because systems often mirror the communication patterns of the organizations that build them.
@@ -483,7 +483,7 @@ Extract the image-processing capability first rather than rewriting the whole ap
 <details>
 <summary>Scenario: After splitting into services, your team sees changing Pod IPs, manual load balancer updates, and unhealthy instances receiving traffic. Which Kubernetes features map to those failures?</summary>
 
-Services and cluster DNS solve the changing-IP discovery problem by giving callers stable names. Deployments and ReplicaSets manage desired replicas and replace failed Pods, while readiness probes keep unhealthy instances out of Service endpoints. Ingress or gateway controllers handle external routing without hand-editing load balancers on each release. These features solve runtime operations problems, not domain-design problems.
+Services and cluster DNS give callers stable discovery names. Deployments and ReplicaSets reconcile replicas they own, but replacement Pods still need available capacity and working dependencies. Container restarts follow policy; readiness checks influence which Pods receive Service traffic rather than guaranteeing health. Ingress or gateway controllers manage external routing. These features address runtime operations, not domain design, and their configuration and observed state must be checked before claiming recovery.
 </details>
 
 <details>
@@ -595,6 +595,7 @@ Failure layer: a distributed monolith, not independent services. Next action: st
 
 ## Sources
 
+- [Kubernetes 1.35: Pod lifecycle and restart policy](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
 - [Amazon Builders' Library - Going faster with continuous delivery](https://aws.amazon.com/builders-library/going-faster-with-continuous-delivery/)
 - [Martin Fowler - Microservices](https://martinfowler.com/articles/microservices.html)
 - [Martin Fowler - Strangler Fig Application](https://martinfowler.com/bliki/StranglerFigApplication.html)

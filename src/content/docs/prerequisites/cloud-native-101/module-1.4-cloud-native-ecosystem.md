@@ -26,9 +26,9 @@ After this module, you will be able to:
 
 ## Why This Module Matters
 
-Imagine a holiday-sale weekend where a team discovers their Kubernetes migration did not create a platform; it created a museum of every cloud native project that had impressed someone in a conference talk. The lead architect mandated a complex service mesh before the team had reliable metrics, selected a sandbox distributed database before the operations team had backup drills, and enabled advanced eBPF networking before anyone could explain the packet path during an outage. When checkout latency spikes, the incident room fills with dashboards, proxy logs, custom resource definitions, and half-remembered architecture diagrams, but no one can tell which layer owns the failure.
+Hypothetical scenario: during a holiday sale, a team discovers that adopting many cloud native tools has made checkout failures harder to diagnose. It introduced a service mesh before reliable metrics, a database before restore drills, and advanced networking before operators understood the packet path. Dashboards and logs now come from several unfamiliar layers, and the team cannot yet identify which one owns the latency spike.
 
-In that scenario, the cost is real: a full afternoon of peak orders lost, emergency consulting fees, and a quarter spent unwinding tools adopted before their problem statements were clear. The painful lesson is that the CNCF landscape is a menu, not a checklist. A production platform needs a small set of well-operated tools that solve known problems; it does not need every project that appears near Kubernetes on a landscape map.
+Potential costs in this hypothetical scenario include lost orders, outside assistance, and time spent simplifying the stack; no measured incident or outcome is asserted here. The lesson is that the CNCF landscape is a menu, not a checklist. A production platform needs a small set of well-operated tools that solve known problems, with explicit ownership and evidence that their benefits justify their operational costs.
 
 This module teaches you how to read that ecosystem without drowning in it. You will learn how CNCF maturity levels signal risk, how tool categories map to real operational problems, and why a beginner should recognize more tools than they can operate deeply. The goal is not to memorize hundreds of logos. The goal is to hear a teammate say "we need policy enforcement," "we need GitOps," or "we need distributed tracing," and know which part of the ecosystem they are reaching for, what trade-off they are accepting, and what question to ask before the tool enters production.
 
@@ -325,7 +325,7 @@ CNI concepts also deserve early attention even if your cloud provider installs t
 
 Container runtime knowledge should be practical rather than encyclopedic. You should know that containerd or CRI-O handles image pulls and container lifecycle on the node, and that kubelet reports container states through Kubernetes. You do not need to memorize runtime internals to pass an introductory module. You do need to know that a container image problem, registry authentication failure, or node disk-pressure issue may surface as a Pod problem even though the Deployment object is correct.
 
-GitOps tools such as Argo CD and Flux belong in the recognition-to-working category for many early roles. If your team uses GitOps, you must understand reconciliation, drift, sync status, and the idea that Git is the desired state. If your team does not use GitOps yet, you should still recognize the pattern because job descriptions and platform conversations mention it constantly. The dangerous beginner move is using manual `kubectl apply` commands against resources owned by a GitOps controller without understanding why the controller reverts them.
+GitOps tools such as Argo CD and Flux belong in the recognition-to-working category for many early roles. Learn desired state, drift, sync status, and configured reconciliation behavior. Argo CD's automatic self-healing of live-only drift uses automated sync with self-heal enabled; self-heal is off by default. A manual sync or a sync triggered by another source change can also overwrite live edits. Inspect the application's settings and history before attributing a reversion to GitOps; drift alone does not establish its cause.
 
 Service mesh concepts can remain conceptual until the architecture requires them. You should know that Istio and Linkerd can add mutual TLS, traffic policy, telemetry, retries, and traffic splitting by controlling service-to-service communication. You should also know that a mesh is not free reliability. It adds proxies, configuration, certificates, upgrade planning, and a second place where networking behavior can break.
 
@@ -446,9 +446,9 @@ The missing category is container image vulnerability scanning, with tools such 
 </details>
 
 <details>
-<summary>Scenario: A team uses Jenkins to run manual `kubectl apply` commands, while Argo CD also reconciles the same namespace from Git. Deployments keep reverting unexpectedly. What is happening?</summary>
+<summary>Scenario: Jenkins applies changes to resources also managed by Argo CD, and changes later revert. Which settings and history would distinguish automatic self-healing from another writer or sync operation?</summary>
 
-The team has two sources of truth fighting each other. GitOps controllers such as Argo CD reconcile the live cluster toward the state declared in Git, so manual `kubectl apply` changes that are not committed to Git are treated as drift. The fix is to make Git the deployment path for resources owned by Argo CD, and reserve manual commands for inspection or documented emergency procedures. This preserves auditability and prevents the controller from looking unpredictable.
+Compare Git's desired state with the live changes and inspect Argo CD's application sync policy, sync history, and resource events. Automated sync with `selfHeal: true` can correct live-only drift; self-heal is disabled by default, so Argo CD's presence alone does not establish that cause. A manual sync, a later Git-triggered sync, another controller, or Jenkins could also explain a change. Once the writer is identified, agree on the deployment path for these resources and document emergency exceptions rather than repeatedly applying competing changes.
 </details>
 
 <details>
@@ -549,6 +549,8 @@ Failure layer: recovery was never exercised. Next action: run one restore into a
 </details>
 
 ## Sources
+
+- [Argo CD: Automatic self-healing and its default](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/#automatic-self-healing)
 
 - [CNCF Landscape](https://landscape.cncf.io)
 - [CNCF Project Maturity Levels](https://www.cncf.io/projects/)
