@@ -535,7 +535,7 @@ pwd
 <details>
 <summary>Solution notes</summary>
 
-Starting inside your own new workspace keeps practice separate from existing home-directory files. Stop if `cd` fails or `pwd` does not show that workspace; do not continue creating or removing files from another location.
+Starting inside your own new workspace keeps practice separate from existing home-directory files. Stop unless the workspace's plain `mkdir` succeeded in this session. Also stop if `cd` fails or `pwd` shows another location. Those location checks alone do not establish ownership of an existing directory.
 </details>
 
 ### Step 2: Create the restaurant structure
