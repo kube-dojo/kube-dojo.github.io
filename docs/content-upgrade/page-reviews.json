@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/zero-to-terminal/module-0.5-editing-files.md",
-      "page_digest": "sha256:61f4b3d98db867715f5393dd2a7b155b17709cfff8ed59932f88fdccf5a0dbd0",
+      "page_digest": "sha256:3d19a2fa7321a92a8b1f106db86ca1d1e79ce0bacac39ffd50f75768af5257bf",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md"],

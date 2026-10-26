@@ -133,8 +133,8 @@ Your screen will change completely because the terminal is now controlled by `na
 
 
 
-^G Help    ^O Write Out  ^F WhereIs    ^K Cut       ^C Location
-^X Exit    ^R Read File  ^\ Replace    ^U Paste     ^T Execute
+^G Help  ^O Write Out  ^F Where Is  ^K Cut    ^T Execute  ^C Location
+^X Exit  ^R Read File  ^\ Replace   ^U Paste  ^J Justify  ^/ Go To Line
 ```
 
 The bottom menu is the reason `nano` is a friendly first editor. It does not expect you to memorize everything before you can leave. The word "Write Out" means save the buffer to a file, and "Exit" means leave the editor and return to the shell. The old-fashioned wording is common in Unix tools, so it is better to learn the phrase once than to be surprised by it later.
@@ -149,7 +149,7 @@ The `^` symbol in that menu means "hold the Ctrl key," not "type a caret charact
 | `^X` | Ctrl + X | Exit nano |
 | `^K` | Ctrl + K | Cut the current line |
 | `^U` | Ctrl + U | Paste a cut line |
-| `^W` | Ctrl + W | Search for text |
+| `^F` or `^W` | Ctrl + F or Ctrl + W | Search for text |
 | `^G` | Ctrl + G | Show help |
 
 With `nano` open, type the following three lines. Do not worry if the screen wraps differently on your terminal; the file content is determined by the characters and line breaks you type, not by the exact visual width of the terminal window. Press Enter at the end of each line so the text becomes three separate lines in the file.
@@ -170,8 +170,8 @@ Today's special: Learning to edit files.
 Chef says: You're doing great.
 
 
-^G Help    ^O Write Out  ^F WhereIs    ^K Cut       ^C Location
-^X Exit    ^R Read File  ^\ Replace    ^U Paste     ^T Execute
+^G Help  ^O Write Out  ^F Where Is  ^K Cut    ^T Execute  ^C Location
+^X Exit  ^R Read File  ^\ Replace   ^U Paste  ^J Justify  ^/ Go To Line
 ```
 
 To save, press Ctrl+O. `nano` will ask you to confirm the destination filename. In this exercise the suggested filename is already correct, so press Enter. The important habit is to read that filename before confirming, especially when you later edit files from different directories or remote machines.
@@ -181,7 +181,7 @@ Ctrl + O
 ```
 
 ```text
-File Name to Write: hello.txt
+Write to File: hello.txt
 ```
 
 After you press Enter, the "Modified" indicator disappears because the editor buffer and the file on disk now match. You are still inside `nano`, so saving and exiting are two separate steps. This separation is useful because you can save a checkpoint, keep editing, and save again before leaving.
@@ -391,7 +391,7 @@ These patterns are intentionally modest because beginner reliability comes from 
 |-----------|------------------|--------------------------|
 | You need to inspect a short file | Run `cat filename` first, then edit only if needed | Opening `nano` just to read and accidentally changing text |
 | You need to make a small edit | Open with `nano`, save with Ctrl+O, exit with Ctrl+X, verify with `cat` | Assuming the file saved because the editor was open |
-| You need to run a script directly | Include `#!/bin/bash`, then run `chmod +x script.sh` before `./script.sh` | Believing the `.sh` suffix alone makes a file executable |
+| You need to run a script directly | Check the shebang and `ls -l script.sh`; add a missing owner execute bit before `./script.sh` | Believing the `.sh` suffix or an unchecked chmod retry proves the cause |
 | You are on a remote host | Confirm `hostname` and `pwd` before editing sensitive files | Editing quickly without checking which machine you are on |
 
 ## When You'd Use This vs Alternatives
@@ -403,7 +403,7 @@ For this module, the decision framework is intentionally simple. Choose the tool
 | See a short file exactly once | `cat filename` | It cannot accidentally edit the file |
 | Make a beginner-friendly terminal edit | `nano filename` | Visible shortcuts reduce memory burden |
 | Make repeated advanced terminal edits | `vim filename` | Motions and commands scale after practice |
-| Run saved commands repeatedly | `chmod +x script.sh` then `./script.sh` | Permissions make the file runnable directly |
+| Run saved commands repeatedly | Inspect `ls -l script.sh`, add a missing execute bit, then `./script.sh` | Direct execution needs the appropriate access; persistent errors need diagnosis |
 | Confirm where you are before editing | `pwd` and `hostname` | Location mistakes are easier to prevent than repair |
 
 You can also think in terms of reversibility. Viewing is easy to back out of because it changes nothing. Editing is reversible only if you know what changed or have a backup. Running a script can affect many files or commands at once, so scripts deserve both content verification and permission awareness. This ladder of risk helps you slow down at the right moments without becoming afraid of the terminal.
@@ -424,13 +424,13 @@ The best choice is often the one that leaves the most evidence. A `cat` command 
 
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
-| Pressing Ctrl+Z instead of Ctrl+X to exit | Ctrl+Z suspends `nano` and hides it in the background instead of closing it | Type `fg` to bring `nano` back, then use Ctrl+X to exit properly |
+| Confusing suspension with exit | GNU nano 9.0 defaults show a hint on Ctrl+Z; Ctrl+T then Ctrl+Z suspends instead of exiting | If the shell reports a stopped editor, run `fg` to resume it, then Ctrl+X to exit; if still in the editor, use Ctrl+X |
 | Forgetting to save before exiting | Beginners expect autosave, but `nano` writes only when told to write out | Press Ctrl+O and Enter before Ctrl+X, or answer `Y` carefully when prompted |
 | Typing `^O` literally into the file | The caret notation looks like two printable characters if you have not seen terminal shortcuts before | Hold Ctrl and press O; do not type the caret character |
 | Using `nano` when you meant to use `cat` | You wanted to inspect a file but opened an editor capable of changing it | Use `cat filename` for short read-only checks and reserve `nano` for edits |
 | Editing a file on a remote server thinking it is local | Terminal prompts can look similar, especially when several sessions are open | Run `hostname` and `pwd` before changing important files |
 | Opening and saving a binary file in `nano` | The editor treats bytes as text and can corrupt non-text formats | Run `file filename` when unsure, and edit only plain text files |
-| Assuming `.sh` makes a script executable | File extensions are human conventions, while execute permission is a filesystem mode | Add a shebang when appropriate and run `chmod +x script.sh` before direct execution |
+| Assuming `.sh` makes a script executable | File extensions are human conventions, while execute permission is a filesystem mode | Check the shebang and `ls -l`; add a missing owner execute bit and investigate access errors that persist |
 
 ## Quiz
 
@@ -620,7 +620,7 @@ Save the file, then run it directly with `./broken-report.sh`. Something is wron
 <details>
 <summary>Check your diagnosis</summary>
 
-There are two failures at two different layers. First, a newly created file has no execute permission, so `./broken-report.sh` answers "Permission denied" until you run `chmod +x broken-report.sh`. Second, the first `echo` line is missing its closing quotation mark, so after the permission is fixed Bash reports `unexpected EOF while looking for matching '"'` and a syntax error at the end of the file. Correct that line to `echo "=== Broken Kitchen Report ==="` with `nano`, save, and run `./broken-report.sh` again. A correct run prints the report heading, the current date, "Memo follows:", and the six memo lines. Notice the order in which the failures appeared: the permission layer blocked everything, and only after it was fixed could Bash even show you the content error. If you tried `bash broken-report.sh` instead, you saw the content error first because that form skips the execute-permission check; both orders are valid diagnostic evidence.
+In this fresh workspace, inspect `ls -l broken-report.sh` after an access error. If the owner's execute bit is missing, add it with `chmod +x broken-report.sh` and retry. If it is already set or access still fails, stop and ask for help checking path access or execution restrictions. Once Bash starts, the first `echo` line's missing closing quotation mark causes an unterminated-string error. Correct it to `echo "=== Broken Kitchen Report ==="` with `nano`, save, and run `./broken-report.sh` again. A correct run prints the heading, current date, "Memo follows:", and six memo lines. These are separate access and parsing layers; the error message and mode check determine which one to address. Running `bash broken-report.sh` selects Bash explicitly and can reveal the content error before adding execute permission.
 
 </details>
 
