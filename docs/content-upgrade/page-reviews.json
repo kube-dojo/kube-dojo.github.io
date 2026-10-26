@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/zero-to-terminal/module-0.3-first-commands.md",
-      "page_digest": "sha256:f3d150ffa085202b925b6d0c61842cdee437cee7e9668dae4739e87cbfdc8820",
+      "page_digest": "sha256:d237a01abe51261711d98736fa743425da235186f78fdf3823e70ae652ba03ec",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-first-commands-p02a.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-first-commands-p02a.md"],
