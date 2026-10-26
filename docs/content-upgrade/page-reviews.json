@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/zero-to-terminal/module-0.4-files-and-directories.md",
-      "page_digest": "sha256:59f734d025300b90e3ab31d229edb4e864b9c6a1631a74cf39684ebc930440bf",
+      "page_digest": "sha256:2f8c13ca52e0818cb512b7ed1ae20f557323d15a8036430b4dd48ba02a76e701",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-files-directories-p02b.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-files-directories-p02b.md"],
