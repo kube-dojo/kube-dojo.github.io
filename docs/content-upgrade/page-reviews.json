@@ -140,7 +140,7 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.11-your-first-server.md",
-      "page_digest": "sha256:65e612f3cb1541795ac2869ab0aa239902b068019f9df6327402074522c81620",
+      "page_digest": "sha256:5e2afe270186754a44d8f8205331e0e5aadd0a1b399d32b4b21fcb4aa07805f5",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],

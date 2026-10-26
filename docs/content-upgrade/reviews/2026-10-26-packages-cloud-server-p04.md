@@ -14,7 +14,7 @@ Owner #2278; sources/practice/assessment #2275/#2276/#2277. Checked 2026-10-26 a
 
 Source URLs above were fetched and relevant passages read by the lead. These are selective support checks, not whole-page source/history acceptance. No invented package matrix, packet capture, zero-charge result or learner measurement is supplied.
 
-Independent R1 caught the retained bind-all quiz mapping and contradictory diagnostic/assessment/isolation claims; these now match loopback and evidence bounds. The source explains client versus Server version and context checks, captures the successful container ID and guards copy/cleanup, and connects workspace/editor commands with `&&`. Package-version labels are simulated. UK carry-forward is explicitly recorded under [#2291](https://github.com/kube-dojo/kube-dojo.github.io/issues/2291#issuecomment-6428781033), preserving English-first scheduling and no UK acceptance.
+Independent R1 caught the retained bind-all quiz mapping and contradictory diagnostic/assessment/isolation claims. R2 caught a remaining cloud-curl health overclaim; that paragraph and the decision row now compare observations without proving complete health, and the port-repair answer refers to guarded cleanup/create/copy. The source explains client versus Server version and context checks, captures the successful container ID and guards copy/cleanup, and connects workspace/editor commands with `&&`. Package-version labels are simulated. Optional wording nits remain under #2275/#2277. UK carry-forward is explicitly recorded under [#2291](https://github.com/kube-dojo/kube-dojo.github.io/issues/2291#issuecomment-6428781033), preserving English-first scheduling and no UK acceptance.
 
 ## Execution and remaining evidence
 
