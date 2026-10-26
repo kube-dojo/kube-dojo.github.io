@@ -246,12 +246,12 @@ The reverse mistake is also common: a name resolves successfully, so someone ass
 
 Once DNS produces an address and a port accepts a connection, the application protocol still has to respond. For web traffic, that protocol is HTTP or HTTPS, and the response includes a status code. A status code is not a vague mood indicator; it is structured evidence about what happened after the server received the request.
 
-`200 OK` means the server received the request and returned the requested resource. `404 Not Found` means the server was reachable, but the specific path did not exist. `500 Internal Server Error` means the server received the request but failed while processing it. Those outcomes point to different owners and different next checks, which is why status codes are so useful.
+`200 OK` reports a successful request. `404 Not Found` means the responding server did not find a current representation or is unwilling to disclose one; it does not prove the resource is absent. `500 Internal Server Error` reports an unexpected server condition. These responses establish an HTTP exchange, not the health of every backend or the identity of the intended destination.
 
 | Code | Meaning | Analogy |
 |------|---------|---------|
 | 200 | OK - here's what you asked for | "Order up! Here's your food." |
-| 404 | Not found - that page doesn't exist | "Sorry, we don't have that dish on the menu." |
+| 404 | Not found or not disclosed | "That dish is not available on this menu." |
 | 500 | Server error - something broke on their end | "The kitchen is on fire." |
 
 The restaurant analogy is helpful if you keep the sequence straight. DNS is finding the restaurant address, the IP route is traveling to the restaurant, the port is choosing the correct counter, and HTTP is the conversation after you arrive. If the kitchen says the dish is not on the menu, your taxi route was not the problem.
@@ -365,7 +365,7 @@ Use the pattern of layered evidence when you are new to a system. Start with the
 
 An anti-pattern worth calling out early is treating a successful ping as proof that the application is healthy. Ping can show that one kind of network probe received a reply, but it does not prove HTTP works, the database accepts connections, DNS points at the intended host, or Kubernetes routed traffic to healthy Pods. It is a useful knock, not a full health check.
 
-Another anti-pattern is treating a `404` as a network outage. A `404` means the server was reached and the application decided the requested path does not exist. That is often a route, URL, deployment, or content problem. If you tell a networking team that DNS is broken when the server is returning `404`, you send the investigation in the wrong direction.
+Another anti-pattern is treating a `404` as proof of a network outage or an absent resource. An HTTP responder answered, but it may not have found a representation or may be withholding disclosure. Check the URL, endpoint, routing, content, and authorization policy rather than assuming either complete network failure or complete network correctness.
 
 For introductory modules, the "when this does not apply" section is intentionally modest, but the habit scales. When later modules introduce SSH, servers, Kubernetes Services, and Ingress controllers, you will keep asking the same sequence of questions with more context. What name did the client use? What address did that name produce? Which port was attempted? Which protocol response came back? The vocabulary expands, but the reasoning pattern stays familiar.
 
@@ -414,7 +414,7 @@ Keep this decision framework in your notes as a small checklist, not as a script
 | Treating a private IP as publicly reachable | Addresses like `192.168.x.x` work inside a local network, not across the internet | Use a public endpoint, VPN, tunnel, or explicit router forwarding when remote access is intended |
 | Forgetting the URL scheme with curl | `curl example.com` may not test the same protocol path as a browser using HTTPS | Be explicit with `curl http://example.com` or `curl https://example.com` |
 | Assuming DNS failure means the server is down | A missing or stale DNS record can fail before traffic reaches the server | Test the known IP when appropriate, then repair the DNS record or cache plan |
-| Calling every `404` a network problem | The server answered, but the requested path was not found | Check the URL path, route configuration, deployment, or application logs |
+| Calling every `404` a network problem | A responder answered, but did not find or disclose a representation | Check the URL, endpoint, routing, authorization policy, and application logs |
 | Changing multiple layers at once | Pressure during an outage makes random edits feel productive | Change one thing at a time and rerun the same evidence-gathering command |
 
 ---
@@ -473,11 +473,13 @@ Use networking commands to explore connections, look up addresses, fetch web con
 
 ### Setup
 
-Create a small practice directory so any files from the exercise are easy to find later. The command below is intentionally ordinary shell practice rather than Kubernetes practice, because this module is about network basics from your terminal.
+Create a fresh disposable workspace under your exclusive control. Run one line at a time; stop on any `mkdir` or `cd` error before later commands or redirects. If the name already exists as a file, directory, or symlink, leave it untouched, choose an unused name, and substitute that name in every later workspace path. Do not use `mkdir -p` for this root. Continue only when `pwd` identifies the new workspace and `ls -a` shows only `.` and `..`; uncertain ownership means start fresh.
 
 ```bash
-$ mkdir -p ~/kubedojo-practice
+$ mkdir ~/kubedojo-practice
 $ cd ~/kubedojo-practice
+$ pwd
+$ ls -a
 ```
 
 ### Tasks
@@ -582,7 +584,7 @@ $ curl -I example.com/this-page-does-not-exist
 
 <details><summary>Solution notes</summary>
 
-A `404` proves the server was reachable enough to answer the request, but the requested path did not exist. That is a very different diagnosis from a name lookup failure or a connection timeout.
+A `404` demonstrates an HTTP response, but not necessarily resource absence: the responder may withhold disclosure. That differs from a name lookup failure or connection timeout; verify the endpoint, path, and access policy before deciding why this request returned `404`.
 
 </details>
 
@@ -644,15 +646,15 @@ content-type: application/json
 date: Thu, 17 Sep 2026 11:22:00 GMT
 ```
 
-**Incident B: The silent ping probe.** An automated alert pings `payment-gateway.example.com` and pages the on-call engineer for total packet loss. When you run `curl -I https://payment-gateway.example.com`, you receive an immediate `200` response over HTTPS. Which layer is responsible for the ping failure, what does the evidence prove, and what is the proper operational conclusion? Think through why a host may drop echo probes before checking the solution.
+**Incident B: The silent ping probe.** An automated ping alert reports total packet loss for `payment-gateway.example.com`, while `curl -I` receives `200` over HTTPS. What does each probe establish, which causes remain hypotheses, and what should you check next? Consider protocol differences before opening the solution.
 
 <details><summary>Diagnosis and layer analysis for Incident B</summary>
 
-**Failing Layer:** Diagnostic protocol filtering (ICMP), not host reachability or application availability.
+**Observed Layer:** ICMP echo replies were not received; HTTPS returned a response for this probe.
 
-**Evidence:** The `ping` command failed with 100% packet loss because intermediate firewalls or the destination host intentionally drop ICMP echo requests. However, `curl -I` successfully resolved the hostname, established a secure TLS connection to port 443, and received a valid HTTP response (`HTTP/2 200`). This proves that DNS works, the network route is active, port 443 is open, and the web application is healthy.
+**Evidence:** No echo replies arrived, while the HTTPS request received `200`. ICMP filtering is one hypothesis, not a demonstrated cause. Different protocols, resolved addresses, intermediaries, and timing can produce different results. The HTTP response demonstrates success for that request, not the health of every application function.
 
-**Next Check or Action:** Update the monitoring check to probe the HTTPS endpoint on port 443 (such as an HTTP health check) rather than relying on ICMP `ping`. No server or network restart is required; the service is operating normally.
+**Next Check or Action:** Compare probe destinations and timing, then check ICMP policy with the network owner. Use an application-appropriate health check for service availability; neither a restart nor a declaration of complete health follows from these two probes alone.
 
 </details>
 
@@ -671,9 +673,9 @@ Content-Length: 162
 
 **Failing Layer:** Application / HTTP content routing (Layer 7), not network reachability or DNS.
 
-**Evidence:** The response line `HTTP/1.1 404 Not Found` and the `Server: nginx/1.24.0` header prove that DNS successfully resolved `internal-docs.example.com`, the network routed the packets to the web server, port 443 accepted the connection, and the web server parsed the HTTP request. The failure is strictly that the web application or web server cannot find a document or route matching `/team/runbooks/networking`.
+**Evidence:** An HTTP responder returned `404` for the requested URL. That narrows the investigation toward content, routing, authorization, or the selected endpoint, but does not prove the document is absent or that the response came from the intended backend. The `Server` header is a response claim, not independent verification of the server software.
 
-**Next Check or Action:** Verify the URL path spelling, check the documentation repository for moved or renamed files, or inspect the web server routing configuration (e.g., Nginx location blocks or static document root). Do not contact the network team or escalate as an infrastructure outage.
+**Next Check or Action:** Verify the URL, expected endpoint, access policy, and moved or renamed files; inspect routing with the service owner. Escalate according to the evidence rather than declaring a complete server outage or ruling out infrastructure involvement from one response.
 
 </details>
 
@@ -687,15 +689,15 @@ PING 10.0.5.50 (10.0.5.50): 56 data bytes
 64 bytes from 10.0.5.50: icmp_seq=1 ttl=64 time=0.791 ms
 ```
 
-**Incident D: Connection refused on the database host.** A backend microservice fails to start, logging a connectivity error when attempting to reach its database host at `10.0.5.50`. An operator attempts to check the server with `curl http://10.0.5.50:80` and receives `Connection refused`, even though `ping -c 2 10.0.5.50` succeeds with sub-millisecond latency. Which layer has the misconfiguration, what does the evidence prove, and what is the immediate correction? Verify the intended service role before checking the answer.
+**Incident D: Connection refused on the database host.** A microservice reports a database connectivity error at `10.0.5.50`. An operator's HTTP probe to port 80 is refused while ping receives replies. What do those tests establish, and what endpoint information is missing before anyone can justify a configuration change? Verify the intended service role before checking the answer.
 
 <details><summary>Diagnosis and layer analysis for Incident D</summary>
 
-**Failing Layer:** Transport / Port selection (Layer 4).
+**Observed Layer:** The TCP connection to port 80 was refused; ICMP echo received replies.
 
-**Evidence:** The ping replies prove that the host at `10.0.5.50` is online and reachable on the local private network. The error `Connection refused` on port 80 means the operating system at `10.0.5.50` actively rejected the TCP connection attempt because no web server process is listening on port 80. The machine is a dedicated PostgreSQL database server, which listens on port 5432 by default, not port 80.
+**Evidence:** The address answered echo probes, while the TCP attempt was actively refused. A missing listener or an active firewall rejection could explain it; this transcript does not identify the rejecting device, database product, configured port, or the microservice's actual connection settings.
 
-**Next Check or Action:** Update the microservice connection string or diagnostic probe to target port 5432 (e.g., `10.0.5.50:5432` or `nc -zv 10.0.5.50 5432`). Verify whether the database daemon is listening on port 5432 and bound to the private network interface.
+**Next Check or Action:** Confirm the intended database endpoint and protocol from its owner or configuration, then inspect its listener and access policy. Test that authorized endpoint with a suitable client before changing the microservice connection string; an HTTP probe to port 80 does not establish which database port to use.
 
 </details>
 

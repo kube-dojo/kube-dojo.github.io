@@ -3,6 +3,30 @@
   "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No full-page acceptance is recorded; coverage reporting is separate from inventory schema/digest checks.",
   "pages": [
     {
+      "path": "prerequisites/zero-to-terminal/module-0.6-git-basics.md",
+      "page_digest": "sha256:d95215ad0d2713882f1661277c4465fdcb2f68af5bfcc70728ed9c50dd21dad8",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/zero-to-terminal/module-0.7-what-is-networking.md",
+      "page_digest": "sha256:caa68f4bd09ecc505e0986f261cec47522ac4dd1f0d5b225a310018914406a5b",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/zero-to-terminal/module-0.8-servers-and-ssh.md",
+      "page_digest": "sha256:7f3485ce2f5f5ced82df63d01146a661253ca6c837b39cac2d26c9bfffe9b971",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-git-network-ssh-p03.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
       "path": "prerequisites/zero-to-terminal/module-0.5-editing-files.md",
       "page_digest": "sha256:3d19a2fa7321a92a8b1f106db86ca1d1e79ce0bacac39ffd50f75768af5257bf",
       "disposition": "revise",
