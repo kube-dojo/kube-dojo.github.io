@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **More precise permission and filename diagnosis.** [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) explains why directory write permission also needs traversal, qualifies private-file permissions, and teaches you to confirm a filename mismatch from an actual listing.
 - **Safer first editor and script practice.** [Editing Files](/prerequisites/zero-to-terminal/module-0.5-editing-files/) now keeps training files in a new workspace, checks which editor is running, and distinguishes missing execute permission from other access problems before suggesting a fix.
 - **Clearer, safer file-and-directory practice.** [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) now establishes a new workspace before writing files, keeps worked examples and exercises in the same project, and labels examples that need files or system paths you may not have.
 - **Safer first file-command practice.** [First Terminal Commands](/prerequisites/zero-to-terminal/module-0.3-first-commands/) now starts file-changing work in a new disposable workspace and asks you to stop if its name is taken. Practice-tree cleanup stays inside it; the final optional step removes that workspace from home only when this session created it.

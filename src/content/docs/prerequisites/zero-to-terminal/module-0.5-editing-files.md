@@ -403,7 +403,7 @@ For this module, the decision framework is intentionally simple. Choose the tool
 | See a short file exactly once | `cat filename` | It cannot accidentally edit the file |
 | Make a beginner-friendly terminal edit | `nano filename` | Visible shortcuts reduce memory burden |
 | Make repeated advanced terminal edits | `vim filename` | Motions and commands scale after practice |
-| Run saved commands repeatedly | Inspect `ls -l script.sh`, add a missing execute bit, then `./script.sh` | Direct execution needs the appropriate access; persistent errors need diagnosis |
+| Run saved commands repeatedly | Inspect `ls -l script.sh`, add a missing owner execute bit to your owned training script, then `./script.sh` | Direct execution needs the appropriate access; persistent errors need diagnosis |
 | Confirm where you are before editing | `pwd` and `hostname` | Location mistakes are easier to prevent than repair |
 
 You can also think in terms of reversibility. Viewing is easy to back out of because it changes nothing. Editing is reversible only if you know what changed or have a backup. Running a script can affect many files or commands at once, so scripts deserve both content verification and permission awareness. This ladder of risk helps you slow down at the right moments without becoming afraid of the terminal.
