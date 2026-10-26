@@ -401,9 +401,9 @@ For a beginner, the best choice is often the one that produces the clearest feed
 
 ## Did You Know?
 
-1. **Many early computers had no interactive screens at all.** Early programmers often used punched cards, physical cards with holes in them, to provide programs and data. Modern terminals are not punch-card systems, but they continue the long tradition of giving computers precise textual instructions.
+1. **Computer input can be prepared offline.** Columbia's [IBM 026 keypunch history](https://www.columbia.edu/cu/computinghistory/punch.html) describes a machine introduced in 1949 that recorded characters as holes in cards. Preparing a card was separate from processing that input on the computer, unlike the immediate command-and-output conversation you practice in a shell.
 
-2. **The word "terminal" originally referred to hardware.** In the 1960s and 1970s, a terminal could be a keyboard and screen, or even a printer-like device, connected to a larger mainframe. Today's terminal applications are often called terminal emulators because they imitate that older role in software.
+2. **A terminal could be a physical keyboard, display and communications interface.** Columbia's [Kermit maintainers](https://columbia.edu/kermit/terminals.html) describe hardware with printers or screens, original manuals dating to the early 1970s, and physical terminals used to test software emulations. The history explains the term “terminal emulator”; the shell interpreting commands is still a separate program.
 
 3. **SSH has been standardized for decades as a secure remote-login protocol family.** RFC 4251 describes the Secure Shell architecture, and OpenSSH remains a common implementation used to reach remote systems from a terminal. That is why terminal confidence matters long before you become a server specialist.
 
@@ -688,9 +688,9 @@ You've completed this exercise when you can demonstrate each item below without 
 - [PowerShell Get-Date cmdlet](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-date?view=powershell-7.5)
 - [PowerShell about_Operators: Subexpression operator](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.5#subexpression-operator--)
 - [Kubernetes kubectl quick reference](https://kubernetes.io/docs/reference/kubectl/quick-reference/)
-- [Punched card](https://en.wikipedia.org/wiki/Punched_card)
+- [Columbia University Computing History: IBM 026 Key Punch](https://www.columbia.edu/cu/computinghistory/punch.html)
 - [Graphical user interface](https://en.wikipedia.org/wiki/Graphical_user_interface)
-- [Computer terminal](https://en.wikipedia.org/wiki/Computer_terminal)
+- [Columbia University Kermit Project: What's a Terminal?](https://columbia.edu/kermit/terminals.html)
 - [Command line crash course](https://developer.mozilla.org/en-US/docs/Learn/Tools_and_testing/Understanding_client-side_tools/Command_line)
 
 ## Next Module

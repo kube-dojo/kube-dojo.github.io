@@ -2,6 +2,8 @@
 
 Continuation: [prompt/recovery correction](2026-10-26-zero-to-terminal-p01b.md) reconciles R1/R2 below and one R3 release-history claim. The remaining full-page evidence gaps stay open.
 
+The [source continuation](2026-10-26-zero-to-terminal-p01c.md) reconciles the other named R3 claims; it preserves incomplete whole-page source, editorial and practical gates.
+
 Owner #2278; source base `17f0248b95df16b68098e9018326402cd3a92160`, reviewed 2026-10-26 by the accountable Codex lead. Read the entire Zero to Terminal hub and modules 0.1/0.2, including all explanations, examples, assessments, sources and navigation. Reused #2315/#2319/#2570/#2572/#2574 as bounded delivery history, not acceptance. Live state/reviews were inspected: no target leases or fact ledgers; module reviews are historical, hub review absent, Ukrainian counterparts stale and parked.
 
 ## Dispositions and findings

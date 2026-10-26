@@ -57,9 +57,9 @@ The restaurant manager is the operating system. The manager does not personally 
 
 The head chef is the CPU, which stands for Central Processing Unit. The chef is the part that actually follows instructions and transforms inputs into outputs. If the recipe says slice, mix, heat, compare, copy, or calculate, the chef is responsible for doing that work. A chef can only work with ingredients that are close enough to reach, which is why the counter matters.
 
-The counter space is RAM, which stands for Random Access Memory. RAM holds the active ingredients and half-finished dishes that the chef needs right now. It is much faster to use than the pantry, but it is temporary. When the kitchen closes, the counter is cleared, and in a computer, RAM is cleared when power disappears.
+The counter space is RAM, which stands for Random Access Memory. In the modern laptop and server examples here, RAM is volatile working memory: it needs power to retain its contents. The counter analogy describes that temporary workspace, not every historical memory technology; the magnetic-core example later shows that memory has been implemented in different ways.
 
-The pantry is disk storage, usually an SSD in modern laptops and servers. Storage keeps recipes, ingredients, photos, documents, programs, operating-system files, and logs after the machine is turned off. The pantry is slower than the counter, but it is durable. A kitchen with no pantry can work only for a moment, while a kitchen with no counter can barely work at all.
+The pantry is storage, such as an SSD or hard disk drive. It keeps photos, documents, programs, operating-system files and logs after the machine is turned off. It provides durable capacity rather than the temporary workspace of RAM. A kitchen pantry is a useful comparison for those roles, but durability still requires backups because devices and files can be lost.
 
 Programs are recipes. A web browser is a recipe for requesting pages, decoding data, drawing tabs, storing cookies, playing media, and responding to your clicks. A text editor is a recipe for displaying characters, saving changes, and tracking cursor movement. The terminal, which appears in the next module, is a recipe for talking directly to the operating system through typed commands.
 
@@ -107,7 +107,7 @@ More RAM = More counter space = More things open at once
   32 GB RAM  -> You're running a professional kitchen
 ```
 
-Those numbers are not universal rules, but they are useful beginner anchors. A small machine can feel fine with light browsing and document editing, then feel miserable during video calls, browser-heavy research, development tools, and virtual machines. The change is not mysterious. Every open program asks for counter space, and the operating system has to make promises with a finite amount of RAM.
+Those rows are an illustrative kitchen comparison, not measured application capacities or hardware recommendations. They do not establish which programs fit in a particular amount of RAM. Compare the memory needs of the software you actually run with the machine's observed pressure and available workspace; the amount needed varies with the workload.
 
 When RAM fills up, the operating system has several unpleasant choices. It can compress memory, discard cached data that can be recreated, move less active data to disk, or in severe cases terminate programs. Moving data between RAM and disk is called swapping or paging, depending on the system. Swapping can keep a machine alive, but it is much slower than working directly in RAM, especially if the disk is also busy.
 
@@ -175,17 +175,17 @@ Two types of pantry:
 
   HDD (Hard Disk Drive):
     - Like a big walk-in pantry
-    - Lots of space, affordable
+    - Capacity and price depend on the model
     - Slower to find things because mechanical parts move
 
   SSD (Solid State Drive):
     - Like a well-organized shelf right outside the kitchen
     - Faster to find things because there are no moving parts
-    - More expensive per shelf
-    - This is what most modern computers use
+    - Compare capacity and measured performance
+    - Check your own device's storage type
 ```
 
-Storage capacity is usually measured in gigabytes or terabytes. A gigabyte is roughly one billion bytes, and a terabyte is roughly one thousand gigabytes in decimal storage marketing terms. A typical laptop may have hundreds of gigabytes or a few terabytes of storage, while a small cloud server might have far less. The exact size matters less than the distinction between durable capacity and active working memory.
+Keep units with the values in your inventory, because tools can use different scales. In decimal units, one gigabyte (GB) is one billion bytes and one terabyte is 1,000 GB. A gibibyte (GiB) is 1,073,741,824 bytes, so it is larger than a GB. [NIST's unit comparison](https://physics.nist.gov/cuu/Units/binary.html) explains the distinction; a different displayed number does not necessarily mean storage disappeared.
 
 The difference between RAM and storage becomes obvious during a power failure. Suppose you are writing a document and the power goes out before autosave runs. The original saved file survives because it was already in the pantry. The unsaved changes disappear because they were on the counter. The CPU does not remember your words, and RAM cannot keep them without power.
 
@@ -237,9 +237,9 @@ The safest habit is to use precise nouns. Say "RAM" when you mean temporary work
 The operating system is the restaurant manager. It does not cook your photo, write your document, or render your web page by itself, but it makes those activities possible. It starts programs, allocates memory, schedules CPU time, handles input from keyboard and mouse, sends output to the display, organizes files, enforces permissions, manages network connections, and keeps many programs from trampling over each other.
 
 ```
-The three main operating systems:
+Examples of desktop and server operating systems:
 
-  Windows  -> The most common desktop OS in many market-share reports
+  Windows  -> Microsoft's operating system family
   macOS    -> Apple's system, used on Macs
   Linux    -> The open-source family used heavily in servers and cloud infrastructure
 ```
@@ -264,7 +264,7 @@ Linux is common in cloud and Kubernetes environments for practical reasons. It i
 
 Here is the part that matters a lot for your Kubernetes journey: many examples assume Linux commands, Linux paths, Linux process behavior, and Linux container images. If you use macOS or Windows on your laptop, you can still learn Kubernetes. You will simply spend time inside Linux-like environments, remote shells, containers, or virtual machines because the server-side ecosystem speaks that language so often.
 
-Checked April 15, 2026: [StatCounter Desktop OS Market Share Worldwide](https://gs.statcounter.com/os-market-share/desktop/worldwide/) and [Kubernetes Windows in Kubernetes](https://kubernetes.io/docs/concepts/windows/).
+The [Kubernetes 1.35 Windows documentation](https://v1-35.docs.kubernetes.io/docs/concepts/windows/intro/#windows-nodes-in-kubernetes) supports that Linux-control-plane/Windows-worker distinction. It does not require your learning laptop to use the same operating system as a cluster node; keep the local desktop and server environment separate in your reasoning.
 
 The operating system also decides how hardware is presented to programs. A program usually does not talk directly to the storage chips or network card. It asks the OS to open a file, allocate memory, create a network connection, or start another process. That indirection is valuable because it keeps programs simpler and lets the operating system enforce rules.
 
@@ -375,11 +375,11 @@ The model is not a substitute for measurement. It is a way to choose the first m
 
 ## Did You Know?
 
-- **Your phone is a computer too.** A modern smartphone is dramatically more capable than the computers used in the Apollo era; for perspective, the Apollo Guidance Computer worked with only tens of kilobytes of memory.
+- **Historical memory counts need context.** The [Apollo Guidance Computer's logical-design description](https://ntrs.nasa.gov/api/citations/19660019469/downloads/19660019469.pdf#page=120) lists 36,864 words of fixed, read-only memory and 2,048 words of erasable memory. Those are word counts: check the word format and memory role before comparing them with a modern machine's byte-based RAM figure.
 
-- **RAM was once magnetic.** Early computers used tiny magnetic rings called core memory for RAM. Each ring stored a single bit, and a full megabyte would have required millions of rings.
+- **Memory has used magnetic rings.** The [Computer History Museum](https://www.computerhistory.org/revolution/memory-storage/8/253) describes core memory in MIT's Whirlwind in 1953. Each ring stored one bit through its magnetization. This is a different implementation from the modern volatile RAM used in the laptop examples above.
 
-- **SSDs have no moving parts.** Traditional hard drives use spinning disks and a moving arm, while SSDs store data in electronic circuits, which is why they are usually faster and more shock-resistant.
+- **SSDs avoid spinning mechanisms.** [Sandisk's comparison](https://www.sandisk.com/solutions/ssd-vs-hdd) distinguishes NAND flash cells in SSDs from the spinning platters and moving mechanisms of HDDs. That explains an important access-time and mechanical-shock difference; it does not guarantee that every SSD will outperform every HDD for every workload or survive every failure.
 
 - **A famous early computer "bug" was a literal bug.** In 1947, engineers on the Harvard Mark II found a moth in the machine and taped it into the logbook. The [Smithsonian's artifact record](https://americanhistory.si.edu/collections/object/nmah_334663) explains that engineers had already used “bug” for faults long before this incident; the moth did not originate the term.
 
@@ -514,7 +514,7 @@ These profiles are synthetic exercises, not measurements from real machines. For
 <details>
 <summary>Check your diagnosis for Profile A</summary>
 
-The saturated resource is RAM, and the evidence is memory at 97% with steadily climbing swap: the counter is full, so the operating system is shuffling inactive data to disk and back. Fitting remediations include closing memory-heavy programs, reducing open browser tabs, or adding more RAM. A bigger disk would not help because 400 GB of pantry space is already free; the problem is temporary workspace, not durable storage.
+RAM pressure is the leading hypothesis because the slowdown coincides with high memory use and growing swap. Check the memory-pressure indicator or available memory and ongoing paging before calling it proven; used memory can include caches. Try closing a memory-heavy program and compare responsiveness. Extra storage capacity would not address this hypothesis because free disk space is already ample.
 </details>
 
 <details>
@@ -539,6 +539,9 @@ The saturated resource is disk space, and the evidence is the root filesystem at
 
 ## Sources
 
+- [Kingston glossary: RAM and predominant volatility in modern memory](https://www.kingston.com/en/memory/kingston-glossary)
+- [NIST: Decimal and binary units](https://physics.nist.gov/cuu/Units/binary.html)
+- [Sandisk: SSD and HDD storage mechanisms](https://www.sandisk.com/solutions/ssd-vs-hdd)
 - [Apple: View memory usage and Memory Pressure](https://support.apple.com/guide/activity-monitor/view-memory-usage-actmntr1004/mac)
 - [procps: free — available memory and reclaimable cache](https://man7.org/linux/man-pages/man1/free.1.html)
 - [procps: top — CPU percentages and Irix/Solaris modes](https://man7.org/linux/man-pages/man1/top.1.html)
@@ -546,7 +549,6 @@ The saturated resource is disk space, and the evidence is the root filesystem at
 - [Kubernetes 1.35: Scheduling resource requests](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/manage-resources-containers/#how-pods-with-resource-requests-are-scheduled)
 - [Kubernetes 1.35: Memory-pressure node conditions and taints](https://v1-35.docs.kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/#node-conditions)
 - [Smithsonian: Log Book With Computer Bug](https://americanhistory.si.edu/collections/object/nmah_334663)
-- [StatCounter Desktop OS Market Share Worldwide](https://gs.statcounter.com/os-market-share/desktop/worldwide)
 - [Kubernetes: Windows in Kubernetes](https://kubernetes.io/docs/concepts/windows/)
 - [Kubernetes: Intro to Windows support](https://kubernetes.io/docs/concepts/windows/intro/)
 - [MDN Web Docs: tabs.discard()](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/discard)
@@ -556,9 +558,8 @@ The saturated resource is disk space, and the evidence is the root filesystem at
 - [Ubuntu Manpage: lscpu](https://manpages.ubuntu.com/manpages/noble/en/man1/lscpu.1.html)
 - [Ubuntu Manpage: free](https://manpages.ubuntu.com/manpages/noble/en/man1/free.1.html)
 - [Ubuntu Manpage: df](https://manpages.ubuntu.com/manpages/noble/en/man1/df.1.html)
-- [Magnetic-core memory](https://en.wikipedia.org/wiki/Magnetic-core_memory)
-- [Harvard Mark II](https://en.wikipedia.org/wiki/Harvard_Mark_II)
-- [Apollo Guidance Computer](https://en.wikipedia.org/wiki/Apollo_Guidance_Computer)
+- [Computer History Museum: Magnetic Core Memory](https://www.computerhistory.org/revolution/memory-storage/8/253)
+- [NASA: Apollo Guidance Computer logical design, Chapter VI-2, PDF page 120](https://ntrs.nasa.gov/api/citations/19660019469/downloads/19660019469.pdf#page=120)
 - [Computer](https://en.wikipedia.org/wiki/Computer)
 - [Operating system](https://en.wikipedia.org/wiki/Operating_system)
 - [Random-access memory](https://en.wikipedia.org/wiki/Random-access_memory)

@@ -1,0 +1,21 @@
+# T01-P01 continuation: named source gaps
+
+Owner #2278, source owner #2275; checked 2026-10-26 against `294ec7cab175cce25e68852ff7909def0ff46820`. This narrows or sources the named R3 memory/storage and input-history claims from the [first full-page review](2026-10-26-zero-to-terminal-p01.md). Preserve the [prompt/recovery correction](2026-10-26-zero-to-terminal-p01b.md). Both lessons remain **revise** with incomplete full-page evidence; this is not exhaustive factual clearance or acceptance.
+
+| Claim / disposition | Primary support and exact applicability |
+|---|---|
+| Vague phone/Apollo capability comparison removed; use documented memory figures | [NASA NTRS report 19660019469](https://ntrs.nasa.gov/api/citations/19660019469/downloads/19660019469.pdf#page=120), PDF page 120, Chapter VI-2, Logical Design/General: 36,864 fixed (read-only) words and 2,048 erasable words. Wording describes this logical-design account, not all Apollo machines or a byte-level performance comparison |
+| Magnetic-core fact directly sourced | [Computer History Museum](https://www.computerhistory.org/revolution/memory-storage/8/253), Magnetic Core Memory: one bit per ring and Whirlwind's 1953 use. No first-in-world claim added; modern volatile RAM is scoped separately using [Kingston's RAM glossary](https://www.kingston.com/en/memory/kingston-glossary) |
+| Units made explicit; preserve values with their units | [NIST](https://physics.nist.gov/cuu/Units/binary.html), comparisons: GB = 10^9 bytes, GiB = 2^30 bytes. Decimal tera/giga ratio is 10^3. The RAM/kitchen graphic is explicitly illustrative, not measured software capacity |
+| Storage mechanism retained; price/prevalence claims narrowed | [Sandisk SSD/HDD comparison](https://www.sandisk.com/solutions/ssd-vs-hdd): NAND cells versus spinning mechanisms. No current price ranking, universal performance or failure-survival guarantee asserted |
+| Unsourced desktop ranking removed | Keep OS-family examples and the versioned [Kubernetes 1.35 Windows-node distinction](https://v1-35.docs.kubernetes.io/docs/concepts/windows/intro/#windows-nodes-in-kubernetes): Linux control plane, Windows/Linux workers. The source does not establish desktop market share |
+| Punched-card generalization narrowed to a concrete device/workflow | [Columbia IBM 026 history](https://www.columbia.edu/cu/computinghistory/punch.html), introductory paragraphs: 1949 introduction and keys punching characters into cards. [Kermit terminal account](https://columbia.edu/kermit/terminals.html), keyboard/display/interface description, explains offline input versus connected terminals |
+| Hardware-terminal definition sourced | The Kermit maintainers describe their physical-terminal collection, manuals from the early 1970s and testing software emulations against hardware. No unsupported origin date or universal mainframe-only definition retained |
+
+## Evidence and limits
+
+The 40 MB NASA PDF was downloaded directly because the web reader's size limit blocked it. The extracted narrative on PDF page 120 labels both counts unambiguously; it agrees with the NASA indexed excerpt. A SHA256 receipt and page text are preserved locally. The parser warned about duplicate Length keys; no table/figure layout inference was used. The obsolete NASA LM08 URL returned 404 and is not cited. CHM, Columbia, NIST, Kingston, Sandisk and versioned Kubernetes text were read for the claims above.
+
+No new executable command is introduced. Earlier macOS read-only/interactive-shell evidence remains bounded to those runs; no Linux/WSL/Windows/PowerShell/cluster execution is inferred. Profile A now requests pressure/available-memory checks and a controlled comparison before treating high used memory as a proven bottleneck.
+
+The named R3 claims are reconciled at this scoped revision; full-page claim coverage, editorial/rubric acceptance, cross-platform practical evidence and learner evidence remain incomplete. D1–D8 remain unassessed. Independent review, final-head CI and publication are delivery gates, not automatic acceptance. Continue with T01-P02 source/editorial work while the applicable P01 runtime evidence remains unknown; keep T01-P01 unchecked until its full contract is met.
