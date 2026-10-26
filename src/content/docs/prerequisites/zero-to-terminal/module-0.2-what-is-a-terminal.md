@@ -278,7 +278,7 @@ Here is the same command-structure idea as a static diagram. Read it from left t
 | Command              | Option               | Argument             |
 +----------------------+----------------------+----------------------+
 | date                 | -u                   |                      |
-| echo                 |                      | 'Hello, World!'      |
+| echo                 |                      | Hello, World!        |
 | hostname             |                      |                      |
 +----------------------+----------------------+----------------------+
 ```
@@ -601,26 +601,26 @@ your-mac.local
 
 </details>
 
-5. Make the output personal, then try one composed command.
+5. Print a literal message, then try one composed command. Copy the fixed message as written; inserting arbitrary text requires choosing quotes that protect its special characters, which is beyond this first exercise.
 
 **Bash, zsh, or WSL:**
 
 ```bash
-echo 'My name is [YOUR NAME] and I just used the terminal!'
+echo 'I just used the terminal!'
 echo "Today is $(date) and I am $(whoami)"
 ```
 
 **PowerShell:**
 
 ```powershell
-Write-Output 'My name is [YOUR NAME] and I just used the terminal!'
+Write-Output 'I just used the terminal!'
 Write-Output "Today is $(Get-Date) and I am $(whoami)"
 ```
 
 The preserved Bash/zsh/WSL prompt-style examples from earlier course notes show the same commands with visible prompt markers for recognition practice:
 
 ```text
-$ echo 'My name is [YOUR NAME] and I just used the terminal!'
+$ echo 'I just used the terminal!'
 ```
 
 ```bash
@@ -630,7 +630,7 @@ $ echo "Today is $(date) and I am $(whoami)"
 <details>
 <summary>Solution guidance</summary>
 
-Replace `[YOUR NAME]` with your actual name or initials before running the first command. In the Bash/zsh/WSL branch, the shell runs `date` and `whoami` first; in the PowerShell branch, it evaluates `Get-Date` and `whoami` inside `Write-Output`. Both branches show command composition in a harmless form, which prepares you for later scripts without requiring you to learn scripting syntax today. See Microsoft's [subexpression operator documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.5#subexpression-operator--) for the PowerShell form.
+The first command prints the literal message without needing any replacement text. In the Bash/zsh/WSL branch, the composed command runs `date` and `whoami` first; in PowerShell, it evaluates `Get-Date` and `whoami` inside `Write-Output`. Both branches show composition while only printing information. See Microsoft's [subexpression operator documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.5#subexpression-operator--) for the PowerShell form.
 
 </details>
 
