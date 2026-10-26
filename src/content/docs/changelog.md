@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Clearer container lifecycle practice.** [What Are Containers?](/prerequisites/cloud-native-101/module-1.1-what-are-containers/) keeps name collisions untouched; [Docker Fundamentals](/prerequisites/cloud-native-101/module-1.2-docker-fundamentals/) uses fresh project folders, loopback web examples and cleanup tied to the lesson's containers, and distinguishes restarting a container from replacing it.
 - **More precise orchestration and architecture decisions.** [What Is Kubernetes?](/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes/) clarifies namespace scope, [the ecosystem lesson](/prerequisites/cloud-native-101/module-1.4-cloud-native-ecosystem/) checks Argo CD policy before blaming reconciliation, and [monoliths versus microservices](/prerequisites/cloud-native-101/module-1.5-monolith-to-microservices/) separates recovery mechanisms from guaranteed application health.
 - **More precise permission and filename diagnosis.** [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) explains why directory write permission also needs traversal, qualifies private-file permissions, and teaches you to confirm a filename mismatch from an actual listing.
 - **Safer first editor and script practice.** [Editing Files](/prerequisites/zero-to-terminal/module-0.5-editing-files/) now keeps training files in a new workspace, checks which editor is running, and distinguishes missing execute permission from other access problems before suggesting a fix.

@@ -451,30 +451,31 @@ The `latest` tag probably moved to a different image between Tuesday and Thursda
 
 This lab proves that a container is an isolated process, not a magical separate machine. You will start a long-running Alpine container, inspect its process view from inside, compare that with the host view, and then destroy data written only to the container filesystem. The exercise is intentionally small because the goal is not Docker fluency yet. The goal is to make the core mental model visible.
 
-Requirements: use a terminal with Docker installed. On a native Linux host, the process comparison is direct. On macOS or Windows with Docker Desktop, Docker runs a hidden Linux VM, so the host-process observation happens inside that VM rather than on the native desktop operating system. That difference is itself a useful reminder that containers share a compatible kernel somewhere.
+Requirements: use a Bash-compatible terminal (WSL or the lab shell on Windows) and Docker in an authorized local context. Keep the same shell and context throughout. Each ID assignment captures your successful creation result and clears it on failure; never populate it with an existing container's ID. Set `isolation_name` below to an unused name once, keeping it for the replacement. A collision means stop, not remove or adopt an existing container. On Desktop, the host-process comparison concerns its Linux VM rather than the native host.
 
 **Task 1: Start a long-running container process.** Run a simple Alpine container that sleeps for an hour. The `-d` flag starts it in the background so your terminal returns immediately while the process keeps running.
 
 ```bash
-docker run -d --name isolation-test alpine sleep 3600
+isolation_name=isolation-test
+isolation_id=$(docker run -d --name "$isolation_name" alpine sleep 3600) || isolation_id=''
 ```
 
 Verify the container is running by checking the container list for the name you just assigned to this specific lab process.
 
 ```bash
-docker ps | grep isolation-test
+test -n "$isolation_id" && docker ps --filter "id=$isolation_id"
 ```
 
 <details>
 <summary>Solution notes for Task 1</summary>
 
-You should see a running container named `isolation-test`. If Docker reports that the name is already in use, remove the old container with the cleanup command at the end of the lab and run the task again. At this point you have not created a VM manually; you have asked the container runtime to start one isolated process from the Alpine image.
+A successful creation should appear in the filtered listing. If creation failed, the empty-ID guard prevents later operations. Leave any conflicting container untouched and choose an unused name before retrying. Capturing this creation result is not a general ownership guarantee; losing the shell or changing contexts means stop and recover the evidence rather than guessing.
 </details>
 
 **Task 2: View the process from inside the container.** Execute a shell command inside the container to list processes. The key observation is that the sleep process appears to be PID 1 from inside the container's process namespace.
 
 ```bash
-docker exec isolation-test ps aux
+test -n "$isolation_id" && docker exec "$isolation_id" ps aux
 ```
 
 <details>
@@ -498,26 +499,26 @@ On native Linux, the process should exist on the host with a normal host PID rat
 **Task 4: Prove ephemerality by losing disposable data.** Create a file inside the running container, verify it exists, then remove and recreate the container with the same name. You are deliberately writing to the container's own filesystem, not to a mounted volume.
 
 ```bash
-docker exec isolation-test sh -c "echo 'Important Data' > /secret.txt"
+test -n "$isolation_id" && docker exec "$isolation_id" sh -c "echo 'Important Data' > /secret.txt"
 ```
 
 Verify it exists before removing the container so you can separate successful file creation from the later replacement behavior.
 
 ```bash
-docker exec isolation-test cat /secret.txt
+test -n "$isolation_id" && docker exec "$isolation_id" cat /secret.txt
 ```
 
 Now stop and remove the container, then start a new one with the exact same name so the replacement boundary is impossible to miss.
 
 ```bash
-docker rm -f isolation-test
-docker run -d --name isolation-test alpine sleep 3600
+test -n "$isolation_id" && docker stop "$isolation_id" && docker rm "$isolation_id" && isolation_id=''
+isolation_id=$(docker run -d --name "$isolation_name" alpine sleep 3600) || isolation_id=''
 ```
 
 Try to read your file again from the new instance, and connect the expected failure back to the writable container layer.
 
 ```bash
-docker exec isolation-test cat /secret.txt
+test -n "$isolation_id" && docker exec "$isolation_id" cat /secret.txt
 ```
 
 <details>
@@ -529,13 +530,13 @@ The final read should fail because the new container started from the original A
 **Task 5: Clean up.** Remove the lab container after the evidence is collected so the next experiment starts from a known state instead of inheriting a leftover name.
 
 ```bash
-docker rm -f isolation-test
+test -n "$isolation_id" && docker stop "$isolation_id" && docker rm "$isolation_id" && isolation_id=''
 ```
 
 <details>
 <summary>Solution notes for Task 5</summary>
 
-The cleanup command is safe to run even if the container is already stopped because `-f` asks Docker to remove it forcefully. A clean lab environment matters because repeated experiments become confusing when old containers, names, or filesystem layers remain. The habit is the same one you will use later with Kubernetes resources: create deliberately, inspect deliberately, and clean up deliberately.
+Cleanup targets only the recorded container from this run and clears its ID afterward. Stop if any step fails. Forced removal is unnecessary here: it can kill a running process, so it is not a general safe response to a familiar name. The lesson is deliberate creation, inspection, and removal of known disposable state.
 </details>
 
 ### Success Criteria
