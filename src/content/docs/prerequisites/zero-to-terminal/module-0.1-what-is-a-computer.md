@@ -19,7 +19,7 @@ After this module, you will be able to:
 
 - **Diagnose** whether a slow computer is more likely constrained by CPU, RAM, disk, or operating-system pressure.
 - **Compare** RAM and storage using the kitchen model, then predict what is lost or preserved when power disappears.
-- **Evaluate** why Linux is common in cloud and Kubernetes environments while recognizing where Windows worker nodes fit.
+- **Optional preview:** **Evaluate** why Linux is common in cloud and Kubernetes environments while recognizing where Windows worker nodes fit.
 - **Implement** a personal spec inventory that records your CPU, RAM, disk capacity, operating system, and current resource pressure.
 - **Predict** what happens when RAM, disk space, or CPU time is exhausted during everyday and server-side workloads.
 
@@ -39,7 +39,7 @@ This module gives you a mental model that will keep paying rent. Later, when Kub
 
 Imagine a restaurant kitchen. Not a fancy one, just a regular, busy kitchen that needs to take orders, prepare food, keep ingredients organized, clean up after itself, and serve customers without mixing up dishes. A computer works in a similar way because it has separate parts with separate responsibilities. The point of the analogy is not that a computer literally cooks; the point is that good kitchens and good computers both need coordination, temporary workspace, long-term storage, and workers that execute instructions.
 
-Most beginners learn computer parts as isolated vocabulary words, which makes the subject feel more complicated than it is. CPU, RAM, disk, and operating system sound like separate flashcards until you watch them cooperate. The restaurant model lets you see the cooperation first, then attach names to each responsibility. Once the whole system is visible, the individual parts become easier to remember and much easier to diagnose.
+CPU, RAM, disk, and operating system can sound like separate vocabulary words until you watch them cooperate. Use the restaurant model to connect each term to a responsibility, then check that explanation against the technical descriptions below. The analogy helps organize questions; measurements from the actual computer are still needed to diagnose a problem.
 
 ```mermaid
 graph TD
@@ -82,7 +82,7 @@ Think of it this way:
     Step 4: Serve             done
 ```
 
-The original module used this sandwich example because it captures something important: computers do not "understand" a program in the human sense. They carry out many small instructions at enormous speed. The magic is not that any one instruction is clever; the magic is that billions of simple operations can be coordinated into useful behavior.
+The sandwich example separates a task from the instructions used to perform it. A processor executes machine instructions rather than interpreting a recipe as a person would. The operating system and programs coordinate those operations into tasks such as displaying a photo or saving a document; the analogy describes their roles, not their internal implementation.
 
 The kitchen model also helps explain failure. If orders pile up while the chef is constantly busy, CPU capacity may be the bottleneck. If the chef keeps clearing and reloading the counter, RAM may be the bottleneck. If ingredients are missing or the pantry is overflowing, disk storage may be the bottleneck. If nobody knows which order should be handled next, the operating system or program behavior may be the bottleneck.
 
@@ -116,7 +116,7 @@ When RAM fills up, the operating system has several unpleasant choices. It can c
 <details>
 <summary>Check your prediction</summary>
 
-If you guessed "the computer gets painfully slow," you are right. Each program needs counter space, and a browser with many tabs open can easily use several gigabytes of RAM. The OS starts shuffling data between RAM and disk, and everything feels delayed.
+The result depends on how much memory those programs actually need; tab count alone does not establish a bottleneck. If their active data exceeds the available workspace, the OS may reclaim caches, compress memory, or move data to disk, and switching applications may slow down. Check memory pressure and ongoing swap activity before concluding that RAM is the cause.
 </details>
 
 This is why "my computer is slow" is not enough information for a good diagnosis. A slow video call with a fast network may point toward CPU pressure if the machine cannot encode or decode video smoothly. A slow laptop after opening many applications may point toward RAM pressure if the system is swapping. A slow file search may point toward disk performance or indexing. The symptom matters, but the resource under pressure matters more.
@@ -270,13 +270,15 @@ The operating system also decides how hardware is presented to programs. A progr
 
 Permissions are one example of those rules. When a program asks to read a file, the operating system can allow or deny the request based on ownership, user identity, and security settings. When a program asks for more memory, the operating system decides whether that request can be satisfied without harming the rest of the machine. This is why the OS is more than a friendly launcher; it is also the referee that keeps shared resources from becoming a free-for-all.
 
-Scheduling is another example. Many programs may want CPU time at once, but a CPU core can execute only one thread of instructions at an instant. The operating system rapidly switches attention among runnable tasks so the machine feels responsive. When the system is healthy, that switching is too fast for a beginner to notice. When the system is overloaded, the switching becomes visible as lag, stutter, delayed typing, or applications that take a long time to respond.
+Scheduling is another example. Many programs may want CPU time at once, and the operating system shares the available processing capacity among runnable tasks. Some processors also let a physical core handle more than one hardware thread through simultaneous multithreading; those threads share the core's resources. More runnable work does not create unlimited capacity, so CPU contention can still delay a task.
 
 Hypothetical scenario: your browser freezes while a music player keeps playing and your mouse still moves. That symptom tells you the entire computer may not be dead. One program may be stuck, while the operating system and other programs are still making progress. If the whole screen stops updating, input stops responding, and audio loops or cuts out, the problem may be broader than one application.
 
 The distinction between a program problem and an operating-system problem becomes important on servers. A single application can crash while the machine remains healthy. A machine can also become unhealthy because memory, disk, CPU, or kernel-level services are under pressure. Operators learn to ask whether the recipe failed, the manager failed, or the kitchen ran out of a shared resource.
 
-## From One Laptop to Kubernetes Nodes
+## Optional Preview: From One Laptop to Kubernetes Nodes
+
+For a first pass, you may continue to [Reading Symptoms Like an Operator](#reading-symptoms-like-an-operator) and return here later. This preview connects the same resources to a future platform; the local spec inventory does not require a cluster or Kubernetes commands.
 
 Kubernetes sounds much larger than one laptop, but it does not escape the kitchen model. A Kubernetes cluster is a collection of computers, usually called nodes, coordinated to run workloads. Each node has CPU, RAM, disk, an operating system, networking, and background agents. Kubernetes adds a scheduling and reconciliation layer above those computers, but it still depends on their ordinary hardware limits.
 
@@ -305,7 +307,7 @@ Pause and predict: if a Kubernetes node has plenty of CPU available but almost n
 <details>
 <summary>Check your prediction</summary>
 
-The answer should now feel obvious. A smart scheduler must consider the resource a workload actually needs, not just the resource that happens to be available. A kitchen with idle chefs but no counter space is still a bad place to prepare a large banquet.
+CPU capacity cannot substitute for memory capacity. In Kubernetes, however, the scheduler normally compares declared resource requests with node allocatable capacity and existing requests, rather than simply reading a live free-memory percentage. Reported memory pressure also affects scheduling through node taints. Distinguish the workload's needs, its declared requests, and the node's observed condition before predicting placement.
 </details>
 
 This one-to-many jump is the reason the module starts at the beginner level but still matters for advanced work. Cloud infrastructure is not a separate universe. It is a way of renting, connecting, automating, and managing computers owned by someone else. Once you understand one computer, you have the vocabulary needed to reason about fleets, clusters, and failures at larger scale.
@@ -379,7 +381,7 @@ The model is not a substitute for measurement. It is a way to choose the first m
 
 - **SSDs have no moving parts.** Traditional hard drives use spinning disks and a moving arm, while SSDs store data in electronic circuits, which is why they are usually faster and more shock-resistant.
 
-- **A famous early computer "bug" was a literal bug.** In 1947, engineers on the Harvard Mark II found a moth stuck in a relay and taped it into the logbook — noting the "first actual case of a bug being found." (Engineers had already been calling glitches "bugs" for decades; this just made the name stick.)
+- **A famous early computer "bug" was a literal bug.** In 1947, engineers on the Harvard Mark II found a moth in the machine and taped it into the logbook. The [Smithsonian's artifact record](https://americanhistory.si.edu/collections/object/nmah_334663) explains that engineers had already used “bug” for faults long before this incident; the moth did not originate the term.
 
 ## Common Mistakes
 
@@ -408,9 +410,9 @@ The unsaved changes were likely in RAM, which is temporary and requires power to
 </details>
 
 <details>
-<summary>3. A future Kubernetes node reports that it has CPU available but is under memory pressure. Should the scheduler place a memory-heavy workload there?</summary>
+<summary>3. Optional preview: a future Kubernetes node reports that it has CPU available but is under memory pressure. What else do you need to predict placement of a memory-heavy workload?</summary>
 
-No, not if the scheduler has a healthier option, because the workload needs the resource that is already scarce. CPU availability only means the chefs have time; memory pressure means the counter space is crowded. A memory-heavy workload placed there may be killed, swapped, or degraded. This is the same laptop reasoning scaled up to a cluster node.
+Do not decide from CPU availability alone. Compare the Pod's declared memory request with the node's allocatable memory and existing requests, and inspect the node's memory-pressure condition and taints. Kubernetes scheduling is not a direct comparison with current free RAM: a low request can understate a workload's eventual use. The resource distinction still matters, but a prediction needs those additional facts.
 </details>
 
 <details>
@@ -472,7 +474,7 @@ RAM is the smaller temporary workspace number, commonly 8 GB, 16 GB, 32 GB, or a
 <details>
 <summary>Solution guidance for Task 3</summary>
 
-On macOS, Activity Monitor has CPU and Memory tabs. On Windows, Task Manager has Processes and Performance views. On Linux, `top` shows CPU and memory activity, while desktop tools may show friendlier graphs. A mostly idle machine has low CPU usage and comfortable free memory. A CPU-bound machine has one or more busy processes. A memory-bound machine has very high memory use or swap activity.
+On macOS, Activity Monitor has CPU and Memory tabs. On Windows, Task Manager has Processes and Performance views. On Linux, `top` shows CPU and memory activity. A busy process or high used-memory number is a clue, not proof of a bottleneck. Check sustained CPU activity against available processing capacity, and memory pressure or available memory alongside ongoing paging. Cached data and allocated swap can remain when applications are responsive; record uncertainty if your evidence does not explain the slowdown.
 </details>
 
 ### Task 4: Predict an upgrade correctly
@@ -488,7 +490,7 @@ On macOS, Activity Monitor has CPU and Memory tabs. On Windows, Task Manager has
 A CPU bottleneck might look like slow video export or a choppy video call while memory and disk are healthy. A RAM bottleneck might look like slow window switching after many apps are open. A disk-space bottleneck might look like failed updates or inability to save files. Matching actions could include closing CPU-heavy work, reducing memory-heavy applications or adding RAM, and deleting or moving files to free storage.
 </details>
 
-### Task 5: Connect your laptop to Kubernetes language
+### Task 5 (optional preview): Connect your laptop to Kubernetes language
 
 - [ ] Rewrite your CPU as "compute capacity" in one sentence.
 - [ ] Rewrite your RAM as "memory capacity" in one sentence.
@@ -503,10 +505,10 @@ Example: "My laptop has compute capacity provided by its CPU, memory capacity pr
 
 ### Task 6: Diagnose three telemetry profiles
 
-Each profile below is a snapshot from a different machine, written the way a monitoring tool or a teammate's message might report it. For each profile, decide which resource is saturated, name the evidence that points there, and choose one remediation that fits the bottleneck. Write your answers down before opening the reveals, because the written commitment is what turns this from reading into retrieval practice.
+These profiles are synthetic exercises, not measurements from real machines. For each profile, identify the leading bottleneck hypothesis, name the supporting evidence, and choose one matching action. Write down what you would check before applying that action; a snapshot can suggest a cause without proving that every other resource is healthy.
 
 - **Profile A: The midnight shuffle.** A laptop has 8 GB of RAM and 400 GB of free disk space. After the owner opens a browser with 40 tabs, a video call, and a code editor, switching windows takes several seconds. The system monitor shows memory at 97% and swap usage climbing steadily, while CPU usage stays near 20%.
-- **Profile B: The runaway export.** A desktop has 32 GB of RAM and 1 TB of free storage. A video export has been running for an hour; the fans are loud, the whole machine feels sluggish, and the monitor shows the export process pinned near 100% CPU with memory at 45% and swap unused.
+- **Profile B: The runaway export.** A desktop has 32 GB of RAM and 1 TB of free storage. During a video export, the desktop becomes sluggish. Across repeated samples, the system-wide CPU summary shows 98% busy and 2% idle across all logical CPUs; the export process accounts for most CPU time. Memory pressure is low and no new swapping is observed.
 - **Profile C: The silent pantry.** A small server has 4 CPU cores at 10% usage and half its RAM free. Application logs stopped growing, package installs fail with "no space left" errors, and `df -h` reports the root filesystem at 99% used.
 
 <details>
@@ -518,7 +520,7 @@ The saturated resource is RAM, and the evidence is memory at 97% with steadily c
 <details>
 <summary>Check your diagnosis for Profile B</summary>
 
-The saturated resource is CPU, and the evidence is one process pinned near 100% CPU while memory sits at 45% and swap is unused: the chef is fully occupied with the export recipe. Fitting remediations include letting the export finish, lowering its quality settings, scheduling heavy jobs for off-hours, or moving to a processor with more cores. Adding RAM would not help because plenty of counter space is already free.
+CPU contention is the leading hypothesis because the system-wide summary stays almost fully busy during the slowdown, and the export accounts for most CPU time. One process at 100% would not establish whole-machine saturation: some tools count 100% per logical CPU. Try pausing or rescheduling the export and compare responsiveness. Extra cores help only if the work can use them; these observations do not justify buying hardware yet.
 </details>
 
 <details>
@@ -533,10 +535,17 @@ The saturated resource is disk space, and the evidence is the root filesystem at
 - [ ] You can explain why RAM and storage are different without using the word "memory" ambiguously.
 - [ ] You can diagnose whether one simple symptom points first toward CPU, RAM, disk, network, or a single stuck program.
 - [ ] You can diagnose a telemetry profile by naming the saturated resource, the evidence, and a matching remediation.
-- [ ] You can explain why Kubernetes nodes are still computers with finite resources.
+- [ ] Optional preview: you can explain why Kubernetes nodes are still computers with finite resources.
 
 ## Sources
 
+- [Apple: View memory usage and Memory Pressure](https://support.apple.com/guide/activity-monitor/view-memory-usage-actmntr1004/mac)
+- [procps: free — available memory and reclaimable cache](https://man7.org/linux/man-pages/man1/free.1.html)
+- [procps: top — CPU percentages and Irix/Solaris modes](https://man7.org/linux/man-pages/man1/top.1.html)
+- [Intel: Hyper-Threading and shared physical cores](https://www.intel.com/content/www/us/en/gaming/resources/hyper-threading.html)
+- [Kubernetes 1.35: Scheduling resource requests](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/manage-resources-containers/#how-pods-with-resource-requests-are-scheduled)
+- [Kubernetes 1.35: Memory-pressure node conditions and taints](https://v1-35.docs.kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/#node-conditions)
+- [Smithsonian: Log Book With Computer Bug](https://americanhistory.si.edu/collections/object/nmah_334663)
 - [StatCounter Desktop OS Market Share Worldwide](https://gs.statcounter.com/os-market-share/desktop/worldwide)
 - [Kubernetes: Windows in Kubernetes](https://kubernetes.io/docs/concepts/windows/)
 - [Kubernetes: Intro to Windows support](https://kubernetes.io/docs/concepts/windows/intro/)
