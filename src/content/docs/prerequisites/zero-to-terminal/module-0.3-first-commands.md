@@ -212,7 +212,30 @@ Running `pwd` outputs your home directory path, such as `/Users/yourname` on mac
 
 Navigation tells you where commands will act, but useful work begins when you create and rearrange files. These commands are intentionally small. `mkdir` creates directories, `touch` creates an empty file when the file does not exist, `cp` creates another copy, and `mv` changes a file's name or location. The power comes from combining those small actions with precise paths.
 
-The safest way to learn creation commands is to run them in a practice area, not in a folder full of important work. Start from your home directory and create a clearly named folder so you can recognize it later. Names with dashes are convenient because they avoid the quoting problems that spaces introduce. Spaces are allowed in file names, but they require care because the shell uses spaces to separate words.
+The safest way to learn creation commands is to run them in a new practice area. Names with dashes are convenient because they avoid the quoting problems that spaces introduce. Spaces are allowed in file names, but they require care because the shell uses spaces to separate words.
+
+### Create your disposable workspace
+
+Return home, then create a dedicated directory for all file-changing practice below:
+
+```bash
+cd ~
+```
+
+```bash
+mkdir kubedojo-first-commands
+```
+
+**Continue only if `mkdir` succeeds.** If it reports that the name already exists, or any other error, stop here. Do not reuse or delete that existing path, and do not add `-p` to bypass the error. Choose a different unused workspace name and substitute it consistently below. [The `mkdir` manual](https://www.gnu.org/s/coreutils/manual/html_node/mkdir-invocation.html) explains why ordinary creation reports a collision while `-p` accepts existing directories.
+
+After successful creation, enter that new directory and verify the location:
+
+```bash
+cd ~/kubedojo-first-commands
+pwd
+```
+
+Continue only if `cd` succeeds and `pwd` ends in your new workspace name. All following `menu.txt`, `restaurant` and copy/move/delete examples belong inside this workspace, including the hands-on exercise. An existing folder elsewhere with the same name is not part of this practice.
 
 `mkdir` stands for make directory. A directory is a folder, and creating one does not move you into it automatically. This is a common beginner assumption: after `mkdir my-first-folder`, your current directory is still wherever it was before. Use `ls` to verify that the folder exists, and use `cd my-first-folder` only when you intentionally want to enter it.
 
@@ -340,7 +363,7 @@ The `-r` flag means "recursive", which is the same idea you saw with `cp -r`, bu
 
 A classic dangerous example is shown below only so you recognize why engineers warn about it. Do not run it. On modern GNU/Linux systems, `rm` normally refuses to operate on `/` because of the default `--preserve-root` safety guard, and disabling that guard requires an explicit unsafe option. The presence of a guard does not make careless deletion safe; it only blocks one especially catastrophic form.
 
-```bash
+```text
 rm -rf /
 ```
 
@@ -500,16 +523,19 @@ Run `ls` to confirm that both `restaurant` and `restaurant-copy` exist, and use 
 
 Exercise scenario: you are preparing a small file layout for an imaginary restaurant, and your job is to create the structure, inspect it, move one item, copy a menu, and clean up the practice workspace. The exercise intentionally uses harmless empty files so you can focus on command behavior rather than file contents. Work slowly, read each path before pressing Enter, and keep the `pwd`, `ls`, action loop in mind whenever something does not look right.
 
-### Step 1: Go to your home directory
+### Step 1: Return to your disposable workspace
+
+Use the new workspace you successfully created above. If you skipped the walkthrough, complete its workspace setup first; an existing directory alone does not prove that its contents are disposable.
 
 ```bash
-cd ~
+cd ~/kubedojo-first-commands
+pwd
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-Starting from home gives the exercise a predictable base location. If you are unsure whether the command worked, run `pwd` and check that the path looks like your user directory rather than a project subfolder or temporary directory.
+Starting inside your own new workspace keeps practice separate from existing home-directory files. Stop if `cd` fails or `pwd` does not show that workspace; do not continue creating or removing files from another location.
 </details>
 
 ### Step 2: Create the restaurant structure
@@ -614,7 +640,7 @@ This step uses `cp` because a backup should leave the original in place. The fin
 In real systems administration and cloud operations, commands often fail or create files in unintended directories because the operator loses track of their current working location. Imagine a teammate was tasked with adding an inventory file named `olive-oil.txt` into the pantry directory at `restaurant/storage/pantry/`. They navigated into `restaurant/kitchen/` to inspect kitchen equipment, forgot their active shell context, and attempted to run the following command using an invalid relative path:
 
 ```bash
-cd ~/restaurant/kitchen
+cd ~/kubedojo-first-commands/restaurant/kitchen
 touch storage/pantry/olive-oil.txt
 ```
 
@@ -638,9 +664,9 @@ pwd
 ls
 ```
 
-`pwd` reports `/home/yourname/restaurant/kitchen` (or your platform equivalent), and `ls` displays `cooking-stations`, `olive-oil.txt`, and `prep-area`. This reveals that `touch olive-oil.txt` created the file inside the kitchen, because relative paths always execute against the active directory printed by `pwd`.
+`pwd` reports `/home/yourname/kubedojo-first-commands/restaurant/kitchen` (or your platform equivalent), and `ls` displays `cooking-stations`, `olive-oil.txt`, and `prep-area`. This reveals that `touch olive-oil.txt` created the file inside the kitchen, because relative paths always execute against the active directory printed by `pwd`.
 
-Next, examine why the teammate's relative command failed. From `/restaurant/kitchen/`, the relative path `storage/pantry/` fails because `kitchen` and `storage` are sibling folders inside `restaurant`. The shell searched for `/restaurant/kitchen/storage/pantry/`, which does not exist.
+Next, examine why the teammate's relative command failed. Inside the workspace's `restaurant/kitchen/`, the relative path `storage/pantry/` fails because `kitchen` and `storage` are sibling folders inside `restaurant`. The shell searched below `kitchen` instead of beside it.
 
 To fix the structure, navigate up to the restaurant root directory and inspect the pantry:
 
@@ -670,10 +696,15 @@ The output for `storage/pantry/` now displays `flour.txt`, `olive-oil.txt`, and 
 
 ### Step 8: Clean up
 
-When you are done experimenting, return to your home directory and clean up only the disposable practice directory you created for this exercise, not any similarly named real project:
+When you are done experimenting, return to your workspace and inspect its practice tree before removing it. Stop if the directory change fails or the displayed location is wrong. Remove only the `restaurant` inside this workspace:
 
 ```bash
-cd ~
+cd ~/kubedojo-first-commands
+pwd
+ls restaurant
+```
+
+```bash
 rm -r restaurant
 ```
 
@@ -683,17 +714,17 @@ Verify that the practice directory is gone by filtering the current directory li
 ls | grep restaurant
 ```
 
-No output means it is gone. This is a good example of empty output as useful information: the `ls` command produced names, and `grep restaurant` found no matching line after the cleanup.
+If the listing succeeds without errors and the filter prints nothing, it found no remaining visible name containing `restaurant`. If you see an error, investigate it rather than treating missing output as proof of successful cleanup.
 
 <details>
 <summary>Solution notes</summary>
 
-This cleanup is safe only because `restaurant` is a disposable practice directory that you created for the exercise. If you are not sure where you are, run `pwd` before cleanup. If you are not sure what is inside the directory, run `ls restaurant` before removal.
+The earlier exclusive workspace creation is what separates this practice tree from a pre-existing `~/restaurant`. Inspecting a directory helps you recognize its contents; it does not establish that you created it or may delete it.
 </details>
 
 Use this success criteria checklist to confirm that you practiced every aligned skill rather than only copying commands:
 
-- [ ] You used `cd ~`, `pwd`, or both to start from a known location.
+- [ ] You created an unused practice workspace and verified its location before changing files.
 - [ ] You created the nested `restaurant` directory structure with `mkdir -p`.
 - [ ] You created empty practice files with `touch` in the correct subdirectories.
 - [ ] You inspected the structure with `ls` at multiple levels.
@@ -702,6 +733,17 @@ Use this success criteria checklist to confirm that you practiced every aligned 
 - [ ] You used `pwd` and `ls` to diagnose a command that ran in the wrong directory, then navigated with `cd` and moved the file with `mv` to restore the correct structure.
 - [ ] You removed only the disposable `restaurant` practice directory with `rm -r`.
 - [ ] You used a pipe with `grep` to verify that cleanup produced no remaining restaurant entry.
+
+The walkthrough's other files still live inside `kubedojo-first-commands`. Keep them for more practice, or inspect the workspace from home and remove it only if it is the new directory you created for this session and contains nothing you want to keep:
+
+```bash
+cd ~
+ls kubedojo-first-commands
+```
+
+```bash
+rm -r kubedojo-first-commands
+```
 
 ## Sources
 
@@ -714,6 +756,7 @@ Use this success criteria checklist to confirm that you practiced every aligned 
 - [POSIX `pwd`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/pwd.html) — Standard behavior for printing the working directory.
 - [POSIX `ls`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/ls.html) — Standard listing utility behavior and options.
 - [POSIX `mkdir`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/mkdir.html) — Standard directory creation utility behavior.
+- [GNU `mkdir`](https://www.gnu.org/s/coreutils/manual/html_node/mkdir-invocation.html) — Existing-path errors and the different behavior of `-p`.
 - [POSIX `touch`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/touch.html) — Standard timestamp update and file creation utility behavior.
 - [POSIX `cp`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/cp.html) — Standard copy utility behavior, including recursive copying.
 - [POSIX `mv`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/mv.html) — Standard move and rename utility behavior.
