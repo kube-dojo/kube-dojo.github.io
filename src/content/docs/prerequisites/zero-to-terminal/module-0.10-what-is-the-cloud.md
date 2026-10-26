@@ -78,7 +78,7 @@ Pause and predict: if a test environment is used only during business hours, whi
 <details>
 <summary>Check your prediction</summary>
 
-The rented cloud model can reduce idle compute charges when the provider supports stopping that compute. Stopping a VM does not stop all billing: retained disks, snapshots, addresses, or other services may still incur charges under the provider's rules. Savings require a resource inventory, scheduled actions, and a cleanup review that checks retained resources and billing afterward; neither stopping nor deleting one VM guarantees a zero-cost environment.
+The rented cloud model can reduce idle compute charges when stopping is supported. Stopping a VM does not stop all billing: AWS documents continuing EBS storage and associated Elastic IP charges while an EC2 instance is stopped. Inventory resources and check provider rules and billing afterward; stopping or deleting one VM does not guarantee zero cost.
 </details>
 
 ## Build Versus Rent: The Operational Tradeoff
@@ -464,14 +464,14 @@ On each page, try to find the same three categories so your notes compare provid
 
 ### Step 3: Write down what you found
 
-Create a fresh disposable workspace under your exclusive control before opening the notes file. Run one line at a time and stop on any `mkdir` or `cd` error. If the name exists as a file, directory, or symlink, leave it untouched and choose an unused name, substituting it in later paths. Use plain `mkdir`, not `mkdir -p`; continue only when `pwd` identifies the new workspace and `ls -a` shows only `.` and `..`. Repeat runs or uncertain ownership require a fresh workspace.
+Create a fresh disposable workspace under your exclusive control. Run the whole connected block: `&&` runs the next command only after success, so failed creation or navigation prevents opening the editor. Listings display context and the editor opens automatically. Leave existing names untouched and choose an unused name for later paths; do not use `mkdir -p`. Unexpected contents or uncertain ownership mean exit without saving and start fresh.
 
 ```bash
-cd ~
-mkdir kubedojo-cloud-notes
-cd kubedojo-cloud-notes
-pwd
-ls -a
+cd ~ &&
+mkdir kubedojo-cloud-notes &&
+cd kubedojo-cloud-notes &&
+pwd &&
+ls -a &&
 nano cloud-notes.txt
 ```
 

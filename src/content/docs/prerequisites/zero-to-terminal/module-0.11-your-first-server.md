@@ -30,7 +30,7 @@ Hypothetical scenario: you have just finished the first ten modules in this trac
 
 That small website is not a toy in the sense that it uses different fundamentals from professional systems. A production platform has more layers, stricter security, automation, monitoring, TLS certificates, multiple environments, and usually Kubernetes 1.35+ somewhere later in the KubeDojo journey. Underneath those layers, though, the same chain still appears: a program listens on a port, receives an HTTP request, reads or generates content, and sends a response back over the network.
 
-You have two deployment paths because "server" can mean more than one useful thing for a beginner. Option A runs nginx locally in a container, so you can practice safely without signing up for a cloud account or exposing anything to the public internet. Option B installs nginx on a cloud VM, so you can experience SSH, package management, public IP addresses, and cloud firewalls in one focused exercise. Both paths teach the same request flow, and the important skill is not memorizing either command sequence but learning how to reason about the system when something does not respond.
+Option A uses an authorized local container with deliberate loopback publication, subject to the Engine and routing caveats below. Option B uses a disposable cloud VM to practice SSH, packages, public addressing, and firewalls. Both teach the request flow; neither a container nor a cloud label alone establishes isolation or correct configuration.
 
 ---
 
@@ -72,7 +72,7 @@ Pause and predict: if nginx is running correctly but the file it expects is miss
 <details>
 <summary>Check your prediction</summary>
 
-The browser shows an error page from nginx itself, typically an HTTP 404 "Not Found" response. That is the key insight: the network connection succeeded, the port had a listener, and nginx answered, but the filesystem lookup failed. A closed port produces a fast "connection refused" because nothing accepted the connection, and a cloud firewall produces a long timeout because the request never reached a listener at all. Three failure shapes, three different layers, three different repairs.
+An HTTP error establishes a response; inspect content and configuration to diagnose a missing file. Refusal suggests a missing listener or active rejection, possibly by an intermediary. Timeout leaves routing, filtering, addressing, and availability as hypotheses. Symptoms guide checks rather than proving one cause or repair.
 
 </details>
 
@@ -121,18 +121,21 @@ sudo apt update && sudo apt install podman -y
 
 If you install Podman, the commands are conceptually identical, but you type `podman` instead of `docker`. Some engineers make an interactive shell shortcut so old Docker examples call Podman, but shortcuts are not a learning requirement and they can make copied examples less clear. In this module, the command examples keep the explicit `docker` name so each line shows the tool being invoked.
 
-Verify that your runtime command is available before starting the server. This is a small habit with a big payoff: test the tool itself before testing the system built with the tool. If this command fails, the problem is installation or shell path configuration, not nginx, HTTP, ports, or your HTML file.
+Check the client, active context, [endpoint details](https://docs.docker.com/reference/cli/docker/context/inspect/), and [Server version](https://docs.docker.com/reference/cli/docker/version/) before creation. `docker --version` reports only the client. Confirm the endpoint belongs to your authorized local runtime and the Server Engine is at least 28.0.0; stop and ask the lab owner if either is unknown or unsuitable. These checks do not eliminate the routing caveat below.
 
 ```bash
 docker --version
+docker context show
+docker context inspect
+docker version
 ```
 
 Now run nginx in the background, publishing port 8080 on the local host's IPv4 loopback address. Docker otherwise publishes on all host addresses by default. Use a current Engine: versions older than 28.0.0 have a documented same-L2-network reachability caveat even for localhost publication. Loopback binding is not a substitute for checking custom routing and firewall policy; do not treat this example as an absolute isolation guarantee.
 
-If container creation fails, stop before copying files or running cleanup. A name collision does not authorize reusing or deleting the existing container; choose an unused name and substitute it in every later command. Only containers successfully created by you for this lesson are disposable.
+The assignment records the ID returned by successful creation and clears it on failure. Keep this shell and context for copy and cleanup; never populate the variable with an existing container's ID. A collision means choose an unused name, not adopt or delete the existing container. This records your creation result, not a general ownership guarantee. In the command, `$(...)` captures the creation output, while `||` runs the clearing assignment if creation fails. The later `test -n` checks that the captured value is nonempty, and `&&` connects the dependent operation to that check. These guards prevent a failed create from falling through to a familiar default name. They do not verify arbitrary IDs, authorize another person's container, or preserve context across terminal sessions. If you lose this shell or change Docker contexts, stop and recover the creation evidence with your instructor instead of guessing which container to remove.
 
 ```bash
-docker run -d -p 127.0.0.1:8080:80 --name my-website nginx
+lesson_container=$(docker run -d -p 127.0.0.1:8080:80 --name my-website nginx) || lesson_container=''
 ```
 
 The `-p 127.0.0.1:8080:80` mapping names the host address, host port, and container port. Your browser contacts host port 8080; nginx listens on container port 80. Use `http://127.0.0.1:8080` if `localhost` resolves to IPv6 on your machine, since this example explicitly binds IPv4.
@@ -149,14 +152,14 @@ You should see an nginx welcome page. That confirms an HTTP response at the URL 
 
 Before you customize the page, make a prediction about file serving. Does nginx load every HTML file into memory once at startup, or does it read the requested file when a request arrives? The practical consequence matters: if nginx reads the file on request, replacing `index.html` should change the next browser refresh without restarting the container. If nginx cached the file permanently at startup, your edit would not appear until the server restarted.
 
-Create a fresh disposable host workspace before editing `index.html`. Run one line at a time; stop on any `mkdir` or `cd` error. An existing file, directory, or symlink with the workspace name must remain untouched: choose an unused name and substitute it in later paths. Do not use `mkdir -p`. Confirm `pwd` and an empty `ls -a` listing (only `.` and `..`) before opening the editor. Keep subsequent edits and copies in this owned workspace; repeat runs or uncertain ownership require a fresh one.
+Create a fresh disposable workspace under your exclusive control. Run the whole connected block: `&&` runs the next command only after success, so failed creation or navigation prevents opening the editor. Listings display context and the editor opens automatically. Leave existing names untouched and choose an unused name for later paths; do not use `mkdir -p`. Unexpected contents or uncertain ownership mean exit without saving and start fresh.
 
 ```bash
-cd ~
-mkdir kubedojo-first-server
-cd kubedojo-first-server
-pwd
-ls -a
+cd ~ &&
+mkdir kubedojo-first-server &&
+cd kubedojo-first-server &&
+pwd &&
+ls -a &&
 nano index.html
 ```
 
@@ -200,10 +203,10 @@ Paste this page into nano, then save with `Ctrl + O`, press Enter, and exit with
 </html>
 ```
 
-Copy the file into the running container. The destination path is not arbitrary: the official nginx Docker image serves static content from `/usr/share/nginx/html/` unless its configuration is changed. The command uses the container name you assigned earlier, which is why naming the container was more than cosmetic.
+Copy the file into the running lesson container using its captured creation ID in the same shell and Docker context. The destination path is not arbitrary: the official nginx Docker image serves static content from `/usr/share/nginx/html/` unless its configuration is changed. Do not substitute an unrelated name or ID when recovering from a failed creation.
 
 ```bash
-docker cp index.html my-website:/usr/share/nginx/html/index.html
+test -n "$lesson_container" && docker cp index.html "$lesson_container:/usr/share/nginx/html/index.html"
 ```
 
 Refresh `http://127.0.0.1:8080` after the copy completes. If your page appears, you have deployed a local web server with a custom document. If the welcome page still appears, do not rerun random commands. Check whether you copied to your lesson container, whether the destination path includes `/usr/share/nginx/html/index.html`, and whether the browser tab uses the published address and port.
@@ -211,8 +214,7 @@ Refresh `http://127.0.0.1:8080` after the copy completes. If your page appears, 
 When done, stop and remove only the container you created for this lesson. If the name was already occupied or creation failed, stop rather than adopting or removing another container. Your workspace's `index.html` remains on the host; container removal does not remove it or undo host runtime setup.
 
 ```bash
-docker stop my-website
-docker rm my-website
+test -n "$lesson_container" && docker stop "$lesson_container" && docker rm "$lesson_container" && lesson_container=''
 ```
 
 This local path is excellent for practice because mistakes are cheap. You can remove the container, rerun it with a different port, copy the page again, and repeat until the request path feels familiar. That repetition builds the mental reflex you will need later when containers run in a cluster and `kubectl` replaces a single local Docker command.
@@ -221,7 +223,7 @@ This local path is excellent for practice because mistakes are cheap. You can re
 
 ## Option B: Cloud Server with SSH and nginx
 
-The cloud option changes the visibility of your work. Instead of serving a page only to your own machine through `localhost`, you create a VM with a public IP address, connect with SSH, install nginx using the operating system package manager, and let outside browsers reach port 80. This is closer to traditional server administration, and it exposes two new failure points that local Docker hides: provider firewall rules and cloud billing limits.
+The cloud option deliberately adds a public endpoint, unlike Option A's intended loopback publication. Use only an authorized disposable VM: SSH, package installation, firewall policy, and billing each introduce decisions that the local path does not teach.
 
 Free tiers change over time, so check the provider's current pricing and eligibility before creating anything. Use only an authorized disposable lab VM, record its related resources, and agree on teardown first. Stopping compute is not complete cleanup: retained resources may remain billable, so follow the inventory and verification steps below rather than assuming a free-tier label guarantees no charges.
 
@@ -249,12 +251,12 @@ Check the service state from the VM before opening a browser. `systemctl` talks 
 sudo systemctl status nginx
 ```
 
-Pause and predict: you have verified that nginx is active on the VM, but your browser at home cannot load the public IP. Which layer should you suspect first, the nginx process or the cloud firewall? A good answer explains why a local test from inside the VM can prove the backend works even while outside traffic remains blocked. Commit to your answer before opening the reveal.
+Pause and predict: nginx is active on the VM but an outside browser times out. What does a local HTTP test add, and which endpoint, listener, routing, or filtering checks would you make next? Separate observations from hypotheses before opening the reveal.
 
 <details>
 <summary>Check your prediction</summary>
 
-Suspect the cloud firewall first, because the process layer is already proven and a timeout is the signature of traffic being dropped before it reaches a listener. Run `curl http://localhost` inside the SSH session: if it returns the nginx page, the server, port, and file path on the VM are all healthy, and the only remaining suspect is the outside network path — usually a security group or provider firewall rule that blocks inbound port 80. Testing inside-out prevents you from restarting a healthy service when the real problem is a closed door in front of the VM.
+Compare `curl http://localhost` inside the VM with the intended page. Local success supports that request path, not every listener address or the external endpoint. Timeout does not identify a firewall fault: inspect the public address, listener binding, routes, and policy before changing configuration.
 
 </details>
 
@@ -264,7 +266,7 @@ Open your browser on your own computer and visit the public IP using plain HTTP.
 http://YOUR_PUBLIC_IP
 ```
 
-If the default nginx page appears, the service is running and the provider firewall is open enough for HTTP. If the browser times out, the most likely problem is a security group, virtual cloud network rule, or provider firewall blocking inbound port 80. If the browser refuses the connection immediately, nginx may not be listening or may have stopped after installation. Different error shapes point to different layers, so read the message before changing configuration.
+A welcome page demonstrates an HTTP response; corroborate the intended VM and listener separately. Timeout leaves addressing, routing, filtering, and availability open. Refusal suggests a missing listener or active rejection, possibly by an intermediary. Compare local and external evidence before choosing a cause.
 
 Edit the default page on the VM. Ubuntu's nginx package serves files from `/var/www/html/` by default, which differs from the official nginx Docker image path you used earlier. That difference is not a contradiction; it is configuration. The same nginx program can serve different directories depending on how it was packaged and configured.
 
@@ -312,7 +314,7 @@ Delete the default content and paste the cloud version of your page. The HTML is
 </html>
 ```
 
-Refresh `http://YOUR_PUBLIC_IP` after saving. If the custom page appears, your browser is crossing the internet to a VM, nginx is receiving the request on port 80, nginx is reading `/var/www/html/index.html`, and the response is returning successfully. That is a real deployment, even though the page is intentionally small.
+A distinctive page at the authorized public URL supports that this request returned your intended content. It does not independently prove the VM, firewall rules, listener, or filesystem path; corroborate these with provider inventory, service configuration, and the saved file when diagnosing a mismatch.
 
 Stop and think: the web server translates URL paths into filesystem paths under a configured web root. If nginx maps the root URL `/` to `/var/www/html/`, what browser path would request an image saved at `/var/www/html/assets/logo.png`? The answer is not the full Linux path, because the browser never sees the server's private directory layout; it sees the URL path that nginx maps into that directory.
 
@@ -389,7 +391,7 @@ Use both paths if you want the clearest mental model. Run local Docker first, th
 | Decision | Choose Local Docker | Choose Cloud VM |
 |----------|---------------------|-----------------|
 | Need no signup | Yes | No |
-| Need a public page | No | Yes |
+| Need deliberate public reachability | Not this loopback setup's intent | Yes, with authorized policy |
 | Want to practice SSH | No | Yes |
 | Want fastest reset | Yes | Sometimes |
 | Need to avoid billing risk | Yes | No |
@@ -434,19 +436,19 @@ The best answer is local Docker, because the goal is visibility on your own mach
 <details>
 <summary>1. Your local Docker deployment says the container started, but `http://localhost:8080` gives a connection error. How do you diagnose the path without guessing?</summary>
 
-Start with `docker ps` to verify the container is still running and to inspect the published port mapping. If the mapping is not `0.0.0.0:8080->80/tcp` or similar, your browser is probably knocking on the wrong host port. If the container is absent, check whether it exited immediately and inspect logs in a later Docker lesson; for this exercise, recreate it with the known-good command. This answer matters because it separates container state from browser behavior before you edit files that may already be correct.
+Inspect your successfully created container and expect `127.0.0.1:8080->80/tcp`. Test `http://127.0.0.1:8080`; if that works while `localhost` fails, check IPv4 versus IPv6 resolution before republishing. Check container state and context if neither works. Do not switch to `0.0.0.0` as a repair: that broadens the listening address.
 </details>
 
 <details>
 <summary>2. You copied `index.html` into `/var/www/html/index.html` inside the official nginx container, but the welcome page still appears. What went wrong, and how do you fix it?</summary>
 
-The official nginx container serves static files from `/usr/share/nginx/html/` by default, so you copied the file into a directory nginx is not using. The fix is to copy the file to `my-website:/usr/share/nginx/html/index.html` or to change nginx configuration in a more advanced exercise. This is not a browser cache problem by default; it is a configuration-path problem. The lesson is that file paths belong to specific environments, and Docker image defaults can differ from Ubuntu package defaults.
+The official nginx image uses `/usr/share/nginx/html/` by default. Use the guarded copy block with the ID returned by your own successful creation to place the file there, then check the response. Container and Ubuntu package defaults differ; verify the actual configuration rather than copying to a familiar but unrelated path.
 </details>
 
 <details>
 <summary>3. Your cloud VM shows `active (running)` for nginx, but a coworker on another network sees a timeout when visiting the public IP. What should you check next?</summary>
 
-A timeout after the service is confirmed running usually points to network reachability, especially a provider firewall or security group that blocks inbound port 80. Run `curl http://localhost` from inside the VM to prove nginx serves a response locally, then inspect the cloud firewall rule for HTTP. If local `curl` fails, fix nginx or the file path first; if local `curl` succeeds, focus on external routing. This sequence prevents you from restarting a healthy service when the real issue is outside the VM.
+A running process does not establish external reachability. Compare local HTTP with the outside request, then verify the public endpoint, listener binding, routing, and access policy. Local success narrows the investigation but does not identify a firewall fault; inspect exact errors before selecting a repair.
 </details>
 
 <details>
@@ -468,7 +470,7 @@ First confirm you edited `/var/www/html/index.html` on the VM, not a local file 
 </details>
 
 <details>
-<summary>7. You intentionally broke the Docker exercise by running `docker run -d -p 127.0.0.1:9090:80 --name broken-site nginx`, then visited `http://127.0.0.1:8080`. Why does that fail, and what is the clean repair?</summary>
+<summary>7. You repeated the guarded create assignment with `127.0.0.1:9090:80`, then visited `http://127.0.0.1:8080`. Why does that fail, and what is the clean repair?</summary>
 
 It fails because the host port changed to 9090, while your browser is still requesting 8080. Docker forwards loopback port 9090 into container port 80. Visit `http://127.0.0.1:9090` or recreate your lesson container with `-p 127.0.0.1:8080:80` if the original port is required. Keep the loopback address when repairing the port mapping; changing HTML will not repair this mismatch.
 </details>
@@ -490,7 +492,7 @@ Update your page so it includes your name or a pseudonym, three things you learn
 <details>
 <summary>Solution guidance</summary>
 
-For local Docker, return to your owned workspace, confirm it with `pwd`, edit `index.html`, and copy it into your lesson container at `my-website:/usr/share/nginx/html/index.html`. For the authorized disposable cloud VM, edit `/var/www/html/index.html` using `sudo nano` over SSH. Refresh the correct URL and use `curl` if the result is unclear; a distinctive temporary sentence can help confirm which saved file is being served.
+For local Docker, confirm your owned workspace with `pwd`, edit `index.html`, and use the guarded copy block with your captured container ID. For the authorized disposable VM, edit `/var/www/html/index.html` over SSH. Refresh the correct URL and compare responses; a distinctive temporary sentence can help identify the saved content being served.
 </details>
 
 ### Task 2: Test Before You Trust the Browser
@@ -505,7 +507,7 @@ The expected result is the raw HTML of your page or an HTTP response that clearl
 
 ### Task 3: Break the Deployment Deliberately
 
-Introduce one controlled failure and record its symptom. For Option A, stop and remove only your lesson container, then run `docker run -d -p 127.0.0.1:9090:80 --name broken-site nginx`; the old 8080 URL should fail. Stop if that container name is occupied rather than removing someone else's container. For Option B, rename the web root file only on your disposable lab VM:
+For Option A, use the guarded cleanup block, then repeat the guarded create assignment with `127.0.0.1:9090:80` instead of `127.0.0.1:8080:80`. This records the replacement ID for copying and cleanup; stop on failure. Record the old URL's symptom. For Option B, rename the web root file only on your disposable lab VM:
 
 ```bash
 sudo mv /var/www/html/index.html /var/www/html/broken.html
@@ -526,7 +528,7 @@ Repair the deployment so the original expected URL works again. Then explain the
 <details>
 <summary>Solution guidance</summary>
 
-For Docker, replace only your lesson container using `-p 127.0.0.1:8080:80` and copy the workspace page back to `/usr/share/nginx/html/index.html`. For the lab VM, rename the file back to `/var/www/html/index.html` or recreate it with `sudo nano`, then test with `curl http://localhost` before using an outside browser. Explain both what failed and why this repair addresses that layer.
+For Docker, use the guarded cleanup and original create blocks to restore `127.0.0.1:8080:80`, then use the guarded copy block with the new ID. For the lab VM, restore `/var/www/html/index.html` and compare local and external responses. Explain the changed observation and why the repair addresses that layer.
 </details>
 
 ### Success Criteria

@@ -124,7 +124,7 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.9-software-and-packages.md",
-      "page_digest": "sha256:66a0711e1e3d2ffdd362b9f1d73fa7c0dfcab9a18d4b7c1b0be6af9ea996f8ba",
+      "page_digest": "sha256:b0f05493f939789a6c93c1969e461ab85c2681f271038d583341b3d0d99536ed",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
@@ -132,7 +132,7 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.10-what-is-the-cloud.md",
-      "page_digest": "sha256:644df44cd872e842b2de639ff6d648cda229b747a1103f77b590416de3378345",
+      "page_digest": "sha256:ecb17d1de54f66c9ad95876038c5f0ed6eb43753643fe97d8d97e01a54814815",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
@@ -140,7 +140,7 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.11-your-first-server.md",
-      "page_digest": "sha256:cd79a6eb4e0eb7d68bb38fe7651b8cd77f4921b42820e5a0766cb89931569389",
+      "page_digest": "sha256:2ceef0b47052a95d616349eac3c95a502c53c6e4d47bfe3bb9084cd5945fb3b4",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
