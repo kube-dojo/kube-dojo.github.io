@@ -511,8 +511,9 @@ test -n "$isolation_id" && docker exec "$isolation_id" cat /secret.txt
 Now stop and remove the container, then start a new one with the exact same name so the replacement boundary is impossible to miss.
 
 ```bash
-test -n "$isolation_id" && docker stop "$isolation_id" && docker rm "$isolation_id" && isolation_id=''
+if test -n "$isolation_id" && docker stop "$isolation_id" && docker rm "$isolation_id"; then
 isolation_id=$(docker run -d --name "$isolation_name" alpine sleep 3600) || isolation_id=''
+fi
 ```
 
 Try to read your file again from the new instance, and connect the expected failure back to the writable container layer.
