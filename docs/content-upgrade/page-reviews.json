@@ -119,7 +119,7 @@
       "page_digest": "sha256:b6f17e8296475ca8a49ebe891751f727be60e297753f9fe47b5abf60050f7051",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
       "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
@@ -129,6 +129,22 @@
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538#issuecomment-6390177972"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-linux.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3538", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3537#issuecomment-6390292971"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+    },
+    {
+      "path": "prerequisites/cloud-native-101/module-1.1-what-are-containers.md",
+      "page_digest": "sha256:c89d9a64b94c77bb0ee2a86501e820097ab7ffa0b011e42efdc148766dd50786",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/cloud-native-101/module-1.2-docker-fundamentals.md",
+      "page_digest": "sha256:635c45cbdbff9aa5c7dd37f74f823e255373a704470950241778f66f8a66a43e",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
       "path": "linux/operations/troubleshooting/index.md",

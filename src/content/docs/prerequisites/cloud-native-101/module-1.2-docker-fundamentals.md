@@ -81,7 +81,7 @@ Name the working command before you run the pair. The diagram after these comman
 docker --version
 # Docker version 29.x.x, build xxxxx
 
-docker run hello-world
+docker run --rm hello-world
 # Should show "Hello from Docker!" message
 ```
 
@@ -108,6 +108,10 @@ A client that answers locally is not the same as a client that reached the engin
 
 ## Running Your First Container
 
+Use a Bash-compatible terminal (WSL or the lab shell on Windows) and an authorized local Docker endpoint. Check `docker context show`, `docker context inspect`, and `docker version`: confirm the endpoint is local and the **Server** Engine is at least 28.0.0, not merely the client. Older Engines have a documented same-L2 localhost-publication caveat. Loopback publication below avoids the all-host default but does not override custom routing or firewall policy. Use the explicit IPv4 URLs below.
+
+Keep this shell and context throughout. Each `*_id=$(docker run ...) || *_id=''` assignment captures your successful creation result and clears it on failure. Later nonempty-ID checks prevent acting on a default name after failure; they are not general ownership proof. Choose unused container names and image tags, substituting consistently rather than overwriting existing tags. Never manually fill an ID variable from an unfamiliar container, and stop if ownership or context becomes uncertain.
+
 An image is a packaged filesystem and metadata template; a container is a running instance created from that template. The difference is similar to a class and an object in programming, or a recipe and a cooked meal in a kitchen. You can keep one image and start many containers from it, each with a separate writable layer, process tree, environment, and network endpoint. This is why Docker can make local experiments cheap: destroying a container does not destroy the image you used to create it.
 
 The nginx example is small, but it contains almost every runtime concept you need. Docker pulls the `nginx` image if it is not present, creates a container, starts the default web server process, maps a host port to a container port, assigns the name `my-nginx`, and runs it in detached mode. The host port is the address you visit from your laptop, while the container port is the port the application listens on inside the container network namespace.
@@ -117,7 +121,7 @@ The nginx example is small, but it contains almost every runtime concept you nee
 <details>
 <summary>Check your prediction</summary>
 
-The command fails because Docker cannot bind to an already occupied host port. Choose a different host port, such as `-p 8081:80`, and keep the container-side port at `80` because nginx still listens there.
+The host port is occupied. Choose a free loopback host port such as `-p 127.0.0.1:8081:80`, retaining container port 80. Do not broaden publication to all host addresses to solve a port conflict.
 
 </details>
 
@@ -125,7 +129,7 @@ Read the publish flag before you decide which number to change. The notes under 
 
 ```bash
 # Run nginx (a web server)
-docker run -d --name my-nginx -p 8080:80 nginx
+nginx_id=$(docker run -d --name my-nginx -p 127.0.0.1:8080:80 nginx) || nginx_id=''
 
 # What happened:
 # - Pulled nginx image from Docker Hub
@@ -139,19 +143,19 @@ After the container starts, test it from outside the container. `curl http://loc
 
 ```bash
 # Test it
-curl http://localhost:8080
+test -n "$nginx_id" && curl http://127.0.0.1:8080
 # Returns nginx welcome page HTML
 
 # View running containers
 docker ps
 # CONTAINER ID  IMAGE  COMMAND                 STATUS         PORTS                  NAMES
-# a1b2c3d4e5f6  nginx  "/docker-entrypoint.…"  Up 10 seconds  0.0.0.0:8080->80/tcp   my-nginx
+# a1b2c3d4e5f6  nginx  "/docker-entrypoint.…"  Up 10 seconds  127.0.0.1:8080->80/tcp   my-nginx
 
 # Stop the container
-docker stop my-nginx
+test -n "$nginx_id" && docker stop "$nginx_id"
 
 # Remove the container
-docker rm my-nginx
+test -n "$nginx_id" && docker rm "$nginx_id" && nginx_id=''
 ```
 
 Stopping and removing are separate operations because Docker preserves stopped containers until you delete them. That design is helpful during debugging because the stopped container still has metadata, exit status, logs, and its final writable layer. It also explains why a developer laptop slowly fills with old containers and images: Docker keeps evidence around until you decide it is safe to discard it.
@@ -162,14 +166,14 @@ Names are another small option with large debugging value. Docker can identify c
 
 The essential lifecycle command set is small enough to memorize, but the value comes from understanding when each command asks Docker to create state, inspect state, or destroy state. `docker run` combines image lookup, container creation, and process start. `docker stop` sends a graceful termination signal before killing the process if it does not exit. `docker rm` deletes container state, while image deletion is handled separately with `docker rmi` because many containers can share the same image.
 
-```bash
+```text
 # Run a container
 docker run [OPTIONS] IMAGE [COMMAND]
 
 # Common options:
 docker run -d nginx                    # Detached (background)
 docker run -it ubuntu bash             # Interactive terminal
-docker run -p 8080:80 nginx           # Port mapping
+docker run -p 127.0.0.1:8080:80 nginx  # Loopback port mapping
 docker run -v /host/path:/container/path nginx  # Volume mount
 docker run --name myapp nginx         # Named container
 docker run -e MY_VAR=value nginx      # Environment variable
@@ -186,6 +190,8 @@ docker rm -f CONTAINER                 # Force remove (stop + rm)
 
 In Kubernetes 1.35+, the same concepts appear with different nouns. A Pod is not a Docker container, but it has container images, environment variables, ports, logs, restart behavior, and volumes. When this course later uses `kubectl logs`, `kubectl exec`, and `kubectl describe`, you should recognize them as orchestration-level versions of the Docker inspection habits you are building now.
 
+Conceptual preview only: read the following manifest and command shapes; do not execute them in this Docker exercise. A future Kubernetes lab must supply an authorized cluster/context, namespace, saved manifest, and cleanup instructions before any apply operation.
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -199,7 +205,7 @@ spec:
         - containerPort: 80
 ```
 
-```bash
+```text
 kubectl apply -f nginx-pod.yaml
 kubectl logs nginx-practice
 kubectl exec -it nginx-practice -- sh
@@ -235,13 +241,14 @@ The third trap is trusting the host browser more than the container evidence. A 
 
 A practical debugging sequence should narrow the failure domain. If `docker ps -a` shows `Exited`, inspect the exit code and read logs. If the container is `Up` but the application returns errors, use logs first, then check environment variables, mounted files, and internal connectivity with an exec session. If the host cannot reach the service but the process is healthy inside the container, compare the application listening port with the host-to-container mapping shown by `docker ps`.
 
-Before running this, what output do you expect if a web container listens on port 8000 internally but you mapped `-p 8080:80` by mistake? The container can stay healthy because its own process is running, but host requests to port 8080 will be forwarded to container port 80 where nothing is listening. That failure feels like a networking problem, yet the root cause is a mismatch between application configuration and Docker run options.
+Before running this, what output do you expect if a web container listens on port 8000 internally but you mapped `-p 127.0.0.1:8080:80` by mistake? The container can stay healthy because its own process is running, but host requests to port 8080 will be forwarded to container port 80 where nothing is listening. That failure feels like a networking problem, yet the root cause is a mismatch between application configuration and Docker run options.
 
 Image management has the same evidence-first logic. Tags are human-readable names, while the image digest is the content-addressed identity. Pulling `nginx:1.26` is more repeatable than pulling `nginx:latest`, but even a mutable tag can be moved by the publisher. Production pipelines should eventually record digests or use admission controls, but at this stage the main habit is to avoid floating tags when you need reproducibility.
 
 Registries complete the image story. Your laptop can build an image, but a CI runner or Kubernetes node needs a registry location it can pull from. Public examples often use Docker Hub because it is familiar, while organizations commonly use private registries such as Amazon ECR, Google Artifact Registry, Azure Container Registry, GitHub Container Registry, or an internal registry. The important principle is the same everywhere: tags are pointers, digests identify content, and access control decides who can push or pull.
 
-```bash
+```text
+# Image-command reference only: do not paste this block. Removal/pruning can affect pre-existing images.
 # Pull images
 docker pull nginx
 docker pull nginx:1.26
@@ -295,12 +302,13 @@ CMD ["python", "app.py"]
 
 The build command gives the image a name and tag with `-t`, then points Docker at the context with `.`. The run command creates a container from the image and maps a host port to the port the application listens on internally. `EXPOSE` in the Dockerfile is documentation and metadata; it does not publish a port by itself, so you still need `-p` when you want traffic from the host.
 
-```bash
+```text
+# Conceptual command shapes; use the fresh-directory worked example below.
 # Build image
 docker build -t myapp:v1 .
 
 # Run container from image
-docker run -d -p 8000:8000 myapp:v1
+docker run -d -p 127.0.0.1:8000:8000 myapp:v1
 ```
 
 | Instruction | Purpose |
@@ -316,6 +324,8 @@ docker run -d -p 8000:8000 myapp:v1
 | `ENTRYPOINT` | Command that always runs (CMD becomes arguments) |
 
 Now build a small Flask application. The point is not Flask itself; the point is watching how dependencies, source files, environment variables, and the runtime command relate to one another. The app reads `NAME` from the environment, which means the same image can produce different greetings at run time without rebuilding. That is exactly the pattern you want for containerized software: immutable image, mutable runtime configuration.
+
+First create an exclusive disposable project directory with `mkdir dojo-flask && cd dojo-flask`. Stop if either command fails; never reuse an existing directory or symlink. Choose an unused name on repeats. Create the following files only in that fresh directory, not in your home directory or a real project.
 
 Create the application file as `app.py`; it is intentionally small so the container mechanics stay visible rather than buried under framework code.
 ```python
@@ -362,17 +372,17 @@ CMD ["python", "app.py"]
 Build the image, run it with an environment variable, and verify that the same image can produce a different response without being rebuilt.
 ```bash
 # Build
-docker build -t hello-flask:v1 .
+docker build -t hello-flask:v1 . &&
 
 # Run
-docker run -d -p 8000:8000 -e NAME=Docker hello-flask:v1
+flask_id=$(docker run -d -p 127.0.0.1:8000:8000 -e NAME=Docker hello-flask:v1) || flask_id=''
 
 # Test
-curl http://localhost:8000
+test -n "$flask_id" && curl http://127.0.0.1:8000
 # Hello, Docker!
 
 # Cleanup
-docker rm -f $(docker ps -q --filter ancestor=hello-flask:v1)
+test -n "$flask_id" && docker stop "$flask_id" && docker rm "$flask_id" && flask_id=''
 ```
 
 Add a `.dockerignore` file before you trust `COPY . .` in a real project. The file uses patterns to remove development-only files from the build context, which speeds builds and reduces the chance of accidentally embedding credentials or host-specific artifacts. It is the container equivalent of packing only what you need for a trip instead of dumping your entire apartment into the suitcase.
@@ -424,6 +434,8 @@ Real applications usually need more than one process. A web service might need a
 For local development with multiple services, the Compose file below defines a `web` service built from the current directory and a `db` service using a PostgreSQL image. The `web` service reaches the database by the service name `db`, not by `localhost`, because each container has its own loopback interface. The named volume `db_data` stores database files outside the database container, which lets you replace the container without deleting the data.
 
 Put the local stack definition in `compose.yaml`, where each service owns one process boundary and Docker Compose provides the shared network.
+
+Use only this disposable directory and an unused Compose project name selected with the lab owner. Inspect `docker compose ls -a` and existing project-labeled containers, networks, and volumes before setting `compose_project` to that verified unused name. The commands refuse an unset name; this is not proof of ownership. Keep the same name, directory, and context. If startup fails or ownership is uncertain, stop instead of cleanup. `down -v` deletes project volumes: use it only for this run's disposable database, never an existing stack.
 ```yaml
 # version: '3.8' # Obsolete in modern Compose, left for backward compatibility
 
@@ -431,7 +443,7 @@ services:
   web:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - DATABASE_URL=postgres://db:5432/mydb
     depends_on:
@@ -451,16 +463,16 @@ volumes:
 
 ```bash
 # Start all services
-docker compose up -d
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" up -d
 
 # View logs
-docker compose logs -f
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" logs -f
 
 # Stop all services
-docker compose down
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" down
 
 # Stop and remove volumes
-docker compose down -v
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" down -v
 ```
 
 Compose is a local development tool, not a production orchestrator for this course. That distinction matters because Compose does not replace Kubernetes scheduling, health management, rollout strategy, cluster networking, or policy controls. It does, however, make the transition easier because it teaches service names, persistent volumes, separate containers, and declarative stack configuration before you need to learn cluster objects.
@@ -693,9 +705,9 @@ You should separate the copying of dependency files from the copying of source f
 </details>
 
 <details>
-<summary>Scenario: You have a database container running locally, but when you restart it, all your saved users disappear. Which Docker run option are you missing, and how does it solve the problem?</summary>
+<summary>Scenario: You remove a database container and create a replacement; users stored only in its writable layer disappear. What storage option is missing, and how does this differ from restarting the same container?</summary>
 
-You are missing a volume mount, such as `-v db_data:/var/lib/postgresql/data` for PostgreSQL data. The container writable layer is tied to the container lifecycle, so removing the container removes data written there. A named volume stores the database files outside that lifecycle and can be attached to a replacement container. This matches the Kubernetes idea that state should live in a volume or external service rather than inside a replaceable container instance.
+Use a volume at the database's configured data directory, such as `-v db_data:/var/lib/postgresql/data` for this PostgreSQL example. Restarting the same container preserves its writable layer; removing it deletes that layer. A replacement starts from the image unless durable data is mounted. A volume can preserve data across replacement, but inspect its ownership and backups before any volume deletion.
 
 </details>
 
@@ -749,18 +761,18 @@ This lab moves from a single static web container to a failing database containe
 
 Build and run a custom web server image from a tiny nginx base. This exercise checks whether you can connect a Dockerfile, a build tag, a named container, and a host port mapping without relying on a prebuilt application image.
 
-1. Create a directory and inside it, create an `index.html` file with the text "Hello KubeDojo!".
+1. Create a fresh exclusive directory and an `index.html` containing "Hello KubeDojo!". The solution guards the entire block with successful plain `mkdir` and `cd`; existing names must remain untouched. Choose an unused name for each repeat, and never substitute `mkdir -p`.
 2. Create a `Dockerfile` that uses `nginx:alpine` as the base image.
 3. Copy your `index.html` to `/usr/share/nginx/html/index.html` inside the image.
 4. Build the image as `dojo-web:v1`.
 5. Run the container in detached mode, mapping port 8080 on your host to port 80 in the container.
-6. Verify by running `curl http://localhost:8080`.
+6. Verify by running `curl http://127.0.0.1:8080`.
 
 <details>
 <summary>View Solution</summary>
 
 ```bash
-mkdir dojo-web && cd dojo-web
+if mkdir dojo-web && cd dojo-web; then
 echo "Hello KubeDojo!" > index.html
 
 cat <<EOF > Dockerfile
@@ -768,11 +780,12 @@ FROM nginx:alpine
 COPY index.html /usr/share/nginx/html/index.html
 EOF
 
-docker build -t dojo-web:v1 .
-docker run -d --name dojo-web-container -p 8080:80 dojo-web:v1
+docker build -t dojo-web:v1 . &&
+web_id=$(docker run -d --name dojo-web-container -p 127.0.0.1:8080:80 dojo-web:v1) || web_id=''
 
 # Checkpoint verification
-curl http://localhost:8080
+test -n "$web_id" && curl http://127.0.0.1:8080
+fi
 ```
 </details>
 
@@ -780,9 +793,9 @@ curl http://localhost:8080
 
 Debug a failing container using logs and environment variables. PostgreSQL intentionally exits when the required password configuration is missing, which makes it a good practice case for reading logs before guessing.
 
-1. Run `docker run -d --name db postgres:16`.
+1. Use the guarded create assignment below to start PostgreSQL and record this run's container ID.
 2. Check its status with `docker ps -a`. Notice it exited immediately.
-3. Check why it failed using `docker logs db`. The log explains the missing password requirement.
+3. Use the guarded log command with that ID to inspect the missing-password error; do not inspect a different container just because it has the expected name.
 4. Remove the failed container.
 5. Run it again, this time passing the required environment variable `POSTGRES_PASSWORD=secret`.
 6. Verify it stays running.
@@ -791,19 +804,19 @@ Debug a failing container using logs and environment variables. PostgreSQL inten
 <summary>View Solution</summary>
 
 ```bash
-docker run -d --name db postgres:16
+db_id=$(docker run -d --name db postgres:16) || db_id=''
 
 # Checkpoint: verify it exited
 docker ps -a
 
 # View logs to find the error
-docker logs db
+test -n "$db_id" && docker logs "$db_id"
 
 # Cleanup
-docker rm db
+test -n "$db_id" && docker rm "$db_id" && db_id=''
 
 # Run with correct environment variable
-docker run -d --name db -e POSTGRES_PASSWORD=secret postgres:16
+db_id=$(docker run -d --name db -e POSTGRES_PASSWORD=secret postgres:16) || db_id=''
 
 # Checkpoint: verify it stays running
 docker ps
@@ -814,7 +827,7 @@ docker ps
 
 Optimize a build and explore the running container. This level is deliberately less polished than a production image because it teaches the mechanics of package installation, interactive containers, and the difference between a foreground shell and a long-running background process.
 
-1. Write a Dockerfile that installs `curl` in an `ubuntu` base image.
+1. Create a fresh exclusive directory for this level so its Dockerfile cannot overwrite Level 1. The guarded solution leaves an existing directory or symlink untouched; choose an unused name if it fails. Write a Dockerfile that installs `curl` in an `ubuntu` base image.
 2. Ensure you use `apt-get update && apt-get install -y curl` in a single `RUN` instruction. Explain why this is important for layer caching.
 3. Build and run the container interactively with `-it` and the `bash` command.
 4. Inside the container, prove you are running as root by typing `whoami`.
@@ -825,23 +838,26 @@ Optimize a build and explore the running container. This level is deliberately l
 <summary>View Solution</summary>
 
 ```bash
+if mkdir dojo-curl && cd dojo-curl; then
 cat <<EOF > Dockerfile
 FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y curl
 EOF
 
-docker build -t my-ubuntu-curl .
+if docker build -t my-ubuntu-curl .; then
 
 # Run interactively
-docker run -it --name test-curl my-ubuntu-curl bash
+docker run --rm -it --name test-curl my-ubuntu-curl bash
 
 # Inside container:
 # whoami
 # exit
 
 # To run in background and exec later:
-docker run -d --name bg-curl my-ubuntu-curl sleep infinity
-docker exec -it bg-curl bash
+curl_id=$(docker run -d --name bg-curl my-ubuntu-curl sleep infinity) || curl_id=''
+test -n "$curl_id" && docker exec -it "$curl_id" bash
+fi
+fi
 ```
 
 Combining `apt-get update` and `apt-get install` ensures that the package index is never cached independently of the packages being installed. If they were separate layers, adding a new package to the install list later could reuse a stale cached update layer and lead to package resolution errors.
@@ -850,9 +866,17 @@ Combining `apt-get update` and `apt-get install` ensures that the package index 
 
 ### Success Criteria
 
-- [ ] You built `dojo-web:v1` from a Dockerfile and verified it with `curl http://localhost:8080`.
+After collecting evidence, clean up only successfully created disposable containers using their captured IDs in the same shell and context. Stop if a command fails or ownership is uncertain; never select containers by a shared image tag. The interactive `--rm` container removes itself on exit; retained images and Compose volumes have separate lifecycles.
+
+```bash
+test -n "$web_id" && docker stop "$web_id" && docker rm "$web_id" && web_id=''
+test -n "$db_id" && docker stop "$db_id" && docker rm "$db_id" && db_id=''
+test -n "$curl_id" && docker stop "$curl_id" && docker rm "$curl_id" && curl_id=''
+```
+
+- [ ] You built `dojo-web:v1` from a Dockerfile and verified it with `curl http://127.0.0.1:8080`.
 - [ ] You explained why host port 8080 maps to container port 80 in the nginx example.
-- [ ] You used `docker logs db` to diagnose the failed PostgreSQL container before fixing it.
+- [ ] You used the captured container ID to diagnose the failed PostgreSQL container before fixing it.
 - [ ] You reran PostgreSQL with the required environment variable and confirmed it stayed running.
 - [ ] You built `my-ubuntu-curl` and entered it with an interactive shell.
 - [ ] You explained why `apt-get update` and `apt-get install` belong in the same `RUN` instruction.
@@ -871,12 +895,12 @@ Failure layer: the engine, not the CLI binary. Next action: start Docker Desktop
 
 </details>
 
-**Card B: nginx never starts.** `docker run -d --name my-nginx -p 8080:80 nginx` exits with "port is already allocated". Another process on the laptop is listening on 8080.
+**Card B: nginx never starts.** A loopback create attempt using `-p 127.0.0.1:8080:80` reports "port is already allocated". Another local process is listening on that address and port. Creation failed; do not adopt or remove a container by its proposed name.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: the host publish port, not nginx. Next action: republish with a free host port, such as `-p 8081:80`, and leave the container port at 80.
+Failure layer: host publication. Retry the guarded create assignment with a free loopback port such as `-p 127.0.0.1:8081:80`, leaving container port 80 unchanged. Inspect any failed-attempt state with the lab owner rather than deleting by name.
 
 </details>
 
@@ -899,6 +923,9 @@ Failure layer: the container user, not only the application bug. Next action: re
 </details>
 
 ## Sources
+
+- [Docker port publishing and localhost caveats](https://docs.docker.com/engine/network/port-publishing/)
+- [Docker writable container layers](https://docs.docker.com/engine/storage/drivers/#container-and-layers)
 
 - [Docker overview](https://docs.docker.com/get-started/docker-overview/)
 - [Docker Desktop product page](https://docker.com/products/docker-desktop)
