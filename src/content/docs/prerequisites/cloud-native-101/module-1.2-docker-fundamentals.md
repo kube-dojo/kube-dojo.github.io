@@ -139,7 +139,7 @@ nginx_id=$(docker run -d --name my-nginx -p 127.0.0.1:8080:80 nginx) || nginx_id
 # - Mapped port 8080 (host) to port 80 (container)
 ```
 
-After the container starts, test it from outside the container. `curl http://localhost:8080` talks to the host port, Docker forwards the connection through its networking layer, and nginx receives the request on port 80 inside the container. `docker ps` then shows the running container and makes the port translation explicit, which is the first place you should look when a service is alive but unreachable from the host.
+After the container starts, test it from outside the container. `curl http://127.0.0.1:8080` talks to the host port, Docker forwards the connection through its networking layer, and nginx receives the request on port 80 inside the container. `docker ps` then shows the running container and makes the port translation explicit, which is the first place you should look when a service is alive but unreachable from the host.
 
 ```bash
 # Test it
@@ -162,7 +162,7 @@ Stopping and removing are separate operations because Docker preserves stopped c
 
 Containers are intentionally disposable, but not all data should be disposable. If an application writes user uploads, database files, or generated reports into the container filesystem, that data lives in the container writable layer and disappears when the container is removed. Volumes move durable data outside the container lifecycle, while environment variables inject runtime configuration without baking it into the image. Port mappings, environment variables, and volumes are the three runtime options you will use constantly in both Docker and Kubernetes.
 
-Names are another small option with large debugging value. Docker can identify containers by generated IDs, but a meaningful name like `my-nginx` or `db` makes logs, cleanup, and mental mapping easier. The tradeoff is that names must be unique, so a stale stopped container can block a new run until you remove or rename it. When a command fails with a name conflict, Docker is telling you there is old state worth inspecting before deleting.
+Names such as `my-nginx` or `db` help you identify a container, but a familiar name does not establish ownership. A name conflict means stop, leave the existing container untouched, and choose an unused name. Removal or renaming requires evidence that this run created that container; the captured ID and same-shell/context prerequisites support that check rather than replacing it.
 
 The essential lifecycle command set is small enough to memorize, but the value comes from understanding when each command asks Docker to create state, inspect state, or destroy state. `docker run` combines image lookup, container creation, and process start. `docker stop` sends a graceful termination signal before killing the process if it does not exit. `docker rm` deletes container state, while image deletion is handled separately with `docker rmi` because many containers can share the same image.
 
@@ -185,7 +185,7 @@ docker ps -a                           # List all containers
 docker stop CONTAINER                  # Stop gracefully
 docker kill CONTAINER                  # Force stop
 docker rm CONTAINER                    # Remove stopped container
-docker rm -f CONTAINER                 # Force remove (stop + rm)
+docker rm -f CONTAINER                 # Force removal sends SIGKILL, then removes
 ```
 
 In Kubernetes 1.35+, the same concepts appear with different nouns. A Pod is not a Docker container, but it has container images, environment variables, ports, logs, restart behavior, and volumes. When this course later uses `kubectl logs`, `kubectl exec`, and `kubectl describe`, you should recognize them as orchestration-level versions of the Docker inspection habits you are building now.
@@ -669,7 +669,7 @@ This decision habit prevents two common wastes of time. One waste is bringing up
 | Running as root | Many base images default to root, and early examples omit users for simplicity | Add a non-root user and set `USER` before `CMD` |
 | Ignoring layer order | Developers copy the whole repo before installing dependencies | Copy dependency manifests first, install, then copy changing source files |
 | Copying everything | The default build context includes local clutter unless excluded | Add `.dockerignore` and use selective `COPY` paths |
-| Not cleaning up | Stopped containers, dangling layers, and unused volumes accumulate silently | Use `docker ps -a`, `docker image prune`, and careful volume cleanup |
+| Not cleaning up | Stopped containers, dangling layers, and unused volumes accumulate silently | Inspect with `docker ps -a`; remove only confirmed lesson-owned containers and review image/volume ownership separately |
 | Hardcoding secrets | Local demos blur the line between configuration and image content | Inject values at runtime and use secret managers in real environments |
 | Using ADD instead of COPY | `ADD` looks like a more powerful copy instruction | Default to `COPY` unless you explicitly need local archive extraction |
 | Ignoring multi-stage builds | Teams optimize for a working first image and forget runtime size | Build in one stage, then copy only artifacts into the final image |
@@ -813,10 +813,11 @@ docker ps -a
 test -n "$db_id" && docker logs "$db_id"
 
 # Cleanup
-test -n "$db_id" && docker rm "$db_id" && db_id=''
+if test -n "$db_id" && docker rm "$db_id"; then
 
 # Run with correct environment variable
 db_id=$(docker run -d --name db -e POSTGRES_PASSWORD=secret postgres:16) || db_id=''
+fi
 
 # Checkpoint: verify it stays running
 docker ps

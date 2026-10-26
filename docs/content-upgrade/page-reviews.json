@@ -132,7 +132,7 @@
     },
     {
       "path": "prerequisites/cloud-native-101/module-1.1-what-are-containers.md",
-      "page_digest": "sha256:c89d9a64b94c77bb0ee2a86501e820097ab7ffa0b011e42efdc148766dd50786",
+      "page_digest": "sha256:58ef87b5564fc782aa9c56b690aa0c6f32a34ea783690a51e0aaf973be44678f",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
@@ -140,7 +140,7 @@
     },
     {
       "path": "prerequisites/cloud-native-101/module-1.2-docker-fundamentals.md",
-      "page_digest": "sha256:635c45cbdbff9aa5c7dd37f74f823e255373a704470950241778f66f8a66a43e",
+      "page_digest": "sha256:5b7d6bbeddb457900b2e518ded4f8763402f3a1d3a56d1d889bbb992bac918af",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-container-ownership-p05.md"],
