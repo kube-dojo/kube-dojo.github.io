@@ -100,11 +100,21 @@ There is another subtle editor distinction that will matter later: some editors 
 
 ## Opening, Editing, Saving, and Exiting
 
-Start in your home directory so the files you create are easy to find and safe to remove later. The `cd ~` command moves you to your home directory, which is a sensible practice area because it is owned by your user account. Running exercises in a predictable directory matters because a beginner can lose confidence quickly when a file is created successfully but in a directory they were not expecting.
+Create a fresh disposable workspace before opening any practice filename. Existing files under your home directory are not automatically safe to edit or remove. Keep this workspace under your exclusive control and use it for every example, script, hands-on task, and cleanup command in this lesson.
+
+Run these commands **one line at a time**. If `mkdir` or `cd` reports any error, stop before the next command. If the workspace name already exists as a file, directory, or symbolic link, leave it untouched and choose an unused name such as `kubedojo-editing-2`; substitute that name in later paths. Use plain `mkdir` for this root, not `mkdir -p`, which would accept an existing directory.
 
 ```bash
 cd ~
+mkdir kubedojo-editing
+cd kubedojo-editing
+pwd
+ls -a
 ```
+
+Continue only when `pwd` identifies the directory you just created and `ls -a` shows only `.` and `..`. If ownership or contents become uncertain, stop and begin in another fresh workspace. On a repeat run, create a new workspace rather than reopening or removing files from an earlier run.
+
+This lesson assumes **GNU nano**. Check the editor's title banner when it opens: a command named `nano` can launch a different editor, such as Pico, on some machines. If the banner does not identify GNU nano, stop and use a training environment with GNU nano or ask your instructor which command launches it. Do not assume the displayed shortcuts match merely because the command name matches.
 
 Now open `nano` with a filename that does not exist yet. This command does not immediately create permanent content on disk; it opens an editor buffer associated with the name `hello.txt`. The file becomes real in the useful sense when you write the buffer out with the save command.
 
@@ -112,7 +122,7 @@ Now open `nano` with a filename that does not exist yet. This command does not i
 nano hello.txt
 ```
 
-Your screen will change completely because the terminal is now controlled by `nano` instead of your shell prompt. You may see a version number that differs from this example, and that is fine. The important pieces are the filename at the top, the empty editing area in the middle, and the shortcut menu at the bottom.
+Your screen will change completely because the terminal is now controlled by `nano` instead of your shell prompt. This simplified GNU nano screen is illustrative; versions, terminal width, and configuration can change the menu. Confirm the GNU nano banner, the filename at the top, the editing area, and the shortcuts at the bottom before typing.
 
 ```text
   GNU nano 9.0                    hello.txt
@@ -123,11 +133,13 @@ Your screen will change completely because the terminal is now controlled by `na
 
 
 
-^G Help    ^O Write Out  ^W Where Is   ^K Cut       ^C Location
+^G Help    ^O Write Out  ^F WhereIs    ^K Cut       ^C Location
 ^X Exit    ^R Read File  ^\ Replace    ^U Paste     ^T Execute
 ```
 
 The bottom menu is the reason `nano` is a friendly first editor. It does not expect you to memorize everything before you can leave. The word "Write Out" means save the buffer to a file, and "Exit" means leave the editor and return to the shell. The old-fashioned wording is common in Unix tools, so it is better to learn the phrase once than to be surprised by it later.
+
+GNU nano 9.0's default menu shows Ctrl+F for search; Ctrl+W also works as a search shortcut and is used in the practice below. Read your actual menu when a key behaves differently, rather than assuming every editor or configuration uses identical bindings.
 
 The `^` symbol in that menu means "hold the Ctrl key," not "type a caret character." When `nano` shows `^O`, press Ctrl and O at the same time. When it shows `^X`, press Ctrl and X at the same time. This notation appears in many terminal programs, logs, and manuals, so learning it here pays off outside `nano` as well.
 
@@ -158,7 +170,7 @@ Today's special: Learning to edit files.
 Chef says: You're doing great.
 
 
-^G Help    ^O Write Out  ^W Where Is   ^K Cut       ^C Location
+^G Help    ^O Write Out  ^F WhereIs    ^K Cut       ^C Location
 ^X Exit    ^R Read File  ^\ Replace    ^U Paste     ^T Execute
 ```
 
@@ -224,7 +236,7 @@ cat hello.txt
 
 When you work on remote systems, this habit protects you from a subtle class of mistakes: editing the wrong host, the wrong directory, or a temporary copy. A quick `pwd` before editing tells you where you are, and a quick `cat` after editing tells you what landed on disk. If you are connected to a remote host, `hostname` can also confirm which machine you are changing before you touch a sensitive file.
 
-Exercise scenario: imagine you intended to edit a practice file in your home directory, but your prompt shows that you are in `/tmp`. Pause and predict: what is the focused fix, and why is typing faster not part of it? Commit to an answer before revealing the explanation.
+Exercise scenario: imagine you intended to edit a practice file in your owned `~/kubedojo-editing` workspace, but your prompt shows that you are in `/tmp`. Pause and predict: what is the focused fix, and why is typing faster not part of it? Commit to an answer before revealing the explanation.
 
 <details>
 <summary>Check your prediction</summary>
@@ -278,7 +290,7 @@ nano my-first-script.sh
 
 The first line of the script will be `#!/bin/bash`. That line is called a shebang, and it tells the system which interpreter should read the file when you execute it directly with `./my-first-script.sh`. If you instead run `bash my-first-script.sh`, you have already chosen Bash explicitly, so the shebang is less important for that invocation. Including it is still a good habit because it makes the script's intended interpreter visible to both humans and the operating system.
 
-Type the following exactly:
+Type the following exactly **inside nano**, not at the shell prompt:
 
 ```bash
 #!/bin/bash
@@ -308,13 +320,14 @@ Before running `chmod`, run the script directly and predict the result. This is 
 <details>
 <summary>Check your prediction</summary>
 
-If your system replies with "Permission denied," it is doing the correct thing: it refuses to treat ordinary text as a program until you explicitly grant that permission. The failure is not in your script content; it is in the filesystem permission layer, which you are about to change deliberately.
+For a fresh script saved by GNU nano, expect no execute bit. If direct execution reports "Permission denied," inspect `ls -l my-first-script.sh` and confirm the owner's permission group lacks `x` before applying the focused fix below. The error alone does not prove a missing execute bit; other access restrictions can also block execution.
 
 </details>
 
 Now add execute permission with `chmod +x`. `chmod` stands for change mode, and `+x` means "add execute permission." You are telling the operating system that this file is allowed to run as a program, not merely sit on disk as text.
 
 ```bash
+ls -l my-first-script.sh
 chmod +x my-first-script.sh
 ```
 
@@ -328,14 +341,14 @@ Expected output:
 
 ```text
 Welcome to the kitchen!
-Today's date is: Sun Mar 23 14:30:00 UTC 2026
+Today's date is: Mon Mar 23 14:30:00 UTC 2026
 You are logged in as: yourname
-Your current directory is: /home/yourname
+Your current directory is: /home/yourname/kubedojo-editing
 
 Great job, chef! Your first script works!
 ```
 
-The exact date, username, and directory will vary, which is a good sign because the script is running commands at execution time rather than printing only fixed text. If you see a permission error, check `chmod +x` again. If you see a syntax error, reopen the file with `nano` and inspect the line number mentioned by the shell. Errors after the permission step usually mean the operating system successfully started the script but Bash found a problem in the text.
+The exact date, username, and workspace path will vary. If execute permission is present but "Permission denied" persists, stop and ask your instructor or administrator to check path access or a filesystem mounted with execution disabled (`noexec`); repeating `chmod` does not fix those causes. The [Linux execve error list](https://man7.org/linux/man-pages/man2/execve.2.html) distinguishes these access failures. If Bash reports a syntax error, reopen the file with `nano` and inspect the reported line. That is a different layer from permission to start the script.
 
 This small debugging sequence is the beginning of a useful diagnostic habit. First ask whether the file can be executed at all. Then ask whether the selected interpreter can parse it. Then ask whether the commands inside do what you intended. Those are different layers, and separating them prevents the frustrating habit of changing random lines without knowing which layer failed.
 
@@ -438,7 +451,7 @@ The caret notation represents the Ctrl key, not text that should be typed litera
 <details>
 <summary>You wrote `backup.sh`, ran `./backup.sh`, and received `Permission denied`. What layer failed, and what is the focused fix?</summary>
 
-The file content may be fine, but the filesystem has not granted execute permission for direct execution. Add execute permission with `chmod +x backup.sh`, then run `./backup.sh` again. This does not guarantee the script logic is correct; it only allows the operating system to try running it. If a new syntax error appears afterward, you have moved to the interpreter-parsing layer and should inspect the reported line.
+The message identifies an access failure, but does not establish its exact cause. Inspect `ls -l backup.sh`; if this is your practice script and the owner's execute bit is missing, add it with `chmod +x backup.sh` and retry. If permission is already present or the failure persists, stop and ask for help checking path access or execution restrictions. A subsequent Bash syntax error belongs to the interpreter-parsing layer and requires inspecting the reported line instead.
 
 </details>
 
@@ -474,14 +487,15 @@ Run `hostname` to confirm which machine you are connected to, and run `pwd` to c
 
 In this exercise you will create a small memo file, edit it, write a script that reads it, grant execute permission, and run the script. The scenario is intentionally ordinary because the mechanics are the lesson. If you can do this calmly with a training memo, you can later apply the same loop to shell helpers, Markdown notes, YAML manifests, and service configuration files.
 
-Work in your home directory so cleanup is straightforward. If any command produces output that differs because of your username, date, or directory, treat that as expected. If a command fails, pause and identify the layer: wrong directory, unsaved file, missing permission, or script content. That habit is more valuable than reaching the end quickly.
+Continue in the exclusive workspace created under **Opening, Editing, Saving, and Exiting**. If you skipped that section, complete its setup first; never open these fixed filenames in an unfamiliar directory. Confirm the workspace with `pwd` and inspect its entries before editing. Username, date, and workspace path may differ; unexpected files or failed navigation mean stop before editing or cleanup. Diagnose other errors by layer: directory, save, access, or script content.
 
 As you work, say the loop out loud if it helps: open, edit, save, exit, verify. For the script portion, add two more words: permit and run. That may sound overly deliberate for a beginner exercise, but deliberate sequencing is how terminal work becomes predictable. The shell will not remind you that a file is unsaved after you leave the editor, and it will not guess that a text file should be executable because it ends in `.sh`.
 
 ### Part 1: Create and edit a memo
 
 ```bash
-cd ~
+pwd
+ls -a
 nano kitchen-memo.txt
 ```
 
@@ -531,7 +545,7 @@ Save and exit with Ctrl+O, Enter, and Ctrl+X. Then verify that all six lines are
 cat kitchen-memo.txt
 ```
 
-### Part 3: Write a cleanup script
+### Part 3: Write a report script
 
 Now create a script that prints a short status report and includes the memo contents. This script combines fixed text, command substitution, and a file-reading command. It is still small, but it demonstrates the reason scripts matter: they preserve a repeatable sequence of terminal actions in a text file.
 
@@ -539,7 +553,7 @@ Now create a script that prints a short status report and includes the memo cont
 nano kitchen-report.sh
 ```
 
-Type this script:
+Type this script **inside nano**, not at the shell prompt:
 
 ```bash
 #!/bin/bash
@@ -557,9 +571,11 @@ echo ""
 echo "Report complete. Kitchen is running smoothly!"
 ```
 
-Save and exit. Before making the script executable, you can inspect it with `cat` if you want one more check. Then grant execute permission and run it directly from the current directory. If you see "Permission denied," repeat the `chmod +x` command and confirm the filename is spelled correctly.
+Save and exit, then inspect the saved script and its permissions before granting execute permission and running it from the workspace. If "Permission denied" persists despite an owner execute bit, stop and ask for help with path access or execution restrictions rather than repeating `chmod`.
 
 ```bash
+cat kitchen-report.sh
+ls -l kitchen-report.sh
 chmod +x kitchen-report.sh
 ./kitchen-report.sh
 ```
@@ -568,7 +584,7 @@ Expected output will vary in the date, username, and file listing:
 
 ```text
 === Kitchen Status Report ===
-Date: Sun Mar 23 14:45:00 UTC 2026
+Date: Mon Mar 23 14:45:00 UTC 2026
 Chef on duty: yourname
 
 --- Memo Board Contents ---
@@ -588,7 +604,7 @@ Report complete. Kitchen is running smoothly!
 
 ### Part 4: Diagnose and fix a broken script (unguided)
 
-Parts 1 through 3 told you every command to run. This part removes the scaffolding and tests whether you can diagnose a failure on your own. Create a file named `broken-report.sh` with exactly this content, including the mistakes as written:
+Parts 1 through 3 told you every command to run. This part removes the scaffolding and tests whether you can diagnose a failure on your own. Use GNU nano in your workspace to create `broken-report.sh`; type this content inside the editor, including the intentional mistakes, rather than pasting it at the shell prompt:
 
 ```bash
 #!/bin/bash
@@ -610,7 +626,14 @@ There are two failures at two different layers. First, a newly created file has 
 
 ### Part 5: Clean up
 
-Remove the training files when you are done. Read the command before running it because `rm` removes files without sending them to a graphical trash folder. In this case the filenames are specific to the exercise, and removing them leaves your home directory tidy for the next module.
+Cleanup is optional. Remove only the training files you created in this run's exclusive workspace. First run `pwd` and `ls -l`, then stop and check that the path and every named file belong to this lesson. If you changed directories, lost track of ownership, or see unexpected entries, do not run `rm`. Read its filenames carefully: it removes files without sending them to a graphical trash folder. Omit any file you did not create; never substitute a wildcard or a recursive removal command.
+
+```bash
+pwd
+ls -l
+```
+
+Only after that check, remove the known disposable files; leave the workspace directory itself in place:
 
 ```bash
 rm hello.txt kitchen-memo.txt kitchen-report.sh my-first-script.sh broken-report.sh

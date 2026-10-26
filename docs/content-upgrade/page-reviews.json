@@ -3,6 +3,14 @@
   "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No full-page acceptance is recorded; coverage reporting is separate from inventory schema/digest checks.",
   "pages": [
     {
+      "path": "prerequisites/zero-to-terminal/module-0.5-editing-files.md",
+      "page_digest": "sha256:61f4b3d98db867715f5393dd2a7b155b17709cfff8ed59932f88fdccf5a0dbd0",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
       "path": "prerequisites/zero-to-terminal/module-0.4-files-and-directories.md",
       "page_digest": "sha256:2f8c13ca52e0818cb512b7ed1ae20f557323d15a8036430b4dd48ba02a76e701",
       "disposition": "revise",
