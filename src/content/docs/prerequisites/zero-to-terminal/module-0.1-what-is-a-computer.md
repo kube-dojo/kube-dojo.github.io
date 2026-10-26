@@ -19,7 +19,7 @@ After this module, you will be able to:
 
 - **Diagnose** whether a slow computer is more likely constrained by CPU, RAM, disk, or operating-system pressure.
 - **Compare** RAM and storage using the kitchen model, then predict what is lost or preserved when power disappears.
-- **Optional preview:** **Evaluate** why Linux is common in cloud and Kubernetes environments while recognizing where Windows worker nodes fit.
+- **Evaluate** why Linux is common in cloud and Kubernetes environments while recognizing where Windows worker nodes fit.
 - **Implement** a personal spec inventory that records your CPU, RAM, disk capacity, operating system, and current resource pressure.
 - **Predict** what happens when RAM, disk space, or CPU time is exhausted during everyday and server-side workloads.
 
@@ -92,7 +92,7 @@ This is also the first step toward thinking like an operator rather than a consu
 
 The CPU is the part of the computer that executes instructions. When you click a button, type a letter, open a browser tab, compress a file, install a package, or run a script, the CPU is involved. It reads instructions, performs arithmetic and comparisons, moves data around, and decides which branch of a program should run next. A faster CPU is like a faster chef because it can complete more steps in the same amount of time.
 
-Modern CPUs are usually described by brand names, model families, clock speeds, and core counts. You might see "Intel Core Ultra," "Apple Silicon M-series," or "AMD Ryzen 5" on a laptop description. Those names are not skills you need to memorize today. The practical idea is that a core is like one working chef, so a CPU with several cores can handle several streams of work at the same time if the software is designed to use them.
+Modern CPUs are usually described by brand names, model families, clock speeds, and core counts. You might see "Intel Core Ultra," "Apple Silicon M-series," or "AMD Ryzen 5" on a laptop description. Those names are not skills you need to memorize today. Several cores can handle parallel work if the software can use them. Thinking of a core as one chef is only a starting point: as the scheduling section explains, some cores share their resources among multiple hardware threads.
 
 Clock speed is often measured in gigahertz, which means billions of cycles per second, but clock speed is not the whole story. A newer CPU can sometimes do more useful work per cycle than an older one, and a CPU with more cores can keep many tasks moving even if one task is busy. That is why "four gigahertz" is not automatically better than "three gigahertz" in every situation. Architecture, cores, power limits, cooling, and workload shape the real result.
 

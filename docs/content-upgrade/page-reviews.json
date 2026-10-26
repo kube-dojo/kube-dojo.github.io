@@ -12,7 +12,7 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.1-what-is-a-computer.md",
-      "page_digest": "sha256:a0a8b1c0eb9a3b0b5ced89dfa8c2f6ab80e4c7d8d0ae3ae024cc579ef480f403",
+      "page_digest": "sha256:874310c9e4242183e31a774f857d7562105cbc59b2c75aeaf2783c69e522a153",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
@@ -20,7 +20,7 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal.md",
-      "page_digest": "sha256:04a8ec2553e4a0741a22bf51af8fa1798221dd6fdb1f48e30386775c1b53e02a",
+      "page_digest": "sha256:5091b850794b52e9c868de2136a321a4cbe76cf3168ca3cff4d8dfa63afa02fb",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
