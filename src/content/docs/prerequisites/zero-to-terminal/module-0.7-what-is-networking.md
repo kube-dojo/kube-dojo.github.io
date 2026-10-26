@@ -447,7 +447,7 @@ The first suspect is the server-side application path. A `500` response means DN
 
 <details><summary>Question 5: A junior developer runs `ping -c 4 api.example.com`, sees only request timeouts, and declares the API server completely down. You run `curl -I https://api.example.com` and get `HTTP/1.1 200 OK`. Why was the conclusion wrong?</summary>
 
-The conclusion treated ping as a complete application health check, which it is not. Ping uses ICMP, and many production systems ignore or block ICMP while still allowing HTTPS on port 443. The successful `curl` result proves the API hostname resolved, the HTTPS path reached a server, and the server returned a successful HTTP response. The accurate diagnosis is that ping traffic is blocked or ignored, not that the API is down.
+The conclusion treated ping as a complete application health check. The HTTPS request received a successful response, while the echo probes received no replies. Filtering or ignored ICMP is one hypothesis; destination selection, timing, and other path differences also need checking. These observations do not establish complete API health or the cause of the missing echo replies.
 
 </details>
 
@@ -603,7 +603,7 @@ This step connects terminal networking with file redirection. The command writes
 
 ### Diagnostic Challenge: Four Network Incidents, No Recipe
 
-The cookbook tasks above guided you through each command with exact arguments. In real operations, however, problems do not arrive with a command recipe; they arrive as ambiguous reports and terminal output. In this challenge, you are presented with four frozen terminal transcripts from different troubleshooting sessions. For each transcript, examine the recorded commands and output, identify which specific layer is failing (DNS name resolution, host reachability, service port or transport, or application response), explain the evidence that proves your conclusion, and decide the single most logical next check or fix. Write down your diagnosis before opening each reveal.
+The cookbook tasks above guided you through exact arguments. Real problems arrive as ambiguous reports and output. For each frozen transcript below, distinguish the observed symptom from possible causes, identify which layers deserve investigation, and choose a justified next check. State what remains unknown; do not invent a single failing device, layer, or configuration merely because the challenge asks for a diagnosis. Write down your reasoning before each reveal.
 
 ```text
 $ nslookup api.example.com
@@ -624,7 +624,7 @@ Date: Thu, 17 Sep 2026 11:20:00 GMT
 
 **Failing Layer:** DNS name resolution.
 
-**Evidence:** The `nslookup` command returned `NXDOMAIN`, meaning the DNS resolver has no record for the name `api.example.com`. Meanwhile, `curl -I` directly to the known host IP address `203.0.113.100` returned `HTTP/1.1 200 OK`, proving that the network path, server host, port 80, and HTTP web service are fully functional. The server is not down at all; the name mapping is absent.
+**Evidence:** The queried DNS resolver reported `NXDOMAIN`, while the direct-IP HTTP request received `200`. Investigate the name and resolver response, but do not call the API fully healthy: an IP request can reach a different virtual host, and one response does not verify every application function or the intended name mapping.
 
 **Next Check or Action:** Verify the DNS zone configuration, registrar, or authoritative name server to ensure an `A` record points `api.example.com` to `203.0.113.100`, and check whether recent DNS record edits have propagated or expired according to their TTL. Do not restart the server or application.
 
@@ -671,7 +671,7 @@ Content-Length: 162
 
 <details><summary>Diagnosis and layer analysis for Incident C</summary>
 
-**Failing Layer:** Application / HTTP content routing (Layer 7), not network reachability or DNS.
+**Observed Layer:** An HTTP responder returned an application-level status; content, authorization, endpoint selection and routing need investigation. The status alone does not rule out a wrong DNS destination or intermediary.
 
 **Evidence:** An HTTP responder returned `404` for the requested URL. That narrows the investigation toward content, routing, authorization, or the selected endpoint, but does not prove the document is absent or that the response came from the intended backend. The `Server` header is a response claim, not independent verification of the server software.
 

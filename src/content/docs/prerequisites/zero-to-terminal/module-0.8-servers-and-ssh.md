@@ -359,7 +359,7 @@ Connection failures are part of the lifecycle too. A timeout leaves routing, fil
 | Symptom | Likely Layer | First Beginner Check |
 |---------|--------------|----------------------|
 | Connection timed out | Network path or firewall | Confirm host, network, VPN, and security group rules |
-| Connection refused | SSH service or port | Confirm the server is listening on the expected port |
+| Connection refused | Listener or active rejection | Check the intended endpoint, listener and rejection policy with its owner |
 | Permission denied | Authentication | Confirm username, key file, password, and account access |
 | Host key warning changed | Host identity | Stop and verify whether the server was rebuilt or intercepted |
 
@@ -614,7 +614,7 @@ Work slowly enough to record evidence at each stage. A good operator's notes are
 - [ ] Write one sentence explaining whether the hostname changed and why that result makes sense for `localhost`.
 - [ ] Build, but do not run, the command that would connect as `admin` to `10.0.0.5` on port `2222` with key file `~/.ssh/work_key`.
 - [ ] Diagnose the three connection failures in Incident A by matching each error symptom to its failure layer and identifying the initial diagnostic command.
-- [ ] Analyze the session transcript in Incident B to prove which machine holds the flag file using hostname, user, and session-boundary receipts.
+- [ ] Analyze Incident B to identify the command's reported target and the missing exit-status/file checks, without claiming unverified file creation.
 - [ ] Evaluate the changed host key warning in Incident C to explain why immediate key removal is hazardous and detail the out-of-band verification procedure.
 
 <details>
@@ -642,7 +642,7 @@ $ ssh -i ~/.ssh/id_ed25519 devops@198.51.100.26
 devops@198.51.100.26: Permission denied (publickey).
 ```
 
-Examine the three error messages recorded across the separate sessions above. A team lead initially reports that all three servers have experienced an identical crash. Using the failure layer model from this module, identify the specific failing layer for each session, contrast why their failure mechanisms differ fundamentally, and determine the single most appropriate first diagnostic check for each.
+Examine the three recorded errors. A team lead initially claims all servers suffered the same crash. Explain what each symptom establishes, which causes remain hypotheses, and which authorized check would narrow them. Distinguish connection establishment from authentication without pretending each error identifies a unique failing device or mechanism.
 
 <details>
 <summary>Diagnosis and layer analysis for Incident A</summary>
@@ -655,7 +655,7 @@ Examine the three error messages recorded across the separate sessions above. A 
 **Session 2 (`198.51.100.25` - `Connection refused`):**
 - **Observed Layer:** The connection to port 22 was actively refused before SSH authentication.
 - **Evidence and Mechanism:** A missing listener or active rejection by a firewall could explain the refusal. The error alone does not identify the rejecting device or prove that the destination operating system was reached.
-- **First Diagnostic Check:** Verify whether `sshd` (the OpenSSH daemon) is installed and active on the host via cloud serial console or management agent (`sudo systemctl status ssh`), or verify whether the server configuration deliberately binds SSH to an alternate port such as `2222` (requiring `ssh -p 2222`).
+- **First Diagnostic Check:** Confirm the intended host and port with its owner, then inspect listener state and rejection policies through an authorized management path. A service-status check on that intended host tests one hypothesis; it does not prove that host produced the refusal.
 
 **Session 3 (`198.51.100.26` - `Permission denied (publickey)`):**
 - **Failing Layer:** Authentication and authorization layer.
@@ -749,7 +749,7 @@ A host key change is frequently benign in cloud environments—for example, if t
 <details>
 <summary>Success criteria</summary>
 
-You have succeeded when your notes show a before-connection context block, an SSH command, an inside-session context block, a clean disconnect, and a final local context check for the guided localhost exercise. In addition, you have successfully completed the unguided diagnostic challenge: distinguishing network timeout, daemon refusal, and publickey rejection in Incident A; proving remote execution and file placement through command context and disconnect receipts in Incident B; and identifying host key verification as an essential identity protection that requires out-of-band fingerprint validation before editing `known_hosts` in Incident C. In all scenarios, you can systematically prove where commands ran and identify failure layers before making changes.
+Your notes should show before/inside/after context checks and a clean disconnect for the guided localhost exercise. For Incident A, distinguish connection symptoms from authentication failure and propose justified checks. For Incident B, identify the reported command target and missing success/file evidence. For Incident C, require out-of-band host-key verification before changing `known_hosts`. Success means keeping observations and hypotheses separate before choosing an action.
 
 </details>
 

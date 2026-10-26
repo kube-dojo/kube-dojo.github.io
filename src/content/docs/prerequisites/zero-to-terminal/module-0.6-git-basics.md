@@ -20,7 +20,7 @@ After completing this module, you will be able to:
 
 - Diagnose repository state by interpreting `git status`, `git diff`, and `git log` output instead of guessing what Git will save.
 - Construct focused commits by moving selected file changes from the working directory into the staging area and then into repository history.
-- Implement a safe local Git setup with accurate author identity, a new repository, and an ignore policy for generated files and secrets.
+- Implement a safe local Git setup with deliberately chosen author identity, a new repository, and an ignore policy for generated files and secrets.
 - Compare local and remote repository timelines so you can choose when to clone, push, pull, fetch, or pause for conflict resolution.
 - Design a small Git workflow for Kubernetes configuration files that produces reviewable history without leaking credentials or generated artifacts.
 
@@ -110,10 +110,6 @@ git config --get user.email
 ```
 
 The `--global` flag changes account-wide configuration, usually in `~/.gitconfig`; this lesson does not change it. After successful initialization, `--local` writes only to that repository. The deliberately fictional training identity below is for disposable local commits, not publication. Before publishing real work, deliberately choose the appropriate author identity for that repository.
-
-```bash
-git config --get user.name
-```
 
 Now create a small project directory for the examples. The project uses Kubernetes-flavored filenames because infrastructure configuration is where Git habits quickly become operational habits. The commands below make a directory, enter it, and initialize a repository. Run them in a practice location such as your home directory or a temporary folder, not inside a real work repository.
 
@@ -753,7 +749,7 @@ Output should look similar to:
 
 ### Task 6: Bonus Challenge — Advanced Ignore Rules
 
-You are working on a new application that generates numerous log files ending in `.log` across various directories. You want Git to ignore all of them to save space, but you must ensure that one specific file named `audit-trail.log` in the root directory is always tracked for compliance reasons. Create a `.gitignore` file that achieves this exact configuration, then verify the result with dummy files and `git status`.
+You are working on a new application that generates numerous log files ending in `.log` across various directories. You want Git to ignore them while allowing the root file `audit-trail.log` to be deliberately tracked as an exception. Create and test the ignore rules; an exception permits staging that file but does not add or commit it automatically.
 
 - [ ] `.gitignore` file created with appropriate wildcard and exclusion rules.
 - [ ] Dummy files created to test the rules.
