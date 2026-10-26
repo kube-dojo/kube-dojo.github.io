@@ -176,11 +176,11 @@ Two types of pantry:
   HDD (Hard Disk Drive):
     - Like a big walk-in pantry
     - Capacity and price depend on the model
-    - Slower to find things because mechanical parts move
+    - Moving parts add seek time when locating data
 
   SSD (Solid State Drive):
     - Like a well-organized shelf right outside the kitchen
-    - Faster to find things because there are no moving parts
+    - No mechanical seek time when locating data
     - Compare capacity and measured performance
     - Check your own device's storage type
 ```
@@ -534,7 +534,7 @@ The saturated resource is disk space, and the evidence is the root filesystem at
 - [ ] You can name your CPU, RAM, storage capacity, free storage, and operating system.
 - [ ] You can explain why RAM and storage are different without using the word "memory" ambiguously.
 - [ ] You can diagnose whether one simple symptom points first toward CPU, RAM, disk, network, or a single stuck program.
-- [ ] You can diagnose a telemetry profile by naming the saturated resource, the evidence, and a matching remediation.
+- [ ] You can identify a likely bottleneck from a telemetry profile, name the evidence and any needed confirmation, and suggest a matching remediation.
 - [ ] Optional preview: you can explain why Kubernetes nodes are still computers with finite resources.
 
 ## Sources
