@@ -99,6 +99,30 @@
       "independent_statuses": {"technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
+      "path": "prerequisites/zero-to-terminal/module-0.9-software-and-packages.md",
+      "page_digest": "sha256:66a0711e1e3d2ffdd362b9f1d73fa7c0dfcab9a18d4b7c1b0be6af9ea996f8ba",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/zero-to-terminal/module-0.10-what-is-the-cloud.md",
+      "page_digest": "sha256:644df44cd872e842b2de639ff6d648cda229b747a1103f77b590416de3378345",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
+      "path": "prerequisites/zero-to-terminal/module-0.11-your-first-server.md",
+      "page_digest": "sha256:cd79a6eb4e0eb7d68bb38fe7651b8cd77f4921b42820e5a0766cb89931569389",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-packages-cloud-server-p04.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
       "path": "ai-history/ch-01-the-laws-of-thought.md",
       "page_digest": "sha256:6e6ef29e8115b9f21578690c47f440031b66dacdc01f51c5519ba116a620c40d",
       "disposition": "revise",

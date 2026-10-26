@@ -692,11 +692,11 @@ htop 3.3.0
 
 <details><summary>Solution notes for Task 6</summary>
 
-Transcript A: The local package index cache is empty or uninitialized. On newly provisioned cloud instances, `/var/lib/apt/lists/` often contains no package indexes or only minimal bootstrap metadata. The package manager cannot find `nginx` because it has not yet indexed the upstream Ubuntu repository catalog. The immediate fix is to run `sudo apt update` to download the current repository indexes, followed by `sudo apt install nginx`.
+Transcript A: APT cannot locate `nginx` in the package information currently available to it. An empty or stale index is one hypothesis, not a demonstrated cause. Check the package spelling and configured repositories; on an authorized practice host, run `sudo apt update` and inspect its output for repository, network, or authentication errors. Retry installation only after confirming the intended package is available; refreshing configured sources does not repair every missing-package cause.
 
 Transcript B: The package `net-speed-check` depends on graphical X11 display libraries (`libx11-6`, `x11-common`, `xterm`) despite claiming to be a command-line tool. On a headless production server, installing unexpected graphical libraries expands the host's attack surface, consumes memory and disk space, and indicates poor package curation. The correct operational decision is to type `n` to cancel the installation immediately, inspect package details with `apt show net-speed-check`, and select a minimal, well-maintained CLI alternative (such as standard `iperf3` or `curl`).
 
-Transcript C: Alice and Bob run different Long-Term Support releases of Ubuntu (22.04 LTS vs. 24.04 LTS). Standard distribution repositories freeze stable software versions at release time to preserve ABI stability and avoid regressions across the OS lifecycle. Alice's system uses Ubuntu 22.04 (`jammy`), which packages `htop` 3.0.5, whereas Bob's system uses Ubuntu 24.04 (`noble`), which packages `htop` 3.3.0. Running `apt show htop` or `apt-cache policy htop` on each machine will verify the repository release suite and explain the version difference without reinstalling packages.
+Transcript C: These simulated outputs show different `htop` versions on two workstations; they are not a verified package-version matrix for those Ubuntu releases. Different release repositories, enabled sources, updates, or installation methods could explain the difference. Compare `command -v htop`, `apt show htop`, and `apt-cache policy htop` on each machine to inspect the selected executable, installed package, candidate version, and repository origins before attributing the behavior to an OS release or reinstalling anything.
 
 </details>
 
@@ -711,6 +711,8 @@ Transcript C: Alice and Bob run different Long-Term Support releases of Ubuntu (
 - [ ] Diagnose unguided package scenarios from terminal transcripts by identifying missing catalog refreshes, evaluating unfamiliar dependency plans, and determining why versions differ across hosts.
 
 ## Sources
+
+- [Ubuntu Noble apt manual](https://manpages.ubuntu.com/manpages/noble/man8/apt.8.html)
 
 - [OWASP CI/CD-SEC-03: Dependency Chain Abuse](https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse)
 - [MDN: Package management basics](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Client-side_tools/Package_management)
