@@ -320,7 +320,7 @@ Stop and think: the web server translates URL paths into filesystem paths under 
 
 Use `curl` when the browser result is ambiguous. A browser renders HTML, caches resources, hides some headers, and may retry requests in ways that obscure the simple request-response exchange. `curl` makes the exchange plain by sending an HTTP request and printing the response body or status information in the terminal, which is why it is a favorite first diagnostic tool for web servers.
 
-For the cloud path, run `curl http://localhost` from inside the SSH session when you want to test nginx without involving the provider firewall. If that works, nginx and the filesystem are healthy on the VM. Then run `curl http://YOUR_PUBLIC_IP` from your own machine when you want to test the external path. Those two tests separate "server works locally" from "outside traffic can reach the server."
+For the cloud path, run `curl http://localhost` inside the SSH session to observe that local request path. A successful response supports that request only; it does not prove complete nginx or filesystem health. Then run `curl http://YOUR_PUBLIC_IP` from your own machine as a separate observation of the external path. Compare the results with inventory, configuration and logs before attributing a difference to the firewall or another component.
 
 When finished, disconnect and inventory the resources created specifically for this authorized disposable lab. Terminate/delete the VM and review its owned retained disks, snapshots, reserved/public addresses, and other billable resources; release only those no longer needed and authorized for removal. Verify the resource inventory and billing afterward, allowing for reporting delay. Stopping compute or deleting one VM does not guarantee zero charges, and unrelated resources must remain untouched.
 
@@ -368,7 +368,7 @@ A third pattern is choosing the smallest environment that proves the thing you n
 
 | Pattern | When to Use It | Why It Works |
 |---------|----------------|--------------|
-| Test inside-out | Browser cannot reach a page | Separates server health from external network reachability |
+| Test inside-out | Browser cannot reach a page | Compares local and external observations before diagnosing a component |
 | Keep paths explicit | Learning a new runtime or package layout | Prevents Docker and Ubuntu nginx paths from blending together |
 | Prefer the smallest useful environment | Practicing a concept for the first time | Reduces cost, risk, and unrelated failure modes |
 
@@ -472,7 +472,7 @@ First confirm you edited `/var/www/html/index.html` on the VM, not a local file 
 <details>
 <summary>7. You repeated the guarded create assignment with `127.0.0.1:9090:80`, then visited `http://127.0.0.1:8080`. Why does that fail, and what is the clean repair?</summary>
 
-It fails because the host port changed to 9090, while your browser is still requesting 8080. Docker forwards loopback port 9090 into container port 80. Visit `http://127.0.0.1:9090` or recreate your lesson container with `-p 127.0.0.1:8080:80` if the original port is required. Keep the loopback address when repairing the port mapping; changing HTML will not repair this mismatch.
+It fails because the host port changed to 9090, while your browser is still requesting 8080. Docker forwards loopback port 9090 into container port 80. Visit `http://127.0.0.1:9090` or use the guarded cleanup, create and copy blocks with `-p 127.0.0.1:8080:80` if the original port is required. Keep the loopback address when repairing the port mapping; changing HTML will not repair this mismatch.
 </details>
 
 ---
