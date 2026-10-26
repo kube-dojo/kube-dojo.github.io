@@ -12,13 +12,44 @@ Baseline at `6bbbd0c48`: 1,089 English pages, eight recorded revise dispositions
 
 Report review coverage, findings/revision status and explicit acceptance separately. A current receipt proves schema/digest validity only. Acceptance records require explicit lead acceptance references and applicable passing evidence under [the existing contract](evidence-and-acceptance.md); source/book/editorial/human gates remain binding. English completion does not wait on Ukrainian; learner studies are needed for measured-improvement claims, not every correction. Unknown execution stays unknown. Never substitute metadata readiness or PR counts for coverage.
 
+## Whole-site delivery sequence
+
+Execution snapshot at `e30fd794b` on 2026-10-26: 12 current English records (11 revise, one retain), zero full-page acceptances, no stale/invalid receipts. Five scoped correction PRs (#3546–#3550) are published. Older reviews remain reusable evidence; neither those repairs nor this snapshot close a full-page batch. Use `/api/content/coverage` for current counts rather than treating this dated snapshot as a live counter.
+
+| Phase | English pages | Existing owners / exit boundary |
+|---|---:|---|
+| 1. Fundamentals, then Linux | 100 | #2278 / #2279; all pages and applicable evidence accepted |
+| 2. Kubernetes and release pages | 267 | #2280 / #2542; preserve exam-pin versus release-track boundaries |
+| 3. Cloud | 104 | #2281; provider execution remains separate from simulations |
+| 4. Platform | 286 | #2282 / #2283 / #2284; Foundations, Disciplines and Toolkits |
+| 5. On-Premises | 67 | #2285; verify documented hardware/environment assumptions |
+| 6. AI, then AI/ML Engineering | 186 | #2286 / #2287; verify source, code and tool assumptions |
+| 7. History book and shared pages | 79 | #2288–#2290 / #2300; retain Chapter 1/73 and source/editorial/human gates |
+| **English total** | **1,089** | Existing 426 exact-path batches; no replacement inventory or mass ticket wave |
+| 8. Ukrainian edition | 562 existing, plus missing counterparts | #2291, #2086, #2110; begins after English readiness, under current fidelity/family gates |
+
+Lab alignment/execution (#2276), source support (#2275), assessments (#2277), navigation/accessibility (#2293) and freshness (#2294) accompany each affected batch. They are not postponed to phase 8. Cross-track integration and final release reconciliation stay with #2292/#2295. New upstream releases enter the standing #2542 playbook, not an unreviewed expansion of the current content packet.
+
+## Bounded execution and acceptance loop
+
+The accountable lead keeps one issue-defined batch active, normally two to four related full pages. Keep only a small now/next queue. Within that batch, disjoint source/execution work may run beside authoring; the exact-head independent reviewer is a separate lane. Start sequentially, use deterministic tools first, and add parallelism only when current quota/health and distinct work justify it. Do not create one agent or goal for the whole site.
+
+1. Read every page and recover prior evidence once; freeze paths and source digests. Record retain/revise/expand and exact findings. Check live leases/state/reviews before claiming work.
+2. Verify load-bearing claims against authoritative sources and run relevant examples in a documented clean environment. Separate runnable commands, illustrative output and deliberate failures. Keep unknown platform/hosted/provider evidence explicit.
+3. Deliver coherent corrections in <20-file, <=200-aggregate-line PRs. Preserve supported outcomes and good prose; no rewrite quota. Independent review, final-head CI, merged build, public smoke, issue evidence and owned-worktree retirement complete each delivery slice.
+4. Before moving the batch checkbox, consolidate its evidence: claim/source map, independent editorial rubric, outcome/assessment alignment, applicable execution and deployment receipts at current digests. A sequence of merged repair PRs is not this acceptance step. Refresh the ledger and references together.
+5. If acceptance is blocked, record the exact missing layer, environment/dependency, existing owner issue and next executable action. Work on another source/editorial packet can continue, but the blocked page/batch remains incomplete; never turn an unavailable environment into `not_applicable` merely to close it.
+6. At each session boundary, report denominator, current records, unresolved findings and explicit acceptances separately; preserve the blocked queue and exact next packet in the local handoff. Hand off/restart around the user's four-to-eight-compaction window, earlier if needed for a clean checkpoint. No speculative completion date or frontmatter-based completion percentage.
+
+Terra's initial suitability assessment is recorded in [the scoped evaluation](terra-evaluation-2026-10-26.md). It proposes bounded assistance, not a global default/profile change or a replacement for cross-provider independent review. Revalidate catalog, tools and aggregate quota before routing; use Astra for the accountable judgment and existing worker profiles until a specific tested alternative is chosen.
+
 ## Milestone 1: Prerequisites, then Linux (100 pages)
 
-Six recorded revise dispositions / 100 pages; 94 pages lack a current review record; no full-page acceptances recorded. Finish the named #2278 editorial residuals, then proceed in learner order. Inspect each section's exact inventory paths before reserving a packet. Each table row covers every Markdown/MDX page directly in that directory; child directories have separate rows. Split reviews into two to four related pages, with smaller bounded correction PRs (<20 files, <=200 aggregate changed lines unless explicitly reviewed otherwise).
+Snapshot at `e30fd794b`: ten current records / 100 pages (nine revise, one retain); 90 pages lack a current record; no full-page acceptances recorded. Inspect each section's exact inventory paths before reserving a packet. Each table row covers every Markdown/MDX page directly in that directory; child directories have separate rows. Split reviews into two to four related pages, with smaller bounded correction PRs (<20 files, <=200 aggregate changed lines unless explicitly reviewed otherwise).
 
 | Order | Directory under `src/content/docs/` | Pages | Current recorded dispositions |
 |---|---|---:|---:|
-| 1 | prerequisites/zero-to-terminal | 12 | 0 |
+| 1 | prerequisites/zero-to-terminal | 12 | 3 revise, 1 retain |
 | 2 | prerequisites/cloud-native-101 | 6 | 2 revise |
 | 3 | prerequisites/kubernetes-basics | 9 | 2 revise |
 | 4 | prerequisites/philosophy-design | 5 | 0 |
@@ -40,7 +71,7 @@ Six recorded revise dispositions / 100 pages; 94 pages lack a current review rec
 
 Prerequisites follows its published Suggested Route. Linux Operations follows its hub's learner route: 8.x administration, performance, troubleshooting, then shell scripting. Its sidebar disagrees and omits the 8.x administration pages; preserve that navigation finding under #2279/#2293. This is a review queue, not a claim that navigation has been fixed.
 
-First new review packet: `prerequisites/zero-to-terminal/{index.md,module-0.1-what-is-a-computer.md,module-0.2-what-is-a-terminal.md}`. Check novice assumptions, explanation, workload and outcomes against the full pages and actual source evidence; preserve supported material. Use existing rubric/source gates rather than a heading or word-count target. Then continue the remaining nine pages in that section. Record exact findings before changing prose.
+T01-P00's named editorial correction is delivered. T01-P01 hub/0.1/0.2 and T01-P02 modules 0.3/0.4/0.5 have full-read notes; scoped repairs through 0.3 are published, while full-page acceptance remains incomplete. **Now:** 0.4 workspace/runnable path sequence. **Next:** 0.5 workspace/editor verification. Then consolidate current P01/P02 source/editorial/assessment/execution gaps before checking either batch; use the explicit blocked queue if an environment remains unavailable. Continue T01-P03 in learner order without losing those obligations. Check novice assumptions, workload, outcomes and sources; preserve supported material and record exact findings before editing.
 
 For each packet: inspect live leases/state/existing reviews and PRs; review full pages and material claims; record retain/revise/expand and unknown layers; fix evidenced concerns; obtain independent review; run applicable checks/execution/render/deployment; reconcile the receipt and owning issue. A blocked lab does not prevent source/editorial work on the next packet, but its page stays incomplete. Avoid speculative completion dates until review throughput and execution prerequisites are established.
 
