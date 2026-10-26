@@ -99,31 +99,37 @@ git version 2.39.2
 
 Before creating commits, configure the identity Git will place into commit metadata. This is not the same thing as authenticating to GitHub during a push. The name and email configured here answer the question, "Who authored this snapshot?" Remote authentication answers a different question: "Is this person allowed to upload to that server?" Keeping those concepts separate prevents confusion when a commit succeeds locally but a push later asks for credentials.
 
-Replace the placeholder name and email below with your own real values before you run the commands.
+First inspect the existing identity without changing it. An unset value may print nothing and return a nonzero status; the disposable repositories below will receive their own local training identity before you commit.
 
 ```bash
-# Set your name (use your real name, this appears in the history)
-git config --global user.name "Your Name"
+# Read your configured name
+git config --get user.name
 
-# Set your email address
-git config --global user.email "you@example.com"
+# Read your configured email address
+git config --get user.email
 ```
 
-The `--global` flag writes to configuration associated with your user account on this computer, usually in `~/.gitconfig`. You can also set repository-specific configuration without `--global`, which is useful when one laptop contributes to both personal and work repositories. For now, a global beginner setup is enough, and you can inspect it with a command that prints the settings Git sees.
+The `--global` flag changes account-wide configuration, usually in `~/.gitconfig`; this lesson does not change it. After successful initialization, `--local` writes only to that repository. The deliberately fictional training identity below is for disposable local commits, not publication. Before publishing real work, deliberately choose the appropriate author identity for that repository.
 
 ```bash
-git config --list
+git config --get user.name
 ```
 
 Now create a small project directory for the examples. The project uses Kubernetes-flavored filenames because infrastructure configuration is where Git habits quickly become operational habits. The commands below make a directory, enter it, and initialize a repository. Run them in a practice location such as your home directory or a temporary folder, not inside a real work repository.
+
+Run one line at a time and stop on any `mkdir`, `cd`, or `git init` error before proceeding. Plain `mkdir` must create a fresh directory under your exclusive control; if the name already exists as a file, directory, or symlink, leave it untouched and choose an unused name, substituting it in later paths. Never replace this check with `mkdir -p`. Confirm `pwd` and an empty `ls -a` listing (only `.` and `..`) before initialization. Keep all later writes inside this disposable repository; start fresh if ownership becomes uncertain.
 
 ```bash
 # Create a new directory
 mkdir k8s-webapp
 cd k8s-webapp
+pwd
+ls -a
 
 # Tell Git to start tracking this directory
 git init --initial-branch=main
+git config --local user.name "KubeDojo Learner"
+git config --local user.email "learner@example.invalid"
 ```
 
 Expected output should confirm that Git created an empty repository database in a hidden `.git` directory.
@@ -601,6 +607,8 @@ In this exercise, you will create a local repository from scratch, simulate a st
 
 Create a new directory named `dojo-k8s-project`, navigate into it, and initialize an empty Git repository so you can observe the first status report from a clean practice workspace.
 
+Start from your home directory and apply the same fresh-directory and manual-stop checks as above. A repeat run needs an unused name, not an existing repository. After successful initialization, set the local training identity; do not change your account-wide Git configuration.
+
 - [ ] Directory created and navigated into.
 - [ ] Git repository initialized.
 
@@ -608,9 +616,14 @@ Create a new directory named `dojo-k8s-project`, navigate into it, and initializ
 <summary>Solution: Task 1</summary>
 
 ```bash
+cd ~
 mkdir dojo-k8s-project
 cd dojo-k8s-project
+pwd
+ls -a
 git init --initial-branch=main
+git config --local user.name "KubeDojo Learner"
+git config --local user.email "learner@example.invalid"
 git status
 ```
 
@@ -744,7 +757,7 @@ You are working on a new application that generates numerous log files ending in
 
 - [ ] `.gitignore` file created with appropriate wildcard and exclusion rules.
 - [ ] Dummy files created to test the rules.
-- [ ] `git status` confirms only the required file is untracked.
+- [ ] `git status` shows `.gitignore` and `audit-trail.log` as untracked; the other logs are ignored.
 
 <details>
 <summary>Solution: Task 6</summary>
@@ -821,11 +834,11 @@ For Challenge 1 (The Planted Workspace):
 2. Run `git diff --staged` to inspect the changes staged for the next commit (`port: 8080`), and run plain `git diff` to inspect the unstaged working tree modification (`# verify container port`).
 3. `incident-token.env` contains sensitive credential material and must never be staged or committed. `temp-notes.txt` is scratch documentation. Both should be added to `.gitignore` (or deleted from disk).
 4. To clean up safely:
-   - Add ignore patterns: append `incident-token.env` and `*.txt` to `.gitignore`.
+   - Add narrow ignore patterns: append `incident-token.env` and `temp-notes.txt` to `.gitignore`.
    - Unstage the incomplete YAML change: run `git restore --staged deployment.yaml`. On Git versions older than 2.23, the equivalent for this already-tracked file is `git reset HEAD deployment.yaml`; `git rm --cached deployment.yaml` would remove the file from tracking entirely, which is not what you want here.
    - Discard the unwanted scratch edits from the working copy: run `git restore deployment.yaml` (or remove the extra lines in `nano`).
    - Remove the untracked scratch files: `rm temp-notes.txt incident-token.env`.
-   - Run `git status` to confirm that the working tree is clean.
+   - Review `.gitignore` and stage it with `git add .gitignore`. If you completed Task 6, also review and stage the empty dummy `audit-trail.log`; otherwise there is no audit file to stage. Commit these intended files with `git commit -m "chore: record practice ignore rules"`, then run `git status` to confirm a clean working tree. Ignoring scratch files alone does not commit the ignore rules or the audit exception.
 
 For Challenge 2 (The Divergent Timelines):
 1. `git push` was rejected because the remote branch `origin/main` contains commit `d4e5f6a` ("chore: update prometheus scrape annotations"), which is not present in the local history. Git prevents non-fast-forward pushes to protect remote history from being silently overwritten.

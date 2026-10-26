@@ -354,7 +354,7 @@ date
 
 The command `date` is included because time matters in troubleshooting. If logs are in UTC but your laptop clock displays local time, you may search the wrong window. The date output also confirms that the remote system clock is not wildly wrong, which can affect certificates, authentication, scheduled jobs, and log ordering.
 
-Connection failures are part of the lifecycle too. "Connection timed out" often points to routing, firewall, host-down, or wrong-address problems. "Connection refused" often means the host answered but no SSH service is listening on that address and port. "Permission denied" usually means you reached the SSH service but authentication failed.
+Connection failures are part of the lifecycle too. A timeout leaves routing, filtering, host availability, and addressing as hypotheses. A refusal suggests a missing listener or active rejection, possibly by an intermediary; it does not identify the cause alone. SSH's "Permission denied" indicates authentication failed after reaching an SSH service.
 
 | Symptom | Likely Layer | First Beginner Check |
 |---------|--------------|----------------------|
@@ -407,12 +407,12 @@ Disconnect cleanly when finished. Your prompt should return to the local shell a
 exit
 ```
 
-On Linux, the SSH client may already be installed, but the SSH server varies by distribution and image. Many desktop systems do not expose SSH until you install and start OpenSSH Server. On Debian or Ubuntu systems where OpenSSH Server is missing or stopped, the following commands install it and start it immediately.
+Optional server setup is only for a disposable Debian/Ubuntu VM that you own or are explicitly authorized to administer, with a console and a network restricted to the lab. Installing SSH exposes a login service; do not do this on a shared host or your everyday machine just to complete the lesson. The following commands install and start it in that VM. Skip setup and read the examples if no authorized VM is available.
 
 ```bash
 sudo apt update
 sudo apt install -y openssh-server
-sudo systemctl enable --now ssh
+sudo systemctl start ssh
 ```
 
 Then test the same local connection flow. If this fails, read the error text rather than retrying blindly. A missing service, blocked port, or wrong account name produces a different symptom than a wrong password.
@@ -421,7 +421,7 @@ Then test the same local connection flow. If this fails, read the error text rat
 ssh localhost
 ```
 
-On Windows, the exact localhost setup depends on whether the OpenSSH Server optional feature is installed and running. For this beginner module, it is acceptable to practice command reading without changing Windows services. The important part is recognizing the shape of a real connection and the prompt that follows successful login.
+After disconnecting, tear down the disposable VM through the same lab system that created it, including any lab-only network exposure. Do not blindly disable or remove an existing SSH service: another user may depend on it. On Windows, localhost setup depends on the installed server feature; practice command reading without changing services when no authorized disposable environment is available.
 
 ```text
 # This is what connecting to a real server would look like:
@@ -437,14 +437,14 @@ yourname@remote-server:~$
 # Type "exit" to disconnect.
 ```
 
-With a real cloud server, the experience looks almost identical. The address might be public, the username might come from the image vendor, and key-based authentication may be required by default, but the lifecycle is still connect, authenticate, verify context, work, and disconnect.
+With an authorized cloud server, the lifecycle is still connect, authenticate, verify context, work, and disconnect. The following is documentation only: `192.0.2.24` is a reserved example address, not a connection target. Substitute only a host and account your lab owner has explicitly authorized; never probe an arbitrary public address copied from an example.
 
-```bash
+```text
 # Connect to a server in the cloud
-ssh ubuntu@54.123.45.67
+ssh ubuntu@192.0.2.24
 
 # You'd see:
-ubuntu@ip-54-123-45-67:~$
+ubuntu@training-server:~$
 
 # Now you're inside a Linux server in a data center somewhere
 # Every command runs there:
@@ -583,7 +583,7 @@ The file is created on the remote machine at `10.0.0.5`, in the current director
 <details>
 <summary>Question 5: Your SSH command returns "Connection refused" immediately, but the host name is correct. What layer do you investigate first?</summary>
 
-"Connection refused" usually means the host answered but nothing accepted the connection on the target port. Investigate whether the SSH server is installed, running, and listening on the port you used. Also check whether the server uses a non-default port that requires `ssh -p`. This is different from "Permission denied," which means you reached the SSH service but failed authentication.
+Investigate connection establishment: confirm the intended port, server listener, and active rejection policies with the host owner. A refusal can come from a missing listener or firewall rejection, so it does not prove which device answered. This differs from SSH's "Permission denied," which indicates authentication failed after an SSH service was reached.
 
 </details>
 
@@ -648,19 +648,19 @@ Examine the three error messages recorded across the separate sessions above. A 
 <summary>Diagnosis and layer analysis for Incident A</summary>
 
 **Session 1 (`198.51.100.24` - `Connection timed out`):**
-- **Failing Layer:** Network routing, security group, or packet filtering layer.
-- **Evidence and Mechanism:** The SSH client dispatched TCP SYN packets toward port 22 of `198.51.100.24`, but received no response before the socket timeout expired. Either an intermediate firewall, a cloud provider security group, a broken network route, or a powered-off virtual machine silently dropped the packets without acknowledging or rejecting them.
+- **Observed Layer:** Connection establishment timed out before SSH authentication.
+- **Evidence and Mechanism:** The client did not establish the connection within its timeout. Filtering, routing trouble, an unavailable host, or loss are hypotheses; the message alone does not show packet captures or identify which device caused the failure.
 - **First Diagnostic Check:** Check cloud provider security group rules to confirm inbound TCP port 22 is permitted from your client IP, verify VPN connectivity if connecting to private subnets, and check instance health and power status in the cloud management console.
 
 **Session 2 (`198.51.100.25` - `Connection refused`):**
-- **Failing Layer:** Service daemon or port binding layer on the destination host.
-- **Evidence and Mechanism:** Network packets successfully traversed the route and reached the destination operating system. However, the host operating system actively rejected the connection by sending back a TCP RST (reset) packet, indicating that no listening process is bound to TCP port 22.
+- **Observed Layer:** The connection to port 22 was actively refused before SSH authentication.
+- **Evidence and Mechanism:** A missing listener or active rejection by a firewall could explain the refusal. The error alone does not identify the rejecting device or prove that the destination operating system was reached.
 - **First Diagnostic Check:** Verify whether `sshd` (the OpenSSH daemon) is installed and active on the host via cloud serial console or management agent (`sudo systemctl status ssh`), or verify whether the server configuration deliberately binds SSH to an alternate port such as `2222` (requiring `ssh -p 2222`).
 
 **Session 3 (`198.51.100.26` - `Permission denied (publickey)`):**
 - **Failing Layer:** Authentication and authorization layer.
-- **Evidence and Mechanism:** Network routing succeeded, TCP handshake on port 22 completed, host key trust was established, and the remote SSH daemon is actively communicating. However, the server rejected the offered public key (`~/.ssh/id_ed25519`) or the user account `devops` does not authorize that key in its `~/.ssh/authorized_keys` file.
-- **First Diagnostic Check:** Run `ssh -v -i ~/.ssh/id_ed25519 devops@198.51.100.26` to inspect which credentials the client offers during negotiation, verify the target username with the team, and ensure the public key (`~/.ssh/id_ed25519.pub`) was appended correctly to `~devops/.ssh/authorized_keys` with `0600` file permissions.
+- **Evidence and Mechanism:** The client reached SSH authentication, but public-key authentication did not succeed. The `-i` argument selects an identity file; this transcript does not show whether that key was usable or offered, and configured identities or an agent may also contribute keys. It does not establish the server's authorization-file contents.
+- **First Diagnostic Check:** On the authorized host only, use verbose client output to inspect identity selection and actual offers, verify the username, and ask the administrator to check authorized keys and access policy. Treat debug output as potentially sensitive; do not blindly append keys or change server files from this error alone.
 
 </details>
 
@@ -685,26 +685,26 @@ laptop-user@workstation:~$ ls -la maintenance.flag
 ls: cannot access 'maintenance.flag': No such file or directory
 ```
 
-An engineer intended to test a maintenance flag script locally, ran the sequence above, disconnected, and then grew alarmed when `ls -la maintenance.flag` failed on their workstation. Did the `touch` command fail? Explain which physical machine currently holds `maintenance.flag`, cite the exact lines of evidence from the transcript that establish session boundaries, and evaluate the operational risk introduced by the engineer's misunderstanding.
+An engineer intended to test a maintenance flag script locally, ran the sequence above, disconnected, and then grew alarmed when `ls -la maintenance.flag` failed on their workstation. What does the transcript establish about the `touch` command's target, and which checks are missing before you can declare success? Cite the session-boundary evidence and evaluate the operational risk introduced by confusing local and remote context.
 
 <details>
 <summary>Diagnosis and context analysis for Incident B</summary>
 
 **Did the command fail?**
-The command did not fail; it executed completely and successfully returned exit status 0 without error output.
+No error is shown, but the transcript does not include an exit-status check or a remote file listing. Success is plausible, not verified; an immediate `echo $?` after `touch` and a remote `ls -l maintenance.flag` would supply the missing evidence.
 
 **Which machine holds `maintenance.flag`?**
-The file exists on the remote production server `worker-prod-04` at the absolute path `/var/www/site/maintenance.flag`.
+If `touch` succeeded, its target was `/var/www/site/maintenance.flag` on the remote server `worker-prod-04`. The local failed listing does not verify the remote file's existence; confirm it through an authorized read-only check before claiming success.
 
 **Transcript Evidence for Session Boundaries:**
 - The prompt `laptop-user@workstation:~$ ssh deployer@worker-prod-04` initiated a remote SSH session.
-- Once connected, running `whoami` returned `deployer`, `hostname` returned `worker-prod-04`, and `pwd` returned `/var/www/site`. These three commands prove conclusively that subsequent shell commands ran in the remote environment.
+- In this illustrative session, `whoami` returned `deployer`, `hostname` returned `worker-prod-04`, and `pwd` returned `/var/www/site`. These outputs identify the reported user, host, and directory within the session; they do not replace SSH host-identity verification.
 - The command `touch maintenance.flag` executed while the shell was still active on `worker-prod-04`.
 - The command `exit` closed the remote session, verified by `logout` and `Connection to 192.0.2.85 closed.`, returning the prompt to `laptop-user@workstation:~$`.
-- The final command `ls -la maintenance.flag` ran in the local workstation directory, where the file was never created.
+- The final command `ls -la maintenance.flag` ran in the local workstation directory and found no file there; it says nothing about the remote path.
 
 **Operational Risk:**
-The engineer believed they were working safely on their local workstation, but actually modified a production server (`worker-prod-04`). Touching `maintenance.flag` on a production host might trigger an automated load balancer or web server rule to display a maintenance page, dropping live user traffic. Furthermore, assuming the command failed locally might lead the engineer to repeat actions blindly while production remains in an unintended state.
+The engineer intended a local test but targeted a production path. If `touch` succeeded there, an application configured to treat that flag as maintenance mode could change behavior. The transcript alone proves neither file creation nor an outage. Assuming failure from the later local listing could lead to repeated writes before the remote state is checked.
 
 </details>
 
@@ -755,6 +755,8 @@ You have succeeded when your notes show a before-connection context block, an SS
 
 ## Sources
 
+- [OpenSSH client configuration: identity selection](https://man.openbsd.org/ssh_config.5)
+- [RFC 5737: IPv4 documentation addresses](https://www.rfc-editor.org/rfc/rfc5737.html)
 - [GitHub Docs Source: Generating a New SSH Key](https://github.com/github/docs/blob/main/content/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent.md)
 - [RFC 4251: The Secure Shell (SSH) Protocol Architecture](https://www.rfc-editor.org/rfc/rfc4251)
 - [RFC 4250: The Secure Shell (SSH) Protocol Assigned Numbers](https://www.rfc-editor.org/rfc/rfc4250)
