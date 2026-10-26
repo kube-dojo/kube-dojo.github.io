@@ -353,10 +353,10 @@ touch shopping-list.txt
 
 `touch` creates a new empty file, but it also updates the timestamp when the file already exists. That dual behavior is useful, but it can surprise beginners. If you expected `touch` to add content, nothing will appear inside the file; it is more like placing a blank recipe card on the counter than writing the recipe.
 
-Hidden files are files or directories whose names start with a dot, such as `.bashrc`, `.zshrc`, `.config/`, `.ssh/`, `.gitconfig`, and `.kube/`. They are hidden from plain `ls` output because configuration files are important but usually not part of everyday browsing. Hiding them reduces clutter and lowers the chance that a beginner deletes a shell or SSH configuration while cleaning up normal documents.
+Hidden files are files or directories whose names start with a dot, such as `.bashrc`, `.zshrc`, `.config/`, `.ssh/`, `.gitconfig`, and `.kube/`. They are hidden from plain `ls` output because configuration files are important but usually not part of everyday browsing. Hiding them reduces clutter and lowers the chance that a beginner deletes a shell or SSH configuration while cleaning up normal documents. The next two commands inspect home explicitly with `~` while your shell stays inside the practice workspace.
 
 ```bash
-ls
+ls ~
 ```
 
 ```text
@@ -364,7 +364,7 @@ Documents    Downloads    Music
 ```
 
 ```bash
-ls -a
+ls -a ~
 ```
 
 ```text
@@ -777,7 +777,7 @@ mkdir -p recipes/desserts
 <details>
 <summary>Solution notes for task 1</summary>
 
-The `-p` option allows each command to create parent directories that do not exist yet. After these commands, `kubedojo-practice` should contain a `recipes` directory, and `recipes` should contain three category directories. If a command prints no output, that usually means it succeeded.
+The `-p` option allows each command to create parent directories that do not exist yet. After these commands, your workspace should contain a `recipes` directory, and `recipes` should contain three category directories. If a command prints no output, that usually means it succeeded.
 
 </details>
 

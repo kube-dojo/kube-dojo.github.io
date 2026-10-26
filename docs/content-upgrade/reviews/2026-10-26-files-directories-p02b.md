@@ -8,6 +8,7 @@ Owner #2278, source/lab/assessment owners #2275/#2276/#2277; base `e30fd794b1b3f
 - The worked example assumed it was inside `kubedojo-practice` but created another `kubedojo-practice/recipes/desserts` underneath it. Use paths relative to the verified workspace consistently.
 - Hands-on setup accepted an existing project before overwriting recipe files. Require this session's fresh workspace, distinguish full-walkthrough from hands-only state, and explain that `touch` preserves the earlier worked-example contents before deliberate replacement.
 - Mark prerequisite-dependent and machine-specific path examples illustrative until their prerequisites exist. Preserve the existing non-secret kubeconfig inspection, outcomes, predictions, assessments and diagnostic teaching.
+- Independent review caught home-listing output after the workspace change: the two hidden-file commands now name `~` explicitly without changing the working directory; the execution harness covers them too. Workspace naming in solution notes also follows the learner's chosen name.
 
 ## Evidence and limits
 
