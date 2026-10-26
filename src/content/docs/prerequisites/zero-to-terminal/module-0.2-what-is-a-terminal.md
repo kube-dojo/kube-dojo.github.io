@@ -417,7 +417,7 @@ For a beginner, the best choice is often the one that produces the clearest feed
 | Forgetting to press Enter | A terminal does not run a command while you are still editing the line | Press Enter once when the command is complete, then wait for output or the prompt to return |
 | Misspelling the command name as `echoo` | The shell treats the first word as an exact program name, so near misses do not count | Check the spelling of the first word and rerun the corrected command |
 | Changing capitalization, such as `Echo` instead of `echo` | Many shells and filesystems treat uppercase and lowercase as different characters | Match the command's capitalization exactly, especially on Linux and WSL |
-| Forgetting a closing quote | The shell thinks the text argument is still unfinished and may show a `>` continuation prompt | Type the missing quote and press Enter, or press Ctrl+C to cancel and start fresh |
+| Forgetting a closing quote | The shell waits for more input, often showing `>` in Bash, `dquote>` in zsh, or `>>` in PowerShell | Compare with your normal prompt; finish the quote or cancel with Ctrl+C and no text selected |
 | Panicking when output keeps printing | A running foreground process can temporarily prevent you from typing a new command | Press Ctrl+C once, then wait to see whether the normal prompt returns |
 | Assuming every terminal window is the same machine | Multiple tabs can connect to different local or remote systems | Confirm which session you opened; compare prompt clues with read-only user and hostname checks |
 | Using a short alias in notes meant for someone else | Aliases only exist if that shell session defines them, so examples can fail on another machine | Write full command names in shared instructions and scripts |
@@ -478,7 +478,7 @@ Inspect whether you copied the prompt symbol from the lesson along with the comm
 <details>
 <summary>Question 8: Your lesson notes use `date`, but your teammate on Windows opened PowerShell. What command should they run instead, and what continuation prompt will PowerShell show if they leave a quote unclosed?</summary>
 
-They should run `Get-Date`, the native PowerShell cmdlet for the current date and time, because `date` is a Unix-style command name and PowerShell has its own command language. If a quote is left unclosed, PowerShell typically shows a `>>` continuation prompt instead of the `>` shown by Bash-like shells, but the recovery is identical: finish the quoted text and press Enter, or press Ctrl+C to cancel and return to a fresh prompt. The command names and prompt decorations change between shells, while the predict-run-compare loop and the recovery habits stay the same.
+Use `Get-Date`, the native PowerShell date/time command. With its default PSReadLine configuration, unfinished input produces `>>`; Bash often shows `>`, while zsh can show `dquote>` for an open double quote. These markers are configurable. Finish the quoted text or cancel with Ctrl+C and no text selected, then compare the result with the normal prompt you saw when the shell opened.
 
 </details>
 
@@ -617,7 +617,7 @@ Transcript A shows a window where someone tried to echo a sentence about release
 
 ```text
 yourname@your-mac ~ % echo "release notes for today
->
+dquote>
 ```
 
 Transcript B shows simulated output from a network check that keeps reporting new lines without printing a fresh prompt:
@@ -672,6 +672,7 @@ You've completed this exercise when you can demonstrate each item below without 
 - [Apple termios manual: INTR and SIGINT](https://github.com/apple-oss-distributions/xnu/blob/14e3d835ecf9736db9bf15b7bc859981275e1fc0/bsd/man/man4/termios.4#L466-L478)
 - [PowerShell 7.5: Normal and customized prompts](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_prompts?view=powershell-7.5)
 - [PSReadLine: AcceptLine and CopyOrCancelLine](https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline_functions?view=powershell-7.5)
+- [PSReadLine: Configurable continuation prompt and its default](https://learn.microsoft.com/en-us/powershell/module/psreadline/set-psreadlineoption?view=powershell-7.5#-continuationprompt)
 - [zsh: Prompt expansion and parser-state markers](https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html)
 - [zsh: Interactive history expansion, including `!` inside double quotes](https://zsh.sourceforge.io/Doc/Release/Expansion.html#History-Expansion)
 - [PowerShell 7.5: Single- and double-quoted strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5)
