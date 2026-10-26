@@ -69,16 +69,16 @@ Owning infrastructure also changes the failure conversation. When the power supp
     Downsize to a smaller kitchen, pay less
 ```
 
-That second option is the cloud model. The provider has already built the data centers and control systems, so you request capacity through a web console, API, command-line tool, or infrastructure-as-code workflow. The attractive part is not merely that the servers live somewhere else; the attractive part is that the provider turns infrastructure into something you can request, measure, resize, automate, and stop paying for when you no longer need it.
+That second option is the cloud model. The provider has already built the data centers and control systems, so you request capacity through a web console, API, command-line tool, or infrastructure-as-code workflow. You can request, measure, resize, automate, and release resources as needs change. Reducing charges depends on each resource's billing rules and what remains allocated, not merely whether a VM is running.
 
 Renting also changes how teams learn. A student, startup, or internal platform team can create a small environment, test an idea, collect evidence, and delete the environment before committing to a bigger design. That short feedback loop is one reason cloud platforms are common in modern engineering education. The risk is that speed can hide weak thinking, so responsible teams pair fast provisioning with naming conventions, account boundaries, access reviews, and written cleanup expectations.
 
-Pause and predict: if a test environment is used only during business hours, which model makes it easier to stop paying for idle capacity at night, and what operational habit would the team need to build so that the savings actually happen? Commit to an answer in your own words before opening the reveal.
+Pause and predict: if a test environment is used only during business hours, which model makes it easier to reduce idle compute charges at night, and what must the team check about retained resources so that the savings actually happen? Commit to an answer in your own words before opening the reveal.
 
 <details>
 <summary>Check your prediction</summary>
 
-The rented cloud model makes the savings possible because a server, disk, or whole environment can be stopped or deleted when the workday ends instead of sitting as purchased hardware that costs money whether or not anyone uses it. Possibility is not the same as reality, though: the savings appear only if the team builds the habit of actually shutting resources down, usually through scheduled stop jobs, tagging, and a cleanup review that catches what automation missed. The operational habit is the ingredient that turns a pricing model into a lower bill.
+The rented cloud model can reduce idle compute charges when the provider supports stopping that compute. Stopping a VM does not stop all billing: retained disks, snapshots, addresses, or other services may still incur charges under the provider's rules. Savings require a resource inventory, scheduled actions, and a cleanup review that checks retained resources and billing afterward; neither stopping nor deleting one VM guarantees a zero-cost environment.
 </details>
 
 ## Build Versus Rent: The Operational Tradeoff
@@ -464,10 +464,15 @@ On each page, try to find the same three categories so your notes compare provid
 
 ### Step 3: Write down what you found
 
-Open your terminal and create a notes file so the exercise leaves behind a small artifact you can inspect later:
+Create a fresh disposable workspace under your exclusive control before opening the notes file. Run one line at a time and stop on any `mkdir` or `cd` error. If the name exists as a file, directory, or symlink, leave it untouched and choose an unused name, substituting it in later paths. Use plain `mkdir`, not `mkdir -p`; continue only when `pwd` identifies the new workspace and `ls -a` shows only `.` and `..`. Repeat runs or uncertain ownership require a fresh workspace.
 
 ```bash
-nano ~/cloud-notes.txt
+cd ~
+mkdir kubedojo-cloud-notes
+cd kubedojo-cloud-notes
+pwd
+ls -a
+nano cloud-notes.txt
 ```
 
 Write what you found in a consistent format, using the provider pages as the source of truth for current limits and conditions:
@@ -500,7 +505,7 @@ Save and exit with `Ctrl + O`, Enter, then `Ctrl + X`. You do not need to create
 ### Step 4: Verify your notes
 
 ```bash
-cat ~/cloud-notes.txt
+cat cloud-notes.txt
 ```
 
 Review your notes and mark whether each provider separated compute, storage, eligibility, and duration clearly. If a page feels confusing, that is useful information rather than a failure. Real cloud work includes reading conditions carefully, checking current provider documentation, and asking what a promise means in the specific region, account, and service you plan to use.
@@ -510,10 +515,12 @@ Review your notes and mark whether each provider separated compute, storage, eli
 - [ ] You visited at least one provider free-tier page and identified whether the offer included compute, storage, or both.
 - [ ] You recorded at least one condition that affects eligibility, such as account age, region, trial credit, or service family.
 - [ ] You mapped one provider-specific service name back to compute, storage, networking, or database categories.
-- [ ] You saved your notes in `~/cloud-notes.txt` and verified them with `cat`.
+- [ ] You saved `cloud-notes.txt` in your new workspace and verified that same file with `cat`.
 - [ ] You can explain why free-tier pages are useful for learning but should not be treated as permanent pricing promises.
 
 ## Sources
+
+- [AWS EC2: Stop and start instances, including retained-resource charges](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html)
 
 - [Kubernetes Project Journey Report](https://www.cncf.io/reports/kubernetes-project-journey-report/)
 - [The NIST Definition of Cloud Computing](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-145.pdf)
