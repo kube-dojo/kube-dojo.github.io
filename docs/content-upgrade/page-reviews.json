@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/philosophy-design/module-1.1-why-kubernetes-won.md",
-      "page_digest": "sha256:de1187082dc363a47d9562871bd98e32d7ec6594e12c9566f0d5815709c551d9",
+      "page_digest": "sha256:b2e88df4d83b0b564c40fda29afb1394a8ca93a4a036b34b8af6d0630c6ef5f7",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-history-provenance-p10c.md", "docs/content-upgrade/reviews/2026-10-27-orchestrator-comparisons-p10d.md", "docs/content-upgrade/reviews/2026-10-27-history-source-anchors-p10f.md", "docs/content-upgrade/reviews/2026-10-27-history-evidence-p10h.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-history-provenance-p10c.md", "docs/content-upgrade/reviews/2026-10-27-orchestrator-comparisons-p10d.md", "docs/content-upgrade/reviews/2026-10-27-history-source-anchors-p10f.md", "docs/content-upgrade/reviews/2026-10-27-history-evidence-p10h.md"],

@@ -76,7 +76,7 @@ Questions to evaluate:
 - Compare required integrations, provider support, and operational fit
 ```
 
-For a real decision, compare the integrations, provider offerings, governance, and operations your team actually needs. Swarm mode's Docker Engine integration can be convenient for a Docker-based workflow, but it is still a dependency to assess alongside alternatives. The existence of open-source Swarm mode does not by itself establish vendor lock-in, poor multi-cloud support, or a specific scaling ceiling.
+For a real decision, compare the integrations, provider offerings, governance, and operations your team actually needs. Swarm mode's Docker Engine integration can be convenient for a Docker-based workflow, but it is still a dependency to assess alongside alternatives. Docker describes its orchestration layer as built on [SwarmKit](https://docs.docker.com/engine/swarm/key-concepts/); the project's [source](https://github.com/moby/swarmkit/blob/074508be6b394a83397ac7896054a481c5b663ba/README.md) and [license](https://github.com/moby/swarmkit/blob/074508be6b394a83397ac7896054a481c5b663ba/LICENSE) provide a concrete way to check its open-source status. Engine integration alone does not establish vendor lock-in, poor multi-cloud support, or a specific scaling ceiling.
 
 For example, suppose a hypothetical team needs three replicas of one web service and replacement after a worker fails. That requirement alone does not distinguish Kubernetes from Swarm: Docker documents [how Swarm replaces failed replicas on available workers](https://docs.docker.com/engine/swarm/#desired-state-reconciliation). To make the comparison useful, add the team's actual constraints: a required storage integration, an existing deployment workflow, or a provider support requirement. Check each against the intended platform version, then test the critical failure path in a disposable environment. The resulting recommendation should identify which requirement changes the choice; naming a capability shared by both systems is insufficient.
 
@@ -123,7 +123,7 @@ Cons:
 - "Too much" for simple deployments
 ```
 
-The honest version of the Kubernetes story includes that last disadvantage. A cluster brings API servers, etcd, controllers, schedulers, networking plugins, storage integrations, certificates, RBAC, admission control, node lifecycle, and upgrade planning. One explanation for accepting that complexity is that a shared control plane can address distributed-systems problems a team would otherwise solve itself. Evaluate that tradeoff against the actual workload and operational capacity.
+The honest version of the Kubernetes story includes that last disadvantage. A cluster brings API servers, etcd, controllers, schedulers, networking plugins, storage integrations, RBAC and admission control. Operating it also requires attention to [certificates](https://v1-35.docs.kubernetes.io/docs/setup/best-practices/certificates/), [node lifecycle](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/nodes/#node-controller) and [upgrade planning](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/cluster-upgrade/). One explanation for accepting that complexity is that a shared control plane can address distributed-systems problems a team would otherwise solve itself. Evaluate that tradeoff against the actual workload and operational capacity.
 
 ---
 
@@ -161,7 +161,7 @@ Declarative design also changes accountability. In an imperative system, the rec
 
 The tradeoff is that declarative systems require learners to become comfortable with indirect action. When you change a Deployment, you are not personally starting each replacement pod; you are changing the desired object and letting controllers execute the rollout. Beginners sometimes interpret that indirection as unnecessary YAML ceremony, especially when a direct `docker run` command feels faster. The platform's value appears when the third replica fails at midnight, a node drains during maintenance, or a rollout needs to pause, resume, and report status without inventing custom control logic.
 
-This is why Kubernetes concepts can feel oddly philosophical at first. A Deployment is not merely a file format, and a Service is not merely a network rule. They are API contracts that let independent controllers and tools coordinate around desired state. The same pattern later powers GitOps, operators, autoscaling, policy controllers, and service meshes, because each extension can work with the Kubernetes API rather than inventing a separate platform from scratch.
+This is why Kubernetes concepts can feel philosophical at first. A Deployment and a Service expose API contracts that controllers and tools can use. A configured [Flux GitOps controller](https://fluxcd.io/flux/flux-e2e/) can apply manifests through that API; [operators](https://v1-35.docs.kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) combine custom resources with controllers, and the [Horizontal Pod Autoscaler](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/) adjusts workload scale from metrics. Integrations have their own requirements: for example, an [Istio external control plane](https://istio.io/latest/docs/setup/install/external-controlplane/) uses Kubernetes API access for service and workload discovery. These examples do not mean every extension or service mesh works identically.
 
 ---
 
@@ -177,7 +177,7 @@ Managed Kubernetes offerings gave teams an option to use the API without operati
 
 Which approach would you choose here and why: a proprietary orchestrator tied to one vendor, or an open platform with multiple providers? Compare the features alongside exit options, training, third-party integrations, and the practical cost of a migration. Neither label alone proves which option is best for a particular organization.
 
-The [CNCF projects directory](https://www.cncf.io/projects/) lists projects including Prometheus, Envoy, Fluentd, containerd, Helm, and OpenTelemetry. Many tools can be used alongside Kubernetes, but some predate or evolved independently from it. A shared API and conventions can make integrations easier to evaluate; check each project's actual interface rather than assuming foundation membership means it depends on Kubernetes.
+The [CNCF projects directory](https://www.cncf.io/projects/) lists projects including Prometheus, Envoy, Fluentd, containerd, Helm, and OpenTelemetry. Their origins differ: [Prometheus began at SoundCloud in 2012](https://prometheus.io/docs/introduction/overview/#what-is-prometheus), before Kubernetes's 2014 announcement. A shared API and conventions can make integrations easier to evaluate; check each project's actual interface rather than assuming foundation membership means it depends on Kubernetes.
 
 The [CNCF Spotify case study](https://www.cncf.io/case-studies/spotify/) reports that Spotify used its homegrown Helios orchestrator and that its engineering team wanted the support of a larger community. The migration ran alongside Helios and was still in progress when the case study was published. This is one organization's account, not proof that every internal platform has the same costs; compare the maintenance and integration work for your own requirements.
 
@@ -193,7 +193,7 @@ Extensibility provides room for different networking, storage, ingress, and depl
 
 That flexibility can create a selection burden. A learner may encounter several ways to expose traffic, install applications, collect metrics, manage certificates, or run policy checks. Instead of memorizing every project, use the core control model to evaluate whether an extension fits the intended workflow and ownership boundaries.
 
-The API-first approach gives automation an explicit interface. Tools can read and write Kubernetes objects through the API: a deployment tool can update an object, an autoscaler can change replica counts, and an admission controller can reject requests. Shared API conventions can help integration, but version compatibility, permissions, and ownership still require testing.
+The API-first approach gives automation an explicit interface. Tools can read and write Kubernetes objects through the API: a deployment tool can update an object, the [HPA](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/) can adjust a supported workload's replica count from metrics, and an admission webhook can reject creation or update requests. Shared API conventions can help integration, but version compatibility, permissions, and ownership still require testing.
 
 The same extensibility is why Kubernetes can feel "too much" for tiny applications. A two-container hobby project may not need CRDs, admission control, autoscaling, storage classes, multi-zone scheduling, or service meshes. For that project, Docker Compose, a small platform-as-a-service, or a managed container app service may be the better engineering decision. Kubernetes wins when its ecosystem and control loops solve problems the team actually has, not when the team wants a fashionable architecture diagram.
 
@@ -222,7 +222,7 @@ timeline
     2025 : Apache Mesos formally retired
 ```
 
-Docker recounts its [2013 public demo](https://www.docker.com/blog/docker-nine-years-young/). Its [archived Classic Swarm README](https://github.com/docker-archive/classicswarm/blob/3cc018dc2cd0af0880330bd75bd351bbf54fde9c/README.md#swarm-disambiguation) distinguishes that project, begun in 2014, from Engine swarm mode; the [1.12 announcement](https://www.docker.com/blog/docker-1-12-built-in-orchestration/) describes the latter. Apache's [Mesos 0.20 announcement](https://mesos.apache.org/blog/mesos-0-20-0-released/) documents Docker support in September 2014. The [Kubernetes project history](https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/) records its 2014 announcement and 2015 release. Docker's [2018 beta announcement](https://www.docker.com/blog/docker-mac-kubernetes/) refers to its 2017 Kubernetes announcement; AWS documented the [EKS preview](https://aws.amazon.com/about-aws/whats-new/2017/11/introducing-amazon-elastic-container-service-for-kubernetes/) and later [general availability](https://aws.amazon.com/blogs/aws/amazon-eks-now-generally-available/), while Microsoft announced [AKS general availability](https://azure.microsoft.com/en-us/blog/azure-kubernetes-service-aks-ga-new-regions-new-features-new-productivity/). Docker's [retired products page](https://docs.docker.com/retired/) records the 2019 acquisition. These dates do not establish an exact year when Kubernetes became an industry standard.
+Docker recounts its [2013 public demo](https://www.docker.com/blog/docker-nine-years-young/). Its [archived Classic Swarm README](https://github.com/docker-archive/classicswarm/blob/3cc018dc2cd0af0880330bd75bd351bbf54fde9c/README.md#swarm-disambiguation) distinguishes that project, begun in 2014, from Engine swarm mode; the [1.12 announcement](https://www.docker.com/blog/docker-1-12-built-in-orchestration/) describes the latter. Apache's [Mesos 0.20 announcement](https://mesos.apache.org/blog/mesos-0-20-0-released/) documents Docker support in September 2014. The [Kubernetes project history](https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/) records its 2014 announcement and 2015 release. Docker's [2018 beta announcement](https://www.docker.com/blog/docker-mac-kubernetes/) refers to its 2017 Kubernetes announcement; AWS documented the [EKS preview](https://aws.amazon.com/about-aws/whats-new/2017/11/introducing-amazon-elastic-container-service-for-kubernetes/) and later [general availability](https://aws.amazon.com/blogs/aws/amazon-eks-now-generally-available/), while Microsoft announced [AKS general availability](https://azure.microsoft.com/en-us/blog/azure-kubernetes-service-aks-ga-new-regions-new-features-new-productivity/). Docker's [retired products page](https://docs.docker.com/retired/) records the 2019 acquisition. The AWS general-availability account also places the preview at re:Invent 2017. Those announcements do not by themselves measure adoption or define a threshold for an industry-wide standard.
 
 Timelines can make an outcome look inevitable, but they do not establish one decisive factor. The course's interpretation is that control loops, Google's experience, CNCF governance, provider offerings, and extensibility are useful factors to consider together. Their relative influence on adoption would require evidence beyond the sequence of events shown here.
 
@@ -248,7 +248,7 @@ gantt
     Version 1.0        :milestone, 2015, 0d
 ```
 
-The [CNCF 2025 annual survey](https://www.cncf.io/reports/the-cncf-annual-cloud-native-survey/) reports that 82% of container users in its respondent population run Kubernetes in production. That finding describes the surveyed group, not every server or organization, and does not establish when experimentation ended. Managed offerings also give teams an option to use the API without operating the full control plane themselves.
+The [CNCF 2025 annual survey announcement](https://www.cncf.io/announcements/2026/01/20/kubernetes-established-as-the-de-facto-operating-system-for-ai-as-production-use-hits-82-in-2025-cncf-annual-cloud-native-survey/) reports that 82% of container users in its respondent population run Kubernetes in production. That finding describes the surveyed group, not every server or organization, and does not establish when experimentation ended. Managed offerings also give teams an option to use the API without operating the full control plane themselves.
 
 One way to interpret the history is to consider Kubernetes as a control-plane pattern for more than web services: platform teams can use its API for automation around security policy, data infrastructure, and AI workloads. This course perspective is a prompt for evaluation, not a measured claim about an industry-wide shift. The opportunity is shared automation; the risk is treating Kubernetes as a universal answer and ignoring simpler deployment models that meet a team's needs with less operational burden.
 
@@ -310,7 +310,7 @@ Before running this decision framework in a real team meeting, write down the st
 
 - **Kubernetes was publicly announced at DockerCon on June 10, 2014.** The project had begun days earlier with an initial GitHub commit that included 250 files, then reached version 1.0 in July 2015. [Kubernetes project history](https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/)
 
-- **The logo is a ship's wheel, and its seven spokes are a Star Trek reference.** The project's original codename, *Project Seven*, referred to Seven of Nine; the spokes are a related nod, as described in a [Kubernetes release interview](https://v1-33.docs.kubernetes.io/blog/2022/04/29/frontiers-fsgroups-and-frogs-the-kubernetes-1.23-release-interview/).
+- **The logo's seven spokes are a Star Trek reference.** The project's original codename, *Project Seven*, referred to Seven of Nine; the spokes are a related nod, as described in a [Kubernetes release interview](https://v1-33.docs.kubernetes.io/blog/2022/04/29/frontiers-fsgroups-and-frogs-the-kubernetes-1.23-release-interview/).
 
 - **Apache Mesos became an Apache top-level project in June 2013 and retired in August 2025; its Attic move completed in October.** The [Apache Attic record](https://attic.apache.org/projects/mesos.html) distinguishes these dates. That history is a useful reminder that serious, proven infrastructure can still lose platform momentum.
 
@@ -323,10 +323,10 @@ When learning about container orchestration history and applying its lessons, be
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
 | Treating K8s as just "Docker Swarm but bigger" | A container-starting comparison can obscure differences in APIs and integrations. | Compare each platform's declarative service model, extension points, and operational fit. |
-| Choosing K8s for a simple 2-container app | Teams confuse the industry-standard platform with the right local answer for every small workload. | Start with Docker Compose, a managed app platform, or another simpler option until orchestration requirements are real. |
+| Choosing K8s for a simple 2-container app | A familiar platform may be chosen before workload and operating needs are compared. | Compare Docker Compose, a managed app platform, or another simpler option against the actual orchestration requirements. |
 | Believing vendor-locked orchestrators are safer | A polished single-vendor service can feel safer than a broad open ecosystem when the first demo is smooth. | Prioritize open governance and exit options for foundational infrastructure that will shape hiring, tooling, and architecture. |
 | Ignoring the CNCF ecosystem | Beginners sometimes rebuild logging, monitoring, policy, and delivery workflows without noticing that standard integrations already exist. | Evaluate mature ecosystem tools before creating custom platform components that your team must maintain alone. |
-| Focusing only on Google's role | The origin story is memorable, so it can overshadow the governance and provider-adoption choices that made adoption safe for competitors. | Explain Kubernetes as Google experience plus CNCF neutrality plus multi-provider adoption, not as a Google product story. |
+| Focusing only on Google's role | The origin story can overshadow documented governance and provider announcements. | Use those facts as evaluation inputs; distinguish an explanation of adoption from evidence of each provider's motives. |
 | Assuming Kubernetes replaces Docker | Container images, runtimes, and orchestrators solve different parts of the system and are often discussed together loosely. | Differentiate image building, runtime execution, and orchestration so each tool's responsibility stays clear. |
 | Trying to learn K8s without understanding the "Why" | Jumping straight into YAML can make Kubernetes feel like arbitrary ceremony rather than a control-system design. | Learn the history and declarative philosophy first, then connect each object to the operational problem it solves. |
 
@@ -382,7 +382,7 @@ You should check whether the operator follows Kubernetes patterns rather than me
 
 This module is conceptual, but the learning should still produce an artifact you can use in an engineering conversation. Imagine your company's CTO wants to build a proprietary internal orchestration system for microservices because Kubernetes "feels too complex." Your task is to prepare a short technical argument that uses the orchestration wars as evidence without pretending Kubernetes is free of tradeoffs.
 
-Start by writing three sentences that define the operational problem, not the preferred tool. Your argument should mention placement, failure recovery, rollout safety, and shared APIs because those are the problems that appear after basic container packaging succeeds. Then write two sentences explaining why an imperative script or proprietary scheduler becomes expensive as teams and failure modes grow. This forces you to diagnose the control-plane problem before recommending the control-plane product.
+Start by writing three sentences that define the operational problem, not the preferred tool. Your argument should mention placement, failure recovery, rollout safety, and shared APIs because those are the problems that appear after basic container packaging succeeds. Then write two sentences evaluating the maintenance, testing and coordination costs a script or proprietary scheduler could create as teams and failure modes grow. Identify assumptions rather than presuming every internal platform is uneconomic.
 
 Next, compare at least two historical contenders. Use Docker Swarm to discuss Engine integration and the integrations a team needs, and use Mesos to discuss resource offers and framework choices. If you include Nomad, evaluate its workload drivers and operational fit rather than treating it as a failed Kubernetes clone. The goal is to show judgment, not brand loyalty.
 
@@ -398,7 +398,7 @@ Start with a documented historical fact. In the [CNCF Spotify case study](https:
 
 The distinction matters when writing an argument. A tempting claim is, "Spotify proved all companies save money by replacing a custom orchestrator with Kubernetes." The case study cannot establish that conclusion. It describes one organization's situation and includes its own account of why the team moved. It does not compare the lifetime costs of every internal system with every Kubernetes deployment, nor does it measure the hypothetical CTO's team. The case is useful precisely because it supplies a concrete question to investigate: who will maintain the capabilities the team chooses to build?
 
-Now add a source for the technical mechanism. The Kubernetes 1.35 [controller documentation](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/), **Controller pattern**, explains that a controller tracks resources whose spec records desired state and works to move current state toward it. **Desired versus current state** also explains that control loops depend on controllers running and being able to make useful changes. A Deployment and its ReplicaSets use this general pattern for their responsibilities; the existence of a controller does not mean a broken image, insufficient capacity, or a network failure will repair itself.
+Now add a source for the technical mechanism. The Kubernetes 1.35 [controller documentation](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/), **Controller pattern**, explains that a controller tracks resources whose spec records desired state and works to move current state toward it. **Desired versus current state** also explains that control loops depend on controllers running and being able to make useful changes. A [Deployment and its ReplicaSets](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/) use this general pattern for their responsibilities; the existence of a controller does not mean a broken image, insufficient capacity, or a network failure will repair itself.
 
 Those two sources answer different questions. Spotify's account describes a historical decision made by one organization. The controller documentation describes a Kubernetes mechanism that a team can inspect and test. Neither source says that the hypothetical company's services need a particular replica count, that its operators have Kubernetes experience, or that a managed control plane will be cheaper. Separating the source's scope from the decision you want to make is part of technical due diligence: a true fact can still be insufficient evidence for a much broader conclusion.
 
@@ -426,7 +426,7 @@ Failure layer: intent was never stored, so each action depends on memory. Next a
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: observed state no longer matches the declared count. Next action: watch for replacements, and check capacity only if they stay pending. Do not recreate them by hand.
+Failure layer: observed state no longer matches the declared count. Next action: watch for replacements and inspect the owning workload's status and events if they do not become ready; capacity and configuration can both block progress. Do not recreate managed Pods by hand.
 
 </details>
 
@@ -444,7 +444,7 @@ Failure layer: packaging was solved; placement, recovery, and a shared API were 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: imperative actions were the source of truth. Next action: recover the desired object from version control, then let controllers converge. Do not treat the shell history as the contract.
+Failure layer: intended configuration was not maintained in a reviewed manifest. Next action: confirm the intended state with the service owner, record or correct the maintained declaration, and verify the result through the chosen workflow. Shell history is evidence of actions, not proof that a reviewed desired object already exists.
 
 </details>
 
@@ -453,7 +453,7 @@ Failure layer: imperative actions were the source of truth. Next action: recover
 - [ ] You identified at least one ecosystem risk related to building a custom orchestrator, referencing CNCF governance or Kubernetes integrations.
 - [ ] You explained the difference between imperative commands and declarative reconciliation in your argument.
 - [ ] You explained a documented lesson from the Borg, Omega, and Kubernetes research record or the Kubernetes controller model.
-- [ ] You provided a concrete example of a company or project that moved away from its earlier orchestration approach.
+- [ ] You provided a reported migration example and distinguished its state at publication from a completed migration.
 - [ ] You stated one condition where Kubernetes would be the wrong first choice for a small workload.
 - [ ] You cited at least two primary sources with the claims or dates they support and labeled at least one point as your own inference.
 
@@ -477,6 +477,15 @@ A strong answer compares the responsibility for scheduling, reconciliation, roll
 - [Docker Docs: Swarm Mode](https://docs.docker.com/engine/swarm/)
 - [Docker: Containers and Existing Linux Primitives](https://www.docker.com/resources/what-container/)
 - [Docker Docs: Image Packaging](https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/)
+- [Docker Docs: SwarmKit Orchestration Layer](https://docs.docker.com/engine/swarm/key-concepts/)
+- [SwarmKit: Pinned Source and License](https://github.com/moby/swarmkit/tree/074508be6b394a83397ac7896054a481c5b663ba)
+- [Prometheus: Project Origins](https://prometheus.io/docs/introduction/overview/#what-is-prometheus)
+- [Kubernetes 1.35: Horizontal Pod Autoscaling](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/)
+- [Kubernetes 1.35: PKI Requirements](https://v1-35.docs.kubernetes.io/docs/setup/best-practices/certificates/)
+- [Kubernetes 1.35: Node Controller](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/nodes/#node-controller)
+- [Kubernetes 1.35: Cluster Upgrade Planning](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/cluster-upgrade/)
+- [Flux: Controller Reconciliation Through the Kubernetes API](https://fluxcd.io/flux/flux-e2e/)
+- [Istio: External Control Plane API Access](https://istio.io/latest/docs/setup/install/external-controlplane/)
 - [Apache Attic: Apache Mesos](https://attic.apache.org/projects/mesos.html)
 - [Apache Mesos Project Site](https://mesos.apache.org/)
 - [CNCF Announcement: 2025 Annual Cloud Native Survey](https://www.cncf.io/announcements/2026/01/20/kubernetes-established-as-the-de-facto-operating-system-for-ai-as-production-use-hits-82-in-2025-cncf-annual-cloud-native-survey/)
