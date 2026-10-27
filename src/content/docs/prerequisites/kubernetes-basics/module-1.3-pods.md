@@ -402,7 +402,7 @@ fi
 [ "$POD_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
 ```
 
-Continue only after setup succeeds. `pod_lab` refuses requests otherwise and always adds the recorded context and namespace, even if the current context changes. If creation failed or returned no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
+Before setup, the current context must match `KUBEDOJO_LAB_CONTEXT`; continue only after setup succeeds. `pod_lab` refuses requests otherwise and adds the recorded context and namespace even if the current context later changes. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. After failure, clean up in this terminal before retrying in a fresh one. If the initial creation failed or returned no UID, inspect the printed namespace manually; cleanup has no ownership evidence to delete it.
 
 ### Task 1: Declarative Multi-Container Creation
 
@@ -486,12 +486,12 @@ In a second terminal on the same host, replace `LOCAL_PORT` with the printed por
 curl --noproxy '*' --fail --show-error http://127.0.0.1:LOCAL_PORT
 ```
 
-You should see the current date and time, updating every 5 seconds. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the setup terminal to stop forwarding, then continue the remaining tasks in that same terminal.
+Each curl request returns one timestamp. Repeat it after five seconds to observe the writer's updated content. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the setup terminal to stop forwarding, then continue the remaining tasks in that same terminal.
 </details>
 
 ### Task 3: Interactive Namespace Exploration
 
-The `content-writer` container continuously overwrites the physical file on the shared volume. Use `kubectl exec` to open an interactive shell inside the `nginx-server` container. Once inside, install `curl` and make a local HTTP request to `localhost:80`. Explain why this works across container boundaries.
+The `content-writer` container continuously overwrites the physical file on the shared volume. Use `pod_lab exec` to open an interactive shell inside the `nginx-server` container. Once inside, install `curl` and make a local HTTP request to `localhost:80`. Explain why this works across container boundaries.
 
 <details>
 <summary>Concept hint</summary>
@@ -535,7 +535,7 @@ Create a new file named `oom-pod.yaml`. Reuse the multi-platform `busybox:1.36.1
 <details>
 <summary>Concept hint</summary>
 
-Set a low `resources.limits.memory` value, then run a stress command that asks for substantially more memory than the limit allows. Wait for the container to terminate before checking status.
+Set a low `resources.limits.memory` value and grow an awk string without a bound. After the container restarts, inspect its retained termination reason; the current state can already have changed by the time you check it.
 </details>
 
 <details>
@@ -575,12 +575,12 @@ Expect a container restart cycle. If the wait times out, inspect the actual stat
 
 ### Task 5: Forensically Diagnosing the Death
 
-Use `kubectl describe` to prove why the `memory-hog` Pod died. Find the exact reason and exit code in the container's last state, and connect that result back to the memory limit in the manifest.
+Use `pod_lab describe` to inspect why the `memory-hog` container terminated. Find the exact reason and exit code in its last state, and connect that result back to the memory limit in the manifest.
 
 <details>
 <summary>Concept hint</summary>
 
-`kubectl describe pod` shows container state history. Look for `Last State` with reason `OOMKilled` and exit code `137`.
+`pod_lab describe pod` shows container state history in the recorded exercise namespace. Look for `Last State` with reason `OOMKilled` and exit code `137`.
 </details>
 
 <details>
@@ -666,7 +666,7 @@ Failure layer: no controller owns the Pod. Next action: check `ownerReferences`,
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: the memory cgroup limit, not an application exit. Next action: compare `resources.limits.memory` with the allocation the command requested before you change application code.
+Failure layer: the memory cgroup limit, not an application exit. Next action: compare `resources.limits.memory` with the command's unbounded string growth before you change application code.
 
 </details>
 
@@ -675,7 +675,7 @@ Success criteria:
 - [ ] You verified both containers became ready and served changing content through `localhost` and port-forwarding.
 - [ ] You explained why Pod containers can share loopback networking while keeping separate filesystems.
 - [ ] You triggered and diagnosed an `OOMKilled` restart using `kubectl describe` and exit code 137.
-- [ ] You cleaned up both disposable Pods without leaving training resources behind.
+- [ ] You verified the namespace UID and removed the owned namespace and both disposable Pods.
 
 ## Sources
 
