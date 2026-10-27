@@ -13,7 +13,9 @@ sidebar:
 
 ---
 
-Throughout this module, commands use the full `kubectl` binary name so every example remains copy-paste runnable in an interactive shell, a script, or a CI troubleshooting note. The examples target Kubernetes 1.35 and focus on behavior that matters when configuration, credentials, and rollout operations meet in a real cluster.
+This module targets Kubernetes 1.35 and examines configuration delivery, credential visibility, and update behavior. Earlier examples are reference material: check their required files, object names, permissions, and request scope before trying them in a disposable lab.
+
+For hands-on practice, run setup once in a fresh Bash terminal and keep that terminal for every `cfg_lab` command and cleanup. The helper supplies the recorded context and namespace; the exercise blocks depend on that setup.
 
 ## What You'll Be Able to Do
 
