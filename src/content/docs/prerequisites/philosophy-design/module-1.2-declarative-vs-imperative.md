@@ -704,6 +704,8 @@ After the first apply, the Deployment should report three desired replicas and t
 - [Kubernetes Documentation: Declarative Management of Kubernetes Objects](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
 - [Kubernetes 1.35: Declarative Management and Pruning](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
 - [Kubernetes 1.35: Server-Side Apply and Field Ownership](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)
+- [Kubernetes 1.35: Controller Model](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
+- [Flux: Kustomization Reconciliation](https://fluxcd.io/flux/components/kustomize/kustomizations/)
 - [Kubernetes Documentation: Imperative Management of Kubernetes Objects Using Configuration Files](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-config/)
 - [Kubernetes Documentation: Managing Kubernetes Objects Using Imperative Commands](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/)
 - [Kubernetes Reference: kubectl apply](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)

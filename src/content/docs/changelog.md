@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Understand what declarative changes guarantee.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now distinguishes Kubernetes from GitOps reconciliation, explains why repeated apply can still fail, and makes ownership conflicts and pruning risks explicit.
 - **Compare orchestrators against your actual requirements.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now separates documented Swarm, Mesos and Nomad capabilities from assumptions about scale, lock-in or operating effort, with a worked example for choosing useful comparison criteria.
 - **Orchestration history with clearer provenance.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now distinguishes reported project activity from formal retirement, anchors dates in primary sources, and removes unsupported historical cutoffs.
 - **Observe reconciliation in a separate practice namespace.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now uses its own namespace and a fresh folder, preserves your saved preferences, and checks ownership before cleanup while you compare repeated apply with a temporary scale change.
