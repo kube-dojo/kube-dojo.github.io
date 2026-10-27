@@ -29,7 +29,7 @@ After this module, you will be able to:
 
 Hypothetical scenario: a platform team is preparing three engineers for Kubernetes certification. Its production environment includes a managed cloud platform, a service mesh, GitOps delivery, cloud identity integration, and monitoring dashboards. The team proposes a study plan that mirrors those tools. Before adopting it, compare each activity with the published objectives for the intended certification. Provider onboarding may be necessary for work while leaving a workload, networking, or troubleshooting objective without practice; record that gap rather than assuming every Kubernetes-related activity serves the same goal.
 
-That story matters because Kubernetes is too large to study by wandering. A learner can spend a productive-looking weekend reading about etcd quorum behavior, eBPF datapaths, CNI plugin design, ArgoCD sync waves, cloud IAM federation, and multi-cluster failover, yet gain almost nothing that improves CKA, CKAD, or CKS performance. Certification exams are not a judgment on whether those topics are useful in production. They are a timed test of specific Kubernetes capabilities, and KubeDojo treats that boundary as a design constraint rather than an inconvenience.
+That scenario asks you to inspect what a study plan leaves unpracticed. Reading about etcd quorum, eBPF datapaths, CNI plugin design, GitOps sync waves or cloud identity can serve a useful goal, but a resource's subject alone does not establish coverage of an exam objective. Record the intended task and the evidence it produces. Certification preparation and workplace specialization can then share relevant context without being treated as interchangeable learning goals or measured improvements in exam performance.
 
 This module teaches the discipline behind that boundary. We are not telling you to ignore production realities forever, and we are not pretending that exam objectives cover every skill a strong engineer needs. We are showing you how to protect certification study from attractive distractions, how to decide when a topic belongs in the main path, and how to park advanced material without feeling like you are abandoning it. The goal is not a smaller understanding of Kubernetes; the goal is the right sequence, with exam fundamentals first and specialization after the credential no longer competes for your attention.
 
@@ -52,7 +52,7 @@ The diagram classifies study activities; it does not predict question frequency 
 
 Think of the exam like a driving test rather than a mechanical engineering degree. The examiner cares whether you can operate the vehicle safely, interpret road conditions, recover from common problems, and follow the rules under pressure. They do not ask you to design a transmission, tune a racing suspension, or compare every commercial GPS system. Those deeper topics can make you a better specialist later, but studying them before you can pass the road test is a sequencing error.
 
-The course's technical examples use Kubernetes 1.35 as their baseline; check the [Linux Foundation exam-environment FAQ](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks#what-application-version-is-running-in-the-exam-environment) before using an example for timed preparation. As checked on October 27, 2026, it lists CKA/CKAD 1.37 and CKS 1.35. A course baseline is not proof of current exam parity. We write the full `kubectl` command so examples do not require a local alias; server queries still require an appropriate configured cluster and permissions.
+KubeDojo's exam-track pin remains Kubernetes 1.35; its separate Release Radar includes other minors. Check the [Linux Foundation exam-environment FAQ](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks#what-application-version-is-running-in-the-exam-environment) before timed preparation. As checked on October 27, 2026, it lists CKA/CKAD 1.37 and CKS 1.35. The existing pin is not proof of current exam parity. We write the full `kubectl` command so examples do not require a local alias; server queries still require an appropriate configured cluster and permissions.
 
 ```bash
 kubectl version --client
@@ -60,7 +60,7 @@ kubectl get pods --all-namespaces
 kubectl auth can-i list pods --all-namespaces
 ```
 
-**Pause and predict:** if you spend one evening practicing `kubectl describe`, `kubectl logs`, `kubectl auth can-i`, and `kubectl get events`, then spend another evening reading a cloud provider's managed node group documentation, which evening is more likely to improve your exam score next week, and why?
+**Pause and predict:** compare an evening practicing `kubectl describe`, `kubectl logs`, `kubectl auth can-i` and events with an evening reading a provider's managed node group guide. Which named exam objective or workplace responsibility would each activity practice, and what result would you inspect?
 
 <details>
 <summary>Check your prediction</summary>
@@ -131,7 +131,7 @@ The cloud-native ecosystem is full of excellent tools that sit beside Kubernetes
 
 Helm is explicit in both the [CKA](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKA_Curriculum_v1.37.pdf) and [CKAD](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKAD_Curriculum_v1.37.pdf) curricula checked on October 27, 2026. CKA names Helm and Kustomize for installing cluster components; CKAD names deploying existing packages with Helm. Practice the named tasks rather than treating Helm as either universally optional or a reason to master every chart-authoring workflow. Apply the same objective-by-objective check to your chosen exam instead of transferring exclusions from another certification.
 
-Worked planning example: suppose your bookmark list contains a Helm chart-authoring course, a lab that deploys an existing package, and a guide to installing a cluster component. Write the exact objective beside each resource before assigning study time. For the checked CKAD curriculum, the existing-package lab directly addresses the named Helm task. For CKA, inspect whether the cluster-component guide actually practices installing that component with Helm or Kustomize. The chart-authoring course may contain useful context, but its title alone does not establish that all its material is required by either objective.
+Worked planning example: suppose your bookmark list contains a Helm chart-authoring course, a lab that deploys an existing package with Helm, and a guide to installing a cluster component. Write the exact objective beside each resource before assigning study time. For the checked CKAD curriculum, verify that the lab actually uses the Helm package manager to deploy an existing package before classifying it under that objective. For CKA, inspect whether the cluster-component guide practices installing that component with Helm or Kustomize. A resource's title alone does not establish that all its material is required by either objective.
 
 Now write the evidence you would want from the selected lab: identify the package and target environment, explain the configuration you selected, inspect the deployed resources, and verify the intended result. Record any setup or permissions the lab assumes. This is a hypothetical plan, not an observed installation or proof of exam readiness. If you cannot explain which objective the exercise demonstrates, investigate that gap before labeling the resource essential. The method preserves relevant tool practice while giving additional chart-development material a deliberate place in the wider learning plan.
 
@@ -154,8 +154,10 @@ The first reason is time efficiency. Kubernetes certification study is usually s
 
 ```mermaid
 flowchart LR
-    A[Learning everything about Kubernetes] -->|6-12 months| B(Overwhelmed)
-    C[Passing CKA with focused study] -->|4-8 weeks| D(Certified)
+    Plan[Study plan] --> Objectives[Map resources to named objectives]
+    Objectives --> Practice[Perform the intended tasks]
+    Practice --> Inspect[Inspect results and remaining gaps]
+    Inspect --> Plan
 ```
 
 The second reason is exam relevance. The CKA, CKAD, and CKS each publish defined curricula, and those curricula create a contract between the learner and the exam. KubeDojo aligns to that contract rather than to whatever happens to be popular in production this quarter. Adding extra material does not automatically make a course better; it increases cognitive load, creates false urgency, and can make a learner confuse adjacent expertise with tested competence. When an extra topic helps explain a tested task, we use it sparingly. When it does not, we point elsewhere.
@@ -190,7 +192,7 @@ A command result does not establish whether the service's data dependencies, rec
 
 </details>
 
-Write the missing recovery evidence before you continue. Then compare it with the bounded task in your chosen curriculum; do not infer exam scope or production readiness from an unlabeled depth score.
+Write the missing recovery evidence before you continue. Then compare it with the bounded task in your chosen curriculum; keep the scope and verification criteria explicit for each goal.
 
 This principle also helps you avoid false equivalence. A topic can be simple to name and still require deep expertise, while another topic can look complex and still require only a practical slice for the exam. "NetworkPolicy" sounds like one object, but real network isolation requires careful label design, namespace boundaries, plugin behavior, default-deny posture, and testing. "Cluster Autoscaler" sounds like an operational basics topic, but it depends heavily on infrastructure providers and node provisioning behavior, so it belongs outside the generic certification path for most learners.
 
@@ -212,7 +214,7 @@ For security-focused learners, the post-exam path can include OPA or Gatekeeper 
 
 For SRE and operations work, the next layer is reliability engineering: SLO-based alerting, capacity planning, chaos experiments, backup validation, incident response, upgrade strategy, and post-incident learning. Kubernetes gives you objects and controllers, but reliability comes from feedback loops and disciplined operations. A certification can verify that you can operate the platform at a foundational level; it cannot replace the repeated practice of running real services through real failure modes.
 
-Which approach would you choose here and why: one month of mixed study where every evening jumps between CKA tasks, ArgoCD, Terraform, Cilium, and cost dashboards, or three weeks of certification focus followed by a post-exam specialization month? The second plan usually wins because it removes competition between goals. It lets you become certified sooner and then gives the advanced topics a dedicated runway instead of treating them as interruptions.
+Compare two hypothetical plans: one mixes certification tasks and workplace-tool study in each session; the other separates those goals into scheduled blocks. Either plan needs an objective and a result to inspect. Choose based on your available time, current gaps and work obligations, then review what the sessions actually covered. This is planning advice, not evidence that one schedule produces faster certification or a particular pass rate.
 
 ---
 
@@ -302,7 +304,7 @@ The decision test is to name the job before choosing the resource. "I need to pa
 ## Did You Know?
 
 - **CNCF publishes separate exam curricula.** Use the [official curriculum repository](https://github.com/cncf/curriculum) to check the objectives for the certification you intend to take; inclusion in a broader landscape is a different question.
-- **Most production Kubernetes users know a focused slice deeply.** They know what their job requires, while certifications prove portable breadth and work builds role-specific depth.
+- **The checked CKA curriculum includes tools and extension mechanisms.** Its Cluster Architecture, Installation and Configuration domain names Helm, Kustomize, CRDs and operators; native-versus-third-party is therefore insufficient as a scope rule.
 - **Certification curricula change over time.** A study plan should track the current official objectives instead of relying on an old course outline or a coworker's memory.
 - **"Expert" is context-dependent.** A networking expert, security expert, developer platform engineer, and SRE may all be strong at Kubernetes while having different deep specialties.
 
