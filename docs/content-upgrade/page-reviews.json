@@ -1,6 +1,6 @@
 {
   "schema": "kubedojo.page_reviews.v1",
-  "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No full-page acceptance is recorded; coverage reporting is separate from inventory schema/digest checks.",
+  "note": "Current-digest dispositions are separate from acceptance. Explicit lead acceptance applies only to named pages with independently verified source receipts and passing applicable layers; coverage reporting is separate from inventory schema/digest checks.",
   "pages": [
     {
       "path": "prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md",
@@ -21,10 +21,65 @@
     {
       "path": "prerequisites/philosophy-design/index.md",
       "page_digest": "sha256:6265bbb9ea925454df50ef8b49d01e8f3474bd9fa1c36ee25e7f8a62f0a46ec3",
-      "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "pass", "editorial_review": "pending", "lab_execution": "not_applicable", "deployed_smoke": "pending"}
+      "disposition": "retain",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md", "docs/content-upgrade/reviews/2026-10-27-philosophy-hub-source-binding.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md", "docs/content-upgrade/reviews/2026-10-27-philosophy-hub-source-binding.md"],
+      "acceptance_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-source-binding.md#lead-acceptance"],
+      "independent_statuses": {"page_presence": "pass", "structural_checks": "pass", "technical_source": "pass", "editorial_review": "pass", "lab_execution": "not_applicable", "deployed_smoke": "pass"},
+      "source_acceptance": {
+        "schema": "kubedojo.source_acceptance.v1",
+        "schema_version": 1,
+        "disposition": "applicable",
+        "page_digest": "sha256:6265bbb9ea925454df50ef8b49d01e8f3474bd9fa1c36ee25e7f8a62f0a46ec3",
+        "seed_digest": "sha256:5916a29e58e700da609c546878ee9b487d800aeb1a49c7701cb6f798caeebf0b",
+        "coverage": {
+          "material_claim_ids": ["Cd62416f", "C6c9a352", "Ced985c1", "C9d577a8", "Ca6e7f2e", "C762129a", "C88032cf", "Cb4364b2", "C9332b8d", "C3d2b560", "Cc54314d"],
+          "reviewed_claim_ids": ["Cd62416f", "C6c9a352", "Ced985c1", "C9d577a8", "Ca6e7f2e", "C762129a", "C88032cf", "Cb4364b2", "C9332b8d", "C3d2b560", "Cc54314d"],
+          "uncovered_claim_ids": []
+        },
+        "claims": [
+          {"claim_id": "Cd62416f", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/", "snapshot_digest": "sha256:ffe6621ade6c772046fd655d85af080ac78b8c322b588b41991b28bd47308799"}},
+          {"claim_id": "C6c9a352", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://v1-35.docs.kubernetes.io/docs/concepts/architecture/self-healing/", "snapshot_digest": "sha256:b59af21fa79356754099dcfaf3308a2386787ac48e04edd5f678e4a65bae475f"}},
+          {"claim_id": "Ced985c1", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://v1-35.docs.kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/", "snapshot_digest": "sha256:4f93e537ce2dca0ceb85c30f5bc2bcb0a2fda2928cc54e733e9eeec51c569a5f"}},
+          {"claim_id": "C9d577a8", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/index.md", "snapshot_digest": "sha256:2e83cfafc5cae1c2b1591e384e12c183ccac3089edcafc34e313ecf5f26adad3"}},
+          {"claim_id": "Ca6e7f2e", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/cloud-native-101/module-1.1-what-are-containers.md", "snapshot_digest": "sha256:58ef87b5564fc782aa9c56b690aa0c6f32a34ea783690a51e0aaf973be44678f"},
+           "supporting_sources": [
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/cloud-native-101/index.md", "snapshot_digest": "sha256:b6f17e8296475ca8a49ebe891751f727be60e297753f9fe47b5abf60050f7051"},
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/index.md", "snapshot_digest": "sha256:2e83cfafc5cae1c2b1591e384e12c183ccac3089edcafc34e313ecf5f26adad3"}
+           ]},
+          {"claim_id": "C762129a", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/kubernetes-basics/module-1.3-pods.md", "snapshot_digest": "sha256:ac9750d3d645c1593c02c2d082f77553334a1770bb24c404d19e1e0e40e4874a"},
+           "supporting_sources": [
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/kubernetes-basics/index.md", "snapshot_digest": "sha256:f93884b9b37d89e6d548905f9632a6bc913fe05fd84ca35937caff853821da7f"},
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/index.md", "snapshot_digest": "sha256:2e83cfafc5cae1c2b1591e384e12c183ccac3089edcafc34e313ecf5f26adad3"}
+           ]},
+          {"claim_id": "C88032cf", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.1-why-kubernetes-won.md", "snapshot_digest": "sha256:ffe16861a005220a59827a907a2e9efe7591ebcbc92a8b870356287c3b729541"}},
+          {"claim_id": "Cb4364b2", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md", "snapshot_digest": "sha256:584b2b43baf9e63f42d236ae1ada55cd9ee908ac0fc4f246f7ab2e438c5371f4"}},
+          {"claim_id": "C9332b8d", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.3-what-we-dont-cover.md", "snapshot_digest": "sha256:8cdb7e92b4b9d28e96591c6fcfe1375dee964a52ee35195b591d585c57ba9c24"}},
+          {"claim_id": "C3d2b560", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.4-dead-ends.md", "snapshot_digest": "sha256:f8a9db4dd9c3f3d0af81be0cc105a25ffafb3cdc5d31593d67bc82e7b33fa833"}},
+          {"claim_id": "Cc54314d", "verdict": "SUPPORTED",
+           "source": {"retrieval_uri": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3571#issuecomment-6447046090", "snapshot_digest": "sha256:181d21ecf2e7b26c4ddb48b349620616d3cf0b1959cb33059db6a3833e6b1118"},
+           "supporting_sources": [
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.1-why-kubernetes-won.md", "snapshot_digest": "sha256:ffe16861a005220a59827a907a2e9efe7591ebcbc92a8b870356287c3b729541"},
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md", "snapshot_digest": "sha256:584b2b43baf9e63f42d236ae1ada55cd9ee908ac0fc4f246f7ab2e438c5371f4"},
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.3-what-we-dont-cover.md", "snapshot_digest": "sha256:8cdb7e92b4b9d28e96591c6fcfe1375dee964a52ee35195b591d585c57ba9c24"},
+             {"retrieval_uri": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.4-dead-ends.md", "snapshot_digest": "sha256:f8a9db4dd9c3f3d0af81be0cc105a25ffafb3cdc5d31593d67bc82e7b33fa833"}
+           ],
+           "arithmetic_record": {"path": ".agent/session226/p10hub/source-binding-prep/arithmetic.json", "snapshot_digest": "sha256:8423a98a9ecee27c5b92be886ac62b86bc15e68ced2fa7ea36bf732d86f5ebf1", "role": "preserves all four header inputs; does not replace them"}}
+        ],
+        "author": {"family": "openai"},
+        "verifier": {"identity": "grok-4.7", "family": "xai"},
+        "run": {"identity": "s226-p10hub-source-r1", "status": "complete", "head": "f98fd07184201db4d38301adaaeb3906302a3c39"}
+      }
     },
     {
       "path": "prerequisites/kubernetes-basics/module-1.7-namespaces-labels.md",
