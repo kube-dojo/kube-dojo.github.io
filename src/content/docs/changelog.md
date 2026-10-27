@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Validate YAML without creating practice objects.** [YAML for Kubernetes](/prerequisites/kubernetes-basics/module-1.8-yaml-kubernetes/) now keeps validation in a fresh folder, fixes its context and namespace, and explains why client checks can differ from server validation and application behavior.
 - **Namespace practice with a fresh workspace.** [Namespaces and Labels](/prerequisites/kubernetes-basics/module-1.7-namespaces-labels/) now keeps manifest files and cluster resources separate from existing work, preserves your saved namespace preference, and checks namespace identity before cleanup.
 - **See which configuration values a running container actually uses.** [ConfigMaps and Secrets](/prerequisites/kubernetes-basics/module-1.6-configmaps-secrets/) now compares updated settings with the container's environment, makes placeholder-secret visibility explicit, and keeps practice and cleanup in their own namespace.
 - **Service troubleshooting in its own workspace.** [Services](/prerequisites/kubernetes-basics/module-1.5-services/) now checks server access, tests DNS in the exercise namespace, and compares NodePort configuration without exposing another service.
