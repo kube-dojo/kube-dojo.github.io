@@ -12,10 +12,10 @@
     },
     {
       "path": "prerequisites/philosophy-design/module-1.4-dead-ends.md",
-      "page_digest": "sha256:f9349c1f13d05fe308e544ef7f78f20be7370e003ef6f35b7d36ae8ebd5a1bee",
+      "page_digest": "sha256:48c34b47d0814ac0c305bdee8a26294e6c6e966c40fa673ed8846bc0fffde9b8",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {

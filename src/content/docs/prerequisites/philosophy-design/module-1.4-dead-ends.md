@@ -29,7 +29,7 @@ Hypothetical scenario: a retailer is reviewing an existing container platform be
 
 The opening scenario asks you to check evidence before selecting a replacement. A dated maintainer record can establish project retirement, while capability documentation describes a deployment model. Neither identifies the requirements of every organization. For a learning or engineering decision, state which product and version you mean, which responsibilities the team must support, and what information is missing. That keeps the audit useful without pretending a tool name determines the answer.
 
-This module is a tour through the cloud-native graveyard, but the purpose is not mockery. Docker Swarm, Apache Mesos, early Cloud Foundry, Chef, Puppet, Ansible, and Docker Compose each solved real problems for real teams. You will study why they lost ground, which parts remain useful, and how to evaluate the next tool that claims to replace Kubernetes. The practical skill is judgment: you should leave able to spot decline signals before your team builds a platform, career plan, or migration strategy around them.
+This module examines technologies and deployment choices in relation to Kubernetes. Docker Swarm, Apache Mesos, Cloud Foundry, Chef, Puppet, Ansible, and Docker Compose have different purposes and lifecycle states; their names alone do not determine whether a particular use is obsolete. Practice checking documented status, operational fit, ownership, and missing evidence before proposing a change.
 
 ## Start With the Shape of a Dead End
 
@@ -168,44 +168,36 @@ kubectl get pods --all-namespaces
 
 The deeper lesson is that technology evaluation requires vocabulary hygiene. "Docker is dead" is false. "Docker Engine as the Kubernetes runtime path is gone after dockershim" is true. "Docker Compose is bad" is false. "Docker Compose is insufficient as a single-node production orchestrator for a multi-service system that needs self-healing and failover" is true. Precise language prevents teams from overcorrecting and throwing away useful tools while still avoiding obsolete platform bets.
 
-## Replace Server Configuration Thinking With Declarative Platform Thinking
+## Define Configuration and Workload Ownership
 
-Chef, Puppet, and Ansible belong to a different operational era. They manage servers by connecting to machines, inspecting state, and applying ordered changes until the machine looks right. That model works for long-lived servers where administrators own the operating system and expect to patch, mutate, and repair the same hosts over time. Kubernetes asks you to think differently. You declare desired state to an API, controllers reconcile that state continuously, and individual pods are disposable results of the control loop rather than precious machines to repair by hand.
+Configuration management and Kubernetes can address different parts of an operating environment, and their responsibilities can overlap. A team may use configuration management for host settings, cluster provisioning, or Kubernetes API objects. Kubernetes controllers observe state and act to move it toward their desired state. The planning question is which workflow owns each intended change and how that workflow interacts with the controllers managing the workload.
 
-**What they were**: Configuration management tools for managing servers.
+**What they are**: Configuration management and automation tools with capabilities that depend on the product and integration.
 
-**Status**: Wrong paradigm for Kubernetes workloads.
+**Status**: Evaluate the actual workflow and its ownership boundaries; a tool name alone does not establish a conflict.
 
-| Traditional CM | Kubernetes Native |
-|---------------|-------------------|
-| Mutable servers | Immutable containers |
-| SSH to servers | API-driven changes |
-| Converge to state | Declare desired state |
-| Agent on each server | No agents needed |
-| Imperative scripts | Declarative YAML |
+| Task | Ownership question |
+|------|--------------------|
+| Configure a host or provision a cluster | Which automation owns the host settings, and who reviews changes to them? |
+| Manage a Kubernetes API object | Which workflow supplies the intended object or fields, and how are changes reviewed? |
+| Reconcile a workload | Which Kubernetes controller acts on the desired state, and what does it manage? |
+| Coordinate multiple writers | Are their objects or fields deliberately assigned, and how will conflicting changes be resolved? |
+| Inspect a node | Which components are involved? Kubernetes documents kubelet and a container runtime on nodes. |
 
-The table is not saying Ansible, Chef, and Puppet are useless. They still appear in traditional infrastructure, compliance automation, and cluster provisioning workflows. The mistake is using them to directly manage Kubernetes workload objects as if pods were servers. If Ansible creates a pod, waits for it, then later edits it imperatively, Ansible is competing with the Kubernetes reconciliation loop. The more native approach is to store manifests or Helm values in version control, let GitOps apply them, and let controllers converge the cluster toward the declared state.
+For example, the [Ansible `kubernetes.core.k8s` module](https://docs.ansible.com/projects/ansible/latest/collections/kubernetes/core/k8s_module.html) uses the Kubernetes API for object creation, reading, updates and deletion. It accepts object definitions and offers an apply option. A playbook creating or updating a Pod is therefore not automatically a conflict; identify what owns that Pod and what subsequent changes the playbook and any controller intend to make. A Deployment and its controller-managed Pods also have different responsibilities, so distinguish a change to the Deployment's desired state from a separate attempt to repair its Pods.
 
 ```mermaid
 flowchart TD
-    subgraph Traditional ["Traditional (Chef/Puppet/Ansible)"]
-        direction TB
-        T1[1. SSH to server] --> T2[2. Check current state]
-        T2 --> T3[3. Apply changes to reach desired state]
-        T3 --> T4[4. Hope nothing drifted]
-    end
-    
-    subgraph K8s ["Kubernetes Native"]
-        direction TB
-        K1[1. Define desired state in YAML] --> K2[2. kubectl apply]
-        K2 --> K3[3. K8s continuously reconciles]
-        K3 --> K4[4. Self-healing, no SSH]
-    end
+    Plan[Agree object and field responsibilities] --> Writer[Automation submits intended API changes]
+    Writer --> API[Kubernetes API stores object state]
+    API --> Controller[Controller observes and reconciles its workload]
+    Controller --> Inspect[Inspect results and ownership conflicts]
+    Inspect --> Plan
 ```
 
-The anti-pattern is easy to miss because Ansible has Kubernetes modules and can call the API. The presence of a module does not mean the tool should own the operational model. If Ansible provisions a managed cluster, installs baseline controllers, or bootstraps a GitOps operator, it may be useful. If Ansible becomes the day-to-day deployment source of truth for Deployments, Services, ConfigMaps, and Secrets, the team has recreated imperative server management on top of a declarative system.
+Multiple declarative managers can coexist when their responsibilities are explicit. For example, a team might assign one workflow the application configuration and another a separate operational field. Kubernetes [Server-Side Apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/) records field managers and can report a conflict when an apply operation attempts to change a field another manager owns. This mechanism is not a general guarantee that every write or every competing controller will raise a conflict. Inspect the actual write methods and agree how to resolve a disagreement before overriding another manager's claim.
 
-Which approach would you choose here and why: a playbook that SSHes to every node and restarts containers in place, or a Git pull request that changes a Deployment image tag and lets Kubernetes roll pods through a readiness-gated rollout? The second option aligns with Kubernetes because the rollout is represented as desired state, recorded in version control, and executed by the control plane. The first option depends on procedural timing and hidden host state, which becomes fragile as the cluster grows.
+Hypothetical planning example: an Ansible workflow and a GitOps workflow both propose different image values for the same Deployment field. Record which workflow should own the image, which applies it, and how the other workflow will stop asserting a conflicting value. If both use Server-Side Apply, an attempted conflicting change can be rejected; inspect the managers and agree on the intended owner before choosing a resolution. If either uses a different write method, check its behavior rather than assuming the same conflict protection. The example describes a plan, not an observed deployment or a reason to prohibit either tool.
 
 For Compose, distinguish a documented production deployment from an unsupported assumption about availability. Starting several services on one host can meet a bounded deployment need, but a successful local startup does not test recovery after losing that host. Evaluate the data, update and failure requirements of the intended environment. The same requirement check should precede adopting a cluster: adding an orchestrator creates operating responsibilities that also need an owner and verification.
 
@@ -284,7 +276,7 @@ Imagine that Project Phoenix is a medium-sized SaaS product with an API, a worke
 
 The first diagnostic move is to separate incident risk from modernization preference. A Swarm cluster can run containers today, so saying "Swarm is old" is not enough for an engineering decision. The stronger argument is operational: if a node fails, if a security patch requires coordinated rollout, if the team needs cloud load balancer integration, or if a new engineer must debug production, the organization receives less help from the modern ecosystem than it would on Kubernetes. The age of the tool matters because it predicts support friction.
 
-Next, examine the Puppet role with care. Puppet may still be doing useful host provisioning, package installation, or baseline compliance. The dead-end part is not the existence of Puppet; it is Puppet acting as the owner of live application state. If the desired number of API replicas lives in a Puppet manifest, a Swarm service definition, and a converted Compose file, the team has three sources of truth. During an outage, nobody can confidently say which control loop should win.
+Next, examine the Puppet role with care. Puppet may handle host provisioning, package installation, or baseline configuration, and its presence does not itself establish a conflict. In this hypothetical plan, if a Puppet workflow, a Swarm service definition, and a converted Compose file each assert different API replica counts, identify which one actually writes the value and which owns the intended setting. Record how the team will detect and resolve disagreement before choosing a change.
 
 The Compose file deserves the same requirements check. Keep a useful local workflow when it serves the team, and inspect the production configuration separately. Docker documents production-specific configuration and deployment changes with Compose. Decide whether that model meets the service's recovery, update and access requirements. If Kubernetes is a candidate, compare its proposed resources and operating responsibilities against the same criteria; choosing a different YAML format does not itself satisfy them.
 
@@ -331,7 +323,7 @@ The strongest pattern is preserving portable concepts while retiring obsolete co
 |--------------|-----------------|--------------------|
 | Choosing a single-vendor orchestrator for core platform work | Ecosystem support narrows when competitors avoid strengthening the owner | Use Kubernetes or another neutrally governed standard with broad provider support. |
 | Translating local Compose files directly into production | Missing probes, policies, scheduling, rollout controls, and secret boundaries stay hidden | Redesign the workload using Kubernetes objects, Helm, Kustomize, and GitOps review. |
-| Managing pods like mutable servers | Imperative repair steps fight controllers and create drift | Declare desired state through the Kubernetes API and let reconciliation do the work. |
+| Multiple workflows asserting incompatible workload state | A controller or another writer may change a value a separate workflow expects to control | Identify the controller and field owners; inspect the actual writes and agree how to resolve conflicts. |
 | Treating legacy expertise as future proof | Hiring and integration markets move away while maintenance burden grows | Convert legacy knowledge into transferable concepts and current platform practice. |
 
 These patterns also explain why Kubernetes itself should not be treated as untouchable forever. A future platform could displace it if it solved real pain, offered trustworthy governance, preserved compatibility or migration paths, attracted cloud-provider support, and created an ecosystem large enough to justify the switch. Until those signals exist, "simpler than Kubernetes" is not enough. Simpler for the first day can become harder for the fifth year.
@@ -357,7 +349,7 @@ For a working team, the decision framework should end in one of four actions. Ad
 - **Mesos powered major production systems** at companies such as Twitter and Airbnb before Kubernetes became the common target for new container platforms.
 - **Docker Engine was not the container image format** removed from Kubernetes; Kubernetes 1.24 removed dockershim, while OCI images and Dockerfiles remained usable.
 - **Kubernetes moved fast because multiple competitors could still cooperate** through CNCF governance, which made it easier for clouds and vendors to support the same API surface.
-- **Chef, Puppet, and Ansible are not dead technologies**; they are simply a poor default for managing Kubernetes workloads that should be controlled through declarative APIs.
+- **Ansible can manage Kubernetes API objects** using definitions supplied to its `kubernetes.core.k8s` module. Check the intended task and ownership rather than treating all configuration management as a competing controller.
 
 ## Common Mistakes
 
@@ -365,7 +357,7 @@ For a working team, the decision framework should end in one of four actions. Ad
 |---------|----------------|---------------|
 | **Learning Docker Swarm as a new orchestration skill** | Old Docker tutorials make Swarm look like the natural next step after Compose. | Skip Swarm tutorials unless you maintain an existing Swarm cluster; focus on Kubernetes orchestration. |
 | **Assuming a local deployment proves production fit** | A successful startup can obscure host-failure and recovery requirements. | Compare the actual availability, update, data and access requirements; Docker documents Compose production use, so justify retention or replacement with evidence. |
-| **Applying Chef, Puppet, or Ansible mindsets to pods** | Server administrators are used to mutable machines and procedural repairs. | Embrace immutable containers, declarative YAML, GitOps, and the Kubernetes reconciliation loop. |
+| **Leaving workload ownership ambiguous** | Multiple workflows can propose changes to the same object or field without an agreed owner. | Identify each writer and controller, assign responsibilities, and check how the actual write methods expose and resolve conflicts. |
 | **Ignoring managed Kubernetes services** | Teams confuse learning value with production ownership and try to operate control planes too early. | Use EKS, GKE, AKS, or another managed service unless you have a dedicated platform team. |
 | **Translating Compose to Kubernetes one-to-one** | Conversion tools make syntax migration look equivalent to architecture migration. | Design Kubernetes manifests intentionally with probes, resources, RBAC, configuration boundaries, and rollout strategy. |
 | **Chasing abandoned or isolated projects** | Hype, old case studies, or impressive demos hide weak maintenance and governance signals. | Check foundation status, release cadence, maintainer diversity, cloud-provider support, and issue health before adopting. |
@@ -392,9 +384,9 @@ You should compare Docker as an image-building workflow with Docker as a Kuberne
 </details>
 
 <details>
-<summary>4. A senior administrator wants Ansible to directly create and repair pods because that worked for virtual machines. Why is that an anti-pattern?</summary>
+<summary>4. A team uses Ansible and a GitOps workflow for the same Kubernetes workload. How would you determine whether their responsibilities conflict?</summary>
 
-Ansible is procedural, while Kubernetes workload management is declarative and controller-driven. If a playbook owns pod repair step by step, it competes with the reconciliation loop and can create drift between what Git says, what the API stores, and what the cluster is running. A better plan is to manage manifests, Helm values, or Kustomize overlays through review and GitOps, then let Kubernetes controllers perform rollout and self-healing.
+Inspect which objects and fields each workflow changes, which controller manages the workload, and what each workflow considers the intended state. Ansible's Kubernetes module can apply object definitions through the API, so its use alone does not establish a conflict. If both workflows assert different values for the same field, agree who owns it and how to reconcile the disagreement. Server-Side Apply can signal a conflict for an apply request against another manager's field; other write methods require their own checks. Verify the actual workflow rather than assuming every competing write is rejected.
 </details>
 
 <details>
@@ -417,7 +409,7 @@ You should challenge the assumption that syntax conversion equals architecture d
 
 ## Hands-On Exercise: Technology Radar Audit
 
-In this exercise, you will audit an imaginary legacy stack and propose a modernization plan based on the patterns in this module. The scenario is deliberately realistic rather than exotic: Project Phoenix uses Docker Swarm for production orchestration, Puppet to SSH into nodes and install or repair Docker, and a monolithic `docker-compose.yml` translated into production by a third-party script. Your job is to separate what should be retired, what should be kept, and what must be redesigned rather than translated.
+In this exercise, you will audit an imaginary legacy stack and propose a modernization plan based on the patterns in this module. Project Phoenix uses Docker Swarm for production orchestration, Puppet to manage node configuration, and a monolithic `docker-compose.yml` translated into production by a third-party script. Your job is to separate what should be retained, changed, or redesigned, and identify what needs further evidence before deciding.
 
 Start by writing a short risk memo with a source and applicability boundary for each lifecycle or capability claim. Separate a confirmed project retirement from a possible mismatch with this hypothetical workload. Identify the requirements and failure observations still needed before recommending retention or migration. If you recommend Kubernetes or another platform, explain which evidenced gap it addresses and what operating responsibilities the recommendation introduces.
 
@@ -427,7 +419,7 @@ Start by writing a short risk memo with a source and applicability boundary for 
 - [ ] **Distinguish project lifecycle from deployment fit** using Mesos's documented retirement, Engine swarm mode, Diego's documented architecture and Compose production guidance.
 - [ ] **Compare Docker image-building workflow with Kubernetes runtime dockershim removal** and state which Docker skills remain useful.
 - [ ] **Design a modernization plan** that explains which components to retain or replace and what evidence supports each decision.
-- [ ] **Explain the paradigm shift** from Puppet-managed mutable servers to declarative Kubernetes reconciliation in one paragraph for the team.
+- [ ] **Explain ownership and reconciliation** in one paragraph: distinguish host configuration, API-object changes, and controller-managed workload state.
 
 ### Suggested Workspace
 
@@ -506,6 +498,10 @@ Failure layer: the startup demonstration did not test host failure or recovery. 
 - [CNCF containerd Project](https://www.cncf.io/projects/containerd/)
 - [CRI-O Project](https://cri-o.io/)
 - [Kubernetes Declarative Management](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
+- [Ansible `kubernetes.core.k8s` module](https://docs.ansible.com/projects/ansible/latest/collections/kubernetes/core/k8s_module.html)
+- [Kubernetes 1.35: Components](https://v1-35.docs.kubernetes.io/docs/concepts/overview/components/)
+- [Kubernetes 1.35: Server-Side Apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)
+- [Kubernetes 1.35: Controllers](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 
 ## Next Module
