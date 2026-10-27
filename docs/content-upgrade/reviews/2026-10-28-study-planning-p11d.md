@@ -1,0 +1,9 @@
+# T01-P11d: classify inspected activities and record missing evidence
+
+Owner #2278; source/editorial #2275, practical #2276 and assessment #2277. Scoped **revise**, not acceptance. The complete page still needs independent source-first review before numeric editorial/exercise scores. The proposed source map and actual captures are under `.agent/session227/study-planning/`; eligibility, reachability and schema checks are not semantic judgments.
+
+The page replaces categorical exclusions and unsupported speed, readiness, career and learner generalizations with task-specific planning questions. Objective verbs retain their stated depth, including understanding; product names and omitted keywords are not exclusion proof. The actual CKA/CKAD v1.37 and CKS v1.34 filename/FAQ1.35 distinction remains dated and explicit; shared pin reconciliation stays #2542.
+
+Visible worked hypothetical cards demonstrate CKA availability/interfaces, CKAD existing-package deployment and CKS encryption mapping before independent practice. The planner requires twelve inspected resources, exact revision/objective, task/depth, expected evidence, uncertainty, defer reason and revisit condition, with layered hints and explanation criteria. These authored examples are not reported installations, real courses or learner observations.
+
+Five fenced bodies remain unchanged, including four previously parsed diagrams and the context-dependent three-command illustration. No new cluster execution, measured learning gain, Ukrainian fidelity or full-page acceptance is claimed. Actual source/assessment review, applicable practical evidence, exact-head CI and merged deployment/public checks remain separate gates. Canonical source/editorial/practical/public statuses stay unknown/pending until their evidence is bound.
