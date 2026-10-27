@@ -12,7 +12,7 @@
     },
     {
       "path": "prerequisites/kubernetes-basics/module-1.5-services.md",
-      "page_digest": "sha256:98d5ac7eed77446f66d7c63e941cee16ac657236d5746a3eb64589ad3b8e6489",
+      "page_digest": "sha256:5420975ee8008ae0a7f301bb8c8a8d5a5053369c9467397dd8fa681452803906",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-services-scope-p08c.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-services-scope-p08c.md"],
