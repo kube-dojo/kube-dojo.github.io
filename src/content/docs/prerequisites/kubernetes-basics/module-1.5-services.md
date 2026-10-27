@@ -32,7 +32,7 @@ After this module, you will be able to perform the work below in a real cluster 
 
 ## Why This Module Matters
 
-Hypothetical scenario: during a peak sales weekend, an online retailer watches its payment success rate collapse even though Kubernetes keeps recreating the payment pods exactly as designed. The frontend has been configured with individual pod IP addresses because that looks simple during a rushed migration, and every restart silently invalidates part of the routing table the application believes is true. Engineers can see healthy replacement pods, but customers see failed checkouts, abandoned carts, and a revenue graph falling while the team chases symptoms in the wrong layer.
+Hypothetical scenario: during a peak sales weekend, an online retailer watches its payment success rate collapse even though Kubernetes keeps recreating the payment pods exactly as designed. The frontend has been configured with individual pod IP addresses because that looks simple during a rushed migration, and pod replacement can silently invalidate part of the routing table the application believes is true. A container restart within the same Pod does not itself replace the Pod or change its IP. Engineers can see healthy replacement pods, but customers see failed checkouts, abandoned carts, and a revenue graph falling while the team chases symptoms in the wrong layer.
 
 That story is painful because nothing exotic had failed. Kubernetes treated pods as replaceable units, which is the whole point of controllers such as Deployments, but the application had treated those pods as durable network destinations. A pod IP is closer to a hotel room number than a home address: it is useful while the guest is there, but you should not print it on contracts or bake it into another service's configuration. Services exist to give applications a stable name and address while Kubernetes continues replacing, scaling, and moving pods underneath.
 
@@ -494,24 +494,38 @@ Start with `kubectl get svc` and `kubectl describe svc` to confirm the Service t
 
 ## Hands-On Exercise
 
-In this exercise, you will create a small Nginx Deployment, expose it with a ClusterIP Service, prove that DNS and endpoints work from inside the cluster, then create a NodePort Service to compare the external shape. The sequence is intentionally close to day-to-day troubleshooting: create the contract, inspect the contract, test from a client pod, and then clean up the resources you created.
+In this synthetic exercise, you will create a small Nginx Deployment, expose it with a ClusterIP Service, test DNS and endpoints from inside the cluster, and inspect a client-generated NodePort manifest without creating it. The sequence is close to day-to-day troubleshooting: create the contract, inspect it, test from a client pod, and clean up the resources you created.
 
 ### Setup
 
-Confirm that `kubectl` can reach your lab cluster before you create any resources. The lab assumes a working Kubernetes 1.35 or newer cluster and a namespace where you can create Deployments, Services, and temporary pods.
+Use a Kubernetes 1.35 or newer context you have independently confirmed is a dedicated disposable lab. Set `KUBEDOJO_LAB_CONTEXT` to that context name before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, all tasks, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer. The helper pins requests to the recorded context and namespace without changing kubeconfig preferences.
 
 ```bash
-kubectl version --client
+SERVICE_READY=no SERVICE_NEW=no
+readonly SERVICE_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" SERVICE_NS="service-lab-$(date +%s)-$$" && { SERVICE_NEW=yes; SERVICE_UID=; }
+service_lab() {
+  [ "$SERVICE_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
+  command kubectl --context "$SERVICE_CONTEXT" --namespace "$SERVICE_NS" "$@"
+}
+if [ "$SERVICE_NEW" = yes ] && [ -n "$SERVICE_CONTEXT" ] && [ "$SERVICE_CONTEXT" != default ] && SERVICE_CURRENT="$(command kubectl config current-context)" && [ "$SERVICE_CURRENT" = "$SERVICE_CONTEXT" ] && command kubectl --context "$SERVICE_CONTEXT" version; then
+  printf 'Exercise context/namespace: %s / %s\n' "$SERVICE_CONTEXT" "$SERVICE_NS"
+  if SERVICE_CREATED_UID="$(command kubectl --context "$SERVICE_CONTEXT" create namespace "$SERVICE_NS" -o jsonpath='{.metadata.uid}')" && [ -n "$SERVICE_CREATED_UID" ]; then
+    SERVICE_UID="$SERVICE_CREATED_UID"; SERVICE_READY=yes
+  fi
+fi
+[ "$SERVICE_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
 ```
+
+Continue only after setup succeeds. The server version check contacts the selected API server; the helper refuses commands until creation returns a nonempty UID. Stop on any failed task command and use cleanup before retrying in a fresh terminal. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
 
 ### Task 1: Create the workload
 
 Create a three-replica Deployment so the Service has multiple pod backends to discover. Waiting for rollout completion matters because a Service can select pods before the application is actually ready, and you want the first endpoint check to reflect healthy backends rather than a rollout in progress.
 
 ```bash
-kubectl create deployment web --image=nginx --replicas=3
-kubectl rollout status deployment web
-kubectl get pods -l app=web --show-labels
+service_lab create deployment web --image=nginx:1.26 --replicas=3
+service_lab rollout status deployment web --timeout=90s
+service_lab get pods -l app=web --show-labels
 ```
 
 <details>
@@ -525,15 +539,15 @@ You should see three pods with an `app=web` label because `kubectl create deploy
 Expose the Deployment and inspect both the Service and the endpoint list. This validates the core implementation outcome: the Service exists as a stable client destination, and Kubernetes has discovered the actual pod IP and port backends behind it.
 
 ```bash
-kubectl expose deployment web --port=80
-kubectl get svc web
-kubectl get endpoints web
+service_lab expose deployment web --port=80
+service_lab get svc web
+service_lab get endpoints web
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-The `web` Service should show `TYPE` as `ClusterIP`, and the endpoint list should contain three pod IP and port entries for port 80. If the endpoint list is empty, compare the Service selector with `kubectl get pods --show-labels` before testing DNS. Empty endpoints mean the Service contract has no selected ready backends.
+The `web` Service should show `TYPE` as `ClusterIP`, and the endpoint list should contain three pod IP and port entries for port 80. Endpoint updates are asynchronous: repeat `service_lab get endpoints web` until the expected entries appear before testing DNS. If they do not converge, compare the Service selector with `service_lab get pods --show-labels` and inspect readiness.
 </details>
 
 ### Task 3: Test DNS and HTTP from inside the cluster
@@ -541,30 +555,29 @@ The `web` Service should show `TYPE` as `ClusterIP`, and the endpoint list shoul
 Launch a temporary BusyBox pod and request the Service by name. This step proves more than object creation: it proves that an in-cluster client can resolve the Service name and receive an HTTP response from one of the selected pods.
 
 ```bash
-kubectl run test --image=busybox --rm -i --restart=Never -- wget -qO- web
-kubectl run test --image=busybox --rm -i --restart=Never -- nslookup web.default.svc.cluster.local
+service_lab run test --image=busybox:1.36.1 --rm -i --restart=Never -- wget -qO- web
+service_lab run test --image=busybox:1.36.1 --rm -i --restart=Never -- nslookup "web.${SERVICE_NS}.svc.cluster.local"
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-The `wget` command should print the Nginx welcome page, while `nslookup` should resolve the Service name. If DNS resolves but `wget` fails, look at endpoints and `targetPort`. If DNS does not resolve, confirm the Service name and namespace before changing the application.
+The `wget` command should print the Nginx welcome page, while `nslookup` should resolve the Service name. The fully qualified name assumes the cluster domain is `cluster.local`; use your lab's domain if different. If DNS resolves but `wget` fails, look at endpoints and `targetPort`. If DNS does not resolve, confirm the Service name and namespace before changing the application.
 </details>
 
-### Task 4: Add a NodePort Service for comparison
+### Task 4: Compare a NodePort manifest
 
-Create a second Service pointing at the same Deployment, but this time publish it as NodePort. You are not making this the recommended production path; you are observing how the Service type changes the externally visible shape while the backend pod selection stays label-driven.
+Generate a reference manifest on the client and compare its type and selector with the live ClusterIP Service. This does not create a Service, allocate a node port, or verify outside reachability.
 
 ```bash
-kubectl expose deployment web --port=80 --type=NodePort --name=web-external
-kubectl get svc web-external
-kubectl describe svc web-external
+service_lab create service nodeport web-external --tcp=80:80 --dry-run=client -o yaml
+service_lab get svc web -o yaml
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-The `web-external` Service should show `TYPE` as `NodePort` and include a high allocated node port in the Service range. The selector should still point at the `app=web` pods, which shows that Service type changes exposure but not the basic label-selection model. In a local lab, actual outside access depends on how your cluster exposes node networking.
+The generated manifest has type `NodePort` and selector `app: web-external`, which does not match this Deployment's `app: web` Pods. A usable Service would need a matching selector; do not apply this reference manifest. Compare it with the live ClusterIP selector, and explain why a matching selector is needed before any backend can receive traffic.
 </details>
 
 ### Task 5: Break and repair the selector
@@ -572,10 +585,15 @@ The `web-external` Service should show `TYPE` as `NodePort` and include a high a
 Patch the Service selector to an intentionally wrong value, observe the endpoint list, then restore the selector. This is the fastest way to make the most common Service failure visible in a safe lab environment.
 
 ```bash
-kubectl patch svc web -p '{"spec":{"selector":{"app":"missing-web"}}}'
-kubectl get endpoints web
-kubectl patch svc web -p '{"spec":{"selector":{"app":"web"}}}'
-kubectl get endpoints web
+service_lab patch svc web -p '{"spec":{"selector":{"app":"missing-web"}}}'
+service_lab get endpoints web
+```
+
+Repeat the endpoint check until it is empty, then restore the selector and repeat the check until three addresses return. Stop and investigate if either change does not converge.
+
+```bash
+service_lab patch svc web -p '{"spec":{"selector":{"app":"web"}}}'
+service_lab get endpoints web
 ```
 
 <details>
@@ -586,11 +604,21 @@ After the broken selector, the endpoint list should become empty because no pod 
 
 ### Cleanup
 
-Delete the Deployment and both Services so the namespace returns to its original state. Cleaning up deliberately is part of the exercise because abandoned NodePort or LoadBalancer objects can create confusing future tests and unnecessary infrastructure exposure.
+Run cleanup in the same Bash terminal, including after an interruption. It checks the live namespace UID against the successful creation response before deleting the namespace and its resources. Failed cleanup retains the receipt for a same-shell retry. The check assumes no concurrent namespace replacement between the UID check and deletion.
 
 ```bash
-kubectl delete deployment web
-kubectl delete svc web web-external
+cleanup_service_lab() {
+  [ -n "${SERVICE_UID:-}" ] && [ -n "${SERVICE_CONTEXT:-}" ] && [ "$SERVICE_CONTEXT" != default ] && [ -n "${SERVICE_NS:-}" ] || { echo 'No recorded exercise namespace; stop' >&2; return 1; }
+  local live_uid
+  live_uid="$(command kubectl --context "$SERVICE_CONTEXT" get namespace "$SERVICE_NS" --ignore-not-found=true -o jsonpath='{.metadata.uid}')" || return 1
+  if [ -n "$live_uid" ]; then
+    [ "$live_uid" = "$SERVICE_UID" ] || { echo 'Namespace UID changed; refusing deletion' >&2; return 1; }
+    command kubectl --context "$SERVICE_CONTEXT" delete namespace "$SERVICE_NS" --ignore-not-found=true --wait=true --timeout=120s || return 1
+  fi
+  SERVICE_READY=no
+  echo 'Exercise namespace is gone; kubeconfig preferences were unchanged'
+}
+cleanup_service_lab
 ```
 
 **Card A: Ten pod addresses after a scale-out.** A Deployment grows from three pods to ten. A teammate pastes ten pod IPs into the client config and says the Service must have grown with them.
@@ -632,13 +660,14 @@ Failure layer: selector match, not the Service IP. Next action: read endpoints, 
 **Success criteria**: use this checklist to confirm that you designed a stable Service contract, implemented the selector and port mapping correctly, compared Service types, and diagnosed the most common empty-endpoints failure mode.
 
 - [ ] Design check: the internal `web` Service is created as a stable ClusterIP destination for the `app=web` pods.
-- [ ] Implementation check: `kubectl get endpoints web` shows three distinct pod IP addresses before you break the selector.
-- [ ] Discovery check: the temporary pod resolves `web.default.svc.cluster.local` and the `wget` command returns the Nginx welcome HTML.
-- [ ] Comparison check: the `web-external` Service is created with a `TYPE` of `NodePort` and a port in the 30000-32767 range.
+- [ ] Implementation check: `service_lab get endpoints web` shows three distinct pod IP addresses before you break the selector.
+- [ ] Discovery check: the temporary pod resolves the namespace-qualified Service name and `wget` returns the Nginx welcome HTML.
+- [ ] Comparison check: the generated NodePort manifest and live ClusterIP selector are compared without external exposure.
 - [ ] Diagnosis check: changing the selector empties the endpoints list, and restoring the selector repopulates it.
 
 ## Sources
 
+- **Exercise references (v1.35):** [kubectl version and server access](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_version/), [client-generated NodePort manifest](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_service_nodeport/), [namespace-qualified DNS](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/dns-pod-service/), and [container restarts versus Pod replacement](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/).
 - [Kubernetes Services, Load Balancing, and Networking](https://kubernetes.io/docs/concepts/services-networking/service/)
 - [Kubernetes DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 - [Kubernetes Service API reference](https://kubernetes.io/docs/reference/kubernetes-api/service-resources/service-v1/)
