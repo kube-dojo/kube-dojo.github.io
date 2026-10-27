@@ -33,7 +33,7 @@ Imagine an on-call engineer is paged at 2 AM because a revenue-critical checkout
 
 Nothing in that story requires Kubernetes to be broken. The cluster was doing exactly what it was built to do: compare the declared desired state with the observed current state and move reality back toward the declaration. The operational failure came from using imperative instincts inside a declarative control system. When the engineer finally changed the Deployment YAML, committed the fix, and applied the corrected manifest, the next rollout converged in seconds because she stopped fighting the controller and started changing the source of truth.
 
-That difference is not academic. Kubernetes rewards operators who ask, "What state should exist?" before asking, "What command should I run?" A controller works on the resources and fields within its responsibility, such as restoring a managed Pod count from an API object's desired state; it does not automatically undo every manual API edit. In this module, you will build the mental model that makes Deployments, Services, GitOps, drift detection, and self-healing feel like parts of one system rather than a pile of commands. [Kubernetes 1.35 controllers](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
+That difference is not academic. Kubernetes rewards operators who ask, "What state should exist?" before asking, "What command should I run?" A controller works on the resources and fields within its responsibility; it does not automatically undo every manual API edit. For example, a [Deployment's ReplicaSet](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/) works to maintain the declared Pod count. This module connects Deployments, Services, GitOps, drift detection, and self-healing to that control model.
 
 You will also practice a habit that becomes more valuable as systems grow: separating investigation from durable change. Investigation can be quick, interactive, and messy because its job is to expose evidence. Durable change must be explicit, reviewed, repeatable, and owned because its job is to survive the next rollout, teammate, cluster replacement, and incident review. That separation is the difference between using commands as tools and letting commands become hidden infrastructure.
 
@@ -41,7 +41,7 @@ You will also practice a habit that becomes more valuable as systems grow: separ
 
 ## The Two Approaches
 
-Imperative operations are direct instructions to perform steps now. They feel natural because most early computing tasks were taught this way: open a shell, run a command, inspect the output, run the next command, and keep going until the system looks right. In a small environment, this style can be fast and satisfying because the operator has immediate feedback and can adapt as new information appears. The hidden cost is that the operator becomes the control loop, which means the system only keeps working while a human remembers the steps, watches the state, and repeats the fix after every failure.
+Imperative operations are direct instructions to perform steps now. In the illustrated shell workflow, an operator runs a command, inspects the output, and chooses the next command until the system looks right. In a small environment, this style can give immediate feedback and let the operator adapt as information appears. A cost to consider is who watches the state, remembers the steps, and repeats a correction if no separate automation owns that work.
 
 The simplest imperative deployment story looks like this. The commands are easy to read, but the operational burden is buried in the comments: someone must check, decide, repeat, and document every correction.
 
@@ -92,13 +92,13 @@ spec:
         image: nginx
 ```
 
-Many engineers define a short local alias for interactive typing, but training material and runbooks should use the full `kubectl` command so examples are copy-paste safe in terminals, scripts, CI jobs, and incident notes. A typing shortcut does not change the API request or the operational model, and it should never become a hidden prerequisite for understanding the lesson.
+A local alias can shorten interactive typing, but this training material uses the full `kubectl` command so examples do not depend on that shortcut in terminals, scripts, CI jobs, or incident notes. A typing shortcut does not change the intended API request or the operational model, and it should not become a hidden prerequisite for understanding the lesson.
 
 ```bash
 kubectl version --client
 ```
 
-The original one-line apply command from many beginner tutorials still captures the important idea: submit the declaration, then let Kubernetes handle the ongoing work. In daily practice, this module uses the full `kubectl` binary in runnable examples because the command should work whether you paste it into an interactive shell, a script, or a CI job.
+The following apply command captures the important idea: submit the declaration, then observe the ongoing controller work. This module uses the full `kubectl` command in runnable examples so the command does not rely on a local alias when pasted into a shell, script, or CI job.
 
 ```bash
 kubectl apply -f nginx-deployment.yaml
@@ -120,7 +120,7 @@ The expectation is not "run the deployment again." Compare the declaration with 
 
 Write create, update, or leave alone before you continue. The next paragraph is about where long-term intent lives. It does not say what the second apply does.
 
-The distinction between the two styles is not that imperative commands are evil and declarative files are always good. The distinction is where long-term intent lives. Imperative work is useful for exploration, quick diagnostics, and temporary emergency action because it gives an operator immediate leverage. Declarative work is safer for production because intent survives the operator, can be reviewed before it changes the cluster, and can be reconciled by software after the next crash, reschedule, or rollout.
+The distinction between the two styles is not that imperative commands are evil and declarative files are always good. The distinction is where long-term intent lives. Imperative work can be useful for exploration, diagnosis, and temporary emergency action. A declarative workflow can make intent reviewable and repeatable when the team records it, validates changes, manages permissions and ownership, and verifies that the relevant controllers can reconcile it.
 
 | Operating Question | Imperative Thinking | Declarative Thinking |
 |---|---|---|
@@ -200,9 +200,9 @@ Which approach would you choose here and why: during a production traffic spike,
 
 ## Why Declarative Wins
 
-Declarative infrastructure wins in Kubernetes because it turns operations into a repeatable relationship between intent, observation, and correction. That relationship supports self-healing, safe automation, reviewable change, and drift detection. The benefits compound: a manifest can be applied repeatedly, reviewed before merge, used by a GitOps controller, compared against live state, and reused to rebuild the environment after failure. Imperative work can accomplish the first change quickly, but it struggles to preserve the next thousand corrections.
+Declarative infrastructure expresses a relationship between intent, observation, and correction. A team can use a recorded manifest for repeated applies, review before merge, GitOps reconciliation, comparison with live state, and rebuilding an environment. Those benefits depend on the workflow: validate the manifest, assign field ownership, restrict permissions, and check rollout status. Imperative actions may be useful during diagnosis, but unrecorded changes can be difficult to reproduce later.
 
-Self-healing is the first visible benefit. When an application container in a Deployment-managed Pod exits, the kubelet normally restarts it within the same Pod according to the Pod's restart policy. When a managed Pod is deleted or lost, the ReplicaSet can create a replacement Pod to restore its desired count. After a node failure, placement and readiness of replacements depend on detection, suitable capacity, and configuration; the desired count alone does not guarantee recovery. See [Pod lifecycle](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) and [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/).
+Self-healing is the first visible benefit. When an application container in a Deployment-managed Pod exits, the kubelet normally restarts it within the same Pod according to the Pod's restart policy. When a managed Pod is deleted or marked for deletion, the ReplicaSet can create a replacement Pod to restore its desired count. After a node failure, placement and readiness of replacements depend on detection, suitable capacity, and configuration; the desired count alone does not guarantee recovery. See [Pod lifecycle](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) and [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/).
 
 Idempotency is the second benefit, and it matters more than beginners expect. Pipelines retry. Humans double-submit commands. GitOps agents reconcile in loops. Reapplying a valid manifest for the same object identity is intended to converge without creating a second object, but permissions, validation, and API availability can still cause errors. The flagless command below uses [client-side apply](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/). With [server-side apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts), changing a field owned by another manager can also report a conflict.
 
@@ -219,7 +219,7 @@ kubectl apply -f deployment.yaml
 kubectl apply -f deployment.yaml
 ```
 
-Version control is the third benefit because declarative configuration can be reviewed like application code. A replica increase, a memory-limit fix, and a readiness probe change become visible commits rather than tribal memory. This does not make every YAML file beautiful, and it does not remove the need for good review, but it does give the team a durable timeline of infrastructure intent.
+Version control can make declarative configuration reviewable like application code. If the team commits a replica increase, memory-limit fix, or readiness probe change, those commits can document its intended change. A manifest does not commit itself or guarantee that every live change was recorded; the team must maintain the repository and review process for that history to be useful.
 
 ```bash
 # Your infrastructure is code
@@ -233,9 +233,9 @@ git revert a1b2c3d
 kubectl apply -f .
 ```
 
-The `git revert` example is intentionally simple. Real rollbacks may require database migrations, compatibility checks, image availability, or staged traffic movement. Declarative infrastructure does not guarantee that every rollback is safe; it guarantees that the intended infrastructure change is recorded and can be discussed, tested, and replayed. That is a major improvement over asking an exhausted operator to reconstruct commands from memory.
+The `git revert` example is intentionally simple. Real rollbacks may require database migrations, compatibility checks, image availability, or staged traffic movement. Declarative infrastructure does not guarantee a safe rollback or a complete record. When changes are committed and preserved, the history gives a team material to discuss, test, and replay instead of relying only on a person's memory.
 
-Drift detection is the fourth benefit. Drift means live reality no longer matches the source of truth. In an imperative environment, drift can be invisible until a rebuild fails or a release overwrites a hidden manual change. In a declarative environment, drift becomes something a tool can detect because there is a known desired state to compare against. GitOps tools extend this idea by continuously reconciling the cluster with Git, but the underlying concept starts with Kubernetes objects.
+Drift means live reality no longer matches the chosen source of truth. An unrecorded manual change can remain unnoticed until a rebuild fails or a release overwrites it. A recorded desired state gives a tool something to compare against live state. A configured GitOps controller can reconcile Git-sourced configuration with cluster objects according to its settings; Kubernetes workload controllers separately act on API objects.
 
 ```text
 Imperative world:
@@ -253,7 +253,7 @@ Declarative world:
 
 The diagram assumes a configured GitOps workflow. Kubernetes controllers reconcile desired state stored in API objects; Kubernetes does not itself read Git continuously. A GitOps controller can separately compare Git with cluster state and apply changes, subject to its configuration and permissions. See the [Kubernetes controller model](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/) and [Flux Kustomization documentation](https://fluxcd.io/flux/components/kustomize/kustomizations/).
 
-There is a tradeoff. Declarative systems can feel indirect when you are debugging because the object you edit may not be the object that actually runs. A Deployment creates ReplicaSets, which create pods. For a selector-backed Service, a controller finds matching Pods and updates EndpointSlices; selectorless Services use separately managed endpoints. An Ingress may be implemented by a controller outside the core API. The price of self-healing is that you must learn ownership chains and status fields instead of assuming the first visible process is the right place to edit. [Kubernetes 1.35 Services](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/)
+There is a tradeoff. Declarative systems can feel indirect when you are debugging because the object you edit may not be the object that actually runs. A Deployment creates ReplicaSets, which create pods. For a [selector-backed Service](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/), a controller finds matching Pods and updates EndpointSlices; selectorless Services use separately managed endpoints. An Ingress may be implemented by a controller outside the core API. The price of self-healing is that you must learn ownership chains and status fields instead of assuming the first visible process is the right place to edit.
 
 ---
 
@@ -277,7 +277,7 @@ kubectl set image deployment/nginx nginx=nginx:1.27
 
 The danger is not that those commands fail. The danger is that they succeed outside the review path. A manual scale can stabilize traffic, but if the manifest still says three replicas, the next apply can reduce capacity. A manual image update can test a fix, but if the Deployment file still references the old image, the next rollout can restore the bug. A live edit can unblock a team, but if no one knows which field changed, the root cause becomes harder to diagnose.
 
-The safer pattern is to use imperative tooling to generate or inspect declarations, then move the durable change into a file. This gives beginners a practical bridge: you can use the command-line generator to avoid memorizing every YAML field, but you still review, commit, and apply the manifest as the source of truth. The command helps you write the declaration; it does not replace the declaration.
+A recommended pattern is to use imperative tooling to generate or inspect declarations, then move the lasting change into a file. A command-line generator can help you start without memorizing every YAML field; review, commit, and apply the manifest through the team's workflow. The command helps you write the declaration, but the file is only a source of truth if the team maintains and uses it.
 
 ```bash
 # Generate YAML, don't apply directly
@@ -301,7 +301,7 @@ The strongest diagnostic question is simple: "If we rebuild this environment fro
 
 ## Visualization: State Over Time
 
-State over time reveals the real operational difference. In an imperative workflow, health is often restored by human action after each drift or failure event. That can work during office hours with a small system and a careful operator, but it does not scale across services, regions, teams, and months of maintenance. The system's reliability is coupled to human attention, which is the scarcest resource during an incident.
+State over time reveals one operational tradeoff. If a workflow depends on a person to detect each failure and repeat a repair, the team must provide that observation and response as services, regions, and responsibilities grow. Consider what happens outside working hours, how a repair is recorded, and which failures a controller or other automation can address. Automation still needs accurate configuration and monitoring.
 
 ```mermaid
 flowchart LR
@@ -341,7 +341,7 @@ This ownership chain is why `kubectl describe pod` is more than a wall of text. 
 
 The same reasoning applies to Services. A beginner may see a Service that does not route traffic and try to recreate it by hand. A declarative operator checks the selector, then checks whether any pod labels match that selector, then checks whether the owning workload template sets those labels. The durable fix may be a label correction in the Deployment, not a Service rewrite. The Service object expresses desired networking intent, but the endpoint population depends on other declared state being consistent with that intent.
 
-ConfigMaps and Secrets create another common ownership puzzle. A team may update a ConfigMap and expect every running process to behave differently instantly. Regular mounted volume data can update eventually, but `subPath` mounts do not receive automatic updates; environment variables stay fixed for the existing container. Even when a file changes, the application must reread or reload it to act on the new value. See the Kubernetes 1.35 [ConfigMap](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/) and [Secret](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/) documentation.
+ConfigMaps and Secrets create another common ownership puzzle. A team may update a ConfigMap and expect every running process to behave differently instantly. Regular mounted volume data can update eventually, but `subPath` mounts do not receive automatic updates; environment variables stay fixed for the existing container. Even when a file changes, the application must reread or reload it to act on the new value. See the Kubernetes 1.35 [ConfigMap](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/) and [Secret](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/) guides and the explicit [Secret environment-update behavior](https://v1-35.docs.kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#define-container-environment-variables-using-secret-data).
 
 Managed fields and server-side apply add even more nuance in advanced workflows, but the beginner rule is enough for now: one resource should have one clear owner for each important field. If a GitOps controller, a Helm release, and a human all update the same Deployment, the live object becomes a battlefield. The problem is not that declarative tools are weak. The problem is that several actors are declaring incompatible truths without a process that resolves the conflict before it reaches the API server.
 
@@ -360,13 +360,13 @@ The answer depends on the surrounding evidence. It may be a normal rollout in pr
 
 Write which of the three you choose, and what evidence would change your mind, before you continue. The next paragraph is about the operator's habit. It does not pick one of those three.
 
-Experienced Kubernetes operators build a habit of moving from symptom to owner to declaration to status. They do not skip inspection, but they also do not confuse inspection with repair. Logs can tell you why a container exits, events can tell you why a pod cannot schedule, and status can tell you whether a rollout is progressing. The durable repair happens when the declaration is corrected so the controller can produce the healthy state again and keep producing it after the next disruption.
+A useful diagnostic sequence moves from symptom to owner to declaration to status. Logs can show why a container exits, events can show why a pod cannot schedule, and status can show whether a rollout is progressing. If the declaration is wrong, correct it and verify the outcome; if the blocker is capacity or an external dependency, changing YAML alone may not restore health.
 
 ---
 
 ## The Mindset Shift
 
-The old infrastructure mindset was shaped by individual machines. A deployment meant logging into a host, pulling code, starting a process, editing a local web server config, opening firewall rules, testing manually, and hoping the notes were good enough for the next person. That workflow creates a deep emotional attachment to the server because the server contains undocumented labor. People become afraid to replace it because nobody knows which hand-made changes make it special.
+Consider an individually managed server as an example. A deployment might involve logging into the host, pulling code, starting a process, editing a web server config, opening firewall rules, and testing manually. If those changes are not recorded, replacing the server can require the next operator to reconstruct them. A maintained declaration and runbook give the team a way to inspect and reproduce intended configuration.
 
 ```text
 Old Thinking (Imperative)
@@ -398,13 +398,13 @@ This mindset shift changes troubleshooting language. Instead of asking only, "Ho
 
 The shift also changes how you design processes. Production changes should flow through manifests, reviews, automated checks, and reconciliation. Debugging commands should be temporary and observable. Emergency commands should create follow-up work. Shared resources need clear ownership: competing writes can overwrite values or encounter field-ownership conflicts depending on the management method. Server-side apply can reject a conflicting field change rather than silently choosing the last writer. [Server-side apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts) documents that distinction.
 
-This is why good Kubernetes teams write runbooks differently from old server teams. An imperative runbook often says, "Run these commands in this order." A declarative runbook says, "Confirm this owner, inspect this status, change this declaration, and verify these conditions." The second style still includes commands, but the commands serve the model rather than replacing it. The operator is not just typing; the operator is reasoning about which desired state should be corrected.
+A runbook can combine both styles. For example, list commands for inspection, then ask the operator to confirm the owner, compare desired and observed state, change the appropriate declaration, and verify the result. Commands remain useful, but the runbook also records why each step is relevant and what evidence should guide the next action.
 
 Declarative thinking also changes how teams review each other's work. A reviewer should not only ask whether the YAML is syntactically valid. The reviewer should ask whether the declaration matches the operational promise the service needs to keep. Does the replica count match expected load? Do labels match Service selectors? Do probes describe real readiness? Do resource requests leave the scheduler enough information? These questions are practical because Kubernetes will enforce whatever the team declares, including mistakes that pass basic syntax checks.
 
-The model is especially helpful when teaching new engineers. Instead of giving them a bag of commands, you can give them a sequence of questions: what object declares the desired state, what controller reconciles it, what current state is being observed, and what evidence explains the gap? A beginner who learns those questions early will make fewer destructive guesses. They may still need help reading events or status fields, but they will look in the right direction.
+When teaching a new engineer, pair commands with questions: what object declares the desired state, what controller reconciles it, what current state is observed, and what evidence explains the gap? Ask the learner to identify an owner and read events or status before making a change, then compare the observed result with the prediction. This is a practice sequence, not a measured claim about incident outcomes.
 
-There is a cultural benefit too. Declarative infrastructure makes operations less dependent on heroics because the system records intent in shared artifacts. That does not remove judgment, but it moves judgment into places where teams can review it before production changes. The best incident responders still use sharp commands under pressure; they also know that an incident is not finished until the declared state, the live state, and the team's explanation agree.
+Teams can choose to record intent in shared artifacts and review changes before production. That process depends on people maintaining the files and following the workflow; a declarative API does not create the record by itself. After an emergency command, record what changed, decide whether the declaration should change too, and verify the resulting live state before closing the follow-up.
 
 Finally, remember that declarative does not mean passive. You are still responsible for designing the target, validating the rollout, watching status, and correcting bad assumptions. Kubernetes automates convergence, not wisdom. The skill you are building is the ability to express intent precisely enough that controllers can do repetitive work safely, while you focus on diagnosing whether the intent itself is correct.
 
@@ -416,7 +416,7 @@ That balance is the philosophy behind this module. You should leave with respect
 
 For an introductory module, the useful pattern is not "never use imperative commands." The useful pattern is "do not let imperative commands become untracked desired state." Use direct commands when you are learning the API, inspecting live symptoms, generating starter YAML, running a temporary debug pod, or taking a documented emergency action. Convert the lasting change back into a manifest before the cluster and the repository drift apart.
 
-The anti-pattern is command-first production management. Teams fall into it because commands feel faster, incidents create pressure, and YAML can feel verbose when the problem seems obvious. The better alternative is to make the declarative path fast enough that it is usable during normal pressure: templates, examples, review habits, and GitOps reconciliation should make the reviewed path the easiest stable path. If the only fast path is manual mutation, the process will train people to bypass the source of truth.
+A risk in command-first production management is that a successful live change may never reach the maintained declaration. Teams can reduce that risk by preparing templates, examples, review procedures, and a configured reconciliation path before an incident. Provide an emergency path too, with an explicit follow-up to record the change and reconcile the intended state.
 
 | Pattern or Anti-Pattern | When Teams Reach For It | Operational Result | Better Habit |
 |---|---|---|---|
@@ -427,7 +427,7 @@ The anti-pattern is command-first production management. Teams fall into it beca
 | Multiple tools own one object | Teams combine Helm, raw apply, and GitOps casually | Updates may overwrite values or encounter server-side field conflicts | Assign one owner and one reconciliation path per resource |
 | Unencrypted secrets in Git | Teams want every object declarative | Sensitive values spread through history | Use External Secrets, SOPS, or Sealed Secrets with review |
 
-Scaling consideration: the more services and teams you have, the more expensive untracked state becomes. A single manual fix can be remembered by one person for one afternoon. Hundreds of manual fixes across clusters become unreproducible infrastructure. Declarative discipline is not ceremony for its own sake; it is how teams keep the system explainable after the people, incidents, and releases have changed.
+Scaling consideration: as services and teams grow, untracked state can become harder to find and reproduce. A manual fix may depend on one person's notes; several such fixes across clusters require a reliable way to identify and reconstruct them. Record the desired configuration and verify the rebuild path so the next operator has evidence to work from.
 
 ---
 
@@ -449,7 +449,7 @@ Did an emergency require a direct live change?
   no  -> Keep the normal declarative path as the source of truth.
 ```
 
-Use this decision path during incidents because pressure narrows thinking. A fast manual command may be the right first action when customers are affected, but it should not be the last action. The moment the immediate risk is reduced, the team should ask what declaration must change so the controller can maintain the fixed state without relying on memory.
+Use this decision path to make the incident follow-up explicit. A manual command may be the right first action when customers are affected, but it should not be the last action. Once the immediate risk is reduced, ask what declaration must change, record the decision, and verify that the responsible controller can maintain the intended state.
 
 | Situation | Best First Move | Why |
 |---|---|---|
@@ -466,7 +466,7 @@ The framework is deliberately conservative because Kubernetes itself is conserva
 ## Did You Know?
 
 - **Kubernetes controllers are reconciliation loops by design.** The official controller documentation describes each controller as tracking at least one resource type and moving current state toward desired state, which is why the same idea appears across Deployments, Jobs, Nodes, and extensions.
-- **Every Kubernetes resource is an API object with declarative shape.** Pods, Services, ConfigMaps, Secrets, Deployments, and custom resources all express desired or observed state through the API, even when a human created them with an imperative command.
+- **Creating an object imperatively does not change its API type.** A Pod or Deployment created by a command is still a [Kubernetes API object](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/). Distinguish how you submitted a change from the API object and controller that consume it.
 - **GitOps grew from the same control-loop idea.** Configured Flux or Argo CD controllers can reconcile Git-sourced configuration with the cluster. Current product behavior depends on settings: for example, Argo CD's automated live-state self-healing requires its `selfHeal` option. See [Flux Kustomizations](https://fluxcd.io/flux/components/kustomize/kustomizations/) and [Argo CD automated sync](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/).
 - **Terraform uses a related model outside Kubernetes.** An invoked `terraform plan` refreshes state by default, compares configuration and state, and proposes changes; `apply` executes planned changes, ordinarily after approval. The ordinary CLI workflow is invoked, not a continuously running Kubernetes controller. [Terraform plan](https://developer.hashicorp.com/terraform/cli/commands/plan) and [apply](https://developer.hashicorp.com/terraform/cli/commands/apply) references.
 
@@ -476,11 +476,11 @@ The framework is deliberately conservative because Kubernetes itself is conserva
 
 | Mistake | Why It Happens | How to Fix It |
 |---|---|---|
-| Using imperative commands as the normal production release path | Commands feel faster than waiting for review, especially when YAML is unfamiliar | Use `kubectl create ... --dry-run=client -o yaml` to generate manifests, then review, commit, and apply them |
-| Editing live resources with `kubectl edit` and never updating Git | The live edit solves the immediate symptom, so the follow-up feels optional | Treat every live edit as an incident hotfix that requires a matching manifest change before closure |
+| Using imperative commands as the normal production release path | A release workflow may lack a convenient reviewed manifest path | Use `kubectl create ... --dry-run=client -o yaml` to generate manifests, then review, commit, and apply them |
+| Editing live resources with `kubectl edit` and never updating Git | A live edit may solve a symptom while leaving the recorded intent stale | Record the edit, decide the intended manifest change, and complete the follow-up before closure |
 | Assuming Kubernetes "undoing" a manual change is a bug | The operator focuses on the visible object and misses its owner controller | Inspect owner references and change the higher-level declaration that owns the object |
 | Mixing Helm, raw `kubectl apply`, and GitOps on the same resource | Each tool seems declarative in isolation, so ownership boundaries are ignored | Assign exactly one tool and one repository path as the source of truth for each managed resource |
-| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Plan deliberate deletion or GitOps pruning. In Kubernetes 1.35, `kubectl apply --prune` modes are alpha; allowlist-based pruning depends on its selector, namespace, allowlist, and discovery, and incorrect scope can delete or retain unexpected objects. Review the [pruning warnings](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects) before use. |
+| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Plan deliberate deletion or GitOps pruning. In Kubernetes 1.35, `kubectl apply --prune` modes are alpha; allowlist-based pruning depends on selector, namespace, allowlist, and discovery, so incorrect scope can unexpectedly delete objects or retain ones intended for removal. Review the [pruning warnings](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects) before use. |
 | Storing sensitive values directly in plain YAML | Teams want all configuration in Git and confuse declarative with unencrypted | Use External Secrets, SOPS, Sealed Secrets, or another approved secret-management workflow |
 | Believing `kubectl apply` makes a multi-resource release perfectly atomic | Declarative convergence can involve several controllers and partial progress | Design readiness probes, rollout checks, and rollback plans around eventual convergence |
 
@@ -699,10 +699,7 @@ After the first apply, the Deployment should report three desired replicas and t
 
 ## Sources
 
-- [Kubernetes Documentation: Kubernetes Components](https://kubernetes.io/docs/concepts/overview/components/)
-- [Kubernetes Documentation: Controllers](https://kubernetes.io/docs/concepts/architecture/controller/)
-- [Kubernetes Documentation: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
-- [Kubernetes Documentation: Declarative Management of Kubernetes Objects](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
+- [Kubernetes 1.35: Components](https://v1-35.docs.kubernetes.io/docs/concepts/overview/components/)
 - [Kubernetes 1.35: Declarative Management and Pruning](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
 - [Kubernetes 1.35: Server-Side Apply and Field Ownership](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)
 - [Kubernetes 1.35: Controller Model](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
@@ -711,17 +708,25 @@ After the first apply, the Deployment should report three desired replicas and t
 - [Kubernetes 1.35: Services and EndpointSlices](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/)
 - [Kubernetes 1.35: ConfigMaps](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/)
 - [Kubernetes 1.35: Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/)
+- [Kubernetes 1.35: Secret Environment Updates](https://v1-35.docs.kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/)
+- [Kubernetes 1.35: API Objects](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/)
 - [Flux: Kustomization Reconciliation](https://fluxcd.io/flux/components/kustomize/kustomizations/)
 - [Argo CD: Automated Sync Policy](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/)
 - [Terraform: Plan Command](https://developer.hashicorp.com/terraform/cli/commands/plan)
 - [Terraform: Apply Command](https://developer.hashicorp.com/terraform/cli/commands/apply)
-- [Kubernetes Documentation: Imperative Management of Kubernetes Objects Using Configuration Files](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-config/)
-- [Kubernetes Documentation: Managing Kubernetes Objects Using Imperative Commands](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/)
-- [Kubernetes Reference: kubectl apply](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
-- [Kubernetes Documentation: Object Management](https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/)
-- [Kubernetes Documentation: Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
-- [Kubernetes Documentation: ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/)
-- [Kubernetes Documentation: Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
+- [Kubernetes 1.35: Imperative Management Using Configuration Files](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-config/)
+- [Kubernetes 1.35: Imperative Commands](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/)
+- [Kubernetes 1.35: kubectl apply](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
+- [Kubernetes 1.35: Object Management](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/object-management/)
+- [Kubernetes 1.35: Labels and Selectors](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+- [GNU Bash: Readonly and Other Bourne Shell Builtins, Current Manual](https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html)
+- [GNU Bash: Command and Other Bash Builtins, Current Manual](https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html)
+- [GNU Bash 3.2: Historical Release and Reference Manual](https://ftp.gnu.org/gnu/bash/bash-3.2.tar.gz)
+- [OpenSSH: ssh Command Manual, Current Development Version](https://man.openbsd.org/ssh.1)
+- [Git: Commit Log](https://git-scm.com/docs/git-log)
+- [Git: Reverting Commits](https://git-scm.com/docs/git-revert)
+- [Docker: Running a Container](https://docs.docker.com/reference/cli/docker/container/run/)
+- [Docker: Listing Containers](https://docs.docker.com/reference/cli/docker/container/ls/)
 
 ---
 
