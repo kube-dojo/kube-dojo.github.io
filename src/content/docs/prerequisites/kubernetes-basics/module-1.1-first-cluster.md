@@ -227,7 +227,7 @@ contexts:
 The following are illustrative configuration commands, not instructions to change your current context. Context selection is persisted in kubeconfig and can affect other clients using that file; it is not merely shell-local. Default `config view` redacts credential fields, but metadata may still be sensitive. The runnable lab below uses its own kubeconfig and explicit contexts; never add `--raw` or print unrelated credentials.
 
 ```text
-# View the raw YAML of your configuration (redacting actual secrets)
+# View configuration with credential fields redacted
 kubectl config view
 
 # See all the context "stamps" in your passport
@@ -263,6 +263,27 @@ Decide the response before you bootstrap a cluster. The next section is about cr
 
 ## Section 4: Bootstrapping and Verifying the First Cluster
 
+### Set up the tools for your platform
+
+Start with [Docker Fundamentals: Installing Docker](/prerequisites/cloud-native-101/module-1.2-docker-fundamentals/#installing-docker) if you have a clean machine. Installing a client binary does not start a container engine. Choose one local engine and follow its platform instructions; you do not need several engines for this lesson.
+
+| Platform | Setup path |
+|---|---|
+| macOS | Install and launch [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/), choosing Apple silicon or Intel as appropriate. An existing [OrbStack installation](https://docs.orbstack.dev/docker/) is another Docker-compatible environment; start it and verify its Docker context. |
+| Ubuntu | Follow [Docker Engine's Ubuntu installation steps](https://docs.docker.com/engine/install/ubuntu/) for a supported release. Confirm the daemon is running and your account has authorized access to its socket. Do not copy Ubuntu package commands onto a different distribution. |
+| Other Linux distributions | Use the [Docker Engine installation guide](https://docs.docker.com/engine/install/) for your distribution rather than assuming its package manager or service setup matches Ubuntu. |
+
+Next install `kind` using its [Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), selecting the release binary for your operating system and CPU architecture. Install [kubectl for macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) or [kubectl for Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/). This lesson pins clusters to v1.35.0 and compares v1.34.0; a v1.35 kubectl client is within the supported one-minor skew for both. Do not assume an engine-bundled client has the required version.
+
+```bash
+docker version
+docker context show
+kind version
+kubectl version --client
+```
+
+Require a successful Docker **Server** response, not just a Client version, and check which local engine the context selects. If the daemon is unavailable, start your chosen engine and retry before creating clusters. These checks establish tool access, not ownership of existing resources. On macOS, open a dedicated terminal and run `bash` for the Bash helpers below; Linux learners should also use a dedicated Bash shell.
+
 Use only an authorized local Docker endpoint under your exclusive control, with no concurrent cluster creators. After installing the tools, open a dedicated Bash terminal and run this setup once. It points `KUBECONFIG` at a private file for this shell; your default file stays unchanged. The helpers refuse existing names and record successful creation, including a Docker object ID. These receipts are scoped evidence, not general ownership proof: stop if the shell, runtime endpoint, or ownership becomes uncertain. Failed partial creations require inspection with the lab owner, not automatic deletion. The other tools compared above are alternatives, not extra lab steps.
 
 ```bash
@@ -285,7 +306,7 @@ lesson_create() {
   existing=$(kind get clusters) || return 1
   if printf '%s\n' "$existing" | grep -Fxq "$name"; then echo 'Name exists: stop and choose an unused name' >&2; return 1; fi
   kind create cluster --name "$name" --kubeconfig "$KUBECONFIG" "$@" || return 1
-  node=$(docker inspect --format '{{.Id}}' "$name-control-plane") || return 1
+  node=$(docker inspect --type=container --format '{{.Id}}' "$name-control-plane") || return 1
   [[ "$node" =~ ^[0-9a-f]{64}$ ]] || return 1
   printf '%s\n' "$node" > "$lesson_dir/$name.owned"
 }
@@ -306,28 +327,19 @@ The setup exits the dedicated shell if workspace creation or navigation fails. K
 
 Treat the helper block as lesson setup; you do not need to memorize its Bash syntax. `lesson_create` runs `kind` and saves a creation receipt, `lesson_delete` checks for that receipt before cleanup, and `lesson_fail` targets the recorded container for the failure exercise. You will still use normal `kubectl` commands to inspect the cluster and switch contexts.
 
-To create your first cluster, Docker must be installed and running because `kind` calls the Docker API to create node containers. The `kind` binary itself is a single executable. The exact install command varies by operating system and package manager, but the Linux AMD64 example shows the basic shape: download the binary, mark it executable, and place it somewhere on your `PATH`. Package managers such as Homebrew can perform the same job on macOS or Linux.
-
-```bash
-# Example download for Linux AMD64 architecture
-curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
-# Grant execute permissions to the downloaded binary
-chmod +x ./kind
-# Move the binary to a directory included in your system PATH
-sudo mv ./kind /usr/local/bin/kind
-```
+Keep the API server on kind's loopback binding; do not change it to `0.0.0.0` or add public port mappings for this lesson. This also applies on a remote Linux machine: its API should stay private to that host. The exercise needs no publicly exposed application or Docker API port.
 
 A default `kind` cluster is created with one command. In that default topology, one container acts as both control plane and worker node. That is acceptable for first contact because it gives you the API server, `etcd`, scheduler, controller manager, kubelet, kube-proxy, CoreDNS, and a runtime in one compact environment. For deterministic exercises, pin the node image to a Kubernetes 1.35+ tag so everyone sees the same API behavior rather than whatever happens to be latest on the day they run the command.
 
 ```bash
-lesson_create dojo-basics
+lesson_create dojo-basics --image kindest/node:v1.35.0
 ```
 
 When this command runs, `kind` pulls the `kindest/node` image, starts a privileged node container, generates certificates, runs `kubeadm init`, starts control plane components, installs networking, and writes access details into kubeconfig. That final kubeconfig step is why your next `kubectl` command knows where the new API server lives. The cluster is local, but it is not fake: you are talking to a real Kubernetes API server whose loopback port is mapped from your host into the node container.
 
 This sequence is worth slowing down because every step leaves a different diagnostic trail. A pull failure points toward registry access or disk space. A node container failure points toward Docker health, permissions, or resource allocation. A `kubeadm init` failure points toward Kubernetes bootstrap logs inside the node. A kubeconfig failure points toward client access rather than cluster creation. When you read a `kind` error, do not collapse all of those stages into "cluster failed." Identify which stage failed, then choose the tool that can see that layer.
 
-To explicitly pin the Kubernetes version, append the `--image` flag to `lesson_create`, for example `lesson_create dojo-basics --image kindest/node:v1.35.0` instead of the unpinned creation above. Pinning matters when you are learning from written material because Kubernetes evolves. A command, API default, or warning can change between releases, and you want differences to be deliberate rather than accidental. In real teams, version pinning also makes bug reports reproducible because everyone can create the same local cluster shape before discussing the failure.
+The `--image` flag pins the Kubernetes version instead of relying on kind's changing default. Pinning matters when you are learning from written material because Kubernetes evolves. A command, API default, or warning can change between releases, and you want differences to be deliberate rather than accidental. In real teams, version pinning also makes bug reports reproducible because everyone can create the same local cluster shape before discussing the failure.
 
 ```bash
 kubectl cluster-info
@@ -406,12 +418,13 @@ lesson_delete dojo-basics
 Now create the multi-node topology. `kind` starts three Docker containers, initializes the first as the control plane, generates join material, and has the other two join as workers over the Docker bridge network. The command takes a little longer than the single-node cluster, but it gives you a topology that can teach scheduling decisions instead of merely API submission.
 
 ```bash
-lesson_create dojo-multi --config multi-node-config.yaml
+lesson_create dojo-multi --config multi-node-config.yaml --image kindest/node:v1.35.0
 ```
 
 Verify the architecture through Kubernetes, not only through Docker. The Kubernetes node list is what the scheduler uses when it chooses placement, so it is the view that matters for later workload behavior. Worker nodes normally show `<none>` in the roles column unless you label them, which is expected and not an error.
 
 ```bash
+kubectl wait node --all --for=condition=Ready --timeout=120s
 kubectl get nodes
 ```
 
@@ -569,13 +582,15 @@ In this exercise, you will create multiple local clusters, inspect kubeconfig, p
 **Setup Requirements:**
 Use the authorized local runtime and same-shell helpers initialized in Section 4; do not run this exercise independently with ambient kubeconfig. If you skipped setup, return there first. Stop if the runtime endpoint or ownership is uncertain. Cleanup is limited to the successful creations recorded by this lesson.
 
+Finish the earlier topology before starting this exercise: if this run still has its `dojo-multi.owned` receipt, run `lesson_delete dojo-multi`. The version comparison needs two single-node clusters together. After recording that comparison, remove both before the optional three-control-plane topology in Task 5. That topology uses more host resources and is not proof of production availability; stop and inspect startup failures rather than adding clusters or changing host limits blindly.
+
 ### Tasks
 
 1. **The Baseline Cluster Initialization:** Create a standard single-node cluster named `primary-dojo`. Verify the cluster is fully running, and utilize command-line tools to determine the exact IP address and port the control plane API server is bound to on your host machine's network interface.
 2. **The Kubeconfig Deep Dive:** Use the redacted view of this lesson's private kubeconfig. Identify the cluster, user, and context references without printing raw credentials or opening your default configuration.
 3. **Strict Version Pinning:** Create a second, completely simultaneous cluster named `legacy-dojo`. This cluster must rigidly enforce running an older version of Kubernetes, specifically v1.34.0, utilizing the specific image tag `kindest/node:v1.34.0`.
 4. **Context Switching Mastery:** Use `kubectl config use-context` to choose each successfully created cluster in the private kubeconfig, then run `kubectl version`. Compare observed server versions without modifying the default file.
-5. **Topology Engineering and Declaration:** Create a declarative YAML configuration file designed to deploy a third cluster named `ha-dojo`. This cluster must artificially simulate a highly available control plane architecture by provisioning exactly three control-plane nodes and zero worker nodes.
+5. **Optional topology practice:** After cleaning up the two comparison clusters, create a declarative YAML configuration for `ha-dojo` with exactly three control-plane nodes and zero worker nodes. Keep this advanced local topology separate from the essential single-node and context exercises.
 6. **Simulated Catastrophic Failure:** Delete only the successfully created clusters recorded by this lesson. Create a new `broken-dojo` with the guarded helper, then use `lesson_fail` to kill its single owned control-plane node. Stop on failed creation, collision, or uncertain ownership; never select an arbitrary Docker container from a listing.
 
 ### Solutions
@@ -587,7 +602,7 @@ First, execute the standard creation command. The custom name makes the generate
 
 ```bash
 # Provision the cluster
-lesson_create primary-dojo
+lesson_create primary-dojo --image kindest/node:v1.35.0
 ```
 
 Once the cluster indicates it has started successfully, find out exactly where it is listening. `kind` maps a random high-numbered port on your host's localhost address to port 6443 inside the container.
@@ -640,7 +655,7 @@ kubectl config get-contexts
 # Explicitly switch the active context to the primary cluster
 kubectl config use-context kind-primary-dojo
 
-# Verify the server version matches the latest default
+# Verify the observed server version matches the v1.35.0 pin
 kubectl version
 
 # Explicitly switch the active context to the legacy cluster
@@ -648,6 +663,10 @@ kubectl config use-context kind-legacy-dojo
 
 # Verify the server version matches exactly v1.34.0
 kubectl version
+
+# Record the comparison, then release both clusters before optional Task 5
+lesson_delete primary-dojo
+lesson_delete legacy-dojo
 ```
 </details>
 
@@ -671,7 +690,7 @@ Now instruct `kind` to read this file during cluster creation.
 
 ```bash
 # Provision the cluster using the configuration file
-lesson_create ha-dojo --config ha-config.yaml
+lesson_create ha-dojo --config ha-config.yaml --image kindest/node:v1.35.0
 
 # Validate the topology
 kubectl get nodes 
@@ -686,13 +705,11 @@ You should see exactly three nodes listed, all explicitly marked with the contro
 Finally, practice cleaning up the environment and observing a raw control plane failure.
 
 ```bash
-# Delete only the lab clusters created earlier in this exercise
-lesson_delete primary-dojo
-lesson_delete legacy-dojo
-lesson_delete ha-dojo
+# If you completed optional Task 5, delete that recorded lesson cluster
+test ! -f "$lesson_dir/ha-dojo.owned" || lesson_delete ha-dojo || exit 1
 
 # Create the target cluster
-lesson_create broken-dojo
+lesson_create broken-dojo --image kindest/node:v1.35.0
 
 # The creation receipt contains the original control-plane Docker ID.
 # A later container reusing the name is never the failure target.
@@ -719,7 +736,7 @@ At the end, inspect the remaining `*.owned` receipts in the printed workspace an
 - [ ] You successfully provisioned and ran multiple distinct, isolated Kubernetes clusters on your host machine simultaneously.
 - [ ] You identified and explained the structural components of the `kubeconfig` file.
 - [ ] You switched the private kubeconfig's current context and compared server versions without altering your default file.
-- [ ] You successfully designed and provisioned a highly non-standard cluster topology utilizing a declarative YAML configuration file.
+- [ ] If you attempted optional Task 5, you verified its declared three-control-plane topology and cleaned it up.
 - [ ] You empirically observed and documented the exact failure mode of `kubectl` when the control plane becomes catastrophically unreachable.
 - [ ] You practiced excellent infrastructure hygiene by successfully deleting all ephemeral clusters created during this exercise.
 

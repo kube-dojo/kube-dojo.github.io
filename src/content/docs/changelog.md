@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Clearer cluster setup on macOS and Linux.** [Your First Cluster](/prerequisites/kubernetes-basics/module-1.1-first-cluster/) now explains which tools to install and start, checks client versions, pins practice clusters and separates the optional advanced topology from the core path.
 - **Clearer kubectl command guidance.** [kubectl Basics](/prerequisites/kubernetes-basics/module-1.2-kubectl-basics/) separates reference examples from practice, explains node-wide drain effects and local file overwrites, and clarifies how context changes persist.
 - **More controlled first-cluster practice.** [Your First Cluster](/prerequisites/kubernetes-basics/module-1.1-first-cluster/) keeps context switching in a private configuration, checks lesson creation before cleanup, and targets the recorded container during the failure exercise.
 - **Clearer container lifecycle practice.** [What Are Containers?](/prerequisites/cloud-native-101/module-1.1-what-are-containers/) keeps name collisions untouched; [Docker Fundamentals](/prerequisites/cloud-native-101/module-1.2-docker-fundamentals/) uses fresh project folders, loopback web examples and cleanup tied to the lesson's containers, and distinguishes restarting a container from replacing it.
