@@ -1,0 +1,7 @@
+# T01-P09a2: state the ConfigMap exercise's setup dependency
+
+Owner #2278, program #2272. Disposition **revise**. The post-publication browser pass of #3567 exposed an unchanged opening promise that every example used full kubectl commands and was independently copy-paste runnable. That contradicted the new cfg_lab helper dependency, despite the setup being documented in the exercise. Replace the blanket promise with reference-example boundaries and explicit same-Bash setup/helper/cleanup instructions; retain the Kubernetes1.35 target and configuration/credential learning outcomes.
+
+This is an opening-prose correction only. The whole module was read in P09a, with independent xAI R1/R2 at407c4638c/df2276837 and successful selected execution at sourcee159745382989815f3a56dd919ca9e78776a58634bc14910b2f4127fb661434f. All22 fenced blocks remain byte-identical to that recorded execution; no new executable example or technical product claim is introduced. The earlier [scoped receipt](2026-10-27-configmap-scope-p09a.md) and PR3567 evidence remain applicable within their stated limits.
+
+The correction does not establish whole-page source/rubric/editorial/assessment/lab/hosted/human/UK acceptance. Current-digest structural checks, exact-head independent delta review/CI, merged build and post-Pages opening/helper smoke are the delivery gates for this follow-up. Existing learner news already describes the corrected exercise; no additional announcement or acceptance promotion is needed.
