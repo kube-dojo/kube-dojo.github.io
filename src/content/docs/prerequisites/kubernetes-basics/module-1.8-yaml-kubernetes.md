@@ -11,7 +11,7 @@ revision_pending: false
 >
 > **Prerequisites**: Modules 1.1-1.7, including basic Kubernetes resources, pods, services, deployments, labels, and the `kubectl` workflow
 >
-> **Command convention**: This module uses the full `kubectl` command in every runnable example so copied commands work in interactive shells, scripts, and CI jobs.
+> **Command convention**: Earlier commands are reference examples; check their files, names, permissions, and request scope before trying them in a disposable lab. Hands-on practice uses `yaml_check` after setup in the same Bash terminal; the helper fixes the context, namespace, and server-dry-run mode.
 
 ---
 
@@ -20,7 +20,7 @@ revision_pending: false
 By the end of this module, you will be able to:
 
 1. **Construct** structurally sound Kubernetes manifests using YAML scalars, mappings, sequences, multi-line strings, and multi-document files.
-2. **Deconstruct** the required Kubernetes manifest fields `apiVersion`, `kind`, `metadata`, and `spec` so you can explain how they route declarative state through the API server.
+2. **Deconstruct** common Kubernetes manifest fields (`apiVersion`, `kind`, and `metadata`) and resource-specific payloads such as Deployment `spec` or ConfigMap `data`, so you can explain how documents become API objects.
 3. **Diagnose** YAML syntax, schema, and type validation failures by combining dry-run output, `kubectl explain`, and targeted inspection of nested manifest paths.
 4. **Design** multi-resource application manifests that connect Deployments, Services, ConfigMaps, environment variables, labels, selectors, and volume mounts.
 5. **Compare** client-side validation, server-side validation, and diff workflows to choose the safest verification step before applying a production change.
