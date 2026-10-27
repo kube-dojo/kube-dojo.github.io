@@ -473,7 +473,7 @@ Start with the operational question
 
 - Kubernetes Service DNS uses the pattern `<service>.<namespace>.svc.cluster.local` by default, so `data.analytics.svc.cluster.local` and `data.prod.svc.cluster.local` can refer to different Services without a naming collision.
 - Label keys and values are constrained around the DNS label tradition, including the familiar 63-character name segment limit, because Kubernetes labels are designed to be compact identifiers that the API server can index efficiently.
-- A namespace deletion is asynchronous: after `kubectl delete namespace alpha-team`, Kubernetes removes namespaced objects and waits for finalizers, so a broken finalizer can leave the namespace in `Terminating` until the object is repaired.
+- Namespace deletion is asynchronous: Kubernetes removes the namespace's objects and waits for finalizers, so a broken finalizer can leave the namespace in `Terminating` until the object is repaired.
 - Lease objects in `kube-node-lease` reduce control-plane load by letting each node update a small heartbeat object instead of constantly rewriting the larger Node status object.
 
 ## Common Mistakes
@@ -595,7 +595,7 @@ if [ "$NS_NEW" = yes ] && [ -n "$NS_CONTEXT" ] && [ "$NS_CONTEXT" != default ] &
     NS_UID="$NS_CREATED_UID"; NS_READY=yes
   fi
 fi
-[ "$NS_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
+[ "$NS_READY" = yes ] || echo 'Setup failed: check the nonempty/non-default lab context, current-context match, creation result, and namespace UID; stop' >&2
 ```
 
 Continue only after setup succeeds. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
@@ -603,7 +603,7 @@ Continue only after setup succeeds. Run setup once: re-pasting disables the help
 Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
 
 ```bash
-NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && cd "$NS_DIR" && printf 'Manifest directory: %s\n' "$NS_DIR"
+NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && printf 'Manifest directory: %s\n' "$NS_DIR" && cd "$NS_DIR"
 ```
 </details>
 
@@ -712,11 +712,11 @@ spec:
 ns_lab apply -f web-svc.yaml
 
 # Verify the service is finding the three v1 pods
-ns_lab get endpoints web-svc
+ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}'
 ns_lab get pods -l app=web,version=v1
 ```
 
-Endpoint updates are asynchronous: repeat the endpoint check until three ready Pod addresses appear before adding the canary; investigate if they do not converge. The legacy Endpoints API has been deprecated since Kubernetes 1.33; EndpointSlices are its replacement.
+Endpoint updates are asynchronous: repeat the endpoint check until three stable Pod names and addresses appear before adding the canary; investigate if they do not converge. This prints every ready member instead of truncating a table. The legacy Endpoints API has been deprecated since Kubernetes 1.33; its warning is expected and EndpointSlices are its replacement.
 </details>
 
 ### Task 5: The Canary Release
@@ -745,11 +745,11 @@ ns_lab apply -f web-v2-canary.yaml
 ns_lab wait --for=condition=Ready pod/web-v2-canary --timeout=90s
 
 # Check the endpoints again
-ns_lab get endpoints web-svc
+ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}'
 ns_lab get pods --show-labels
 ```
 
-Repeat the endpoint check until it includes the ready canary and three stable Pods; investigate if it does not converge. Because the Service selector checks only `app=web`, both versions qualify for traffic.
+Repeat the endpoint check until it lists `web-v2-canary` and three `web-v1` Pod names with their IPs; investigate if it does not converge. The deprecation warning is expected and separate from this membership check. Because the Service selector checks only `app=web`, both versions qualify for traffic.
 </details>
 
 ### Task 6: Cleanup
