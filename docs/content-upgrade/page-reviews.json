@@ -12,7 +12,7 @@
     },
     {
       "path": "prerequisites/philosophy-design/index.md",
-      "page_digest": "sha256:10073322df14cbc1ee3bac404f15881c9c40eeaab321481aa8cf401b1e61137a",
+      "page_digest": "sha256:6265bbb9ea925454df50ef8b49d01e8f3474bd9fa1c36ee25e7f8a62f0a46ec3",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md"],

@@ -2,7 +2,7 @@
 
 Owner #2278; source/editorial/practice #2275/#2276. This receipt covers the entire hub, not the four linked module bodies. Initial disposition **revise**: the opening asserted undisputed industry dominance, treated declarative management as sufficient for resilience/scalability, and dismissed omitted technology universally. The correction states the section's learning sequence and scopes the controller model; no unsupported adoption statistic or measured learner benefit replaces those claims.
 
-Reviewed source: `prerequisites/philosophy-design/index.md`, SHA-256 `10073322df14cbc1ee3bac404f15881c9c40eeaab321481aa8cf401b1e61137a`, all24 lines. Claim map checked2026-10-27:
+Reviewed source: `prerequisites/philosophy-design/index.md`, SHA-256 `6265bbb9ea925454df50ef8b49d01e8f3474bd9fa1c36ee25e7f8a62f0a46ec3`, all24 lines. Claim map checked2026-10-27:
 
 | Complete source span | Evidence and disposition |
 |---|---|
