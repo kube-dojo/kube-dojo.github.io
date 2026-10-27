@@ -4,10 +4,10 @@
   "pages": [
     {
       "path": "prerequisites/philosophy-design/module-1.1-why-kubernetes-won.md",
-      "page_digest": "sha256:0c8640953f456e3569c908ce99726cc1c19510ce859777a02c0b6db4e65a939b",
+      "page_digest": "sha256:7585caee325c387de12558f1d48a280c177212c1caf2ca2728a3c8f77e2ac921",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-history-provenance-p10c.md", "docs/content-upgrade/reviews/2026-10-27-orchestrator-comparisons-p10d.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-history-provenance-p10c.md", "docs/content-upgrade/reviews/2026-10-27-orchestrator-comparisons-p10d.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-history-provenance-p10c.md", "docs/content-upgrade/reviews/2026-10-27-orchestrator-comparisons-p10d.md", "docs/content-upgrade/reviews/2026-10-27-history-source-anchors-p10f.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-history-provenance-p10c.md", "docs/content-upgrade/reviews/2026-10-27-orchestrator-comparisons-p10d.md", "docs/content-upgrade/reviews/2026-10-27-history-source-anchors-p10f.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
