@@ -42,6 +42,9 @@ tiers:
                           # third-party fork.
     - raw.githubusercontent.com
     - apache.org
+    - gnu.org             # official Bash/Coreutils manuals and release archives
+    - openbsd.org         # official OpenBSD/OpenSSH manual pages
+    - git-scm.com         # official Git command documentation
     - linuxfoundation.org
     - cloudnative.io
     - opencontainers.org
@@ -67,6 +70,8 @@ tiers:
     - aws.amazon.com
     - docs.aws.amazon.com
     - cloud.google.com
+    - research.google     # Google Research records about its own systems;
+                          # vendor evidence, not independent competitor evidence
     - learn.microsoft.com
     - azure.microsoft.com
     - redhat.com
