@@ -61,7 +61,7 @@ That separation is one reason Kubernetes commands often come in pairs: one comma
 
 There is a practical security lesson here too. Requests sent to the API server pass through [authentication and authorization, with admission controls applying to relevant changes](https://v1-35.docs.kubernetes.io/docs/concepts/security/controlling-access/). A cluster may let you read pods while blocking deletes, or let you create ConfigMaps while rejecting privileged pods through policy. When a command is denied, do not work around it with a more powerful credential by reflex. First decide whether the policy is protecting the cluster from exactly the kind of change you are trying to make.
 
-**Pause and predict:** If `kubectl` is only an API client, what happens when your kubeconfig points at a healthy cluster but your credential has expired?
+**Pause and predict:** For a cluster resource request, what happens when your kubeconfig points at a healthy cluster but your credential has expired?
 
 <details>
 <summary>Check your prediction</summary>
@@ -501,7 +501,7 @@ You will still see these anti-patterns in real environments because they often w
 
 | Anti-pattern | What Goes Wrong | Better Alternative |
 |---|---|---|
-| Treating `default` as the whole cluster | Workloads vanish from view because they live in another namespace. | Use `-A` for inventory and `kubectl config set-context --current --namespace=...` for focused work. |
+| Treating `default` as the whole cluster | Workloads vanish from view because they live in another namespace. | Use `-A` for inventory and explicit `-n` for focused work; record and restore any persistent namespace-default change. |
 | Grepping human tables in scripts | Column changes, headers, or coincidental text produce false matches. | Use `--field-selector`, `-o jsonpath`, `-o custom-columns`, or `jq` against JSON. |
 | Making live-only fixes on GitOps resources | The controller reconciles back to Git and the incident repeats. | Update the manifest in Git, or suspend reconciliation intentionally with a written rollback plan. |
 | Using `--force --grace-period=0` as a cleanup shortcut | The API object can disappear while the real process or external resource remains. | Read finalizers and node health first, then force only when the risk is known and documented. |
@@ -574,7 +574,7 @@ kubectl ns kubectl-practice
 | Mistake | Why It Happens | How to Fix It |
 |---|---|---|
 | Running destructive commands in the wrong context. | Stale `current-context` from previous work; no visual prompt indicator. | Run `kubectl config current-context` before destructive operations and keep the context visible in your shell prompt. |
-| Forgetting `--namespace` and assuming the cluster is empty. | `kubectl get pods` defaults to `default`, which is often not where workloads live. | Use `-n <namespace>` explicitly, use `-A` for inventory, or set a temporary namespace on the current context. |
+| Forgetting `--namespace` and assuming the cluster is empty. | The context's namespace, or `default` when absent, can hide workloads elsewhere. | Use explicit `-n` or `-A`; namespace defaults persist in kubeconfig, so record and restore any change. |
 | Reading plain `kubectl logs` on a CrashLoopBackOff pod and seeing nothing useful. | The current container instance may have just restarted and not reached the failing line yet. | Use `kubectl logs <pod> --previous`, then read `kubectl describe pod <pod>` Events if previous logs are empty. |
 | Editing Deployments live and forgetting to update Git. | The change works temporarily, but the durable source of truth still contains the old value. | Update the manifest, run `kubectl diff`, and apply through the same workflow your team uses for durable changes. |
 | Mixing manual `kubectl scale` with a GitOps-managed Deployment. | The controller reconciles the object back to the replica count stored in Git. | Change Git, introduce an HPA, or intentionally suspend reconciliation with a documented rollback plan. |
@@ -642,46 +642,50 @@ kubectl ns kubectl-practice
 
 ## Hands-On Exercise
 
-Exercise scenario: you will create a namespace, deploy two small workloads, deliberately break one image rollout, diagnose the failure, repair it, practice structured output extraction, open a temporary port-forward, and clean up. Use a local kind or minikube cluster rather than a shared environment. The goal is not to memorize every flag; it is to rehearse a complete operations loop with explicit target checks, safe inspection, precise mutation, verification, and cleanup.
+Exercise scenario: create a namespace, deploy two small workloads, break and repair an image rollout, extract structured output, open a temporary port-forward, and clean up. First open a new dedicated Bash terminal and run the setup block in [Module 1.1, Section 4](../module-1.1-first-cluster/#section-4-bootstrapping-and-verifying-the-first-cluster), including its helpers, to obtain a fresh private workspace and kubeconfig. Use the same authorized local Docker endpoint under exclusive control, with no concurrent creators, throughout this exercise. Do not reuse a shared cluster or configuration.
 
-Before you start, confirm your kubeconfig is pointing at a non-production cluster. If the next command returns anything other than a local practice cluster, stop and switch contexts before continuing. Every later step creates or deletes resources, so this pre-flight check is part of the exercise rather than optional ceremony.
+The following creates a new disposable cluster through the prerequisite's guarded helper. A familiar context name alone proves neither identity nor ownership. Stop on any unexpected failure; keep receipts for recovery rather than adopting an existing resource. Each client command names the private kubeconfig and fixed lesson context; namespaced work also names the namespace, without changing a default.
 
-Keep a short note beside your terminal while you work through the lab. For each step, write the question the command answered, not just whether the command succeeded. For example, the namespace step answers "where will my objects go by default?" while the bad image step answers "can I distinguish a registry or tag failure from a crashed application?" This habit turns a sequence of commands into a troubleshooting playbook you can reuse.
+Keep a short note beside your terminal while you work through the lab. For each step, write the question the command answered, not just whether the command succeeded. The namespace step answers "which isolated workspace holds my objects?" while the bad image step answers "is this a pull failure or a crashed application?" This turns commands into a reusable troubleshooting playbook.
 
 ```bash
-# Pre-flight check: build this habit before destructive work
-kubectl config current-context
-# Expected: something like "kind-kind" or "minikube"
+lesson_workspace || exit 1
+set -o noclobber # Refuse to overwrite existing lesson files
+lesson_create kubectl-dojo --image kindest/node:v1.35.0 || exit 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo cluster-info
 ```
 
-### Step 1: Set up a working namespace and make it your default for this shell
+### Step 1: Create and record a practice namespace
 
 ```bash
-kubectl create namespace kubectl-practice
-kubectl config set-context --current --namespace=kubectl-practice
-kubectl config view --minify | grep namespace:
-# Expected: namespace: kubectl-practice
+lab_ns="kubectl-practice-$$"
+lab_uid=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo create namespace "$lab_ns" -o jsonpath='{.metadata.uid}') || exit 1
+test -n "$lab_uid" || exit 1
+lesson_workspace && printf '%s\n' "$lab_uid" > namespace.uid || exit 1
+printf 'Practice namespace: %s\n' "$lab_ns"
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-The namespace should appear in `kubectl get namespaces`, and the minified config view should show `namespace: kubectl-practice`. If the namespace line is missing, repeat the `set-context --current --namespace=kubectl-practice` command and verify you did not change contexts in another terminal.
+Successful creation returns the new namespace UID, which the private workspace records for cleanup. A failed create exits the dedicated shell before workload commands can follow. Keep this shell and workspace; do not reconstruct ownership from a namespace name if they are lost. The default kubeconfig file and its namespace settings remain unchanged.
 </details>
 
 ### Step 2: Deploy two workloads, one imperatively and one declaratively
 
 ```bash
 # Imperative
-kubectl create deployment imperative-web --image=nginx:1.27.0 --replicas=2
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" create deployment imperative-web --image=nginx:1.27.0 --replicas=2
 
 # Generate a manifest declaratively, then apply it
-kubectl create deployment declarative-web --image=httpd:2.4 --replicas=2 \
-  --dry-run=client -o yaml > declarative-web.yaml
-kubectl apply -f declarative-web.yaml
+lesson_workspace && kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" create deployment declarative-web --image=httpd:2.4 --replicas=2 \
+  --dry-run=client -o yaml > declarative-web.yaml || exit 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" apply -f declarative-web.yaml
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/imperative-web --timeout=120s
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/declarative-web --timeout=120s
 
 # Inspect both
-kubectl get deploy,rs,pod -o wide
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get deploy,rs,pod -o wide
 ```
 
 <details>
@@ -693,20 +697,20 @@ You should see two Deployments, two ReplicaSets, and four Pods once both rollout
 ### Step 3: Break something on purpose, then debug it
 
 ```bash
-# Push a bad image tag. This should fail.
-kubectl set image deployment/imperative-web nginx=nginx:does-not-exist
-kubectl rollout status deployment/imperative-web --timeout=30s
+# The image update is accepted; its rollout should time out on the bad tag.
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" set image deployment/imperative-web nginx=nginx:does-not-exist
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/imperative-web --timeout=30s
 # Expected: timeout, deployment stuck
 
 # Diagnose
-kubectl get pods -l app=imperative-web
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pods -l app=imperative-web
 # Look for ImagePullBackOff
-kubectl describe pod -l app=imperative-web | tail -30
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" describe pod -l app=imperative-web | tail -30
 # Read the Events at the bottom
 
 # Fix it
-kubectl set image deployment/imperative-web nginx=nginx:1.27.0
-kubectl rollout status deployment/imperative-web
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" set image deployment/imperative-web nginx=nginx:1.27.0
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/imperative-web --timeout=120s
 ```
 
 <details>
@@ -719,13 +723,13 @@ The failed rollout should produce an `ImagePullBackOff` or `ErrImagePull` event 
 
 ```bash
 # Get just pod names, one per line
-kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
 
 # Custom columns view
-kubectl get pods -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName,IP:.status.podIP
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pods -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName,IP:.status.podIP
 
 # Sort by age
-kubectl get pods --sort-by=.metadata.creationTimestamp
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pods --sort-by=.metadata.creationTimestamp
 ```
 
 <details>
@@ -737,8 +741,10 @@ The JSONPath command should print only pod names, one per line, while the custom
 ### Step 5: Exec into a pod and confirm internal state
 
 ```bash
-POD=$(kubectl get pod -l app=imperative-web -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -it "$POD" -- sh -c 'nginx -v && hostname && cat /etc/hostname'
+POD=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pod -l app=imperative-web --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}') || exit 1
+test -n "$POD" || exit 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" wait --for=condition=Ready pod/"$POD" --timeout=60s || exit 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" exec -it "$POD" -- sh -c 'nginx -v && hostname && cat /etc/hostname'
 ```
 
 <details>
@@ -747,48 +753,64 @@ kubectl exec -it "$POD" -- sh -c 'nginx -v && hostname && cat /etc/hostname'
 The command should print an nginx version and a hostname that matches the pod's internal hostname. If it fails because the pod is not ready, check the pod status first; if it fails because the shell is missing, the image is too minimal for this particular `exec` example.
 </details>
 
-### Step 6: Port-forward and verify connectivity from your laptop
+### Step 6: Port-forward and verify connectivity on the same host
 
 ```bash
-kubectl port-forward deployment/imperative-web 8080:80 &
-sleep 2
-curl -s http://localhost:8080 | head -5
-# You should see HTML from nginx
-kill %1
+# Write a unique response into one specific ready Pod, then forward that Pod.
+printf '%s\n' "$lab_ns" | kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" exec -i "$POD" -- sh -c 'cat > /usr/share/nginx/html/lesson.txt' || exit 1
+printf 'Expected response: %s\n' "$lab_ns"
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" port-forward --address 127.0.0.1 pod/"$POD" :80
+# Wait for: Forwarding from 127.0.0.1:<assigned-port> -> 80
 ```
+
+Leave this foreground command running. Open a second terminal on the same host (a second SSH session to that machine if working remotely), start Bash by running `bash`, then enter the port printed by this command and the expected response printed immediately above it:
+
+```bash
+read -r -p 'Assigned port: ' lab_port
+read -r -p 'Expected response: ' lab_expected
+[[ "$lab_port" =~ ^[0-9]+$ ]] && test -n "$lab_expected" &&
+  lab_response=$(curl --noproxy '*' --fail --silent --show-error --max-time 5 "http://127.0.0.1:$lab_port/lesson.txt") &&
+  test "$lab_response" = "$lab_expected" && printf 'Verified lesson response: %s\n' "$lab_response"
+```
+
+Proceed only if the exact response matches. Return to the first terminal and press **Ctrl-C**, then wait for its shell prompt before cleanup. If forwarding fails before printing its bind line, stop; do not curl an assumed port or terminate another job.
 
 <details>
 <summary>Solution notes</summary>
 
-The `curl` output should start with HTML from nginx, proving that your laptop can reach a pod through the API-server-backed tunnel. Killing the background job closes the tunnel, so there is no Service, Ingress, firewall rule, or cloud resource left behind.
+The OS assigns an available local port, and `--address 127.0.0.1` binds only loopback. The exact namespace marker distinguishes this Pod's response from an unrelated web listener. The foreground tunnel ends with Ctrl-C; there is no background job number or PID to guess and no public Service or host port mapping to remove.
 </details>
 
 ### Step 7: Clean up
 
 ```bash
-kubectl config set-context --current --namespace=default
-kubectl delete namespace kubectl-practice
-# Wait for it to fully terminate before moving on
-kubectl get namespace kubectl-practice 2>&1 | grep NotFound
+lesson_workspace || exit 1
+test -s namespace.uid || exit 1
+current_uid=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo get namespace "$lab_ns" -o jsonpath='{.metadata.uid}') || exit 1
+test -n "$current_uid" || exit 1
+test "$current_uid" = "$(cat namespace.uid)" || exit 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo delete namespace "$lab_ns" --wait=true --timeout=120s && rm namespace.uid
+# Stop if deletion fails: retain the receipt and ask the lab owner for recovery.
+test ! -e namespace.uid && lesson_delete kubectl-dojo && lesson_finish
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-The namespace deletion can take a little time because Kubernetes removes the resources inside it before removing the namespace object. The cleanup is complete when the final command reports `NotFound`, and your current context points back at the `default` namespace.
+Namespace deletion waits for removal and preserves the UID receipt on failure. Only after success does the guarded helper delete this run's cluster and restore the previous `KUBECONFIG` environment value. Retain the private workspace for evidence; close the dedicated shell afterward. Never delete a replacement namespace with a different UID or force-remove finalizers to clear this exercise.
 </details>
 
 ### Success criteria
 
-- [ ] You ran `kubectl config current-context` before doing anything destructive and confirmed you were on a local cluster.
-- [ ] You created the `kubectl-practice` namespace and set it as the default namespace for your shell.
-- [ ] You used read-only inspection (`kubectl get`, `kubectl describe`, `kubectl logs --previous`) before the repair step in the lab.
+- [ ] You created a new disposable cluster with private kubeconfig and kept the fixed context visible in commands.
+- [ ] You recorded successful namespace creation and its UID without changing a namespace default.
+- [ ] You used `get` and `describe` before repair; you can explain why an unpulled image has no previous container logs.
 - [ ] You deployed `imperative-web` with an imperative `kubectl create deployment` command and `declarative-web` from a generated YAML manifest.
 - [ ] You broke `imperative-web` by setting a non-existent image tag, observed the resulting `ImagePullBackOff`, and used `kubectl describe` Events to confirm the cause.
 - [ ] You fixed the broken Deployment by re-setting a valid image and confirmed via `kubectl rollout status` that the rollout succeeded.
 - [ ] You extracted pod names using `-o jsonpath` with a `range` block, producing one name per line.
 - [ ] You used `kubectl exec -it` to run a multi-command shell snippet inside a pod.
-- [ ] You used `kubectl port-forward` to access the workload from your laptop on `localhost:8080` and saw a real HTTP response.
+- [ ] You verified the Pod's exact marker through an assigned loopback port, then stopped the foreground tunnel with Ctrl-C.
 - [ ] You cleaned up by deleting the namespace and confirmed it no longer exists.
 
 - [ ] I named a failure layer and a next action for each frozen client-layer card before opening the reveal.
