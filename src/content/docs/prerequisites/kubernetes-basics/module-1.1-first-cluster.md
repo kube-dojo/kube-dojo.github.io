@@ -273,16 +273,20 @@ Start with [Docker Fundamentals: Installing Docker](/prerequisites/cloud-native-
 | Ubuntu | Follow [Docker Engine's Ubuntu installation steps](https://docs.docker.com/engine/install/ubuntu/) for a supported release. Confirm the daemon is running and your account has authorized access to its socket. Do not copy Ubuntu package commands onto a different distribution. |
 | Other Linux distributions | Use the [Docker Engine installation guide](https://docs.docker.com/engine/install/) for your distribution rather than assuming its package manager or service setup matches Ubuntu. |
 
-Next install `kind` using its [Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), selecting the release binary for your operating system and CPU architecture. Install [kubectl for macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) or [kubectl for Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/). This lesson pins clusters to v1.35.0 and compares v1.34.0; a v1.35 kubectl client is within the supported one-minor skew for both. Do not assume an engine-bundled client has the required version.
+Next install `kind` using its [Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), selecting the release binary for your operating system and CPU architecture. For [kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) or [Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/), use the specific-version download procedure with **v1.35.0**, not the page's latest-release default or `stable.txt`. For example, the Apple-silicon binary is `https://dl.k8s.io/release/v1.35.0/bin/darwin/arm64/kubectl`; Linux x86-64 uses `https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl`. Verify the matching `.sha256` download as the instructions show, then install using your platform's steps. This client supports both the v1.35.0 lesson clusters and the v1.34.0 comparison. An engine-bundled client may have a different version.
+
+Open a dedicated terminal and run `bash` before the checks and helpers below. Require kubectl minor v1.35 for this lesson; the check exits that dedicated shell if a different minor is selected.
 
 ```bash
-docker version
-docker context show
-kind version
-kubectl version --client
+docker version || exit 1
+docker context show || exit 1
+kind version || exit 1
+client_version=$(kubectl version --client -o yaml) || exit 1
+printf '%s\n' "$client_version"
+printf '%s\n' "$client_version" | grep -Eq '^  gitVersion: v1[.]35[.]' || { echo 'Install kubectl v1.35.x before continuing' >&2; exit 1; }
 ```
 
-Require a successful Docker **Server** response, not just a Client version, and check which local engine the context selects. If the daemon is unavailable, start your chosen engine and retry before creating clusters. These checks establish tool access, not ownership of existing resources. On macOS, open a dedicated terminal and run `bash` for the Bash helpers below; Linux learners should also use a dedicated Bash shell.
+Require a successful Docker **Server** response, not just a Client version, and check which local engine the context selects. If the daemon is unavailable, start your chosen engine and retry before creating clusters. These checks establish tool access, not ownership of existing resources. Keep this dedicated Bash shell for the lesson rather than assuming the default terminal shell supports every helper.
 
 Use only an authorized local Docker endpoint under your exclusive control, with no concurrent cluster creators. After installing the tools, open a dedicated Bash terminal and run this setup once. It points `KUBECONFIG` at a private file for this shell; your default file stays unchanged. The helpers refuse existing names and record successful creation, including a Docker object ID. These receipts are scoped evidence, not general ownership proof: stop if the shell, runtime endpoint, or ownership becomes uncertain. Failed partial creations require inspection with the lab owner, not automatic deletion. The other tools compared above are alternatives, not extra lab steps.
 
@@ -329,7 +333,7 @@ Treat the helper block as lesson setup; you do not need to memorize its Bash syn
 
 Keep the API server on kind's loopback binding; do not change it to `0.0.0.0` or add public port mappings for this lesson. This also applies on a remote Linux machine: its API should stay private to that host. The exercise needs no publicly exposed application or Docker API port.
 
-A default `kind` cluster is created with one command. In that default topology, one container acts as both control plane and worker node. That is acceptable for first contact because it gives you the API server, `etcd`, scheduler, controller manager, kubelet, kube-proxy, CoreDNS, and a runtime in one compact environment. For deterministic exercises, pin the node image to a Kubernetes 1.35+ tag so everyone sees the same API behavior rather than whatever happens to be latest on the day they run the command.
+A default `kind` cluster is created with one command. In that default topology, one container acts as both control plane and worker node. That is acceptable for first contact because it gives you the API server, `etcd`, scheduler, controller manager, kubelet, kube-proxy, CoreDNS, and a runtime in one compact environment. Pin the node image to the explicit v1.35.0 tag shown here so the exercise does not silently follow kind's changing default.
 
 ```bash
 lesson_create dojo-basics --image kindest/node:v1.35.0
@@ -376,7 +380,7 @@ Write the count before you compare Docker and Kubernetes views. The next section
 
 Networking is where local clusters often stop feeling intuitive. Your Pods receive IP addresses from a cluster network, but your laptop does not automatically route to that Pod network. In a `kind` cluster, nodes sit on a Docker bridge network, and the API server is the one port mapped by default so `kubectl` can communicate. If you deploy a web application, a Pod IP such as `10.244.0.5` is meaningful inside the cluster, but your browser has no native route to that address from the host.
 
-The quickest access pattern is port forwarding. A command like `kubectl port-forward svc/my-web-app 8080:80` opens a local client-side tunnel through the API server to a Service or Pod. It is useful for debugging because it requires no permanent cluster networking setup. For more realistic local ingress, you can configure `kind` port mappings before cluster creation and run an ingress controller. For local LoadBalancer behavior, you need an implementation such as MetalLB because your laptop does not have a cloud load balancer controller.
+The quickest access pattern is port forwarding. A command like `kubectl port-forward svc/my-web-app 8080:80` opens a local client-side tunnel through the API server to a Service or Pod. It is useful for debugging because it requires no permanent cluster networking setup. A separately authorized ingress exercise can configure `kind` port mappings before creation, explicitly using a loopback `listenAddress` for private practice; this lesson adds no such mappings. For local LoadBalancer behavior, you need an implementation such as MetalLB because your laptop does not have a cloud load balancer controller.
 
 **Pause and predict:** If you start a port-forward, load the application in your browser, and then close the terminal window, what happens to the browser connection?
 
@@ -455,7 +459,7 @@ docker logs <container-id>
 
 Port conflicts produce a different failure shape. The API server listens on port 6443 inside the node container, and `kind` maps a host port to reach it. If you explicitly configure host ports for ingress or reuse a port already taken by another local process, the new cluster cannot bind it. On macOS or Linux, commands such as `lsof -i :6443` or `netstat -tulpn | grep 6443` identify the owner. Prefer choosing a different configured port over killing unknown processes unless you are certain what owns the socket.
 
-Version skew looks stranger because the cluster may be healthy while your client behaves incorrectly. Kubernetes supports a limited minor-version skew between `kubectl` and the API server. If your local client is too old for a Kubernetes 1.35 cluster, you can see errors such as missing resources, malformed output, or unsupported API behavior even though Docker shows the control plane container running. Check both client and server versions, then upgrade the client so it falls within the supported skew window.
+Version skew can affect a client that is either too old or too new. Kubernetes supports kubectl within one minor version of the API server, so choosing the latest client is not always the repair. Check both versions and select a compatible client; use v1.35 for this lesson's v1.35/v1.34 comparison. Do not diagnose a client compatibility problem from healthy Docker containers alone.
 
 The most basic failure is a missing container runtime. `kind` cannot create nodes if Docker is not reachable, and the error often says exactly that:
 
@@ -543,7 +547,7 @@ The practical decision is usually about feedback speed and fidelity. Local clust
 | Leaving idle clusters running for days | Node containers, images, and volumes consume host resources | Use recorded creation evidence and guarded lesson cleanup; a familiar name alone never authorizes deletion. |
 | Editing a node container by hand | Manual `docker exec` changes are invisible to your cluster configuration and vanish on recreate. | Encode node behavior in `kind` config, manifests, or automation, then recreate the cluster to prove it persists. |
 | Ignoring Docker memory and disk limits | `kind` relies on Docker, so host resource pressure prevents Kubernetes components and images from starting. | Allocate enough Docker memory, keep free disk space, and inspect Docker logs when cluster creation fails. |
-| Using an old client against a newer API server | Kubernetes only supports limited client/server minor-version skew. | Upgrade the client or create a cluster version that falls within the supported skew policy. |
+| Using an incompatible client/server pair | Kubernetes supports limited minor-version skew in either direction. | Select compatible versions; the newest client is not necessarily suitable for an older cluster. |
 
 ## Quiz
 
@@ -577,7 +581,7 @@ The cluster is missing a load balancer implementation that can satisfy the Servi
 
 ## Hands-On Exercise
 
-In this exercise, you will create multiple local clusters, inspect kubeconfig, pin Kubernetes versions, switch contexts, declare topology, and observe what happens when the control plane disappears. The work is intentionally progressive: first you prove basic creation, then you prove identity and version control, and only then do you simulate failure. Keep notes on what each command proves, because the diagnostic habit is more valuable than the specific cluster names.
+In the core exercise, you will create local clusters, inspect kubeconfig, compare pinned Kubernetes versions, switch contexts, and observe control-plane failure. Optional Task 5 adds a three-control-plane topology after the comparison clusters are cleaned up. First prove basic creation, then identity and version control, then simulate failure; keep notes on what each command establishes.
 
 **Setup Requirements:**
 Use the authorized local runtime and same-shell helpers initialized in Section 4; do not run this exercise independently with ambient kubeconfig. If you skipped setup, return there first. Stop if the runtime endpoint or ownership is uncertain. Cleanup is limited to the successful creations recorded by this lesson.
@@ -586,12 +590,12 @@ Finish the earlier topology before starting this exercise: if this run still has
 
 ### Tasks
 
-1. **The Baseline Cluster Initialization:** Create a standard single-node cluster named `primary-dojo`. Verify the cluster is fully running, and utilize command-line tools to determine the exact IP address and port the control plane API server is bound to on your host machine's network interface.
+1. **The Baseline Cluster Initialization:** Create a standard single-node cluster named `primary-dojo`. Verify it is running and determine the API server's host loopback address and port.
 2. **The Kubeconfig Deep Dive:** Use the redacted view of this lesson's private kubeconfig. Identify the cluster, user, and context references without printing raw credentials or opening your default configuration.
 3. **Strict Version Pinning:** Create a second, completely simultaneous cluster named `legacy-dojo`. This cluster must rigidly enforce running an older version of Kubernetes, specifically v1.34.0, utilizing the specific image tag `kindest/node:v1.34.0`.
 4. **Context Switching Mastery:** Use `kubectl config use-context` to choose each successfully created cluster in the private kubeconfig, then run `kubectl version`. Compare observed server versions without modifying the default file.
 5. **Optional topology practice:** After cleaning up the two comparison clusters, create a declarative YAML configuration for `ha-dojo` with exactly three control-plane nodes and zero worker nodes. Keep this advanced local topology separate from the essential single-node and context exercises.
-6. **Simulated Catastrophic Failure:** Delete only the successfully created clusters recorded by this lesson. Create a new `broken-dojo` with the guarded helper, then use `lesson_fail` to kill its single owned control-plane node. Stop on failed creation, collision, or uncertain ownership; never select an arbitrary Docker container from a listing.
+6. **Simulated Catastrophic Failure:** Clean up `ha-dojo` if you completed optional Task 5; the comparison clusters were already removed after Task 4. Create a new `broken-dojo` with the guarded helper, then use `lesson_fail` to kill its single owned control-plane node. Stop on failed creation, collision, or uncertain ownership; never select an arbitrary Docker container from a listing.
 
 ### Solutions
 
@@ -671,7 +675,7 @@ lesson_delete legacy-dojo
 </details>
 
 <details>
-<summary>Solution for Task 5: Topology Engineering and Declaration</summary>
+<summary>Solution for Optional Task 5: Topology Engineering and Declaration</summary>
 
 To build complex architectures, use a configuration file instead of a long set of command-line flags. Create a file named `ha-config.yaml`:
 
@@ -693,6 +697,7 @@ Now instruct `kind` to read this file during cluster creation.
 lesson_create ha-dojo --config ha-config.yaml --image kindest/node:v1.35.0
 
 # Validate the topology
+kubectl wait node --all --for=condition=Ready --timeout=120s
 kubectl get nodes 
 ```
 
