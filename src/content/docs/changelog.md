@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Clearer kubectl command guidance.** [kubectl Basics](/prerequisites/kubernetes-basics/module-1.2-kubectl-basics/) separates reference examples from practice, explains node-wide drain effects and local file overwrites, and clarifies how context changes persist.
 - **More controlled first-cluster practice.** [Your First Cluster](/prerequisites/kubernetes-basics/module-1.1-first-cluster/) keeps context switching in a private configuration, checks lesson creation before cleanup, and targets the recorded container during the failure exercise.
 - **Clearer container lifecycle practice.** [What Are Containers?](/prerequisites/cloud-native-101/module-1.1-what-are-containers/) keeps name collisions untouched; [Docker Fundamentals](/prerequisites/cloud-native-101/module-1.2-docker-fundamentals/) uses fresh project folders, loopback web examples and cleanup tied to the lesson's containers, and distinguishes restarting a container from replacing it.
 - **More precise orchestration and architecture decisions.** [What Is Kubernetes?](/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes/) clarifies namespace scope, [the ecosystem lesson](/prerequisites/cloud-native-101/module-1.4-cloud-native-ecosystem/) checks Argo CD policy before blaming reconciliation, and [monoliths versus microservices](/prerequisites/cloud-native-101/module-1.5-monolith-to-microservices/) separates recovery mechanisms from guaranteed application health.

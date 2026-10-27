@@ -40,7 +40,7 @@ This module teaches the command surface as an operating workflow rather than as 
 
 ## The Mental Model: kubectl Is a Typed API Client
 
-The most useful sentence in this module is simple: [every `kubectl` command becomes a request to the Kubernetes API server](https://v1-35.docs.kubernetes.io/docs/concepts/overview/kubectl/). The binary on your laptop reads kubeconfig, chooses a context, loads credentials, builds a REST request, sends it over TLS, and formats the response. It does not schedule pods, pull images, create containers, or edit etcd directly. [Those jobs belong to the API server, controllers, scheduler, kubelet, and storage layer](https://v1-35.docs.kubernetes.io/docs/concepts/overview/components/), which is why a failed command is often telling you about one of those components rather than about the CLI itself.
+For cluster resource operations, [`kubectl` acts as a client of the Kubernetes API server](https://v1-35.docs.kubernetes.io/docs/concepts/overview/kubectl/). The binary on your laptop reads kubeconfig, chooses a context, loads credentials, builds a REST request, sends it over TLS, and formats the response. Local configuration commands and client-side manifest generation are exceptions; they do not require a cluster resource request. The client does not schedule pods, pull images, create containers, or edit etcd directly. [Those jobs belong to the API server, controllers, scheduler, kubelet, and storage layer](https://v1-35.docs.kubernetes.io/docs/concepts/overview/components/), which is why a failed command is often telling you about one of those components rather than about the CLI itself.
 
 The flow below is worth studying because it explains many beginner surprises. If `kubectl get pods` says the server is unreachable, your first suspect is connectivity or kubeconfig, not the pods. If `kubectl apply` is rejected even though the YAML looks correct, an admission controller or schema rule on the API server may be responsible. If `kubectl logs` returns nothing for a container that keeps restarting, the current container instance may not be the one that crashed. The command output is evidence from a distributed system, not just text on a terminal.
 
@@ -59,7 +59,7 @@ The same model also explains why `kubectl` output sometimes lags behind your int
 
 That separation is one reason Kubernetes commands often come in pairs: one command changes desired state, and another command verifies observed state. `kubectl set image` may update a Deployment immediately, but `kubectl rollout status` tells you whether the controller managed to replace old pods with ready new pods. `kubectl delete namespace` may mark the namespace for deletion immediately, but `kubectl get namespace` later tells you whether finalizers and cleanup completed. Treat command success as the beginning of verification, not the end of operational thinking.
 
-There is a practical security lesson here too. Because `kubectl` talks to the API server with your identity, [every command is subject to authentication, authorization, and admission](https://v1-35.docs.kubernetes.io/docs/concepts/security/controlling-access/). A cluster may let you read pods while blocking deletes, or let you create ConfigMaps while rejecting privileged pods through policy. When a command is denied, do not work around it with a more powerful credential by reflex. First decide whether the policy is protecting the cluster from exactly the kind of change you are trying to make.
+There is a practical security lesson here too. Requests sent to the API server pass through [authentication and authorization, with admission controls applying to relevant changes](https://v1-35.docs.kubernetes.io/docs/concepts/security/controlling-access/). A cluster may let you read pods while blocking deletes, or let you create ConfigMaps while rejecting privileged pods through policy. When a command is denied, do not work around it with a more powerful credential by reflex. First decide whether the policy is protecting the cluster from exactly the kind of change you are trying to make.
 
 **Pause and predict:** If `kubectl` is only an API client, what happens when your kubeconfig points at a healthy cluster but your credential has expired?
 
@@ -178,7 +178,9 @@ Output choices also affect how well teammates can review your work. A ticket com
 
 [You can create Kubernetes objects imperatively or declaratively](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/), and the difference is bigger than syntax. Imperative commands tell the cluster to do one action now: run this pod, create this Deployment, expose this Service, scale this workload. Declarative workflows describe the desired end state in a manifest and let the API server and controllers reconcile toward that state. Both styles are legitimate, but they belong in different operational situations.
 
-```bash
+The following command shapes are illustrative, not a runnable lab. Before any mutation, verify the actual cluster behind the context, specify the intended namespace, and confirm you own or are authorized to change each target. Inspect manifests and directories before applying them.
+
+```text
 # Imperative: fast, ephemeral, and useful for practice or one-off debugging
 kubectl run nginx --image=nginx:1.27.0
 kubectl create deployment web --image=httpd:2.4 --replicas=3
@@ -196,7 +198,7 @@ kubectl create deployment web --image=httpd:2.4 --replicas=3 \
   --dry-run=client -o yaml > deployment.yaml
 ```
 
-The bridge command in the last line is the practical answer to a common beginner fear: nobody expects you to write every Deployment manifest from memory. [`--dry-run=client -o yaml` asks the client to build the object it would have sent, print it as YAML, and stop before contacting the API server](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_deployment/). You get correct structure, indentation, API version, and required fields, then you edit the result and treat the file as source material. That workflow is faster and safer than copying an outdated manifest from a random search result.
+The bridge command in the last line is the practical answer to a common beginner fear: nobody expects you to write every Deployment manifest from memory. [`--dry-run=client -o yaml` asks the client to build the object it would have sent, print it as YAML, and stop before contacting the API server](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_deployment/). Shell redirection can overwrite an existing local file even on a dry-run; choose a fresh, owned destination first. You get a starting structure to edit and review, rather than copying an outdated manifest from a random search result.
 
 Imperative commands still have a legitimate place. During an exam, a throwaway lab, or a quick diagnostic session, `kubectl run` and `kubectl create deployment` help you create a known object quickly and then inspect how Kubernetes represents it. The danger starts when a temporary command becomes undocumented production state. If another engineer cannot find the desired state in Git, they cannot review it, reproduce it in another environment, or understand why the live cluster differs from the declared system.
 
@@ -245,7 +247,9 @@ Name who wins before you read the safe-change section. The next section is about
 
 Changing a live object is not one operation in Kubernetes; it is a family of choices with different risk profiles. `kubectl apply` updates the object from a file, `kubectl edit` opens the live object in your editor, `kubectl patch` sends a targeted patch, and `kubectl set image` changes a common field without forcing you to write JSON by hand. The safe choice depends on whether the change is durable, reviewed, automated, or a temporary intervention during troubleshooting.
 
-```bash
+These are illustrative command shapes, not instructions to run against the current context. Verify the cluster, namespace, target ownership and desired change before adapting them.
+
+```text
 # The four ways to change a live resource
 kubectl apply -f updated-deployment.yaml
 kubectl edit deployment web
@@ -263,7 +267,9 @@ kubectl annotate pod nginx owner=team-payments
 
 Deletion deserves extra respect because [Kubernetes deletion is a coordinated process, not just removal from a database](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/). A normal pod deletion sets a deletion timestamp, lets the kubelet send `SIGTERM`, waits for the grace period, and then completes removal when cleanup is done. Force deletion skips important parts of that coordination from the API server's perspective. If the node is actually gone, force may be necessary; if the node is healthy and a finalizer is stuck, force can hide the object while leaving the underlying cleanup problem unsolved.
 
-```bash
+The following are illustrative deletion and maintenance commands. Check the explicit cluster and namespace, enumerate the selected resources, and confirm ownership and authorization before deleting; `--all` selects every Pod in the named namespace. Drain acts on a **node**, across namespaces: it marks the node unschedulable and evicts eligible Pods. `--delete-emptydir-data` permits eviction despite loss of local `emptyDir` data. Use it only on an authorized node after assessing workloads, disruption, and data loss; see the [drain reference](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/).
+
+```text
 # Graceful deletion is the default
 kubectl delete pod nginx
 kubectl delete -f deployment.yaml
@@ -275,7 +281,7 @@ kubectl delete pods -l app=stale-experiment
 # The high-risk escape hatch, only after diagnosis
 kubectl delete pod nginx --grace-period=0 --force
 
-# The safer node-level workflow before planned maintenance
+# Node-level maintenance, after workload and data assessment
 kubectl drain kind-worker --ignore-daemonsets --delete-emptydir-data
 ```
 
@@ -283,9 +289,11 @@ Wrong-target changes are the beginner mistake that experienced engineers still f
 
 There are two common styles for context safety. Some engineers use one merged kubeconfig with many contexts and rely on visible prompts, explicit `--context`, and careful switching. Others keep separate kubeconfig files per environment and set `KUBECONFIG` per terminal session so a production shell and a local shell do not share mutable context state. Both can work, but the second style reduces accidental switching because changing clusters becomes a deliberate act of opening or configuring a shell rather than a remembered command.
 
-Namespace defaults are useful for focused work, but they should not hide the target from you. Setting a default namespace for a practice session saves typing and makes examples cleaner, while using explicit `-n` flags in runbooks and scripts makes the target obvious to reviewers. A good compromise is to set the namespace during interactive lab work and keep explicit namespaces in anything copied into documentation, automation, or incident notes. That way convenience stays local and the durable record remains clear.
+Namespace defaults are useful for focused work, but they should not hide the target from you. Setting a default changes shared kubeconfig context state, potentially affecting other terminals using that configuration. Explicit `--context` and `-n` flags make the target visible in commands; if you change a default, record and restore its prior value.
 
-```bash
+These examples illustrate both reads and changes to cluster or kubeconfig state; verify the intended target before adapting them.
+
+```text
 # Namespace operations
 kubectl get namespaces
 kubectl create namespace payments-staging
@@ -351,7 +359,9 @@ The safest operators are not the ones who never type destructive commands. They 
 
 Day-to-day Kubernetes debugging usually follows a small set of commands rather than an encyclopedic tour of the CLI. `kubectl logs` answers what the container wrote to stdout and stderr. [`kubectl exec` lets you run a command inside the container](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_exec/) when the image contains the tools you need. [`kubectl port-forward` creates a temporary local tunnel through the API server](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) so you can reach an internal pod or service without exposing it publicly.
 
-```bash
+The examples are illustrative. Debug containers, commands run inside containers, copying files, and local tunnels can change state or expose access; confirm the cluster, namespace, target and authorization before adapting them. Copying out can also overwrite a local file.
+
+```text
 # Logs: the first thing to check when an app misbehaves.
 kubectl logs nginx # current container output
 kubectl logs nginx -f # follow output while behavior evolves
@@ -405,16 +415,16 @@ Port-forwarding is similarly useful because it creates temporary reachability wi
 
 [`kubectl proxy` solves a different problem from `port-forward`: it runs a local proxy to the Kubernetes API server, not to your application Service](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_proxy/). Use it when you need to explore API paths, test an API request from a local tool, or understand what a dashboard-style client is asking the API server. Do not use it as a shortcut for application access, because it exposes the API surface through your local authenticated session and can make an unsafe URL look like an ordinary local web endpoint. When the question is "can my app receive HTTP traffic?" choose `port-forward`; when the question is "what does the Kubernetes API return for this resource path?" choose `proxy`.
 
-Exercise scenario: a teammate says `web-frontend` in the `staging` namespace is not responding after a deployment. You have never seen this workload before, so you start by proving the target cluster before you inspect resources. This is not busywork; it is a guardrail against applying the right command to the wrong place. It also records the first fact in the investigation: which cluster your evidence came from.
+Hypothetical scenario: a teammate says `web-frontend` in the `staging` namespace is not responding after a deployment. The following transcript and output are illustrative, not a recorded run. A context name alone does not prove cluster identity or authorization; verify the actual cluster and target before making a change.
 
-```bash
+```text
 $ kubectl config current-context
 kind-staging
 ```
 
 Now use a broad read to inspect the related pods, Deployment, and Service together. The label selector is important because it narrows the view without requiring you to know generated ReplicaSet or Pod names ahead of time. Starting with `describe` against a guessed pod name would be slower and more error-prone because it assumes you already know where the failure lives.
 
-```bash
+```text
 $ kubectl get pods,deploy,svc -n staging -l app=web-frontend
 NAME                                READY   STATUS              RESTARTS   AGE
 pod/web-frontend-6c5f9b7d8-2xqpk    0/1     ImagePullBackOff    0          11m
@@ -430,7 +440,7 @@ service/web-frontend    ClusterIP   10.96.142.18    <none>        80/TCP
 
 The table already tells a useful story. The Deployment exists and created three pods, so the controller is active. The Service exists, but it cannot serve traffic because no pod is ready. Every pod is in `ImagePullBackOff`, which points away from application code and toward image name, tag, credentials, registry access, or node pull behavior. One `describe` on one failing pod should now be enough to confirm the exact reason.
 
-```bash
+```text
 $ kubectl describe pod web-frontend-6c5f9b7d8-2xqpk -n staging
 [... lots of output above ...]
 Events:
@@ -446,14 +456,14 @@ Events:
 
 The events make the failure concrete: the requested image tag does not exist. That means the pod was scheduled, the kubelet attempted the pull, and the registry returned a not-found response. You can confirm the Deployment's requested image with JSONPath, which is a precise field extraction rather than a manual scan through a long YAML object. This is also the kind of command you can paste into a ticket because it shows exactly what Kubernetes is trying to run.
 
-```bash
+```text
 $ kubectl get deployment web-frontend -n staging -o jsonpath='{.spec.template.spec.containers[*].image}'
 myregistry.local/web-frontend:v2.1.0
 ```
 
-The immediate repair can use `kubectl set image` if you are in a lab or staging environment and need to verify the diagnosis quickly. The durable repair should still be a manifest change in Git, because otherwise the next declarative reconcile may restore the bad image tag. Notice how the command sequence verifies rollout completion rather than assuming the API accepted command means the application is healthy.
+An authorized immediate repair can use `kubectl set image` after confirming the cluster, namespace, workload ownership and intended image. The durable repair should still be a manifest change in Git, because otherwise the next declarative reconcile may restore the bad image tag. Notice how the illustrative sequence verifies rollout completion rather than assuming the API accepted command means the application is healthy.
 
-```bash
+```text
 $ kubectl set image deployment/web-frontend -n staging web-frontend=myregistry.local/web-frontend:v2.0.9
 deployment.apps/web-frontend image updated
 
@@ -532,7 +542,9 @@ Another way to use the framework is to name the source of truth before choosing 
 
 The `kubectl` command surface does not end with built-in verbs. [Kubernetes supports plugins by discovering executable files named with the `kubectl-` prefix on your `PATH`](https://v1-35.docs.kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/). That mechanism is useful when a team needs a repeated local view or workflow, but it also creates an operator decision: a plugin should make a safe workflow easier to repeat, not hide a risky mutation behind a friendly subcommand. If a runbook depends on a plugin, the runbook should name the plugin, installation source, and expected behavior instead of assuming every shell has the same extension installed.
 
-```bash
+The following plugin commands are illustrative. Installing plugins changes local tool state; selecting a namespace changes persistent kubeconfig state. Verify the source and intended context before adapting them.
+
+```text
 # Discover plugins available in this shell
 kubectl plugin list
 
@@ -611,21 +623,21 @@ kubectl ns kubectl-practice
    <details>
    <summary>Answer</summary>
 
-   Teach them to generate a skeleton with `kubectl create deployment myapp --image=nginx:1.27.0 --replicas=3 --dry-run=client -o yaml > deployment.yaml`. That creates a valid starting object with current API versions and correct indentation, then lets the engineer edit intentional fields instead of inventing the whole structure. Pair it with `kubectl explain` to discover optional fields. The result is easier to review, repeat, and apply than a copied snippet of unknown age.
+   Teach them to generate a skeleton with `kubectl create deployment myapp --image=nginx:1.27.0 --replicas=3 --dry-run=client -o yaml`, then save it to a fresh, owned file. Shell redirection to an existing path overwrites it even though the command is a client dry-run. Review the generated fields and use `kubectl explain` to discover options before applying the manifest to an authorized target.
    </details>
 
 7. **You need to implement the full beginner operations loop in a safe practice namespace: create the namespace, deploy workloads, break and repair an image rollout, tunnel traffic briefly, and clean up. What order should you follow, and why does that order reduce risk?**
    <details>
    <summary>Answer</summary>
 
-   Start by checking `kubectl config current-context`, then create and select the practice namespace, deploy the imperative and declarative workloads, inspect them with `get`, break the image, diagnose with `describe` Events, repair with `set image`, verify rollout, use `port-forward` only after pods are healthy, and finally delete the namespace. That order reduces risk because target verification comes before mutation, broad inspection comes before detailed diagnosis, and cleanup happens after you have verified the learning objective. It also mirrors real operations work: scope first, change narrowly, prove the result, then remove temporary resources. Skipping the early context or namespace steps is how a harmless lab command turns into a wrong-cluster change.
+   Verify the actual disposable cluster behind the context, then create a uniquely named practice namespace and confirm creation succeeded and that you own it. Use explicit context and namespace for the workloads, inspect them, break and diagnose the image, repair it and verify rollout, then use a temporary port-forward. Delete only the namespace you successfully created, and verify cleanup. If changing a kubeconfig default, record and restore its previous value: context state can be shared across terminals.
    </details>
 
 8. **You ran a destructive command and only afterward wondered whether your context was still set to production. What should your immediate verification sequence be, and what habit would have prevented the uncertainty?**
    <details>
    <summary>Answer</summary>
 
-   First run `kubectl config current-context` to identify the cluster your shell is currently targeting, then explicitly query the affected resource with `--context` for both the intended and feared clusters if both contexts exist. That tells you where the resource now exists or no longer exists. The preventive habit is to run `kubectl config current-context` before destructive commands and keep context plus namespace visible in your shell prompt. Kubernetes has no general undo button, so target verification belongs before mutation, not after it.
+   Check `kubectl config current-context`, then verify which cluster that context identifies and inspect the affected resource using explicit contexts and namespaces where authorized. Current context alone may have changed since the command and does not prove where it ran; consult available audit records and follow the incident process. Before mutation, verify the cluster and namespace, target ownership and authorization, and keep the target visible in the command.
    </details>
 
 ## Hands-On Exercise
