@@ -644,48 +644,57 @@ kubectl ns kubectl-practice
 
 Exercise scenario: create a namespace, deploy two small workloads, break and repair an image rollout, extract structured output, open a temporary port-forward, and clean up. First open a new dedicated Bash terminal and run the setup block in [Module 1.1, Section 4](../module-1.1-first-cluster/#section-4-bootstrapping-and-verifying-the-first-cluster), including its helpers, to obtain a fresh private workspace and kubeconfig. Use the same authorized local Docker endpoint under exclusive control, with no concurrent creators, throughout this exercise. Do not reuse a shared cluster or configuration.
 
-The following creates a new disposable cluster through the prerequisite's guarded helper. A familiar context name alone proves neither identity nor ownership. Stop on any unexpected failure; keep receipts for recovery rather than adopting an existing resource. Each client command names the private kubeconfig and fixed lesson context; namespaced work also names the namespace, without changing a default.
+The following creates a new disposable cluster through the prerequisite's guarded helper. A familiar context name alone proves neither identity nor ownership. The `lesson_step` wrappers return on failure while retaining this shell, its helpers and workspace for recovery. Stop if a block fails; do not paste later steps. Each client command names the private kubeconfig and fixed lesson context; namespaced work also names the namespace, without changing a default.
 
 Keep a short note beside your terminal while you work through the lab. For each step, write the question the command answered, not just whether the command succeeded. The namespace step answers "which isolated workspace holds my objects?" while the bad image step answers "is this a pull failure or a crashed application?" This turns commands into a reusable troubleshooting playbook.
 
 ```bash
-lesson_workspace || exit 1
+lesson_step() {
+lesson_workspace || return 1
 set -o noclobber # Refuse to overwrite existing lesson files
-lesson_create kubectl-dojo --image kindest/node:v1.35.0 || exit 1
+lesson_create kubectl-dojo --image kindest/node:v1.35.0 || return 1
 kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo cluster-info
+}
+lesson_step || { printf 'Stop; retain workspace: %s\n' "$lesson_dir" >&2; false; }
 ```
 
 ### Step 1: Create and record a practice namespace
 
 ```bash
+lesson_step() {
 lab_ns="kubectl-practice-$$"
-lab_uid=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo create namespace "$lab_ns" -o jsonpath='{.metadata.uid}') || exit 1
-test -n "$lab_uid" || exit 1
-lesson_workspace && printf '%s\n' "$lab_uid" > namespace.uid || exit 1
+lab_uid=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo create namespace "$lab_ns" -o jsonpath='{.metadata.uid}') || return 1
+test -n "$lab_uid" || return 1
+lesson_workspace && printf '%s\n' "$lab_uid" > namespace.uid || return 1
 printf 'Practice namespace: %s\n' "$lab_ns"
+}
+lesson_step || { printf 'Stop; retain workspace: %s\n' "$lesson_dir" >&2; false; }
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-Successful creation returns the new namespace UID, which the private workspace records for cleanup. A failed create exits the dedicated shell before workload commands can follow. Keep this shell and workspace; do not reconstruct ownership from a namespace name if they are lost. The default kubeconfig file and its namespace settings remain unchanged.
+Successful creation returns the new namespace UID, which the private workspace records for cleanup. A failed create stops this block and preserves the shell for recovery. Keep this shell and workspace; do not reconstruct ownership from a namespace name if they are lost. The default kubeconfig file and its namespace settings remain unchanged.
 </details>
 
 ### Step 2: Deploy two workloads, one imperatively and one declaratively
 
 ```bash
 # Imperative
-kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" create deployment imperative-web --image=nginx:1.27.0 --replicas=2
+lesson_step() {
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" create deployment imperative-web --image=nginx:1.27.0 --replicas=2 || return 1
 
 # Generate a manifest declaratively, then apply it
 lesson_workspace && kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" create deployment declarative-web --image=httpd:2.4 --replicas=2 \
-  --dry-run=client -o yaml > declarative-web.yaml || exit 1
-kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" apply -f declarative-web.yaml
-kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/imperative-web --timeout=120s
-kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/declarative-web --timeout=120s
+  --dry-run=client -o yaml > declarative-web.yaml || return 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" apply -f declarative-web.yaml || return 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/imperative-web --timeout=120s || return 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" rollout status deployment/declarative-web --timeout=120s || return 1
 
 # Inspect both
 kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get deploy,rs,pod -o wide
+}
+lesson_step || { printf 'Stop; retain workspace: %s\n' "$lesson_dir" >&2; false; }
 ```
 
 <details>
@@ -705,8 +714,8 @@ kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_n
 # Diagnose
 kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pods -l app=imperative-web
 # Look for ImagePullBackOff
-kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" describe pod -l app=imperative-web | tail -30
-# Read the Events at the bottom
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" describe pod -l app=imperative-web
+# Read Events under each Pod; find the waiting Pod's failed image tag.
 
 # Fix it
 kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" set image deployment/imperative-web nginx=nginx:1.27.0
@@ -741,10 +750,13 @@ The JSONPath command should print only pod names, one per line, while the custom
 ### Step 5: Exec into a pod and confirm internal state
 
 ```bash
-POD=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pod -l app=imperative-web --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}') || exit 1
-test -n "$POD" || exit 1
-kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" wait --for=condition=Ready pod/"$POD" --timeout=60s || exit 1
+lesson_step() {
+POD=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" get pod -l app=imperative-web --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}') || return 1
+test -n "$POD" || return 1
+kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" wait --for=condition=Ready pod/"$POD" --timeout=60s || return 1
 kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" exec -it "$POD" -- sh -c 'nginx -v && hostname && cat /etc/hostname'
+}
+lesson_step || { printf 'Stop; retain workspace: %s\n' "$lesson_dir" >&2; false; }
 ```
 
 <details>
@@ -757,9 +769,10 @@ The command should print an nginx version and a hostname that matches the pod's 
 
 ```bash
 # Write a unique response into one specific ready Pod, then forward that Pod.
-printf '%s\n' "$lab_ns" | kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" exec -i "$POD" -- sh -c 'cat > /usr/share/nginx/html/lesson.txt' || exit 1
+if printf '%s\n' "$lab_ns" | kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" exec -i "$POD" -- sh -c 'cat > /usr/share/nginx/html/lesson.txt'; then
 printf 'Expected response: %s\n' "$lab_ns"
 kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo -n "$lab_ns" port-forward --address 127.0.0.1 pod/"$POD" :80
+else printf 'Stop; marker write failed. Retain workspace: %s\n' "$lesson_dir" >&2; false; fi
 # Wait for: Forwarding from 127.0.0.1:<assigned-port> -> 80
 ```
 
@@ -768,9 +781,10 @@ Leave this foreground command running. Open a second terminal on the same host (
 ```bash
 read -r -p 'Assigned port: ' lab_port
 read -r -p 'Expected response: ' lab_expected
-[[ "$lab_port" =~ ^[0-9]+$ ]] && test -n "$lab_expected" &&
+if [[ "$lab_port" =~ ^[0-9]+$ ]] && test -n "$lab_expected" &&
   lab_response=$(curl --noproxy '*' --fail --silent --show-error --max-time 5 "http://127.0.0.1:$lab_port/lesson.txt") &&
-  test "$lab_response" = "$lab_expected" && printf 'Verified lesson response: %s\n' "$lab_response"
+  test "$lab_response" = "$lab_expected"; then printf 'Verified lesson response: %s\n' "$lab_response"
+else printf 'Response check failed; stop and inspect the tunnel and inputs.\n' >&2; false; fi
 ```
 
 Proceed only if the exact response matches. Return to the first terminal and press **Ctrl-C**, then wait for its shell prompt before cleanup. If forwarding fails before printing its bind line, stop; do not curl an assumed port or terminate another job.
@@ -784,20 +798,23 @@ The OS assigns an available local port, and `--address 127.0.0.1` binds only loo
 ### Step 7: Clean up
 
 ```bash
-lesson_workspace || exit 1
-test -s namespace.uid || exit 1
-current_uid=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo get namespace "$lab_ns" -o jsonpath='{.metadata.uid}') || exit 1
-test -n "$current_uid" || exit 1
-test "$current_uid" = "$(cat namespace.uid)" || exit 1
-kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo delete namespace "$lab_ns" --wait=true --timeout=120s && rm namespace.uid
-# Stop if deletion fails: retain the receipt and ask the lab owner for recovery.
-test ! -e namespace.uid && lesson_delete kubectl-dojo && lesson_finish
+lesson_cleanup() {
+lesson_workspace || return 1
+if test -e namespace.uid; then
+  test -s namespace.uid || return 1
+  current_uid=$(kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo get namespace "$lab_ns" -o jsonpath='{.metadata.uid}') || return 1
+  test -n "$current_uid" && test "$current_uid" = "$(cat namespace.uid)" || return 1
+  kubectl --kubeconfig "$lesson_dir/config" --context kind-kubectl-dojo delete namespace "$lab_ns" --wait=true --timeout=120s && rm namespace.uid || return 1
+fi
+lesson_delete kubectl-dojo && lesson_finish
+}
+lesson_cleanup || { printf 'Cleanup stopped; retain shell and workspace: %s\n' "$lesson_dir" >&2; false; }
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-Namespace deletion waits for removal and preserves the UID receipt on failure. Only after success does the guarded helper delete this run's cluster and restore the previous `KUBECONFIG` environment value. Retain the private workspace for evidence; close the dedicated shell afterward. Never delete a replacement namespace with a different UID or force-remove finalizers to clear this exercise.
+Namespace deletion waits for removal and preserves the UID receipt on failure. Only after success does the guarded helper delete this run's cluster and restore the previous `KUBECONFIG` environment value. If cluster deletion fails after namespace cleanup, keep this shell and retry `lesson_cleanup` after resolving the failure; the missing namespace receipt skips that completed phase. Retain the private workspace for evidence; close the shell after successful cleanup. Never delete a replacement namespace with a different UID or force-remove finalizers to clear this exercise.
 </details>
 
 ### Success criteria
