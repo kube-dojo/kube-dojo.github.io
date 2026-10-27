@@ -9,6 +9,7 @@ sidebar:
 ## October 2026
 
 - **Plan study against the objective you will practice.** [What We Don't Cover](/prerequisites/philosophy-design/module-1.3-what-we-dont-cover/) replaces unsupported exam percentages with a practical classification method, corrects Helm guidance, and distinguishes the exam-track pin from current exam versions.
+- **Separate retirement from deployment fit.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now distinguishes Mesos's formal retirement from documented Swarm, Diego and Compose deployment models, and asks you to justify keeping or replacing a tool against actual requirements.
 - **Build a recommendation from evidence.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now separates documented events from explanations of adoption and works through a sourced architecture argument, including its assumptions, counterargument, and missing local evidence.
 - **Know what a declarative workflow still needs from you.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now makes recorded intent, review, ownership and verification explicit, with clearer diagnostic advice and source links for its examples.
 - **Follow what actually reconciles and reloads.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now distinguishes container restarts from replacement Pods, explains configuration-update exceptions, and clarifies when GitOps and Terraform act.
