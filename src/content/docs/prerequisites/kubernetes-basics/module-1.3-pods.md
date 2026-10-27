@@ -331,7 +331,7 @@ When you are unsure, write down the recovery story in one paragraph before choos
 | :--- | :--- | :--- |
 | **Treating Pods exactly like physical VMs** | Misunderstanding the shared lifecycle. Placing a web frontend, backend API, and a database inside one single Pod. | Break disparate, independently scalable applications into separate single-container Pods unless they are physically coupled and share local disk space. |
 | **Deploying naked, unmanaged Pods in production** | Falsely believing Pods are inherently resilient. They are ephemeral and will not be resurrected if a physical node dies. | Always wrap Pods in higher-level, resilient controllers like Deployments, DaemonSets, or StatefulSets to ensure high availability. |
-| **Forgetting Resource Requests and Limits entirely** | Laziness, rushing features to production, or a lack of application performance profiling. | Always strictly define memory and CPU limits. Without limits, a single severe memory leak in one rogue Pod can crash the entire multi-tenant worker node. |
+| **Forgetting Resource Requests and Limits entirely** | Rushing features to production or a lack of application performance profiling. | Choose requests and limits for the workload: CPU limits can throttle, while unbounded memory use can contribute to node memory pressure or OOM. |
 | **Misunderstanding `localhost` in multi-container Pods** | Forgetting that all containers inside a Pod strictly share the exact same network namespace, routing table, and IP address. | Use distinct, different ports for each individual container within the Pod to completely avoid `Address already in use` OS-level bind errors. |
 | **Using `latest` Docker image tags** | Developer convenience during local development dangerously leaking into production manifests. | Always pin images to specific SHAs or immutable version tags (e.g., `v2.1.4`) to prevent unpredictable rollouts and `ImagePullBackOff` disasters. |
 | **Using `exec` to manually fix live production problems** | Treating ephemeral containers like mutable Linux servers. Manual changes are lost instantly the very moment the Pod restarts. | Pods are strictly immutable. Fix the configuration centrally in Git or the Dockerfile, build a brand new image, and redeploy it declaratively via CI/CD. |
@@ -384,7 +384,25 @@ When you are unsure, write down the recovery story in one paragraph before choos
 
 ## Hands-On Exercise: The Ultimate Multi-Container Debugging Challenge
 
-In this hands-on exercise, you will create a multi-container Pod, inspect its shared namespace behavior, trigger an intentional memory failure, and practice the diagnostic sequence used during real incidents. Work in a disposable namespace or local training cluster, and use the full `kubectl` command so every example remains copy-paste runnable.
+In this synthetic exercise, you will create a multi-container Pod, inspect its shared namespace behavior, trigger an intentional memory failure, and practice diagnosis. Use a context you have independently confirmed is a dedicated disposable lab; the guard cannot prove ownership or disposability. Use one fresh Bash terminal for setup, all tasks, and cleanup, and do not share the exercise namespace with another writer. Set `KUBEDOJO_LAB_CONTEXT` to the confirmed context name before setup; the literal name `default` is refused. The helper sends requests to the recorded context and namespace without changing kubeconfig preferences.
+
+```bash
+POD_READY=no POD_NEW=no
+readonly POD_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" POD_NS="pod-lab-$(date +%s)-$$" && { POD_NEW=yes; POD_UID=; }
+pod_lab() {
+  [ "$POD_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
+  command kubectl --context "$POD_CONTEXT" --namespace "$POD_NS" "$@"
+}
+if [ "$POD_NEW" = yes ] && [ -n "$POD_CONTEXT" ] && [ "$POD_CONTEXT" != default ] && POD_CURRENT="$(command kubectl config current-context)" && [ "$POD_CURRENT" = "$POD_CONTEXT" ]; then
+  printf 'Exercise context/namespace: %s / %s\n' "$POD_CONTEXT" "$POD_NS"
+  if POD_CREATED_UID="$(command kubectl --context "$POD_CONTEXT" create namespace "$POD_NS" -o jsonpath='{.metadata.uid}')" && [ -n "$POD_CREATED_UID" ]; then
+    POD_UID="$POD_CREATED_UID"; POD_READY=yes
+  fi
+fi
+[ "$POD_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
+```
+
+Continue only after setup succeeds. `pod_lab` refuses requests otherwise and always adds the recorded context and namespace, even if the current context changes. If creation failed or returned no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
 
 ### Task 1: Declarative Multi-Container Creation
 
@@ -436,13 +454,13 @@ Apply the declarative manifest to your local cluster. Verify that the Pod transi
 <details>
 <summary>Concept hint</summary>
 
-Use `kubectl apply` to submit the manifest, wait until the Pod reports Ready, then tunnel port 80 from the Pod to a local port and curl it from your workstation.
+Use `pod_lab apply` to submit the manifest, wait until the Pod reports Ready, then tunnel port 80 from the Pod to a local port and curl it from your workstation.
 </details>
 
 <details>
 <summary>Command hint</summary>
 
-Run `kubectl apply -f multi-pod.yaml`, then `kubectl wait --for=condition=Ready pod/web-logger --timeout=60s`, then `kubectl port-forward pod/web-logger 8080:80` in the background and curl `http://localhost:8080`.
+Run `pod_lab apply -f multi-pod.yaml`, then `pod_lab wait --for=condition=Ready pod/web-logger --timeout=60s`, then `pod_lab port-forward --address 127.0.0.1 pod/web-logger :80`. Use its printed local port in a second terminal on the same host.
 </details>
 
 <details>
@@ -450,28 +468,25 @@ Run `kubectl apply -f multi-pod.yaml`, then `kubectl wait --for=condition=Ready 
 
 ```bash
 # Apply the declarative manifest to the API Server
-kubectl apply -f multi-pod.yaml
+pod_lab apply -f multi-pod.yaml
 
 # Wait for the pod to become fully ready
-kubectl wait --for=condition=Ready pod/web-logger --timeout=60s
+pod_lab wait --for=condition=Ready pod/web-logger --timeout=60s
 ```
 
-Open a new terminal window, or background the port-forward process to test it:
+Run the port-forward in the setup terminal. The operating system selects a free local port; read the port printed after `127.0.0.1:`.
 
 ```bash
-# Establish a secure port-forward tunnel to the Pod in the background
-kubectl port-forward pod/web-logger 8080:80 &
-
-# Wait a moment for the tunnel to establish
-sleep 2
-
-# Curl the local port to verify
-curl http://localhost:8080
-# You should see the current date and time printed, updating every 5 seconds.
-
-# Terminate the background port-forward process
-kill %1
+pod_lab port-forward --address 127.0.0.1 pod/web-logger :80
 ```
+
+In a second terminal on the same host, replace `LOCAL_PORT` with the printed port and request the page:
+
+```bash
+curl --noproxy '*' --fail --show-error http://127.0.0.1:LOCAL_PORT
+```
+
+You should see the current date and time, updating every 5 seconds. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the setup terminal to stop forwarding, then continue the remaining tasks in that same terminal.
 </details>
 
 ### Task 3: Interactive Namespace Exploration
@@ -487,7 +502,7 @@ Containers in the same Pod share a network namespace, so `localhost` inside one 
 <details>
 <summary>Command hint</summary>
 
-Use `kubectl exec -it web-logger -c nginx-server -- /bin/sh`, install curl with `apk add --no-cache curl`, then curl `http://localhost:80`.
+Use `pod_lab exec -it web-logger -c nginx-server -- /bin/sh`, install curl with `apk add --no-cache curl`, then curl `http://localhost:80`.
 </details>
 
 <details>
@@ -495,7 +510,7 @@ Use `kubectl exec -it web-logger -c nginx-server -- /bin/sh`, install curl with 
 
 ```bash
 # Execute an interactive shell inside the specific container
-kubectl exec -it web-logger -c nginx-server -- /bin/sh
+pod_lab exec -it web-logger -c nginx-server -- /bin/sh
 ```
 
 Once inside the container's interactive shell, execute the following:
@@ -515,7 +530,7 @@ Even though you entered the `nginx-server` container's filesystem namespace, Ngi
 
 ### Task 4: Intentionally Triggering an OOMKilled Event
 
-Create a new file named `oom-pod.yaml`. Define a Pod that runs the `polinux/stress` image, give it a strict memory limit of `50Mi`, and set the command to allocate more memory than the cgroup permits. Apply the file and watch its lifecycle status.
+Create a new file named `oom-pod.yaml`. Reuse the multi-platform `busybox:1.36.1` image with a memory limit of `50Mi`. Its intentionally unbounded `awk` loop doubles a string until the container exceeds that limit. Run this synthetic failure only in the disposable lab namespace; it is not an application pattern to reuse.
 
 <details>
 <summary>Concept hint</summary>
@@ -526,7 +541,7 @@ Set a low `resources.limits.memory` value, then run a stress command that asks f
 <details>
 <summary>Command hint</summary>
 
-Use the `polinux/stress` image with `--vm-bytes` above the limit, apply the manifest, then wait for `OOMKilled` with `kubectl wait --for=jsonpath='{.status.containerStatuses[0].state.terminated.reason}'=OOMKilled pod/memory-hog --timeout=60s` or watch with `kubectl get pod memory-hog --watch`.
+Apply the BusyBox manifest, then wait for the retained termination reason with `pod_lab wait --for=jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'=OOMKilled pod/memory-hog --timeout=60s`. The default restart policy restarts the container, so its current state may already have changed while `lastState` preserves the preceding termination.
 </details>
 
 <details>
@@ -541,21 +556,21 @@ metadata:
 spec:
   containers:
     - name: stress-test
-      image: polinux/stress:1.0.4
-      command: ["stress", "--vm", "1", "--vm-bytes", "150M", "--vm-hang", "1"]
+      image: busybox:1.36.1
+      command: ["awk", "BEGIN { x = \"x\"; while (1) x = x x }"]
       resources:
         limits:
           memory: "50Mi"
 ```
 ```bash
 # Apply the doomed pod to the cluster
-kubectl apply -f oom-pod.yaml
+pod_lab apply -f oom-pod.yaml
 
-# Wait until the kernel terminates the over-limit process
-kubectl wait --for=jsonpath='{.status.containerStatuses[0].state.terminated.reason}'=OOMKilled pod/memory-hog --timeout=60s
-kubectl get pod memory-hog
+# Wait for the preceding termination to appear after the container restarts
+pod_lab wait --for=jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'=OOMKilled pod/memory-hog --timeout=60s
+pod_lab get pod memory-hog
 ```
-You should briefly see the Pod run and then observe a restart cycle. The process asks the kernel for substantially more memory than the configured cgroup permits, so the kernel terminates it to protect the node.
+Expect a container restart cycle. If the wait times out, inspect the actual state and Events before drawing a conclusion: an image-pull or scheduling failure is not evidence of an OOM kill. The next task checks the recorded reason and exit code rather than treating every nonzero command result as the intended failure.
 </details>
 
 ### Task 5: Forensically Diagnosing the Death
@@ -571,7 +586,7 @@ Use `kubectl describe` to prove why the `memory-hog` Pod died. Find the exact re
 <details>
 <summary>Command hint</summary>
 
-Run `kubectl describe pod memory-hog` and scroll to the `Containers:` section for the `stress-test` container.
+Run `pod_lab describe pod memory-hog` and scroll to the `Containers:` section for the `stress-test` container.
 </details>
 
 <details>
@@ -579,33 +594,43 @@ Run `kubectl describe pod memory-hog` and scroll to the `Containers:` section fo
 
 ```bash
 # Extract the forensic log of the dead pod
-kubectl describe pod memory-hog
+pod_lab describe pod memory-hog
 ```
 Scroll to the `Containers:` section, locate the `stress-test` container, and inspect the `Last State:` block. The important evidence is `Reason: OOMKilled` alongside `Exit Code: 137`, which shows that the kernel killed the process after it exceeded the configured memory limit.
 </details>
 
 ### Task 6: Systematic Clean Up
 
-Cleanly delete both Pods created during this exercise to free cluster resources and leave the training environment ready for the next module.
+Run cleanup in the same Bash terminal, even after an interruption. It checks the live namespace UID against the successful creation response before deleting the namespace and its Pods. Failed cleanup retains the receipt for a same-shell retry. This check assumes no concurrent namespace replacement between the UID check and deletion.
 
 <details>
 <summary>Concept hint</summary>
 
-Delete the Pod objects you created; graceful deletion is the default and appropriate here.
+Delete the owned exercise namespace only after verifying its identity.
 </details>
 
 <details>
 <summary>Command hint</summary>
 
-Run `kubectl delete pod web-logger memory-hog`.
+Run the cleanup block below; a mismatched UID or read error stops deletion.
 </details>
 
 <details>
 <summary>Full solution</summary>
 
 ```bash
-# Delete the pods, returning the cluster to a clean state
-kubectl delete pod web-logger memory-hog
+cleanup_pod_lab() {
+  [ -n "${POD_UID:-}" ] && [ -n "${POD_CONTEXT:-}" ] && [ "$POD_CONTEXT" != default ] && [ -n "${POD_NS:-}" ] || { echo 'No recorded exercise namespace; stop' >&2; return 1; }
+  local live_uid
+  live_uid="$(command kubectl --context "$POD_CONTEXT" get namespace "$POD_NS" --ignore-not-found=true -o jsonpath='{.metadata.uid}')" || return 1
+  if [ -n "$live_uid" ]; then
+    [ "$live_uid" = "$POD_UID" ] || { echo 'Namespace UID changed; refusing deletion' >&2; return 1; }
+    command kubectl --context "$POD_CONTEXT" delete namespace "$POD_NS" --ignore-not-found=true --wait=true --timeout=120s || return 1
+  fi
+  POD_READY=no
+  echo 'Exercise namespace is gone; kubeconfig preferences were unchanged'
+}
+cleanup_pod_lab
 ```
 </details>
 
@@ -653,6 +678,8 @@ Success criteria:
 - [ ] You cleaned up both disposable Pods without leaving training resources behind.
 
 ## Sources
+
+- **Exercise scope and diagnosis (v1.35):** [request namespaces](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#setting-the-namespace-for-a-request), [object UIDs](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids), [port-forward address and random port](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/), and [retained container termination state](https://github.com/kubernetes/api/blob/v0.35.0/core/v1/types.go#L3135-L3139).
 - [Kubernetes Pods](https://kubernetes.io/docs/concepts/workloads/pods/)
 - [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
 - [Init Containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/)
