@@ -1,0 +1,13 @@
+# Philosophy hub source binding: review request and evidence
+
+Owner #2278/#2275. This packet adds the complete11-claim citation seed for the English hub source SHA-256 `6265bbb9ea925454df50ef8b49d01e8f3474bd9fa1c36ee25e7f8a62f0a46ec3`. It changes no published page. A schema-valid seed is a research record, not source acceptance; no nested acceptance receipt or lead acceptance is supplied at this stage.
+
+The full24-line hub was independently reviewed in [R1](https://github.com/kube-dojo/kube-dojo.github.io/pull/3571#issuecomment-6447046090) and its footer delta in [R2](https://github.com/kube-dojo/kube-dojo.github.io/pull/3571#issuecomment-6447261199). Those verdicts support technical/editorial scope and hub-only lab non-applicability; they did not review this seed or a formal snapshot-bound receipt. This request requires that missing binding and semantic verification, not a transcription of unsupported verifier verdicts.
+
+Captured evidence includes three version-pinned Kubernetes1.35 HTML snapshots and nine immutable repository snapshots at `426d8a6eedd16c38b90fba805fcbed7c31f18169`, each byte-matched to its Git blob. Local curriculum ordering, existential practice presence and four module titles/slugs/outcomes/time headers are distinct from empirical learner claims. The existing seed class `standard` records curriculum declarations here; it does not designate an external industry standard.
+
+Claim `Cc54314d` is derived arithmetic: its four inputs are `C88032cf`, `Cb4364b2`, `C9332b8d` and `C3d2b560`, each with a pinned primary header. Four80–110-minute planning ranges give320–440minutes=5h20–7h20. The linked public R1 contains the independent calculation; it supplements the four primary inputs and does not replace them. No measured completion time is claimed.
+
+Publication evidence for the unchanged page: merged `606df73ac87291915d7361a8336d5a0a568c9fe4`, build2181, [Pages40539695663](https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/40539695663), then HTTP200 hub/news and all six actual learner destinations with matching headings. Chrome desktop Auto/dark inspection covered all24lines, the table/time caveat/footer and six clicked routes. No mobile/light, linked-module, Ukrainian or learner-study acceptance follows.
+
+The independent verifier must check complete material coverage, source semantics and actual snapshot hashes, and return a completed revision-bound receipt only for supported claims. Formal source and lead acceptance remain pending until that evidence and exact-head review are complete. English hub applicability does not waive module or book gates.

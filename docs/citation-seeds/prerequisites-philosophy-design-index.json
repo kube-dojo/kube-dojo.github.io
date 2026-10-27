@@ -1,0 +1,76 @@
+{
+  "module_key": "prerequisites/philosophy-design/index",
+  "module_path": "src/content/docs/prerequisites/philosophy-design/index.md",
+  "research_run_id": "2026-10-27T16:14:19.496892+00:00-codex-model-unknown",
+  "schema_version": 1,
+  "claims": [
+    {
+      "claim_id": "Cd62416f", "claim_text": "The API records desired state, and controllers work to bring current state toward it.",
+      "claim_class": "standard", "span_hint": "line 9",
+      "disposition": "supported", "proposed_url": "https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/", "proposed_tier": "standards",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Controller concepts: desired state in spec; control loops attempt convergence, not a guarantee."
+    },
+    {
+      "claim_id": "C6c9a352", "claim_text": "Application recovery depends on controllers, configuration, and resources available.",
+      "claim_class": "standard", "span_hint": "line 9",
+      "disposition": "supported", "proposed_url": "https://v1-35.docs.kubernetes.io/docs/concepts/architecture/self-healing/", "proposed_tier": "standards",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Self-healing examples and considerations distinguish infrastructure repair from application-level recovery; use controller source as supplementary context."
+    },
+    {
+      "claim_id": "Ced985c1", "claim_text": "Scaling depends on controllers, configuration, and resources available.",
+      "claim_class": "standard", "span_hint": "lines 9 and 24",
+      "disposition": "supported", "proposed_url": "https://v1-35.docs.kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/", "proposed_tier": "standards",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "HPA requires target and metrics; resource metrics depend on requests. HPA alone does not guarantee capacity."
+    },
+    {
+      "claim_id": "C9d577a8", "claim_text": "Cloud Native 101 and Kubernetes Basics precede Philosophy & Design in the curriculum route.",
+      "claim_class": "standard", "span_hint": "line 7",
+      "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/index.md", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Repository curriculum sequence, not an empirical claim about learner completion."
+    },
+    {
+      "claim_id": "Ca6e7f2e", "claim_text": "Cloud Native 101 includes hands-on practice before this section.",
+      "claim_class": "standard", "span_hint": "line 7",
+      "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/cloud-native-101/module-1.1-what-are-containers.md", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Pinned module includes a hands-on exercise; section index is separately captured. This does not assert every learner completed it."
+    },
+    {
+      "claim_id": "C762129a", "claim_text": "Kubernetes Basics includes hands-on practice before this section.",
+      "claim_class": "standard", "span_hint": "line 7",
+      "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/kubernetes-basics/module-1.3-pods.md", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Pinned module includes a hands-on exercise; section index is separately captured. This does not assert every learner completed it."
+    },
+    {
+      "claim_id": "C88032cf", "claim_text": "Module 1.1: Why Kubernetes Won: Historical context and adoption factors; published slug module-1.1-why-kubernetes-won; planning header 80–110 minutes.",
+      "claim_class": "standard", "span_hint": "line 17",
+      "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.1-why-kubernetes-won.md", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Curriculum declaration verified against pinned frontmatter, time header, outcomes and headings; not a claim of learner performance."
+    },
+    {
+      "claim_id": "Cb4364b2", "claim_text": "Module 1.2: Declarative vs Imperative - The Philosophy: Desired state, reconciliation, and imperative changes; published slug module-1.2-declarative-vs-imperative; planning header 80–110 minutes.",
+      "claim_class": "standard", "span_hint": "line 18",
+      "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Curriculum declaration verified against pinned frontmatter, time header, outcomes and headings; not a claim of learner performance."
+    },
+    {
+      "claim_id": "C9332b8d", "claim_text": "Module 1.3: What We Don't Cover (and Why): Scope decisions and why we made them; published slug module-1.3-what-we-dont-cover; planning header 80–110 minutes.",
+      "claim_class": "standard", "span_hint": "line 19",
+      "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.3-what-we-dont-cover.md", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Curriculum declaration verified against pinned frontmatter, time header, outcomes and headings; not a claim of learner performance."
+    },
+    {
+      "claim_id": "C3d2b560", "claim_text": "Module 1.4: Dead Ends - Technologies We Skip: Technologies we skip and why; published slug module-1.4-dead-ends; planning header 80–110 minutes.",
+      "claim_class": "standard", "span_hint": "line 20",
+      "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/426d8a6eedd16c38b90fba805fcbed7c31f18169/src/content/docs/prerequisites/philosophy-design/module-1.4-dead-ends.md", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Curriculum declaration verified against pinned frontmatter, time header, outcomes and headings; not a claim of learner performance."
+    },
+    {
+      "claim_id": "Cc54314d", "claim_text": "Four module planning headers sum to 320–440 minutes, about 5 hours 20 minutes–7 hours 20 minutes.",
+      "claim_class": "standard", "span_hint": "line 22",
+      "disposition": "supported", "proposed_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3571#issuecomment-6447046090", "proposed_tier": "upstream",
+      "suggested_rewrite": null, "lesson_point_url": null, "rationale": "Derived from C88032cf, Cb4364b2, C9332b8d and C3d2b560: four pinned 80–110-minute headers give 4*80=320 and 4*110=440, or 5h20–7h20. The public independent R1 review records this arithmetic; all four primary header snapshots and arithmetic.json are retained. Not measured learner time."
+    }
+  ],
+  "further_reading": [],
+  "notes": "Curated proposal for the complete English hub at page digest sha256:6265bbb9ea925454df50ef8b49d01e8f3474bd9fa1c36ee25e7f8a62f0a46ec3. No source-acceptance receipt or verifier verdict is generated here. The supported research dispositions require independent semantic/binding review. standard is the existing schema class for local curriculum declarations here; it does not claim an external industry standard or empirical timing statistic. Cc54314d arithmetic depends on the four individually sourced header claims; the public review is calculation evidence, not a replacement for those inputs."
+}
