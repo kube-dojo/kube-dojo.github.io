@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Orchestration history with clearer provenance.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now distinguishes reported project activity from formal retirement, anchors dates in primary sources, and removes unsupported historical cutoffs.
 - **Observe reconciliation in a separate practice namespace.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now uses its own namespace and a fresh folder, preserves your saved preferences, and checks ownership before cleanup while you compare repeated apply with a temporary scale change.
 - **A clearer route through Kubernetes design.** [Philosophy & Design](/prerequisites/philosophy-design/) now explains the module sequence, separates reconciliation from application guarantees, and treats skipped topics as curriculum priorities to assess against your own needs.
 - **Validate YAML without creating practice objects.** [YAML for Kubernetes](/prerequisites/kubernetes-basics/module-1.8-yaml-kubernetes/) now keeps validation in a fresh folder, fixes its context and namespace, and explains why client checks can differ from server validation and application behavior.
