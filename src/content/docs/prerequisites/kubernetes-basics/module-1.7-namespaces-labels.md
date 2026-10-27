@@ -598,7 +598,7 @@ fi
 [ "$NS_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
 ```
 
-Continue only after setup succeeds. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
+Continue only after setup succeeds. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
 
 Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
 
