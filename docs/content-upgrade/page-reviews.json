@@ -4,10 +4,10 @@
   "pages": [
     {
       "path": "prerequisites/philosophy-design/module-1.3-what-we-dont-cover.md",
-      "page_digest": "sha256:3928dc3fb8695d0ca4ac53d5ffe658371d6905642b4fdd7947791105c5673451",
+      "page_digest": "sha256:7a464e430f6d82b64e1360e948f12c5c14fd6bbaecefb98f31d318a63ba58da1",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-study-scope-p11a.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-study-scope-p11a.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-study-scope-p11a.md", "docs/content-upgrade/reviews/2026-10-27-study-depth-p11c.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-study-scope-p11a.md", "docs/content-upgrade/reviews/2026-10-27-study-depth-p11c.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
