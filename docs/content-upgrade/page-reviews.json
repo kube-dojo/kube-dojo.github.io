@@ -12,7 +12,7 @@
     },
     {
       "path": "prerequisites/philosophy-design/module-1.4-dead-ends.md",
-      "page_digest": "sha256:48c34b47d0814ac0c305bdee8a26294e6c6e966c40fa673ed8846bc0fffde9b8",
+      "page_digest": "sha256:5997a904a3eb05f36ed141d7dc50486f2107fa586f4443652f80e93cdabbc297",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md"],

@@ -184,7 +184,9 @@ Configuration management and Kubernetes can address different parts of an operat
 | Coordinate multiple writers | Are their objects or fields deliberately assigned, and how will conflicting changes be resolved? |
 | Inspect a node | Which components are involved? Kubernetes documents kubelet and a container runtime on nodes. |
 
-For example, the [Ansible `kubernetes.core.k8s` module](https://docs.ansible.com/projects/ansible/latest/collections/kubernetes/core/k8s_module.html) uses the Kubernetes API for object creation, reading, updates and deletion. It accepts object definitions and offers an apply option. A playbook creating or updating a Pod is therefore not automatically a conflict; identify what owns that Pod and what subsequent changes the playbook and any controller intend to make. A Deployment and its controller-managed Pods also have different responsibilities, so distinguish a change to the Deployment's desired state from a separate attempt to repair its Pods.
+For example, the [Ansible `kubernetes.core.k8s` module](https://docs.ansible.com/projects/ansible/latest/collections/kubernetes/core/k8s_module.html), checked October 27, 2026 at collection 6.6.0, uses the Kubernetes API for object creation, reading, updates and deletion. It accepts object definitions; its client-side `apply` option is distinct from `server_side_apply`, which requires `apply: true`. A playbook creating or updating a Pod is not automatically a conflict; identify its owner and subsequent changes. Distinguish a Deployment's desired state from a separate attempt to repair its controller-managed Pods.
+
+The figure is a planning workflow, not a serialized API execution trace. Inspect the write response for conflicts before assuming a requested change was stored; controllers can run concurrently with these inspection steps.
 
 ```mermaid
 flowchart TD
@@ -276,7 +278,7 @@ Imagine that Project Phoenix is a medium-sized SaaS product with an API, a worke
 
 The first diagnostic move is to separate incident risk from modernization preference. A Swarm cluster can run containers today, so saying "Swarm is old" is not enough for an engineering decision. The stronger argument is operational: if a node fails, if a security patch requires coordinated rollout, if the team needs cloud load balancer integration, or if a new engineer must debug production, the organization receives less help from the modern ecosystem than it would on Kubernetes. The age of the tool matters because it predicts support friction.
 
-Next, examine the Puppet role with care. Puppet may handle host provisioning, package installation, or baseline configuration, and its presence does not itself establish a conflict. In this hypothetical plan, if a Puppet workflow, a Swarm service definition, and a converted Compose file each assert different API replica counts, identify which one actually writes the value and which owns the intended setting. Record how the team will detect and resolve disagreement before choosing a change.
+Next, examine the Puppet role with care. Its [agent applies a configuration catalog to a managed node](https://help.puppet.com/core/current/Content/PuppetCore/architecture.htm); its presence does not itself establish a workload conflict. In this hypothetical plan, if a Puppet workflow, a Swarm service definition, and a converted Compose file each assert different API replica counts, identify which one actually writes the value and which owns the intended setting. Record how the team will detect and resolve disagreement before choosing a change.
 
 The Compose file deserves the same requirements check. Keep a useful local workflow when it serves the team, and inspect the production configuration separately. Docker documents production-specific configuration and deployment changes with Compose. Decide whether that model meets the service's recovery, update and access requirements. If Kubernetes is a candidate, compare its proposed resources and operating responsibilities against the same criteria; choosing a different YAML format does not itself satisfy them.
 
@@ -435,7 +437,7 @@ kubectl get deploy --all-namespaces
 <details>
 <summary>Show one possible modernization plan</summary>
 
-A strong plan cites Apache's formal Mesos retirement, distinguishes Classic Swarm from Engine swarm mode, and uses the Diego and Compose guides for the deployment models they actually describe. It does not invent a hiring-market comparison or require replacing every working tool. For Project Phoenix, it names unanswered questions about host failure, application rollout, data recovery, ownership and support, then recommends collecting the evidence needed to compare candidates. A Kubernetes proposal is one possible result, with its own configuration and operating work to assess.
+A strong plan cites Apache's formal Mesos retirement, distinguishes Classic Swarm from Engine swarm mode, and uses the Diego and Compose guides for the deployment models they actually describe. It does not invent a hiring-market comparison or require replacing every working tool. For Project Phoenix, it names unanswered questions about host failure, application rollout, data recovery, ownership and support, then recommends collecting the evidence needed to compare candidates. Its ownership paragraph assigns host configuration, intended API-object fields and controller-managed workload state separately, with actual writers and disagreement checks named. A Kubernetes proposal is one possible result, with its own configuration and operating work to assess.
 </details>
 
 **Card A: The easier tool looks like the platform.** It deploys one stateless service with less YAML than Kubernetes. A team wants to bet the next five years on it because the demo was faster.
