@@ -1,5 +1,7 @@
 # T01-P10i: declarative workflow evidence and limits
 
+This is the historical repair-stage note. The [source-binding assessment](2026-10-27-declarative-source-binding.md) records the subsequently completed independent source/rubric review and remaining acceptance gates for the unchanged page.
+
 Owner #2278; source/assessment #2275/#2277. Scoped **revise**, not full-page clearance. Source SHA-256 `581cc9893da2b614ca3e9c900b259439fcb455c90b36ea87f292b78ab2fac575`. Preserves all31 fenced blocks and the complete nine-fence Hands-On section byte-identically to the prior delivered source; the opening now distinguishes illustrative snippets from the dedicated practice procedure.
 
 Unmeasured prevalence, historical culture, learner-effect and production-safety assertions are narrowed to an illustrated workflow, conditional engineering benefits or recommended practice. Committed intent requires an actual repository workflow; neither declarative APIs nor GitOps guarantee a complete record, safe rollback, universal reliability or fewer learner errors. Diagnostic advice separates incorrect declarations from capacity/external blockers; recovery remains conditional.
