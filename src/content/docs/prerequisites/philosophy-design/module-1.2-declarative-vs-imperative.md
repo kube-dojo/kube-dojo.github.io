@@ -531,13 +531,35 @@ The label can flip depending on which pipeline applied its desired state most re
 
 ## Hands-On Exercise
 
-This exercise uses a local or disposable Kubernetes 1.35+ cluster. You do not need a production cluster, and you should not run these commands against a shared environment unless your team has explicitly approved the namespace and cleanup steps. The goal is to see reconciliation, idempotency, and drift with a tiny Deployment so the behavior is familiar before you meet it during a real incident.
+This synthetic exercise uses an independently confirmed dedicated disposable Kubernetes 1.35+ lab. Set `KUBEDOJO_LAB_CONTEXT` to that context name before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, all steps, and cleanup. The guard cannot prove cluster ownership or disposability; do not share the exercise namespace with another writer. The goal is to see reconciliation, idempotency, and drift with a tiny Deployment.
 
-First, create a clean namespace and a small declarative Deployment. The manifest intentionally uses an explicit label selector because selectors are how the Deployment knows which pods belong to its desired state. Read the file before applying it and predict how many pods should exist after convergence.
+First, create a fresh namespace and record its UID. The helper sends requests to the recorded context and namespace without changing saved kubeconfig preferences. It refuses commands until creation succeeds with a nonempty UID.
 
 ```bash
-kubectl create namespace declarative-lab --dry-run=client -o yaml > namespace.yaml
+DECL_READY=no DECL_NEW=no
+readonly DECL_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" DECL_NS="declarative-lab-$(date +%s)-$$" && { DECL_NEW=yes; DECL_UID=; }
+decl_lab() {
+  [ "$DECL_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
+  command kubectl --context "$DECL_CONTEXT" --namespace "$DECL_NS" "$@"
+}
+if [ "$DECL_NEW" = yes ] && [ -n "$DECL_CONTEXT" ] && [ "$DECL_CONTEXT" != default ] && DECL_CURRENT="$(command kubectl config current-context)" && [ "$DECL_CURRENT" = "$DECL_CONTEXT" ]; then
+  printf 'Exercise context/namespace: %s / %s\n' "$DECL_CONTEXT" "$DECL_NS"
+  if DECL_CREATED_UID="$(command kubectl --context "$DECL_CONTEXT" create namespace "$DECL_NS" -o jsonpath='{.metadata.uid}')" && [ -n "$DECL_CREATED_UID" ]; then
+    DECL_UID="$DECL_CREATED_UID"; DECL_READY=yes
+  fi
+fi
+[ "$DECL_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
 ```
+
+Continue only after setup succeeds. If creation failed or returned no UID, inspect the printed namespace manually; cleanup has no ownership evidence to delete it. Stop on a failed task command and clean up before retrying in a fresh terminal.
+
+Create and enter a fresh scratch directory before writing the manifest so you do not overwrite existing files such as `namespace.yaml` or `web-deployment.yaml`. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually when no longer needed.
+
+```bash
+DECL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/declarative-lab.XXXXXXXX")" && cd "$DECL_DIR" && printf 'Manifest directory: %s\n' "$DECL_DIR"
+```
+
+Now write the Deployment. Its explicit label selector identifies the pods that belong to its desired state. Read the file before applying it and predict how many pods should exist after convergence.
 
 ```bash
 cat <<'EOF' > web-deployment.yaml
@@ -545,7 +567,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: declarative-lab
 spec:
   replicas: 3
   selector:
@@ -564,43 +585,63 @@ spec:
 EOF
 ```
 
-Apply the namespace and Deployment from files, then inspect what Kubernetes created. The important observation is that you apply one higher-level object, but the controller creates lower-level pods to satisfy it.
+Apply the Deployment from the file, then inspect what Kubernetes created. The helper supplies the namespace. You apply one higher-level object, but the controller creates lower-level pods to satisfy it.
 
 ```bash
-kubectl apply -f namespace.yaml
-kubectl apply -f web-deployment.yaml
-kubectl get deployment web -n declarative-lab
-kubectl get pods -n declarative-lab -l app=web
+decl_lab apply -f web-deployment.yaml
+decl_lab rollout status deployment/web --timeout=90s
+decl_lab get deployment web
+decl_lab get pods -l app=web
 ```
 
-Now deliberately create drift by deleting one pod. Do not immediately reapply the manifest. Watch the pod list until the replacement appears, and connect the behavior back to the reconciliation loop from the diagram.
+Now deliberately create drift by deleting one pod. Do not immediately reapply the manifest. Watch the pod list until the replacement appears, stop the watch with <kbd>Ctrl</kbd>+<kbd>C</kbd>, and connect the behavior back to the reconciliation loop from the diagram.
 
 ```bash
-POD_NAME="$(kubectl get pods -n declarative-lab -l app=web -o jsonpath='{.items[0].metadata.name}')"
-kubectl delete pod "$POD_NAME" -n declarative-lab
-kubectl get pods -n declarative-lab -l app=web --watch
+if POD_NAME="$(decl_lab get pods -l app=web -o jsonpath='{.items[0].metadata.name}')" && [ -n "$POD_NAME" ]; then
+  decl_lab delete pod "$POD_NAME" && decl_lab get pods -l app=web --watch
+else
+  echo 'No pod selected; stop' >&2
+fi
 ```
 
 Next, test idempotency by applying the same Deployment again. The expected result is not an additional Deployment and not six pods. The expected result is convergence to the same declared shape.
 
 ```bash
-kubectl apply -f web-deployment.yaml
-kubectl apply -f web-deployment.yaml
-kubectl get deployment web -n declarative-lab
+decl_lab apply -f web-deployment.yaml
+decl_lab apply -f web-deployment.yaml
+decl_lab get deployment web
 ```
 
 Finally, create a temporary imperative scale and then correct it declaratively. This is the incident pattern in miniature: a manual command changes live state, and the durable fix is to update the manifest so the source of truth matches the desired capacity.
 
 ```bash
-kubectl scale deployment web -n declarative-lab --replicas=5
-kubectl get deployment web -n declarative-lab
+decl_lab scale deployment web --replicas=5
+decl_lab get deployment web
 ```
 
-Edit `web-deployment.yaml` so `spec.replicas` is `5`, apply it, and explain in your notes why this is different from leaving the manual scale alone. Clean up the namespace only after you have captured the observations you need.
+Edit `web-deployment.yaml` so `spec.replicas` is `5`, apply it, and explain in your notes why this is different from leaving the manual scale alone. Wait for rollout before checking the result, then clean up after recording your observations.
 
 ```bash
-kubectl apply -f web-deployment.yaml
-kubectl delete namespace declarative-lab
+decl_lab apply -f web-deployment.yaml
+decl_lab rollout status deployment/web --timeout=90s
+decl_lab get deployment web
+```
+
+Run cleanup in the same terminal, including after an interruption. It checks the live namespace UID against the successful creation response before deleting the namespace and its resources. Failed cleanup retains the receipt for a same-shell retry. The check is not atomic with deletion and assumes no concurrent namespace replacement. The scratch directory remains for manual inspection.
+
+```bash
+cleanup_decl_lab() {
+  [ -n "${DECL_UID:-}" ] && [ -n "${DECL_CONTEXT:-}" ] && [ "$DECL_CONTEXT" != default ] && [ -n "${DECL_NS:-}" ] || { echo 'No recorded exercise namespace; stop' >&2; return 1; }
+  local live_uid
+  live_uid="$(command kubectl --context "$DECL_CONTEXT" get namespace "$DECL_NS" --ignore-not-found=true -o jsonpath='{.metadata.uid}')" || return 1
+  if [ -n "$live_uid" ]; then
+    [ "$live_uid" = "$DECL_UID" ] || { echo 'Namespace UID changed; refusing deletion' >&2; return 1; }
+    command kubectl --context "$DECL_CONTEXT" delete namespace "$DECL_NS" --ignore-not-found=true --wait=true --timeout=120s || return 1
+  fi
+  DECL_READY=no
+  echo 'Exercise namespace is gone; kubeconfig preferences were unchanged'
+}
+cleanup_decl_lab
 ```
 
 **Card A: The server rebooted at 03:00.** Three `nginx` containers were started from a shell before the operator went home. In the morning the host is up and the containers are gone. The shell history was not saved.

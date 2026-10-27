@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Observe reconciliation in a separate practice namespace.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now preserves your saved preferences, checks ownership before cleanup, and waits for rollout while you compare repeated apply with a temporary scale change.
 - **A clearer route through Kubernetes design.** [Philosophy & Design](/prerequisites/philosophy-design/) now explains the module sequence, separates reconciliation from application guarantees, and treats skipped topics as curriculum priorities to assess against your own needs.
 - **Validate YAML without creating practice objects.** [YAML for Kubernetes](/prerequisites/kubernetes-basics/module-1.8-yaml-kubernetes/) now keeps validation in a fresh folder, fixes its context and namespace, and explains why client checks can differ from server validation and application behavior.
 - **Namespace practice with a fresh workspace.** [Namespaces and Labels](/prerequisites/kubernetes-basics/module-1.7-namespaces-labels/) now keeps manifest files and cluster resources separate from existing work, preserves your saved namespace preference, and checks namespace identity before cleanup.
