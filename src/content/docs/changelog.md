@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Namespace practice with a fresh workspace.** [Namespaces and Labels](/prerequisites/kubernetes-basics/module-1.7-namespaces-labels/) now keeps manifest files and cluster resources separate from existing work, preserves your saved namespace preference, and checks namespace identity before cleanup.
 - **See which configuration values a running container actually uses.** [ConfigMaps and Secrets](/prerequisites/kubernetes-basics/module-1.6-configmaps-secrets/) now compares updated settings with the container's environment, makes placeholder-secret visibility explicit, and keeps practice and cleanup in their own namespace.
 - **Service troubleshooting in its own workspace.** [Services](/prerequisites/kubernetes-basics/module-1.5-services/) now checks server access, tests DNS in the exercise namespace, and compares NodePort configuration without exposing another service.
 - **More controlled Pod experiments.** [Pods](/prerequisites/kubernetes-basics/module-1.3-pods/) now isolates its practice resources, uses a localhost-only tunnel, and makes the memory-failure exercise work on Apple Silicon while preserving the reason for the container's last termination.

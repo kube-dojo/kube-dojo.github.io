@@ -3,6 +3,14 @@
   "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No full-page acceptance is recorded; coverage reporting is separate from inventory schema/digest checks.",
   "pages": [
     {
+      "path": "prerequisites/kubernetes-basics/module-1.7-namespaces-labels.md",
+      "page_digest": "sha256:234d22ab543aa2666bd01206fb6dadbf7c707cf5f599daf1c197b875879dbf5a",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
       "path": "prerequisites/kubernetes-basics/module-1.6-configmaps-secrets.md",
       "page_digest": "sha256:e159745382989815f3a56dd919ca9e78776a58634bc14910b2f4127fb661434f",
       "disposition": "revise",
