@@ -11,6 +11,14 @@
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
+      "path": "prerequisites/philosophy-design/index.md",
+      "page_digest": "sha256:10073322df14cbc1ee3bac404f15881c9c40eeaab321481aa8cf401b1e61137a",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-philosophy-hub-p10a.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "pass", "editorial_review": "pending", "lab_execution": "not_applicable", "deployed_smoke": "pending"}
+    },
+    {
       "path": "prerequisites/kubernetes-basics/module-1.7-namespaces-labels.md",
       "page_digest": "sha256:1cd53903643c1bacb9fed04c587627898edee738ce71baf319079fa4c6f42705",
       "disposition": "revise",

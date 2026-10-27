@@ -1,0 +1,21 @@
+# T01-P10a: complete English Philosophy & Design hub review
+
+Owner #2278; source/editorial/practice #2275/#2276. This receipt covers the entire hub, not the four linked module bodies. Initial disposition **revise**: the opening asserted undisputed industry dominance, treated declarative management as sufficient for resilience/scalability, and dismissed omitted technology universally. The correction states the section's learning sequence and scopes the controller model; no unsupported adoption statistic or measured learner benefit replaces those claims.
+
+Reviewed source: `prerequisites/philosophy-design/index.md`, SHA-256 `10073322df14cbc1ee3bac404f15881c9c40eeaab321481aa8cf401b1e61137a`, all24 lines. Claim map checked2026-10-27:
+
+| Complete source span | Evidence and disposition |
+|---|---|
+| Frontmatter1–5 | Title and sidebar.order0 identify the hub; deterministic source parse/inventory checks apply. |
+| Opening7 | Earlier-section source hubs exist; added explicit routes clarify the intended prerequisite sequence. This is curriculum sequencing, not evidence that every reader completed those labs. |
+| Model9 | [Kubernetes1.35 Controllers](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/), controller pattern/desired-versus-current/design: API objects record desired state; controllers try to bring current state toward it and can fail. [Self-healing](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/self-healing/), capabilities/considerations, distinguishes recovery mechanisms from application/storage problems. [HPA](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/), how-it-works/metrics support, requires configured targets and available metrics. These support the bounded explanation, not automatic application success. |
+| Scope11 | Learning-sequence advice, not a universal value judgment. Module1.3 outcomes and scope sections discuss boundaries/deferred specialization; Module1.4 outcomes/sections discuss technologies skipped, decline signals and retained uses. This verifies the hub's short descriptions; linked module facts and exercises remain separately owned. |
+| Table13–20 | Four existing source targets have matching titles/slugs/sidebar sequence and 80–110minute headers. Module1.1 covers historical/adoption factors;1.2 compares desired state/reconciliation/imperative changes;1.3/1.4 cover curriculum scope. No claim of completed linked-module review. |
+| Time22 | 4×80=320;4×110=440 minutes, converted correctly to5h20–7h20. Explicit header-derived planning estimates, no measured completion time. |
+| Sources24 | Three version-pinned official pages support model/limits. No incidents, quotations, empirical adoption claims, executable snippets, diagrams or assets occur on this hub. |
+
+Editorial applicability: this is an inventory `hub`, with purpose orientation and navigation (`scripts/quality/content_inventory.py::_page_type`). The module/lab rubric's numeric D1–D8 scoring, module word floor, quiz and hands-on requirements do not describe this page type: `scripts/quality/pipeline.py::iter_all_modules` and `scripts/quality/density.py` explicitly skip `index.md`. No numeric score or policy exemption for module bodies is claimed. Review the whole hub for audience/sequence, understandable terminology, accurate scope summaries, clear links, qualified technical explanation and honest time estimates. Independent cross-family editorial review remains pending at submission; a lead read or heuristic is not that review.
+
+Lab execution is **not_applicable to this hub** because it contains no executable exercise or lab instructions. Linked modules retain their own practical gates. Learner research is not claimed; no measured-improvement assertion requires a study here. Ukrainian fidelity remains #2291 and is not inferred from counterpart presence.
+
+Source presence, all-line source verification and local parse/link-target checks are recorded separately from rendered routes. Branch CI, independent editorial review and post-merge build/Pages/public/browser checks remain required before final English-hub acceptance; no full-page acceptance is recorded at submission. #2582's completed time-band scope remains closed.
