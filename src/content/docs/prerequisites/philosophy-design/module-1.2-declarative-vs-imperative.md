@@ -204,14 +204,14 @@ Declarative infrastructure wins in Kubernetes because it turns operations into a
 
 Self-healing is the first visible benefit. When a container crashes, Kubernetes can start another because the desired pod template still exists. When a node dies, the scheduler can place replacement pods elsewhere because the workload declaration still requests capacity. When someone deletes a pod, the controller can recreate it because the desired replica count still says the pod population is incomplete. You did not write all of that recovery logic; you expressed the shape of the desired workload.
 
-Idempotency is the second benefit, and it matters more than beginners expect. Pipelines retry. Humans double-submit commands. GitOps agents reconcile in loops. Reapplying a valid manifest for the same object identity is intended to converge without creating a second object, but permissions, validation, availability, and field-management conflicts can still cause errors. See [declarative management](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/) and [server-side apply conflicts](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts).
+Idempotency is the second benefit, and it matters more than beginners expect. Pipelines retry. Humans double-submit commands. GitOps agents reconcile in loops. Reapplying a valid manifest for the same object identity is intended to converge without creating a second object, but permissions, validation, and API availability can still cause errors. The flagless command below uses [client-side apply](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/). With [server-side apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts), changing a field owned by another manager can also report a conflict.
 
 ```bash
 # Run this 100 times
 kubectl apply -f deployment.yaml
 
 # Same valid object identity: no second Deployment is created
-# Requests can still fail, including on field conflicts
+# Requests can still fail on validation, permissions, or API availability
 ```
 
 ```bash
@@ -389,8 +389,9 @@ New Thinking (Declarative)
 -> Define desired state in YAML
 -> Commit to Git
 -> kubectl apply (or let GitOps do it)
--> K8s handles the rest
--> Git IS the documentation
+-> Workload controllers reconcile API objects
+-> GitOps reconciliation requires a configured controller
+-> Git records reviewed intent
 ```
 
 This mindset shift changes troubleshooting language. Instead of asking only, "How do I restart the thing?" a declarative operator asks, "Why does the controller believe this is the thing that should exist?" Instead of asking, "Who changed the server?" the team asks, "Which commit or controller changed the declared state?" Instead of treating Kubernetes as an obstacle that undoes manual fixes, the team treats it as a persistent worker that needs accurate instructions.
@@ -423,7 +424,7 @@ The anti-pattern is command-first production management. Teams fall into it beca
 | Git as source of truth | Multiple people deploy the same service | Reviews and history explain production state | Keep manifests close to the service or in a platform repo |
 | Temporary imperative debug | A live symptom needs fast inspection | Useful evidence without pretending it is permanent | Record the command and remove temporary objects |
 | Live edits as normal deployment | The release path feels too slow | Drift, missing audit trail, and surprise rollbacks | Fix the release path and apply reviewed manifests |
-| Multiple tools own one object | Teams combine Helm, raw apply, and GitOps casually | Fields flip between competing declarations | Assign one owner and one reconciliation path per resource |
+| Multiple tools own one object | Teams combine Helm, raw apply, and GitOps casually | Updates may overwrite values or encounter server-side field conflicts | Assign one owner and one reconciliation path per resource |
 | Unencrypted secrets in Git | Teams want every object declarative | Sensitive values spread through history | Use External Secrets, SOPS, or Sealed Secrets with review |
 
 Scaling consideration: the more services and teams you have, the more expensive untracked state becomes. A single manual fix can be remembered by one person for one afternoon. Hundreds of manual fixes across clusters become unreproducible infrastructure. Declarative discipline is not ceremony for its own sake; it is how teams keep the system explainable after the people, incidents, and releases have changed.
@@ -479,7 +480,7 @@ The framework is deliberately conservative because Kubernetes itself is conserva
 | Editing live resources with `kubectl edit` and never updating Git | The live edit solves the immediate symptom, so the follow-up feels optional | Treat every live edit as an incident hotfix that requires a matching manifest change before closure |
 | Assuming Kubernetes "undoing" a manual change is a bug | The operator focuses on the visible object and misses its owner controller | Inspect owner references and change the higher-level declaration that owns the object |
 | Mixing Helm, raw `kubectl apply`, and GitOps on the same resource | Each tool seems declarative in isolation, so ownership boundaries are ignored | Assign exactly one tool and one repository path as the source of truth for each managed resource |
-| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Plan deliberate deletion or GitOps pruning. In Kubernetes 1.35, `kubectl apply --prune` modes are alpha; incorrect scope can delete unexpected objects. Review the [pruning warnings](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects) before use. |
+| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Plan deliberate deletion or GitOps pruning. In Kubernetes 1.35, `kubectl apply --prune` modes are alpha; incorrect scope can delete unexpected objects or retain objects intended for removal. Review the [pruning warnings](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects) before use. |
 | Storing sensitive values directly in plain YAML | Teams want all configuration in Git and confuse declarative with unencrypted | Use External Secrets, SOPS, Sealed Secrets, or another approved secret-management workflow |
 | Believing `kubectl apply` makes a multi-resource release perfectly atomic | Declarative convergence can involve several controllers and partial progress | Design readiness probes, rollout checks, and rollback plans around eventual convergence |
 
@@ -499,9 +500,9 @@ The manual scale changed live state without changing the declarative source of t
 
 </details>
 
-<details><summary>Your pipeline runs `kubectl apply -f deployment.yaml` several times in a row after a retry bug. The file does not change. What should happen, and why is that safe?</summary>
+<details><summary>Your pipeline runs `kubectl apply -f deployment.yaml` several times in a row after a retry bug. The file does not change. What result should you expect, and which checks are still needed?</summary>
 
-For the same valid manifest and object identity, successful repeated applies should not create another Deployment. Kubernetes may update managed fields or report that the object is unchanged, while controllers work toward the declared workload shape. An apply can still fail, for example on validation, permissions, or field conflicts, so a retry needs error handling and a separate readiness check.
+For the same valid manifest and object identity, successful repeated client-side applies should not create another Deployment. Controllers still need to bring the workload toward its declared shape. The command can fail on validation, permissions, or API availability, so check the command result and workload readiness separately. A pipeline using `--server-side` must also handle conflicts when it tries to change another manager's field.
 
 </details>
 
