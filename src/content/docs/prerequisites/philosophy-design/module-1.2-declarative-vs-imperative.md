@@ -538,6 +538,8 @@ The outcome depends on the update method and field ownership: one update may ove
 
 This synthetic exercise uses an independently confirmed dedicated disposable Kubernetes 1.35+ lab. Set `KUBEDOJO_LAB_CONTEXT` to that context name before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, all steps, and cleanup. The guard cannot prove cluster ownership or disposability; do not share the exercise namespace with another writer. The goal is to see reconciliation, idempotency, and drift with a tiny Deployment.
 
+**Exercise scenario:** you need to show a teammate which desired state survives a Pod deletion and an operator's temporary scale. Your evidence must distinguish a submitted command from a converged workload and a durable declaration. Work through warm-up, failure injection and integration; attempt each challenge before opening its hints. The final transfer task is a written design, not another unrecorded cluster test.
+
 First, create a fresh namespace and record its UID. The helper sends requests to the recorded context and namespace without changing saved kubeconfig preferences. It refuses commands until creation succeeds with a nonempty UID.
 
 ```bash
@@ -564,7 +566,19 @@ Create and enter a fresh scratch directory before writing the manifest so you do
 DECL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/declarative-lab.XXXXXXXX")" && cd "$DECL_DIR" && printf 'Manifest directory: %s\n' "$DECL_DIR"
 ```
 
-Now write the Deployment. Its explicit label selector identifies the pods that belong to its desired state. Read the file before applying it and predict how many pods should exist after convergence.
+**Warm-up challenge:** in the scratch directory, declare a Deployment named `web` with three replicas, selector and template label `app: web`, and an `nginx:1.27` container exposing port 80. Predict the desired count before submission. Explain why selecting the same workload matters when comparing later observations. Keep the mandatory context/namespace helper; the challenge is designing the declaration, not bypassing its boundary.
+
+<details><summary>Hint 1 — identify the contract</summary>
+
+Separate the Deployment's identity, desired count and Pod template. The selector must match the template labels. A replica request is intent; readiness is an observation you will inspect after the controller has acted.
+
+</details>
+<details><summary>Hint 2 — choose fields and evidence</summary>
+
+Use `apps/v1`, `kind: Deployment`, `spec.replicas`, `spec.selector.matchLabels` and `spec.template`. Put the container under the template. Decide which Deployment and Pod-list observations would distinguish three desired replicas from three ready replicas.
+
+</details>
+<details><summary>Hint 3 — compare a complete declaration</summary>
 
 ```bash
 cat <<'EOF' > web-deployment.yaml
@@ -590,7 +604,11 @@ spec:
 EOF
 ```
 
-Apply the Deployment from the file, then inspect what Kubernetes created. The helper supplies the namespace. You apply one higher-level object, but the controller creates lower-level pods to satisfy it.
+</details>
+
+Apply your declaration and inspect convergence through `decl_lab`. Record desired and available counts plus the selected Pod identities. If rollout times out, inspect the workload's events and readiness rather than recording the apply exit code as success. Compare your approach with the command hint only after deciding which evidence you need.
+
+<details><summary>Command hint — submit, wait and inspect</summary>
 
 ```bash
 decl_lab apply -f web-deployment.yaml
@@ -599,7 +617,21 @@ decl_lab get deployment web
 decl_lab get pods -l app=web
 ```
 
-Now deliberately create drift by deleting one pod. Do not immediately reapply the manifest. Watch the pod list until the replacement appears, stop the watch with <kbd>Ctrl</kbd>+<kbd>C</kbd>, and connect the behavior back to the reconciliation loop from the diagram.
+</details>
+
+**Failure-injection challenge:** remove one selected managed Pod without reapplying the file. Predict what changes and what remains the same, then collect evidence of replacement and the resulting count. Explain which declaration is sufficient for recovery in this experiment and which scheduling or application conditions could still prevent readiness. Stop the watch with <kbd>Ctrl</kbd>+<kbd>C</kbd> after recording your observations.
+
+<details><summary>Hint 1 — reason about ownership</summary>
+
+Deleting a managed Pod does not delete the Deployment's desired count. Look for a replacement identity rather than interpreting the disappearance of the old Pod as a new desired count. Your prediction is conditional on the cluster being able to run a replacement.
+
+</details>
+<details><summary>Hint 2 — narrow the operation</summary>
+
+Select a Pod using the exercise's `app=web` label inside the recorded namespace, remove that Pod and watch the same selection. Keep the manifest untouched so the result tests controller behavior rather than another apply.
+
+</details>
+<details><summary>Hint 3 — select, delete and watch</summary>
 
 ```bash
 if POD_NAME="$(decl_lab get pods -l app=web -o jsonpath='{.items[0].metadata.name}')" && [ -n "$POD_NAME" ]; then
@@ -609,7 +641,21 @@ else
 fi
 ```
 
-Next, test idempotency by applying the same Deployment again. The expected result is not an additional Deployment and not six pods. The expected result is convergence to the same declared shape.
+</details>
+
+**Integration challenge:** first test an unchanged reapply, then change capacity temporarily to five and make that intent durable in the file. Before each action, predict the Deployment identity and desired count. Record how your observations distinguish an unchanged reapply, a live edit and a changed declaration; a short apply response is not the complete result.
+
+<details><summary>Hint 1 — separate three sources of evidence</summary>
+
+Compare the file, live desired fields and observed availability. Applying the unchanged three-replica file should target the same object. A live scale to five changes desired state in the API, while the unchanged file still records three. Decide what another apply of that old file could do before editing it.
+
+</details>
+<details><summary>Hint 2 — choose the durable correction</summary>
+
+Keep the Deployment name and selector stable. Inspect after repeat apply, scale the live count and inspect again, then edit only the intended replica count in the manifest and apply it. Wait for rollout before treating five available replicas as observed. Explain where review and a repository commit would fit in a real delivery workflow; this scratch-file exercise does not perform that commit.
+
+</details>
+<details><summary>Hint 3 — reapply and inspect</summary>
 
 ```bash
 decl_lab apply -f web-deployment.yaml
@@ -617,20 +663,26 @@ decl_lab apply -f web-deployment.yaml
 decl_lab get deployment web
 ```
 
-Finally, create a temporary imperative scale and then correct it declaratively. This is the incident pattern in miniature: a manual command changes live state, and the durable fix is to update the manifest so the source of truth matches the desired capacity.
+Create the temporary live scale and inspect it:
 
 ```bash
 decl_lab scale deployment web --replicas=5
 decl_lab get deployment web
 ```
 
-Edit `web-deployment.yaml` so `spec.replicas` is `5`, apply it, and explain in your notes why this is different from leaving the manual scale alone. Wait for rollout before checking the result, then clean up after recording your observations.
+Edit `web-deployment.yaml` so `spec.replicas` is `5`, then apply and verify:
 
 ```bash
 decl_lab apply -f web-deployment.yaml
 decl_lab rollout status deployment/web --timeout=90s
 decl_lab get deployment web
 ```
+
+</details>
+
+If setup reports failure, stop before task commands; do not clear the readonly guards to retry in the same shell. If Pod selection returns nothing, inspect the label selection and workload rather than deleting an unrelated Pod. A watch stopped with your interrupt is not evidence that reconciliation failed: check the recorded identities and readiness separately. These checks connect the task's evidence to the ownership and spec-versus-status reasoning taught above.
+
+**Transfer challenge, on paper:** choose a different stateless service name and a desired count appropriate to a hypothetical workload. Design a declaration, observation plan and review path that preserve the same ownership principle. Include one case where desired replicas are present but availability is lower, and explain what you would inspect before editing intent. Identify one application behavior this nginx exercise cannot establish. Compare your plan with the solution notes after writing it; do not present that plan as an executed recovery test.
 
 Run cleanup in the same terminal, including after an interruption. It checks the live namespace UID against the successful creation response before deleting the namespace and its resources. Failed cleanup retains the receipt for a same-shell retry. The check is not atomic with deletion and assumes no concurrent namespace replacement. The scratch directory remains for manual inspection.
 
@@ -689,11 +741,14 @@ Failure layer: live state and declared intent disagree, and Git is the durable r
 - [ ] You deleted a managed pod and observed Kubernetes create a replacement.
 - [ ] You applied the same manifest more than once and confirmed the workload did not duplicate.
 - [ ] You performed a temporary imperative scale and then updated the manifest to match.
+- [ ] You explained the identity/count predictions, separated desired from observed state, and wrote a transfer plan with a workload-specific evidence limit.
 - [ ] You cleaned up the lab namespace after recording the reconciliation behavior.
 
 <details><summary>Solution notes</summary>
 
 After the first apply, the Deployment should report three desired replicas and the pod list should show three matching pods once scheduling finishes. When you delete one pod, the pod disappears briefly and a replacement is created because the Deployment controller still sees `spec.replicas: 3` as the desired state. Reapplying the same file should not double the workload because the object identity and desired fields are the same. The manual scale to five replicas is acceptable as a temporary observation, but the durable correction is changing `web-deployment.yaml` so Git and the cluster agree.
+
+For the transfer plan, preserve the relationship between a workload's identity, selected Pods, declared count and availability evidence while changing the service-specific declaration. If availability trails intent, inspect events and readiness before assuming the desired count is wrong. A running nginx example does not establish another application's data consistency, external dependency behavior or acceptable recovery time. A plan that records those missing tests is more defensible than treating object creation as a complete production result.
 
 </details>
 
