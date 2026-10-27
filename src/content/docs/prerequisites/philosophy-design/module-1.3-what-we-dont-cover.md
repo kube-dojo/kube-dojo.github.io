@@ -98,12 +98,12 @@ Our approach is to teach Kubernetes first. When you understand the platform, pro
 |-------|-------------|----------------|
 | Multi-cluster federation | Beyond certification scope | K8s docs, KubeFed project |
 | Cluster autoscaling | Cloud-specific implementations | Provider docs |
-| Disaster recovery | Organization-specific | SRE books, your company runbooks |
+| Organization-wide disaster recovery design | Separate service requirements from named exam tasks | SRE books, your company runbooks |
 | Cost optimization | Cloud-specific | FinOps resources, cloud calculators |
 
 Production operations at scale are where Kubernetes becomes deeply contextual. A disaster recovery plan depends on data stores, recovery objectives, organizational risk tolerance, cloud regions, backup tooling, incident roles, and the team's appetite for operational complexity. Cost optimization depends on billing models, reserved capacity, autoscaling policies, workload seasonality, and business priorities. Multi-cluster design depends on latency, tenancy, compliance, traffic management, and who is allowed to operate the platform. Those topics are important, but they cannot be reduced to a portable certification checklist without losing the context that makes them useful.
 
-The exam does test operational thinking, but at a smaller and more mechanical scale. You may need to drain a node, inspect a failed control plane component, restore an etcd snapshot, reason about resource requests, or identify why a workload is not scheduled. Those tasks are operational, but they are bounded. KubeDojo therefore teaches the tested mechanics and the reasoning behind them, while leaving full production design to SRE practice, company runbooks, and platform-specific training.
+Choose the operational task from the curriculum you actually intend to study. The checked CKA curriculum includes preparing cluster infrastructure, creating and managing clusters with kubeadm, managing their lifecycle and implementing a highly available control plane. A full organizational recovery program adds service-specific responsibilities, but that distinction does not make cluster availability out of scope. Map a proposed backup or recovery exercise to the chosen objective and state what it verifies; do not assume the same task is required by CKA, CKAD and CKS.
 
 ### Deep Networking
 
@@ -116,18 +116,18 @@ The exam does test operational thinking, but at a smaller and more mechanical sc
 
 Networking is the most tempting rabbit hole because it explains so many real outages. A learner starts with a Service that cannot reach a Pod, then finds kube-proxy, iptables, IPVS, DNS, CoreDNS, CNI plugins, overlay networks, BGP, eBPF, and service meshes. The chain is technically coherent, but the exam does not ask you to become a network plugin author. It asks you to reason about Kubernetes networking from the perspective of an administrator or application operator: labels, selectors, ports, endpoints, DNS names, NetworkPolicies, and basic troubleshooting.
 
-The distinction matters during practice. If a NetworkPolicy blocks traffic, you should be able to inspect pod labels, namespace selectors, ingress and egress rules, and the intended source and destination. You do not need to write a CNI plugin or explain every datapath optimization used by a particular implementation. A specialist who works on Cilium or Calico needs that depth, but a certification candidate needs the portable object model first.
+The distinction matters during practice. If a NetworkPolicy blocks traffic, inspect labels, selectors, rules and the intended source and destination. The checked CKA curriculum explicitly names understanding extension interfaces such as CNI, CSI and CRI, alongside networking tasks. Plugin authorship is a different activity from understanding an interface or implementing the named task. A product name alone cannot decide whether a resource belongs in the plan: the checked CKS curriculum names Cilium and Istio as examples for Pod-to-Pod encryption.
 
 ### Specific Tools and Projects
 
-| Tool | Why We Skip | Where to Learn |
+| Tool | Depth boundary to check | Where to Learn |
 |------|-------------|----------------|
-| ArgoCD | GitOps tool, not on exam | ArgoCD documentation |
-| Istio | Service mesh, separate certification track | Istio documentation |
-| Terraform | IaC tool, not K8s-specific | HashiCorp Learn |
-| Prometheus/Grafana | Observability tools, briefly touched | Project documentation |
+| ArgoCD | Separate tool-specific sync workflows from the chosen objective | ArgoCD documentation |
+| Istio | CKS names it as an encryption example; that does not require its entire feature set | Istio documentation |
+| Terraform | Separate infrastructure provisioning from the named Kubernetes task | HashiCorp Learn |
+| Prometheus/Grafana | Map the proposed monitoring activity to the exact objective | Project documentation |
 
-The cloud-native ecosystem is full of excellent tools that sit beside Kubernetes rather than inside the certification objective. ArgoCD is a strong GitOps controller, Terraform is a widely used infrastructure tool, Istio is a service mesh with its own mental model, and Prometheus with Grafana is a common observability pairing. We mention these projects when they clarify the landscape, but we do not turn a certification module into four additional curricula. Each tool has its own commands, failure modes, and design tradeoffs, and mixing those into the core path usually makes learners slower at the native tasks the exam actually measures.
+Separate a product's full curriculum from the specific task a certification names. The checked [CKS curriculum](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKS_Curriculum%20v1.34.pdf), Minimize Microservice Vulnerabilities, includes implementing Pod-to-Pod encryption with Cilium and Istio as examples. Blanket advice to postpone both products would therefore omit relevant CKS practice. Record the required behavior, the environment and how you will verify it, then park unrelated features deliberately. This retrieved curriculum file is named v1.34; the separately checked FAQ lists the CKS exam environment as 1.35. A curriculum-file label and an exam runtime are distinct evidence, so recheck both before preparation.
 
 Helm is explicit in both the [CKA](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKA_Curriculum_v1.37.pdf) and [CKAD](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKAD_Curriculum_v1.37.pdf) curricula checked on October 27, 2026. CKA names Helm and Kustomize for installing cluster components; CKAD names deploying existing packages with Helm. Practice the named tasks rather than treating Helm as either universally optional or a reason to master every chart-authoring workflow. Apply the same objective-by-objective check to your chosen exam instead of transferring exclusions from another certification.
 
@@ -160,7 +160,7 @@ flowchart LR
     Inspect --> Plan
 ```
 
-The second reason is exam relevance. The CKA, CKAD, and CKS each publish defined curricula, and those curricula create a contract between the learner and the exam. KubeDojo aligns to that contract rather than to whatever happens to be popular in production this quarter. Adding extra material does not automatically make a course better; it increases cognitive load, creates false urgency, and can make a learner confuse adjacent expertise with tested competence. When an extra topic helps explain a tested task, we use it sparingly. When it does not, we point elsewhere.
+The second reason is exam relevance. CKA, CKAD and CKS have separate published curricula; use the exact objective as the planning reference rather than assuming a shared native-only syllabus. A KubeDojo route still needs verification against that objective and the current environment. Record a concrete gap when a route omits required practice, and give unrelated material a separate learning goal. Popularity in production does not establish an exam requirement, and a third-party name does not establish an exclusion.
 
 The third reason is maintainability. Kubernetes moves quickly enough that even a focused curriculum needs regular review for version drift, deprecated behavior, changed defaults, and exam objective updates. The more optional topics a course includes, the more likely some of them become stale, misleading, or shallow. For each route, check its stated target against current provider requirements and versioned technical sources; a narrow scope alone does not establish that its content is current.
 
@@ -314,13 +314,13 @@ The decision test is to name the job before choosing the resource. "I need to pa
 
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
-| **Rabbitholing on CNI plugins** | Networking is fascinating, and Calico or Cilium docs can make the datapath feel like the real exam. | Learn enough to install or recognize a CNI, then practice standard Services, DNS, and NetworkPolicies with native objects. |
+| **Classifying a network tool by name alone** | Plugin development, interface knowledge and security tasks can appear in adjacent documentation. | Map the task: CKA names extension interfaces; CKS names Pod-to-Pod encryption with Cilium/Istio examples. Separate those activities from unrelated internals. |
 | **Memorizing YAML syntax** | A blank editor can encourage memorizing fields without checking their meaning. | Practice `kubectl run` and `kubectl create` with `--dry-run=client -o yaml`, then inspect, edit and verify the generated manifest. |
 | **Studying cloud-specific IAM** | Your company uses AWS IRSA, EKS Pod Identity, GKE Workload Identity, or AKS integrations, so it feels like core Kubernetes. | Focus first on ServiceAccounts, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings, and `kubectl auth can-i` in vanilla Kubernetes. |
 | **Building a Raspberry Pi cluster** | Hands-on hardware feels more authentic than a local lab. | Use kind, minikube, or a simple VM lab because the exam tests Kubernetes operation, not hardware quirks or ARM image issues. |
 | **Treating Helm as universally optional or exhaustive** | A workplace chart workflow can obscure the specific task named in a curriculum. | Practice the Helm tasks named by your exam; both the checked CKA and CKAD curricula include Helm. Keep unrelated chart-authoring depth in a separate plan. |
 | **Studying GitOps with ArgoCD or Flux too early** | GitOps is a modern production norm, and it feels like the natural next step after Deployments. | Understand declarative state conceptually, then postpone tool-specific sync behavior until after native workload and troubleshooting fluency. |
-| **Trying to master etcd operations** | etcd is the brain of the cluster, so deep theory seems necessary for credibility. | Practice the official snapshot and restore workflow required for the exam, then leave compaction, quorum tuning, and disaster design for specialization. |
+| **Assuming one etcd study rule fits every exam** | Cluster operation and application development are different goals. | Map the specific task to your exam's objective and environment; distinguish demonstrated cluster mechanics from a complete service recovery plan. |
 
 ---
 
@@ -359,13 +359,13 @@ Horizontal Pod Autoscaler deserves more exam focus because it is a Kubernetes AP
 <details>
 <summary>You plan to build a highly available bare-metal cluster with external etcd before taking the CKA next week. Is that a good design for a time-boxed learning plan?</summary>
 
-It is a strong platform engineering project, but it is a poor design for a time-boxed exam plan. The build would introduce load balancers, hardware behavior, external etcd operations, networking choices, and failure modes that are far beyond what you need before next week's exam. A focused plan should use a simple lab and spend the limited time on the tasks most likely to be tested. Put the highly available build in the post-exam roadmap and practice kubeadm, troubleshooting, and etcd snapshot mechanics now.
+Do not defer high availability merely because it sounds advanced: the checked CKA curriculum explicitly includes implementing and configuring a highly available control plane. Break the proposal into that named task and additional hardware or organizational requirements. Choose a lab where you can perform and verify the required task with your available preparation time; park extra complexity with a reason. A single-control-plane lab can serve other objectives, but it does not itself demonstrate this availability objective. The curriculum does not supply a prediction of next week's questions.
 </details>
 
 <details>
 <summary>You have a bookmark list full of Istio, ArgoCD, Cilium, provider IAM, and etcd articles. How would you implement a personal boundary without losing those resources?</summary>
 
-Create two lists: exam scope and post-exam specialization. Move each advanced resource into the second list with a short note about why it might matter later, such as "service mesh for production traffic policy" or "Cilium datapath for our platform team." Then choose a smaller set of exam-scope tasks for the current week, such as RBAC drills, Service troubleshooting, NetworkPolicy scenarios, and etcd snapshot practice. This boundary keeps curiosity alive while preventing it from consuming the certification schedule.
+Use the exercise's three categories: exam scope, supporting context and post-exam specialization. Classify each resource's actual task against the chosen curriculum. A CKS resource practicing Pod-to-Pod encryption may belong in exam scope even if its title says Istio or Cilium; a tour of unrelated internals can belong elsewhere. For CKA, retain the named control-plane and extension-interface practice. Record why a resource is deferred and what evidence would change the classification. Do not use the presence of a product name as the rule.
 </details>
 
 ---
@@ -381,7 +381,7 @@ Create a short document with three headings: `Exam Scope`, `Supporting Context`,
 ### Tasks
 
 1. Inventory at least twelve resources you were planning to use, including videos, docs pages, internal runbooks, and practice labs. Mark each one with the certification you are pursuing and the reason you thought it belonged in the plan.
-2. Evaluate each resource against official exam objectives and move it into `Exam Scope`, `Supporting Context`, or `Post-Exam Specialization`. Be strict: a resource can be useful and still be outside this month's certification goal.
+2. Evaluate each resource's task against your exam's official objectives and move it into `Exam Scope`, `Supporting Context`, or `Post-Exam Specialization`. Check named tools and cluster-availability tasks before deferring them; do not transfer an exclusion from another exam.
 3. Compare the advanced items with the native Kubernetes tasks they might be replacing. For example, compare an Istio traffic policy tutorial with Service and NetworkPolicy practice, or compare a cloud IAM guide with RBAC drills.
 4. Design a one-week time-boxed learning plan that gives most of your practice time to native Kubernetes tasks and reserves only brief context time for anything outside scope.
 5. Diagnose one likely pressure point that could pull you off plan, such as a manager asking for provider knowledge, a coworker recommending a tool, or your own curiosity about internals.
@@ -432,7 +432,7 @@ Failure layer: an adjacent tool displaced the tested object. Next action: move t
 ### Success Criteria
 
 - [ ] You have evaluated at least twelve study materials and assigned each one to `Exam Scope`, `Supporting Context`, or `Post-Exam Specialization`.
-- [ ] You have identified at least two topics you were planning to study that are outside the certification scope, such as Istio, EKS specifics, ArgoCD, Cilium internals, or Terraform.
+- [ ] You have justified at least two scope decisions using exact objectives and resource tasks, retaining named practice even when it involves a third-party tool. If an item is deferred, its reason and separate learning goal are recorded.
 - [ ] You have compared at least one advanced topic with the native Kubernetes task it was displacing.
 - [ ] You have designed a one-week time-boxed learning plan that protects core Kubernetes practice.
 - [ ] You have diagnosed one realistic scope-creep pressure point and written how you will respond.
@@ -444,6 +444,7 @@ Failure layer: an adjacent tool displaced the tested object. Next action: move t
 
 - [CNCF CKA curriculum, inspected revision: Cluster Architecture, Installation and Configuration](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKA_Curriculum_v1.37.pdf)
 - [CNCF CKAD curriculum, inspected revision: Application Deployment](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKAD_Curriculum_v1.37.pdf)
+- [CNCF CKS curriculum, inspected v1.34 file: Minimize Microservice Vulnerabilities](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKS_Curriculum%20v1.34.pdf)
 - [Linux Foundation FAQ: current exam environments](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks#what-application-version-is-running-in-the-exam-environment)
 - [Kubernetes documentation: Concepts overview](https://kubernetes.io/docs/concepts/)
 - [Kubernetes documentation: Tasks](https://kubernetes.io/docs/tasks/)
@@ -462,4 +463,4 @@ Failure layer: an adjacent tool displaced the tested object. Next action: move t
 
 ## Next Module
 
-[Module 1.4: Dead Ends - Technologies We Skip](../module-1.4-dead-ends/) - Why certain technologies are deprecated and should not be part of your Kubernetes certification path.
+[Module 1.4: Dead Ends - Technologies We Skip](../module-1.4-dead-ends/) - Distinguish project retirement from deployment fit and justify retaining or replacing a component.
