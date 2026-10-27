@@ -27,7 +27,7 @@ After this module, you will be able to:
 
 ## Why This Module Matters
 
-Consider a platform team preparing three engineers for Kubernetes certification. Their production clusters run on a managed cloud platform with a service mesh, GitOps delivery, cloud identity integration, and a monitoring stack that has grown over several years, so their study plan mirrors the environment they see every day. Two engineers spend evenings learning Terraform modules, provider-specific node group behavior, service mesh traffic policies, and custom dashboards, then struggle on practice exams because they are slow at native tasks such as inspecting pods, fixing RBAC, reading events, and using `kubectl` under time pressure. The cost is not only exam fees; it is several weeks of delayed project work, lost confidence, and a calendar full of rework that could have been avoided with a tighter definition of scope.
+Hypothetical scenario: a platform team is preparing three engineers for Kubernetes certification. Its production environment includes a managed cloud platform, a service mesh, GitOps delivery, cloud identity integration, and monitoring dashboards. The team proposes a study plan that mirrors those tools. Before adopting it, compare each activity with the published objectives for the intended certification. Provider onboarding may be necessary for work while leaving a workload, networking, or troubleshooting objective without practice; record that gap rather than assuming every Kubernetes-related activity serves the same goal.
 
 That story matters because Kubernetes is too large to study by wandering. A learner can spend a productive-looking weekend reading about etcd quorum behavior, eBPF datapaths, CNI plugin design, ArgoCD sync waves, cloud IAM federation, and multi-cluster failover, yet gain almost nothing that improves CKA, CKAD, or CKS performance. Certification exams are not a judgment on whether those topics are useful in production. They are a timed test of specific Kubernetes capabilities, and KubeDojo treats that boundary as a design constraint rather than an inconvenience.
 
@@ -37,19 +37,22 @@ This module teaches the discipline behind that boundary. We are not telling you 
 
 ## Our Philosophy: Exam-Focused, Not Exhaustive
 
-KubeDojo exists to help you pass Kubernetes certifications efficiently, then use that foundation as a launchpad for deeper work. The curriculum is therefore selective on purpose. We apply the 80/20 rule because certification performance usually comes from repeated practice with core primitives, troubleshooting workflows, and command fluency rather than from broad exposure to every project in the cloud-native ecosystem. If a topic appears directly in the exam objectives, we teach it. If it does not appear but explains an objective well enough to improve performance, we teach the minimum useful version. If it is fascinating but unrelated to the tested task, we mark it as post-exam specialization.
+For certification study, choose a bounded route through KubeDojo's wider curriculum. Start with the [official CNCF curriculum for your exam](https://github.com/cncf/curriculum), then map each objective to an activity and a result you can check. Related material can provide supporting context or belong in a separate work-learning plan. This is a planning method, not a measured claim that a fixed fraction of topics accounts for a fixed fraction of the exam or guarantees a pass.
 
 ```mermaid
-pie title The 80/20 Rule for Certifications
-    "Core topics we cover deeply (80% of exam)" : 80
-    "Edge cases, rarely tested, advanced (20% of exam)" : 20
+flowchart LR
+    Topic[Study topic] --> Match{Named exam objective?}
+    Match -->|Yes| Practice[Practice and verify that objective]
+    Match -->|No| Context{Needed to explain an objective?}
+    Context -->|Yes| Support[Bound the supporting context]
+    Context -->|No| Later[Separate work or specialization plan]
 ```
 
-The chart is intentionally simple because the decision is intentionally practical. A certification candidate does not need an encyclopedic model of the CNCF ecosystem before learning how to create a Deployment, debug a failing Service, repair a kubelet, or apply a NetworkPolicy. Those skills are closer to the center of the exam because they are native Kubernetes tasks that can be tested in a constrained terminal environment. A custom controller, a managed cloud identity feature, or a vendor dashboard may be valuable at work, but it is difficult to test fairly across all candidates, and that usually pushes it outside the certification path.
+The diagram classifies study activities; it does not predict question frequency or score. An objective can name a tool or extension mechanism as well as a native object. For example, the [CKA curriculum](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKA_Curriculum_v1.37.pdf) explicitly includes Helm, Kustomize, CRDs, and installing and configuring operators. Classifying all third-party tools as out of scope would therefore produce an incomplete plan. Check the intended task and depth before deciding what to defer.
 
 Think of the exam like a driving test rather than a mechanical engineering degree. The examiner cares whether you can operate the vehicle safely, interpret road conditions, recover from common problems, and follow the rules under pressure. They do not ask you to design a transmission, tune a racing suspension, or compare every commercial GPS system. Those deeper topics can make you a better specialist later, but studying them before you can pass the road test is a sequencing error.
 
-This is also why our examples prefer vanilla Kubernetes and Kubernetes 1.35+ semantics unless a certification objective says otherwise. The exam environment rewards knowledge that travels across clusters: API objects, control plane concepts, RBAC, scheduling, workload management, observability basics, security primitives, and troubleshooting with standard tools. When we use command examples, we write the full `kubectl` command because examples should be safe to paste into non-interactive shells and scripts, even though many engineers use a shorter alias interactively during timed practice.
+The course's technical examples use Kubernetes 1.35 as their baseline; check the [Linux Foundation exam-environment FAQ](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks#what-application-version-is-running-in-the-exam-environment) before using an example for timed preparation. As checked on October 27, 2026, it lists CKA/CKAD 1.37 and CKS 1.35. A course baseline is not proof of current exam parity. We write the full `kubectl` command so examples do not require a local alias; server queries still require an appropriate configured cluster and permissions.
 
 ```bash
 kubectl version --client
@@ -126,7 +129,11 @@ The distinction matters during practice. If a NetworkPolicy blocks traffic, you 
 
 The cloud-native ecosystem is full of excellent tools that sit beside Kubernetes rather than inside the certification objective. ArgoCD is a strong GitOps controller, Terraform is a widely used infrastructure tool, Istio is a service mesh with its own mental model, and Prometheus with Grafana is a common observability pairing. We mention these projects when they clarify the landscape, but we do not turn a certification module into four additional curricula. Each tool has its own commands, failure modes, and design tradeoffs, and mixing those into the core path usually makes learners slower at the native tasks the exam actually measures.
 
-There is one subtle exception: Helm is currently explicit in CKAD scope, while it is not the center of CKA or CKS study. That does not mean Helm is unimportant; it means your depth should match the exam you are taking. For CKAD, standard chart operations are worth practicing because the objective says so. For CKA or CKS, Helm may remain useful context, but it should not crowd out native troubleshooting, cluster maintenance, workload configuration, or security tasks.
+Helm is explicit in both the [CKA](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKA_Curriculum_v1.37.pdf) and [CKAD](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKAD_Curriculum_v1.37.pdf) curricula checked on October 27, 2026. CKA names Helm and Kustomize for installing cluster components; CKAD names deploying existing packages with Helm. Practice the named tasks rather than treating Helm as either universally optional or a reason to master every chart-authoring workflow. Apply the same objective-by-objective check to your chosen exam instead of transferring exclusions from another certification.
+
+Worked planning example: suppose your bookmark list contains a Helm chart-authoring course, a lab that deploys an existing package, and a guide to installing a cluster component. Write the exact objective beside each resource before assigning study time. For the checked CKAD curriculum, the existing-package lab directly addresses the named Helm task. For CKA, inspect whether the cluster-component guide actually practices installing that component with Helm or Kustomize. The chart-authoring course may contain useful context, but its title alone does not establish that all its material is required by either objective.
+
+Now write the evidence you would want from the selected lab: identify the package and target environment, explain the configuration you selected, inspect the deployed resources, and verify the intended result. Record any setup or permissions the lab assumes. This is a hypothetical plan, not an observed installation or proof of exam readiness. If you cannot explain which objective the exercise demonstrates, investigate that gap before labeling the resource essential. The method preserves relevant tool practice while giving additional chart-development material a deliberate place in the wider learning plan.
 
 **Pause and predict:** if your company uses Istio heavily, should you study it for the CKA?
 
@@ -166,50 +173,24 @@ Before running another study session, ask yourself this: what output do you expe
 "Just enough" does not mean shallow. It means the depth of a topic should match the job the topic is doing in your current learning path. Pods, Deployments, Services, RBAC, NetworkPolicy, scheduling, storage, and troubleshooting all deserve meaningful practice because they appear across the certifications and because they form the portable vocabulary of Kubernetes. Other topics require a narrower slice. For etcd, a candidate may need to know how to take and restore a snapshot using the official tool, while a production expert may need to understand quorum, compaction, defragmentation, latency, backup validation, and failure domains.
 
 ```mermaid
-gantt
-    title Depth Levels by Topic (Exam Needs vs. Expert Level)
-    dateFormat X
-    axisFormat %s
-
-    section Pods
-    Exam Needs          :a1, 0, 4
-    Expert Level        :a2, 0, 10
-
-    section Deployments
-    Exam Needs          :b1, 0, 4
-    Expert Level        :b2, 0, 8
-
-    section Services
-    Exam Needs          :c1, 0, 4
-    Expert Level        :c2, 0, 9
-
-    section NetworkPolicy
-    Exam Needs          :d1, 0, 3
-    Expert Level        :d2, 0, 8
-
-    section RBAC
-    Exam Needs          :e1, 0, 3
-    Expert Level        :e2, 0, 10
-
-    section Helm
-    Exam Needs          :f1, 0, 4
-    Expert Level        :f2, 0, 9
-
-    section etcd backup
-    Exam Needs          :g1, 0, 1
-    Expert Level        :g2, 0, 10
+flowchart TD
+    Goal[Name the goal and target environment] --> Task[Define the task and its verification]
+    Task --> Exam[Certification: map to the published objective]
+    Task --> Work[Production: identify dependencies and recovery requirements]
+    Exam --> Gap[Record missing knowledge or practice]
+    Work --> Gap
 ```
 
-**Pause and predict:** look at the depth chart above and decide why etcd backup has a small exam-depth bar but a large expert-depth bar.
+**Pause and predict:** why does a successful backup command alone leave unanswered questions about recovery of a production service?
 
 <details>
 <summary>Check your prediction</summary>
 
-The exam can ask you to execute a bounded recovery workflow, so the necessary skill is precise command practice with the documented snapshot process. Production expertise is wider because a real restore can affect every workload, every controller, and every API object in the cluster, and a mistake can turn a recoverable incident into data loss.
+A command result does not establish whether the service's data dependencies, recovery procedure, access requirements, and acceptable recovery time have been tested together. Identify what the chosen exam objective requires separately from what the actual service needs. The diagram assigns no numerical difficulty, study hours, or relative importance to either goal.
 
 </details>
 
-Write why the two bars differ before you continue. The next paragraph is about false equivalence between other topics. It does not explain these two bars.
+Write the missing recovery evidence before you continue. Then compare it with the bounded task in your chosen curriculum; do not infer exam scope or production readiness from an unlabeled depth score.
 
 This principle also helps you avoid false equivalence. A topic can be simple to name and still require deep expertise, while another topic can look complex and still require only a practical slice for the exam. "NetworkPolicy" sounds like one object, but real network isolation requires careful label design, namespace boundaries, plugin behavior, default-deny posture, and testing. "Cluster Autoscaler" sounds like an operational basics topic, but it depends heavily on infrastructure providers and node provisioning behavior, so it belongs outside the generic certification path for most learners.
 
@@ -237,24 +218,19 @@ Which approach would you choose here and why: one month of mixed study where eve
 
 ## Visualization: KubeDojo Scope
 
-The scope diagram below is the mental model for this module. KubeDojo sits inside the certification curricula, which sit inside production operations, which sit inside the much larger CNCF landscape. The nesting is important because it prevents two common errors. One error is assuming the exam covers all production Kubernetes. The other error is assuming that anything outside the exam is irrelevant. The truth is more useful: the exam is a focused slice, and KubeDojo follows that slice.
+The scope diagram distinguishes two learning goals. A certification plan follows its named objectives; a workplace plan follows the responsibilities of a particular system. They can share concepts and practice, but neither is a complete substitute for the other. KubeDojo also has separate cloud, Linux, platform and other learning tracks, so this module's study boundary is not a description of everything the site covers.
 
 ```mermaid
 flowchart TD
-    subgraph CNCF [CNCF Landscape 1000+ projects]
-        subgraph Prod [Production Operations - Company-specific, tools, etc.]
-            subgraph Cert [Certification Curricula]
-                KubeDojo((KubeDojo - Cert Focus))
-            end
-        end
-    end
-    style CNCF fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#111
-    style Prod fill:#ececff,stroke:#333,stroke-width:2px,color:#111
-    style Cert fill:#d4edda,stroke:#333,stroke-width:2px,color:#111
-    style KubeDojo fill:#28a745,color:#111,stroke:#333,stroke-width:2px
+    KubeDojo[KubeDojo learning routes] --> Cert[Certification plan]
+    KubeDojo --> Work[Workplace or specialization plan]
+    Cert --> Objectives[Named exam objectives and practice]
+    Work --> Responsibilities[System requirements and operating responsibilities]
+    Objectives --> Shared[Identify shared concepts and separate gaps]
+    Responsibilities --> Shared
 ```
 
-Use this diagram when you feel tension between work relevance and exam relevance. If a topic is inside the certification box, it belongs in your immediate study plan. If it is inside production operations but outside certification, it may belong in your work learning plan or post-exam roadmap. If it is somewhere in the broader CNCF landscape, it may be worth knowing exists, but it should not consume certification time unless a direct objective pulls it inward.
+Use this diagram when work relevance and exam relevance compete for the same study time. Map the resource to an objective or an operating responsibility and decide which goal has priority now. Keep deferred material visible with its reason and a review date. This records your planning choice without claiming that a tool is universally irrelevant or that a particular allocation guarantees a better score.
 
 The diagram also explains why KubeDojo can be opinionated without being dismissive. We can say "do not study ArgoCD for the CKA" and still respect ArgoCD as a production tool. We can say "do not learn BGP configuration for CKAD" and still respect networking specialists. A curriculum that refuses to draw boundaries eventually becomes a map of everything, and a map of everything is hard to use when you have a timed exam in front of you.
 
@@ -325,7 +301,7 @@ The decision test is to name the job before choosing the resource. "I need to pa
 
 ## Did You Know?
 
-- **The CNCF landscape has 1000+ projects.** No human can master them all, and the existence of a project in the landscape does not automatically make it certification scope.
+- **CNCF publishes separate exam curricula.** Use the [official curriculum repository](https://github.com/cncf/curriculum) to check the objectives for the certification you intend to take; inclusion in a broader landscape is a different question.
 - **Most production Kubernetes users know a focused slice deeply.** They know what their job requires, while certifications prove portable breadth and work builds role-specific depth.
 - **Certification curricula change over time.** A study plan should track the current official objectives instead of relying on an old course outline or a coworker's memory.
 - **"Expert" is context-dependent.** A networking expert, security expert, developer platform engineer, and SRE may all be strong at Kubernetes while having different deep specialties.
@@ -337,10 +313,10 @@ The decision test is to name the job before choosing the resource. "I need to pa
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
 | **Rabbitholing on CNI plugins** | Networking is fascinating, and Calico or Cilium docs can make the datapath feel like the real exam. | Learn enough to install or recognize a CNI, then practice standard Services, DNS, and NetworkPolicies with native objects. |
-| **Memorizing YAML syntax** | A blank editor feels scary, so learners try to remember every field by sight. | Master `k run` and `k create` with `--dry-run=client -o yaml`, then edit generated manifests quickly and accurately. |
+| **Memorizing YAML syntax** | A blank editor can encourage memorizing fields without checking their meaning. | Practice `kubectl run` and `kubectl create` with `--dry-run=client -o yaml`, then inspect, edit and verify the generated manifest. |
 | **Studying cloud-specific IAM** | Your company uses AWS IRSA, EKS Pod Identity, GKE Workload Identity, or AKS integrations, so it feels like core Kubernetes. | Focus first on ServiceAccounts, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings, and `k auth can-i` in vanilla Kubernetes. |
 | **Building a Raspberry Pi cluster** | Hands-on hardware feels more authentic than a local lab. | Use kind, minikube, or a simple VM lab because the exam tests Kubernetes operation, not hardware quirks or ARM image issues. |
-| **Over-indexing on Helm or Helmfile** | Helm may be the way your team deploys applications every day. | Match depth to the exam: practice standard Helm tasks for CKAD, but do not let Helm crowd out CKA or CKS core tasks. |
+| **Treating Helm as universally optional or exhaustive** | A workplace chart workflow can obscure the specific task named in a curriculum. | Practice the Helm tasks named by your exam; both the checked CKA and CKAD curricula include Helm. Keep unrelated chart-authoring depth in a separate plan. |
 | **Studying GitOps with ArgoCD or Flux too early** | GitOps is a modern production norm, and it feels like the natural next step after Deployments. | Understand declarative state conceptually, then postpone tool-specific sync behavior until after native workload and troubleshooting fluency. |
 | **Trying to master etcd operations** | etcd is the brain of the cluster, so deep theory seems necessary for credibility. | Practice the official snapshot and restore workflow required for the exam, then leave compaction, quorum tuning, and disaster design for specialization. |
 
@@ -433,12 +409,12 @@ Failure layer: work usefulness was treated as the certification goal. Next actio
 
 </details>
 
-**Card C: The etcd bars look inconsistent.** The chart shows a short exam bar and a long expert bar for backup and restore. Someone concludes the topic is either trivial or out of scope.
+**Card C: A backup command succeeded.** Someone treats that result as proof both of exam readiness and of a production recovery plan.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: exam depth was confused with production blast radius. Next action: practice the documented snapshot commands, and do not treat a full-cluster restore drill as this week's exam task.
+Failure layer: a command result was substituted for the intended acceptance criteria. Next action: check the published exam objective and identify the service-level recovery evidence still missing. Neither goal follows automatically from that one result.
 
 </details>
 
@@ -464,6 +440,9 @@ Failure layer: an adjacent tool displaced the tested object. Next action: move t
 
 ## Sources
 
+- [CNCF CKA curriculum, inspected revision: Cluster Architecture, Installation and Configuration](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKA_Curriculum_v1.37.pdf)
+- [CNCF CKAD curriculum, inspected revision: Application Deployment](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKAD_Curriculum_v1.37.pdf)
+- [Linux Foundation FAQ: current exam environments](https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks#what-application-version-is-running-in-the-exam-environment)
 - [Kubernetes documentation: Concepts overview](https://kubernetes.io/docs/concepts/)
 - [Kubernetes documentation: Tasks](https://kubernetes.io/docs/tasks/)
 - [Kubernetes documentation: kubectl reference](https://kubernetes.io/docs/reference/kubectl/)
