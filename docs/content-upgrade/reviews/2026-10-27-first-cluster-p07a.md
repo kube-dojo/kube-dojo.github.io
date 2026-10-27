@@ -1,0 +1,19 @@
+# T01-P07a: first-cluster lifecycle and kubeconfig practice
+
+Owner #2278; source/practice/assessment #2275/#2276/#2277. Full base-page read on 2026-10-27: 735 lines, SHA-256 `92ceacdd63b5abdaf1e430de45ee0e997bda81c18d2835aa4da81c2e46208434`. The lead read the original page and integrated the preserved draft with GPT-6.1 Sol. Disposition remains **revise**, D1–D8 unassessed. This packet does not check off T01-P07; the hub and kubectl lesson retain separate obligations.
+
+## Scoped corrections and primary support
+
+| Finding | Correction and support checked 2026-10-27 |
+|---|---|
+| Fixed-name creation followed by deletion | Same-shell helpers refuse collisions and list/create failures, record successful creation, and retain receipts on failed deletion. Exclusive authorized local runtime/no concurrent creators are prerequisites; receipts are not general ownership proof. [kind quick start](https://kind.sigs.k8s.io/docs/user/quick-start/#deleting-a-cluster) documents deletion, including success for an absent cluster, not ownership. |
+| Default kubeconfig and raw credential exposure | A fresh private workspace and kubeconfig preserve genuine `kubectl config use-context` teaching without editing the default file. Redacted view replaces raw file printing. [Kubernetes kubeconfig](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/), context and environment sections: contexts persist in configuration, not just the shell. |
+| Explicit kind path semantics | Local create/delete help and [v0.33.0 create source](https://github.com/kubernetes-sigs/kind/blob/v0.33.0/pkg/cmd/kind/create/cluster/createcluster.go), `Kubeconfig` flag and `CreateWithKubeconfigPath`; [delete source](https://github.com/kubernetes-sigs/kind/blob/v0.33.0/pkg/cmd/kind/delete/cluster/deletecluster.go), `provider.Delete`; [helper](https://github.com/kubernetes-sigs/kind/blob/v0.33.0/pkg/cluster/internal/kubeconfig/kubeconfig.go), `Export`/`Remove`: explicit paths flow to configuration write/removal. Source inspection is not execution proof. |
+| Workspace failure and arbitrary node selection | Setup exits a dedicated shell on failed creation/navigation; both YAML writes check the workspace first. Failure simulation uses the original 64-hex Docker ID saved after successful creation. [Docker inspect](https://docs.docker.com/reference/cli/docker/inspect/), formatting/type sections, documents selecting objects by name/ID and formatting fields. |
+| Broad Docker cleanup | Inspect usage; delete only recorded lesson clusters and stop on uncertain ownership. No host-wide prune. [Docker prune](https://docs.docker.com/reference/cli/docker/system/prune/) acts across eligible shared daemon objects. |
+
+## Verification and limits
+
+Twenty-five source-derived macOS Bash cases passed using explicit kind/Docker/kubectl stubs: both YAML writes with missing setup, wrong directory, changed kubeconfig, success and failed setup/navigation; list/create/inspect/ID failures, collisions, original-ID failure targeting after simulated name reuse, cleanup receipt preservation/removal, and restoration of unset/empty/populated KUBECONFIG. These prove shell control flow and file preservation only. Enabled structural checks pass with source reachability explicitly skipped. Exact-head independent review and CI remain delivery gates.
+
+Docker runtime probe failed: the configured OrbStack socket was absent. No daemon, installation, cluster, image, privileged operation, node failure, hosted lab or documented learner-platform execution was established. Full factual/source, pedagogy, assessment, workload and rubric clearance remain incomplete; pre-existing broad claims and optional installation/version details still need their owning review. Ukrainian fidelity stays with #2291, parked under English-first scheduling. Merged primary build and scoped publication checks are separate delivery evidence, not full-page acceptance.
