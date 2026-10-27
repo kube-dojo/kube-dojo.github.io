@@ -527,7 +527,7 @@ Add stable labels that distinguish the intended component and environment, then 
 
 ## Hands-On Exercise: The Multi-Tenant Sandbox
 
-In this exercise, you will create a namespace, add resource guardrails, deploy a stable release, expose it through a Service, and then introduce a canary that joins the Service endpoint set because of labels. You can run this in any disposable Kubernetes 1.35+ cluster where you have permission to create namespaces, LimitRanges, ResourceQuotas, Deployments, Pods, and Services. If your current cluster is shared with other learners, choose a unique namespace name instead of `alpha-team`.
+In this synthetic exercise, you will create a namespace, add resource guardrails, deploy a stable release, expose it through a Service, and introduce a canary that joins the Service endpoint set because of labels. Use a Kubernetes 1.35+ context you have independently confirmed is a dedicated disposable lab. Namespace scoping does not itself isolate network traffic.
 
 These four cases are the ones to write down before you run the sandbox. Each one names a layer you can check with a read-only command. Do not fix the cluster until you have named that layer.
 
@@ -569,34 +569,47 @@ Failure layer: namespace admission, not a node capacity failure. Next action: re
 
 Success criteria:
 
-- [ ] The active context points at the exercise namespace before workloads are created.
+- [ ] The helper targets the recorded context and generated exercise namespace before workloads are created.
 - [ ] The namespace contains a LimitRange and ResourceQuota that describe the intended guardrails.
 - [ ] The stable `web-v1` Deployment creates three ready Pods with `app=web` and `version=v1`.
 - [ ] The `web-svc` Service has endpoints for the stable Pods before the canary is added.
 - [ ] The canary Pod uses `app=web` and `version=v2`, then appears in the Service endpoint set.
-- [ ] Cleanup removes the exercise namespace and returns the context to a safe namespace.
+- [ ] Cleanup removes the owned exercise namespace without changing kubeconfig preferences.
 
 ### Task 1: Create the Isolation Zone
 
-Create a new namespace for a simulated development team and switch your active context to it. This makes later commands shorter while still giving you a visible namespace boundary to inspect.
+Set `KUBEDOJO_LAB_CONTEXT` to the independently confirmed lab context before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, all tasks, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer. It prints the generated namespace and pins each request to it without switching the active context or changing saved preferences.
 
 <details><summary><strong>Solution</strong></summary>
 
 ```bash
-# Create the namespace
-kubectl create namespace alpha-team
+NS_READY=no NS_NEW=no
+readonly NS_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" NS_NAME="namespace-lab-$(date +%s)-$$" && { NS_NEW=yes; NS_UID=; }
+ns_lab() {
+  [ "$NS_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
+  command kubectl --context "$NS_CONTEXT" --namespace "$NS_NAME" "$@"
+}
+if [ "$NS_NEW" = yes ] && [ -n "$NS_CONTEXT" ] && [ "$NS_CONTEXT" != default ] && NS_CURRENT="$(command kubectl config current-context)" && [ "$NS_CURRENT" = "$NS_CONTEXT" ]; then
+  printf 'Exercise context/namespace: %s / %s\n' "$NS_CONTEXT" "$NS_NAME"
+  if NS_CREATED_UID="$(command kubectl --context "$NS_CONTEXT" create namespace "$NS_NAME" -o jsonpath='{.metadata.uid}')" && [ -n "$NS_CREATED_UID" ]; then
+    NS_UID="$NS_CREATED_UID"; NS_READY=yes
+  fi
+fi
+[ "$NS_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
+```
 
-# Switch your context to the new namespace
-kubectl config set-context --current --namespace=alpha-team
+Continue only after setup succeeds. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
 
-# Verify you are in the new namespace
-kubectl config view --minify -o jsonpath='{..namespace}'
+Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
+
+```bash
+NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && cd "$NS_DIR" && printf 'Manifest directory: %s\n' "$NS_DIR"
 ```
 </details>
 
 ### Task 2: Establish the Guardrails
 
-Apply a `LimitRange` to the `alpha-team` namespace so missing CPU requests and limits receive safe defaults, then add a small `ResourceQuota` so the namespace has a visible budget. The default values are intentionally modest because this exercise runs on small learning clusters.
+Apply a `LimitRange` to the exercise namespace so missing CPU requests and limits receive defaults, then add a small `ResourceQuota` so the namespace has a visible budget. The default values are intentionally modest because this exercise runs on small learning clusters.
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -606,7 +619,6 @@ apiVersion: v1
 kind: LimitRange
 metadata:
   name: cpu-guardrails
-  namespace: alpha-team
 spec:
   limits:
   - default:
@@ -621,7 +633,6 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: alpha-budget
-  namespace: alpha-team
 spec:
   hard:
     requests.cpu: "2"
@@ -630,11 +641,11 @@ spec:
 ```
 
 ```bash
-kubectl apply -f guardrails.yaml
+ns_lab apply -f guardrails.yaml
 
 # Verify the LimitRange and ResourceQuota
-kubectl describe limitrange cpu-guardrails
-kubectl describe quota alpha-budget
+ns_lab describe limitrange cpu-guardrails
+ns_lab describe quota alpha-budget
 ```
 </details>
 
@@ -650,7 +661,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web-v1
-  namespace: alpha-team
 spec:
   replicas: 3
   selector:
@@ -669,9 +679,10 @@ spec:
 ```
 
 ```bash
-kubectl apply -f web-v1.yaml
-kubectl get pods --show-labels
-kubectl describe pod -l app=web,version=v1
+ns_lab apply -f web-v1.yaml
+ns_lab rollout status deployment/web-v1 --timeout=90s
+ns_lab get pods --show-labels
+ns_lab describe pod -l app=web,version=v1
 ```
 
 The described Pods should show CPU values injected by the LimitRange, even though the Deployment template did not specify them directly. That confirms admission-time defaulting is working.
@@ -689,7 +700,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web-svc
-  namespace: alpha-team
 spec:
   selector:
     app: web
@@ -699,12 +709,14 @@ spec:
 ```
 
 ```bash
-kubectl apply -f web-svc.yaml
+ns_lab apply -f web-svc.yaml
 
 # Verify the service is finding the three v1 pods
-kubectl get endpoints web-svc
-kubectl get pods -l app=web,version=v1
+ns_lab get endpoints web-svc
+ns_lab get pods -l app=web,version=v1
 ```
+
+Endpoint updates are asynchronous: repeat the endpoint check until three ready Pod addresses appear before adding the canary; investigate if they do not converge. The legacy Endpoints API has been deprecated since Kubernetes 1.33; EndpointSlices are its replacement.
 </details>
 
 ### Task 5: The Canary Release
@@ -719,7 +731,6 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: web-v2-canary
-  namespace: alpha-team
   labels:
     app: web
     version: v2
@@ -730,38 +741,47 @@ spec:
 ```
 
 ```bash
-kubectl apply -f web-v2-canary.yaml
+ns_lab apply -f web-v2-canary.yaml
+ns_lab wait --for=condition=Ready pod/web-v2-canary --timeout=90s
 
 # Check the endpoints again
-kubectl get endpoints web-svc
-kubectl get pods --show-labels
+ns_lab get endpoints web-svc
+ns_lab get pods --show-labels
 ```
 
-The Service endpoint list should now include the canary Pod as well as the three stable Pods. Because the Service selector checks only `app=web`, both versions qualify for traffic.
+Repeat the endpoint check until it includes the ready canary and three stable Pods; investigate if it does not converge. Because the Service selector checks only `app=web`, both versions qualify for traffic.
 </details>
 
 ### Task 6: Cleanup
 
-Delete the namespace to remove every namespaced object created in the exercise, then return your context to `default` or another safe namespace. Namespace deletion can take a few moments because Kubernetes garbage-collects the contained objects.
+Run cleanup in the same terminal, including after an interruption. It compares the live namespace UID with the successful creation response before deleting the namespace and its objects. Failed cleanup retains the receipt for a same-shell retry. This check is not atomic with deletion and assumes no concurrent namespace replacement. The scratch directory remains for manual inspection.
 
 <details><summary><strong>Solution</strong></summary>
 
 ```bash
-# Delete the namespace and all exercise resources inside it
-kubectl delete namespace alpha-team
-
-# Reset your context back to default
-kubectl config set-context --current --namespace=default
+cleanup_ns_lab() {
+  [ -n "${NS_UID:-}" ] && [ -n "${NS_CONTEXT:-}" ] && [ "$NS_CONTEXT" != default ] && [ -n "${NS_NAME:-}" ] || { echo 'No recorded exercise namespace; stop' >&2; return 1; }
+  local live_uid
+  live_uid="$(command kubectl --context "$NS_CONTEXT" get namespace "$NS_NAME" --ignore-not-found=true -o jsonpath='{.metadata.uid}')" || return 1
+  if [ -n "$live_uid" ]; then
+    [ "$live_uid" = "$NS_UID" ] || { echo 'Namespace UID changed; refusing deletion' >&2; return 1; }
+    command kubectl --context "$NS_CONTEXT" delete namespace "$NS_NAME" --ignore-not-found=true --wait=true --timeout=120s || return 1
+  fi
+  NS_READY=no
+  echo 'Exercise namespace is gone; kubeconfig preferences were unchanged'
+}
+cleanup_ns_lab
 ```
 </details>
 
 ## Sources
 
-- [Kubernetes documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
-- [Kubernetes documentation: Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+- [Kubernetes v1.35 documentation: Namespaces](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+- [Kubernetes v1.35 documentation: Labels and Selectors](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
 - [Kubernetes documentation: Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
-- [Kubernetes documentation: Resource Quotas](https://kubernetes.io/docs/concepts/policy/resource-quotas/)
-- [Kubernetes documentation: Limit Ranges](https://kubernetes.io/docs/concepts/policy/limit-range/)
+- [Kubernetes v1.35 documentation: Resource Quotas](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/)
+- [Kubernetes v1.35 documentation: Limit Ranges](https://v1-35.docs.kubernetes.io/docs/concepts/policy/limit-range/)
+- [Kubernetes v1.35: object UIDs](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids) and [Endpoints deprecation](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/#endpoints-deprecated)
 - [Kubernetes documentation: DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 - [Kubernetes documentation: Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 - [Kubernetes documentation: Recommended Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
