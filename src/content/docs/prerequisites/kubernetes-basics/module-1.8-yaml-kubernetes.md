@@ -11,7 +11,7 @@ revision_pending: false
 >
 > **Prerequisites**: Modules 1.1-1.7, including basic Kubernetes resources, pods, services, deployments, labels, and the `kubectl` workflow
 >
-> **Command convention**: Earlier commands are reference examples; check their files, names, permissions, and request scope before trying them in a disposable lab. Hands-on practice uses `yaml_check` after setup in the same Bash terminal; the helper fixes the context, namespace, and server-dry-run mode.
+> **Command convention**: Earlier commands are reference examples; check their files, names, permissions, and request scope before trying them in a disposable lab. Hands-on practice uses `yaml_check` after setup in the same Bash terminal; the helper pins the request context and namespace and always uses server dry run.
 
 ---
 
@@ -494,9 +494,9 @@ Is the field path unfamiliar?
         +-- no ----+
                   |
                   v
-Does the file parse and match local schema?
+Have you checked the file's structure?
                   |
-                  +-- no --> Run kubectl apply --dry-run=client and fix syntax or type errors
+                  +-- no --> Use client dry run for early feedback; verify types with server dry run
                   |
                   +-- yes ---+
                              |
@@ -520,7 +520,7 @@ Use client-side dry run when you are still editing and want immediate feedback o
 | Situation | Preferred Tool | Reason |
 | :--- | :--- | :--- |
 | You cannot remember where `readOnly` belongs for a volume mount | `kubectl explain pod.spec.containers.volumeMounts` | The schema shows the exact nested field path and expected type |
-| You are editing a local Pod example and want fast feedback | `kubectl apply --dry-run=client -f pod.yaml` | The client catches YAML and basic schema mistakes without waiting on the cluster |
+| You are editing a local Pod example and want fast feedback | `kubectl apply --dry-run=client -f pod.yaml` | Client checks give early feedback, may contact the API, and may accept invalid fields |
 | You are validating an operator CRD before merge | `kubectl apply --dry-run=server -f resource.yaml` | The API server validates the installed CRD version and admission policy |
 | You are changing selectors on a live Deployment or Service | `kubectl diff -f service.yaml` | The diff exposes destructive relationship changes before they are applied |
 

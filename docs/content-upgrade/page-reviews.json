@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/kubernetes-basics/module-1.8-yaml-kubernetes.md",
-      "page_digest": "sha256:b7fa04db568c1c370d4e0fbce38f1252fc5656fb4bcf9c06d37142706fde9f74",
+      "page_digest": "sha256:c0d5f223d7201945d3e1145dde1a96124141181db85026e6d517e6c442323785",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-yaml-validation-p09c.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-yaml-validation-p09c.md"],
