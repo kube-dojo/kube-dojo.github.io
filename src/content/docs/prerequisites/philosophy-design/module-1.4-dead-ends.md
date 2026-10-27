@@ -27,7 +27,7 @@ After this module, you will be able to:
 
 Hypothetical scenario: a retailer is reviewing an existing container platform before expanding it. Its engineers need to determine which components remain supported, what happens when a host fails, how application changes are rolled out, and who maintains the integrations. They are considering Kubernetes, but neither a migration nor keeping the current platform is automatically the right answer. The audit needs a dated maintainer record, documented capabilities for the intended version, and tests of the failures the service must tolerate. This scenario supplies decision questions, not a real company's spending, hiring history, incident or measured migration outcome.
 
-That story matters because beginners often assume the best career move is to learn every technology that appears in old architecture diagrams. In cloud-native engineering, that instinct is expensive. A dead-end technology can still have documentation, conference talks, and working clusters, so the question is not whether it ever solved a problem. The question is whether it is still a good place to invest learning time, production risk, and team attention when Kubernetes 1.35 and the surrounding ecosystem have become the default platform vocabulary.
+The opening scenario asks you to check evidence before selecting a replacement. A dated maintainer record can establish project retirement, while capability documentation describes a deployment model. Neither identifies the requirements of every organization. For a learning or engineering decision, state which product and version you mean, which responsibilities the team must support, and what information is missing. That keeps the audit useful without pretending a tool name determines the answer.
 
 This module is a tour through the cloud-native graveyard, but the purpose is not mockery. Docker Swarm, Apache Mesos, early Cloud Foundry, Chef, Puppet, Ansible, and Docker Compose each solved real problems for real teams. You will study why they lost ground, which parts remain useful, and how to evaluate the next tool that claims to replace Kubernetes. The practical skill is judgment: you should leave able to spot decline signals before your team builds a platform, career plan, or migration strategy around them.
 
@@ -77,7 +77,7 @@ Apache Mesos and Marathon are more subtle because Mesos was technically impressi
 
 **What it was**: Two-level resource scheduler (Mesos) with container orchestration (Marathon).
 
-**Status, checked October 27, 2026**: The [Apache Attic record](https://attic.apache.org/projects/mesos.html) identifies Mesos as retired in August 2025, with its Attic move completed in October. This is a formal project-lifecycle fact, rather than a claim that new usage reached zero in an earlier year. Marathon's repository and any distribution support require their own checks; Mesos's status does not establish a separate Marathon retirement date.
+**Status, checked October 27, 2026**: The [Apache Attic record](https://attic.apache.org/projects/mesos.html) identifies Mesos as retired in August 2025, with its Attic move completed in October 2025. This is a formal project-lifecycle fact, rather than a claim that new usage reached zero in an earlier year. Marathon's repository and any distribution support require their own checks; Mesos's status does not establish a separate Marathon retirement date.
 
 ```mermaid
 timeline
@@ -213,16 +213,16 @@ For Compose, distinguish a documented production deployment from an unsupported 
 
 **Status, checked October 27, 2026**: Docker explicitly documents [using Compose in production](https://docs.docker.com/compose/how-tos/production/), including deployment on a single server and production-specific configuration. A single-host deployment needs an explicit answer for host failure, data recovery, updates, access and monitoring. Production use alone does not establish that Compose is unsuitable, and Kubernetes alone does not establish that those requirements are satisfied.
 
-**Pause and predict:** if `docker-compose up` brings up your entire stack locally, why is it dangerous to run that exact same command on a production server?
+**Pause and predict:** a Compose application starts on a laptop. Which production configuration and failure-recovery questions remain unanswered by that result?
 
 <details>
 <summary>Check your prediction</summary>
 
-The risk is not that the file format is ugly. A single-node process lacks cluster scheduling, multi-node failover, native rollout control, API-driven policy, and the self-healing behavior that production users eventually demand.
+A local startup does not establish what happens when the production host fails, where durable data is recovered, or whether an update meets the service's availability target. Docker documents Compose production use and possible configuration changes; compare that model with the actual requirements. Identify which failures still need tests before recommending retention, a configuration change, an additional component, or migration.
 
 </details>
 
-Write the production risk before you continue. The next block is a sample file. The paragraph after it should not be the first place you learn the risk.
+Write the unanswered requirements and the evidence you would collect before continuing. The next block is an illustrative service definition, not a completed recovery plan.
 
 Consider a typical `docker-compose.yml`:
 
@@ -239,9 +239,9 @@ services:
       - db-data:/var/lib/postgresql/data
 ```
 
-Read the file as a local stack, not as a production control plane. Write down what disappears when that one host disappears, before you read the comparisons that follow. Those comparisons are about wrappers, defaults, and translation tools. They assume you already named the risk.
+Read the example as a service definition. It does not state a recovery-time target, identify off-host backups, or show a host-loss test. Write the missing operating questions before choosing a deployment platform. The comparison should explain which requirements each candidate would satisfy and which observations are still needed.
 
-Docker's production guide recommends reviewing configuration such as code mounts, ports, environment variables, restart policy and logging, and explains rebuilding and recreating a service for deployment changes. Those steps do not by themselves demonstrate an availability target or successful recovery from host failure. State which failures the application must tolerate and test the actual design. Requirements for access control, secrets, traffic management and observability depend on the system; identify them explicitly instead of assuming that either a Compose file or a Kubernetes manifest supplies them automatically.
+Docker's production guide lists possible configuration changes involving code mounts, ports, environment variables, restart policy and logging, and explains rebuilding and recreating a service for deployment changes. Those steps do not by themselves demonstrate an availability target or successful recovery from host failure. State which failures the application must tolerate and test the actual design. Requirements for access control, secrets, traffic management and observability depend on the system; identify them explicitly instead of assuming that either a Compose file or a Kubernetes manifest supplies them automatically.
 
 Translation tools such as Kompose can help people see rough Kubernetes equivalents, but one-to-one translation is rarely a good final architecture. A Compose service does not automatically imply a production Deployment with readiness probes, resource requests, PodDisruptionBudgets, network policies, service accounts, and environment-specific configuration. The modernization task is to redesign using Kubernetes primitives, not to mechanically convert syntax and hope the missing operational requirements appear.
 
@@ -249,7 +249,7 @@ Translation tools such as Kompose can help people see rough Kubernetes equivalen
 
 The dead-end pattern becomes clearer when you compare what lost with what remains current. Kubernetes did not win every technical argument. It won the coordination argument. Once cloud providers, tooling vendors, educators, security products, storage drivers, service meshes, and hiring pipelines treated Kubernetes as the shared target, alternatives had to offer overwhelming value to overcome isolation. Most did not.
 
-Keep project lifecycle, capability and decision criteria separate. Apache's Mesos record establishes formal retirement; Docker's Swarm and Compose documentation describes supported deployment models; Cloud Foundry's documentation explains Diego's architecture. These records do not measure why organizations adopted or left each product. Governance, operating effort and integration requirements are questions for the actual team to investigate, alongside which failure paths its design can tolerate.
+Keep project lifecycle, capability and decision criteria separate. Apache's Mesos record establishes formal retirement; Docker's Swarm and Compose documentation describes deployment models; Cloud Foundry's documentation explains Diego's architecture. These records do not measure why organizations adopted or left each product. Governance, operating effort and integration requirements are questions for the actual team to investigate, alongside which failure paths its design can tolerate.
 
 | Category | Current/Relevant |
 |----------|-----------------|
@@ -288,7 +288,7 @@ Next, examine the Puppet role with care. Puppet may still be doing useful host p
 
 The Compose file deserves the same requirements check. Keep a useful local workflow when it serves the team, and inspect the production configuration separately. Docker documents production-specific configuration and deployment changes with Compose. Decide whether that model meets the service's recovery, update and access requirements. If Kubernetes is a candidate, compare its proposed resources and operating responsibilities against the same criteria; choosing a different YAML format does not itself satisfy them.
 
-A good assessment memo names failure modes in concrete language. "Swarm is deprecated" is weaker than "Swarm reduces our access to managed cloud integrations, current hiring pools, and Kubernetes-native security tooling." "Puppet is bad" is weaker than "Puppet should not repair pods because Kubernetes controllers already own desired state and rollout behavior." "Compose is not production" is weaker than "Compose gives us no multi-node scheduler, no native service account boundaries, and no controller that replaces failed replicas across hosts."
+A useful assessment memo separates a source-backed fact, a requirement, and the missing local evidence. For example: Apache records Mesos as retired in August 2025, so this deployment needs an explicit support and maintenance plan. Docker documents single-server production use with Compose; the hypothetical service still needs evidence of data recovery and acceptable behavior after host loss. Engine swarm mode has documented orchestration capabilities, but its name alone does not establish whether the required integrations exist. Each conclusion identifies something another engineer can check instead of inventing a deprecation, hiring comparison, or universal production ban.
 
 Now map responsibilities before selecting replacements. For each component, record what it owns, its documented lifecycle, and any operating requirement the current design cannot satisfy. The result can justify retention, a configuration change, an additional component, or migration. A Kubernetes proposal should explain who owns its infrastructure, workload declarations, upgrades, data and verification. Keep Docker image building and host-management responsibilities distinct from the decision about application orchestration.
 
@@ -312,7 +312,7 @@ Success metrics should be operational, not cosmetic. Count reduced recovery time
 
 The final recommendation for Project Phoenix should read like a risk-managed modernization plan rather than an accusation against the past. The old stack was a reasonable accumulation of decisions made under earlier constraints. The new stack should keep the useful parts, such as OCI image builds and local Compose convenience, while retiring production dependencies that isolate the team from the current ecosystem. That tone matters because migrations are social systems as much as technical ones.
 
-By the time you can write that assessment, you are no longer memorizing which tools are dead. You are practicing platform judgment. You can diagnose why Docker Swarm, Mesos, Cloud Foundry, and Compose production deployments became risky, compare Docker's surviving image role with its retired runtime role, evaluate governance and ecosystem signals, and design a modernization plan that uses Kubernetes without treating it as a magic word.
+The assessment should distinguish Mesos's documented retirement from the deployment-fit questions for Engine swarm mode, Diego and Compose. Explain what the sources establish, what the hypothetical workload requires, and which tests or support information are still missing. A recommendation can retain a component or propose migration. Its value comes from that checked argument, rather than from selecting Kubernetes in advance or treating every older product as formally retired.
 
 ## Patterns & Anti-Patterns
 
@@ -423,7 +423,7 @@ Start by writing a short risk memo with a source and applicability boundary for 
 
 ### Tasks
 
-- [ ] **Evaluate container orchestration technologies** by writing governance, ecosystem, cloud-provider support, and adoption notes for Swarm versus Kubernetes.
+- [ ] **Evaluate container orchestration technologies** by writing dated maintainer, capability and integration notes for Swarm versus Kubernetes.
 - [ ] **Distinguish project lifecycle from deployment fit** using Mesos's documented retirement, Engine swarm mode, Diego's documented architecture and Compose production guidance.
 - [ ] **Compare Docker image-building workflow with Kubernetes runtime dockershim removal** and state which Docker skills remain useful.
 - [ ] **Design a modernization plan** that explains which components to retain or replace and what evidence supports each decision.
@@ -484,10 +484,10 @@ Failure layer: the startup demonstration did not test host failure or recovery. 
 
 ### Success Criteria
 
-- [ ] Your audit identifies at least three critical points of failure or dead-end technologies in Project Phoenix.
-- [ ] Your replacement map distinguishes tools to retire from concepts to keep, especially Docker image building.
+- [ ] Your audit identifies at least three operating requirements or support questions, with the evidence needed to assess them.
+- [ ] Your component decision map distinguishes retention, migration and concepts to preserve, including the separate role of image building.
 - [ ] Your modernization plan justifies retention or migration against documented capabilities, support and explicit operating requirements.
-- [ ] Your configuration plan moves workload ownership from Puppet procedures to declarative YAML, Helm, Kustomize, or GitOps.
+- [ ] Your configuration plan identifies which tool owns each intended state and how conflicting changes will be detected and resolved.
 - [ ] Your final paragraph evaluates Compose against explicit production requirements instead of assuming production use is always an anti-pattern.
 
 ## Sources
