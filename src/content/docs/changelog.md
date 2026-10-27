@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Compare orchestrators against your actual requirements.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now separates documented Swarm, Mesos and Nomad capabilities from assumptions about scale, lock-in or operating effort, with a worked example for choosing useful comparison criteria.
 - **Orchestration history with clearer provenance.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now distinguishes reported project activity from formal retirement, anchors dates in primary sources, and removes unsupported historical cutoffs.
 - **Observe reconciliation in a separate practice namespace.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now uses its own namespace and a fresh folder, preserves your saved preferences, and checks ownership before cleanup while you compare repeated apply with a temporary scale change.
 - **A clearer route through Kubernetes design.** [Philosophy & Design](/prerequisites/philosophy-design/) now explains the module sequence, separates reconciliation from application guarantees, and treats skipped topics as curriculum priorities to assess against your own needs.
