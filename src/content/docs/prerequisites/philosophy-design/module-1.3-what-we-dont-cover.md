@@ -107,14 +107,14 @@ Choose the operational task from the curriculum you actually intend to study. Th
 
 ### Deep Networking
 
-| Topic | Why We Skip | Where to Learn |
+| Topic | Depth boundary to check | Where to Learn |
 |-------|-------------|----------------|
 | BGP configuration | Beyond certification scope | Network engineering resources |
 | Service mesh internals | Retain the CKS encryption task naming Istio; classify other mesh depth separately | Project documentation |
 | eBPF/Cilium internals | Retain the CKS encryption task naming Cilium; classify unrelated datapath internals separately | Cilium documentation |
 | Custom CNI development | Developer topic, not admin | CNI specification |
 
-Networking is the most tempting rabbit hole because it explains so many real outages. A learner starts with a Service that cannot reach a Pod, then finds kube-proxy, iptables, IPVS, DNS, CoreDNS, CNI plugins, overlay networks, BGP, eBPF, and service meshes. The chain is technically coherent, but the exam does not ask you to become a network plugin author. It asks you to reason about Kubernetes networking from the perspective of an administrator or application operator: labels, selectors, ports, endpoints, DNS names, NetworkPolicies, and basic troubleshooting.
+For a networking resource, identify the task it supports before choosing its depth. A Service connectivity exercise can involve labels, selectors, ports, endpoints, DNS, NetworkPolicy and troubleshooting. An implementation guide may address a different objective or additional specialization. Those connections do not establish one networking syllabus for every certification; compare the exact activity with the chosen curriculum and record how you will verify its result.
 
 The distinction matters during practice. If a NetworkPolicy blocks traffic, inspect labels, selectors, rules and the intended source and destination. The checked CKA curriculum's cluster-architecture domain explicitly names understanding extension interfaces such as CNI, CSI and CRI. Plugin authorship is a different activity from understanding an interface or implementing the named task. A product name alone cannot decide whether a resource belongs in the plan: the checked CKS curriculum names Cilium and Istio for Pod-to-Pod encryption.
 
@@ -196,7 +196,7 @@ Write the missing recovery evidence before you continue. Then compare it with th
 
 This principle also helps you avoid false equivalence. A topic can be simple to name and still require deep expertise, while another topic can look complex and still require only a practical slice for the exam. "NetworkPolicy" sounds like one object, but real network isolation requires careful label design, namespace boundaries, plugin behavior, default-deny posture, and testing. "Cluster Autoscaler" sounds like an operational basics topic, but it depends heavily on infrastructure providers and node provisioning behavior, so it belongs outside the generic certification path for most learners.
 
-A useful study question is not "Could this ever matter?" Almost everything in the Kubernetes ecosystem can matter somewhere. The better question is "What is the smallest version of this topic that improves my next exam attempt?" If the smallest useful version is still large, vendor-specific, or disconnected from the published objectives, park it in the post-exam roadmap. Parking is not forgetting; it is protecting sequence.
+A useful study question is not "Could this ever matter?" Ask which part of the resource serves the named objective and which part adds another learning goal. Retain required practice even when it uses a specific tool or needs substantial work. Give unrelated depth a separate plan with an explicit reason; the resource's size or vendor-specific label alone does not establish that it belongs after the exam.
 
 Worked example: suppose you are studying Services and discover that your production cluster uses a cloud load balancer controller with many annotations. The exam-relevant slice is to know how Service types behave, how selectors map to endpoints, how ports and targetPorts relate, and how to troubleshoot a Service that has no endpoints. The post-exam slice is to study the provider controller, external traffic policy behavior in that environment, annotation-specific features, and cost implications. Those are connected, but they are not the same learning task.
 
@@ -434,7 +434,7 @@ Failure layer: an adjacent tool displaced the tested object. Next action: move t
 - [ ] You have evaluated at least twelve study materials and assigned each one to `Exam Scope`, `Supporting Context`, or `Post-Exam Specialization`.
 - [ ] You have justified at least two scope decisions using exact objectives and resource tasks, retaining named practice even when it involves a third-party tool. If an item is deferred, its reason and separate learning goal are recorded.
 - [ ] You have compared at least one advanced topic with the native Kubernetes task it was displacing.
-- [ ] You have designed a one-week time-boxed learning plan that protects core Kubernetes practice.
+- [ ] You have designed a one-week time-boxed learning plan that retains the named tasks and their required verification, including specified tools and interfaces.
 - [ ] You have diagnosed one realistic scope-creep pressure point and written how you will respond.
 - [ ] You have implemented a hard boundary sentence that says what you will not study until after you pass.
 

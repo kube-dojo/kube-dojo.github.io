@@ -8,7 +8,7 @@ sidebar:
 
 ## October 2026
 
-- **Keep named exam tasks in your study plan.** [What We Don't Cover](/prerequisites/philosophy-design/module-1.3-what-we-dont-cover/) now distinguishes CKA control-plane availability and CKS encryption practice from unrelated product depth, with scope decisions tied to the chosen curriculum.
+- **Keep named exam tasks in your study plan.** [What We Don't Cover](/prerequisites/philosophy-design/module-1.3-what-we-dont-cover/) now retains CKA practice implementing and configuring a highly available control plane and CKS encryption practice, with scope decisions tied to the chosen curriculum.
 - **Plan study against the objective you will practice.** [What We Don't Cover](/prerequisites/philosophy-design/module-1.3-what-we-dont-cover/) replaces unsupported exam percentages with a practical classification method, corrects Helm guidance, and distinguishes the exam-track pin from current exam versions.
 - **Separate retirement from deployment fit.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now distinguishes Mesos's formal retirement from documented Swarm, Diego and Compose deployment models, and asks you to justify keeping or replacing a tool against actual requirements.
 - **Build a recommendation from evidence.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now separates documented events from explanations of adoption and works through a sourced architecture argument, including its assumptions, counterargument, and missing local evidence.
