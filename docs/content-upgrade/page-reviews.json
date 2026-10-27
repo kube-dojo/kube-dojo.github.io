@@ -12,7 +12,7 @@
     },
     {
       "path": "prerequisites/kubernetes-basics/module-1.1-first-cluster.md",
-      "page_digest": "sha256:850f6e57095060132d477d95e9b834b164c1eddfe8f76c94a427d847b14a0604",
+      "page_digest": "sha256:e91070a7f3ce9258903accd574da3bd40737018f7e48524208757eec1e9d55a6",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-first-cluster-p07a.md", "docs/content-upgrade/reviews/2026-10-27-cluster-platform-setup-p07a2.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-first-cluster-p07a.md", "docs/content-upgrade/reviews/2026-10-27-cluster-platform-setup-p07a2.md"],
