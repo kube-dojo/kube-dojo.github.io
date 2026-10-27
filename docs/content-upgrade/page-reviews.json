@@ -92,11 +92,11 @@
     },
     {
       "path": "prerequisites/kubernetes-basics/module-1.4-deployments.md",
-      "page_digest": "sha256:2651d62e3bef45c29495d983e83e30081507b42cff87227056ceb8c6e557c802",
+      "page_digest": "sha256:a7ad7415f09d801cdddf865c9d0b38b569b11a30ae4342c6e60c35d594326b3d",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6419306963"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/pull/3536#issuecomment-6389933630", "docs/content-upgrade/reviews/2026-10-27-deployment-scope-p08a.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-prerequisites.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3534#issuecomment-6390140367", "docs/content-upgrade/reviews/2026-10-26-prerequisites-p00.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6419306963", "docs/content-upgrade/reviews/2026-10-27-deployment-scope-p08a.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
       "path": "prerequisites/cloud-native-101/module-1.4-cloud-native-ecosystem.md",

@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Deployment practice with clearer boundaries.** [Deployments](/prerequisites/kubernetes-basics/module-1.4-deployments/) now keeps exercise commands in their own namespace without changing your saved preferences, and checks the namespace identity before cleanup.
 - **More controlled kubectl practice.** [kubectl Basics](/prerequisites/kubernetes-basics/module-1.2-kubectl-basics/) now uses a separate cluster and namespace, checks the response through a localhost-only tunnel, and walks through stopping the tunnel and cleaning up the exercise.
 - **Clearer cluster setup on macOS and Linux.** [Your First Cluster](/prerequisites/kubernetes-basics/module-1.1-first-cluster/) now explains which tools to install and start, checks client versions, pins practice clusters and separates the optional advanced topology from the core path.
 - **Clearer kubectl command guidance.** [kubectl Basics](/prerequisites/kubernetes-basics/module-1.2-kubectl-basics/) separates reference examples from practice, explains node-wide drain effects and local file overwrites, and clarifies how context changes persist.
