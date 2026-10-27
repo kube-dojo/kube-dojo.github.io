@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Service troubleshooting in its own workspace.** [Services](/prerequisites/kubernetes-basics/module-1.5-services/) now checks server access, tests DNS in the exercise namespace, and compares NodePort configuration without exposing another service.
 - **More controlled Pod experiments.** [Pods](/prerequisites/kubernetes-basics/module-1.3-pods/) now isolates its practice resources, uses a localhost-only tunnel, and makes the memory-failure exercise work on Apple Silicon while preserving the reason for the container's last termination.
 - **Deployment practice with clearer boundaries.** [Deployments](/prerequisites/kubernetes-basics/module-1.4-deployments/) now keeps exercise commands in their own namespace without changing your saved preferences, and checks the namespace identity before cleanup.
 - **More controlled kubectl practice.** [kubectl Basics](/prerequisites/kubernetes-basics/module-1.2-kubectl-basics/) now uses a separate cluster and namespace, checks the response through a localhost-only tunnel, and walks through stopping the tunnel and cleaning up the exercise.
