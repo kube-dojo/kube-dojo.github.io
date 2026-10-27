@@ -578,7 +578,7 @@ fi
 [ "$CFG_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
 ```
 
-Continue only after setup succeeds. `cfg_lab` pins requests to the recorded context and namespace without changing kubeconfig preferences. Stop on a failed task command and clean up before retrying in a fresh terminal. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
+Continue only after setup succeeds. `cfg_lab` pins requests to the recorded context and namespace without changing kubeconfig preferences. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. Stop on a failed task command and clean up before retrying in a fresh terminal. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
 
 ### Task 1: Create the configuration objects
 
@@ -635,7 +635,7 @@ Read the stored Secret and decode the single value so you can see exactly where 
 
 ```bash
 cfg_lab get secret app-secret -o yaml
-cfg_lab get secret app-secret -o jsonpath='{.data.DB_PASS}' | base64 -d
+cfg_lab get secret app-secret -o jsonpath='{.data.DB_PASS}' | base64 -d && printf '\n'
 ```
 
 <details><summary>Solution notes for Task 2</summary>
@@ -653,7 +653,7 @@ cfg_lab create configmap app-config \
   --from-literal=LOG_LEVEL=info \
   --from-literal=APP_NAME=myapp \
   --dry-run=client -o yaml | cfg_lab apply -f -
-cfg_lab get configmap app-config -o jsonpath='{.data.LOG_LEVEL}'
+cfg_lab get configmap app-config -o jsonpath='{.data.LOG_LEVEL}{"\n"}'
 cfg_lab exec config-test -- printenv LOG_LEVEL
 cfg_lab logs config-test | grep LOG_LEVEL
 ```
@@ -692,7 +692,7 @@ spec:
 EOF
 cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s
 cfg_lab exec config-test -- ls -l /etc/app-config
-cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL
+cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL && printf '\n'
 ```
 
 <details><summary>Solution notes for Task 4</summary>

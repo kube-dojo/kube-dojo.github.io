@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/kubernetes-basics/module-1.6-configmaps-secrets.md",
-      "page_digest": "sha256:bccec94555478785cceab39fdd21fcc0a473357a92f0c58aea6dab30ff7f4e42",
+      "page_digest": "sha256:e159745382989815f3a56dd919ca9e78776a58634bc14910b2f4127fb661434f",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-configmap-scope-p09a.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-configmap-scope-p09a.md"],
