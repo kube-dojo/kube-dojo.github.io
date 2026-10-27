@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/kubernetes-basics/module-1.7-namespaces-labels.md",
-      "page_digest": "sha256:234d22ab543aa2666bd01206fb6dadbf7c707cf5f599daf1c197b875879dbf5a",
+      "page_digest": "sha256:1cd53903643c1bacb9fed04c587627898edee738ce71baf319079fa4c6f42705",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md"],
