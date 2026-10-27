@@ -12,10 +12,10 @@
     },
     {
       "path": "prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md",
-      "page_digest": "sha256:61416f9f5f58e982cdc0cf303dd92b161a2d30af0ef3c59192d8b9f6af6b017e",
+      "page_digest": "sha256:7e99fe4e864d453d1f86680854afb4f5daa5e32ad888b5f1f8879cb50f717d86",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md", "docs/content-upgrade/reviews/2026-10-27-declarative-sources-p10g.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md", "docs/content-upgrade/reviews/2026-10-27-declarative-sources-p10g.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {

@@ -33,7 +33,7 @@ Imagine an on-call engineer is paged at 2 AM because a revenue-critical checkout
 
 Nothing in that story requires Kubernetes to be broken. The cluster was doing exactly what it was built to do: compare the declared desired state with the observed current state and move reality back toward the declaration. The operational failure came from using imperative instincts inside a declarative control system. When the engineer finally changed the Deployment YAML, committed the fix, and applied the corrected manifest, the next rollout converged in seconds because she stopped fighting the controller and started changing the source of truth.
 
-That difference is not academic. Kubernetes rewards operators who ask, "What state should exist?" before asking, "What command should I run?" It punishes teams that treat a live cluster as a collection of mutable servers because every controller is designed to undo unowned manual edits. In this module, you will build the mental model that makes Deployments, Services, GitOps, drift detection, and self-healing feel like parts of one system rather than a pile of commands.
+That difference is not academic. Kubernetes rewards operators who ask, "What state should exist?" before asking, "What command should I run?" A controller works on the resources and fields within its responsibility, such as restoring a managed Pod count from an API object's desired state; it does not automatically undo every manual API edit. In this module, you will build the mental model that makes Deployments, Services, GitOps, drift detection, and self-healing feel like parts of one system rather than a pile of commands. [Kubernetes 1.35 controllers](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
 
 You will also practice a habit that becomes more valuable as systems grow: separating investigation from durable change. Investigation can be quick, interactive, and messy because its job is to expose evidence. Durable change must be explicit, reviewed, repeatable, and owned because its job is to survive the next rollout, teammate, cluster replacement, and incident review. That separation is the difference between using commands as tools and letting commands become hidden infrastructure.
 
@@ -136,7 +136,7 @@ Hypothetical scenario: a platform team investigates a memory-limit change that a
 
 ## The Reconciliation Loop
 
-Kubernetes is built around reconciliation. A controller watches desired state from the API server, observes current state from the cluster, compares the two, and takes action when they differ. This pattern appears in Deployments, ReplicaSets, StatefulSets, Jobs, Services, Nodes, and many extension controllers. It is the reason Kubernetes can recover from pod deletion, node failure, and partial rollout progress without waiting for a human to re-run the last correct command.
+Kubernetes is built around reconciliation. A controller watches desired state from the API server, observes current state from the cluster, compares the two, and takes action when they differ. This pattern appears in Deployments, ReplicaSets, StatefulSets, Jobs, Services, Nodes, and many extension controllers. It can help recover from pod deletion, node failure, or partial rollout progress without re-running the original command, but recovery depends on the responsible controller, failure detection, capacity, scheduling constraints, and valid configuration.
 
 ```mermaid
 flowchart TD
@@ -202,7 +202,7 @@ Which approach would you choose here and why: during a production traffic spike,
 
 Declarative infrastructure wins in Kubernetes because it turns operations into a repeatable relationship between intent, observation, and correction. That relationship supports self-healing, safe automation, reviewable change, and drift detection. The benefits compound: a manifest can be applied repeatedly, reviewed before merge, used by a GitOps controller, compared against live state, and reused to rebuild the environment after failure. Imperative work can accomplish the first change quickly, but it struggles to preserve the next thousand corrections.
 
-Self-healing is the first visible benefit. When a container crashes, Kubernetes can start another because the desired pod template still exists. When a node dies, the scheduler can place replacement pods elsewhere because the workload declaration still requests capacity. When someone deletes a pod, the controller can recreate it because the desired replica count still says the pod population is incomplete. You did not write all of that recovery logic; you expressed the shape of the desired workload.
+Self-healing is the first visible benefit. When an application container in a Deployment-managed Pod exits, the kubelet normally restarts it within the same Pod according to the Pod's restart policy. When a managed Pod is deleted or lost, the ReplicaSet can create a replacement Pod to restore its desired count. After a node failure, placement and readiness of replacements depend on detection, suitable capacity, and configuration; the desired count alone does not guarantee recovery. See [Pod lifecycle](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) and [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/).
 
 Idempotency is the second benefit, and it matters more than beginners expect. Pipelines retry. Humans double-submit commands. GitOps agents reconcile in loops. Reapplying a valid manifest for the same object identity is intended to converge without creating a second object, but permissions, validation, and API availability can still cause errors. The flagless command below uses [client-side apply](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/). With [server-side apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts), changing a field owned by another manager can also report a conflict.
 
@@ -253,7 +253,7 @@ Declarative world:
 
 The diagram assumes a configured GitOps workflow. Kubernetes controllers reconcile desired state stored in API objects; Kubernetes does not itself read Git continuously. A GitOps controller can separately compare Git with cluster state and apply changes, subject to its configuration and permissions. See the [Kubernetes controller model](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/) and [Flux Kustomization documentation](https://fluxcd.io/flux/components/kustomize/kustomizations/).
 
-There is a tradeoff. Declarative systems can feel indirect when you are debugging because the object you edit may not be the object that actually runs. A Deployment creates ReplicaSets, which create pods. A Service selects endpoints through labels. An Ingress may be implemented by a controller outside the core API. The price of self-healing is that you must learn ownership chains and status fields instead of assuming the first visible process is the right place to edit.
+There is a tradeoff. Declarative systems can feel indirect when you are debugging because the object you edit may not be the object that actually runs. A Deployment creates ReplicaSets, which create pods. For a selector-backed Service, a controller finds matching Pods and updates EndpointSlices; selectorless Services use separately managed endpoints. An Ingress may be implemented by a controller outside the core API. The price of self-healing is that you must learn ownership chains and status fields instead of assuming the first visible process is the right place to edit. [Kubernetes 1.35 Services](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/)
 
 ---
 
@@ -341,7 +341,7 @@ This ownership chain is why `kubectl describe pod` is more than a wall of text. 
 
 The same reasoning applies to Services. A beginner may see a Service that does not route traffic and try to recreate it by hand. A declarative operator checks the selector, then checks whether any pod labels match that selector, then checks whether the owning workload template sets those labels. The durable fix may be a label correction in the Deployment, not a Service rewrite. The Service object expresses desired networking intent, but the endpoint population depends on other declared state being consistent with that intent.
 
-ConfigMaps and Secrets create another common ownership puzzle. A team may update a ConfigMap and expect every running process to behave differently instantly. Some mounted files update over time, some applications need a restart to reload configuration, and environment variables are fixed when the container starts. Declarative thinking does not mean every field has immediate runtime effect. It means the desired objects are explicit, and you must understand which controllers and runtimes consume each field.
+ConfigMaps and Secrets create another common ownership puzzle. A team may update a ConfigMap and expect every running process to behave differently instantly. Regular mounted volume data can update eventually, but `subPath` mounts do not receive automatic updates; environment variables stay fixed for the existing container. Even when a file changes, the application must reread or reload it to act on the new value. See the Kubernetes 1.35 [ConfigMap](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/) and [Secret](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/) documentation.
 
 Managed fields and server-side apply add even more nuance in advanced workflows, but the beginner rule is enough for now: one resource should have one clear owner for each important field. If a GitOps controller, a Helm release, and a human all update the same Deployment, the live object becomes a battlefield. The problem is not that declarative tools are weak. The problem is that several actors are declaring incompatible truths without a process that resolves the conflict before it reaches the API server.
 
@@ -391,7 +391,7 @@ New Thinking (Declarative)
 -> kubectl apply (or let GitOps do it)
 -> Workload controllers reconcile API objects
 -> GitOps reconciliation requires a configured controller
--> Git records reviewed intent
+-> Git records committed intent; review is team policy
 ```
 
 This mindset shift changes troubleshooting language. Instead of asking only, "How do I restart the thing?" a declarative operator asks, "Why does the controller believe this is the thing that should exist?" Instead of asking, "Who changed the server?" the team asks, "Which commit or controller changed the declared state?" Instead of treating Kubernetes as an obstacle that undoes manual fixes, the team treats it as a persistent worker that needs accurate instructions.
@@ -467,8 +467,8 @@ The framework is deliberately conservative because Kubernetes itself is conserva
 
 - **Kubernetes controllers are reconciliation loops by design.** The official controller documentation describes each controller as tracking at least one resource type and moving current state toward desired state, which is why the same idea appears across Deployments, Jobs, Nodes, and extensions.
 - **Every Kubernetes resource is an API object with declarative shape.** Pods, Services, ConfigMaps, Secrets, Deployments, and custom resources all express desired or observed state through the API, even when a human created them with an imperative command.
-- **GitOps grew from the same control-loop idea.** Tools such as Flux and Argo CD extend reconciliation by making Git the desired source and repeatedly comparing the live cluster against the committed manifests.
-- **Terraform uses a related model outside Kubernetes.** Modern infrastructure tools often maintain a desired configuration, compare it with observed provider state, and calculate changes, showing that declarative thinking is now a broad infrastructure pattern rather than a Kubernetes-only habit.
+- **GitOps grew from the same control-loop idea.** Configured Flux or Argo CD controllers can reconcile Git-sourced configuration with the cluster. Current product behavior depends on settings: for example, Argo CD's automated live-state self-healing requires its `selfHeal` option. See [Flux Kustomizations](https://fluxcd.io/flux/components/kustomize/kustomizations/) and [Argo CD automated sync](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/).
+- **Terraform uses a related model outside Kubernetes.** An invoked `terraform plan` refreshes state by default, compares configuration and state, and proposes changes; `apply` executes planned changes, ordinarily after approval. The ordinary CLI workflow is invoked, not a continuously running Kubernetes controller. [Terraform plan](https://developer.hashicorp.com/terraform/cli/commands/plan) and [apply](https://developer.hashicorp.com/terraform/cli/commands/apply) references.
 
 ---
 
@@ -480,7 +480,7 @@ The framework is deliberately conservative because Kubernetes itself is conserva
 | Editing live resources with `kubectl edit` and never updating Git | The live edit solves the immediate symptom, so the follow-up feels optional | Treat every live edit as an incident hotfix that requires a matching manifest change before closure |
 | Assuming Kubernetes "undoing" a manual change is a bug | The operator focuses on the visible object and misses its owner controller | Inspect owner references and change the higher-level declaration that owns the object |
 | Mixing Helm, raw `kubectl apply`, and GitOps on the same resource | Each tool seems declarative in isolation, so ownership boundaries are ignored | Assign exactly one tool and one repository path as the source of truth for each managed resource |
-| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Plan deliberate deletion or GitOps pruning. In Kubernetes 1.35, `kubectl apply --prune` modes are alpha; incorrect scope can delete unexpected objects or retain objects intended for removal. Review the [pruning warnings](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects) before use. |
+| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Plan deliberate deletion or GitOps pruning. In Kubernetes 1.35, `kubectl apply --prune` modes are alpha; allowlist-based pruning depends on its selector, namespace, allowlist, and discovery, and incorrect scope can delete or retain unexpected objects. Review the [pruning warnings](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects) before use. |
 | Storing sensitive values directly in plain YAML | Teams want all configuration in Git and confuse declarative with unencrypted | Use External Secrets, SOPS, Sealed Secrets, or another approved secret-management workflow |
 | Believing `kubectl apply` makes a multi-resource release perfectly atomic | Declarative convergence can involve several controllers and partial progress | Design readiness probes, rollout checks, and rollback plans around eventual convergence |
 
@@ -514,7 +514,7 @@ The engineer should inspect the owning Deployment, ReplicaSet, pod events, and r
 
 <details><summary>Your team uses a GitOps controller. An administrator manually edits a configuration file inside a running pod, sees the bug disappear, and then sees it return later. Why did the fix not stick?</summary>
 
-The edit happened inside live runtime state rather than in the declared configuration that creates the pod. A restarted pod, new rollout, or GitOps reconciliation will recreate workload state from the committed manifests and configured objects. The manual edit may have been useful evidence, but it was not a durable production fix. The correct fix is to change the ConfigMap, Secret reference, image, or application configuration in the repository that the controller reconciles.
+The edit happened inside live runtime state rather than in the declared configuration that creates the pod. A replacement Pod or new rollout can recreate workload state from its declared image and configuration; a GitOps controller reconciles configured API resources, not arbitrary files inside a running container. The manual edit may have been useful evidence, but it was not a durable production fix. Change the ConfigMap, Secret reference, image, or application configuration in the repository that the controller reconciles.
 
 </details>
 
@@ -706,7 +706,15 @@ After the first apply, the Deployment should report three desired replicas and t
 - [Kubernetes 1.35: Declarative Management and Pruning](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
 - [Kubernetes 1.35: Server-Side Apply and Field Ownership](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)
 - [Kubernetes 1.35: Controller Model](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
+- [Kubernetes 1.35: Pod Lifecycle and Container Restarts](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
+- [Kubernetes 1.35: Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+- [Kubernetes 1.35: Services and EndpointSlices](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/)
+- [Kubernetes 1.35: ConfigMaps](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/)
+- [Kubernetes 1.35: Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/)
 - [Flux: Kustomization Reconciliation](https://fluxcd.io/flux/components/kustomize/kustomizations/)
+- [Argo CD: Automated Sync Policy](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/)
+- [Terraform: Plan Command](https://developer.hashicorp.com/terraform/cli/commands/plan)
+- [Terraform: Apply Command](https://developer.hashicorp.com/terraform/cli/commands/apply)
 - [Kubernetes Documentation: Imperative Management of Kubernetes Objects Using Configuration Files](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-config/)
 - [Kubernetes Documentation: Managing Kubernetes Objects Using Imperative Commands](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/)
 - [Kubernetes Reference: kubectl apply](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)

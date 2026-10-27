@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Follow what actually reconciles and reloads.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now distinguishes container restarts from replacement Pods, explains configuration-update exceptions, and clarifies when GitOps and Terraform act.
 - **Trace orchestration milestones to primary sources.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now distinguishes Classic Swarm from Engine swarm mode, replaces vague adoption labels with documented events, and connects its Pokémon GO case and Project Seven codename to their sources.
 - **Understand what declarative changes guarantee.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now distinguishes Kubernetes from GitOps reconciliation, explains why repeated apply can still fail, and makes ownership conflicts and pruning risks explicit.
 - **Compare orchestrators against your actual requirements.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now separates documented Swarm, Mesos and Nomad capabilities from assumptions about scale, lock-in or operating effort, with a worked example for choosing useful comparison criteria.
