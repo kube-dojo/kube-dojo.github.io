@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **More controlled Pod experiments.** [Pods](/prerequisites/kubernetes-basics/module-1.3-pods/) now isolates its practice resources, uses a localhost-only tunnel, and makes the memory-failure exercise work on Apple Silicon while preserving the reason for the container's last termination.
 - **Deployment practice with clearer boundaries.** [Deployments](/prerequisites/kubernetes-basics/module-1.4-deployments/) now keeps exercise commands in their own namespace without changing your saved preferences, and checks the namespace identity before cleanup.
 - **More controlled kubectl practice.** [kubectl Basics](/prerequisites/kubernetes-basics/module-1.2-kubectl-basics/) now uses a separate cluster and namespace, checks the response through a localhost-only tunnel, and walks through stopping the tunnel and cleaning up the exercise.
 - **Clearer cluster setup on macOS and Linux.** [Your First Cluster](/prerequisites/kubernetes-basics/module-1.1-first-cluster/) now explains which tools to install and start, checks client versions, pins practice clusters and separates the optional advanced topology from the core path.
