@@ -236,7 +236,7 @@ Timelines can make victory look inevitable, but engineers living through those y
 
 The Pokemon Go launch in 2016 became an unusually visible proof point because traffic reportedly surged far beyond expectations and Google Cloud discussed how Kubernetes and GKE helped handle the load. Case studies should never be treated as universal proof that one platform solves every scaling problem, but they matter because enterprises often need public evidence before trusting a young infrastructure project. Kubernetes gained a story that was easy to retell: real consumer traffic, extreme demand, and an orchestration platform that could scale under pressure.
 
-The chart below marks selected years with documented events; it does not measure adoption or maintenance intervals. Docker [announced built-in orchestration in 2016](https://www.docker.com/blog/docker-1-12-built-in-orchestration/). The Mesos [February 2024 board report](https://whimsy.apache.org/board/minutes/Mesos.html) described merged pull requests and a relatively active community, and the [Apache board retired the project](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html) in August 2025. The Kubernetes announcement and release years follow the project history linked above.
+The chart below marks selected years with documented events; it does not measure adoption or maintenance intervals. Docker [announced built-in orchestration in 2016](https://www.docker.com/blog/docker-1-12-built-in-orchestration/). The Mesos [February 2024 board report](https://whimsy.apache.org/board/minutes/Mesos.html) described merged pull requests and a relatively active community. The [Apache board retired the project](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html) in August 2025, citing inactivity; the earlier activity report does not describe its state at retirement. The Kubernetes announcement and release years follow the project history linked above.
 
 ```mermaid
 gantt
@@ -314,13 +314,13 @@ Before running this decision framework in a real team meeting, write down the st
 
 ## Did You Know?
 
-- **Kubernetes means "helmsman" or "pilot" in Ancient Greek.** Kubernetes and "cybernetics" share a Greek root meaning steersman; **K8s** counts the 8 letters between the "K" and the "s". [Kubernetes overview](https://v1-35.docs.kubernetes.io/docs/concepts/overview/); [Norbert Wiener, *Cybernetics*, introduction](https://electronicliteraturereview.org/downloads/PDF/Wiener_1948.pdf).
+- **Kubernetes means "helmsman" or "pilot" in Ancient Greek.** The abbreviation **K8s** counts the 8 letters between the "K" and the "s". [Kubernetes overview](https://v1-35.docs.kubernetes.io/docs/concepts/overview/).
 
 - **Kubernetes was publicly announced at DockerCon on June 10, 2014.** The project had begun days earlier with an initial GitHub commit that included 250 files, then reached version 1.0 in July 2015.
 
 - **The logo is a ship's wheel, and the 7 spokes are a Star Trek reference.** They nod to the project's early internal codename, *Project Seven of Nine*, which itself referenced Borg.
 
-- **Apache Mesos became an Apache top-level project in June 2013 and retired to the Apache Attic in 2025.** That history is a useful reminder that serious, proven infrastructure can still lose platform momentum.
+- **Apache Mesos became an Apache top-level project in June 2013 and retired in August 2025; its Attic move completed in October.** The [Apache Attic record](https://attic.apache.org/projects/mesos.html) distinguishes these dates. That history is a useful reminder that serious, proven infrastructure can still lose platform momentum.
 
 ---
 
@@ -466,6 +466,15 @@ A strong answer says that the team should avoid building a proprietary orchestra
 - [Google Cloud Blog: Bringing Pokemon Go to Life on Google Cloud](https://cloud.google.com/blog/products/containers-kubernetes/bringing-pokemon-go-to-life-on-google-cloud)
 - [CNCF Blog: Spotify Capacity Planning with Kubernetes](https://www.cncf.io/blog/2019/06/27/with-kubernetes-spotifys-capacity-planning-went-from-almost-an-hour-to-seconds-or-minutes-2/)
 - [HashiCorp Nomad Documentation](https://developer.hashicorp.com/nomad/docs)
+- [Kubernetes 1.35 Overview: Name and Abbreviation](https://v1-35.docs.kubernetes.io/docs/concepts/overview/)
+- [ASF Mesos Board Reports: February 2024 Activity](https://whimsy.apache.org/board/minutes/Mesos.html)
+- [ASF Board Minutes: August 2025 Mesos Termination, Special Order 7C](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html)
+- [Docker: Built-in Orchestration, 2016](https://www.docker.com/blog/docker-1-12-built-in-orchestration/)
+- [Docker: Kubernetes Beta, Recalling the 2017 Announcement](https://www.docker.com/blog/docker-mac-kubernetes/)
+- [AWS: EKS Preview, 2017](https://aws.amazon.com/about-aws/whats-new/2017/11/introducing-amazon-elastic-container-service-for-kubernetes/)
+- [AWS: EKS General Availability, 2018](https://aws.amazon.com/blogs/aws/amazon-eks-now-generally-available/)
+- [Microsoft: AKS General Availability, 2018](https://azure.microsoft.com/en-us/blog/azure-kubernetes-service-aks-ga-new-regions-new-features-new-productivity/)
+- [Docker: Retired Products and the 2019 Enterprise Acquisition](https://docs.docker.com/retired/)
 
 ---
 
