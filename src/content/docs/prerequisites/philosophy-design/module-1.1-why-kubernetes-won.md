@@ -206,27 +206,27 @@ The orchestration wars happened quickly because container adoption compressed ye
 ```mermaid
 timeline
     title The Orchestration Wars Timeline
-    2013 : Docker launches, containers go mainstream
+    2013 : Docker publicly demoed at PyCon
     2014 : Google announces Kubernetes (June)
-         : Docker Swarm announced
-         : Mesos/Marathon gaining traction
+         : Classic Docker Swarm project begins
+         : Mesos 0.20 adds Docker support
     2015 : Kubernetes 1.0 released (July)
          : CNCF formed, Kubernetes donated
-    2016 : Pokemon Go runs on Kubernetes (massive validation)
+    2016 : Docker Engine 1.12 adds swarm mode
+         : Pokémon GO launches on GKE and Kubernetes
     2017 : Docker Inc. announces Kubernetes support
          : AWS announces EKS (preview, re:Invent)
     2018 : Kubernetes first CNCF project to graduate (March)
          : EKS and AKS become generally available (June)
     2019 : Mirantis acquires Docker Enterprise
-    2020+ : Focus shifts from "should we use K8s?" to "how do we use K8s better?"
     2025 : Apache Mesos formally retired
 ```
 
-The [Kubernetes project history](https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/) records the 2014 announcement and 2015 release. Docker's [2018 beta announcement](https://www.docker.com/blog/docker-mac-kubernetes/) refers to its 2017 Kubernetes announcement; AWS documented the [EKS preview](https://aws.amazon.com/about-aws/whats-new/2017/11/introducing-amazon-elastic-container-service-for-kubernetes/) and later [general availability](https://aws.amazon.com/blogs/aws/amazon-eks-now-generally-available/), while Microsoft announced [AKS general availability](https://azure.microsoft.com/en-us/blog/azure-kubernetes-service-aks-ga-new-regions-new-features-new-productivity/). Docker's [retired products page](https://docs.docker.com/retired/) records the 2019 acquisition. These dates do not establish an exact year when Kubernetes became an industry standard.
+Docker recounts its [2013 public demo](https://www.docker.com/blog/docker-nine-years-young/). Its [archived Classic Swarm README](https://github.com/docker-archive/classicswarm/blob/3cc018dc2cd0af0880330bd75bd351bbf54fde9c/README.md#swarm-disambiguation) distinguishes that project, begun in 2014, from Engine swarm mode; the [1.12 announcement](https://www.docker.com/blog/docker-1-12-built-in-orchestration/) describes the latter. Apache's [Mesos 0.20 announcement](https://mesos.apache.org/blog/mesos-0-20-0-released/) documents Docker support in September 2014. The [Kubernetes project history](https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/) records its 2014 announcement and 2015 release. Docker's [2018 beta announcement](https://www.docker.com/blog/docker-mac-kubernetes/) refers to its 2017 Kubernetes announcement; AWS documented the [EKS preview](https://aws.amazon.com/about-aws/whats-new/2017/11/introducing-amazon-elastic-container-service-for-kubernetes/) and later [general availability](https://aws.amazon.com/blogs/aws/amazon-eks-now-generally-available/), while Microsoft announced [AKS general availability](https://azure.microsoft.com/en-us/blog/azure-kubernetes-service-aks-ga-new-regions-new-features-new-productivity/). Docker's [retired products page](https://docs.docker.com/retired/) records the 2019 acquisition. These dates do not establish an exact year when Kubernetes became an industry standard.
 
 Timelines can make victory look inevitable, but engineers living through those years did not have that luxury. Docker had the developer mindshare, Mesos had scale credentials, Nomad had operational elegance, and Kubernetes had a steep learning curve. The decisive factor was not one feature; it was the way several forces compounded. Declarative controllers made operations more resilient, Google's experience made the design credible, CNCF governance made vendors comfortable, cloud-provider support made adoption practical, and extensibility made the ecosystem self-reinforcing.
 
-The Pokemon Go launch in 2016 became an unusually visible proof point because traffic reportedly surged far beyond expectations and Google Cloud discussed how Kubernetes and GKE helped handle the load. Case studies should never be treated as universal proof that one platform solves every scaling problem, but they matter because enterprises often need public evidence before trusting a young infrastructure project. Kubernetes gained a story that was easy to retell: real consumer traffic, extreme demand, and an orchestration platform that could scale under pressure.
+In a 2016 [account prepared with Niantic](https://cloud.google.com/blog/products/containers-kubernetes/bringing-pokemon-go-to-life-on-google-cloud), Google Cloud reported that Pokémon GO traffic reached 50 times its initial target and that the game's application logic ran on GKE powered by Kubernetes. This is a visible case study, not universal proof that one platform solves every scaling problem. Use it to ask what the team learned about operating under pressure, then assess other systems against their own requirements.
 
 The chart below marks selected years with documented events; it does not measure adoption or maintenance intervals. Docker [announced built-in orchestration in 2016](https://www.docker.com/blog/docker-1-12-built-in-orchestration/). The Mesos [February 2024 board report](https://whimsy.apache.org/board/minutes/Mesos.html) described merged pull requests and a relatively active community. The [Apache board retired the project](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html) in August 2025, citing inactivity; the earlier activity report does not describe its state at retirement. The Kubernetes announcement and release years follow the project history linked above.
 
@@ -250,7 +250,7 @@ gantt
 
 Adoption data reinforces the outcome, but it should be read carefully. CNCF survey numbers describe respondent populations and usage categories, not every server in the world, so they are better evidence of momentum than a perfect census. The more important pattern is that Kubernetes moved from experimentation into production infrastructure across industries, while managed Kubernetes services made the API available even to teams that did not want to operate the full control plane themselves.
 
-By 2026, the discussion had shifted again. Kubernetes was no longer only the web-service orchestrator from the container boom; it had become a control-plane pattern for platform teams, security policy, data infrastructure, and AI workloads. That expansion creates both opportunity and risk. The opportunity is that a stable API substrate can support many kinds of automation; the risk is that teams will treat Kubernetes as a universal answer and ignore simpler deployment models that would meet their needs with less operational burden.
+One way to interpret the history is to consider Kubernetes as a control-plane pattern for more than web services: platform teams can use its API for automation around security policy, data infrastructure, and AI workloads. This course perspective is a prompt for evaluation, not a measured claim about an industry-wide shift. The opportunity is shared automation; the risk is treating Kubernetes as a universal answer and ignoring simpler deployment models that meet a team's needs with less operational burden.
 
 Another way to read the market outcome is through hiring and training. A company choosing Kubernetes can recruit engineers who have seen similar objects, failure modes, and operational patterns elsewhere, even if the surrounding cloud provider and tooling differ. A company choosing a private orchestrator must teach every new engineer its local model from scratch, and every vendor integration becomes a translation project. That does not make the private choice impossible, but it raises the long-term cost of being unique.
 
@@ -310,7 +310,7 @@ Before running this decision framework in a real team meeting, write down the st
 
 - **Kubernetes was publicly announced at DockerCon on June 10, 2014.** The project had begun days earlier with an initial GitHub commit that included 250 files, then reached version 1.0 in July 2015.
 
-- **The logo is a ship's wheel, and the 7 spokes are a Star Trek reference.** They nod to the project's early internal codename, *Project Seven of Nine*, which itself referenced Borg.
+- **The logo is a ship's wheel, and its seven spokes are a Star Trek reference.** The project's original codename, *Project Seven*, referred to Seven of Nine; the spokes are a related nod, as described in a [Kubernetes release interview](https://v1-33.docs.kubernetes.io/blog/2022/04/29/frontiers-fsgroups-and-frogs-the-kubernetes-1.23-release-interview/).
 
 - **Apache Mesos became an Apache top-level project in June 2013 and retired in August 2025; its Attic move completed in October.** The [Apache Attic record](https://attic.apache.org/projects/mesos.html) distinguishes these dates. That history is a useful reminder that serious, proven infrastructure can still lose platform momentum.
 
@@ -467,6 +467,10 @@ A strong answer says that the team should avoid building a proprietary orchestra
 - [ASF Mesos Board Reports: February 2024 Activity](https://whimsy.apache.org/board/minutes/Mesos.html)
 - [ASF Board Minutes: August 2025 Mesos Termination, Special Order 7C](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html)
 - [Docker: Built-in Orchestration, 2016](https://www.docker.com/blog/docker-1-12-built-in-orchestration/)
+- [Docker: First Public Demo in 2013](https://www.docker.com/blog/docker-nine-years-young/)
+- [Docker Classic Swarm: Archived README](https://github.com/docker-archive/classicswarm/blob/3cc018dc2cd0af0880330bd75bd351bbf54fde9c/README.md#swarm-disambiguation)
+- [Apache Mesos: 0.20.0 Release](https://mesos.apache.org/blog/mesos-0-20-0-released/)
+- [Kubernetes: 1.23 Release Interview](https://v1-33.docs.kubernetes.io/blog/2022/04/29/frontiers-fsgroups-and-frogs-the-kubernetes-1.23-release-interview/)
 - [Docker: Kubernetes Beta, Recalling the 2017 Announcement](https://www.docker.com/blog/docker-mac-kubernetes/)
 - [AWS: EKS Preview, 2017](https://aws.amazon.com/about-aws/whats-new/2017/11/introducing-amazon-elastic-container-service-for-kubernetes/)
 - [AWS: EKS General Availability, 2018](https://aws.amazon.com/blogs/aws/amazon-eks-now-generally-available/)
