@@ -97,7 +97,7 @@ Cons:
 - Required separate components (Marathon, Chronos)
 ```
 
-Mesos teaches an important lesson about platform competition: excellent technology can still lose if the adoption path is too heavy and the ecosystem becomes fragmented. Marathon, Chronos, DC/OS, framework choices, and operational complexity created a surface area that rewarded specialist teams but intimidated many mainstream adopters. Kubernetes did not have a trivial learning curve, but it offered a clearer container-first story, a standard API shape, and a fast-growing ecosystem that made new integrations feel like investments in the industry default. Apache formally retired Mesos to the Attic in 2025, which turned that market outcome into project history.
+Mesos teaches an important lesson about platform competition: excellent technology can still lose if the adoption path is too heavy and the ecosystem becomes fragmented. Marathon, Chronos, DC/OS, framework choices, and operational complexity created a surface area that rewarded specialist teams but intimidated many mainstream adopters. Kubernetes did not have a trivial learning curve, but it offered a clearer container-first story, a standard API shape, and a fast-growing ecosystem that made new integrations feel like investments in the industry default. Apache's board [retired Mesos in August 2025](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html); the [move to the Attic completed in October](https://attic.apache.org/projects/mesos.html).
 
 HashiCorp Nomad is the most interesting comparison because it did not disappear. Nomad chose a pragmatic design: a single binary, a smaller conceptual surface, and first-class support for mixed workloads such as containers, Java services, batch jobs, and ordinary binaries. It fits organizations that value operational simplicity and already use Consul, Vault, or Terraform. That makes Nomad less like a defeated rival and more like a disciplined alternative for teams that do not need the full Kubernetes ecosystem.
 
@@ -221,40 +221,39 @@ timeline
     2015 : Kubernetes 1.0 released (July)
          : CNCF formed, Kubernetes donated
     2016 : Pokemon Go runs on Kubernetes (massive validation)
-    2017 : Docker Inc. adds Kubernetes support (confirming market demand)
+    2017 : Docker Inc. announces Kubernetes support
          : AWS announces EKS (preview, re:Invent)
-         : Kubernetes becomes de facto standard
     2018 : Kubernetes first CNCF project to graduate (March)
          : EKS and AKS become generally available (June)
-    2019 : Docker Swarm momentum slows as Mirantis acquires Docker Enterprise
-         : Twitter begins deprecating Mesos
+    2019 : Mirantis acquires Docker Enterprise
     2020+ : Focus shifts from "should we use K8s?" to "how do we use K8s better?"
     2025 : Apache Mesos formally retired
 ```
+
+The [Kubernetes project history](https://kubernetes.io/blog/2024/06/06/10-years-of-kubernetes/) records the 2014 announcement and 2015 release. Docker's [2018 beta announcement](https://www.docker.com/blog/docker-mac-kubernetes/) refers to its 2017 Kubernetes announcement; AWS documented the [EKS preview](https://aws.amazon.com/about-aws/whats-new/2017/11/introducing-amazon-elastic-container-service-for-kubernetes/) and later [general availability](https://aws.amazon.com/blogs/aws/amazon-eks-now-generally-available/), while Microsoft announced [AKS general availability](https://azure.microsoft.com/en-us/blog/azure-kubernetes-service-aks-ga-new-regions-new-features-new-productivity/). Docker's [retired products page](https://docs.docker.com/retired/) records the 2019 acquisition. These dates do not establish an exact year when Kubernetes became an industry standard.
 
 Timelines can make victory look inevitable, but engineers living through those years did not have that luxury. Docker had the developer mindshare, Mesos had scale credentials, Nomad had operational elegance, and Kubernetes had a steep learning curve. The decisive factor was not one feature; it was the way several forces compounded. Declarative controllers made operations more resilient, Google's experience made the design credible, CNCF governance made vendors comfortable, cloud-provider support made adoption practical, and extensibility made the ecosystem self-reinforcing.
 
 The Pokemon Go launch in 2016 became an unusually visible proof point because traffic reportedly surged far beyond expectations and Google Cloud discussed how Kubernetes and GKE helped handle the load. Case studies should never be treated as universal proof that one platform solves every scaling problem, but they matter because enterprises often need public evidence before trusting a young infrastructure project. Kubernetes gained a story that was easy to retell: real consumer traffic, extreme demand, and an orchestration platform that could scale under pressure.
 
-The Gantt view below is a simplified market map rather than a precise maintenance calendar. Its value is that it shows the different endings: Swarm remained available but no longer defined the market, Mesos moved from proven enterprise technology to retirement, and Kubernetes moved from rapid growth into default-platform status. Nomad is not shown in this preserved diagram, but you should remember it as the niche survivor rather than a failed clone.
+The chart below marks selected years with documented events; it does not measure adoption or maintenance intervals. Docker [announced built-in orchestration in 2016](https://www.docker.com/blog/docker-1-12-built-in-orchestration/). The Mesos [February 2024 board report](https://whimsy.apache.org/board/minutes/Mesos.html) described merged pull requests and a relatively active community, and the [Apache board retired the project](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html) in August 2025. The Kubernetes announcement and release years follow the project history linked above.
 
 ```mermaid
 gantt
-    title The Orchestration Wars
+    title Selected Orchestration Milestones
     dateFormat YYYY
     axisFormat %Y
     
     section Docker Swarm
-    Active Development :2014, 2019
-    Reduced momentum   :done, 2019, 2026
+    Built-in swarm mode :milestone, 2016, 0d
     
     section Mesos/Marathon
-    Active Adoption    :2014, 2018
-    Abandoned/Retired  :done, 2018, 2025
+    Activity reported  :milestone, 2024, 0d
+    Formal retirement  :milestone, 2025, 0d
     
     section Kubernetes
-    Rapid Growth       :active, 2014, 2018
-    De Facto Standard  :active, 2018, 2026
+    Announced          :milestone, 2014, 0d
+    Version 1.0        :milestone, 2015, 0d
 ```
 
 Adoption data reinforces the outcome, but it should be read carefully. CNCF survey numbers describe respondent populations and usage categories, not every server in the world, so they are better evidence of momentum than a perfect census. The more important pattern is that Kubernetes moved from experimentation into production infrastructure across industries, while managed Kubernetes services made the API available even to teams that did not want to operate the full control plane themselves.
@@ -315,7 +314,7 @@ Before running this decision framework in a real team meeting, write down the st
 
 ## Did You Know?
 
-- **Kubernetes means "helmsman" or "pilot" in Ancient Greek.** It is also the etymological root of "cybernetics", and the abbreviation **K8s** counts the 8 letters between the "K" and the "s".
+- **Kubernetes means "helmsman" or "pilot" in Ancient Greek.** Kubernetes and "cybernetics" share a Greek root meaning steersman; **K8s** counts the 8 letters between the "K" and the "s". [Kubernetes overview](https://v1-35.docs.kubernetes.io/docs/concepts/overview/); [Norbert Wiener, *Cybernetics*, introduction](https://electronicliteraturereview.org/downloads/PDF/Wiener_1948.pdf).
 
 - **Kubernetes was publicly announced at DockerCon on June 10, 2014.** The project had begun days earlier with an initial GitHub commit that included 250 files, then reached version 1.0 in July 2015.
 
