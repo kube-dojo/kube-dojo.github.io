@@ -1,6 +1,6 @@
 # T01-P10i: declarative workflow evidence and limits
 
-Owner #2278; source/assessment #2275/#2277. Scoped **revise**, not full-page clearance. Source SHA-256 `8e0a7503bcef0b98c3f1aea56f117e8004f390cf4d20a2fd2b6b7fd94f3d6380`. Preserves all31 fenced blocks and the complete nine-fence Hands-On section byte-identically to the prior delivered source.
+Owner #2278; source/assessment #2275/#2277. Scoped **revise**, not full-page clearance. Source SHA-256 `98d7560f5e18c3fb505b0c83e20cce09e37c038c78035b67b321f22142a1aabc`. Preserves all31 fenced blocks and the complete nine-fence Hands-On section byte-identically to the prior delivered source; the opening now distinguishes illustrative snippets from the dedicated practice procedure.
 
 Unmeasured prevalence, historical culture, learner-effect and production-safety assertions are narrowed to an illustrated workflow, conditional engineering benefits or recommended practice. Committed intent requires an actual repository workflow; neither declarative APIs nor GitOps guarantee a complete record, safe rollback, universal reliability or fewer learner errors. Diagnostic advice separates incorrect declarations from capacity/external blockers; recovery remains conditional.
 
