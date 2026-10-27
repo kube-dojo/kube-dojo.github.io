@@ -392,7 +392,7 @@ CI/CD validation should treat multi-resource files as a single deployment unit b
 
 Debugging manifests becomes manageable when you separate four failure layers. The first layer is YAML syntax: can the text be parsed into data at all? The second layer is Kubernetes schema: does the data match the `apiVersion` and `kind` you declared? The third layer is cluster admission: do namespaces, CRDs, permissions, and policies allow the request? The fourth layer is runtime behavior: do controllers and workloads actually reach the desired state after the object is accepted?
 
-Client-side dry run is the fastest first pass. It catches many syntax and schema mistakes without contacting the API server, so it is useful while authoring a file locally. It is also limited by the client version and by what the client can know without the live cluster. Use it as a quick edit loop, not as the final production gate.
+Client-side dry run is a useful first pass while editing. It may contact the API server for discovery or schema information, but it does not send the object through server-side dry-run admission. Client dry run may accept invalid fields, so success is not reliable proof of schema correctness; use server dry run for the exercise below. Neither dry run proves runtime behavior or dependency availability.
 
 ```bash
 kubectl apply -f my-pod.yaml --dry-run=client
@@ -475,7 +475,7 @@ Strong Kubernetes YAML practice is less about memorizing snippets and more about
 | Guessing list versus mapping shape | The file is valid YAML but fails schema validation or creates the wrong object shape | Examples look visually similar, especially around `containers`, `env`, and `ports` | Read the schema type and map `<[]Object>` to hyphenated sequence items |
 | Copying chart values into manifests | Fields that belong to a templating tool are rejected by the Kubernetes API | The chart input and rendered output both use YAML, so the boundary feels blurry | Render the chart, inspect the output, and validate the actual Kubernetes manifest |
 | Quoting every scalar defensively | Integers and booleans become strings where the schema requires native types | Teams try to avoid YAML type surprises by treating everything as text | Quote ambiguous strings, but leave numeric fields unquoted when the schema expects numbers |
-| Treating client dry run as final proof | Cluster-specific policy, RBAC, CRDs, and admission failures appear later | Client validation is fast and available without cluster access | Use client dry run for editing and server-side dry run before merge or release |
+| Treating client dry run as final proof | Cluster-specific policy, RBAC, CRDs, and admission failures appear later | Client validation gives useful early feedback | Use client dry run for editing and server-side dry run before merge or release |
 
 The most reliable pattern is to keep the intended object relationships near each other during review. If a Service selects `app: web`, reviewers should be able to see the pod template labels that satisfy that selector. If a container mounts `config-store`, reviewers should be able to see the pod-level volume named `config-store`. If an environment variable references `app-config`, reviewers should be able to see whether that ConfigMap is created by the same release unit or by a documented external dependency.
 
@@ -570,7 +570,7 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 <details><summary>5. Scenario: A 500-line application bundle passes `kubectl apply --dry-run=client -f app.yaml`, but the real apply is rejected by an admission policy for a required label. Why did client-side validation miss it, and what should the pipeline do?</summary>
 
-**Answer:** Client-side validation does not contact the API server, so it cannot evaluate live admission controllers, RBAC, namespace state, or cluster-specific CRD behavior. The required-label policy exists in the target cluster, not in the local syntax check. The pipeline should run `kubectl apply --dry-run=server -f app.yaml` against a representative cluster before applying the change. This question compares validation strategies and explains why server-side dry run is the safer release gate.
+**Answer:** Client dry run may contact the API server for discovery or schema information, but it does not send the object through server-side dry-run admission, so it misses the required-label admission policy. Run `kubectl apply --dry-run=server -f app.yaml` against a representative cluster before applying the change. That checks the request against the server's validation and admission path; it does not establish runtime behavior or prove dependent objects will be available.
 </details>
 
 <details><summary>6. Scenario: A Service is valid and a Deployment is valid, but the Service has no endpoints after deployment. The Service selector is `app: frontend` and `tier: web`, while the pod template labels are `app: frontend` and `tier: ui`. What is wrong?</summary>
@@ -585,13 +585,29 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 ## Hands-On Exercise
 
-In this exercise, you will build a small multi-resource application manifest, intentionally encounter structural failures, and use the module's debugging workflow to repair them. The exercise assumes access to a Kubernetes 1.35-compatible cluster such as kind, minikube, or a shared development namespace. If you do not have a cluster, you can still read the dry-run commands and compare the expected diagnostics, but the server-side validation step requires an API server.
+In this synthetic exercise, you will build a small multi-resource application manifest, intentionally encounter structural failures, and use server dry runs to repair them. Server dry run sends requests through validation and admission without persisting the objects. Use an independently confirmed dedicated disposable Kubernetes 1.35+ lab context and an existing namespace in that lab. The conceptual examples earlier in this module are separate from this dry-run exercise.
 
-Use a scratch directory outside your source repository for the lab file so you do not accidentally commit exercise artifacts. Create a file named `dojo-app.yaml`. The first version is intentionally broken in several ways: the API version is wrong for a Deployment, a numeric field is quoted as a string, and the container list is missing its sequence structure.
+Set `KUBEDOJO_LAB_CONTEXT` and `KUBEDOJO_LAB_NAMESPACE` to the confirmed context and existing namespace before setup; the literal context name `default` is refused (a namespace named `default` is allowed). Use one fresh Bash terminal. The guard cannot prove the cluster is disposable, and it does not change kubeconfig preferences. Setup creates and enters a fresh scratch directory so `dojo-app.yaml` cannot overwrite an existing file; retain the directory for inspection and remove it manually when no longer needed.
+
+```bash
+YAML_READY=no YAML_NEW=no
+readonly YAML_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" YAML_NS="${KUBEDOJO_LAB_NAMESPACE:-}" && YAML_NEW=yes
+yaml_check() {
+  [ "$YAML_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
+  command kubectl --context "$YAML_CONTEXT" --namespace "$YAML_NS" apply --dry-run=server -f dojo-app.yaml
+}
+if [ "$YAML_NEW" = yes ] && [ -n "$YAML_CONTEXT" ] && [ "$YAML_CONTEXT" != default ] && [ -n "$YAML_NS" ] && YAML_CURRENT="$(command kubectl config current-context)" && [ "$YAML_CURRENT" = "$YAML_CONTEXT" ] && YAML_DIR="$(mktemp -d "${TMPDIR:-/tmp}/yaml-lab.XXXXXXXX")" && cd "$YAML_DIR"; then
+  YAML_READY=yes
+  printf 'Exercise context/namespace/directory: %s / %s / %s\n' "$YAML_CONTEXT" "$YAML_NS" "$YAML_DIR"
+fi
+[ "$YAML_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
+```
+
+Continue only after setup succeeds. Create `dojo-app.yaml` in the printed directory. The first version is intentionally broken in several ways: the API version is wrong for a Deployment, a numeric field is quoted as a string, and the container list is missing its sequence structure.
 
 ### Task 1: The Broken Foundation
 
-Create `dojo-app.yaml` with this payload, then run `kubectl apply -f dojo-app.yaml --dry-run=client` and read the first error carefully.
+Create `dojo-app.yaml` with this payload, then run `yaml_check` and read the first error carefully.
 
 ```yaml
 apiVersion: v1
@@ -615,12 +631,12 @@ spec:
 
 <details><summary>Solution & Diagnosis 1</summary>
 
-You should see an error similar to `no matches for kind "Deployment" in version "v1"`. Change `apiVersion: v1` to `apiVersion: apps/v1` because Deployments belong to the `apps` API group, not the core group. This repair addresses the Kubernetes root contract before you debug deeper structure.
+You may see an error similar to `no matches for kind "Deployment" in version "v1"`; validation order and diagnostics can vary. Change `apiVersion: v1` to `apiVersion: apps/v1` because Deployments belong to the `apps` API group, not the core group. This repair addresses the Kubernetes root contract before you debug deeper structure.
 </details>
 
 ### Task 2: The Type and Structure Failures
 
-Run the client dry run again. Fix the next errors one at a time instead of trying to rewrite the whole file from memory. Use `kubectl explain deployment.spec.replicas` and `kubectl explain deployment.spec.template.spec.containers` if you want to confirm both the integer field and the sequence shape.
+Run `yaml_check` again. Fix the next errors one at a time instead of trying to rewrite the whole file from memory. Review the schema examples above for the integer field and sequence shape.
 
 <details><summary>Solution & Diagnosis 2</summary>
 
@@ -686,14 +702,10 @@ data:
 
 ### Task 5: Connecting the Pieces
 
-Modify the Deployment so the `nginx` container reads the ConfigMap key as an environment variable named `GREETING`. Then run a server-side dry run to validate the complete application stack against the live API server and any admission policy in the cluster.
+Modify the Deployment so the `nginx` container reads the ConfigMap key as an environment variable named `GREETING`. Then run the server dry run on the complete file.
 
 ```bash
-kubectl apply -f dojo-app.yaml --dry-run=server
-```
-
-```bash
-kubectl apply -f dojo-app.yaml --dry-run=server
+yaml_check
 ```
 
 <details><summary>Solution 5</summary>
@@ -744,7 +756,7 @@ spec:
     targetPort: 80
 ```
 
-When you run `kubectl apply -f dojo-app.yaml --dry-run=server`, you should see output confirming all three resources:
+When you run `yaml_check` successfully, output should identify all three resources as server dry runs. The exact wording can vary:
 
 ```text
 configmap/app-config created (server dry run)
@@ -752,7 +764,7 @@ deployment.apps/web-app created (server dry run)
 service/web-app-svc created (server dry run)
 ```
 
-If you see this, your multi-resource YAML file is structurally sound, schema-compliant, and acceptable to the target API server. Remove `--dry-run=server` only when you intend to create or update the objects in the selected namespace.
+This checks the requests through the server validation and admission path; it does not prove scheduling, image availability, Service reachability, or application behavior. Server dry runs do not persist the ConfigMap for a dependent object, so they cannot establish that the running bundle will find its dependency. Inspect references and selectors separately; this exercise never persists the objects.
 </details>
 
 **Card A: The sequence count is off by one.** A reviewer counts every hyphen in the `users` block, including the ones under `permissions`, and reports four users.
@@ -807,7 +819,7 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 - [ ] You repaired a sequence indentation problem by adding the missing container hyphen.
 - [ ] You appended a Service as a separate YAML document using `---`.
 - [ ] You prepended a ConfigMap dependency and referenced it from the Deployment environment.
-- [ ] You ran a server-side dry run and saw dry-run confirmations for the ConfigMap, Deployment, and Service.
+- [ ] You ran the server dry run and identified its limits for the ConfigMap, Deployment, and Service.
 
 ## Sources
 
@@ -820,7 +832,9 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 * [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 * [Kubernetes volumes](https://kubernetes.io/docs/concepts/storage/volumes/)
 * [kubectl explain reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/)
-* [kubectl apply reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
+* [Kubernetes v1.35 kubectl apply reference](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
+* [Kubernetes v1.35 API dry-run and field validation](https://v1-35.docs.kubernetes.io/docs/reference/using-api/api-concepts/#dry-run)
+* [kubectl v1.35.0 apply implementation](https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go)
 * [kubectl diff reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/)
 * [YAML 1.2.2 specification](https://yaml.org/spec/1.2.2/)
 
