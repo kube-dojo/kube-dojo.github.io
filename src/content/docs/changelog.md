@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Build a recommendation from evidence.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now separates documented events from explanations of adoption and works through a sourced architecture argument, including its assumptions, counterargument, and missing local evidence.
 - **Follow what actually reconciles and reloads.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now distinguishes container restarts from replacement Pods, explains configuration-update exceptions, and clarifies when GitOps and Terraform act.
 - **Trace orchestration milestones to primary sources.** [Why Kubernetes Won](/prerequisites/philosophy-design/module-1.1-why-kubernetes-won/) now distinguishes Classic Swarm from Engine swarm mode, replaces vague adoption labels with documented events, and connects its Pokémon GO case and Project Seven codename to their sources.
 - **Understand what declarative changes guarantee.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) now distinguishes Kubernetes from GitOps reconciliation, explains why repeated apply can still fail, and makes ownership conflicts and pruning risks explicit.
