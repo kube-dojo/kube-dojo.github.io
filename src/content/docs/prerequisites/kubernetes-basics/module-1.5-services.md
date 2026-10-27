@@ -15,11 +15,11 @@ lab:
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
-> **Prerequisites**: Module 4 (Deployments), especially labels, replicas, rollout behavior, and why pods are replaceable
+> **Prerequisites**: [Module 1.4: Deployments](../module-1.4-deployments/), especially labels, replicas, rollout behavior, and why pods are replaceable
 
 ---
 
-This module writes the full `kubectl` command in every runnable example so each block can be copied into a normal shell or lab script without relying on interactive aliases. The examples target Kubernetes 1.35 and focus on the built-in Service API rather than higher-level routing systems such as Ingress or Gateway API.
+The examples target Kubernetes 1.35 and focus on the built-in Service API rather than higher-level routing systems such as Ingress or Gateway API. The hands-on exercise defines `service_lab`, which adds context and namespace flags to `kubectl`. Run its setup before the task blocks, and keep the same Bash terminal through cleanup; those blocks depend on the helper and recorded namespace identity.
 
 ## What You'll Be Able to Do
 
@@ -547,7 +547,7 @@ service_lab get endpoints web
 <details>
 <summary>Solution notes</summary>
 
-The `web` Service should show `TYPE` as `ClusterIP`, and the endpoint list should contain three pod IP and port entries for port 80. Endpoint updates are asynchronous: repeat `service_lab get endpoints web` until the expected entries appear before testing DNS. If they do not converge, compare the Service selector with `service_lab get pods --show-labels` and inspect readiness.
+The `web` Service should show `TYPE` as `ClusterIP`, and the endpoint list should contain three pod IP and port entries for port 80. Endpoint updates are asynchronous: repeat `service_lab get endpoints web` until the expected entries appear before testing DNS. If they do not converge, compare the Service selector with `service_lab get pods --show-labels` and inspect readiness. Expect a deprecation warning: [Endpoints is deprecated in v1.33](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/#endpoints-deprecated). That warning does not mean the Service or DNS request failed; EndpointSlice is the replacement API for new integrations.
 </details>
 
 ### Task 3: Test DNS and HTTP from inside the cluster
