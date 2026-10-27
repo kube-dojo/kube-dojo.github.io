@@ -22,7 +22,7 @@
     },
     {
       "path": "prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md",
-      "page_digest": "sha256:8e0a7503bcef0b98c3f1aea56f117e8004f390cf4d20a2fd2b6b7fd94f3d6380",
+      "page_digest": "sha256:98d7560f5e18c3fb505b0c83e20cce09e37c038c78035b67b321f22142a1aabc",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md", "docs/content-upgrade/reviews/2026-10-27-declarative-sources-p10g.md", "docs/content-upgrade/reviews/2026-10-27-declarative-evidence-p10i.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md", "docs/content-upgrade/reviews/2026-10-27-declarative-sources-p10g.md", "docs/content-upgrade/reviews/2026-10-27-declarative-evidence-p10i.md"],

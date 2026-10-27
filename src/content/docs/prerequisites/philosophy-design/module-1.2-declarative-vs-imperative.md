@@ -41,6 +41,8 @@ You will also practice a habit that becomes more valuable as systems grow: separ
 
 ## The Two Approaches
 
+The short shell and YAML examples before the Hands-On section illustrate management methods. Practice begins with the dedicated lab procedure in that section.
+
 Imperative operations are direct instructions to perform steps now. In the illustrated shell workflow, an operator runs a command, inspects the output, and chooses the next command until the system looks right. In a small environment, this style can give immediate feedback and let the operator adapt as information appears. A cost to consider is who watches the state, remembers the steps, and repeats a correction if no separate automation owns that work.
 
 The simplest imperative deployment story looks like this. The commands are easy to read, but the operational burden is buried in the comments: someone must check, decide, repeat, and document every correction.
@@ -466,7 +468,7 @@ The framework is deliberately conservative because Kubernetes itself is conserva
 ## Did You Know?
 
 - **Kubernetes controllers are reconciliation loops by design.** The official controller documentation describes each controller as tracking at least one resource type and moving current state toward desired state, which is why the same idea appears across Deployments, Jobs, Nodes, and extensions.
-- **Creating an object imperatively does not change its API type.** A Pod or Deployment created by a command is still a [Kubernetes API object](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/). Distinguish how you submitted a change from the API object and controller that consume it.
+- **Creating an object imperatively does not change its API type.** A Pod or Deployment created by a command is still a [Kubernetes API object](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/). Distinguish how you submitted a change from the API object and any controller that reconciles it.
 - **GitOps grew from the same control-loop idea.** Configured Flux or Argo CD controllers can reconcile Git-sourced configuration with the cluster. Current product behavior depends on settings: for example, Argo CD's automated live-state self-healing requires its `selfHeal` option. See [Flux Kustomizations](https://fluxcd.io/flux/components/kustomize/kustomizations/) and [Argo CD automated sync](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/).
 - **Terraform uses a related model outside Kubernetes.** An invoked `terraform plan` refreshes state by default, compares configuration and state, and proposes changes; `apply` executes planned changes, ordinarily after approval. The ordinary CLI workflow is invoked, not a continuously running Kubernetes controller. [Terraform plan](https://developer.hashicorp.com/terraform/cli/commands/plan) and [apply](https://developer.hashicorp.com/terraform/cli/commands/apply) references.
 
