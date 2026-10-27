@@ -4,7 +4,7 @@
   "pages": [
     {
       "path": "prerequisites/kubernetes-basics/module-1.2-kubectl-basics.md",
-      "page_digest": "sha256:1862772308306526cdad05112e8180034cf4c211ccfb0e8aa2778acf0df71f92",
+      "page_digest": "sha256:386b35f35608ee982ff46394fe8bc8e9a9264d34495eea6051486cb3de83cb1f",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-kubectl-reference-p07b1.md", "docs/content-upgrade/reviews/2026-10-27-kubectl-exercise-p07b2.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-kubectl-reference-p07b1.md", "docs/content-upgrade/reviews/2026-10-27-kubectl-exercise-p07b2.md"],
