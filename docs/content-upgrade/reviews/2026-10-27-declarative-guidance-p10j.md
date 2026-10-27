@@ -1,5 +1,7 @@
 # T01-P10j: goal-first declarative practice
 
+The [consolidated English-page acceptance](2026-10-28-declarative-page-acceptance.md) records the subsequent fresh current-procedure execution and publication evidence for this exact page; this repair-stage note retains its historical pending statuses.
+
 Owner #2278; practical #2276 and assessment #2277; source/editorial #2275. Scoped **revise** at page SHA-256 `04890a7e20abe1d41891210def80266837b9219eeffac55583cfba8b85cbf924`. Actual [metadata R1/R2](https://github.com/kube-dojo/kube-dojo.github.io/pull/3585#issuecomment-6454897805) retained the prior source/module rubric but found lab L1–L5 `3,3,4,3,3`=16/25. A selected successful runtime did not clear scenario design, progressive difficulty, hints or transfer.
 
 The exercise now asks for an approach before revealing commands: warm-up declaration/evidence, managed-Pod failure injection, integration of repeat apply/live scale/file correction, then a written transfer design for another stateless service. Concept, object/field and command hints are separate disclosures. Error feedback connects setup failure, empty selection, rollout timeout and intentional watch interruption to the evidence that still needs inspection. The mandatory context/namespace setup and cleanup remain visible; hiding the safety boundary is not the learning task. A sixth criterion checks explanation and the written transfer plan.
