@@ -29,7 +29,7 @@ After this module, you will be able to:
 
 ## Why This Module Matters
 
-Imagine an on-call engineer is paged at 2 AM because a revenue-critical checkout service is crash-looping during a regional promotion. Half-asleep, she treats the system like an old fleet of hand-managed servers: SSH into the node, restart the container, watch the process come back, and close the alert. Kubernetes immediately kills her manually started container and replaces it with a new pod from the Deployment template, which still contains the broken environment variable. She restarts it again, Kubernetes removes it again, and the incident stretches for 45 minutes while customers abandon carts and the incident channel fills with contradictory theories.
+Imagine an on-call engineer is paged at 2 AM because a revenue-critical checkout service is crash-looping during a regional promotion. She repeatedly deletes the failing Deployment-managed pod, hoping a restart will fix it. The Deployment's ReplicaSet creates replacements from the unchanged template, which still contains the broken environment variable. The replacements fail too, and the incident stretches for 45 minutes while customers abandon carts and the incident channel fills with contradictory theories.
 
 Nothing in that story requires Kubernetes to be broken. The cluster was doing exactly what it was built to do: compare the declared desired state with the observed current state and move reality back toward the declaration. The operational failure came from using imperative instincts inside a declarative control system. When the engineer finally changed the Deployment YAML, committed the fix, and applied the corrected manifest, the next rollout converged in seconds because she stopped fighting the controller and started changing the source of truth.
 
@@ -204,14 +204,14 @@ Declarative infrastructure wins in Kubernetes because it turns operations into a
 
 Self-healing is the first visible benefit. When a container crashes, Kubernetes can start another because the desired pod template still exists. When a node dies, the scheduler can place replacement pods elsewhere because the workload declaration still requests capacity. When someone deletes a pod, the controller can recreate it because the desired replica count still says the pod population is incomplete. You did not write all of that recovery logic; you expressed the shape of the desired workload.
 
-Idempotency is the second benefit, and it matters more than beginners expect. Pipelines retry. Humans double-submit commands. GitOps agents reconcile in loops. If repeated execution created duplicate objects every time, automation would be terrifying. Declarative apply semantics make the safe path boring: the same input should converge to the same result, and a no-op should remain a no-op when the cluster already matches the file.
+Idempotency is the second benefit, and it matters more than beginners expect. Pipelines retry. Humans double-submit commands. GitOps agents reconcile in loops. Reapplying a valid manifest for the same object identity is intended to converge without creating a second object, but permissions, validation, availability, and field-management conflicts can still cause errors. See [declarative management](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/) and [server-side apply conflicts](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts).
 
 ```bash
 # Run this 100 times
 kubectl apply -f deployment.yaml
 
-# Result: Same state every time
-# No duplicates, no conflicts, no "already exists" errors
+# Same valid object identity: no second Deployment is created
+# Requests can still fail, including on field conflicts
 ```
 
 ```bash
@@ -246,10 +246,12 @@ Imperative world:
 
 Declarative world:
 - Git is the source of truth
-- K8s continuously enforces that truth
-- Changes require PR review
-- Confidence in deployments
+- A configured GitOps controller reconciles Git with API objects
+- Kubernetes workload controllers reconcile API desired state
+- Teams may require PR review as policy
 ```
+
+The diagram assumes a configured GitOps workflow. Kubernetes controllers reconcile desired state stored in API objects; Kubernetes does not itself read Git continuously. A GitOps controller can separately compare Git with cluster state and apply changes, subject to its configuration and permissions. See the [Kubernetes controller model](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/) and [Flux Kustomization documentation](https://fluxcd.io/flux/components/kustomize/kustomizations/).
 
 There is a tradeoff. Declarative systems can feel indirect when you are debugging because the object you edit may not be the object that actually runs. A Deployment creates ReplicaSets, which create pods. A Service selects endpoints through labels. An Ingress may be implemented by a controller outside the core API. The price of self-healing is that you must learn ownership chains and status fields instead of assuming the first visible process is the right place to edit.
 
@@ -393,7 +395,7 @@ New Thinking (Declarative)
 
 This mindset shift changes troubleshooting language. Instead of asking only, "How do I restart the thing?" a declarative operator asks, "Why does the controller believe this is the thing that should exist?" Instead of asking, "Who changed the server?" the team asks, "Which commit or controller changed the declared state?" Instead of treating Kubernetes as an obstacle that undoes manual fixes, the team treats it as a persistent worker that needs accurate instructions.
 
-The shift also changes how you design processes. Production changes should flow through manifests, reviews, automated checks, and reconciliation. Debugging commands should be temporary and observable. Emergency commands should create follow-up work. Shared resources should have clear ownership because two teams declaring different states for the same object will not produce a peaceful compromise; the last apply usually wins until the next apply changes it again.
+The shift also changes how you design processes. Production changes should flow through manifests, reviews, automated checks, and reconciliation. Debugging commands should be temporary and observable. Emergency commands should create follow-up work. Shared resources need clear ownership: competing writes can overwrite values or encounter field-ownership conflicts depending on the management method. Server-side apply can reject a conflicting field change rather than silently choosing the last writer. [Server-side apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts) documents that distinction.
 
 This is why good Kubernetes teams write runbooks differently from old server teams. An imperative runbook often says, "Run these commands in this order." A declarative runbook says, "Confirm this owner, inspect this status, change this declaration, and verify these conditions." The second style still includes commands, but the commands serve the model rather than replacing it. The operator is not just typing; the operator is reasoning about which desired state should be corrected.
 
@@ -477,7 +479,7 @@ The framework is deliberately conservative because Kubernetes itself is conserva
 | Editing live resources with `kubectl edit` and never updating Git | The live edit solves the immediate symptom, so the follow-up feels optional | Treat every live edit as an incident hotfix that requires a matching manifest change before closure |
 | Assuming Kubernetes "undoing" a manual change is a bug | The operator focuses on the visible object and misses its owner controller | Inspect owner references and change the higher-level declaration that owns the object |
 | Mixing Helm, raw `kubectl apply`, and GitOps on the same resource | Each tool seems declarative in isolation, so ownership boundaries are ignored | Assign exactly one tool and one repository path as the source of truth for each managed resource |
-| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Use GitOps pruning or carefully scoped `kubectl apply --prune` policies, and verify before deleting shared resources |
+| Forgetting to prune resources removed from files | Applying a changed file updates known objects but does not always delete old named objects | Plan deliberate deletion or GitOps pruning. In Kubernetes 1.35, `kubectl apply --prune` modes are alpha; incorrect scope can delete unexpected objects. Review the [pruning warnings](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects) before use. |
 | Storing sensitive values directly in plain YAML | Teams want all configuration in Git and confuse declarative with unencrypted | Use External Secrets, SOPS, Sealed Secrets, or another approved secret-management workflow |
 | Believing `kubectl apply` makes a multi-resource release perfectly atomic | Declarative convergence can involve several controllers and partial progress | Design readiness probes, rollout checks, and rollback plans around eventual convergence |
 
@@ -499,7 +501,7 @@ The manual scale changed live state without changing the declarative source of t
 
 <details><summary>Your pipeline runs `kubectl apply -f deployment.yaml` several times in a row after a retry bug. The file does not change. What should happen, and why is that safe?</summary>
 
-The cluster should converge to the same declared state each time rather than creating duplicate Deployments or extra unmanaged pods. Declarative apply is intended to be idempotent: repeating the same desired state should produce the same end state. Kubernetes may update managed fields or report that the object is unchanged, but the workload shape should remain stable. This property is what makes retries and continuous reconciliation practical.
+For the same valid manifest and object identity, successful repeated applies should not create another Deployment. Kubernetes may update managed fields or report that the object is unchanged, while controllers work toward the declared workload shape. An apply can still fail, for example on validation, permissions, or field conflicts, so a retry needs error handling and a separate readiness check.
 
 </details>
 
@@ -523,7 +525,7 @@ Idempotency applies to repeating the same object identity, not to guessing that 
 
 <details><summary>Two teams apply competing labels to the same shared namespace through separate pipelines. One declares `environment: production`, and the other declares `environment: staging`. What happens, and what design flaw does this expose?</summary>
 
-The label can flip depending on which pipeline applied its desired state most recently. Kubernetes is not resolving a business disagreement; it is accepting API updates from two sources that both claim ownership over the same field. The design flaw is multiple sources of truth for a shared resource. The fix is to assign ownership, centralize the namespace declaration, and move conflicts into review where humans can resolve them before controllers act.
+The outcome depends on the update method and field ownership: one update may overwrite another, or server-side apply may report a conflict. Kubernetes does not resolve the teams' business disagreement. The design flaw is competing sources of truth for a shared field. Assign ownership, centralize the namespace declaration, and resolve disagreements in review before changes reach the API.
 
 </details>
 
@@ -700,6 +702,8 @@ After the first apply, the Deployment should report three desired replicas and t
 - [Kubernetes Documentation: Controllers](https://kubernetes.io/docs/concepts/architecture/controller/)
 - [Kubernetes Documentation: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 - [Kubernetes Documentation: Declarative Management of Kubernetes Objects](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
+- [Kubernetes 1.35: Declarative Management and Pruning](https://v1-35.docs.kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
+- [Kubernetes 1.35: Server-Side Apply and Field Ownership](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)
 - [Kubernetes Documentation: Imperative Management of Kubernetes Objects Using Configuration Files](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-config/)
 - [Kubernetes Documentation: Managing Kubernetes Objects Using Imperative Commands](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/)
 - [Kubernetes Reference: kubectl apply](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
