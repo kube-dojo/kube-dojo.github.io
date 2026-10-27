@@ -558,46 +558,54 @@ No. ConfigMaps and Secrets have a 1 MiB object size limit, and pushing multi-meb
 
 ## Hands-On Exercise
 
-This exercise uses a disposable namespace so you can inspect ConfigMaps and Secrets without touching other work. You will create non-sensitive application settings, create a Secret, run a Pod that consumes both, and then modify the design to practice file-based delivery. The goal is not just to make the YAML apply; it is to predict which values are visible where and which changes require a new Pod.
+This synthetic exercise uses a disposable namespace to inspect ConfigMaps and Secrets. You will create non-sensitive application settings, create a Secret, run a Pod that consumes both, and then practice file-based delivery. Use only the non-real placeholder shown here: environment values and the Pod's startup logs expose plaintext, so never use real credentials in this exercise.
 
-Before you begin, confirm that your current context points at a disposable cluster where creating and deleting lab resources is safe, then create an isolated lab namespace:
+Use a context you have independently confirmed is a dedicated disposable lab, and set `KUBEDOJO_LAB_CONTEXT` to its name before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, every task, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer.
 
 ```bash
-kubectl config current-context
-kubectl create namespace config-lab
+CFG_READY=no CFG_NEW=no
+readonly CFG_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" CFG_NS="config-lab-$(date +%s)-$$" && { CFG_NEW=yes; CFG_UID=; }
+cfg_lab() {
+  [ "$CFG_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
+  command kubectl --context "$CFG_CONTEXT" --namespace "$CFG_NS" "$@"
+}
+if [ "$CFG_NEW" = yes ] && [ -n "$CFG_CONTEXT" ] && [ "$CFG_CONTEXT" != default ] && CFG_CURRENT="$(command kubectl config current-context)" && [ "$CFG_CURRENT" = "$CFG_CONTEXT" ]; then
+  printf 'Exercise context/namespace: %s / %s\n' "$CFG_CONTEXT" "$CFG_NS"
+  if CFG_CREATED_UID="$(command kubectl --context "$CFG_CONTEXT" create namespace "$CFG_NS" -o jsonpath='{.metadata.uid}')" && [ -n "$CFG_CREATED_UID" ]; then
+    CFG_UID="$CFG_CREATED_UID"; CFG_READY=yes
+  fi
+fi
+[ "$CFG_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
 ```
 
-All commands in this exercise use `-n config-lab` so lab objects stay separate from other work.
+Continue only after setup succeeds. `cfg_lab` pins requests to the recorded context and namespace without changing kubeconfig preferences. Stop on a failed task command and clean up before retrying in a fresh terminal. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
 
 ### Task 1: Create the configuration objects
 
-Use the original quick path to create a ConfigMap and Secret, then inspect them with full `kubectl get ... -o yaml` commands. The literal Secret value is intentionally a lab placeholder, not a production credential pattern.
+Use the quick path to create a ConfigMap and Secret, then inspect them with `cfg_lab get ... -o yaml` commands. The literal Secret value is intentionally a lab placeholder, not a production credential pattern.
 
 ```bash
 # 1. Create ConfigMap
-kubectl create configmap app-config \
+cfg_lab create configmap app-config \
   --from-literal=LOG_LEVEL=debug \
-  --from-literal=APP_NAME=myapp \
-  -n config-lab
+  --from-literal=APP_NAME=myapp
 
 # 2. DECISION POINT: Create the secret.
 # Will you use --from-literal or create a YAML file with stringData? 
 # We'll use the CLI for speed here:
-kubectl create secret generic app-secret \
-  --from-literal=DB_PASS=secretpassword \
-  -n config-lab
+cfg_lab create secret generic app-secret \
+  --from-literal=DB_PASS=secretpassword
 
 # 3. Create pod using both
-cat << 'EOF' | kubectl apply -f -
+cat << 'EOF' | cfg_lab apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: config-test
-  namespace: config-lab
 spec:
   containers:
   - name: test
-    image: busybox
+    image: busybox:1.36.1
     command: ['sh', '-c', 'env && sleep 3600']
     envFrom:
     - configMapRef:
@@ -611,13 +619,13 @@ spec:
 EOF
 
 # 4. Verify env vars are present
-kubectl wait --for=condition=Ready pod/config-test -n config-lab --timeout=60s
-kubectl logs config-test -n config-lab | grep -E "LOG_LEVEL|APP_NAME|DB_PASSWORD"
+cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s
+cfg_lab logs config-test | grep -E "LOG_LEVEL|APP_NAME|DB_PASSWORD"
 ```
 
 <details><summary>Solution notes for Task 1</summary>
 
-The original commands create one ConfigMap, one Secret, and one Pod in `config-lab`. Useful inspection commands at this point are `kubectl get configmap app-config -n config-lab -o yaml`, `kubectl get secret app-secret -n config-lab -o yaml`, and `kubectl logs config-test -n config-lab`. Notice that the Pod logs show plaintext environment values because the process received them at startup. That visibility is useful for a lab and risky for real credentials in production logs.
+The commands create one ConfigMap, one Secret, and one Pod in the exercise namespace. Useful inspection commands are `cfg_lab get configmap app-config -o yaml`, `cfg_lab get secret app-secret -o yaml`, and `cfg_lab logs config-test`. The Pod logs show plaintext environment values from startup; that visibility is risky for real credentials.
 
 </details>
 
@@ -626,8 +634,8 @@ The original commands create one ConfigMap, one Secret, and one Pod in `config-l
 Read the stored Secret and decode the single value so you can see exactly where base64 applies. This step builds the habit of distinguishing Kubernetes serialization from actual confidentiality.
 
 ```bash
-kubectl get secret app-secret -n config-lab -o yaml
-kubectl get secret app-secret -n config-lab -o jsonpath='{.data.DB_PASS}' | base64 -d
+cfg_lab get secret app-secret -o yaml
+cfg_lab get secret app-secret -o jsonpath='{.data.DB_PASS}' | base64 -d
 ```
 
 <details><summary>Solution notes for Task 2</summary>
@@ -638,21 +646,23 @@ The YAML view shows encoded data under `.data.DB_PASS`, while the decode command
 
 ### Task 3: Prove environment variables are static
 
-Update the ConfigMap after the Pod is running, then compare the API object with the Pod logs. You should see the new value in the ConfigMap and the old value inside the already-started container.
+Update the ConfigMap after the Pod is running, then compare the API object with the container's current environment and its startup log snapshot. You should see the new value in the ConfigMap and the old value inside the already-started container.
 
 ```bash
-kubectl create configmap app-config \
+cfg_lab create configmap app-config \
   --from-literal=LOG_LEVEL=info \
   --from-literal=APP_NAME=myapp \
-  -n config-lab \
-  --dry-run=client -o yaml | kubectl apply -f -
-kubectl get configmap app-config -n config-lab -o jsonpath='{.data.LOG_LEVEL}'
-kubectl logs config-test -n config-lab | grep LOG_LEVEL
+  --dry-run=client -o yaml | cfg_lab apply -f -
+cfg_lab get configmap app-config -o jsonpath='{.data.LOG_LEVEL}'
+cfg_lab exec config-test -- printenv LOG_LEVEL
+cfg_lab logs config-test | grep LOG_LEVEL
 ```
 
 <details><summary>Solution notes for Task 3</summary>
 
-The ConfigMap object changes, but the environment in the existing container does not. This is expected because the container runtime does not rewrite process environments after startup. A Deployment rollout, Pod deletion, or file-based configuration design is required when the running application must observe a changed value.
+The ConfigMap object changes, but `printenv` in the existing container still shows `debug`; the log records the startup snapshot. This is expected because the container runtime does not rewrite process environments after startup. A Deployment rollout, Pod deletion, or file-based configuration design is required when the running application must observe a changed value.
+
+The first `apply` may warn that the ConfigMap lacks its last-applied-configuration annotation because you created it imperatively; kubectl adds that annotation automatically.
 
 </details>
 
@@ -661,17 +671,16 @@ The ConfigMap object changes, but the environment in the existing container does
 Delete the original Pod and recreate it with the ConfigMap mounted at `/etc/app-config`. Then inspect the directory to see how keys become files.
 
 ```bash
-kubectl delete pod config-test -n config-lab
-cat << 'EOF' | kubectl apply -f -
+cfg_lab delete pod config-test
+cat << 'EOF' | cfg_lab apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: config-test
-  namespace: config-lab
 spec:
   containers:
   - name: test
-    image: busybox
+    image: busybox:1.36.1
     command: ['sh', '-c', 'ls -l /etc/app-config && cat /etc/app-config/LOG_LEVEL && sleep 3600']
     volumeMounts:
     - name: app-config
@@ -681,9 +690,9 @@ spec:
     configMap:
       name: app-config
 EOF
-kubectl wait --for=condition=Ready pod/config-test -n config-lab --timeout=60s
-kubectl exec config-test -n config-lab -- ls -l /etc/app-config
-kubectl exec config-test -n config-lab -- cat /etc/app-config/LOG_LEVEL
+cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s
+cfg_lab exec config-test -- ls -l /etc/app-config
+cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL
 ```
 
 <details><summary>Solution notes for Task 4</summary>
@@ -694,18 +703,26 @@ Each ConfigMap key appears as a file under `/etc/app-config`. This layout is bet
 
 ### Task 5: Clean up and record success criteria
 
-Remove the disposable resources after you have confirmed both environment and file delivery behavior. Cleanup matters because stale Secrets and ConfigMaps make later debugging harder.
+Run cleanup in the same terminal, including after an interruption. It compares the live namespace UID with the successful creation response before deleting the namespace and its resources. Failed cleanup retains the receipt for a same-shell retry. This check is not atomic with deletion and assumes no concurrent namespace replacement.
 
 ```bash
-kubectl delete pod config-test -n config-lab
-kubectl delete configmap app-config -n config-lab
-kubectl delete secret app-secret -n config-lab
-kubectl delete namespace config-lab
+cleanup_cfg_lab() {
+  [ -n "${CFG_UID:-}" ] && [ -n "${CFG_CONTEXT:-}" ] && [ "$CFG_CONTEXT" != default ] && [ -n "${CFG_NS:-}" ] || { echo 'No recorded exercise namespace; stop' >&2; return 1; }
+  local live_uid
+  live_uid="$(command kubectl --context "$CFG_CONTEXT" get namespace "$CFG_NS" --ignore-not-found=true -o jsonpath='{.metadata.uid}')" || return 1
+  if [ -n "$live_uid" ]; then
+    [ "$live_uid" = "$CFG_UID" ] || { echo 'Namespace UID changed; refusing deletion' >&2; return 1; }
+    command kubectl --context "$CFG_CONTEXT" delete namespace "$CFG_NS" --ignore-not-found=true --wait=true --timeout=120s || return 1
+  fi
+  CFG_READY=no
+  echo 'Exercise namespace is gone; kubeconfig preferences were unchanged'
+}
+cleanup_cfg_lab
 ```
 
 <details><summary>Solution notes for Task 5</summary>
 
-The cleanup commands remove only the resources created in `config-lab`. If a delete command reports that a resource is not found, confirm you passed `-n config-lab` before assuming the resource never existed.
+Cleanup deletes the owned exercise namespace after the UID check. If it is already absent, cleanup succeeds without issuing a delete; a read error or changed UID stops deletion.
 
 </details>
 
@@ -752,12 +769,13 @@ Success criteria:
 - [ ] Pod `config-test` reached the Running state and displayed the expected environment values.
 - [ ] Updating the ConfigMap did not change the already-running environment variable.
 - [ ] The ConfigMap was mounted as files under `/etc/app-config`.
-- [ ] All lab resources in `config-lab` were deleted after verification.
+- [ ] The owned exercise namespace and its resources were removed after verification.
 
 ## Sources
 
-- [Kubernetes documentation: ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/)
-- [Kubernetes documentation: Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
+- [Kubernetes v1.35 documentation: ConfigMaps](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/)
+- [Kubernetes v1.35 documentation: Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/)
+- [Kubernetes v1.35: request namespaces](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#setting-the-namespace-for-a-request) and [object UIDs](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids)
 - [Kubernetes task: Configure a Pod to use a ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
 - [Kubernetes task: Distribute credentials securely using Secrets](https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/)
 - [Kubernetes task: Encrypt data at rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
