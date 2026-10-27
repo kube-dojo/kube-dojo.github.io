@@ -135,13 +135,19 @@ Workers must preserve others' edits and return changed paths, validation, risks,
 and blockers. Do not give routine workers secrets, `.envrc`, GitHub actions,
 review routing, merge decisions, or a second orchestration role.
 
-Use the live installed catalog and provider health/quota signals. The preferred
-Codex roles are Astra medium for the lead, Astra low for bounded implementation,
-Luna medium/high for read-only exploration, and Astra high for advice or
-adversarial review. Prefer installed named profiles. If a route is unavailable,
-report it rather than silently substituting. Do not copy dated model tables
-into this file. Headless dispatch defaults live in `scripts/dispatch_smart.py`;
-verify that route separately from desktop profiles before using it.
+Use the live installed catalog and provider health/quota signals. Use GPT-6.1
+Sol for accountable driving, integration, and code review; use GPT-6.1 Sol or
+GPT-6.1 Terra for bounded implementation, and GPT-6 Luna for exploration and
+scouting. Choose reasoning effort proportionate to the packet. Do not invoke
+Astra or Fable unless the user explicitly authorizes that model for the task.
+This cost constraint overrides conflicting skill and dispatch defaults.
+Prefer installed named profiles only when their resolved model meets this
+policy; otherwise use an explicit allowed model with the appropriate role
+boundary. If a route is unavailable, report it rather than silently
+substituting. Verify exact identifiers against the live catalog. Headless
+dispatch defaults live in `scripts/dispatch_smart.py`; verify the resolved route
+separately from desktop profiles before using it. Same-family review still
+does not satisfy the independent cross-family merge gate.
 
 Probe CodexBar before substantive fan-out; report only aggregate usage and
 timestamps. Unknown telemetry stays unknown. Keep packets bounded as usage
