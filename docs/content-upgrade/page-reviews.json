@@ -12,10 +12,10 @@
     },
     {
       "path": "prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md",
-      "page_digest": "sha256:982354b4c7127af88d705123a56d4cefaafb1d2180aa65d9cb97ade9e6023b59",
+      "page_digest": "sha256:d2b9e9ea0b7c861830eb958d88524db48db2424d066474746ec2fc895b75b926",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md", "docs/content-upgrade/reviews/2026-10-27-declarative-guarantees-p10e.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
