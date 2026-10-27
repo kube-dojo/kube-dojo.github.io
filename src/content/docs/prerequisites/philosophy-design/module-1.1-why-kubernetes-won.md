@@ -66,12 +66,12 @@ That pressure produced a category called container orchestration. A container or
 Docker Swarm offered teams familiar with Docker a route from local container commands to clustered service management. Docker announced integrated Swarm mode in Engine 1.12 in 2016; its [current documentation](https://docs.docker.com/engine/swarm/) describes declarative services, scaling, networking, and reconciliation. [Docker's 1.12 announcement](https://www.docker.com/blog/docker-1-12-built-in-orchestration/) provides the historical point of reference; current capabilities should not be assumed to describe every earlier release.
 
 ```text
-Pros:
+Documented capabilities:
 - Integrated with Docker Engine
 - Declarative services and reconciliation
 - Service scaling and multi-host networking
 
-Cons:
+Questions to evaluate:
 - Assess the Docker Engine dependency and existing deployment tooling
 - Compare required integrations, provider support, and operational fit
 ```
@@ -80,28 +80,28 @@ For a real decision, compare the integrations, provider offerings, governance, a
 
 For example, suppose a hypothetical team needs three replicas of one web service and replacement after a worker fails. That requirement alone does not distinguish Kubernetes from Swarm: Docker documents [how Swarm replaces failed replicas on available workers](https://docs.docker.com/engine/swarm/#desired-state-reconciliation). To make the comparison useful, add the team's actual constraints: a required storage integration, an existing deployment workflow, or a provider support requirement. Check each against the intended platform version, then test the critical failure path in a disposable environment. The resulting recommendation should identify which requirement changes the choice; naming a capability shared by both systems is insufficient.
 
-Apache Mesos took a broader approach to datacenter resource management. Its [architecture](https://mesos.apache.org/documentation/architecture/) describes resource offers and framework schedulers, so the platform can support different workload models. [Marathon](https://github.com/mesosphere/marathon) and [Chronos](https://github.com/mesos/chronos) are examples of workload-specific frameworks, rather than components every Mesos deployment required.
+Apache Mesos took a broader approach to datacenter resource management. Its [architecture](https://mesos.apache.org/documentation/architecture/) describes resource offers and framework schedulers, so the platform could support different workload models. [Marathon](https://github.com/d2iq-archive/marathon/blob/90619da70d79a2ecf19368a21c6a695ea981bd74/README.md) and [Chronos](https://github.com/mesos/chronos/blob/c1348ddfd80eb8f888418805005066c230fc6ad2/README.md) are examples of workload-specific frameworks, rather than components every Mesos deployment required.
 
 ```text
-Pros:
+Documented capabilities:
 - Resource offers to framework schedulers
 - Frameworks can support different workload types
 
-Cons:
+Questions to evaluate:
 - Evaluate the framework and operational components needed for each workload
-- Account for the team's experience with two-level scheduling
+- Account for the team's experience with resource offers and framework schedulers
 ```
 
 Mesos teaches an important lesson about platform competition: excellent technology can still lose if the adoption path is too heavy and the ecosystem becomes fragmented. Marathon, Chronos, DC/OS, framework choices, and operational complexity created a surface area that rewarded specialist teams but intimidated many mainstream adopters. Kubernetes did not have a trivial learning curve, but it offered a clearer container-first story, a standard API shape, and a fast-growing ecosystem that made new integrations feel like investments in the industry default. Apache's board [retired Mesos in August 2025](https://www.apache.org/foundation/board/minutes/2025/board_minutes_2025_08_20.html); the [move to the Attic completed in October](https://attic.apache.org/projects/mesos.html).
 
-HashiCorp Nomad is another alternative for mixed workloads. Its [current documentation](https://developer.hashicorp.com/nomad/docs/what-is-nomad) describes a single-binary scheduler; its [task driver documentation](https://developer.hashicorp.com/nomad/docs/job-declare/task-driver) covers containers, Java, QEMU, and executable workloads. These current capabilities are useful evaluation inputs, not evidence of a historical market ranking or a universal overhead advantage.
+HashiCorp Nomad is another alternative for mixed workloads. Its [current documentation](https://developer.hashicorp.com/nomad/docs/what-is-nomad) describes a single-binary scheduler; its [task driver documentation](https://developer.hashicorp.com/nomad/docs/job-declare/task-driver) lists Docker, Java, QEMU, Isolated Fork/Exec, and Raw Fork/Exec. These current capabilities are useful evaluation inputs, not evidence of a historical market ranking or a universal overhead advantage.
 
 ```text
-Pros:
+Documented capabilities:
 - Single-binary design
 - Task drivers for container and non-container workloads
 
-Cons:
+Questions to evaluate:
 - Evaluate integrations and operational responsibilities for your workload
 ```
 
@@ -346,7 +346,7 @@ You should separate technical speed from platform survivability. A faster schedu
 
 </details>
 
-<details><summary>3. Your team is comparing Docker Swarm and Kubernetes for an enterprise application that may run across AWS and on-premises servers. One engineer argues for Swarm because setup is simpler. What historical context changes the decision?</summary>
+<details><summary>3. Your team is comparing Docker Swarm and Kubernetes for an enterprise application that may run across AWS and on-premises servers. One engineer argues for Swarm because setup is simpler. Which requirements should you compare before deciding?</summary>
 
 Swarm mode's Docker integration may fit the team's existing workflow. Compare the specific AWS and on-premises deployment support, desired integrations, governance, and operational responsibilities for each platform rather than assuming either system cannot span environments. Consider future coordination costs as well as day-one setup, and verify the available options for the versions being evaluated.
 
@@ -364,9 +364,9 @@ Spotify's experience shows that a homegrown orchestrator can solve real local pr
 
 </details>
 
-<details><summary>6. A CTO notes that Mesos was proven at massive scale and asks why the "best technology" did not win. How should you answer?</summary>
+<details><summary>6. A CTO likes Mesos's resource-offer architecture and proposes it for a new system. What should a platform comparison establish beyond that technical preference?</summary>
 
-Platform outcomes depend on adoption path, ecosystem, governance, and usability as well as technical capability. Mesos offered resource management through framework schedulers; compare the components and experience an organization would need with the Kubernetes API and its integrations. A proven design for one workload does not by itself establish the best fit for another.
+Compare the workload-specific frameworks, integrations, and operating responsibilities the system would need. Distinguish historical capabilities from current project status: Apache retired Mesos in 2025, so any proposal for a new deployment must explain how maintenance and support would be handled. A feature preference alone does not establish a suitable platform, and the retirement does not prove why every organization chose another tool.
 
 </details>
 
@@ -459,8 +459,8 @@ A strong answer says that the team should avoid building a proprietary orchestra
 - [CNCF Blog: Spotify Capacity Planning with Kubernetes](https://www.cncf.io/blog/2019/06/27/with-kubernetes-spotifys-capacity-planning-went-from-almost-an-hour-to-seconds-or-minutes-2/)
 - [HashiCorp Nomad Documentation](https://developer.hashicorp.com/nomad/docs)
 - [Apache Mesos: Resource Offers and Framework Architecture](https://mesos.apache.org/documentation/architecture/)
-- [Marathon: Mesos Application Framework](https://github.com/mesosphere/marathon)
-- [Chronos: Scheduled and Dependency-based Mesos Jobs](https://github.com/mesos/chronos)
+- [Marathon: Mesos Application Framework](https://github.com/d2iq-archive/marathon/blob/90619da70d79a2ecf19368a21c6a695ea981bd74/README.md)
+- [Chronos: Scheduled and Dependency-based Mesos Jobs](https://github.com/mesos/chronos/blob/c1348ddfd80eb8f888418805005066c230fc6ad2/README.md)
 - [HashiCorp: Introduction to Nomad](https://developer.hashicorp.com/nomad/docs/what-is-nomad)
 - [HashiCorp: Nomad Task Drivers](https://developer.hashicorp.com/nomad/docs/job-declare/task-driver)
 - [Kubernetes 1.35 Overview: Name and Abbreviation](https://v1-35.docs.kubernetes.io/docs/concepts/overview/)
