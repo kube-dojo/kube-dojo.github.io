@@ -3,6 +3,14 @@
   "note": "Supplied dispositions reconciled after scoped corrections; current digest is not exhaustive current-page clearance. No full-page acceptance is recorded; coverage reporting is separate from inventory schema/digest checks.",
   "pages": [
     {
+      "path": "prerequisites/philosophy-design/module-1.2-declarative-vs-imperative.md",
+      "page_digest": "sha256:982354b4c7127af88d705123a56d4cefaafb1d2180aa65d9cb97ade9e6023b59",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-declarative-scope-p10b.md"],
+      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+    },
+    {
       "path": "prerequisites/kubernetes-basics/module-1.8-yaml-kubernetes.md",
       "page_digest": "sha256:c0d5f223d7201945d3e1145dde1a96124141181db85026e6d517e6c442323785",
       "disposition": "revise",
