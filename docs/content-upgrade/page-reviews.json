@@ -14,10 +14,10 @@
     },
     {
       "path": "prerequisites/philosophy-design/module-1.4-dead-ends.md",
-      "page_digest": "sha256:6a1a84514c90c3e6dbae14a427c10b170c77bf72c22805b30b48c1552d9ee346",
+      "page_digest": "sha256:b3a172377e1ec4569e3aa6fcb8a57cdb13ee08b67a1442b7db12cb3c760208e6",
       "disposition": "revise",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md", "docs/content-upgrade/reviews/2026-10-28-runtime-adapter-p11f.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md", "docs/content-upgrade/reviews/2026-10-28-runtime-adapter-p11f.md"],
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md", "docs/content-upgrade/reviews/2026-10-28-runtime-adapter-p11f.md", "docs/content-upgrade/reviews/2026-10-28-technology-evidence-p11g.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md", "docs/content-upgrade/reviews/2026-10-28-runtime-adapter-p11f.md", "docs/content-upgrade/reviews/2026-10-28-technology-evidence-p11g.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
