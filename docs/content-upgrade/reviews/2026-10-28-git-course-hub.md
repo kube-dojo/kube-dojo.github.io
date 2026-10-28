@@ -1,0 +1,9 @@
+# T01-P12: Git course orientation and study planning
+
+Owner #3622; parents #2278/#2272 and P12 remain open. This correction bounds the course's recovery/readiness promises, labels summaries as topics, and keeps all ten routes and unmeasured body-header planning ranges. Linked lessons retain their own source, rubric and practice gates.
+
+Complete English hub digest `sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa`; seed digest `sha256:80dc9db1f85e3feef7ea145cbecb1843fd51ec114fd75ccfadb94b5a09137697`. Actual native xAI Grok4.7 independently approved all78 material claims and the complete hub editorial scope in [source R1](https://github.com/kube-dojo/kube-dojo.github.io/issues/3622#issuecomment-6468195605). The genuine receipt binds these bytes;102source/digest pairs match17 immutable repository snapshots at `d1190642d43ae2e57e60b70762cc396d6833fb95`. Schema binding alone is not semantic review.
+
+The verifier independently recomputed ten lower/upper header sums as920–1240minutes, or15h20–20h40. These are curriculum planning declarations, not measured learner times. Subsequent Advanced Merging diagnostic correction `6c609854` changes none of its cited title, body range or prerequisite fields. Future linked metadata changes require rechecking the hub.
+
+All176 pipeline tests pass. The ordinary module-template verifier returns false for this navigation hub's absent module/quiz/lab template; those numeric requirements are not applicable here, and no module-structure pass or waiver is asserted. The hub has no executable exercise, code fence or lab; linked-module execution remains separate. Proposed-branch CI, exact pushed-head independent PR review, merged build/Pages and complete actual public hub/route inspection remain delivery gates. No whole-page acceptance is recorded yet; Ukrainian fidelity, linked-module acceptance and learner effects are not asserted.
