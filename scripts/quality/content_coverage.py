@@ -30,6 +30,7 @@ def build_coverage(repo_root: Path) -> dict:
     tracks = {locale: {} for locale in locales}
     sections = {locale: {} for locale in locales}
     milestone = dict.fromkeys(FIELDS, 0)
+    pages = []
     for page in inventory["pages"]:
         locale, section, evidence = page["locale"], page["section"], page["evidence"]
         track = section.split("/")[0] if section else "shared"
@@ -48,6 +49,25 @@ def build_coverage(repo_root: Path) -> dict:
                       int(current and evidence["disposition"] in {"revise", "expand"}),
                       int(bool(accepted)), int(evidence["receipt_status"] == "stale"),
                       int(evidence["receipt_status"] == "invalid")), strict=True))
+        reasons = [f"{key}: {statuses[key]}" for key in required if statuses[key] != "pass"]
+        reasons += evidence["source_acceptance"].get("reasons", [])
+        if not current:
+            reasons.append(f"receipt: {evidence['receipt_status']}")
+        if evidence["disposition"] != "retain":
+            reasons.append(f"disposition: {evidence['disposition'] or 'unknown'}")
+        if not explicit:
+            reasons.append("no valid lead acceptance references")
+        if statuses["lab_execution"] not in {"pass", "not_applicable"}:
+            reasons.append(f"lab_execution: {statuses['lab_execution']}")
+        pages.append({
+            "path": page["path"], "locale": locale, "type": page["type"],
+            "receipt_status": evidence["receipt_status"], "disposition": evidence["disposition"],
+            **{key: bool(values[key]) for key in FIELDS[1:]},
+            "layers": statuses, "reasons": reasons,
+            "references": {key: [ref[:1000] for ref in receipt.get(key, []) if isinstance(ref, str)][:30]
+                           if isinstance(receipt.get(key), list) else []
+                           for key in ("reviewer_refs", "evidence_refs", "acceptance_refs")},
+        })
         buckets = [locales[locale], tracks[locale].setdefault(track, dict.fromkeys(FIELDS, 0)),
                    sections[locale].setdefault(section or "shared", dict.fromkeys(FIELDS, 0))]
         if locale == "en" and track in {"prerequisites", "linux"}:
@@ -65,7 +85,7 @@ def build_coverage(repo_root: Path) -> dict:
         "schema": "kubedojo.content_coverage.v1", "caveat": CAVEAT,
         "status": "unavailable" if unavailable or errors else "needs_attention" if attention else "ok",
         "coverage_health": "unknown" if unknown else "known",
-        "locales": locales, "tracks": tracks, "sections": sections,
+        "locales": locales, "tracks": tracks, "sections": sections, "pages": pages,
         "milestones": {"prerequisites_linux": milestone}, "parked_locales": ["uk"],
         "errors": errors, "receipt_errors": receipt_errors, "missing_pages": missing,
         "new_pages": inventory.get("new_pages", []),

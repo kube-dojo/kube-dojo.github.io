@@ -56,6 +56,11 @@ def test_no_automatic_acceptance(tmp_path):
     assert report["locales"]["en"]["unreviewed"] == 0
     assert report["locales"]["en"]["needs_revision"] == 0
     assert report["status"] == "needs_attention"
+    row = next(page for page in report["pages"] if page["path"] == "linux/index.md")
+    assert row["acceptance_recorded"] is False and row["review_recorded"] is True
+    assert row["layers"]["technical_source"] == "unknown"
+    assert row["references"]["acceptance_refs"] == ["lead:acceptance"]
+    assert "technical_source: unknown" in row["reasons"]
 
 
 def test_missing_and_malformed_input(tmp_path):
@@ -89,7 +94,12 @@ def test_explicit_acceptance_gates(tmp_path, monkeypatch):
     for refs, expected in ((None, 0), ([], 0), ([" "], 0), (["lead:accepted"], 1)):
         receipt["acceptance_refs"] = refs
         evidence.write_text(json.dumps({"pages": [receipt]}))
-        assert build_coverage(tmp_path)["locales"]["en"]["acceptance_recorded"] == expected
+        report = build_coverage(tmp_path)
+        for locale, totals in report["locales"].items():
+            rows = [page for page in report["pages"] if page["locale"] == locale]
+            for key, count in totals.items():
+                assert count == (len(rows) if key == "total" else sum(row[key] for row in rows))
+        assert report["locales"]["en"]["acceptance_recorded"] == expected
     receipt["independent_statuses"]["deployed_smoke"] = "unknown"
     evidence.write_text(json.dumps({"pages": [receipt]}))
     assert build_coverage(tmp_path)["locales"]["en"]["acceptance_recorded"] == 0
@@ -121,3 +131,18 @@ def test_empty_english_is_unavailable(tmp_path):
     evidence.write_text('{"pages": []}')
     report = build_coverage(tmp_path)
     assert report["status"] == "unavailable" and report["coverage_health"] == "unknown"
+
+
+def test_row_projection_stale_mdx_and_private_receipts(tmp_path):
+    docs, evidence, receipt = setup_pages(tmp_path)
+    (docs / "index.mdx").write_text("---\ntitle: Hub\n---\n")
+    receipt.update(private_trace="secret", source_acceptance={"private": "secret"})
+    evidence.write_text(json.dumps({"pages": [receipt]}))
+    (docs / "linux/index.md").write_text("changed")
+    report = build_coverage(tmp_path)
+    rows = {page["path"]: page for page in report["pages"]}
+    assert rows["index.mdx"]["type"] == "hub"
+    assert rows["uk/linux/index.md"]["locale"] == "uk"
+    stale = rows[receipt["path"]]
+    assert stale["stale"] and not stale["acceptance_recorded"] and stale["unreviewed"]
+    assert "receipt: stale" in stale["reasons"] and "secret" not in json.dumps(report)
