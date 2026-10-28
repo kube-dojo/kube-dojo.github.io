@@ -88,13 +88,14 @@ export function enhanceMetaChips(root: Element): void {
           if (segment.some((node) => node instanceof Element &&
             (node.matches(':not(strong):not(em):not(code)') || node.querySelector(':not(strong):not(em):not(code)')))) return;
           const text = segment.map((node) => node.textContent || '').join('').trim();
-          const c = text.match(/^Complexity:\s*\[?(QUICK|MEDIUM|COMPLEX|ADVANCED|EXPERT)\]?$/i);
+          const c = text.match(/^Complexity:\s*\[?(QUICK|MEDIUM|COMPLEX|ADVANCED|EXPERT)\]?(?:\s*([-—–:].+))?$/i);
           const t = text.match(/^Time(?:\s+to\s+Complete)?:\s*(.+)$/i);
           if (!c && !t) return;
           if (c) complexity = c[1];
           if (t) time = t[1].trim();
+          if (c?.[2]) return; // Keep explanatory qualifiers intact alongside the chip.
           segment.forEach((node) => removals.add(node));
-          const separator = separators[index] || separators[index - 1];
+          const separator = separators.slice(0, index + 1).reverse().find((node) => !removals.has(node));
           if (separator) removals.add(separator);
         });
       }
