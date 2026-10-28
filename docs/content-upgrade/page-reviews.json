@@ -374,13 +374,13 @@
     },
     {
       "path": "prerequisites/git-deep-dive/module-2-advanced-merging.md",
-      "page_digest": "sha256:5a4228365b156e08649d750a4b78935558f4169b0527627d0a72b427828bb839",
+      "page_digest": "sha256:f4a3ef4dea331ce0abdaf673c3111bb788fbdac010f5ac698c2ab08d154ee27b",
       "disposition": "revise",
       "reviewer_refs": [
-        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md"
+        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-render-p12c.md"
       ],
       "evidence_refs": [
-        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md"
+        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-render-p12c.md"
       ],
       "independent_statuses": {
         "page_presence": "pass",
