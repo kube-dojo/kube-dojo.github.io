@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Audit a claim before choosing a platform.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now works through lifecycle, capability and missing evidence, with hints for comparing retention and migration against actual requirements.
 - **Separate image builds from runtime integration.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now distinguishes removed built-in dockershim from external adapters and asks you to verify compatibility, with a clearer single-host recovery boundary.
 - **Check who owns the change.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now distinguishes host configuration, API automation and workload reconciliation, with a worked example for resolving conflicting field ownership.
 - **Classify the activity and name the evidence.** [What We Don't Cover](/prerequisites/philosophy-design/module-1.3-what-we-dont-cover/) now works through three exam-specific planning examples and helps you record inspected tasks, missing evidence and reasons to revisit deferred study.
