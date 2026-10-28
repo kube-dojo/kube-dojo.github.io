@@ -82,7 +82,7 @@ The split between the editor buffer and the staged proposal is the first recover
 | Index | Proposed next commit | `git ls-files --stage` | Staged content differs from editor content |
 | Object database | Immutable blobs, trees, commits, tags | `git cat-file -t <hash>` | Hash exists, is missing, or has unexpected type |
 | Refs | Branch and tag pointers | `git rev-parse main` | Branch points at the wrong commit |
-| `HEAD` | Current checkout pointer | `cat .git/HEAD` | Detached state or wrong symbolic ref |
+| `HEAD` | Current checkout pointer | `cat "$(git rev-parse --git-path HEAD)"` | Detached state or wrong symbolic ref |
 
 ### Reading `.git` Without Treating It as a Toy
 Inspecting `.git` is safe when you read files and use plumbing commands, but it is risky when you edit internals by hand. A branch ref is just a text file in simple repositories, yet manually overwriting it can bypass reflog entries and surprise collaborators. The disciplined approach is to read internals to build a diagnosis, then use Git commands such as `git branch`, `git update-ref`, `git restore`, or `git switch` to make intentional changes.
@@ -260,7 +260,7 @@ first stable
 The `object` line points to the commit being tagged, while the tag object itself has its own identity. A lightweight tag such as `git tag quick-test HEAD` skips that object and writes only a ref name pointing directly at the commit, which is useful for local labels but weaker for release evidence.
 
 ## The Index: Staging as a Proposed Commit
-The staging area, also known as the index, is a crucial intermediate step between your working directory and repository history. It is a binary file at `.git/index` that stores the paths, modes, object IDs, and metadata Git will use for the next commit. It is not a copy of your working directory, and it is not the same as `HEAD`. It is a proposed snapshot that can be inspected, updated, and committed.
+The staging area, also known as the index, is a crucial intermediate step between your working directory and repository history. Its binary file stores the paths, modes, object IDs, and metadata Git will use for the next commit. In a default layout it is `.git/index`; `git rev-parse --git-path index` locates the selected index, including an alternate `GIT_INDEX_FILE`. It is not a copy of your working directory, and it is not the same as `HEAD`. It is a proposed snapshot that can be inspected, updated, and committed.
 
 When you run `git add <file>`, Git computes the object ID for the file content, writes a blob object if needed, and updates the index entry for that path. If you edit the same file afterward, the working tree changes but the index still points at the earlier blob. This is the behavior behind the familiar `git status` message that a file is both staged and modified. Internally, Git is simply comparing three states: `HEAD`, index, and working tree.
 
@@ -456,11 +456,11 @@ cat .git/packed-refs
 
 `HEAD` is the special pointer that tells Git what you currently have checked out. In the common case, it is a symbolic reference such as `ref: refs/heads/main`, which means new commits should advance the `main` branch. In detached `HEAD` state, it points directly to a commit instead of to a branch name. Detached `HEAD` is not corruption; it is a normal state for CI builds, tag inspection, and historical debugging, but new commits made there need a branch or tag if you want to keep them.
 
-Let's see our current `HEAD` and branch ref:
+In this training repository, inspect `HEAD` and the `main` branch ref. A linked worktree or separate Git directory can use a `.git` file rather than a directory, so ask Git for the path to this worktree's `HEAD` ([worktree details](https://git-scm.com/docs/git-worktree#_details)). The inner command prints the path; quoting its result lets `cat` read that file:
 
 ```bash
 # View what HEAD points to
-cat .git/HEAD
+cat "$(git rev-parse --git-path HEAD)"
 
 # View the main branch ref (works for loose and packed refs)
 git rev-parse main
@@ -469,14 +469,14 @@ git rev-parse main
 **Expected Output (similar to):**
 
 ```
-# cat .git/HEAD
+# cat "$(git rev-parse --git-path HEAD)"
 ref: refs/heads/main
 
 # git rev-parse main
 2f1a... (this will be the hash of your latest commit)
 ```
 
-This shows that `HEAD` points to the `main` branch, and the `main` branch points to the latest commit. When you make a new commit, Git creates a commit object, points that commit at its parent and tree, and then moves the current branch pointer forward. If `HEAD` is detached, Git can still create the commit, but no branch name moves with it. That is why detached commits feel lost after checkout even though the objects may still exist.
+In this training repository, the example shows that `HEAD` points to the `main` branch, and `main` points to its latest commit. When you make a new commit, Git creates a commit object, points that commit at its parent and tree, and then moves the current branch pointer forward. If `HEAD` is detached, Git can still create the commit, but no branch name moves with it. That is why detached commits feel lost after checkout even though the objects may still exist.
 
 The recovery mindset starts from that distinction: deleting a branch removes a ref, not necessarily the commits, trees, and blobs it named. A detached commit may not appear in the branch list, but a local reflog may record where `HEAD` pointed. Reflog entries can expire and objects can be pruned under separate rules, so inspect and preserve available evidence promptly instead of assuming a fixed recovery window.
 
@@ -527,7 +527,7 @@ When Git behaves unexpectedly, choose the diagnostic route by asking which layer
 |---|---|---|---|
 | File has unexpected edits | Is the change staged, unstaged, or both? | `git status --short` | Use `git diff --staged` and index inspection |
 | Commit seems to omit a file | Did the index include the intended blob? | `git show --name-status HEAD` | Inspect the commit tree and staged entries |
-| Branch points at the wrong work | Did the ref move, or did `HEAD` detach? | `cat .git/HEAD` and `git reflog` | Create a protective branch before repair |
+| Branch points at the wrong work | Did the ref move, or did `HEAD` detach? | `cat "$(git rev-parse --git-path HEAD)"` and `git reflog` | Create a protective branch before repair |
 | Object hash appears in logs | What type of object is this? | `git cat-file -t <hash>` | Pretty-print or recover content by type |
 | CI checked out a raw commit | Is new work being created detached? | `git status --branch` | Create a branch before preserving new commits |
 
@@ -563,7 +563,7 @@ You are inspecting a tree object, not a blob or commit. The entries describe a d
 Start by comparing the three states separately instead of trusting the editor view. `git diff --staged` shows what the index would commit relative to `HEAD`, while `git diff` shows how the working tree differs from the index. `git ls-files --stage deployment.yaml` can confirm the staged blob object ID if you need proof. This implements staging-area discipline because you only commit after the index points at the intended content.
 </details>
 
-<details><summary>Scenario: CI checked out a raw commit hash, a developer made a hotfix there, and now `cat .git/HEAD` does not show `ref: refs/heads/main`. What recovery plan keeps the detached `HEAD` work safe?</summary>
+<details><summary>Scenario: CI checked out a raw commit hash, a developer committed a hotfix there, and now `cat "$(git rev-parse --git-path HEAD)"` shows a raw commit hash instead of a symbolic ref. What recovery plan keeps the detached `HEAD` work safe?</summary>
 
 This is detached `HEAD`, which is normal but easy to lose track of. The safe recovery plan is to create a branch or tag at the current commit before switching away, then decide whether to merge, cherry-pick, or open a pull request from that branch. New commits made while detached are real commit objects, but no branch ref advances with them. Preserving a ref makes those commits reachable and gives the team a stable name for review.
 </details>
@@ -619,7 +619,7 @@ Run `git hash-object configmap.yaml` twice without changing the file and confirm
 
 <details><summary>Solution for task 5</summary>
 
-Make a second commit on `main` (for example, add a comment line to `configmap.yaml`, stage, and commit) so the branch has at least two commits. Note the first commit hash with `git rev-list --max-parents=0 HEAD`. Check out that commit in detached `HEAD` with `git switch --detach "$(git rev-list --max-parents=0 HEAD)"`, make a small edit, stage, and commit. Inspect `cat .git/HEAD` — it should show a raw commit hash, not `ref: refs/heads/...`. Before switching away, create a branch at the current commit with `git branch recovered-detached-work HEAD`. Switch back to `main` with `git switch main` and verify with `git rev-parse recovered-detached-work` that the preserved commit ID matches your detached commit. The success condition is that no useful commit depends only on detached `HEAD`.
+Make a second commit on `main` (for example, add a comment line to `configmap.yaml`, stage, and commit) so the branch has at least two commits. Note the first commit hash with `git rev-list --max-parents=0 HEAD`. Check out that commit in detached `HEAD` with `git switch --detach "$(git rev-list --max-parents=0 HEAD)"`, make a small edit, stage, and commit. Inspect `cat "$(git rev-parse --git-path HEAD)"` — it should show a raw commit hash, not `ref: refs/heads/...`. Before switching away, create a branch at the current commit with `git branch recovered-detached-work HEAD`. Switch back to `main` with `git switch main` and verify with `git rev-parse recovered-detached-work` that the preserved commit ID matches your detached commit. The success condition is that no useful commit depends only on detached `HEAD`.
 
 For a related synthetic recovery check, stay in the disposable training repository on `main`. Choose unused names for `throwaway` and `recovered-fsck` if either already exists. The [`git commit` options](https://git-scm.com/docs/git-commit) `--allow-empty --only` create an empty commit without including staged work. Record its ID and return to `main` before deleting the throwaway branch:
 
@@ -700,6 +700,9 @@ Failure layer: raw objects before names. Next action: start with `git log -- pat
 - [Git documentation: git-hash-object](https://git-scm.com/docs/git-hash-object)
 - [Git documentation: git-ls-files](https://git-scm.com/docs/git-ls-files)
 - [Git documentation: git-rev-parse](https://git-scm.com/docs/git-rev-parse)
+- [Git documentation: repository layout](https://git-scm.com/docs/gitrepository-layout)
+- [Git documentation: worktree details](https://git-scm.com/docs/git-worktree#_details)
+- [Git documentation: index format](https://git-scm.com/docs/gitformat-index)
 - [Git documentation: gitrevisions](https://git-scm.com/docs/gitrevisions)
 - [Git documentation: git-reflog](https://git-scm.com/docs/git-reflog)
 - [Git documentation: git-fsck](https://git-scm.com/docs/git-fsck)
