@@ -90,4 +90,3 @@ def test_absolute_gate_scans_canonical_and_duplicate(tmp_path: Path, monkeypatch
     ok, result = gate(tmp_path)
     assert not ok
     assert result["after"] == [["duplicate", NEW, CANONICAL]]
-
