@@ -183,6 +183,15 @@ body[data-kd-modal-open='true'] { overflow: hidden; }
   background: var(--g900);
 }
 
+/* Mermaid emits blue flowchart edges and arrowheads with inline SVG colors. */
+:root[data-theme='dark'] :is(.kd-mermaid__mount, .kd-mermaid-modal__content) .flowchart-link[style*='stroke:blue;'] {
+  stroke: #60a5fa !important;
+}
+:root[data-theme='dark'] :is(.kd-mermaid__mount, .kd-mermaid-modal__content) marker[id$='_blue'] path[stroke='blue'][fill='blue'] {
+  stroke: #60a5fa !important;
+  fill: #60a5fa !important;
+}
+
 /* ===== QUIZ / DETAILS-SUMMARY — card style ===== */
 .sl-markdown-content details {
   margin: 1.375rem 0; padding: 0;
