@@ -263,14 +263,12 @@ capacity: (quoted CodexBar + avoid list)
 parallel_free_seats: …
 ```
 
-Default pattern: **qualified worker, no advisor seat**. Luna at high does
-routine bounded Codex work. Sol at high does accountable coding and formal
-review. Opus 5.5 reviews. Sonnet 5, AGY, and native Grok do ordinary
-implement and content work. Do not dispatch Fable or Astra unless the
-problem is really tough (contested architecture, a split review, or a
-judgment the working seats cannot settle). A normal packet does not get an
-advisor brief first. Do not spend Sol, Astra, or Fable on lockfiles, pointer
-publishes, or smoke jobs. Role boundaries:
+Default pattern: Terra 6.1 handles coding, implementation, writing, computer
+use and QA; Sol 6.1 drives, integrates, solves hard problems and reviews.
+GPT-6 Luna only scouts read-only. Choose effort for the packet and verify
+the live route. Astra and Fable require explicit operator authorization;
+a hard problem or routing card does not grant it. Other provider routes
+come from live discovery in dispatch-router. Role boundaries:
 `.claude/rules/fleet-driver-routing.md`.
 
 After ≥3 implement dispatches this session, require ≥2 agents **and** ≥2
