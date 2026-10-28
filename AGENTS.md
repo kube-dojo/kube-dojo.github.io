@@ -136,9 +136,10 @@ and blockers. Do not give routine workers secrets, `.envrc`, GitHub actions,
 review routing, merge decisions, or a second orchestration role.
 
 Use the live installed catalog and provider health/quota signals. Use GPT-6.1
-Sol for accountable driving, integration, and code review; use GPT-6.1 Sol or
-GPT-6.1 Terra for bounded implementation, and GPT-6 Luna for exploration and
-scouting. Choose reasoning effort proportionate to the packet. Do not invoke
+Terra by default for coding, implementation, writing, computer use and QA
+testing; use GPT-6.1 Sol for accountable driving, integration, hard problems
+and review, and GPT-6 Luna for exploration and scouting. Choose reasoning
+effort proportionate to the packet. Do not invoke
 Astra or Fable unless the user explicitly authorizes that model for the task.
 This cost constraint overrides conflicting skill and dispatch defaults.
 Prefer installed named profiles only when their resolved model meets this

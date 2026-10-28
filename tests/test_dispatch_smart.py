@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "dispatch_smart.py"
 SCRIPTS_DIR = SCRIPT.parent
+REPO = SCRIPT.parents[1]
+PRIMARY_REPO = REPO.parent.parent if REPO.parent.name == ".worktrees" else REPO
 
 
 def _run_dispatch_smart(args: list[str]) -> subprocess.CompletedProcess:
-    cmd = [sys.executable, str(SCRIPT)] + args
+    cmd = [str(PRIMARY_REPO / ".venv/bin/python"), str(SCRIPT)] + args
     return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
 
@@ -209,7 +212,7 @@ def test_parse_opencode_json_events_extracts_final_assistant_text() -> None:
     assert _parse_opencode_json_events(ndjson) == "VERDICT: APPROVE"
 
 
-def test_codex_defaults_are_gpt_6_sol_luna_astra() -> None:
+def test_codex_defaults_use_terra_execution_sol_judgment_luna_scouting() -> None:
     sys.path.insert(0, str(SCRIPTS_DIR))
     from dispatch_smart import TASK_CLASSES
 
@@ -219,16 +222,26 @@ def test_codex_defaults_are_gpt_6_sol_luna_astra() -> None:
         assert cfg.models["deepseek"] == "deepseek-flash"
         assert cfg.codex_reasoning_effort == "high", task_class
         assert not cfg.models["codex"].startswith("gpt-5.6"), task_class
-        if task_class in {"search", "edit"}:
+        if task_class == "search":
             assert cfg.models["codex"] == "gpt-6-luna", task_class
-        elif task_class in {"draft", "review"}:
-            assert cfg.models["codex"] == "gpt-6-sol", task_class
-        elif task_class == "architect":
-            assert cfg.models["codex"] == "gpt-6-astra"
+        elif task_class in {"edit", "draft"}:
+            assert cfg.models["codex"] == "gpt-6.1-terra", task_class
+        elif task_class in {"review", "architect"}:
+            assert cfg.models["codex"] == "gpt-6.1-sol", task_class
         if task_class == "search":
             assert cfg.models["cursor"] == "composer-2.5"
         else:
             assert cfg.models["cursor"] == "grok-4.7-high"
+
+
+def test_codex_environment_override_reaches_cli() -> None:
+    code = (
+        "from pathlib import Path;from scripts.agent_runtime.adapters.codex import CodexAdapter;"
+        "p=CodexAdapter().build_invocation(prompt='x',mode='danger',cwd=Path.cwd(),model=None,task_id=None,session_id=None,tool_config=None);"
+        "assert p.cmd[p.cmd.index('-m')+1]=='gpt-6.1-sol'"
+    )
+    result = subprocess.run([str(PRIMARY_REPO / ".venv/bin/python"), "-c", code], cwd=REPO, env={**os.environ, "AB_CODEX_MODEL": "gpt-6.1-sol"}, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
 
 
 def test_grok_search_argv_sets_low_effort() -> None:

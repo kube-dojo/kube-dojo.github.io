@@ -18,20 +18,20 @@ Usage:
     .venv/bin/python scripts/dispatch_smart.py search \
         "Find every place that imports agent_runtime.runner.invoke."
 
-    # Same task class, routed to codex (gpt-5.4-mini)
+    # Same task class, routed to Codex (GPT-6 Luna)
     .venv/bin/python scripts/dispatch_smart.py search --agent codex \
         "Find every place that imports agent_runtime.runner.invoke."
 
-    # Mid-tier edit — codex picks gpt-5.3-codex-spark (separate counter)
+    # Bounded edit — Codex picks GPT-6.1 Terra
     .venv/bin/python scripts/dispatch_smart.py edit --agent codex \
         --worktree .worktrees/codex-fix-issue-500 \
         --new-branch codex/fix-issue-500 \
         "Fix the off-by-one in scripts/foo.py:142, add a regression test."
 
-    # Heavy work — judgment / integration (opus or gpt-5.5)
-    .venv/bin/python scripts/dispatch_smart.py architect \
-        --worktree .worktrees/claude-redesign-pipeline \
-        --new-branch claude/redesign-pipeline \
+    # Heavy work — Codex judgment / integration uses GPT-6.1 Sol
+    .venv/bin/python scripts/dispatch_smart.py architect --agent codex \
+        --worktree .worktrees/codex-redesign-pipeline \
+        --new-branch codex/redesign-pipeline \
         "Redesign the quality pipeline so phase ordering is data-driven."
 
 Skill auto-loading:
@@ -51,10 +51,10 @@ Task classes — model mapping per agent:
     class       claude                       codex            cursor
     -------     --------------------------   --------------   --------------
     search      claude-haiku-4-5-20251001    gpt-6-luna       composer-2.5
-    edit        claude-sonnet-5              gpt-6-luna       grok-4.7-high
-    draft       claude-sonnet-5        gpt-6-sol       grok-4.7-high
-    review      claude-opus-5-5        gpt-6-sol       grok-4.7-high
-    architect   claude-fable-5-1       gpt-6-astra     grok-4.7-high
+    edit        claude-sonnet-5              gpt-6.1-terra    grok-4.7-high
+    draft       claude-sonnet-5              gpt-6.1-terra    grok-4.7-high
+    review      claude-opus-5-5               gpt-6.1-sol      grok-4.7-high
+    architect   claude-fable-5-1              gpt-6.1-sol      grok-4.7-high
 
 Each dispatch is recorded to ``logs/smart_dispatch.jsonl`` for usage
 auditing. The FULL response body is also persisted to
@@ -75,6 +75,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -82,6 +83,8 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -169,24 +172,21 @@ class TaskClassConfig:
     default_timeout_s: int
     description: str
     codex_search: bool = False  # opt-in per class
-    # Codex reasoning effort. High is the default for Sol, Luna, and Astra.
+    # Headless Codex task classes default to high; native roles may differ.
     # Luna max is only for an unusually hard scout; do not set it here.
     codex_reasoning_effort: str = "high"
     grok_reasoning_effort: str | None = None  # native grok --reasoning-effort
 
 
-# Model slugs below are LIVE defaults as of 2026-09-22. Re-probe before trusting
+# Model slugs below implement routing defaults. Re-probe before trusting
 # memory. Override per call with `--model`.
 # Claude catalog: review default = claude-opus-5-5 (Opus 5.5);
 # architect/advisor = claude-fable-5-1 (Fable 5.1);
 # edit/draft = claude-sonnet-5 (Sonnet 5); search = claude-haiku-4-5-20251001.
-# Codex (probed 2026-09-22, `codex debug models`): gpt-6-sol @ high is the
-# orchestrator, advanced-work seat, and formal reviewer (draft + review).
-# gpt-6-luna @ high scouts and does bounded repeatable work (search + edit);
-# it is not a reviewer. gpt-6-astra @ high stays advisory (architect).
-# gpt-5.6-sol, gpt-5.6-terra, and gpt-5.6-luna are fallback only.
-# Luna is about 20x cheaper than Sol ($0.10/$0.50 vs $2/$10 per million).
-# Do not treat Luna max as a match for Sol low. Default scout effort is high.
+# Codex operator policy: Terra 6.1 handles coding/writing (edit + draft),
+# Sol 6.1 handles hard problems/review (architect + review), and GPT-6 Luna
+# remains the read-only scout. Re-probe `codex debug models` before dispatch;
+# unavailable models are not permission to substitute Astra or Fable.
 # Cursor is grok-4.7-high except search, which is composer-2.5.
 # Native grok search stays grok-4.7 with --reasoning-effort low.
 # DeepSeek V4.1 Flash is deepseek-flash (first-party). OpenCode and Qwen are
@@ -212,7 +212,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6-luna",
+            "codex": "gpt-6.1-terra",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -227,7 +227,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6-sol",
+            "codex": "gpt-6.1-terra",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -242,7 +242,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-opus-5-5",
-            "codex": "gpt-6-sol",
+            "codex": "gpt-6.1-sol",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -257,7 +257,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-fable-5-1",
-            "codex": "gpt-6-astra",
+            "codex": "gpt-6.1-sol",
             "deepseek": "deepseek-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -913,6 +913,7 @@ def fire(
                     session_id = None
                     stderr_excerpt = f"{type(exc).__name__}: {exc}"
     except Exception as exc:  # surface the failure but still log it
+        logger.exception("Agent dispatch failed")
         ok = False
         response = ""
         session_id = None
@@ -1179,13 +1180,12 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    if mode == "danger" and not args.worktree and not args.dry_run:
-        # agy carve-out: agy under danger mode only suppresses interactive
-        # permission prompts (--dangerously-skip-permissions); it does not
-        # write files. Review-class agy dispatches don't need a worktree.
-        # codex review/search carve-out: read-only task classes; no worktree.
-        if args.agent != "agy" and not codex_readonly_class:
-            p.error("--mode danger requires --worktree (no override)")
+    # agy and Codex read-only task classes have existing no-worktree carve-outs.
+    if (
+        mode == "danger" and not args.worktree and not args.dry_run
+        and args.agent != "agy" and not codex_readonly_class
+    ):
+        p.error("--mode danger requires --worktree (no override)")
 
     worktree: Path | None = None
     if args.worktree:

@@ -7,3 +7,7 @@ ENABLE_PROMPT_CACHING_1H = "1"
 [features.multi_agent_v2]
 enabled = true
 tool_namespace = "agents"
+
+[agents]
+default_subagent_model = "gpt-6.1-terra"
+default_subagent_reasoning_effort = "low"

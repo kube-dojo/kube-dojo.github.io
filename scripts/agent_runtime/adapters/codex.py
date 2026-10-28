@@ -124,7 +124,7 @@ class CodexAdapter:
     """Adapter for ``codex exec`` (OpenAI ChatGPT Codex CLI)."""
 
     name: str = "codex"
-    default_model: str = "gpt-6-sol"
+    default_model: str = os.environ.get("AB_CODEX_MODEL", "gpt-6.1-terra")
     supported_modes: frozenset[str] = frozenset({"danger"})
 
     def build_invocation(
