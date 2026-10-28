@@ -107,10 +107,11 @@ describe('Content Enhancer — Meta Chips', () => {
   });
 
   it('handles Markdown soft breaks without replacing prerequisite links', () => {
-    const root = createContent('<blockquote><p><strong>Complexity:</strong> <code>[MEDIUM]</code>\n<strong>Time:</strong> 30 min\nPrerequisite: <a href="/git/">Git</a></p></blockquote>');
+    const root = createContent('<blockquote><p><strong>Complexity:</strong> <code>[MEDIUM]</code> - Bridge module\n<strong>Time:</strong> 30 min\nPrerequisite: <a href="/git/">Git</a></p></blockquote>');
     const link = root.querySelector('a'); enhanceMetaChips(root);
     expect(root.querySelectorAll('.kd-chip')).toHaveLength(2);
     expect(root.querySelector('a')).toBe(link);
+    expect(root.querySelector('blockquote')?.textContent).toContain('[MEDIUM] - Bridge module');
   });
 
   it('preserves separate prerequisite and next-module paragraphs and links', () => {
@@ -142,9 +143,10 @@ describe('Content Enhancer — Meta Chips', () => {
   });
 
   it('preserves unknown pipe fields and removes metadata-only quotes', () => {
-    const root = createContent('<blockquote>Toolkit | Complexity: [MEDIUM] | Time: 45 min | <a href="/more/">More</a></blockquote>');
+    const root = createContent('<blockquote>Toolkit <a href="/more/">More</a> | Complexity: [MEDIUM] | Time: 45 min</blockquote>');
     enhanceMetaChips(root);
     expect(root.querySelector('blockquote')?.textContent).toContain('Toolkit');
+    expect(root.querySelector('blockquote')?.textContent).not.toContain('|');
     expect(root.querySelector('a')?.getAttribute('href')).toBe('/more/');
     const only = createContent('<blockquote><p>Complexity: [QUICK]</p><p>Time: 15 min</p></blockquote>');
     enhanceMetaChips(only);
