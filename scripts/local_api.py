@@ -7473,7 +7473,8 @@ def render_quality_board_page_html() -> str:
 
   <section class=\"panel qb-wrap\" style=\"margin-bottom:18px;overflow-wrap:anywhere\" aria-label=\"Canonical coverage\">
     <h2>Canonical page coverage</h2>
-    <p id=\"cc-summary\" role=\"status\">Loading canonical coverage&hellip;</p><p id=\"cc-note\"></p>
+    <p id=\"cc-summary\" role=\"status\">Loading canonical coverage&hellip;</p><div id=\"cc-tracks\"></div>
+    <details><summary>Coverage definitions</summary><p>Accepted: current acceptance recorded. Current unaccepted: current review without acceptance or revision. Revision: current review requests revision or expansion. Stale: receipt does not match the page. Invalid: invalid receipt. Missing: no current review excluding stale and invalid.</p><p id=\"cc-note\"></p></details>
     <div class=\"qb-tools\">
       <input class=\"qb-input\" id=\"cc-search\" type=\"search\" aria-label=\"Search page paths\" placeholder=\"Search page paths\">
       <select class=\"qb-select\" id=\"cc-locale\" aria-label=\"Locale\"><option value=\"\">All locales</option><option value=\"en\">EN</option><option value=\"uk\">UK (parked)</option></select>
@@ -7481,7 +7482,7 @@ def render_quality_board_page_html() -> str:
     </div>
     <p id=\"cc-count\"></p><div id=\"cc-rows\" style=\"max-height:600px;overflow:auto\"></div>
   </section>
-  <div class=\"panel\">
+  <details class=\"panel\"><summary>Legacy pipeline progress (secondary)</summary>
     <div class=\"panel-header\">
       <div class=\"panel-title\">
         <span class=\"panel-icon\" style=\"background:var(--accent-muted);color:var(--accent);\">Q</span>
@@ -7489,11 +7490,12 @@ def render_quality_board_page_html() -> str:
       <span class=\"panel-badge\" id=\"qb-badge\" style=\"background:var(--accent-muted);color:var(--accent);\">&nbsp;</span>
     </div>
     <div class=\"panel-body-flush\" id=\"quality-board\"><div class=\"empty-state\">Loading&hellip;</div></div>
-  </div>
+  </details>
 </main>
 <script>
 {_QUALITY_BOARD_PAGE_JS}
 </script>
+<script src=\"/static/content-coverage.js\"></script>
 <script src=\"/static/quality-coverage.js\"></script>
 {_render_poll_stale_script()}
 </body>
@@ -8058,8 +8060,8 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
   <main class="main">
     <div class="summary-grid">
       <section class="summary-shell">
-        <div class="summary-head">English review coverage <span class="panel-badge" id="coverage-badge">Unknown</span></div>
-        <a class="quality-summary-card" href="/api/content/coverage"><span><span id="coverage-counts">Waiting for evidence</span><br><span id="coverage-milestone">Prerequisites + Linux</span></span></a>
+        <div class="summary-head">English acceptance <span class="panel-badge" id="coverage-badge">Unknown</span></div>
+        <a class="quality-summary-card" href="/quality"><span><span id="coverage-counts">Waiting for evidence</span><br><progress id="coverage-progress" aria-label="English acceptance" style="accent-color:#4ade80" hidden></progress><br><span id="coverage-milestone">No acceptance inferred</span></span></a>
       </section>
 
       <section class="summary-shell">
@@ -8068,8 +8070,8 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
       </section>
 
       <section class="summary-shell">
-        <div class="summary-head"><div class="summary-title"><span class="summary-icon" style="background:var(--accent-muted);color:var(--accent);">Q</span>Quality</div><span class="panel-badge" id="quality-summary-badge">&nbsp;</span></div>
-        <a class="quality-summary-card" href="/quality"><span><span class="quality-summary-title">Legacy pipeline labels, not full-page acceptance</span><span class="quality-summary-counts" id="quality-summary-counts">Loading&hellip;</span></span><span class="quality-summary-link">View board &rarr;</span></a>
+        <div class="summary-head"><div class="summary-title"><span class="summary-icon" style="background:var(--accent-muted);color:var(--accent);">Q</span>Quality</div><span class="panel-badge" id="quality-summary-badge">Unknown</span></div>
+        <a class="quality-summary-card" href="/quality"><span><span class="quality-summary-title">Canonical page acceptance</span><span class="quality-summary-counts" id="quality-summary-counts">Loading&hellip;</span></span><span class="quality-summary-link">View board &rarr;</span></a>
       </section>
 
       <section class="summary-shell">
@@ -8161,18 +8163,22 @@ def render_dashboard_html(repo_root: Path = REPO_ROOT, *, issue_number: int = DE
       b.textContent = attention ? `${{attention}} needs attention` : 'Healthy'; tone(b, attention ? 'amber' : 'green');
     }}
 
+    let refreshVersion = 0;
     async function refresh() {{
+      const version = ++refreshVersion;
       const btn = $('#refresh'); btn.classList.add('loading');
+      renderCoverage(null);
       try {{
-        const [missing, pipelineStatus, briefing, qualityBoard, activitySummary] = await Promise.all([
-          fetchJson('/api/missing-modules/status'), fetchJson('/api/pipeline/v2/status'), fetchJson('/api/briefing/session?compact=1'), fetchJson('/api/quality/board'), fetchJson('/api/activity?limit=3')
+        const [missing, pipelineStatus, briefing, activitySummary] = await Promise.all([
+          fetchJson('/api/missing-modules/status'), fetchJson('/api/pipeline/v2/status'), fetchJson('/api/briefing/session?compact=1'), fetchJson('/api/activity?limit=3')
         ]);
-        renderCoverage(briefing); renderOperator(briefing); renderQuality(qualityBoard); renderPipeline(pipelineStatus); renderActivity(activitySummary); renderHealth(briefing, missing);
+        if (version !== refreshVersion) return;
+        renderCoverage(briefing); renderOperator(briefing); renderPipeline(pipelineStatus); renderActivity(activitySummary); renderHealth(briefing, missing);
         setPollTs($('#last-updated'), briefing);
         $('#last-updated').textContent = `Updated ${{new Date().toLocaleTimeString()}}`;
         const pill = $('#conn-status'); pill.innerHTML = '<span class="dot"></span> Connected'; tone(pill, 'green');
-      }} catch (err) {{ const pill = $('#conn-status'); pill.innerHTML = '<span class="dot"></span> Error'; tone(pill, 'red'); console.error('Dashboard refresh failed:', err); }}
-      finally {{ btn.classList.remove('loading'); }}
+      }} catch (err) {{ if (version !== refreshVersion) return; renderCoverage(null); const pill = $('#conn-status'); pill.innerHTML = '<span class="dot"></span> Error'; tone(pill, 'red'); console.error('Dashboard refresh failed:', err); }}
+      finally {{ if (version === refreshVersion) btn.classList.remove('loading'); }}
     }}
     $('#refresh').addEventListener('click', refresh); refresh(); setInterval(refresh, 60000);
   </script>
