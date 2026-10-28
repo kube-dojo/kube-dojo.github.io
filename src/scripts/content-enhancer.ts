@@ -65,8 +65,8 @@ export function enhanceMetaChips(root: Element): void {
       let complexity: string | null = null;
       let time: string | null = null;
       const removals = new Set<Node>();
-      const containers = [...quote.children].every((el) => el.tagName === 'P')
-        && quote.children.length ? [...quote.children] : [quote];
+      const paragraphs = [...quote.children].filter((el) => el.tagName === 'P');
+      const containers = paragraphs.length ? paragraphs : [quote];
       for (const container of containers) {
         // Split only direct text separators; leave inline elements and links intact.
         for (const node of [...container.childNodes]) {

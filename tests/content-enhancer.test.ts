@@ -95,6 +95,17 @@ describe('Content Enhancer — Meta Chips', () => {
     expect(root.querySelector('blockquote')?.textContent).toContain('Prerequisites');
   });
 
+  it('preserves prerequisite list and link nodes beside metadata paragraphs', () => {
+    const root = createContent('<blockquote><p>Complexity: [MEDIUM]</p><p>Time: 30 min</p><ul><li><a href="/git/">Git prerequisite</a></li></ul></blockquote>');
+    const list = root.querySelector('ul');
+    const link = root.querySelector('a');
+    enhanceMetaChips(root);
+    expect(root.querySelectorAll('.kd-chip')).toHaveLength(2);
+    expect(root.querySelector('ul')).toBe(list);
+    expect(root.querySelector('a')).toBe(link);
+    expect(link?.getAttribute('href')).toBe('/git/');
+  });
+
   it('preserves separate prerequisite and next-module paragraphs and links', () => {
     const root = createContent('<blockquote><p><strong>Complexity</strong>: <code>[MEDIUM]</code></p><p><strong>Time to Complete</strong>: 45 min</p><p><strong>Prerequisites</strong>: <a href="/git/">Git</a></p><p>Next: <a href="/next/">Next module</a></p></blockquote>');
     const links = [...root.querySelectorAll('a')];
