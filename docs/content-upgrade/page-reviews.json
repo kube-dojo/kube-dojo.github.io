@@ -371,6 +371,25 @@
         "lab_execution": "unknown",
         "deployed_smoke": "pending"
       }
+    },
+    {
+      "path": "prerequisites/git-deep-dive/module-2-advanced-merging.md",
+      "page_digest": "sha256:ae4d9e37b810faf7a8c19685396b58b16697561166e41515034efe82da5c4d8d",
+      "disposition": "revise",
+      "reviewer_refs": [
+        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md"
+      ],
+      "evidence_refs": [
+        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md"
+      ],
+      "independent_statuses": {
+        "page_presence": "pass",
+        "structural_checks": "pass",
+        "technical_source": "unknown",
+        "editorial_review": "pending",
+        "lab_execution": "unknown",
+        "deployed_smoke": "pending"
+      }
     }
   ]
 }

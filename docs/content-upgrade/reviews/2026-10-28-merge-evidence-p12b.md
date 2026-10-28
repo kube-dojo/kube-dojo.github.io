@@ -1,0 +1,7 @@
+# T01-P12b: interpret merge bases, strategy versions and diff evidence
+
+Owner #2278; source/editorial #2275 and assessment #2277. This scoped packet remains **revise**. It distinguishes an unspecified single `git merge-base` result from all best bases and `ort`'s merged reference tree. Strategy names are versioned: current single-head/multiple-head defaults, histogram default and `recursive`'s synonym status since2.50 replace unsupported universal performance rankings.
+
+Default dense-combined output does not isolate only human conflict resolutions. Teaching, the matching outcome, pattern, quiz and exercise now use parent comparisons and two-parent remerge evidence with its reconstruction/output limits. No diff is presented as a transcript of human actions. Three actual official Git captures with raw/text hashes are preserved under `.agent/session227/merge-evidence/sources/manifest.json`: git-show, git-merge-base and git-merge.
+
+All43fenced bodies remain unchanged; no lesson merge, conflict resolution, recovery or schema-validation command was executed. Structural verification and a scoped independent source review are separate from current-head CI and merged publication. Whole-page source/rubric/practical acceptance, branching/GitOps/schema-validation/time-metadata residuals and the section hub remain outstanding. The five accepted English pages and all37prior ledger rows are preserved; Ukrainian fidelity and measured learning are not asserted.
