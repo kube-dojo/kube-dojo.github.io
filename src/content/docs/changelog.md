@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Read a merge diff with its limits in mind.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) now distinguishes merge-base candidates from the strategy's reference tree and explains what combined and remerge views can establish.
 - **Check what Git can still recover.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now distinguishes configurable reflog expiration from object lifetime and explains repository layouts and tag references without assuming loose files.
 - **Audit a claim before choosing a platform.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now works through lifecycle, capability and missing evidence, with hints for comparing retention and migration against actual requirements.
 - **Separate image builds from runtime integration.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now distinguishes removed built-in dockershim from external adapters and asks you to verify compatibility, with a clearer single-host recovery boundary.
