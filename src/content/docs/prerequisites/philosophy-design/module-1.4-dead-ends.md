@@ -155,7 +155,7 @@ When someone says "Kubernetes removed Docker, so we must rewrite every Dockerfil
 
 For a migration review, inventory the node's existing runtime integration and the CRI API supported by the proposed replacement. The FAQ identifies logging configuration, monitoring and any scripts or workloads that depend on the Docker Engine API as areas to examine. Record which checks your environment needs and the results when they are actually run; a documentation comparison alone is not a runtime compatibility test. If keeping Docker Engine, check the external adapter's compatibility and operational support for the chosen versions as part of that plan.
 
-Here is the operator-facing habit this module expects in later Kubernetes labs. Use explicit `kubectl` commands in shared notes, runbooks, and copy-paste examples so the command still works in non-interactive shells and on a teammate's machine. Many engineers use shorter personal shell conveniences interactively, but production documentation should show the full binary because clarity beats keystroke savings when someone is debugging under pressure.
+Here is the operator-facing habit this module expects in later Kubernetes labs. Use explicit `kubectl` commands in shared notes, runbooks, and copy-paste examples to avoid depending on personal shell aliases. Record the required context, permissions and versions separately; writing the binary's full name alone does not establish that a command will succeed in another environment.
 
 ```bash
 kubectl get nodes
@@ -521,6 +521,9 @@ Failure layer: the startup demonstration did not test host failure or recovery. 
 - [Kubernetes 1.35: Components](https://v1-35.docs.kubernetes.io/docs/concepts/overview/components/)
 - [Kubernetes 1.35: Server-Side Apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)
 - [Kubernetes 1.35: Controllers](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
+- [Puppet: agent and catalog architecture](https://help.puppet.com/core/current/Content/PuppetCore/architecture.htm)
+- [Kubernetes 1.35: RBAC authorization](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/rbac/)
+- [Kubernetes 1.35: NetworkPolicy](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/network-policies/)
 
 ## Next Module
 
