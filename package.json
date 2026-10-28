@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "NODE_DISABLE_COMPILE_CACHE=1 astro build",
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",
