@@ -55,7 +55,7 @@ Stay inside this child for **all** practice steps. Paste the complete grouped se
   git --version
   practice_dir=my-git-repo
   mkdir "$practice_dir"
-  cd "$practice_dir"
+  cd "./$practice_dir"
   git init -b main --ref-format=files --object-format=sha1
   test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"
   test "$(git rev-parse --absolute-git-dir)" = "$(pwd -P)/.git"
