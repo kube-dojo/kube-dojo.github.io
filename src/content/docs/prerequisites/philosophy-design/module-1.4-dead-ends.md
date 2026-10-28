@@ -20,7 +20,7 @@ After this module, you will be able to:
 
 - **Evaluate** container orchestration technologies using governance, ecosystem, cloud-provider support, and adoption signals.
 - **Diagnose** the difference between formal project retirement and a deployment model that does not meet a workload's requirements.
-- **Compare** Docker as an image-building workflow with Docker as a Kubernetes runtime removed after dockershim.
+- **Compare** Docker image-building workflows with Kubernetes runtime integrations before and after built-in dockershim removal.
 - **Design** a modernization plan that justifies which tools to retain or replace against documented capabilities and operating requirements.
 
 ## Why This Module Matters
@@ -112,52 +112,48 @@ Do not learn BOSH, Diego, Mesos architecture, Marathon configuration, or Swarm s
 
 ## Separate Docker Images From the Kubernetes Runtime
 
-The Docker story causes more confusion than any other dead end because people use the word Docker to mean several different things. Docker can mean Dockerfiles, the Docker CLI, Docker Desktop, the Docker Engine, the Docker image format, Docker Hub, or Docker as the node-level runtime behind Kubernetes. Kubernetes removed only the dockershim path that let kubelet talk to Docker Engine as a runtime. It did not remove OCI container images, Dockerfiles, local image builds, or the everyday developer workflow of packaging software into containers.
+Docker can mean Dockerfiles, the Docker CLI, Docker Desktop, Docker Engine, image builds, or Docker Hub. Separate the build workflow from the node runtime integration: Kubernetes 1.24 removed the built-in dockershim that connected kubelet to Docker Engine. That removal did not remove Dockerfiles or image builds, and an external CRI adapter can still connect kubelet to Docker Engine. The precise impact depends on the runtime, build process and workloads in the environment being upgraded.
 
-**What it was**: The original container runtime for Kubernetes.
+**What it was**: Dockershim was the built-in integration between kubelet and Docker Engine.
 
-**Status**: Removed from Kubernetes in version 1.24 (May 2022).
+**Status**: Kubernetes removed built-in dockershim in version 1.24; `cri-dockerd` is an external adapter for Docker Engine.
 
-**Pause and predict:** if Docker was the first major container runtime, why did the Kubernetes community build the CRI, the Container Runtime Interface, instead of hardcoding Docker support forever?
+**Pause and predict:** what does a container runtime interface let kubelet do when a cluster uses a different runtime?
 
 <details>
 <summary>Check your prediction</summary>
 
-A stable interface lets Kubernetes talk to runtimes such as containerd and CRI-O without treating one full developer platform as special. That interface reduced coupling, removed an unnecessary layer, and let node operators use leaner runtimes designed for orchestration rather than desktop convenience.
+CRI defines a communication interface between kubelet and a container runtime. The [2016 Kubernetes 1.5 announcement](https://kubernetes.io/blog/2016/12/container-runtime-interface-cri-in-kubernetes/) described an alpha plugin interface intended to let kubelet use different runtimes without recompilation. For current version requirements, consult the corresponding versioned documentation rather than treating the 2016 announcement as current setup guidance.
 
 </details>
 
-Write why the interface exists before you continue. The next figure is a timeline, and the paragraph after it is about Dockerfiles. Neither one explains why the interface was built.
+Write the interface's role before you continue. The timeline identifies two documented milestones; it does not predict which runtime a particular cluster uses.
 
 ```mermaid
 timeline
-    title Docker as Kubernetes Runtime Timeline
-    2014-2016 : Docker is THE way to run containers in K8s
-    2016 : CRI (Container Runtime Interface) introduced
-    2017 : containerd becomes CNCF project
-    2020 : K8s announces dockershim deprecation
-    2022 : K8s 1.24 removes dockershim completely
+    title Selected CRI and Dockershim Milestones
+    2016 : CRI introduced as alpha in Kubernetes 1.5
+    2022 : Kubernetes 1.24 removes built-in dockershim
 ```
 
-The dockershim removal is a perfect example of evaluating a usage pattern instead of condemning a whole tool. Docker as an image-building workflow is still worth knowing because developers need repeatable image builds, local test loops, and clear Dockerfiles. Docker as the Kubernetes runtime is the obsolete part because kubelet can now talk directly to containerd or CRI-O through CRI. The old path asked Kubernetes to call Docker Engine, which then called containerd, which then created containers. The modern path removes the middle layer.
+The [Kubernetes 1.35 runtime documentation](https://v1-35.docs.kubernetes.io/docs/setup/production-environment/container-runtimes/) requires a CRI-conformant runtime and documents containerd and CRI-O among its examples. The [CRI reference](https://v1-35.docs.kubernetes.io/docs/concepts/containers/cri/) states that kubelet requires the v1 CRI API for Kubernetes 1.26 and later. Docker Engine does not implement CRI itself, but the [dockershim FAQ](https://kubernetes.io/blog/2022/02/17/dockershim-faq/) describes the external `cri-dockerd` adapter connecting kubelet to it. Check the intended version and integration rather than assuming a closed list of runtimes.
+
+The following is a schematic of selected paths, not a complete inventory or an observed cluster. Before removal, the built-in dockershim connected kubelet to Docker Engine. After removal, a CRI-compatible runtime such as containerd is one option; Docker Engine with the external adapter is another. The diagram does not describe every internal component or establish which path an exam or workplace uses.
 
 ```mermaid
 flowchart LR
-    subgraph Before ["Before K8s 1.24 (Unnecessary layer)"]
-        direction LR
-        K1[Kubernetes] --> D[Docker]
-        D --> C1[containerd]
-        C1 --> W1[Container]
+    subgraph Before ["Selected path before 1.24"]
+        K1[kubelet] --> S[Built-in dockershim] --> D1[Docker Engine]
     end
-    
-    subgraph After ["After K8s 1.24 (Direct, efficient)"]
-        direction LR
-        K2[Kubernetes] --> C2[containerd]
-        C2 --> W2[Container]
+    subgraph After ["Selected paths after 1.24"]
+        K2[kubelet] -->|CRI| C[containerd]
+        K2 -->|CRI| A[External cri-dockerd] --> D2[Docker Engine]
     end
 ```
 
-When a junior engineer says "Kubernetes removed Docker, so we must rewrite every Dockerfile," your response should be calm and precise. Kubernetes runs OCI images. Docker builds OCI-compatible images. The node runtime changed; the image contract did not. In a Kubernetes 1.35 cluster, you should expect containerd or CRI-O underneath kubelet, but your build pipeline may still run `docker build`, BuildKit, Buildah, Kaniko, or another image builder depending on your security and platform constraints.
+When someone says "Kubernetes removed Docker, so we must rewrite every Dockerfile," distinguish image building from kubelet's runtime connection. The FAQ explains that images built with Docker remain usable with other runtimes; removal of the built-in shim alone does not require rewriting Dockerfiles. Still check the actual images, workload dependencies and target runtime when planning a migration rather than promising that every workload will behave identically. A build pipeline and node runtime can be evaluated separately.
+
+For a migration review, inventory the node's existing runtime integration and the CRI API supported by the proposed replacement. The FAQ identifies logging configuration, monitoring and any scripts or workloads that depend on the Docker Engine API as areas to examine. Record which checks your environment needs and the results when they are actually run; a documentation comparison alone is not a runtime compatibility test. If keeping Docker Engine, check the external adapter's compatibility and operational support for the chosen versions as part of that plan.
 
 Here is the operator-facing habit this module expects in later Kubernetes labs. Use explicit `kubectl` commands in shared notes, runbooks, and copy-paste examples so the command still works in non-interactive shells and on a teammate's machine. Many engineers use shorter personal shell conveniences interactively, but production documentation should show the full binary because clarity beats keystroke savings when someone is debugging under pressure.
 
@@ -166,7 +162,7 @@ kubectl get nodes
 kubectl get pods --all-namespaces
 ```
 
-The deeper lesson is that technology evaluation requires vocabulary hygiene. "Docker is dead" is false. "Docker Engine as the Kubernetes runtime path is gone after dockershim" is true. "Docker Compose is bad" is false. "Docker Compose is insufficient as a single-node production orchestrator for a multi-service system that needs self-healing and failover" is true. Precise language prevents teams from overcorrecting and throwing away useful tools while still avoiding obsolete platform bets.
+Use precise boundaries: built-in dockershim was removed, while an external adapter can connect Docker Engine to kubelet. Docker documents Compose production use, including a single-server deployment. That deployment alone does not provide cross-host failover when its host is lost; assess any restart behavior and additional recovery mechanisms in the actual configuration rather than assuming no process can be restarted.
 
 ## Define Configuration and Workload Ownership
 
@@ -248,7 +244,7 @@ Keep project lifecycle, capability and decision criteria separate. Apache's Meso
 | Category | Current/Relevant |
 |----------|-----------------|
 | Orchestration | Kubernetes |
-| Runtime | containerd, CRI-O |
+| Runtime | CRI-conformant options, including containerd and CRI-O; Docker Engine through an external adapter |
 | Images | Docker/Buildah for building |
 | Config | Helm, Kustomize, native YAML |
 | GitOps | ArgoCD, Flux |
@@ -256,7 +252,7 @@ Keep project lifecycle, capability and decision criteria separate. Apache's Meso
 | Monitoring | Prometheus, Grafana |
 | Logging | Fluentd, Loki |
 
-The table is intentionally not a shopping list to memorize. It is a map of where ecosystem energy currently lives. A platform team designing for Kubernetes 1.35 should expect Kubernetes for orchestration, containerd or CRI-O for runtime, OCI images built by Docker or Buildah-family tools, Helm or Kustomize for packaging and overlays, GitOps for continuous reconciliation, and Prometheus-style observability. The exact product can vary, but the direction of travel should not surprise anyone interviewing for modern infrastructure roles.
+The table is a set of examples, not a required product stack. For Kubernetes 1.35, check CRI conformance and the CRI API requirement for the chosen runtime integration. Select image-building, configuration, delivery and observability tools against the team's actual operating needs, support and compatibility evidence.
 
 ```mermaid
 flowchart LR
@@ -349,7 +345,7 @@ For a working team, the decision framework should end in one of four actions. Ad
 ## Did You Know?
 
 - **Mesos powered major production systems** at companies such as Twitter and Airbnb before Kubernetes became the common target for new container platforms.
-- **Docker Engine was not the container image format** removed from Kubernetes; Kubernetes 1.24 removed dockershim, while OCI images and Dockerfiles remained usable.
+- **Kubernetes 1.24 removed built-in dockershim**, not Dockerfiles or image building. The external `cri-dockerd` adapter provides a separate path to Docker Engine; check the chosen versions and workload compatibility.
 - **Kubernetes moved fast because multiple competitors could still cooperate** through CNCF governance, which made it easier for clouds and vendors to support the same API surface.
 - **Ansible can manage Kubernetes API objects** using definitions supplied to its `kubernetes.core.k8s` module. Check the intended task and ownership rather than treating all configuration management as a competing controller.
 
@@ -363,7 +359,7 @@ For a working team, the decision framework should end in one of four actions. Ad
 | **Ignoring managed Kubernetes services** | Teams confuse learning value with production ownership and try to operate control planes too early. | Use EKS, GKE, AKS, or another managed service unless you have a dedicated platform team. |
 | **Translating Compose to Kubernetes one-to-one** | Conversion tools make syntax migration look equivalent to architecture migration. | Design Kubernetes manifests intentionally with probes, resources, RBAC, configuration boundaries, and rollout strategy. |
 | **Chasing abandoned or isolated projects** | Hype, old case studies, or impressive demos hide weak maintenance and governance signals. | Check foundation status, release cadence, maintainer diversity, cloud-provider support, and issue health before adopting. |
-| **Assuming Docker is dead** | Dockershim removal is confused with removal of Dockerfiles and OCI images. | Continue learning image builds; only Docker Engine as the Kubernetes runtime path is obsolete. |
+| **Assuming Kubernetes removed all Docker use** | Built-in dockershim removal is confused with removal of image builds or every Docker Engine integration. | Separate image building from the node runtime; inspect CRI compatibility and the external adapter option. |
 
 ## Quiz
 
@@ -382,7 +378,7 @@ Legacy work can be rational when the pay and scope are explicit, but Mesos and M
 <details>
 <summary>3. During a Kubernetes 1.35 upgrade, a junior engineer says all Dockerfiles must be rewritten because Kubernetes removed Docker. What do you explain?</summary>
 
-You should compare Docker as an image-building workflow with Docker as a Kubernetes runtime. Kubernetes removed dockershim in 1.24, which ended the special path where kubelet used Docker Engine as the node runtime, but OCI images built from Dockerfiles still run through containerd or CRI-O. The build pipeline may remain unchanged while the node runtime changes, so the migration plan should focus on runtime compatibility and operational testing rather than rewriting application images unnecessarily.
+Kubernetes 1.24 removed the built-in dockershim integration, not Dockerfiles or image building. Docker Engine can still connect through the external `cri-dockerd` adapter; containerd and CRI-O are other documented runtime examples. The existing build pipeline may remain useful, but check the target CRI integration, image and workload dependencies, and operational behavior before concluding that any particular migration is compatible. Rewriting every Dockerfile does not follow from shim removal alone.
 </details>
 
 <details>
@@ -419,7 +415,7 @@ Start by writing a short risk memo with a source and applicability boundary for 
 
 - [ ] **Evaluate container orchestration technologies** by writing dated maintainer, capability and integration notes for Swarm versus Kubernetes.
 - [ ] **Distinguish project lifecycle from deployment fit** using Mesos's documented retirement, Engine swarm mode, Diego's documented architecture and Compose production guidance.
-- [ ] **Compare Docker image-building workflow with Kubernetes runtime dockershim removal** and state which Docker skills remain useful.
+- [ ] **Compare Docker image building with node runtime integration**: explain built-in dockershim removal, the external adapter option and the compatibility checks still needed.
 - [ ] **Design a modernization plan** that explains which components to retain or replace and what evidence supports each decision.
 - [ ] **Explain ownership and reconciliation** in one paragraph: distinguish host configuration, API-object changes, and controller-managed workload state.
 
@@ -463,7 +459,7 @@ Failure layer: the control surface, not a broken old path. Next action: name the
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: the node runtime was coupled to one developer platform. Next action: keep the image build, and expect containerd or CRI-O under kubelet. Do not rewrite Dockerfiles for this reason.
+The built-in dockershim was removed, but that fact alone does not require rewriting Dockerfiles. Identify the actual node runtime and CRI integration, including whether an external adapter is used, then check the target images and workload dependencies. Treat compatibility as a result to verify rather than an assumption.
 
 </details>
 
@@ -489,9 +485,11 @@ Failure layer: the startup demonstration did not test host failure or recovery. 
 - [Apache Attic: Mesos formal retirement and move dates](https://attic.apache.org/projects/mesos.html)
 - [Cloud Foundry: Diego components and architecture](https://docs.cloudfoundry.org/concepts/diego/diego-architecture.html)
 - [Docker: Use Compose in production](https://docs.docker.com/compose/how-tos/production/)
-- [Kubernetes Dockershim Removal FAQ](https://kubernetes.io/blog/2020/12/02/dockershim-faq/)
+- [Kubernetes Dockershim Removal FAQ, updated 2022](https://kubernetes.io/blog/2022/02/17/dockershim-faq/)
 - [Kubernetes Dockershim Historical Context](https://kubernetes.io/blog/2022/05/03/dockershim-historical-context/)
-- [Kubernetes Container Runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/)
+- [Kubernetes 1.35 Container Runtimes](https://v1-35.docs.kubernetes.io/docs/setup/production-environment/container-runtimes/)
+- [Kubernetes 1.35 Container Runtime Interface](https://v1-35.docs.kubernetes.io/docs/concepts/containers/cri/)
+- [Kubernetes 1.5: Introducing CRI](https://kubernetes.io/blog/2016/12/container-runtime-interface-cri-in-kubernetes/)
 - [Kubernetes RuntimeClass](https://kubernetes.io/docs/concepts/containers/runtime-class/)
 - [Docker Swarm Mode Documentation](https://docs.docker.com/engine/swarm/)
 - [Apache Mesos Project](https://mesos.apache.org/)
