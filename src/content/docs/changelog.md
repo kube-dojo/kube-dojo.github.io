@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Choose a Git workflow for your release needs.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) now compares branching tradeoffs and asks you to check which revision Argo CD tracks before expecting a deployment.
 - **Read a merge diff with its limits in mind.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) now distinguishes merge-base candidates from the strategy's reference tree and explains what combined and remerge views can establish.
 - **Check what Git can still recover.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now distinguishes configurable reflog expiration from object lifetime and explains repository layouts and tag references without assuming loose files.
 - **Audit a claim before choosing a platform.** [Dead Ends](/prerequisites/philosophy-design/module-1.4-dead-ends/) now works through lifecycle, capability and missing evidence, with hints for comparing retention and migration against actual requirements.

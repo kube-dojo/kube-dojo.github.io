@@ -374,13 +374,13 @@
     },
     {
       "path": "prerequisites/git-deep-dive/module-2-advanced-merging.md",
-      "page_digest": "sha256:6b47688c63b8990b3b9315b5ea6997988ec098f1963b384950581e73161a01dd",
+      "page_digest": "sha256:5b20f40f770b1b9ee6cc1388a87ad90217797a20a8332fd07dca3aced0f0374e",
       "disposition": "revise",
       "reviewer_refs": [
-        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-render-p12c.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-summary-p12d.md"
+        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-render-p12c.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-summary-p12d.md", "docs/content-upgrade/reviews/2026-10-28-git-workflow-boundaries-p12e.md"
       ],
       "evidence_refs": [
-        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-render-p12c.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-summary-p12d.md"
+        "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-render-p12c.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-summary-p12d.md", "docs/content-upgrade/reviews/2026-10-28-git-workflow-boundaries-p12e.md"
       ],
       "independent_statuses": {
         "page_presence": "pass",
