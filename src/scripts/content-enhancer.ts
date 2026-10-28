@@ -88,7 +88,7 @@ export function enhanceMetaChips(root: Element): void {
           if (segment.some((node) => node instanceof Element &&
             (node.matches(':not(strong):not(em):not(code)') || node.querySelector(':not(strong):not(em):not(code)')))) return;
           const text = segment.map((node) => node.textContent || '').join('').trim();
-          const c = text.match(/^Complexity:\s*\[?(QUICK|MEDIUM|COMPLEX|ADVANCED|EXPERT)\]?(?:\s*([-—–:].+))?$/i);
+          const c = text.match(/^Complexity:\s*\[?(QUICK|MEDIUM|COMPLEX|ADVANCED|EXPERT)\]?(.*)$/i);
           const t = text.match(/^Time(?:\s+to\s+Complete)?:\s*(.+)$/i);
           if (!c && !t) return;
           if (c) complexity = c[1];
