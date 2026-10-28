@@ -129,7 +129,7 @@ const refresh = eval('(' + page.slice(start, end).trim() + ')');
   console.log(JSON.stringify({known,stale,unknown,race:nodes}));
 })();
 """
-    node = Path("/Users/krisztiankoos/projects/kubedojo/.agent/session228/runtime/node-v22.23.4-darwin-arm64/bin/node")
+    node = os.environ.get("KUBEDOJO_NODE") or "node"
     result = subprocess.run([str(node), "-e", script], capture_output=True, text=True, check=True,
                             env={**os.environ, "NODE_DISABLE_COMPILE_CACHE": "1"})
     states = json.loads(result.stdout)

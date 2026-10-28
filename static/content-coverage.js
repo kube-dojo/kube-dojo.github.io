@@ -7,7 +7,7 @@ function coveragePartition(v) {
   return parts.every(n => n >= 0) && parts.reduce((a, b) => a + b, 0) === v.total ? parts : null;
 }
 function coveragePercent(v) {
-  return v.total ? (100 * v.acceptance_recorded / v.total).toFixed(1) : '0.0';
+  return v.total ? Math.min(v.acceptance_recorded < v.total ? 99.9 : 100, 100 * v.acceptance_recorded / v.total).toFixed(1) : '0.0';
 }
 function renderCoverage(briefing) {
   const c = briefing?.content_coverage, en = c?.locales?.en, uk = c?.locales?.uk;
