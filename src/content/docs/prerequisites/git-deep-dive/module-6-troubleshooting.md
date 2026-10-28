@@ -758,7 +758,7 @@ This is one implementation of the evidence contract. The script stays outside th
 
 ```bash
 {
-bad_tip=$(git rev-parse HEAD)
+bad_tip=$(git rev-parse HEAD) || { echo "STOP: cannot read bad tip"; exit 1; }
 test_script="$lab_dir-test-port.sh"
 cat > "$test_script" <<'EOF'
 #!/usr/bin/env bash
@@ -773,13 +773,13 @@ EOF
 chmod +x "$test_script"
 
 # Preflight the same classifier against both anchors and an error fixture.
-anchor_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-anchor.XXXXXXXX")
+anchor_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-anchor.XXXXXXXX") || { echo "STOP: cannot create anchor directory"; exit 1; }
 git show v1.0:deployment.yaml > "$anchor_dir/deployment.yaml" || { echo "STOP: missing good anchor"; exit 1; }
 (cd "$anchor_dir" && "$test_script") || { echo "STOP: good anchor did not pass"; exit 1; }
 if "$test_script"; then echo "STOP: unexpected good tip"; exit 1; else
   test "$?" -eq 1 || { echo "STOP: bad tip untestable"; exit 1; }
 fi
-error_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-error.XXXXXXXX")
+error_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-error.XXXXXXXX") || { echo "STOP: cannot create error directory"; exit 1; }
 if (cd "$error_dir" && "$test_script"); then echo "STOP: unexpected match"; exit 1; else
   test "$?" -eq 125 || { echo "STOP: missing file was not skipped"; exit 1; }
 fi
@@ -799,7 +799,7 @@ if (cd "$anchor_dir" && "$test_script"); then echo "STOP: unexpected good candid
 fi
 git show "$candidate^:deployment.yaml" > "$anchor_dir/deployment.yaml" || { echo "STOP: missing parent"; exit 1; }
 (cd "$anchor_dir" && "$test_script") || { echo "STOP: parent did not pass"; exit 1; }
-git --no-pager show --stat --patch "$candidate"
+git --no-pager show --stat --patch "$candidate" || { echo "STOP: cannot inspect candidate patch"; exit 1; }
 
 git bisect reset || { echo "STOP: bisect reset failed"; exit 1; }
 test "$(git branch --show-current)" = "$original_branch" || { echo "STOP: wrong branch"; exit 1; }
