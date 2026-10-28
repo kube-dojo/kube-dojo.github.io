@@ -1,0 +1,7 @@
+# T01-P12a: bound reflog retention and physical repository layout
+
+Owner #2278; source/editorial #2275 and assessment #2277. This initial Git packet remains **revise**. It corrects the claim that pre-rebase commits have a default90-day recovery window: official Git docs distinguish90-day general entry expiration and30-day expiration for entries unreachable from the current tip, with configurable rules and no guaranteed object lifetime. Recovery depends on actual remaining evidence and cleanup history.
+
+The lesson now scopes the ordinary `.git` directory example to a default non-bare layout, distinguishes bare repositories and gitfiles/separate metadata, and describes lightweight tags as refs without creating tag objects. Physical storage need not be a loose file; `git show-ref` avoids assuming a backend. Nearby recovery language no longer guarantees that a missing ConfigMap or commit remains recoverable.
+
+Four actual official Git captures and raw/text hashes are preserved under `.agent/session227/git-state-boundaries/sources/manifest.json`: git-config, git-reflog, gitrepository-layout and git-show-ref. Source capture/reachability is not semantic approval. All23code fences remain unchanged; no lesson mutation, reflog expiration, pruning or recovery exercise was executed for this packet. Structural verification, exact-head independent review/CI and merged publication remain separate gates. Full-page claim coverage, rubric/practical acceptance, remaining Git lessons and T01-P12 remain outstanding; no Ukrainian fidelity or learner-effect claim is made.
