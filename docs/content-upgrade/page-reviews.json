@@ -350,6 +350,25 @@
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-24-book-ch01.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-24-book-ch01.md"],
       "independent_statuses": {"technical_source": "fail", "editorial_review": "pending"}
+    },
+    {
+      "path": "prerequisites/git-deep-dive/module-1-git-internals.md",
+      "page_digest": "sha256:22ba87e4db18e4be81c2635e5372f287ae21d30c451ebaa4628d428f7dc56405",
+      "disposition": "revise",
+      "reviewer_refs": [
+        "docs/content-upgrade/reviews/2026-10-28-git-state-boundaries-p12a.md"
+      ],
+      "evidence_refs": [
+        "docs/content-upgrade/reviews/2026-10-28-git-state-boundaries-p12a.md"
+      ],
+      "independent_statuses": {
+        "page_presence": "pass",
+        "structural_checks": "pass",
+        "technical_source": "unknown",
+        "editorial_review": "pending",
+        "lab_execution": "unknown",
+        "deployed_smoke": "pending"
+      }
     }
   ]
 }
