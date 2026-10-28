@@ -236,11 +236,12 @@ Hypothetical scenario: two engineers are repairing a shared branch named `featur
 
 The safer tool is `--force-with-lease`, which turns the push into a conditional update. Without an explicit expected commit, Git compares the server branch with your local remote-tracking ref. If the server has moved since that ref was last updated, the push is rejected. But an editor or background fetch can update that ref to a teammate's new commit without you inspecting or incorporating it; the implicit lease could then permit overwriting their work.
 
-For a stronger boundary, fetch, capture the remote tip's object ID, and inspect that saved ID before deciding with collaborators whether it can be replaced. Capture it **before** rewriting; inspecting the moving tracking ref and saving it afterward leaves a race with background fetches. The explicit lease compares against the saved ID even if a later fetch moves the tracking ref. It detects a changed tip, but does not prove you incorporated work or have permission to rewrite it.
+For a stronger boundary, fetch, **capture the remote tip's object ID before inspecting it**, and inspect that saved ID before deciding with collaborators whether it can be replaced. Do this before rewriting; inspecting the moving tracking ref and saving it afterward leaves a race with background fetches. The explicit lease compares against the saved ID even if a later fetch moves the tracking ref. It rejects any current tip other than that saved ID, but does not prove you incorporated work or have permission to rewrite it.
 
 ```bash
+# Start on your local feature/helm-migration branch; stop if a command fails.
 git fetch origin
-expected=$(git rev-parse refs/remotes/origin/feature/helm-migration)
+expected=$(git rev-parse --verify refs/remotes/origin/feature/helm-migration^{commit})
 # Inspect this exact saved tip and compare it with your branch:
 git log --oneline "$expected"
 git log --oneline HEAD.."$expected"
@@ -260,11 +261,11 @@ Git compares object IDs precisely, while human memory collapses branch state int
 
 Write which value each form compares before you continue. The next paragraph is the repair loop after a refusal.
 
-When a lease is rejected, do not fall back to `--force`. Fetch the remote, capture the new tip's object ID, then inspect and compare that saved ID as above. Decide with collaborators how to incorporate the new commits through a deliberate rebase or merge. After resolving the work, retry with that same saved expectation only if rewriting remains appropriate; another rejection starts this capture-before-inspection loop again.
+When a lease is rejected, do not fall back to `--force`. Fetch the remote, capture the new tip's object ID, then inspect and compare that saved ID as above. Decide with collaborators how to incorporate the new commits through a deliberate rebase or merge. After resolving the work, retry with this newly saved ID as the explicit expectation only if rewriting remains appropriate; another rejection starts this capture-before-inspection loop again.
 
 The lease mechanism is also a social signal. If a branch rejects your push, Git is telling you that your assumption of sole ownership is no longer guaranteed. That does not always mean a teammate intentionally collaborated on your branch; automation might have updated it, a maintainer might have pushed a fix, or another machine you use might have moved the same branch. In all cases, investigation is cheaper than reconstructing lost review work.
 
-This habit matters during pull request review because review branches are often rewritten in response to feedback. You might amend a Kubernetes Deployment commit after a reviewer asks for a resource limit, squash a noisy typo fix into the original documentation change, or rebase on a newly merged security patch. Those are reasonable operations when you own the branch. They become risky only when the branch is shared and the push command ignores whether the server changed while you were editing.
+This habit matters during pull request review because review branches are often rewritten in response to feedback. You might amend a Kubernetes Deployment commit after a reviewer asks for a resource limit, squash a noisy typo fix into the original documentation change, or rebase on a newly merged security patch. These operations require coordination and a saved, inspected tip: another contributor, automation, or another machine you use can move even a personally owned branch.
 
 ## 5. Pull Requests Are Reviewable Stories, Not File Dumps
 
@@ -406,7 +407,7 @@ Reviewers should also know when to test locally. A documentation-only change mig
 <details>
 <summary>Check your prediction</summary>
 
-If the teammate is only reading and you own the branch, amend and push with a lease. If the teammate might push to the same branch, coordinate first or ask them to open a separate branch, because Git cannot infer team intent from a branch name.
+If the teammate is only reading and you own the branch, capture and inspect its tip, then amend and push with an explicit lease. If the teammate might push to the same branch, coordinate first or ask them to open a separate branch, because Git cannot infer team intent from a branch name.
 
 </details>
 
@@ -421,7 +422,7 @@ Professional Git collaboration becomes repeatable when teams standardize pattern
 | Fetch-before-decide | Before rebasing, force pushing, deleting branches, or diagnosing divergence. | It refreshes remote-tracking branches so decisions use current server state. | Make it part of review-branch repair playbooks and incident checklists. |
 | Fork-and-pull triangle | When contributors should not push directly to the authoritative repository. | It separates personal write access from protected integration history. | Keep `origin` and `upstream` names consistent across onboarding docs. |
 | Atomic PR commits | When a change touches multiple manifests, services, scripts, or docs. | It lets reviewers validate and revert one logical decision at a time. | Enforce smaller PRs socially before adding heavy policy gates. |
-| Lease-based rewriting | When amending, squashing, or rebasing a branch that has been pushed. | An explicit expected tip rejects a remote that has moved since that tip was inspected. | Coordinate first and save the reviewed object ID before rewriting. |
+| Lease-based rewriting | When amending, squashing, or rebasing a branch that has been pushed. | An explicit lease rejects any current remote tip other than the saved object ID. | Capture the tip's ID, inspect that saved ID, coordinate, then rewrite. |
 
 Anti-patterns usually appear when speed is mistaken for simplicity. A monolithic pull request may feel fast for the author because it postpones organization, but it transfers complexity to reviewers and incident responders. A direct push to protected history may feel efficient until it bypasses the evidence trail that explains why the change was accepted. A raw force push may feel like the quickest way through a rejection, but it removes Git's chance to warn you that the server changed.
 
@@ -432,7 +433,7 @@ Anti-patterns usually appear when speed is mistaken for simplicity. A monolithic
 | Sharing one mutable feature branch broadly | Multiple people rewrite or push to the same branch and create ownership confusion. | Use separate contributor branches, or agree explicitly when a shared branch is required. |
 | Squashing unrelated work before review | Reviewers cannot isolate risk, and rollback becomes imprecise. | Use `git add -p` and explicit paths to create atomic commits before opening the PR. |
 
-The pattern that matters most is explicit ownership. If a branch is yours, inspect its remote tip before amending or rebasing, and use an explicit lease when updating it. If a branch is shared, rewriting it requires coordination because leases protect object IDs, not team agreements. If a branch represents protected project history, do not rewrite it casually; use pull requests, review evidence, and branch protection so everyone can reconstruct why the final state was accepted.
+The pattern that matters most is explicit ownership. If a branch is yours, capture its remote tip's ID and inspect that saved ID before amending or rebasing, then use it as the explicit lease expectation. If a branch is shared, rewriting it requires coordination because leases protect object IDs, not team agreements. If a branch represents protected project history, do not rewrite it casually; use pull requests, review evidence, and branch protection so everyone can reconstruct why the final state was accepted.
 
 ## Decision Framework
 
@@ -445,7 +446,8 @@ flowchart TD
     B --> C
     C -->|Clean local branch| D["Fast-forward or rebase"]
     C -->|Local commits exist| E["Review divergence first"]
-    E --> F["git pull --rebase or manual rebase"]
+    E --> K["Capture remote tip ID, inspect saved ID, coordinate"]
+    K --> F["git pull --rebase or manual rebase"]
     F --> G["Need to update pushed rewritten branch?"]
     G -->|Yes| H["Push with an explicit lease for the reviewed tip"]
     G -->|No| I["git push origin branch"]
@@ -480,7 +482,7 @@ Use the framework from left to right. First decide whether you need information,
 | Vague commit messages | The author treats commit messages as chores instead of durable communication for reviewers and automation. | Use Conventional Commits and explain why the change exists when the subject alone is not enough. |
 | Pushing directly to upstream `main` | Write access exists, so the contributor bypasses the same PR path everyone else uses. | Protect the default branch and require pull requests, checks, and review before integration. |
 | Squashing unrelated changes before review | The author groups an afternoon of work into one save point, which hides rollback boundaries. | Use explicit staging or `git add -p` to create commits with one operational purpose each. |
-| Panicking when a lease is rejected | The safe command blocks a stale rewrite, and the author interprets the rejection as an obstacle. | Stop, fetch, inspect the new remote commits, incorporate them deliberately, and retry the lease only when state is clear. |
+| Panicking when a lease is rejected | The conditional push detects a different remote tip, and the author interprets the rejection as an obstacle. | Fetch, capture the new tip's ID, inspect that saved ID, incorporate missing work, and retry with that ID as the explicit expectation only if rewriting remains appropriate. |
 | Reviewing only the web diff for high-risk manifests | Browser diffs make it easy to skim YAML without validating API acceptance or rollout assumptions. | Pull the branch when risk warrants it, run relevant tests, and validate Kubernetes manifests with `kubectl apply --dry-run=server` where appropriate. |
 
 ## Quiz
@@ -494,7 +496,7 @@ Answer: Fetch from `upstream` first so your remote-tracking branch reflects the 
 <details>
 <summary>Question 2: You rebased your review branch to clean up commits, but `git push origin my-feature` is rejected. How do you evaluate whether `--force-with-lease` is safe, and what should you do if the lease fails?</summary>
 
-Answer: A normal push rejects after a rebase because the rewritten commits no longer fast-forward from the remote branch. Coordinate ownership, capture the remote tip's object ID before rewriting, and inspect that saved ID as the explicit lease expectation. If the lease fails, do not use raw force; fetch, inspect and integrate the new work deliberately. An implicit lease alone can be undermined by background fetches.
+Answer: A normal push rejects when the rebased branch no longer fast-forwards from the remote tip. Ideally capture and inspect the remote tip before rewriting. Since you already rebased, coordinate, fetch, save the tip's object ID as `expected`, inspect that saved ID and `HEAD.."$expected"`, and incorporate any missing work deliberately. Push only with that ID as the explicit expectation, as in section 4. If rejected, repeat the fetch-capture-inspect loop with a new saved ID; do not use raw force or an implicit retry after fetching.
 </details>
 
 <details>
@@ -518,7 +520,7 @@ Answer: Fetch from `upstream`, because it represents the central authoritative r
 <details>
 <summary>Question 6: A reviewer asks you to change a label in a Kubernetes Deployment manifest that belongs in your previous commit. How do you update the pull request without creating a noisy "fix label" commit, and what safety command protects collaborators?</summary>
 
-Answer: Coordinate with collaborators, fetch, capture the remote tip, and inspect that saved ID before amending. Stage the label change, amend with `git commit --amend --no-edit`, and push with that explicit expectation as in section 4. If the remote tip differs from the saved value, the push is rejected; the lease cannot establish whether the saved tip was actually reviewed or integrated.
+Answer: Coordinate with collaborators, fetch, capture the remote tip, and inspect that saved ID before amending. Stage the label change and run `git commit --amend --no-edit` to keep the refinement in its logical commit. Push with `git push "--force-with-lease=refs/heads/branch-name:$expected" origin branch-name:branch-name`, using the actual branch name and saved ID as in section 4. A different remote tip rejects the push; the lease cannot establish whether the saved tip was actually reviewed or integrated.
 </details>
 
 <details>
@@ -656,11 +658,11 @@ git push origin feat/nginx-deployment
 
 Imagine a reviewer requested that you increase the `replicas` value to `3`. Instead of making a new "fix replicas" commit, you will amend your previous work to keep the history clean. This is appropriate because the branch is still under review and the change belongs to the existing Deployment commit rather than a new design decision.
 
-In this single-user simulation, capture and inspect the pushed tip before amending. In a shared branch, coordinate and inspect any teammate work before choosing a tip to replace. Modify `deployment.yaml` and change `replicas: 2` to `replicas: 3`, treating the edit as a refinement of the Deployment commit rather than a new feature.
+In this single-user simulation, capture and inspect the pushed tip before amending; `HEAD.."$expected"` should print nothing because no remote-only commits exist. Stop and investigate unexpected output or command failure. In a shared branch, coordinate and inspect any teammate work before choosing a tip to replace. Modify `deployment.yaml` and change `replicas: 2` to `replicas: 3`, treating the edit as a refinement of the Deployment commit rather than a new feature.
 
 ```bash
 git fetch origin
-expected=$(git rev-parse refs/remotes/origin/feat/nginx-deployment)
+expected=$(git rev-parse --verify refs/remotes/origin/feat/nginx-deployment^{commit})
 git log --oneline "$expected"
 git log --oneline HEAD.."$expected"
 sed -i.bak 's/replicas: 2/replicas: 3/' deployment.yaml
@@ -753,7 +755,7 @@ Failure layer: the hosting permission boundary. Next action: treat the rejection
 
 </details>
 
-**Card D: The lease trusts "I fetched recently."** A force-with-lease is skipped because the last fetch "felt recent." The remote-tracking ref is not consulted.
+**Card D: The lease trusts "I fetched recently."** An implicit lease is assumed to preserve teammate work because a fetch ran recently, without inspecting what that fetch downloaded.
 
 <details>
 <summary>Check your prediction</summary>
@@ -767,7 +769,7 @@ Failure layer: memory versus an object ID. Next action: capture the remote tip's
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: branch ownership. Next action: coordinate, or ask them to use a separate branch. Amend with a lease only when you own the branch and they are only reading.
+Failure layer: branch ownership. Next action: coordinate, or ask them to use a separate branch. When you own the branch and they are only reading, capture and inspect its tip before amending, then use that ID as an explicit lease expectation.
 
 </details>
 
