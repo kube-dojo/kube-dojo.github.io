@@ -8,7 +8,7 @@ sidebar:
 
 ## October 2026
 
-- **Find the Git state for your worktree.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now shows how to locate the selected index and inspect `HEAD` across repository layouts.
+- **Find the Git state for your worktree.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now shows how to locate the selected index and inspect `HEAD` across repository layouts, with clearly formatted commands in its recovery questions.
 - **Compare Git recovery clues.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now shows how reflogs affect an unreachable-object search and how to preserve a commit for inspection.
 - **Check what a manifest validator proves.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) repairs its local merge exercise and separates schema checks from matching ConfigMap references and observing a running workload.
 - **Choose a Git workflow for your release needs.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) now compares branching tradeoffs and asks you to check which revision Argo CD tracks before expecting a deployment.

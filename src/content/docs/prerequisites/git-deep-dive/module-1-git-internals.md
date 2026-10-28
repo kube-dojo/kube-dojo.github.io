@@ -553,37 +553,37 @@ The tradeoff is speed versus certainty. During a local typo, speed wins, and por
 | Editing refs manually to "fix" history | Ref files look simple in small repositories | Use Git commands that update reflogs and related state intentionally |
 
 ## Quiz
-<details><summary>Scenario: You are investigating a colleague's local repository because a script corrupted their working directory. `git cat-file -p` on an object prints entries like `100644 blob 9d8c... app.js` and `040000 tree 1a2b... src`. What are you inspecting, and how does that help you diagnose repository state?</summary>
+<details><summary><span>Scenario: You are investigating a colleague's local repository because a script corrupted their working directory. <code>git cat-file -p</code> on an object prints entries like <code>100644 blob 9d8c... app.js</code> and <code>040000 tree 1a2b... src</code>. What are you inspecting, and how does that help you diagnose repository state?</span></summary>
 
 You are inspecting a tree object, not a blob or commit. The entries describe a directory snapshot by naming a file blob and a nested tree, so this object helps you diagnose repository state at the directory level. It tells you which object IDs represented particular paths, but it does not contain the file contents or the commit metadata. To continue the investigation, inspect the referenced blob for content or find the commit that points to this tree.
 </details>
 
-<details><summary>Scenario: You staged `deployment.yaml`, edited it again, and then noticed that your Kubernetes 1.35+ rollout commit may not include the latest change. How should you compare the working tree, index, and commit before proceeding?</summary>
+<details><summary><span>Scenario: You staged <code>deployment.yaml</code>, edited it again, and then noticed that your Kubernetes 1.35+ rollout commit may not include the latest change. How should you compare the working tree, index, and commit before proceeding?</span></summary>
 
 Start by comparing the three states separately instead of trusting the editor view. `git diff --staged` shows what the index would commit relative to `HEAD`, while `git diff` shows how the working tree differs from the index. `git ls-files --stage deployment.yaml` can confirm the staged blob object ID if you need proof. This implements staging-area discipline because you only commit after the index points at the intended content.
 </details>
 
-<details><summary>Scenario: CI checked out a raw commit hash, a developer committed a hotfix there, and now `cat "$(git rev-parse --git-path HEAD)"` shows a raw commit hash instead of a symbolic ref. What recovery plan keeps the detached `HEAD` work safe?</summary>
+<details><summary><span>Scenario: CI checked out a raw commit hash, a developer committed a hotfix there, and now <code>cat "$(git rev-parse --git-path HEAD)"</code> shows a raw commit hash instead of a symbolic ref. What recovery plan keeps the detached <code>HEAD</code> work safe?</span></summary>
 
 This is detached `HEAD`, which is normal but easy to lose track of. The safe recovery plan is to create a branch or tag at the current commit before switching away, then decide whether to merge, cherry-pick, or open a pull request from that branch. New commits made while detached are real commit objects, but no branch ref advances with them. Preserving a ref makes those commits reachable and gives the team a stable name for review.
 </details>
 
-<details><summary>Scenario: A teammate says Git stores only diffs, so a missing `ConfigMap` cannot be recovered unless you know the exact patch. How would you evaluate content-addressable storage in your answer?</summary>
+<details><summary><span>Scenario: A teammate says Git stores only diffs, so a missing <code>ConfigMap</code> cannot be recovered unless you know the exact patch. How would you evaluate content-addressable storage in your answer?</span></summary>
 
 Git's logical model is snapshot-based: commits point to trees, and trees point to blobs containing file content. Packfiles may delta-compress objects physically, but that optimization does not change how you reason about recovery. If a commit or tree that referenced the `ConfigMap` is reachable, you can restore the full file content from that snapshot. The content-addressable design also lets Git verify object integrity by comparing stored content to its object ID.
 </details>
 
-<details><summary>Scenario: You have a blob hash from `git fsck`, but no path name. Which Git objects must you compare to reconstruct project history around that content?</summary>
+<details><summary><span>Scenario: You have a blob hash from <code>git fsck</code>, but no path name. Which Git objects must you compare to reconstruct project history around that content?</span></summary>
 
 A blob alone gives content but not a path, so you need trees that reference the blob and commits that reference those trees. Comparing blobs, trees, and commits lets you reconstruct project history from content up through directory snapshots to named commits. This is why `git cat-file -p <blob>` is only the first step. The useful story appears when you find the tree entry that named the blob and the commit that made that tree reachable.
 </details>
 
-<details><summary>Scenario: During incident response, someone proposes `git reset --hard` and `git gc --prune=now` to "clean things up" before investigation. What should you do instead?</summary>
+<details><summary><span>Scenario: During incident response, someone proposes <code>git reset --hard</code> and <code>git gc --prune=now</code> to "clean things up" before investigation. What should you do instead?</span></summary>
 
 Do not start with cleanup when recovery is still uncertain. First inspect `HEAD`, refs, reflog, the index, and any suspicious object IDs, then create protective branches or tags for commits that might matter. A hard reset can discard working and staged evidence, while immediate pruning can remove unreachable objects that were still recoverable. The better plan is to preserve evidence, diagnose the layer, and then repair narrowly.
 </details>
 
-<details><summary>Scenario: You need to teach a junior engineer why branch creation is fast and why deleting a branch is not the same as deleting every file. What explanation should you give?</summary>
+<details><summary><span>Scenario: You need to teach a junior engineer why branch creation is fast and why deleting a branch is not the same as deleting every file. What explanation should you give?</span></summary>
 
 A branch is a ref, which is a lightweight name pointing at a commit object. Creating a branch usually writes a small pointer, and deleting one removes that name rather than immediately deleting all objects reachable from the old tip. The commits and their trees and blobs may remain reachable from other refs, reflogs, or temporary unreachable storage windows. This explanation connects branch behavior to the object graph instead of to folder-copy intuition.
 </details>
