@@ -134,7 +134,7 @@ Git identifies best common ancestors as merge bases. In a complex history there 
 git merge-base main feature/ingress-update
 ```
 
-Without `--all`, `git merge-base` prints one best common ancestor; when several exist, which one it prints is unspecified. Use `git merge-base --all` to list them. The [merge strategy documentation](https://git-scm.com/docs/git-merge) explains that `ort` can merge multiple common ancestors into a virtual reference tree before the three-way merge. Thus the single printed commit is not necessarily the strategy's actual reference tree. See [git-merge-base](https://git-scm.com/docs/git-merge-base) for the criss-cross example.
+Without `--all`, `git merge-base` prints one best common ancestor; when several exist, which one it prints is unspecified. Use `git merge-base --all` to list them. The [merge strategy documentation](https://git-scm.com/docs/git-merge) explains that `ort` can merge multiple common ancestors into a reference tree before the three-way merge. Thus the single printed commit is not necessarily the strategy's actual reference tree. See [git-merge-base](https://git-scm.com/docs/git-merge-base) for the criss-cross example.
 
 **Pause and predict:** Look at the following branch topology. If you are on `main` and run `git merge feature/cache`, which commit is the merge base?
 
@@ -275,7 +275,7 @@ secretGenerator:
 
 Always comprehensively validate the structural integrity of your infrastructure-as-code files before committing the final resolution. Once verified, add both files to the index and commit to finalize the complex multi-file merge.
 
-After finalizing a merge, inspect the result from more than one perspective. By default, `git show <merge-commit-hash>` uses a dense combined diff for a merge, subject to options such as `--first-parent`. A combined diff lists files modified from all parents; the dense form also omits certain hunks where the result picks an unmodified parent variant. It is therefore not a complete list of changes or a record of human actions. For a two-parent merge, `git show --remerge-diff <merge-commit-hash>` reconstructs a temporary merge and compares it with the recorded result; it can help investigate differences, but it is not a transcript of how the merge was resolved. Its output and interactions with options may change. See [git-show](https://git-scm.com/docs/git-show) and compare parent-specific diffs where needed.
+After finalizing a merge, inspect the result from more than one perspective. By default, `git show <merge-commit-hash>` uses a dense combined diff for a merge, subject to options such as `--first-parent`. A combined diff lists files modified from all parents; the dense form omits uninteresting hunks where the parents have only two variants and the result picks one without modification. It is therefore not a complete list of changes or a record of human actions. For a two-parent merge, `git show --remerge-diff <merge-commit-hash>` reconstructs a temporary tree, potentially containing conflict markers, and compares it with the recorded result. It can help investigate differences, but is not a transcript of how the merge was resolved. Its output and option interactions may change except where explicitly documented. See [git-show](https://git-scm.com/docs/git-show) and compare parent-specific diffs where needed.
 
 ```bash
 kubectl kustomize . | kubeconform -summary -
@@ -702,8 +702,8 @@ In this exact moment, the staging branch ref does not move because an octopus me
 </details>
 
 <details>
-<summary>Question 3: A two-parent merge resolves a large StatefulSet and ConfigMap conflict. Which views can help review the recorded result, and what can they not prove?</summary>
-Inspect the merge with `git show`, remembering that its default dense combined view omits files not modified from every parent and some hunks. Compare the result with each parent for a fuller view. `git show --remerge-diff <merge-commit-hash>` reconstructs a temporary merge and shows its difference from the recorded result; the output and its interactions with options may change. Neither view is a transcript or proof of which changes a person made manually, so use the branch intent, review notes and validation evidence as well.
+<summary>Question 3: A two-parent merge resolves a large StatefulSet and ConfigMap conflict. Which views help review the recorded result, what can they not prove, and what version detail matters when comparing the recursive strategy?</summary>
+Inspect the merge with `git show`, remembering that its default dense combined view omits files not modified from every parent and some hunks. Compare the result with each parent for a fuller view. `git show --remerge-diff <merge-commit-hash>` reconstructs a temporary tree, potentially containing conflict markers, and shows its difference from the recorded result; output and option interactions may change except where documented. Neither view proves which changes a person made manually, so use branch intent, review notes and validation evidence as well. Record the installed Git version: `recursive` was a separate implementation through2.49 and names `ort` starting with2.50.
 </details>
 
 <details>
@@ -871,6 +871,8 @@ git show --stat --summary HEAD
 git show HEAD
 ```
 
+To complete the comparison task for this recorded two-parent merge, use `git show --diff-merges=separate -p HEAD` for each parent's view and `git show --remerge-diff HEAD` for the reconstructed-tree comparison. Explain the omissions and reconstruction limits in your audit; neither output identifies a person's actions. Check the installed Git version before interpreting the `recursive` strategy name.
+
 </details>
 
 **Card A: A fast-forward is drawn as a merge commit.** After `feature/add-metadata` lands on an undiverged `main`, someone expects `git log --graph` to show a fork.
@@ -915,6 +917,7 @@ The success criteria are intentionally broader than "Git says the merge is compl
 
 - [Git merge documentation](https://git-scm.com/docs/git-merge)
 - [Git merge-base documentation](https://git-scm.com/docs/git-merge-base)
+- [Git show documentation: merge-diff formats](https://git-scm.com/docs/git-show)
 - [Git rerere documentation](https://git-scm.com/docs/git-rerere)
 - [Git rebase documentation](https://git-scm.com/docs/git-rebase)
 - [Git cherry-pick documentation](https://git-scm.com/docs/git-cherry-pick)
