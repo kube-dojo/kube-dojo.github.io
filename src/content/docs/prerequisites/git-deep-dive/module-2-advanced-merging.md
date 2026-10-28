@@ -293,15 +293,26 @@ To aid in visualizing these complex situations, you can utilize `git mergetool`,
 
 If your team constantly encounters the exact same identical conflicts repeatedly due to long-lived branches, Git's `rerere` (Reuse Recorded Resolution) feature is an absolute lifesaver. It is globally enabled by setting the configuration `rerere.enabled = true`. When enabled, Git mathematically fingerprints the conflict and observes your manual resolution, storing the mapping in a hidden cache. If that exact conflict ever arises again during a future merge or rebase, Git automatically applies your previous resolution without halting.
 
-### The Auto-Merge Phenomenon: A Historical Case Study
+### Predict and Observe a Merge
 
-To deeply understand how Git's context windows operate, it is highly instructive to look at a legacy exercise. In earlier versions of this course, students were given the following exact sequence of commands to intentionally create a merge conflict.
+Predict whether Git will combine two changes to different fields in the same Deployment. Then run this experiment and inspect the result: a clean text merge still needs a review of the combined configuration.
 
-The first part of the legacy exercise created a tiny repository and a Kubernetes Deployment that was deliberately small enough for students to inspect by eye. Older classroom versions sometimes used a short interactive alias for Kubernetes validation, but the runnable examples here keep the full `kubectl` command so every block can be copied into a non-interactive shell or CI job without relying on local shell setup.
+Use one Unix-like shell with Git and kubeconform on `PATH`. Record `git --version` and `kubeconform -v`; schema validation below targets Kubernetes 1.35.0 and may download schemas, but needs no cluster. The setup creates a fresh scratch directory with a fictional repository-local identity and signing disabled.
+
 ```bash
-mkdir k8s-merge-lab && cd k8s-merge-lab
+git --version
+kubeconform -v
+mkdir -p "${TMPDIR:-/tmp}"
+lab_dir=$(mktemp -d "${TMPDIR:-/tmp}/k8s-merge-lab.XXXXXX")
+cd "$lab_dir" || exit
 git init --initial-branch=main
+git config user.name "Example Learner"
+git config user.email "learner@example.invalid"
+git config commit.gpgsign false
+git config tag.gpgsign false
 ```
+
+Save the following as `deployment.yaml` in the scratch directory:
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -326,7 +337,7 @@ git add deployment.yaml
 git commit -m "chore: initial api deployment"
 ```
 
-The second part created two diverging branches that changed different fields in the same Deployment. One branch changed desired capacity, while the other changed the container image, and the teaching intent was to make those independent intentions collide inside one manifest.
+Create two branches from the same base. One changes desired capacity; the other updates the image. Before merging, predict whether Git will combine them or ask for help, and explain what evidence would distinguish those outcomes.
 ```bash
 git checkout -b feature/scale-up
 sed -i.bak 's/replicas: 2/replicas: 5/g' deployment.yaml && rm deployment.yaml.bak
@@ -341,50 +352,17 @@ git add deployment.yaml
 git commit -m "chore: update nginx to 1.27.1"
 ```
 
-The third part asked students to merge the image branch into the scale branch and observe the result. In the original classroom version, the expectation was a visible conflict, which made the next resolution step easy to explain and easy to grade.
+Merge the image branch into the scale branch and inspect the result:
 ```bash
 git checkout feature/scale-up
 git merge feature/update-image
-# Output will show CONFLICT (content)
+git status --short
+git ls-files -u
 ```
 
-The strict pedagogical expectation was that this sequence would produce the following dramatic conflict markers in the file, because the older exercise treated nearby edits in the same YAML object as though they would always overlap:
-```text
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: api-server
-spec:
-<<<<<<< HEAD
-  replicas: 5
-  selector:
-    matchLabels:
-      app: api
-  template:
-    metadata:
-      labels:
-        app: api
-    spec:
-      containers:
-      - name: api
-        image: nginx:1.27.0
-=======
-  replicas: 2
-  selector:
-    matchLabels:
-      app: api
-  template:
-    metadata:
-      labels:
-        app: api
-    spec:
-      containers:
-      - name: api
-        image: nginx:1.27.1
->>>>>>> feature/update-image
-```
+A recorded run of this exact fixture with Git 2.56.0 completed a clean merge, retained both changes, and left no unmerged entries or working-tree changes. Results can differ with Git version, configuration, or changed inputs; inspect your own output. If a conflict occurs, use `git status` to identify the affected file and resolve its markers before continuing.
 
-The student would then manually resolve the file to this final state, preserving the scale decision from one branch and the patched image decision from the other branch:
+Compare the combined file with this intended result:
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -405,119 +383,18 @@ spec:
         image: nginx:1.27.1
 ```
 
-The exercise then required validation before committing, because a syntactically broken Deployment is still a failed merge even when the Git conflict markers have been removed:
+Check that both decisions survived, then validate the manifest's schema:
+
 ```bash
-kubeconform -summary deployment.yaml
-# Expect output confirming the Deployment schema is valid
-```
-```bash
-git add deployment.yaml
-git commit -m "Merge branch 'feature/update-image' into feature/scale-up resolving replicas and image"
+git status --short
+git ls-files -u
+grep -nE 'replicas:|image:' deployment.yaml
+kubeconform -strict -kubernetes-version 1.35.0 -summary deployment.yaml
 ```
 
-The legacy solution key provided to students looked exactly like this, and it is worth preserving because it shows the intended operational sequence even though modern Git usually handles this particular example automatically:
-<details>
-<summary>View Solutions</summary>
+Expect replicas `5`, image `nginx:1.27.1`, no unmerged entries, and a valid Deployment schema. On a clean merge, Git has already created the merge commit; no additional commit is needed. If your run conflicts, remove markers while retaining both intended changes, stage the resolution, and complete the merge with `git commit`.
 
-**Task 1: Create the Scale Branch**
-```bash
-git checkout -b feature/scale-up
-sed -i.bak 's/replicas: 2/replicas: 5/g' deployment.yaml && rm deployment.yaml.bak
-git add deployment.yaml
-git commit -m "feat: scale api to 5 replicas"
-```
-
-**Task 2: Create the Image Update Branch**
-```bash
-git checkout main
-git checkout -b feature/update-image
-sed -i.bak 's/image: nginx:1.27.0/image: nginx:1.27.1/g' deployment.yaml && rm deployment.yaml.bak
-git add deployment.yaml
-git commit -m "chore: update nginx to 1.27.1"
-```
-
-**Task 3: Trigger the Conflict**
-```bash
-git checkout feature/scale-up
-git merge feature/update-image
-# Output will show CONFLICT (content)
-```
-
-**Task 4: Resolve the Conflict**
-Open `deployment.yaml` in your editor. It will look similar to this:
-```text
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: api-server
-spec:
-<<<<<<< HEAD
-  replicas: 5
-  selector:
-    matchLabels:
-      app: api
-  template:
-    metadata:
-      labels:
-        app: api
-    spec:
-      containers:
-      - name: api
-        image: nginx:1.27.0
-=======
-  replicas: 2
-  selector:
-    matchLabels:
-      app: api
-  template:
-    metadata:
-      labels:
-        app: api
-    spec:
-      containers:
-      - name: api
-        image: nginx:1.27.1
->>>>>>> feature/update-image
-```
-
-Edit the file to remove markers and combine the desired state:
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: api-server
-spec:
-  replicas: 5
-  selector:
-    matchLabels:
-      app: api
-  template:
-    metadata:
-      labels:
-        app: api
-    spec:
-      containers:
-      - name: api
-        image: nginx:1.27.1
-```
-
-**Task 5: Validate the YAML**
-```bash
-kubeconform -summary deployment.yaml
-# Expect output confirming the Deployment schema is valid
-```
-
-**Task 6: Finalize the Merge**
-```bash
-git add deployment.yaml
-git commit -m "Merge branch 'feature/update-image' into feature/scale-up resolving replicas and image"
-```
-
-</details>
-
-However, if you attempt to run this legacy exercise today using a modern Git version equipped with the highly optimized `ort` strategy, it seamlessly auto-merges without generating any conflict whatsoever. This fascinating phenomenon occurs because the modifications to `replicas` (line 6) and `image` (line 17) are separated by exactly ten unchanged lines. This gap provides Git's internal algorithms with just enough unambiguous textual context to safely apply both discrete hunks independently. The "overlapping context illusion" in older tutorials often fails to account for the increasing sophistication of modern Git diff engines.
-
-That does not make the legacy exercise useless; it makes it a useful warning about relying on intuition instead of observing the actual merge engine. Older teaching material often describes conflicts as if nearby conceptual changes must collide, but Git's decision is based on the diff hunks it can derive from the merge base and both tips. Two changes may feel related to a human because they live inside one Kubernetes object, yet still be mechanically independent enough for `ort` to combine them without asking. The opposite is also true: two changes that look harmless in separate reviews can collide if they alter the same small YAML region, especially when generated blocks or repeated keys reduce context.
+A clean text merge is not proof that the combined configuration works in a target environment. Schema validation checks shape, not deployment behavior. Compare the branch changes and review their combined intent before applying any configuration.
 
 ### The Octopus Merge: Taming Multiple Branches
 
