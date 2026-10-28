@@ -5,7 +5,12 @@ Per-agent overlay directory for OpenAI Codex. Shared skills live in
 here; `agents_extensions/deploy.sh --target codex` will materialize into `.codex/`.
 
 `config.toml` is the portable project config. It enables multi-agent v2 in the
-`agents` namespace without changing home models, permissions, or MCP servers.
+`agents` namespace, with Terra 6.1 as the default subagent model. The lead stays
+Sol 6.1; coding, writing, computer use and QA default to Terra 6.1, while hard
+problems and review use Sol 6.1. Personal named roles live in `~/.codex/agents/`.
+The project overlay does not change home permissions or MCP servers.
+Headless Codex uses Terra 6.1 for `edit`/`draft`, Sol 6.1 for `review`/`architect`, and GPT-6 Luna for `search`.
+Unclassified bridge calls default to Terra 6.1; explicit per-call and `AB_CODEX_MODEL` overrides take precedence.
 Run `bash agents_extensions/deploy.sh --target codex`, then the same command
 with `--check` to verify deployment. A differing local config is preserved and
 deployment fails. Inspect its diff first; `--force-config` explicitly backs up
