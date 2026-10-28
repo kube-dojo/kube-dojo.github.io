@@ -14,7 +14,7 @@
     },
     {
       "path": "prerequisites/philosophy-design/module-1.4-dead-ends.md",
-      "page_digest": "sha256:b3a172377e1ec4569e3aa6fcb8a57cdb13ee08b67a1442b7db12cb3c760208e6",
+      "page_digest": "sha256:3a2159efd64c072a8ef5a7f52af9e80d6abaae016aaf568f24b778cf9eb9fbea",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md", "docs/content-upgrade/reviews/2026-10-28-runtime-adapter-p11f.md", "docs/content-upgrade/reviews/2026-10-28-technology-evidence-p11g.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-technology-status-p11b.md", "docs/content-upgrade/reviews/2026-10-28-configuration-ownership-p11e.md", "docs/content-upgrade/reviews/2026-10-28-runtime-adapter-p11f.md", "docs/content-upgrade/reviews/2026-10-28-technology-evidence-p11g.md"],

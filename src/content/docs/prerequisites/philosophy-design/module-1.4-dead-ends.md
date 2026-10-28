@@ -217,7 +217,6 @@ Write the unanswered requirements and the evidence you would collect before cont
 Consider a typical `docker-compose.yml`:
 
 ```yaml
-version: '3'
 services:
   api:
     image: myapi:v1
@@ -227,6 +226,8 @@ services:
     image: postgres:13
     volumes:
       - db-data:/var/lib/postgresql/data
+volumes:
+  db-data:
 ```
 
 Read the example as a service definition. It does not state a recovery-time target, identify off-host backups, or show a host-loss test. Write the missing operating questions before choosing a deployment platform. The comparison should explain which requirements each candidate would satisfy and which observations are still needed.
@@ -241,18 +242,18 @@ When comparing technologies, distinguish a documented lifecycle event from a sta
 
 Keep project lifecycle, capability and decision criteria separate. Apache's Mesos record establishes formal retirement; Docker's Swarm and Compose documentation describes deployment models; Cloud Foundry's documentation explains Diego's architecture. These records do not measure why organizations adopted or left each product. Governance, operating effort and integration requirements are questions for the actual team to investigate, alongside which failure paths its design can tolerate.
 
-| Category | Current/Relevant |
+| Category | Evidence to collect for the proposed design |
 |----------|-----------------|
-| Orchestration | Kubernetes |
-| Runtime | CRI-conformant options, including containerd and CRI-O; Docker Engine through an external adapter |
-| Images | Docker/Buildah for building |
-| Config | Helm, Kustomize, native YAML |
-| GitOps | ArgoCD, Flux |
-| Service Mesh | Istio, Linkerd, Cilium |
-| Monitoring | Prometheus, Grafana |
-| Logging | Fluentd, Loki |
+| Orchestration | Required scheduling, rollout and recovery behavior, plus the components responsible |
+| Runtime | Intended versions, CRI conformance and API support; any external adapter and its support |
+| Images | Build inputs, target image/workload compatibility and verification results |
+| Config | Intended objects and fields, their writers and disagreement handling |
+| GitOps | Which desired state the proposed workflow owns and how changes are reviewed |
+| Service Mesh | Required traffic or encryption behavior and how the proposed implementation would be tested |
+| Monitoring | Required signals, collection paths, alert owners and retention |
+| Logging | Required records, collection and access paths, retention and host-loss behavior |
 
-The table is a set of examples, not a required product stack. For Kubernetes 1.35, check CRI conformance and the CRI API requirement for the chosen runtime integration. Select image-building, configuration, delivery and observability tools against the team's actual operating needs, support and compatibility evidence.
+The table prompts an investigation rather than prescribing a product stack. For Kubernetes 1.35, check CRI conformance and the CRI API requirement for the chosen runtime integration. Select image-building, configuration, delivery and observability tools against the team's actual operating needs, support and compatibility evidence.
 
 ```mermaid
 flowchart LR
