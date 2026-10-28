@@ -80,7 +80,7 @@ async function renderHost(host: HTMLElement): Promise<void> {
     themeVariables: {
       fontSize: '18px',
       // Git graphs use a separate, smaller label size than the general font.
-      commitLabelFontSize: '16px',
+      commitLabelFontSize: '15px',
       commitLabelColor: currentTheme() === 'light' ? '#111111' : '#ffffff',
       commitLabelBackground: currentTheme() === 'light' ? '#ffffff' : '#0f172a',
       // The default light palette uses pale fills for these mindmap sections.
