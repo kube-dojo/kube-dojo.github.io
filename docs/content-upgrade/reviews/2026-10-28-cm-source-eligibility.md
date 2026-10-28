@@ -1,0 +1,7 @@
+# Official configuration-management source eligibility
+
+Owner #2275; supports #2278 and #2272. The unchanged fetcher's domain gate rejects the actual official Ansible module and Puppet architecture hosts before semantic claim review. Admit only `docs.ansible.com` and `help.puppet.com` in the vendor tier. Registrable roots and sibling hosts remain outside this addition; label-boundary subdomains follow the existing matcher. The header now describes narrow documentation hosts already used in this file.
+
+Actual retrieved official pages and body hashes are preserved in `.agent/session227/configuration-ownership/sources/manifest.json`: Ansible `kubernetes.core.k8s` docs and Puppet architecture. Both describe their own systems. Vendor material does not establish independent competitor comparisons, migration benefits, adoption or learner effects; each source/claim/version still needs independent semantic review. This change grants no page, rubric, runtime or translation acceptance and changes no fetch/matching code.
+
+Required verification: load this exact proposed config in the unchanged classifier; test official hosts, rejected roots/sibling/suffix lookalikes and existing tiers. Existing citation-fetch/strict-verdict tests and mandatory pipeline baseline are separate checks. Exact-head cross-family review and CI remain required before merge. No published Astro source or executable code changes.
