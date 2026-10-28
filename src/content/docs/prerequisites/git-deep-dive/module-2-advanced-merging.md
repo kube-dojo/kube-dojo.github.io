@@ -3,7 +3,6 @@ title: "Module 2: The Art of the Branch — Advanced Merging"
 sidebar:
   order: 2
 description: "Mastering Git merge strategies, conflict resolution, and branching models for Kubernetes infrastructure."
-timeToComplete: "75 minutes"
 prerequisites: ["Module 1 (Git Internals)"]
 nextModule: "[Module 3: History as a Choice](../module-3-interactive-rebasing/)"
 revision_pending: false
@@ -11,7 +10,7 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 100–130 minutes (long-form read + hands-on exercise)
+> **Planning estimate**: 100–130 minutes for reading and practice; this estimate has not been measured.
 >
 > **Prerequisites**: Module 1, Git Internals. This module assumes you can read a commit graph, create branches, and commit small changes, but it does not assume you have already handled a production-grade Kubernetes merge conflict under pressure.
 
@@ -19,14 +18,14 @@ revision_pending: false
 
 ## Learning Outcomes
 - **Diagnose** the root cause of complex merge conflicts within Kubernetes manifest files by analyzing the merge base and divergent commit histories.
-- **Implement** fast-forward, three-way, and octopus merges strategically to maintain a clean, navigable project history.
-- **Resolve** intricate multi-file conflicts during infrastructure-as-code integration without introducing YAML syntax errors or regression bugs.
+- **Choose and explain** fast-forward, three-way, and octopus merges for a given history.
+- **Resolve** multi-file conflicts in infrastructure-as-code and validate syntax and intended relationships.
 - **Evaluate** branching strategies (Trunk-based, GitFlow, GitHub Flow) against a platform team's release cadence, supported versions and validation needs.
 - **Diagnose** merge-base and strategy behavior using the graph, installed Git version and diff evidence.
 
 ## Why This Module Matters
 
-On October 21, 2018, routine optical hardware maintenance severed the US East Coast network hub from the primary US East Coast data center for 43 seconds. An automated failover promoted the US-West hub to primary, but the US-East hub continued to accept writes. Both sites held authoritative-looking records for the same rows. The incident caused more than 24 hours of degraded service; engineers had to manually reconcile the records that both sites had accepted during the brief split before consistency could be restored, and approximately 200,000 webhook payloads were permanently dropped. The incident demonstrated that divergent timelines can each appear correct in isolation while creating massive conflict at infrastructure scale. The same problem exists in source control every time long-lived branches are reconciled. Advanced Git merging is the practiced skill that keeps that reconciliation from becoming an outage.
+In its [October 2018 incident report](https://github.blog/news-insights/company-news/oct21-post-incident-analysis/), GitHub describes a 43-second network interruption followed by database failover, divergent writes across sites, and 24 hours and 11 minutes of degraded service. Recovery used backup restoration and replica synchronization; manual reconciliation of some writes was still in progress when the report was published. About 200,000 webhook payloads were dropped after their internal time-to-live expired. This illustrates the need to reconcile divergent state, but database replication is not a Git merge: its mechanisms and recovery constraints differ.
 
 For Kubernetes platform work, merging is more than a repository housekeeping task because the merged text often becomes a desired-state contract consumed by controllers, admission policies, scanners, and deployment automation. A clean-looking merge can still leave a selector pointing at the wrong labels, a generated Secret missing from a Kustomize overlay, or a release branch carrying assumptions that are no longer true for Kubernetes 1.35 clusters. This module treats merging as an operational design skill: you will inspect graph shape, choose the right integration method, resolve conflicts by synthesizing intent, and validate that the resulting manifests still describe a coherent system.
 
@@ -34,7 +33,7 @@ For Kubernetes platform work, merging is more than a repository housekeeping tas
 
 ### The Geometry of Integration: Fast-Forward vs. Three-Way Merges
 
-When you issue a `git merge` command, Git does not blindly smash files together line by line. Instead, it performs a rigorous geometric analysis of your repository's commit history graph to determine the safest mathematical way to integrate the disparate changes. Understanding this underlying geometry is the fundamental difference between dictating your project's history and being a victim of it.
+Git uses the commit graph to identify the histories and merge base, then attempts to combine their changes. Understanding that graph helps you select an integration method and investigate a conflict.
 
 #### The Fast-Forward Merge
 
@@ -44,8 +43,13 @@ This conceptual model perfectly describes a **fast-forward merge**. It occurs wh
 
 ```bash
 # Setting up a fast-forward scenario
-git init cluster-config
-cd cluster-config
+ff_dir=$(mktemp -d "${TMPDIR:-/tmp}/cluster-config.XXXXXX")
+cd "$ff_dir" || exit
+git init --initial-branch=main
+git config --local user.name "Example Learner"
+git config --local user.email "learner@example.invalid"
+git config --local commit.gpgsign false
+git config --local tag.gpgsign false
 echo "apiVersion: v1" > config.yaml
 git add config.yaml
 git commit -m "Initialize cluster config"
@@ -60,9 +64,9 @@ git checkout main
 git merge feature/add-metadata
 ```
 
-The command output is intentionally boring, and that boredom is the entire point of a fast-forward integration. Git reports that it updated one commit range to another, then shows only the file-level change summary because no second parent and no merge commit were needed.
+Illustrative output follows; commit IDs differ in your repository. A fast-forward moves the branch pointer without creating a merge commit.
 ```text
-Updating a1b2c3d..e4f5g6h
+Updating a1b2c3d..e4f5a6b
 Fast-forward
  config.yaml | 1 +
  1 file changed, 1 insertion(+)
@@ -70,7 +74,7 @@ Fast-forward
 
 Because the `main` branch had not diverged—meaning no new commits were added to `main` while the `feature/add-metadata` branch was being actively developed—Git simply moved the `main` pointer forward to catch up. 
 
-If you want to force Git to create a merge commit anyway (often done to preserve the historical context that a specific feature branch existed at all), you can use the `git merge --no-ff` flag, which always creates a merge commit even when a fast-forward would be perfectly possible. Conversely, running `git merge --ff-only` succeeds only if a clean fast-forward is mathematically possible; otherwise, it exits immediately with a non-zero status and refuses to merge. It is also worth noting a specific edge case: a fast-forward merge is automatically suppressed, and Git behaves as if `--no-ff` was passed, when merging an annotated tag that is not stored within the standard `refs/tags/` hierarchy.
+When a fast-forward is possible but you want a merge commit to retain branch context, use `git merge --no-ff`. Divergent histories already need a merge commit. If the incoming tip is already an ancestor of the current tip, Git reports that it is already up to date; `--no-ff` does not create a redundant merge. `git merge --ff-only` permits a fast-forward or an already-up-to-date no-op and refuses a divergent history. An annotated tag outside `refs/tags/` also suppresses fast-forward by default.
 
 This distinction matters in automation because a protected branch can use `--ff-only` as a guardrail rather than as a style preference. If a pipeline expects a deployment branch to be a strict descendant of a reviewed release branch, a failed fast-forward tells you the graph no longer matches the release process you thought you were following. That failure is useful evidence. It says that someone introduced independent history and that the team now needs a deliberate integration decision instead of a silent pointer move.
 
@@ -83,7 +87,7 @@ Because this was a fast-forward merge, `main` simply moved to the tip of `featur
 
 </details>
 
-Sketch the graph before you continue. The next section explains what changes when both sides have new commits. It does not draw this history.
+Sketch the resulting graph and mark where each branch name points. Keep that drawing to compare with the next example, where both branches advance independently.
 
 #### The Three-Way Merge
 
@@ -105,26 +109,26 @@ gitGraph
    merge feature/rbac id: "H (merge commit)"
 ```
 
-To resolve this divergence algorithmically, Git looks at the common ancestor (commit `E`), compares it against your current state (`C`) to see exactly what you changed, and then compares the ancestor against the incoming state (`G`) to see exactly what they changed. Git then attempts to synthesize and apply both sets of changes to the baseline `E` simultaneously. If the modifications do not overlap on the exact same lines of code, Git successfully creates a new **merge commit** (represented as `H` in the diagram) that mathematically binds the two parallel timelines together.
+In this simple example Git compares the common ancestor `E` with each tip, `C` and `G`, and combines the changes. If the changes can be merged cleanly, the result records a merge commit with both tips as parents. Different changes to the same lines can conflict, while identical changes can be combined; inspect the actual result.
 
 **Pause and predict:** What do you think happens if both branch `main` and branch `feature/rbac` modified the exact same `subjects` list in a RoleBinding manifest, but added different users? How will Git's three-way merge handle this specific scenario?
 
 <details>
 <summary>Check your prediction</summary>
 
-Overlapping edits to the same lines do not auto-merge. Git stops and marks a conflict because it cannot tell which user list should survive. Non-overlapping edits on different lines can still apply together.
+In this example the branches add different users at the same location, so a conflict is possible. Identical changes to the same lines can merge cleanly. Inspect the merge result instead of assuming all overlap behaves alike.
 
 </details>
 
-Write conflict or auto-merge before you continue. The table below names several change shapes. Read your own prediction before you use that table as a lookup.
+Record your prediction and the assumptions behind it. Compare it with the change shapes below, then check the actual merge result before deciding whether manual resolution is needed.
 
 | Change Type | Branch A (main) vs Base | Branch B (feature) vs Base | Git's Action during Merge |
 | :--- | :--- | :--- | :--- |
 | File added | Not present | Added | File is added |
 | File modified | Unchanged | Modified | Modification applied |
 | File deleted | Deleted | Unchanged | File remains deleted |
-| File modified | Modified (Line 10) | Modified (Line 50) | Both modifications applied |
-| File modified | Modified (Line 20) | Modified (Line 20) | **CONFLICT** |
+| File modified | Modified (Line 10) | Modified (Line 50) | Often both apply; inspect the result |
+| File modified | Different change (Line 20) | Different change (Line 20) | Can conflict; identical changes can merge |
 
 ### Merge Bases, Strategies, and Git's Internal Engines
 
@@ -162,29 +166,37 @@ The merge base is commit `B`. To find it, trace backwards from `main` (commit D)
 
 </details>
 
-Write the commit letter before you continue. The next paragraph names merge strategies. It does not identify the base of this topology.
+Record the commit letter and trace both ancestry paths back to that point. Then explain why choosing a strategy is a separate decision from identifying the merge inputs.
 
 Git provides several merge strategies that govern how files are combined: `ort`, `recursive`, `resolve`, `octopus`, `ours`, and `subtree`. The installed Git version matters when interpreting a strategy name.
 
 The current [Git merge documentation](https://git-scm.com/docs/git-merge) specifies `ort` as the default strategy when merging a single head and `octopus` for multiple heads, unless a strategy is chosen explicitly. `ort` uses the histogram diff algorithm by default for merge comparisons. `recursive` was a separate implementation through Git 2.49; starting with 2.50, the name is a synonym for `ort`. Check the installed version before comparing strategy behavior, and do not infer a universal speed or accuracy ranking from the strategy name.
 
-The other available strategies serve highly specialized use cases. The `resolve` strategy uses a very traditional three-way merge algorithm but explicitly does NOT handle file renames, whereas `ort` detects and handles renames gracefully. The `ours` strategy (invoked via `git merge -s ours`) aggressively discards ALL changes from the other branch entirely—the resulting tree is always mathematically identical to the current branch's HEAD tree. It is crucial to understand that this is fundamentally different from the strategy option (invoked via `git merge -X ours`), which still performs a standard three-way merge but automatically favors the current branch's code only when resolving overlapping conflicting hunks.
+The `resolve` strategy does not handle file renames; `ort` can detect them. `git merge -s ours` records the current tree as the result of the entire merge. In contrast, `git merge -X ours` favors the current side for conflicting hunks while retaining non-conflicting changes from both sides; for a binary conflict it selects the entire current-side content. Review the resulting tree in either case.
 
 #### The Resolution Process
 
-When Git encounters overlapping changes that it cannot mathematically resolve, it halts the automated merge process. You must manually intervene. The manual resolution process follows five strict, sequential steps:
+When Git cannot combine changes automatically, inspect the index and decide how to resolve them. This workflow covers a text conflict; other conflict types, such as delete/modify, may have no inline markers.
 
 1. **Identify the Conflict:** Git stops the merge execution and marks the files as conflicted in the index. Run `git status` to see the exact list of files requiring your immediate attention.
-2. **Locate the Markers:** Open the conflicted file in your text editor and search for the standard conflict markers: `<<<<<<<` (which marks the beginning of your current branch's changes), `=======` (the dividing line separating the two diverging realities), and `>>>>>>>` (which marks the end of the incoming branch's changes).
+2. **Locate the Markers:** For a text conflict, inspect `<<<<<<<`, `=======`, and `>>>>>>>` in the file. For markerless conflicts, use `git status` and `git ls-files -u` to inspect the unmerged paths and stages.
 3. **Analyze the Divergence:** Carefully read the code within the markers. Understand exactly what the `HEAD` version was trying to accomplish architecturally versus what the incoming branch was attempting to do.
-4. **Synthesize the Intent:** Delete the conflict markers entirely and manually edit the raw code so that both intended changes are combined harmoniously, ensuring you do not introduce YAML syntax errors or semantic logical bugs.
-5. **Finalize the Resolution:** Save the file, run `git add <file>` to instruct Git that the conflict has been successfully resolved, and finally run `git commit` to securely finalize the overarching merge operation.
+4. **Synthesize the Intent:** Remove any markers and edit the file to preserve the intended changes. Validate syntax and behavior separately.
+5. **Record the Resolution:** Save and validate the chosen content, run `git add <file>` to stage it, inspect any remaining unmerged paths, and use `git commit` to record the active merge. Staging records a choice; validation must establish whether it meets the intended requirements.
 
 ### Conflict Resolution in Infrastructure-as-Code: Multi-File Complexity
 
-Conflicts are not compiler errors; they are simply Git pausing its execution to ask for human judgment because its mathematical models cannot safely guess developer intent. When a conflict occurs, Git's internal index becomes a highly complex, multi-dimensional workspace. During a three-way merge, Git physically stores up to three distinct versions of each conflicted file directly within the index structure: stage 1 (the common ancestor base), stage 2 (the current HEAD version), and stage 3 (the incoming MERGE_HEAD version). You can inspect these internal stages directly by running `git ls-files -u`. Furthermore, when using the modern `ort` merge strategy, Git intelligently writes an `AUTO_MERGE` reference pointing to a tree that exactly matches the current working tree content, complete with all the inline conflict markers.
+In a three-way conflict, the index can hold stage 1 (base), stage 2 (current side), and stage 3 (incoming side); inspect them with `git ls-files -u`. With `ort`, `AUTO_MERGE` records a tree snapshot of the conflicted working tree as Git initially wrote it, not a live view of subsequent edits.
 
-Consider a complex real-world platform scenario. Team Alpha is working on branch `feature/ha-redis` to increase redundancy. Team Beta is simultaneously working on branch `feature/redis-auth` to lock down security. Both teams heavily modify the core `redis-deployment.yaml` and the overarching `kustomization.yaml` file that orchestrates the deployment logic.
+**Worked diagnosis:** Suppose `deployment.yaml` has a text conflict during a two-parent merge. Start with `git status --short`: a `UU` entry indicates both sides modified the path and Git has not recorded a resolution. Then run `git ls-files -u -- deployment.yaml` to inspect the unmerged index entries. The stage numbers identify the base and each side, while the object IDs identify the stored file versions. This makes the index useful even when a working-tree file has already been edited.
+
+For a path with all three stages, `git show :1:deployment.yaml` prints the base, `git show :2:deployment.yaml` prints the current side, and `git show :3:deployment.yaml` prints the incoming side. Compare each side against the base to understand what changed, then compare those intentions against the file you intend to stage. These are whole-file versions, not isolated conflicting lines. For example, the base might request two replicas, the current side five, and the incoming side three; selecting a value requires a product decision, not a Git command that can infer capacity needs.
+
+Not every conflict has all three entries: an add/add conflict has no base for that path, and a delete/modify conflict lacks the deleted side. A missing stage is evidence about the conflict shape, so check `git ls-files -u` before trying to show it. Choosing `git checkout --ours -- deployment.yaml` selects the entire current-side file, which can discard unrelated incoming edits as well as the disputed hunk. Instead, edit deliberately and inspect the resulting diff.
+
+After resolving, `git add deployment.yaml` replaces its unmerged entries with the staged result; rerun `git ls-files -u` to check whether any paths remain unmerged. Staging records your choice, but does not establish that a selector matches its labels, a reference exists, or the workload behaves correctly. Validate the complete rendered configuration and its relationships, then finish an active merge with `git commit` after review. If you decide to abort instead, first inspect what work must be preserved.
+
+Hypothetical scenario: teams change two Redis-related files. The snippets below are illustrative fragments, not complete runnable resources or an HA or authentication configuration. The image tag stands in for a hypothetically approved base image; it is not a universal recommendation. Three replicas alone do not establish Redis high availability, and setting `REDIS_PASSWORD` alone does not establish server authentication. The password is a dummy value shown in plaintext; do not store real secrets this way.
 
 Team Alpha's changes on `feature/ha-redis`:
 ```yaml
@@ -228,7 +240,7 @@ secretGenerator:
   - password=supersecret
 ```
 
-When the lead platform engineer attempts to merge `feature/redis-auth` into `feature/ha-redis`, Git evaluates the text, detects the severe overlap, and violently halts the process across multiple files:
+For a synthetic base chosen to make both files conflict, a merge may report output like the following. The commands and output are illustrative; the fragments above do not create the branches or base:
 
 ```bash
 git checkout feature/ha-redis
@@ -240,11 +252,11 @@ git merge feature/redis-auth
 # Automatic merge failed; fix conflicts and then commit the result.
 ```
 
-If you panic upon seeing massive multi-file infrastructure conflicts, remember that running `git merge --abort` is functionally equivalent to running `git reset --merge` when a `MERGE_HEAD` is present, but only when your working tree and index are clean enough for Git to unwind the merge safely. If you have unstaged edits outside the conflict, stash or commit them first, or use `git merge --abort` only after understanding what will be discarded. When `merge.autostash` is enabled, Git may temporarily stash local changes during the merge and restore them on abort via `MERGE_AUTOSTASH`. If you choose to proceed instead of aborting, you must synthesize the conflicting configurations accurately, ensuring no YAML structures are broken.
+Before starting a merge, commit or stash unrelated changes so they can be recovered. If a merge is in progress, `git merge --abort` attempts to reconstruct the pre-merge state; pre-existing uncommitted changes can make that reconstruction unreliable. With `MERGE_AUTOSTASH`, abort applies the saved stash, which may itself conflict. Inspect and preserve work before recovery; do not assume a conflicted index can be stashed safely.
 
-To successfully resolve this specific scenario, we must determine the desired outcome across all files: we want High Availability (replicas: 3) AND authentication (env vars). For the infrastructure to actually work, the Kustomization file must include BOTH the `commonLabels` AND the `secretGenerator` so that the `redis-secret` referenced in the deployment actually exists.
+For this illustration, preserve the intended replica count and Secret reference together with the generator. These fragments do not establish a working service, authentication, or high availability. `commonLabels` is deprecated and can add labels to selectors; changing an existing Deployment's immutable selector can prevent an update. Consider `labels` with `includeSelectors: false` where appropriate, and inspect rendered selectors and Pod labels before migrating.
 
-The correctly synthesized deployment configuration:
+Illustrative combined Deployment fragment:
 ```yaml
 spec:
   replicas: 3
@@ -261,7 +273,7 @@ spec:
               key: password
 ```
 
-The correctly synthesized kustomization configuration:
+Illustrative combined Kustomization fragment:
 ```yaml
 resources:
 - redis-deployment.yaml
@@ -273,25 +285,27 @@ secretGenerator:
   - password=supersecret
 ```
 
-Always comprehensively validate the structural integrity of your infrastructure-as-code files before committing the final resolution. Once verified, add both files to the index and commit to finalize the complex multi-file merge.
+For a complete runnable configuration, validate the rendered manifests and references before staging and committing the resolution. Compare the generated Secret name with the Deployment reference as well as checking schema shape; the illustrative fragments alone do not prove that relationship works.
 
-After finalizing a merge, inspect the result from more than one perspective. By default, `git show <merge-commit-hash>` uses a dense combined diff for a merge, subject to options such as `--first-parent`. A combined diff lists files modified from all parents; the dense form omits uninteresting hunks where the parents have only two variants and the result picks one without modification. It is therefore not a complete list of changes or a record of human actions. For a two-parent merge, `git show --remerge-diff <merge-commit-hash>` reconstructs a temporary tree, potentially containing conflict markers, and compares it with the recorded result. It can help investigate differences, but is not a transcript of how the merge was resolved. Its output and option interactions may change except where explicitly documented. See [git-show](https://git-scm.com/docs/git-show) and compare parent-specific diffs where needed.
+Once the merge is committed, inspect its result from more than one perspective. By default, `git show <merge-commit-hash>` uses a dense combined diff for a merge, subject to options such as `--first-parent`. A combined diff lists files modified from all parents; the dense form omits uninteresting hunks where the parents have only two variants and the result picks one without modification. It is therefore not a complete list of changes or a record of human actions. Git 2.36's release notes introduce `git log --remerge-diff`. In Git 2.56, `git show --remerge-diff` also reconstructs a temporary tree for a two-parent merge, potentially containing conflict markers, and compares it with the recorded result. It can help investigate differences, but is not a transcript of how the merge was resolved. Its output and option interactions may change except where explicitly documented. Compare parent-specific diffs where needed.
+
+The following commands are illustrative for a complete repository; the fragments above do not supply all required files. Rendering and schema validation do not prove the generated Secret exists in a cluster.
 
 ```bash
-kubectl kustomize . | kubeconform -summary -
+kubectl kustomize . | kubeconform -strict -kubernetes-version 1.35.0 -summary -
 
 # If successful:
 git add redis-deployment.yaml kustomization.yaml
-git commit -m "Merge redis-auth, resolving multi-file replicas, image, and secret generator conflicts"
+git commit -m "Merge redis-auth, synthesizing replica, image, and Secret reference intent"
 ```
 
-Hypothetical scenario: a platform engineer resolves the core Deployment YAML manually but, feeling overwhelmed, runs `git checkout --ours kustomization.yaml` to bypass the second conflict. Git accepts the command and allows the merge to finish, yet the Deployment now expects a password Secret that the Kustomization file no longer generates. In a GitOps flow, that kind of text-level success can become a runtime failure as soon as the controller applies the reconciled tree. The lesson is not that `--ours` is forbidden; it is that whole-file conflict shortcuts must be justified against the complete resource graph, not against the file that looks most annoying in the editor.
+Hypothetical scenario: a platform engineer resolves the Deployment manually, then uses `git checkout --ours kustomization.yaml`, stages that file and commits the merge. The Deployment fragment references a password Secret that the chosen Kustomization no longer generates. Inspect the rendered resources to expose that missing relationship. Choosing a whole file can be deliberate, but the decision needs review against the complete resource graph before anyone considers deployment.
 
 When you review this kind of merge, read the final configuration as a set of relationships rather than as two independent files. Rendering with `kubectl kustomize` produces manifests; kubeconform checks their schema shape. Neither proves that a referenced Secret exists in the target namespace or that a container uses its value correctly. Inspect the rendered names and references separately, then use authorized server and runtime checks for the intended environment. Keep these checks distinct before treating the merge as ready for deployment.
 
-To aid in visualizing these complex situations, you can utilize `git mergetool`, which launches a specialized external visual diffing tool presenting the BASE, LOCAL, and REMOTE versions side-by-side, and then automatically writes your final resolved result directly to the MERGED file. You can also significantly alter how Git presents conflicts natively in your editor. Three distinct merge conflict styles are available via the `merge.conflictStyle` configuration: `merge` shows only the two diverging sides, `diff3` adds a `|||||||` block showing the original ancestor code to provide critical context on why the conflict happened, and `zdiff3` is functionally identical to diff3 but trims matching, unchanged lines from the outer edges of the conflict block to reduce visual noise. The highly efficient `zdiff3` conflict style was introduced in Git 2.35.0.
+`git mergetool` invokes an external merge tool, selected by configuration or from Git's available defaults. For a custom `mergetool.<tool>.cmd`, Git sets `BASE` (the common base, when available), `LOCAL`, `REMOTE` and `MERGED`; interfaces and behavior vary by tool. Git's `merge.conflictStyle` controls text markers: `diff3` includes the base, while `zdiff3` also trims matching lines at conflict edges. Check the installed Git version and tool configuration.
 
-If your team constantly encounters the exact same identical conflicts repeatedly due to long-lived branches, Git's `rerere` (Reuse Recorded Resolution) feature is an absolute lifesaver. It is globally enabled by setting the configuration `rerere.enabled = true`. When enabled, Git mathematically fingerprints the conflict and observes your manual resolution, storing the mapping in a hidden cache. If that exact conflict ever arises again during a future merge or rebase, Git automatically applies your previous resolution without halting.
+Git's `rerere` records and reuses conflict resolutions when enabled with `rerere.enabled`; an existing `rr-cache` directory also enables it by default. Its cache belongs to that repository's Git directory. Reuse is not validation: inspect the result, stage the resolved files if needed, and complete the merge. Whether reuse also stages files depends on the autoupdate setting.
 
 ### Predict and Observe a Merge
 
@@ -360,7 +374,7 @@ git status --short
 git ls-files -u
 ```
 
-A recorded run of this exact fixture with Git 2.56.0 completed a clean merge, retained both changes, and left no unmerged entries or working-tree changes. Results can differ with Git version, configuration, or changed inputs; inspect your own output. If a conflict occurs, use `git status` to identify the affected file and resolve its markers before continuing.
+A recorded run of this exact fixture with Git 2.56.0 completed a clean merge, retained both changes, and left no unmerged entries or working-tree changes. The edits affect separate regions, which Git can combine; this fixture establishes no universal line-gap threshold. Results can differ with Git version, configuration, or changed inputs; inspect your own output. If a conflict occurs, use `git status` to identify the affected file and resolve its markers before continuing.
 
 Compare the combined file with this intended result:
 ```yaml
@@ -392,22 +406,22 @@ grep -nE 'replicas:|image:' deployment.yaml
 kubeconform -strict -kubernetes-version 1.35.0 -summary deployment.yaml
 ```
 
-Expect replicas `5`, image `nginx:1.27.1`, no unmerged entries, and a valid Deployment schema. On a clean merge, Git has already created the merge commit; no additional commit is needed. If your run conflicts, remove markers while retaining both intended changes, stage the resolution, and complete the merge with `git commit`.
+Expect replicas `5`, image `nginx:1.27.1`, empty output from `git status --short` and `git ls-files -u`, and a valid Deployment schema. If Git opens an editor for the merge message, save and close it to finish that merge commit. Once the clean merge command succeeds, no additional commit is needed. If your run conflicts, remove markers while retaining both intended changes, stage the resolution, and complete the merge with `git commit`.
 
 A clean text merge is not proof that the combined configuration works in a target environment. Schema validation checks shape, not deployment behavior. Compare the branch changes and review their combined intent before applying any configuration.
 
 ### The Octopus Merge: Taming Multiple Branches
 
-Occasionally, a Kubernetes platform team needs to orchestrate a massive integration of several entirely independent feature branches into a final release candidate branch all at the exact same time. Attempting to do this sequentially through a long chain of individual two-branch merges creates an unnecessarily messy, stair-stepped history. Git provides the powerful `octopus` strategy specifically for this scenario. It is automatically selected as the default strategy when you instruct Git to merge more than two branches simultaneously.
+An octopus merge combines multiple incoming heads in one merge commit. Git selects the `octopus` strategy by default when merging more than one incoming head; it is suitable for bundling topic branches when the merge can be handled automatically. The diagram's arrows point from parent commits toward their child.
 
 ```mermaid
 graph LR
     A((A)) --> B((B))
-    B --> C((C: main))
+    B --> C((C: release-v1.35))
     
-    B --> D((D: b1))
-    B --> E((E: b2))
-    B --> F((F: b3))
+    B --> D((D: ingress))
+    B --> E((E: autoscaling))
+    B --> F((F: network-policies))
     
     C --> G((G: Octopus Merge))
     D --> G
@@ -425,30 +439,27 @@ git merge feature/ingress feature/autoscaling feature/network-policies
 <details>
 <summary>Check your prediction</summary>
 
-Unlike a standard two-branch three-way merge, which pauses mid-flight and leaves interactive conflict markers in your working directory while keeping the branch pointer unchanged, an octopus merge stops as soon as it hits a conflict it cannot resolve automatically. Git prints `Automatic merge failed; fix conflicts and then commit the result.`, does **not** move the branch ref, and leaves the working tree and index in a conflicted or partially merged state. Run `git merge --abort` to discard that in-progress merge and return to the pre-merge snapshot.
+It can leave a hand-resolvable merge when the final incoming head conflicts. In the recorded Git 2.56 control, the branch ref stayed unchanged while `MERGE_HEAD`, unmerged index entries and partial work remained; stage 2 contained an intermediate octopus result. The pinned implementation permits this only for the final head: an earlier unresolved conflict prevents processing later heads. Inspect status rather than assuming one universal failure state. I recommend aborting an active attempt before retrying integration pairwise, with validation after each merge and on the combined result.
 
 </details>
 
-Write pause or stop before you continue. The next prompt asks which recovery you would choose after that failure. It does not describe the failure itself.
+Record the branch, index and working-tree state you would inspect after a failed attempt. Use that evidence to choose recovery rather than assuming a failed command left the workspace unchanged.
 
-> **Stop and think**: If an octopus merge fails due to a conflict between `feature/autoscaling` and `feature/network-policies`, which approach would you choose:
-> A) Abandon the octopus merge entirely and merge all three sequentially.
-> B) Merge the two conflicting branches into each other first, resolve the conflict, and then retry the octopus merge with the updated branches.
-> Why is your chosen approach safer for maintaining a clean history?
+> **Stop and think**: If the octopus attempt fails, how would you use a dedicated integration branch and pairwise merges to identify and resolve the conflict without modifying either topic branch? Inspect the failed state first, abort an in-progress attempt if appropriate, then merge and validate each topic into the integration branch in turn. Explain how this preserves the topic branches and why the final result still needs review.
 
 ### Advanced History Rewriting and Cherry-Picking
 
 Before integrating a branch, consider whether its commits communicate independent changes clearly. Cleaning up unpublished work can help review, but rewriting a shared branch requires coordination with its collaborators.
 
-The `git rebase --interactive` command is the ultimate tool for historical surgery. It supports a wide array of powerful commit-editing commands, including `pick`, `edit`, `reword` (to change a message without altering code), `drop` (to erase a commit entirely), `squash` (to meld a commit into the previous one while combining messages), `fixup`, `fixup -c/-C`, `break`, and `exec` (which runs a shell script against every commit to ensure tests pass). By default, `git rebase --interactive` strictly excludes merge commits from the generated instruction list to flatten the history.
+Interactive rebase supports `pick`, `edit`, `reword`, `drop`, `squash`, `fixup`, `break`, and `exec`. An `exec` instruction runs at its position in the instruction list; `--exec` inserts commands after commit-creating instructions. With autosquash, inserted commands appear at the end of a squash/fixup series, not after every original commit. By default the instruction list omits merge commits.
 
-Additionally, you can use `git rebase --onto <newbase>` to physically transplant a sequence of commits onto a completely different base than their original upstream, allowing a topic branch to be detached and moved to a different parent entirely.
+Use `git rebase --onto <newbase> <upstream> <branch>` to select a commit range and replay it onto another base. Inspect the upstream boundary and graph first, because choosing the wrong range can omit required changes or replay unrelated work.
 
 If your team uses rebasing for unpublished local work, `git pull --rebase origin main` fetches remote changes and replays your local commits on top. Check your current branch and worktree first, and follow the repository's review policy before pushing. Conflicts can still stop the replay; rebasing does not validate the resulting manifests or authorize rewriting shared history.
 
-If you only need to integrate a single, highly specific commit from another divergent branch without merging the whole timeline, use `git cherry-pick`. Running `git cherry-pick -x` automatically appends a highly useful '(cherry picked from commit ...)' traceability line directly to the commit message. Running `git cherry-pick -n` (or `--no-commit`) applies the underlying changes to the working tree and index without actually creating a new commit, allowing you to manually tweak the code before committing.
+Use `git cherry-pick` to apply selected commits without merging the entire branch. `git cherry-pick -x` adds a source line for conflict-free picks; conflicts may require recording provenance manually. `git cherry-pick -n` applies changes without creating a commit. Either form can conflict and needs review and validation.
 
-Another powerful mechanism is `git merge --squash`. This command executes the integration logic of a merge but deliberately does not create a commit and does not record the `MERGE_HEAD` pointer, leaving the heavily combined result purely staged in your index for a subsequent, manually crafted mega-commit.
+`git merge --squash` prepares a merge result without creating a commit or recording `MERGE_HEAD`. After a clean squash merge, review the working tree and staged changes before making a single commit. Inspect conflicts deliberately if integration fails; squash does not establish that the combined changes are valid.
 
 To effectively audit how merges have structurally impacted your repository over time, you can query the timeline using `git log --merges` (which prints only merge commits and is functionally equivalent to passing `--min-parents=2`) or use `git log --no-merges` (which completely excludes all merge commits and is equivalent to passing `--max-parents=1`).
 
@@ -497,9 +508,9 @@ For a GitOps repository, inspect the controller's configured revision and sync p
 
 Repository merge restrictions determine which integration operations are allowed. Choose these rules alongside the branching model; enabling a particular merge method does not itself enforce release cadence, testing or deployment approval.
 
-GitHub offers three distinct pull request merge methods: 'Create a merge commit' (which forces `--no-ff`), 'Squash and merge', and 'Rebase and merge'. It is critical to understand that GitHub's 'Rebase and merge' feature does not operate exactly like a local rebase; it always aggressively updates the committer information and creates entirely new commit SHAs, which can confuse local clients if not managed properly.
+GitHub offers merge commit, squash, and rebase merge methods. GitHub's rebase-and-merge creates new commit SHAs and updates committer information; account for that difference when reconciling local history.
 
-GitLab similarly offers three formal merge request methods: 'Merge commit' (the `--no-ff` equivalent), 'Merge commit with semi-linear history', and 'Fast-forward merge'. GitLab added automatic rebase before merge for both the semi-linear and fast-forward methods starting in GitLab 18.0.
+GitLab offers merge commit, semi-linear, and fast-forward merge methods. Its automatic rebase feature was introduced behind a disabled flag in 18.0, enabled on GitLab.com in 18.11, had the flag removed in 19.0, and became generally available in 19.2. Check the installed version and configuration before relying on it.
 
 ## Patterns & Anti-Patterns
 
@@ -516,13 +527,13 @@ A third pattern is to keep merge commits reviewable and explain any additional c
 | **Short-lived review branches** | Engineers want frequent integration with review before merge. | Limits accumulated divergence without guaranteeing conflict-free merges. | Keep checks fast and define how incomplete behavior stays out of releases; use flags when appropriate. |
 | **Layered conflict validation** | The merge touches Kubernetes YAML, Helm output, Kustomize overlays, or policy-as-code. | Rendering, schema validation, reference inspection and runtime checks answer different questions. | Record versions and schema sources; keep applicable checks available locally and in CI. |
 | **Reviewable merge commits** | A three-way merge needed synthesis. | Parent-specific and remerge comparisons provide complementary views of the result. | Record intent and validation; no diff proves which edits were manual. |
-| **Recorded recurring resolutions** | The same branch family repeatedly conflicts during release preparation. | `rerere` can reuse a previously accepted resolution, reducing repeated manual work. | The cache should be trusted only after the team has validated the first resolution carefully. |
+| **Recorded recurring resolutions** | The same branch family repeatedly conflicts during release preparation. | `rerere` can reuse a previously recorded resolution, reducing repeated manual work. | The cache is local to each repository; review every reused result against current intent and tests. |
 
-The corresponding anti-patterns usually arise from understandable pressure. A release is late, an environment is unhealthy, or a senior engineer is away, so someone chooses the fastest-looking button in an IDE. The problem is that Git conflict tools optimize for completing the merge operation, while production safety depends on preserving both branches' intent. Accepting "ours" across an entire file may remove conflict markers quickly, but it also discards the incoming branch's design without forcing the resolver to state that decision explicitly. If a security branch added a NetworkPolicy and the release branch changed only image tags, a blind "ours" resolution can silently erase the control that mattered most.
+The corresponding anti-patterns can arise under release pressure: a resolver chooses an IDE shortcut to finish the merge without inspecting the selected content. Accepting "ours" across an entire file can discard incoming changes outside the disputed hunk. In a hypothetical Deployment conflict, both branches change the image while the security branch also adds a container security context elsewhere in that same file. Selecting the release branch's whole file can discard that added context. Compare both versions and the intended result before staging it.
 
 The second trap is leaving a release branch without an owner or a fix-propagation policy. Isolation can serve stabilization or maintenance, but missed fixes can leave supported branches inconsistent. In a GitOps repository, compare the branch with the actual tracked revision, not an assumed `main`. A risky integration may combine hotfixes, chart updates and policy changes under release pressure; inspect those changes and their intended environments before choosing how to integrate them.
 
-The third anti-pattern is treating automatic merge success as proof of semantic correctness. The auto-merge case study above demonstrates why this is dangerous. Modern `ort` can correctly combine far-apart hunks, and that is usually a benefit, but a clean merge can still produce a Deployment whose labels no longer match its selector or an overlay whose generated Secret name changed while the consuming environment variable stayed fixed. Before running this in your own repository, pause and predict: if Git reports "Automatic merge went well" on a Kubernetes manifest, what separate validations would prove that the cluster object is still meaningful rather than merely parseable?
+The third anti-pattern is treating automatic merge success as proof of semantic correctness. The diagnostic exercise combines the scale and image edits correctly; a different combination can still violate a resource relationship. For example, independent changes to a Deployment's selector and Pod labels may merge cleanly while leaving those values inconsistent. Kustomize rewrites recognized generated-resource references, so inspect its rendered output rather than assuming a name change broke every reference. Pause and predict: after a successful text merge, which checks establish schema shape, local relationships and behavior in the intended target environment?
 
 ## Decision Framework
 
@@ -537,33 +548,33 @@ Use the following decision matrix as a practical guide when you are under pressu
 | Current branch is behind and has no unique commits | `git merge --ff-only incoming` | The branch pointer can move without creating a synthetic merge commit. | Run the relevant tests or render manifests if the incoming branch was not already validated. |
 | Two fresh branches touched different files | Normal three-way merge with `ort` | Git can synthesize independent file changes cleanly while preserving both parents. | Review the merge commit and run targeted CI for changed areas. |
 | Two branches touched the same Kubernetes manifest | Resolve intent, then validate in layers | Text adjacency cannot establish resource relationships. | Render first, validate against the chosen schema version, inspect references, and run applicable policy/server/runtime checks. |
-| Several independent branches need one release branch | Octopus merge only if conflicts are unlikely | The history stays compact, but the operation refuses manual conflicts. | Pre-merge each branch against trunk and retry only when every pair is clean. |
-| Old branch has a stale merge base | Recreate from current `main` and cherry-pick intent | The old graph encodes obsolete assumptions about the platform. | Test each selected commit after replay, especially migrations and API changes. |
+| Several independent branches need one release branch | Consider octopus when conflicts are unlikely | A difficult conflict may stop the operation and leave partial work. | Inspect status; abort an in-progress attempt if appropriate and integrate conflicting changes separately. |
+| Old branch has a stale merge base | Inspect intent, then compare merge and selective cherry-pick | Old assumptions may need adaptation, but age alone does not predict conflicts. | Review dependencies and test selected changes after replay, especially migrations and API changes. |
 | Pull request contains noisy local commits | Interactive rebase before review | Reviewers see a coherent story instead of temporary savepoints. | Re-run tests after rewriting and force-push only to branches you own. |
 
-There is one final question that experienced maintainers ask before approving any non-trivial merge: "Could I explain this result to the on-call engineer at 3 a.m.?" If the answer is no, the branch is too large, the resolution is too clever, or the validation evidence is too thin. That question is especially useful for GitOps work because the repository is both documentation and control plane input. A reviewer who can trace the merge base, the conflicting intent, the chosen resolution, and the validation command has enough context to trust the change or reject it with specifics.
+One useful review heuristic is: "Could I explain this result to the on-call engineer?" If the explanation is unclear, investigate whether the scope, resolution or validation evidence needs improvement. That question is useful for GitOps work because the repository is both documentation and control plane input. Trace the merge base, each branch's intent, the chosen resolution and the relevant validation before deciding whether the evidence supports integration.
 
 For day-to-day work, a compact flow helps prevent panic decisions. Start with `git status` to make sure your workspace is clean, inspect the graph with `git log --oneline --graph --decorate --all`, identify the merge base when the branch has been alive for more than a short review cycle, then choose the least surprising integration method that preserves the information your team will need later. After resolution, validate the rendered platform object and inspect the merge commit rather than only the final file. This sequence is slower than clicking a button, but it is much faster than debugging a cluster that accepted a syntactically valid yet semantically broken configuration.
 
 ## Did You Know?
 
-1. Current Git documentation names `ort` as the default for merging one head and `octopus` for multiple heads; `recursive` names `ort` starting in Git 2.50.
-2. Running the maintenance command `git rerere gc` prunes unresolved conflict records older than 15 days and resolved conflict records older than 60 days, which keeps repeated-resolution caches from growing without bound.
-3. Octopus merges fit the Linux-style maintainer workflow of bundling many topic branches into a single integration history without a long sequence of two-parent merge commits.
-4. The conflict marker symbols (`<<<<<<<`, `=======`, `>>>>>>>`) predate Git by decades and were established by earlier merge tooling in the RCS era, which is why they appear familiar across many version control systems.
+1. Git 2.50 made `recursive` a synonym for `ort`; earlier versions used a separate implementation.
+2. `git rerere gc` uses configurable default expiry periods of 15 days for unresolved and 60 days for resolved records.
+3. Git documents three conflict styles: `merge`, `diff3`, and `zdiff3`. Git 2.35's release notes announce the added "zealous diff3" presentation; that release's configuration manual names the setting `zdiff3`.
+4. A three-way conflict can store up to three index stages: base, current side and incoming side.
 
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
 | :--- | :--- | :--- |
-| **Panic committing unresolved markers** | Engineer feels overwhelmed, attempts to save work mid-conflict by running `git commit -a`, thereby committing `<<<<<<<` directly into the codebase. | Run `git merge --abort` immediately to reset the working directory to the pre-merge state, take a breath, and start over. |
+| **Committing unresolved markers** | Markers were staged as ordinary text. | If the merge is still in progress, inspect and resolve it or abort deliberately. If already committed, fix forward or use the team's approved history-recovery process; `git merge --abort` cannot undo a completed merge. |
 | **Breaking YAML indentation** | Deleting conflict markers shifts YAML blocks or introduces duplicate keys. | Run strict schema validation on rendered manifests; separately check references and behavior. A schema pass is not deployment proof. |
-| **"Ostrich merging" (ignoring upstream)** | Keeping a feature branch alive for 6 weeks without pulling from main, resulting in a monolithic, unresolvable conflict later. | Merge `main` into your feature branch (or rebase against it) daily. Conflict resolution should be a continuous, small-scale tax, not a massive end-of-project penalty. |
+| **Ignoring upstream** | Work diverges without checking how related changes interact. | Inspect the graph and changes, and integrate or rebase according to the team's policy; resolve and validate any conflicts. |
 | **Resolving logic, breaking syntax** | Focusing so hard on getting both sets of configuration into the file that you create duplicate keys (e.g., two `spec` blocks in a pod definition). | Understand the schema of the file you are editing. Use IDE plugins with Kubernetes schema validation enabled during conflict resolution. |
-| **Accidental "Evil Merges"** | While resolving a conflict, the engineer sneaks in an unrelated fix or typo correction that was not part of either branch. | A merge commit should *only* contain the resolution of the conflict. Make unrelated fixes in a separate, discrete commit afterward. |
+| **Unexplained extra merge changes** | A resolver adds an unrelated fix while combining the branches. | As a stricter review policy, keep unrelated fixes in separate commits. Git permits additional fixups; explain any such changes rather than assuming they came from a parent or conflict. |
 | **Deleting the wrong side** | Misunderstanding `HEAD` vs the incoming branch, and blindly choosing "Accept Current Change" when the incoming branch contained critical security patches. | Read the code inside the markers. Never trust automated UI buttons in IDEs without verifying what exact lines will survive the merge. |
 
-> **Stop and think**: Review the mistakes in the table above. Which of these would cause the most catastrophic failure in your current team's specific context? Rank them by potential severity based on your deployment pipeline's safeguards (or lack thereof).
+> **Stop and think**: Which failure in the table would matter most in your team's context? Rank the consequences and name the review or validation check that would expose each failure before deployment.
 
 ## Quiz
 
@@ -577,7 +588,7 @@ Check which branch you are on, whether the worktree is clean and whether anyone 
 <details>
 <summary>Question 2: You trigger an automated pipeline that attempts an octopus merge, integrating four different microservice deployment updates into a staging branch. Git halts and reports a conflict between two of the branches. What happens to the staging branch in this exact moment, and how is the pipeline affected?</summary>
 
-In this exact moment, the staging branch ref does not move because an octopus merge stops when it cannot finish automatically. Git reports `Automatic merge failed; fix conflicts and then commit the result.` Unlike a standard two-branch merge that pauses with conflict markers while leaving the merge in progress, an octopus merge does not advance the branch pointer, but it **does** leave the working tree and index dirty with conflict markers or partial merge results until you run `git merge --abort` (or resolve and commit). Pipelines must treat this as a failed merge attempt that needs cleanup, not as a no-op that left the workspace pristine.
+The branch ref does not move on a failed merge. Inspect `git status` and the index: depending on when and how the attempt failed, partial changes or an in-progress merge may remain. A pipeline should fail and perform appropriate cleanup, not assume a pristine workspace.
 
 </details>
 
@@ -591,7 +602,7 @@ Inspect the merge with `git show`, remembering that its default dense combined v
 <details>
 <summary><span>Question 4: An incident occurs in production because a <code>ConfigMap</code> update was inexplicably lost during a recent deployment. Looking at the Git history, you see a merge commit connecting a feature branch to main. The file changed on both branches, but the feature branch's changes are completely missing in the final merge commit. What likely happened during the conflict resolution?</span></summary>
 
-The engineer performing the merge likely encountered a complex conflict within the `ConfigMap`, became overwhelmed, and mistakenly opted to completely overwrite the incoming changes. They probably used a command like `git checkout --ours configmap.yaml` or blindly clicked "Accept Current Changes" in their IDE's conflict resolution interface. By doing so, they entirely discarded the valid configuration updates from the feature branch while keeping their own, and then finalized the merge commit without realizing the loss of data. This scenario underscores exactly why a visual inspection and validation of the final merged files (such as using `kubectl diff`) is absolutely mandatory before committing a resolved conflict.
+Choosing the current side during conflict resolution is one possible cause, but the history alone does not establish the command, intent, or motive. Compare the merge result with each parent and the original change, then inspect review evidence. Validate the local result; `kubectl diff` compares against a live target and requires appropriate access, so it answers a separate question.
 
 </details>
 
@@ -607,7 +618,7 @@ To evaluate the branching strategy, ask whether the team supports multiple relea
 <details>
 <summary><span>Question 6: You are tasked with taking over a legacy <code>feature/database-migration</code> branch that was abandoned by a former employee. Before attempting to integrate it, you run <code>git merge-base main feature/database-migration</code> and find that the common ancestor is a commit from over a year ago. What is the safest sequence of actions to rescue this work without breaking the current cluster state, and why?</span></summary>
 
-Attempting a direct three-way merge with a year-old base is extremely dangerous, as Git will try to mathematically reconcile hundreds of conflicting architectural changes simultaneously. Instead, you should first examine the original intent by running `git diff <merge-base-hash>..feature/database-migration` to isolate exactly what the former employee changed. Once the isolated logic is understood, the safest approach is to create a fresh branch off the current `main` and use `git cherry-pick` to selectively bring over only the relevant database migration commits. This strategy completely abandons the deeply diverged history and ensures you are manually adapting the legacy logic to the modern, real-time state of the infrastructure.
+Age alone does not determine conflict size. Inspect the graph, the base-to-branch diff, and current requirements, then compare a merge with selectively cherry-picking relevant commits onto a new branch. Cherry-picks can also conflict and may depend on omitted commits. Resolve and test the chosen result before any deployment; neither method guarantees cluster safety.
 
 </details>
 
@@ -623,6 +634,24 @@ Use a Unix-like shell with Git, Perl and kubeconform on `PATH` (for example `bre
 - [ ] Merge `feature/scale-api` into `feature/harden-api`, inspect the merge base, review the auto-merged `deployment.yaml`, and resolve the conflict in `configmap.yaml`.
 - [ ] Validate both resolved manifests against the chosen schemas, then inspect the ConfigMap reference and explain why a schema pass cannot prove that reference exists in a cluster.
 - [ ] Inspect the final merge with `git show`, compare each parent and explain what the diff views can and cannot establish about the resolution.
+
+<details>
+<summary>Hint 1: Separate the decisions</summary>
+
+Identify what each branch intended before choosing the ConfigMap value. If `git status` shows `UU`, both sides modified that file: inspect both versions and the base before selecting the result. A clean Deployment merge still needs review to confirm both intended changes survived.
+</details>
+
+<details>
+<summary>Hint 2: Locate the conflict</summary>
+
+Use Git's status and unmerged index entries to find the affected file. If there is no `MERGE_HEAD`, do not assume a merge is still active or run abort blindly; inspect the branch and working tree to determine the actual state before choosing recovery.
+</details>
+
+<details>
+<summary>Hint 3: Check the relationship</summary>
+
+If schema validation fails, inspect the reported file and field against the selected Kubernetes schema version, repair the manifest, and rerun the check. Once it passes, compare the Deployment's ConfigMap reference name with the ConfigMap's metadata name; explain what that local comparison cannot prove.
+</details>
 
 <details>
 <summary>Setup and task solutions</summary>
@@ -774,7 +803,7 @@ To complete the comparison task for this recorded two-parent merge, use `git sho
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: pointer move versus a new commit. Next action: look for a single line ending at the feature tip. A merge commit appears only when you force `--no-ff` or the histories had already diverged.
+Failure layer: pointer move versus a new commit. In this fixture, look for a single line ending at the feature tip. A forced `--no-ff` would instead record a merge commit; inspect ancestry and merge options before generalizing to another history.
 
 </details>
 
@@ -783,7 +812,7 @@ Failure layer: pointer move versus a new commit. Next action: look for a single 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: overlapping hunks. Next action: expect a conflict, not a combined list. Different lines can still apply; the same lines cannot be guessed.
+Failure layer: differing edits to the same hunk can conflict. Inspect the result; identical edits can merge cleanly.
 
 </details>
 
@@ -796,12 +825,12 @@ Failure layer: the common ancestor, not either tip. Next action: walk both histo
 
 </details>
 
-**Card D: An octopus conflict pauses like a two-branch merge.** `feature/network-policies` conflicts after two other branches merged cleanly. The plan is to edit markers and commit.
+**Card D: A failed octopus attempt left a pristine workspace.** `feature/network-policies` conflicts after two other branches merged cleanly. The pipeline plans to start another integration without inspecting status.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: all-or-nothing versus a paused two-parent merge. Next action: do not treat the partial result as a commit to finish. Abort and integrate the conflicting pair first.
+Failure layer: a failed octopus attempt can leave partial state. Inspect status, abort an in-progress merge if appropriate, and integrate the conflicting changes separately.
 
 </details>
 
@@ -815,6 +844,8 @@ kubeconform -strict -kubernetes-version 1.35.0 -summary missing-reference.yaml
 Expect a schema pass: the reference is still a string of the permitted shape. Compare that name with the ConfigMap definition to identify the broken relationship yourself. Keep this diagnostic file uncommitted. Server-side validation and runtime observation answer further questions; neither was performed by this local exercise.
 
 Success means recording the merge base, both branches' intent, five replicas, the retained probe, the chosen strict ConfigMap value, a schema pass and the matching local reference names. Explain why the negative reference control still passes schema validation, and distinguish those results from admission acceptance, object existence in a target namespace and a functioning workload. Keep the scratch path and evidence for review; no production repository or cluster was changed.
+
+**Transfer challenge:** Consider two branches changing a Deployment selector and its Pod labels. How would you inspect and validate their relationship after merging, and what evidence would still require a target environment?
 
 ## Sources
 
@@ -830,14 +861,25 @@ Success means recording the merge base, both branches' intent, five replicas, th
 - [Git show documentation: merge-diff formats](https://git-scm.com/docs/git-show)
 - [Git rerere documentation](https://git-scm.com/docs/git-rerere)
 - [Git rebase documentation](https://git-scm.com/docs/git-rebase)
+- [Git pull: fetch, then rebase or merge](https://git-scm.com/docs/git-pull)
 - [Git cherry-pick documentation](https://git-scm.com/docs/git-cherry-pick)
 - [Git log documentation](https://git-scm.com/docs/git-log)
-- [Git attributes documentation for merge drivers](https://git-scm.com/docs/gitattributes)
-- [Kubernetes kubectl apply reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
 - [Kubernetes Kustomize documentation](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/)
 - [GitHub October 21 2018 post-incident analysis](https://github.blog/news-insights/company-news/oct21-post-incident-analysis/)
 - [GitHub pull request merge methods](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/about-merge-methods-on-github)
 - [GitLab merge request methods](https://docs.gitlab.com/user/project/merge_requests/methods/)
+- [Redis security and authentication](https://redis.io/docs/latest/operate/oss_and_stack/management/security/)
+- [Redis Sentinel high availability](https://redis.io/docs/latest/operate/oss_and_stack/management/sentinel/)
+- [Git 2.56 merge strategies](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/merge-strategies.adoc)
+- Git release history: [2.35](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/RelNotes/2.35.0.adoc), [2.36](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/RelNotes/2.36.0.adoc), [2.50](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/RelNotes/2.50.0.adoc).
+- [Git mergetool manual](https://git-scm.com/docs/git-mergetool)
+- [Git index entries and unmerged stages](https://git-scm.com/docs/git-ls-files)
+- [Kustomize labels and selectors](https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/labels/)
+- Kubernetes relationships: [Deployment selectors and immutable updates](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#label-selector-updates), [kubectl diff against live configuration](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/).
+- Git path and index operations: [checkout](https://git-scm.com/docs/git-checkout), [add](https://git-scm.com/docs/git-add), [short status](https://git-scm.com/docs/git-status), [stash conflicts](https://git-scm.com/docs/git-stash).
+- Git configuration: [merge conflict styles](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/config/merge.adoc), [rerere and local cache](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/config/rerere.adoc), [rerere expiry defaults](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/config/gc.adoc).
+- [Official Redis image entrypoint snapshot](https://github.com/redis/docker-library-redis/blob/76c393fd8ac537201fe4bc4f200b4b5daee03f24/7.2/alpine/docker-entrypoint.sh)
+- [Git 2.35 conflict-style configuration](https://github.com/git/git/blob/89bece5c8c96f0b962cfc89e63f82d603fd60bed/Documentation/config/merge.txt)
 
 ## Next Module
 
