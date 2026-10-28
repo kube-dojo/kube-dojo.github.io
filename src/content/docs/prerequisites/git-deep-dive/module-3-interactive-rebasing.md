@@ -8,7 +8,7 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 90–120 minutes (planning estimate for the long-form read and hands-on exercise, not measured learner timing)
 >
 > **Prerequisites**: Module 2 of Git Deep Dive
 
@@ -53,7 +53,7 @@ Write a count before you continue. The next section compares merge and rebase as
 
 ## Merging, Rebasing, and the Shape of Review
 
-When a feature branch falls behind `main`, Git gives you two ordinary ways to integrate upstream changes. A merge preserves the exact historical topology by creating a new commit with two parents. That is valuable when you need an auditable record of when two lines of development were joined, especially on long-lived release branches or shared integration branches. The cost is that repeated merges can create a graph full of diamonds, making it harder to answer simple questions such as "which commit introduced this regression?"
+When a feature branch falls behind `main`, Git gives you two ordinary ways to integrate upstream changes. When histories have diverged, a merge normally creates a new commit with two parents and preserves both lines of development. If the current branch is an ancestor of the target, Git can instead fast-forward its pointer without creating a merge commit. A merge commit is valuable when you need an auditable record of when two lines of development were joined, especially on long-lived release branches or shared integration branches. The cost is that repeated merges can create a graph full of diamonds, making it harder to answer simple questions such as "which commit introduced this regression?"
 
 ```mermaid
 flowchart LR
@@ -142,7 +142,7 @@ The command vocabulary is small, but the differences matter. `squash` and `fixup
 
 | Command | Action | Primary Use Case |
 | :--- | :--- | :--- |
-| `pick` | Applies the commit exactly as it is. | Default action. Leaves the commit untouched. |
+| `pick` | Replays the commit's change without intentionally editing it. | Default action. Its SHA can change when its parent changes. |
 | `reword` | Applies the commit, but pauses to open an editor so you can change the message. | Fixing a typo in a commit message or adding more descriptive context. |
 | `edit` | Applies the commit, then completely stops the rebase process, returning control to the terminal. | Splitting a large commit into smaller ones, or modifying the actual file contents of a historical commit. |
 | `squash` | Melds the contents of this commit into the commit immediately above it. Pauses to let you combine their commit messages. | Combining related changes (e.g., a feature and its corresponding unit tests) into one logical unit. |
@@ -150,7 +150,7 @@ The command vocabulary is small, but the differences matter. `squash` and `fixup
 | `drop` | Completely ignores the commit. It will not be replayed. | Deleting experimental code or accidental commits entirely. (You can also just delete the line in the editor). |
 | `exec` | Runs an arbitrary shell command after the previous line is applied. | Running a test suite or linter automatically after every commit to ensure the build isn't broken mid-history. |
 
-The replay loop is simple once you separate the plan from the execution. Git detaches `HEAD` at the chosen base, reads the first instruction, creates a replacement commit for that instruction, and advances through the list. If an instruction requires human input, Git pauses. If the list finishes successfully, Git moves the original branch name to the new final commit and leaves the old commits unreferenced except through safety mechanisms such as the reflog.
+The replay loop is simple once you separate the plan from the execution. Git detaches `HEAD` at the chosen base and processes the instructions in order, replaying or combining commits as requested; unchanged commits can sometimes be reused. If an instruction requires human input or conflicts, Git pauses. On success, Git moves the original branch name to the final commit. Old commits may remain reachable through other refs or reflogs. This simplified diagram highlights `pick`, `squash`, and `edit`; the table above covers the other instructions.
 
 ```mermaid
 flowchart TD
@@ -166,6 +166,8 @@ flowchart TD
 
     IsSquash -- No --> IsEdit{"Is it 'edit'?"}
     IsEdit -- Yes --> ApplyEdit["Apply, STOP execution, return control."]
+    ApplyEdit --> Resume["Amend or split; then rebase --continue."]
+    Resume --> Step4
 
     ApplyPick --> Step4["4. Repeat until the list is empty."]
     ApplySquash --> Step4
@@ -173,7 +175,7 @@ flowchart TD
     Step4 -- "List not empty" --> Step3
     Step4 -- "List empty" --> Step5["5. Point the original branch reference to the new HEAD."]
 
-    Step5 --> Step6["6. Garbage collect the old orphaned commits eventually."]
+    Step5 --> Step6["6. Old objects may remain through refs or reflogs; pruning is separate."]
 ```
 
 Before running an interactive rebase on meaningful work, check three things. First, make sure the branch is private or explicitly coordinated. Second, make sure your working tree is clean, because unrelated unstaged edits complicate conflict recovery. Third, inspect the branch range with `git log --oneline --decorate main..HEAD` so you know which commits will appear. That quick inspection prevents the classic mistake of rebasing the wrong side of the relationship.
@@ -224,7 +226,9 @@ There is also a testing reason to keep commit boundaries coherent. When `git bis
 
 The `edit` command is the right tool when combining commits is not enough. Suppose you made one large commit called "Add service and ingress manifests", but the Service and Ingress should be reviewed separately. During interactive rebase, mark that commit with `edit`. Git will apply it, stop, and return you to a shell with the large commit as `HEAD`. Your job is to replace that commit with a better sequence before telling the rebase engine to continue.
 
-```bash
+Illustrative output at an `edit` stop:
+
+```text
 Stopped at 5c4b3a2... Add service and ingress manifests
 You can amend the commit now, with
   git commit --amend
@@ -258,7 +262,9 @@ Splitting commits deserves the same discipline. After `git reset HEAD~1`, the wo
 
 Conflict recovery during a rebase has a strict rhythm. Read `git status`, open the files containing conflict markers, resolve the content, stage the resolved files, and run `git rebase --continue`. Do not run `git commit` unless Git specifically tells you the current pause is an `edit` step where you are intentionally amending or replacing a commit. In ordinary conflict resolution, the rebase engine is already constructing the commit that failed, and `--continue` hands the corrected index back to that engine.
 
-```bash
+Illustrative conflict output:
+
+```text
 CONFLICT (content): Merge conflict in deployment.yaml
 error: could not apply 3a2b1c4... Add memory limits
 ```
@@ -377,9 +383,9 @@ When the decision involves sensitive data, add one more question: has the value 
 
 ## Did You Know?
 
-- The Git 1.7 series (early 1.7-era releases around 2010) introduced `--fixup` and `--squash` commit options; autosquash in interactive rebase matured across that same 1.7 line and later became central to fast interactive cleanup.
-- Git stores rewritten commits as new objects, and the default reflog expiration policy often keeps reachable reflog entries for 90 days, giving you a recovery window after many local mistakes.
-- The Linux kernel workflow strongly favors linear, reviewable patch series from contributors, which is one reason rebasing and patch cleanup are treated as everyday engineering skills in that ecosystem.
+- Git's [1.7.4 release notes](https://github.com/git/git/blob/v2.56.0/Documentation/RelNotes/1.7.4.adoc) record the introduction of the `git commit --fixup` and `--squash` options, which prepare messages for later interactive rebasing.
+- The [reflog expiration defaults](https://git-scm.com/docs/git-reflog#Documentation/git-reflog.txt---expirelttimegt) are 90 days for ordinary entries and 30 days for entries unreachable from the current tip. Configuration or deliberate pruning can shorten recovery; neither value guarantees object retention.
+- The Linux kernel's [patch submission guide](https://www.kernel.org/doc/html/latest/process/submitting-patches.html#separate-your-changes) asks contributors to separate logical changes and keep every patch in a series buildable, so reviewers and `git bisect` can inspect intermediate states.
 - `git rebase --exec` can run a command after each replayed commit, so a fast manifest check can catch the exact commit that first breaks a Kubernetes 1.35+ deployment example.
 
 ## Common Mistakes
@@ -426,11 +432,11 @@ Run `git rebase --abort` to return the branch, index, and working tree to the st
 
 ## Hands-On Exercise
 
-In this exercise, you will create a messy commit history containing Kubernetes manifests and a leaked secret, then use interactive rebasing to sculpt it into a clean, professional history. Work in a safe empty directory because the lab intentionally creates and rewrites commits. The manifests are deliberately small so you can focus on Git behavior instead of Kubernetes syntax, but the workflow mirrors real Kubernetes 1.35+ pull request cleanup.
+In this Git-only exercise, you will create a messy commit history containing manifest-shaped files and a fake password string, then use interactive rebasing to sculpt it into a clean, professional history. Work in a safe empty directory because the lab intentionally creates and rewrites commits. The files are deliberately incomplete and are not deployable manifests; do not apply them to a cluster. Never substitute an actual credential for the literal practice string.
 
 ### Setup
 
-Run the following bash script in a safe, empty directory to generate the repository and the messy history.
+Before starting, install Git, configure a commit name and email, and configure an editor that Git can open for interactive rebase and commit messages. Run the following bash script in a safe, empty directory to generate the repository and the messy history.
 
 ```bash
 mkdir k8s-rebase-lab && cd k8s-rebase-lab
@@ -581,10 +587,13 @@ fixup 5555555 remove password from configmap
 ## Sources
 
 - [Git documentation: git-rebase](https://git-scm.com/docs/git-rebase)
+- [Git documentation: git-merge, fast-forward and true merges](https://git-scm.com/docs/git-merge#_fast_forward_merge)
 - [Git documentation: git-commit](https://git-scm.com/docs/git-commit)
 - [Git documentation: git-reset](https://git-scm.com/docs/git-reset)
 - [Git documentation: git-reflog](https://git-scm.com/docs/git-reflog)
 - [Git documentation: git-config, rerere.enabled](https://git-scm.com/docs/git-config)
+- [Git documentation: git-rerere](https://git-scm.com/docs/git-rerere)
+- [Git book: Git Objects](https://git-scm.com/book/en/v2/Git-Internals-Git-Objects)
 - [Git book: Rewriting History](https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History)
 - [GitHub Docs: About pull request merges](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/about-merge-methods-on-github)
 - [GitHub Docs: Removing sensitive data from a repository](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
