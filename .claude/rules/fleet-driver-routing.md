@@ -8,15 +8,13 @@ role boundary, not a frozen roster.
 
 | Seat | Effort | Does | Does not |
 | --- | --- | --- | --- |
-| **GPT-6 Sol** | high | Accountable coding, content drafts that need the advanced seat, formal cross-family review | Scouting, lockfiles, routine bounded edits |
-| **GPT-6 Luna** | high | Bounded repeatable work: search and edit. Default scout effort is high | Orchestrating, formal review, advisory |
-| **GPT-6 Astra** | high | A really tough advisory problem only | Ordinary implementation, routine review, content CF, normal packets |
+| **GPT-6.1 Terra** | packet-specific | Default coding, implementation, writing, computer use and QA | Accountable driving or final hard-problem/review judgment |
+| **GPT-6.1 Sol** | packet-specific | Accountable driving, integration, hard problems and review | Default routine execution or scouting |
+| **GPT-6 Luna** | packet-specific | Read-only exploration and scouting | Implementation, orchestration, formal review or hard-problem judgment |
 
-Do not dispatch Astra or Fable for a normal packet. Sol, Luna, Opus 5.5,
-Sonnet 5, AGY, and native Grok cover coding, review, and content. Summon
-Astra or Fable only when the problem is really tough: contested architecture,
-a split review, or a judgment those seats cannot settle. Say why in the
-routing card. Do not pick `gpt-5.6-*` for new work.
+Astra and Fable require explicit operator authorization, even for a hard
+problem. A routing card cannot supply that authorization. Follow AGENTS.md
+and the live catalog; do not silently substitute an unavailable route.
 
 ## Other seats
 
@@ -77,12 +75,11 @@ alternatives_considered:
   - <seat> — free/busy — why not
 ```
 
-`advisor_packet` stays `none` unless the card names a really tough problem.
+`advisor_packet` stays `none` without explicit operator authorization for Astra/Fable.
 After three implement dispatches in one session, use at least two agents and
 two tiers, or write `NOTE: fleet_breadth` with a tool-backed blocker. The
 same practical seat on a third consecutive implement dispatch needs that note.
 
-Default shape: a qualified worker with no advisor call. Luna at high for
-routine bounded Codex work. Sol at high for accountable coding and formal
-review. Opus 5.5, Sonnet 5, AGY, or native Grok for the rest of ordinary
-work. Astra and Fable are not that path.
+Default shape: Terra 6.1 execution with explicit ownership; Sol 6.1 drives,
+handles hard problems and reviews; GPT-6 Luna scouts read-only. Choose effort
+for the packet and preserve required independent cross-provider review.
