@@ -4,22 +4,22 @@ sidebar:
   order: 0
 ---
 
-**Master the tool that every engineer uses daily but few truly understand.**
+**Go deeper with Git, from repository internals to team workflows.**
 
-You already know `git add`, `git commit`, `git push`. This course takes you from "I can save my work" to "I understand the machine and can handle any situation."
+Start here after practicing `git add`, `git commit`, and `git push`. Explore how Git stores work, how history changes, and how to choose recovery and collaboration tools for a particular situation.
 
-Every module uses Kubernetes manifests, Helm charts, and real infrastructure files — not `hello.txt`.
+Examples include Kubernetes manifests, Helm charts, and infrastructure files.
 
 ---
 
 ## Modules
 
-| # | Module | Time | What You'll Master |
+| # | Module | Time | Topics |
 |---|--------|------|--------------------|
 | 1 | [Module 1: The Ghost in the Machine — Git Internals](module-1-git-internals/) | 100–140 min | .git directory, objects, SHA hashing, the DAG |
 | 2 | [Module 2: The Art of the Branch — Advanced Merging](module-2-advanced-merging/) | 100–130 min | FF vs 3-way merges, conflict resolution, branching strategies |
 | 3 | [Module 3: History as a Choice — Interactive Rebasing](module-3-interactive-rebasing/) | 90–120 min | Interactive rebase, squash, fixup, the Golden Rule |
-| 4 | [Module 4: The Safety Net — Undo and Recovery](module-4-undo-recovery/) | 100–130 min | reset, reflog, revert — never lose code again |
+| 4 | [Module 4: The Safety Net — Undo and Recovery](module-4-undo-recovery/) | 100–130 min | reset, reflog, revert, and recovery limits |
 | 5 | [Module 5: Multi-Tasking Mastery — Worktrees and Stashing](module-5-worktrees-stashing/) | 80–110 min | Worktrees, stash, parallel branch work |
 | 6 | [Module 6: The Digital Detective — Troubleshooting and Search](module-6-troubleshooting/) | 90–120 min | bisect, blame, pickaxe search, history forensics |
 | 7 | [Module 7: Professional Collaboration — Remotes and PRs](module-7-remotes-prs/) | 90–120 min | Remotes, PRs, fetch vs pull, atomic commits |
@@ -36,9 +36,9 @@ These are planning estimates copied from the ten module headers, not measured le
 - [Zero to Terminal](../zero-to-terminal/) — especially Module 0.6 (Git Basics)
 - Basic comfort with the command line (`cd`, `ls`, `cat`, `nano`)
 
-## After This Course
+## Continue Learning
 
-You're ready for:
+Choose a next route:
 - [Modern DevOps](../modern-devops/) — the next step on the prerequisites route; CI/CD and GitOps build directly on this course
-- [CKA Certification](../../k8s/cka/) — git skills used throughout exam prep
+- [CKA Certification](../../k8s/cka/) — an optional route into Kubernetes administration
 - [Linux](/linux/) — optional deeper systems knowledge if you skipped the Linux fork earlier
