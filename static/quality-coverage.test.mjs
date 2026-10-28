@@ -7,22 +7,44 @@ class Element {
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
   addEventListener(event, callback) { this.events[event] = callback; }
+  setAttribute(key, value) { this[key] = value; }
   set innerHTML(_) { throw new Error('Unsafe HTML rendering'); }
 }
-const elements = Object.fromEntries(['cc-summary', 'cc-note', 'cc-rows', 'cc-count', 'cc-search', 'cc-locale', 'cc-status', 'refresh'].map(id => [id, new Element(id)]));
+const elements = Object.fromEntries(['cc-summary', 'cc-note', 'cc-tracks', 'cc-rows', 'cc-count', 'cc-search', 'cc-locale', 'cc-status', 'refresh'].map(id => [id, new Element(id)]));
 const row = {path: '<img onerror=alert(1)>.mdx', locale: 'en', type: 'hub', receipt_status: 'stale', disposition: null,
   acceptance_recorded: false, unreviewed: true, reasons: ['receipt: stale'], layers: {technical_source: 'unknown'},
   references: {acceptance_refs: ['javascript:alert(1)', '<script>bad()</script>']}};
 const data = {pages: [row, {...row, path: 'uk/index.md', locale: 'uk', receipt_status: 'missing'}],
-  locales: {en: {acceptance_recorded: 0, total: 1, review_recorded: 0, needs_revision: 0, unreviewed: 1, stale: 1, invalid: 0}},
+  locales: {en: {acceptance_recorded: 10, total: 1089, review_recorded: 41, needs_revision: 30, unreviewed: 1048, stale: 1, invalid: 0},
+    uk: {acceptance_recorded: 0, total: 1, review_recorded: 0, needs_revision: 0, unreviewed: 1, stale: 0, invalid: 0}},
+  tracks: {en: {shared: {acceptance_recorded: 10, total: 1089, review_recorded: 41, needs_revision: 30, unreviewed: 1048, stale: 1, invalid: 0}},
+    uk: {shared: {acceptance_recorded: 0, total: 1, review_recorded: 0, needs_revision: 0, unreviewed: 1, stale: 0, invalid: 0}}},
   parked_locales: ['uk'], status: 'needs_attention', coverage_health: 'unknown', caveat: 'Supplied assertion only'};
 let response = {ok: true, json: async () => data};
 const context = {document: {getElementById: id => elements[id], createElement: tag => new Element(tag)},
   fetch: async () => response, setInterval() {}, Date};
+vm.runInNewContext(readFileSync(new URL('./content-coverage.js', import.meta.url), 'utf8'), context);
+const corpus = {total: 1089, acceptance_recorded: 10, review_recorded: 41, needs_revision: 30, stale: 1, invalid: 0, unreviewed: 1048};
+context.corpus = corpus;
+assert.deepEqual(Array.from(vm.runInNewContext('coveragePartition(corpus)', context)), [10, 1, 30, 1, 0, 1047]);
+assert.equal(vm.runInNewContext('coveragePercent(corpus)', context), '0.9');
+assert.equal(vm.runInNewContext('coveragePartition({...corpus, unreviewed: 1000})', context), null);
+assert.equal(vm.runInNewContext('coveragePartition({...corpus, needs_revision: 99})', context), null);
 vm.runInNewContext(readFileSync(new URL('./quality-coverage.js', import.meta.url), 'utf8'), context);
 await new Promise(setImmediate);
 assert.match(elements['cc-summary'].textContent, /health unknown/);
 assert.equal(elements['cc-rows'].children.length, 2);
+assert.equal(elements['cc-tracks'].children.length, 2);
+assert.match(elements['cc-tracks'].children[1].children[0].textContent, /UK \(parked\)/);
+assert.match(elements['cc-tracks'].children[0].children[1].children[0].textContent, /10\/1089 accepted · 0.9%/);
+assert.equal(elements['cc-tracks'].children[0].children[1].children[1].value, 10);
+assert.equal(elements['cc-tracks'].children[0].children[1].children[1].max, 1089);
+assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[0].textContent, /Accepted: 10/);
+assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[1].textContent, /Current unaccepted: 1/);
+assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[2].textContent, /Revision: 30/);
+assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[3].textContent, /Stale: 1/);
+assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[4].textContent, /Invalid: 0/);
+assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[5].textContent, /Missing: 1047/);
 const details = elements['cc-rows'].children[0];
 assert.equal(details.tag, 'details');
 assert.equal(details.children[0].tag, 'summary');
@@ -62,6 +84,7 @@ await failed;
 assert.match(elements['cc-summary'].textContent, /unavailable \/ unknown: HTTP 503/);
 assert.equal(elements['cc-count'].textContent, '');
 assert.equal(elements['cc-rows'].children.length, 0);
+assert.equal(elements['cc-tracks'].children.length, 0);
 elements['cc-search'].events.input();
 assert.equal(elements['cc-count'].textContent, '');
 assert.equal(elements['cc-rows'].children.length, 0);
@@ -73,6 +96,14 @@ await elements.refresh.events.click();
 assert.match(elements['cc-summary'].textContent, /Invalid coverage response/);
 assert.equal(elements['cc-count'].textContent, '');
 assert.equal(elements['cc-rows'].children.length, 0);
+response = {ok: true, json: async () => ({...data, tracks: {...data.tracks, en: {}}})};
+await elements.refresh.events.click();
+assert.match(elements['cc-summary'].textContent, /Invalid coverage counters/);
+assert.equal(elements['cc-tracks'].children.length, 0);
+response = {ok: true, json: async () => ({...data, status: 'unavailable'})};
+await elements.refresh.events.click();
+assert.match(elements['cc-summary'].textContent, /Coverage unavailable/);
+assert.equal(elements['cc-tracks'].children.length, 0);
 response = {ok: true, json: async () => ({})};
 await elements.refresh.events.click();
 assert.match(elements['cc-summary'].textContent, /Invalid coverage response/);

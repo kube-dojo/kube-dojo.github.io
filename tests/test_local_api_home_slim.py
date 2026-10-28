@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -51,6 +52,12 @@ def test_home_keeps_topnav_and_route_summary_cards(tmp_path: Path) -> None:
 def test_home_does_not_render_tables(tmp_path: Path) -> None:
     assert "<table" not in _home(tmp_path).lower()
 
+def test_quality_discloses_definitions_and_legacy_board() -> None:
+    html = local_api.render_quality_board_page_html()
+    assert '<details><summary>Coverage definitions</summary>' in html
+    assert '<details class="panel"><summary>Legacy pipeline progress (secondary)</summary>' in html
+    assert html.index('/static/content-coverage.js') < html.index('/static/quality-coverage.js')
+
 
 def test_home_drops_moved_panel_markers(tmp_path: Path) -> None:
     html = _home(tmp_path)
@@ -83,8 +90,9 @@ def test_home_drops_moved_panel_markers(tmp_path: Path) -> None:
 
 def test_coverage_card_renders_counts_and_unknown_without_false_zero(tmp_path: Path) -> None:
     html = _home(tmp_path)
-    assert 'href="/api/content/coverage"' in html
-    assert "Legacy pipeline labels, not full-page acceptance" in html
+    assert "English acceptance" in html
+    assert "Canonical page acceptance" in html
+    assert html.count("renderCoverage(null)") == 2
     assert '<script src="/static/content-coverage.js"></script>' in html
     status, source, content_type = local_api.route_request(Path(__file__).resolve().parents[1], "/static/content-coverage.js")
     assert status == 200 and "javascript" in content_type
@@ -94,26 +102,47 @@ const nodes = {};
 const $ = key => nodes[key] ||= {textContent: ''};
 function tone() {}
 """ + function + """
-renderCoverage({content_coverage: {
+const good = {content_coverage: {
   status:'needs_attention',coverage_health:'known',
-  locales:{en:{total:1089,review_recorded:8,needs_revision:8,acceptance_recorded:0}},
+  locales:{en:{total:1089,review_recorded:41,needs_revision:30,acceptance_recorded:10,unreviewed:1048,stale:1,invalid:0},
+    uk:{total:562,review_recorded:0,needs_revision:0,acceptance_recorded:0,unreviewed:562,stale:0,invalid:0}}, parked_locales:['uk'],
   milestones:{prerequisites_linux:{total:100,review_recorded:6,acceptance_recorded:0}}
-}});
+}}; renderCoverage(good);
 const known = JSON.parse(JSON.stringify(nodes));
 renderCoverage({content_coverage: {status:'needs_attention',coverage_health:'unknown',
-  locales:{en:{total:1089,review_recorded:0,needs_revision:0,acceptance_recorded:0,stale:8,invalid:0}},
+  locales:{en:{total:1089,review_recorded:0,needs_revision:0,acceptance_recorded:0,unreviewed:1089,stale:8,invalid:0},
+    uk:{total:562,review_recorded:0,needs_revision:0,acceptance_recorded:0,unreviewed:562,stale:0,invalid:0}}, parked_locales:['uk'],
   milestones:{prerequisites_linux:{total:100,review_recorded:0,acceptance_recorded:0}},receipt_error_count:8}});
 const stale = JSON.parse(JSON.stringify(nodes));
 renderCoverage({});
-console.log(JSON.stringify({known,stale,unknown:nodes}));
+const unknown = JSON.parse(JSON.stringify(nodes));
+""" + "\nconst page = " + json.dumps(html) + ";\n" + """
+const pending = [];
+let calls = 0, refreshVersion = 0;
+nodes['#refresh'] = {classList:{add(){},remove(){}}};
+const fetchJson = () => calls++ < 4 ? new Promise(resolve => pending.push(resolve)) : Promise.reject(new Error('offline'));
+const renderOperator = () => {}, renderPipeline = () => {}, renderActivity = () => {}, renderHealth = () => {}, setPollTs = () => {};
+const start = page.indexOf('    async function refresh()'), end = page.indexOf("    $('#refresh').addEventListener", start);
+const refresh = eval('(' + page.slice(start, end).trim() + ')');
+(async () => {
+  const old = refresh(); await refresh(); pending.forEach(resolve => resolve(good)); await old;
+  console.log(JSON.stringify({known,stale,unknown,race:nodes}));
+})();
 """
-    result = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True)
+    node = Path("/Users/krisztiankoos/projects/kubedojo/.agent/session228/runtime/node-v22.23.4-darwin-arm64/bin/node")
+    result = subprocess.run([str(node), "-e", script], capture_output=True, text=True, check=True,
+                            env={**os.environ, "NODE_DISABLE_COMPILE_CACHE": "1"})
     states = json.loads(result.stdout)
-    assert "8 / 1089" in states["known"]["#coverage-counts"]["textContent"]
-    assert "0 acceptance records" in states["known"]["#coverage-counts"]["textContent"]
-    assert "6 / 100" in states["known"]["#coverage-milestone"]["textContent"]
+    assert "10 / 1089 accepted · 0.9%" in states["known"]["#coverage-counts"]["textContent"]
+    assert states["known"]["#coverage-progress"]["value"] == 10
+    assert states["known"]["#coverage-progress"]["max"] == 1089
+    assert "30 need revision" in states["known"]["#coverage-milestone"]["textContent"]
+    assert "UK parked: 0/562" in states["known"]["#coverage-milestone"]["textContent"]
     assert states["stale"]["#coverage-badge"]["textContent"] == "Health unknown"
-    assert "8 stale" in states["stale"]["#coverage-counts"]["textContent"]
-    assert "8 evidence errors" in states["stale"]["#coverage-counts"]["textContent"]
+    assert "8 stale" in states["stale"]["#coverage-milestone"]["textContent"]
+    assert states["known"]["#quality-summary-counts"]["textContent"] == states["known"]["#coverage-counts"]["textContent"]
     assert states["unknown"]["#coverage-badge"]["textContent"] == "Unknown"
     assert states["unknown"]["#coverage-counts"]["textContent"] == "Coverage evidence unavailable"
+    assert states["unknown"]["#quality-summary-counts"]["textContent"] == "Coverage evidence unavailable"
+    assert states["unknown"]["#coverage-progress"]["hidden"] is True
+    assert states["race"]["#coverage-badge"]["textContent"] == "Unknown"

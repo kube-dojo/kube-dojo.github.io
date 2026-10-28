@@ -1,20 +1,30 @@
-function renderCoverage(briefing) {
-  const c = briefing?.content_coverage, en = c?.locales?.en, m = c?.milestones?.prerequisites_linux;
-  const b = $('#coverage-badge'), line = $('#coverage-counts'), milestone = $('#coverage-milestone');
-  if (!en || !m || c.status === 'unavailable') {
-    b.textContent = 'Unknown'; line.textContent = 'Coverage evidence unavailable'; milestone.textContent = 'No acceptance inferred'; tone(b, 'amber'); return;
-  }
-  b.textContent = c.coverage_health === 'known' ? 'Recorded evidence' : 'Health unknown'; tone(b, 'amber');
-  const errors = c.receipt_error_count ?? (c.receipt_errors || []).length;
-  line.textContent = `${en.review_recorded} / ${en.total} pages with current review records · ${en.needs_revision} need revision · ${en.acceptance_recorded} acceptance records · ${en.stale ?? 0} stale · ${en.invalid ?? 0} invalid · ${errors} evidence errors`;
-  milestone.textContent = `Prerequisites + Linux: ${m.review_recorded} / ${m.total} review records · ${m.acceptance_recorded} acceptance records. Ukrainian parked. Records are not exhaustive clearance.`;
+/* All acceptance decisions and counts come from the canonical report. */
+function coveragePartition(v) {
+  const keys = ['total', 'acceptance_recorded', 'review_recorded', 'needs_revision', 'stale', 'invalid', 'unreviewed'];
+  if (!v || keys.some(key => !Number.isSafeInteger(v[key]) || v[key] < 0)) return null;
+  const parts = [v.acceptance_recorded, v.review_recorded - v.acceptance_recorded - v.needs_revision,
+    v.needs_revision, v.stale, v.invalid, v.unreviewed - v.stale - v.invalid];
+  return parts.every(n => n >= 0) && parts.reduce((a, b) => a + b, 0) === v.total ? parts : null;
 }
-
-function renderQuality(data) {
-  const b = $('#quality-summary-badge'), c = $('#quality-summary-counts');
-  if (!data || data.error) { b.textContent = 'Unavailable'; c.textContent = 'No quality data'; tone(b, 'red'); return; }
-  const t = data.totals || {};
-  const left = (t.needs_rewrite || 0) + (t.needs_review || 0) + (t.shipped_unreviewed || 0) + (t.both || 0);
-  b.textContent = `${t.done || 0} / ${t.total || 0} labeled done`; tone(b, left ? 'amber' : 'green');
-  c.textContent = `rewrite=${t.needs_rewrite || 0} · review=${t.needs_review || 0} · shipped=${t.shipped_unreviewed || 0} · both=${t.both || 0}`;
+function coveragePercent(v) {
+  return v.total ? (100 * v.acceptance_recorded / v.total).toFixed(1) : '0.0';
+}
+function renderCoverage(briefing) {
+  const c = briefing?.content_coverage, en = c?.locales?.en, uk = c?.locales?.uk;
+  const b = $('#coverage-badge'), line = $('#coverage-counts'), milestone = $('#coverage-milestone');
+  const qb = $('#quality-summary-badge'), qc = $('#quality-summary-counts'), bar = $('#coverage-progress');
+  const parts = coveragePartition(en);
+  if (!parts || !coveragePartition(uk) || !Array.isArray(c?.parked_locales) ||
+      !c.parked_locales.includes('uk') || c.parked_locales.includes('en') ||
+      !['ok', 'needs_attention'].includes(c.status) || !['known', 'unknown'].includes(c.coverage_health)) {
+    b.textContent = qb.textContent = 'Unknown';
+    line.textContent = qc.textContent = 'Coverage evidence unavailable';
+    milestone.textContent = 'No acceptance inferred'; bar.hidden = true;
+    bar.value = 0; bar.max = 1; tone(b, 'amber'); tone(qb, 'amber'); return;
+  }
+  b.textContent = qb.textContent = c.coverage_health === 'known' ? 'Recorded evidence' : 'Health unknown';
+  tone(b, 'amber'); tone(qb, 'amber');
+  line.textContent = qc.textContent = `${en.acceptance_recorded} / ${en.total} accepted · ${coveragePercent(en)}%`;
+  milestone.textContent = `${parts[1]} current unaccepted · ${parts[2]} need revision · ${parts[3]} stale · UK parked: ${uk.acceptance_recorded}/${uk.total}`;
+  bar.max = en.total || 1; bar.value = en.acceptance_recorded; bar.hidden = !en.total;
 }
