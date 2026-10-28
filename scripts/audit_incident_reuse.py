@@ -233,8 +233,8 @@ INCIDENTS: dict[str, list[str]] = {
         r"(REJECT[\s\-]THE[\s\-]REST|policy reorder).{0,400}Cloudflare",
     ],
     "GitHub August 2021 MySQL degradation": [
-        r"GitHub.{0,400}(August 2021|August 10,?\s*2021|MySQL primary|degraded|77[\s\-]minute|seventy[\s\-]seven minute|service discovery misconfiguration|dashboards.{0,40}same.{0,40}database)",
-        r"(MySQL primary|degraded.{0,80}database|dashboards.{0,40}down too).{0,200}GitHub",
+        r"GitHub.{0,400}(August 2021|August 10,?\s*2021|MySQL primary|77[\s\-]minute|seventy[\s\-]seven minute|service discovery misconfiguration|dashboards.{0,40}same.{0,40}database)",
+        r"(MySQL primary|dashboards.{0,40}down too).{0,200}GitHub",
     ],
     "Siloscape 2021 Windows container escape": [
         # Distinctive malware name — bare match is safe (no other product/CVE shares the name).
@@ -274,9 +274,7 @@ def in_scope(p: Path) -> bool:
     s = str(p)
     if any(d in s for d in EXCLUDE_DIRS):
         return False
-    if p.name == "index.md":
-        return False
-    return True
+    return p.name != "index.md"
 
 
 def scan() -> tuple[dict[str, list[tuple[Path, str]]], list[Path]]:
