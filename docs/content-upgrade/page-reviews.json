@@ -494,7 +494,7 @@
         "technical_source": "pass",
         "editorial_review": "pass",
         "lab_execution": "pass",
-        "deployed_smoke": "fail"
+        "deployed_smoke": "pending"
       },
       "source_acceptance": {
         "schema": "kubedojo.source_acceptance.v1",
