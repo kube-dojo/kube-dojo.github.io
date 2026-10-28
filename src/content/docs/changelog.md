@@ -8,7 +8,6 @@ sidebar:
 
 ## October 2026
 
-- **Predict what Git will merge before resolving it.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) contrasts a clean automatic merge with real conflict state, explains reuse and abort boundaries, and adds scoped validation and transfer checks.
 - **Practice Git interruptions with clear state checks.** [Worktrees and Stashing](/prerequisites/git-deep-dive/module-5-worktrees-stashing/) now includes disposable setup, portable hotfix practice, recovery hints, and a move-and-repair stretch exercise.
 - **Plan Git study with clearer expectations.** The [Git Deep Dive overview](/prerequisites/git-deep-dive/) sets out lesson topics, reading and practice estimates, recovery limits, and routes for continuing your study.
 - **See prerequisites before you start.** Module pages keep prerequisite and next-lesson information visible alongside difficulty and study time.
