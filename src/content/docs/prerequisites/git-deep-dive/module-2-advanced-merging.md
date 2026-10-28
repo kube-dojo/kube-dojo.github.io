@@ -22,7 +22,7 @@ revision_pending: false
 - **Implement** fast-forward, three-way, and octopus merges strategically to maintain a clean, navigable project history.
 - **Resolve** intricate multi-file conflicts during infrastructure-as-code integration without introducing YAML syntax errors or regression bugs.
 - **Evaluate** different branching strategies (Trunk-based, GitFlow, GitHub Flow) to select the optimal workflow for a high-velocity Kubernetes platform team.
-- **Compare** the internal diff algorithms of the modern `ort` and legacy `recursive` merge strategies to understand how Git handles file renames and complex tree integrations.
+- **Diagnose** merge-base and strategy behavior using the graph, installed Git version and diff evidence.
 
 ## Why This Module Matters
 
@@ -128,13 +128,13 @@ Write conflict or auto-merge before you continue. The table below names several 
 
 ### Merge Bases, Strategies, and Git's Internal Engines
 
-The true hidden genius of Git's architecture lies in exactly how it calculates and locates the merge base. When branch histories become deeply complex and intertwined with multiple cross-merges, finding the optimal common ancestor is a computationally difficult task. If you ever need to manually verify what commit Git currently considers the merge base before attempting a highly risky or widespread merge, you can invoke the calculation engine directly:
+Git identifies best common ancestors as merge bases. In a complex history there may be more than one, so inspecting the graph and the candidates helps explain the inputs to a merge. Start with the following command, then use `--all` when you need to check for multiple best bases:
 
 ```bash
 git merge-base main feature/ingress-update
 ```
 
-The output of `git merge-base` is one selected best common ancestor commit hash for the two branches, which Git uses as the starting point for its three-way merge calculation. In criss-cross histories with multiple equally good bases, run `git merge-base --all` to list every candidate. Understanding exactly which commit acts as the base is critical when diagnosing why Git seems to be generating strange or counterintuitive conflicts.
+Without `--all`, `git merge-base` prints one best common ancestor; when several exist, which one it prints is unspecified. Use `git merge-base --all` to list them. The [merge strategy documentation](https://git-scm.com/docs/git-merge) explains that `ort` can merge multiple common ancestors into a virtual reference tree before the three-way merge. Thus the single printed commit is not necessarily the strategy's actual reference tree. See [git-merge-base](https://git-scm.com/docs/git-merge-base) for the criss-cross example.
 
 **Pause and predict:** Look at the following branch topology. If you are on `main` and run `git merge feature/cache`, which commit is the merge base?
 
@@ -164,9 +164,9 @@ The merge base is commit `B`. To find it, trace backwards from `main` (commit D)
 
 Write the commit letter before you continue. The next paragraph names merge strategies. It does not identify the base of this topology.
 
-Git provides several merge strategies that govern how files are combined: `ort`, `recursive` (now an alias/synonym for `ort`), `resolve`, `octopus`, `ours`, and `subtree`. 
+Git provides several merge strategies that govern how files are combined: `ort`, `recursive`, `resolve`, `octopus`, `ours`, and `subtree`. The installed Git version matters when interpreting a strategy name.
 
-For standard two-branch merges, modern Git uses the `ort` strategy as the universal default. Standing for "Ostensibly Recursive's Twin", the `ort` strategy became the default in Git 2.34.0 (released in November 2021) and it defaults to using `diff-algorithm=histogram` internally. This algorithmic choice makes it significantly faster and vastly more accurate at handling massive file renames and complex directory restructurings across diverged branches. The `ort` backend entirely replaced the legacy `recursive` strategy, which was subsequently fully deprecated in Git 2.50.0 and now exists merely as a silent synonym and alias for `ort` to preserve backwards compatibility for old scripts.
+The current [Git merge documentation](https://git-scm.com/docs/git-merge) specifies `ort` as the default strategy when merging a single head and `octopus` for multiple heads, unless a strategy is chosen explicitly. `ort` uses the histogram diff algorithm by default for merge comparisons. `recursive` was a separate implementation through Git 2.49; starting with 2.50, the name is a synonym for `ort`. Check the installed version before comparing strategy behavior, and do not infer a universal speed or accuracy ranking from the strategy name.
 
 The other available strategies serve highly specialized use cases. The `resolve` strategy uses a very traditional three-way merge algorithm but explicitly does NOT handle file renames, whereas `ort` detects and handles renames gracefully. The `ours` strategy (invoked via `git merge -s ours`) aggressively discards ALL changes from the other branch entirely—the resulting tree is always mathematically identical to the current branch's HEAD tree. It is crucial to understand that this is fundamentally different from the strategy option (invoked via `git merge -X ours`), which still performs a standard three-way merge but automatically favors the current branch's code only when resolving overlapping conflicting hunks.
 
@@ -275,7 +275,7 @@ secretGenerator:
 
 Always comprehensively validate the structural integrity of your infrastructure-as-code files before committing the final resolution. Once verified, add both files to the index and commit to finalize the complex multi-file merge.
 
-After finalizing a complex merge, you or a reviewer may need to isolate and review only the specific manual conflict resolutions you made, without the noise of unrelated feature changes. You can achieve this by inspecting the merge commit with `git show <merge-commit-hash>`, which displays a specialized "combined diff" that intelligently filters the output to highlight only the lines modified differently from both parent branches.
+After finalizing a merge, inspect the result from more than one perspective. By default, `git show <merge-commit-hash>` uses a dense combined diff for a merge, subject to options such as `--first-parent`. A combined diff lists files modified from all parents; the dense form also omits certain hunks where the result picks an unmodified parent variant. It is therefore not a complete list of changes or a record of human actions. For a two-parent merge, `git show --remerge-diff <merge-commit-hash>` reconstructs a temporary merge and compares it with the recorded result; it can help investigate differences, but it is not a transcript of how the merge was resolved. Its output and interactions with options may change. See [git-show](https://git-scm.com/docs/git-show) and compare parent-specific diffs where needed.
 
 ```bash
 kubectl kustomize . | kubeconform -summary -
@@ -633,13 +633,13 @@ The most reliable pattern is small, frequent integration against a protected tru
 
 Another durable pattern is schema-aware validation immediately after conflict resolution. Git knows that two lines of YAML text differ, but it does not know whether a `secretKeyRef` points at a Secret that Kustomize still generates, whether a selector matches the labels inside a Pod template, or whether an API field is valid in Kubernetes 1.35. The resolver therefore has to move from text reconciliation to platform reconciliation. Running `kubeconform -summary <manifest.yaml>` (offline schema validation), `kubectl kustomize`, or an admission-style validation tool is the engineering step that converts "Git accepted the file" into "this configuration still represents a coherent cluster object."
 
-A third pattern is reviewable merge commits. When a merge commit exists only because two timelines were joined, it should contain only the conflict synthesis required to join them. That discipline makes `git show <merge-commit>` useful during review because the combined diff can focus on the lines changed differently from both parents. If the resolver also folds in refactors, formatting changes, or unrelated policy edits, the merge commit becomes an opaque bundle, and reviewers lose the ability to distinguish conflict resolution from opportunistic feature work. This is how teams accidentally bless an "evil merge" that introduces behavior neither parent branch intended.
+A third pattern is to keep merge commits reviewable and explain any additional changes. A combined diff offers one view of the result, but omits some changes and cannot identify who made an edit or why. Compare each parent and, for a two-parent merge, consider a remerge diff alongside the recorded result and review notes. Those views help investigate unexpected additions without claiming to reconstruct a person's actions.
 
 | Pattern | Use When | Why It Works | Scaling Consideration |
 | :--- | :--- | :--- | :--- |
 | **Short-lived integration branches** | Platform engineers need review but still deploy frequently from `main`. | The merge base stays recent, conflict regions stay small, and rollback boundaries remain clear. | Requires automated tests and feature flags so unfinished work can be hidden safely. |
 | **Schema-aware conflict validation** | The merge touches Kubernetes YAML, Helm output, Kustomize overlays, or policy-as-code. | Git validates text ancestry, while Kubernetes tooling validates object shape and API compatibility. | Validation must be fast enough to run locally and in CI, or engineers will skip it under pressure. |
-| **Resolution-only merge commits** | A three-way merge needed manual synthesis. | Reviewers can audit the combined diff and see exactly what the human resolver changed. | Teams need a norm that unrelated cleanup waits for a separate commit. |
+| **Reviewable merge commits** | A three-way merge needed synthesis. | Parent-specific and remerge comparisons provide complementary views of the result. | Record intent and validation; no diff proves which edits were manual. |
 | **Recorded recurring resolutions** | The same branch family repeatedly conflicts during release preparation. | `rerere` can reuse a previously accepted resolution, reducing repeated manual work. | The cache should be trusted only after the team has validated the first resolution carefully. |
 
 The corresponding anti-patterns usually arise from understandable pressure. A release is late, an environment is unhealthy, or a senior engineer is away, so someone chooses the fastest-looking button in an IDE. The problem is that Git conflict tools optimize for completing the merge operation, while production safety depends on preserving both branches' intent. Accepting "ours" across an entire file may remove conflict markers quickly, but it also discards the incoming branch's design without forcing the resolver to state that decision explicitly. If a security branch added a NetworkPolicy and the release branch changed only image tags, a blind "ours" resolution can silently erase the control that mattered most.
@@ -671,7 +671,7 @@ For day-to-day work, a compact flow helps prevent panic decisions. Start with `g
 
 ## Did You Know?
 
-1. The `ort` merge strategy, short for Ostensibly Recursive's Twin, became the default two-head merge engine in Git 2.34.0 in November 2021 and uses the histogram diff algorithm internally for many merge comparisons.
+1. Current Git documentation names `ort` as the default for merging one head and `octopus` for multiple heads; `recursive` names `ort` starting in Git 2.50.
 2. Running the maintenance command `git rerere gc` prunes unresolved conflict records older than 15 days and resolved conflict records older than 60 days, which keeps repeated-resolution caches from growing without bound.
 3. Octopus merges fit the Linux-style maintainer workflow of bundling many topic branches into a single integration history without a long sequence of two-parent merge commits.
 4. The conflict marker symbols (`<<<<<<<`, `=======`, `>>>>>>>`) predate Git by decades and were established by earlier merge tooling in the RCS era, which is why they appear familiar across many version control systems.
@@ -702,8 +702,8 @@ In this exact moment, the staging branch ref does not move because an octopus me
 </details>
 
 <details>
-<summary>Question 3: A junior engineer just resolved a massive 500-line multi-file conflict involving a StatefulSet and a ConfigMap, and you need to review their work. Looking at the standard full file diff is overwhelming and includes unrelated changes. How can you, as a reviewer, isolate and view *only* the specific manual conflict resolutions the engineer made?</summary>
-You can isolate the manual conflict resolutions by inspecting the merge commit itself using the `git show <merge-commit-hash>` command. When you run this on a merge commit, Git displays a specialized "combined diff" instead of a standard linear diff. This combined diff intelligently filters the output to only show the specific lines that were modified differently from *both* parent branches, highlighting exactly where the engineer's manual resolution deviated from what Git's automatic merge would have attempted. This provides the precise, surgical view required to audit complex manual conflict resolutions without being drowned in the noise of unrelated feature changes.
+<summary>Question 3: A two-parent merge resolves a large StatefulSet and ConfigMap conflict. Which views can help review the recorded result, and what can they not prove?</summary>
+Inspect the merge with `git show`, remembering that its default dense combined view omits files not modified from every parent and some hunks. Compare the result with each parent for a fuller view. `git show --remerge-diff <merge-commit-hash>` reconstructs a temporary merge and shows its difference from the recorded result; the output and its interactions with options may change. Neither view is a transcript or proof of which changes a person made manually, so use the branch intent, review notes and validation evidence as well.
 </details>
 
 <details>
@@ -732,7 +732,7 @@ Work in a scratch directory outside any production repository. The commands belo
 - [ ] Create `feature/scale-api` to change replicas and a competing ConfigMap setting.
 - [ ] Merge `feature/scale-api` into `feature/harden-api`, inspect the merge base, review the auto-merged `deployment.yaml`, and resolve the conflict in `configmap.yaml`.
 - [ ] Validate the resolved manifests with `kubeconform -summary` before committing the merge.
-- [ ] Inspect the final merge commit with `git show` and explain which lines were human conflict resolutions.
+- [ ] Inspect the final merge with `git show`, compare each parent and explain what the diff views can and cannot establish about the resolution.
 
 <details>
 <summary>Setup and task solutions</summary>
