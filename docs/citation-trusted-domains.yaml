@@ -4,8 +4,8 @@
 # Tiered by claim class per Codex's consult (session 5, 2026-04-19).
 # Citations whose host is not on this list auto-reject at the deterministic
 # gate. Expanding the list is a committed config change, never a per-module
-# override. Keep entries to bare registrable domains; subdomains match
-# automatically via suffix check in scripts/fetch_citation.py.
+# override. Use bare domains or narrow official documentation hosts;
+# subdomains match via label-boundary suffix checks in scripts/fetch_citation.py.
 #
 # When a claim class does not match any tier below, it falls through to
 # `general` (which is intentionally narrow). Research prompts should prefer
@@ -67,6 +67,8 @@ tiers:
   # VENDOR. A vendor citation for a claim about a competitor's product
   # must be rejected at research time.
   vendor:
+    - docs.ansible.com    # official module docs, for Ansible's own capabilities
+    - help.puppet.com    # official architecture docs, for Puppet's own capabilities
     - aws.amazon.com
     - docs.aws.amazon.com
     - cloud.google.com
