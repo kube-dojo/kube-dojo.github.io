@@ -713,21 +713,21 @@ Inspect the merge with `git show`, remembering that its default dense combined v
 </details>
 
 <details>
-<summary>Question 4: An incident occurs in production because a <code>ConfigMap</code> update was inexplicably lost during a recent deployment. Looking at the Git history, you see a merge commit connecting a feature branch to main. The file changed on both branches, but the feature branch's changes are completely missing in the final merge commit. What likely happened during the conflict resolution?</summary>
+<summary><span>Question 4: An incident occurs in production because a <code>ConfigMap</code> update was inexplicably lost during a recent deployment. Looking at the Git history, you see a merge commit connecting a feature branch to main. The file changed on both branches, but the feature branch's changes are completely missing in the final merge commit. What likely happened during the conflict resolution?</span></summary>
 
 The engineer performing the merge likely encountered a complex conflict within the `ConfigMap`, became overwhelmed, and mistakenly opted to completely overwrite the incoming changes. They probably used a command like `git checkout --ours configmap.yaml` or blindly clicked "Accept Current Changes" in their IDE's conflict resolution interface. By doing so, they entirely discarded the valid configuration updates from the feature branch while keeping their own, and then finalized the merge commit without realizing the loss of data. This scenario underscores exactly why a visual inspection and validation of the final merged files (such as using `kubectl diff`) is absolutely mandatory before committing a resolved conflict.
 
 </details>
 
 <details>
-<summary>Question 5: Your organization is adopting GitOps with ArgoCD to manage Kubernetes clusters, but the QA team insists on keeping the legacy GitFlow branching model with long-lived <code>develop</code> and release branches. Why will this combination inevitably lead to deployment failures and configuration drift?</summary>
+<summary><span>Question 5: Your organization is adopting GitOps with ArgoCD to manage Kubernetes clusters, but the QA team insists on keeping the legacy GitFlow branching model with long-lived <code>develop</code> and release branches. Why will this combination inevitably lead to deployment failures and configuration drift?</span></summary>
 
 This combination will fail because GitFlow isolates infrastructure changes in long-lived branches for extended periods, which fundamentally violates the core philosophy of GitOps. In a proper GitOps architecture, the main branch of the Git repository must serve as the absolute, real-time source of truth for the cluster's state. When changes sit unmerged in a `develop` branch for weeks, the actual cluster state inevitably drifts as other hotfixes or updates are applied directly to the mainline. This severe divergence makes rapid, predictable iteration impossible and practically guarantees massive, unresolvable merge conflicts when the long-lived branches are finally integrated.
 
 </details>
 
 <details>
-<summary>Question 6: You are tasked with taking over a legacy <code>feature/database-migration</code> branch that was abandoned by a former employee. Before attempting to integrate it, you run <code>git merge-base main feature/database-migration</code> and find that the common ancestor is a commit from over a year ago. What is the safest sequence of actions to rescue this work without breaking the current cluster state, and why?</summary>
+<summary><span>Question 6: You are tasked with taking over a legacy <code>feature/database-migration</code> branch that was abandoned by a former employee. Before attempting to integrate it, you run <code>git merge-base main feature/database-migration</code> and find that the common ancestor is a commit from over a year ago. What is the safest sequence of actions to rescue this work without breaking the current cluster state, and why?</span></summary>
 
 Attempting a direct three-way merge with a year-old base is extremely dangerous, as Git will try to mathematically reconcile hundreds of conflicting architectural changes simultaneously. Instead, you should first examine the original intent by running `git diff <merge-base-hash>..feature/database-migration` to isolate exactly what the former employee changed. Once the isolated logic is understood, the safest approach is to create a fresh branch off the current `main` and use `git cherry-pick` to selectively bring over only the relevant database migration commits. This strategy completely abandons the deeply diverged history and ensures you are manually adapting the legacy logic to the modern, real-time state of the infrastructure.
 
