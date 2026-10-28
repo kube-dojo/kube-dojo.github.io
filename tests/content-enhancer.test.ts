@@ -106,6 +106,13 @@ describe('Content Enhancer — Meta Chips', () => {
     expect(link?.getAttribute('href')).toBe('/git/');
   });
 
+  it('handles Markdown soft breaks without replacing prerequisite links', () => {
+    const root = createContent('<blockquote><p><strong>Complexity:</strong> <code>[MEDIUM]</code>\n<strong>Time:</strong> 30 min\nPrerequisite: <a href="/git/">Git</a></p></blockquote>');
+    const link = root.querySelector('a'); enhanceMetaChips(root);
+    expect(root.querySelectorAll('.kd-chip')).toHaveLength(2);
+    expect(root.querySelector('a')).toBe(link);
+  });
+
   it('preserves separate prerequisite and next-module paragraphs and links', () => {
     const root = createContent('<blockquote><p><strong>Complexity</strong>: <code>[MEDIUM]</code></p><p><strong>Time to Complete</strong>: 45 min</p><p><strong>Prerequisites</strong>: <a href="/git/">Git</a></p><p>Next: <a href="/next/">Next module</a></p></blockquote>');
     const links = [...root.querySelectorAll('a')];

@@ -70,19 +70,16 @@ export function enhanceMetaChips(root: Element): void {
       for (const container of containers) {
         // Split only direct text separators; leave inline elements and links intact.
         for (const node of [...container.childNodes]) {
-          if (node.nodeType !== Node.TEXT_NODE || !node.textContent?.includes('|')) continue;
-          const parts = node.textContent.split('|');
+          if (node.nodeType !== Node.TEXT_NODE || !/[|\n]/.test(node.textContent || '')) continue;
+          const parts = (node.textContent || '').split(/([|\n])/);
           const fragment = document.createDocumentFragment();
-          parts.forEach((part, index) => {
-            if (index) fragment.appendChild(document.createTextNode('|'));
-            fragment.appendChild(document.createTextNode(part));
-          });
+          parts.forEach((part) => fragment.appendChild(document.createTextNode(part)));
           node.parentNode?.replaceChild(fragment, node);
         }
         const segments: Node[][] = [[]];
         const separators: Node[] = [];
         for (const node of [...container.childNodes]) {
-          if (node.nodeName === 'BR' || (node.nodeType === Node.TEXT_NODE && node.textContent === '|')) {
+          if (node.nodeName === 'BR' || (node.nodeType === Node.TEXT_NODE && /^[|\n]$/.test(node.textContent || ''))) {
             separators.push(node); segments.push([]);
           } else segments[segments.length - 1].push(node);
         }
