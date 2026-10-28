@@ -45,18 +45,28 @@ These demonstrations target Git 2.56 and the files ref backend. First start a di
 bash --noprofile --norc
 ```
 
-Stay inside this child for **all** practice steps. Paste the complete setup below; its `set -e` ends only this child on a failed setup command. If the child exits, **STOP: do not paste later commands into the original parent shell**. Fix the cause and start a fresh child before retrying. Check the printed Git version; use Git 2.56 for the recorded examples. Other ref backends can store references differently.
+Stay inside this child for **all** practice steps. Paste the complete grouped setup below; a failed setup command ends only this child. If it exits, **STOP: do not paste later commands into the parent shell**. Preserve any partially created directory; after fixing the cause, start a new child and change `practice_dir` to a new unused name, such as `my-git-repo-2`. Check the printed Git version; use Git 2.56 for the recorded examples. Other ref backends can store references differently.
 
 ```bash
-set -e
-trap 'printf "%s\n" "STOP: practice shell ended; do not continue in the parent shell."' EXIT
-git --version
-mkdir my-git-repo
-cd my-git-repo
-git init -b main --ref-format=files --object-format=sha1
-test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"
-ls -F .git
+{
+  set -e
+  trap 'printf "%s\n" "STOP: practice shell ended; do not continue in the parent shell."' EXIT
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+  git --version
+  practice_dir=my-git-repo
+  mkdir "$practice_dir"
+  cd "$practice_dir"
+  git init -b main --ref-format=files --object-format=sha1
+  test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"
+  test "$(git rev-parse --absolute-git-dir)" = "$(pwd -P)/.git"
+  ls -F .git
+  set +e
+}
 ```
+
+After successful setup, ordinary diagnostic failures leave the child open. Inspect each result; after an unexpected failure, stop that task and resolve it before proceeding.
+
+To resume later, start a new child and reuse this block with `mkdir` and `git init` omitted, selecting the existing `practice_dir`; retain both location checks. Shell variables are lost when the child exits: re-run the relevant inspection steps. For current `HEAD`, use `COMMIT_HASH=$(git rev-parse HEAD)` and `TREE_HASH=$(git rev-parse HEAD^{tree})`; earlier or detached IDs require your recorded evidence, not substitution with today's `HEAD`.
 
 **Illustrative listing:** Ordering, spacing, and template entries may differ.
 
@@ -64,7 +74,7 @@ ls -F .git
 HEAD		config		description	hooks/		info/		objects/	refs/
 ```
 
-Before the first commit below, configure a practice identity in this repository with `git config --local user.name "Git Practice"` and `git config --local user.email "practice@example.invalid"`.
+Before the first commit below, configure a practice identity here with `git config --local user.name "Git Practice"` and `git config --local user.email "practice@example.invalid"`. If identity or signing fails, the child remains open: inspect the error and local configuration, fix the identity or use `git config --local commit.gpgsign false` in this disposable repository, then retry the commit before continuing. Do not switch to the parent shell.
 
 The output is small enough to look harmless, but each entry participates in a separate part of Git's state machine. `HEAD` usually points at a branch, `config` stores repository-specific settings, `hooks/` can run local automation, `info/` can hold local ignore rules, `objects/` contains the object database, and `refs/` contains branch and tag names. Identifying the affected part gives an investigation a starting point.
 
@@ -604,7 +614,7 @@ This exercise builds a small repository and asks you to inspect each Git layer d
 ### Setup
 Use Git 2.56 and the fresh disposable files-backend repository initialized above. Configure a local identity in that repository for commits, and keep all commands inside it. The sample file is a Kubernetes `ConfigMap` because configuration drift is a realistic platform failure, but Git treats it like any other text file. Your job is to observe which Git layer changes after each operation.
 
-Before the first commit, set a practice identity with `git config --local user.name "Git Practice"` and `git config --local user.email "practice@example.invalid"` in this repository. If a commit fails for identity or signing configuration, inspect the local settings and resolve them within the disposable repository before continuing.
+Use the identity/signing recovery guidance above if a commit fails; resolve it inside the verified practice child before continuing.
 
 ### Tasks
 - [ ] Diagnose repository state by listing `.git`, reading `HEAD`, and identifying where refs and objects live.
