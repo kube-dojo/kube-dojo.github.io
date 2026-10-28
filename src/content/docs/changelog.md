@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Shape Git history safely.** [Interactive Rebasing](/prerequisites/git-deep-dive/module-3-interactive-rebasing/) clarifies squash-merge transplants and private-history cleanup, with graduated exercise hints and readable quiz commands.
 - **Find the Git state for your worktree.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now shows how to locate the selected index and inspect `HEAD` across repository layouts, with clearly formatted commands in its recovery questions.
 - **Compare Git recovery clues.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now shows how reflogs affect an unreachable-object search and how to preserve a commit for inspection.
 - **Check what a manifest validator proves.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) repairs its local merge exercise and separates schema checks from matching ConfigMap references and observing a running workload.

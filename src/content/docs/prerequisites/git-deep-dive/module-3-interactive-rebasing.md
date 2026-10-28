@@ -18,7 +18,7 @@ revision_pending: false
 
 - Reconstruct fragmented commit history into a logical narrative using interactive rebase operations such as squash, reword, fixup, drop, and edit.
 - Diagnose and resolve iterative rebase conflicts without creating duplicate commits or breaking the rebase sequence.
-- Formulate a safe strategy for removing accidentally committed sensitive data from an unpublished branch's permanent history.
+- Formulate a safe strategy for removing accidentally committed sensitive data from an unpublished branch's surviving commit history.
 - Compare and evaluate merging, rebasing, and `git rebase --onto` when synchronizing feature work with upstream branches.
 - Implement a branch transplant that moves active work away from obsolete base commits after a squash merge.
 
@@ -117,6 +117,8 @@ git rebase -i HEAD~5
 ```
 
 When the editor opens, the oldest commit appears at the top and the newest appears at the bottom, which is the reverse of the default `git log` view many engineers know. Git reads the sheet from top to bottom, so moving a line changes the order in which that commit is replayed. This small interface detail carries a lot of power. A fixup commit must sit immediately under the commit it should be absorbed into, and a squash command always combines with the commit directly above it.
+
+Illustrative instruction sheet with synthetic hashes and shortened comments:
 
 ```text
 pick 3a2b1c4 Add initial deployment.yaml
@@ -287,7 +289,7 @@ Recorded conflict resolutions can help, but they are not a substitute for unders
 
 The most confusing rebase failures often happen after a dependent branch is merged with a squash strategy. Imagine `feature-api-update` was branched from `feature-db-migration` because the API work needed the new schema. Later, `feature-db-migration` is approved and merged into `main` using Squash and Merge. The final changes are on `main`, but the original migration commit SHAs are not, because the platform replaced them with one new commit during the squash.
 
-If you run a plain `git rebase main` from `feature-api-update`, Git compares commit identities, not just patch intent. It sees the old migration commits in your branch and does not recognize them as the same as the squashed commit on `main`. As a result, it may try to replay migration work that already exists in a different form, producing large conflicts and making the API commits harder to isolate.
+If you run a plain `git rebase main` from `feature-api-update`, Git normally detects and drops clean cherry-picks already represented upstream: it compares patch equivalence rather than commit identities alone. A multi-commit squash combines changes into one patch that may not match each original migration patch individually. Those old commits can therefore remain replay candidates, producing duplicate changes or conflicts. A verified old-upstream boundary tells Git explicitly which commits to exclude, so the API work can be isolated without relying on those individual patch matches.
 
 ```mermaid
 flowchart LR
@@ -384,7 +386,7 @@ When the decision involves sensitive data, add one more question: has the value 
 ## Did You Know?
 
 - Git's [1.7.4 release notes](https://github.com/git/git/blob/v2.56.0/Documentation/RelNotes/1.7.4.adoc) record the introduction of the `git commit --fixup` and `--squash` options, which prepare messages for later interactive rebasing.
-- The [reflog expiration defaults](https://git-scm.com/docs/git-reflog#Documentation/git-reflog.txt---expirelttimegt) are 90 days for ordinary entries and 30 days for entries unreachable from the current tip. Configuration or deliberate pruning can shorten recovery; neither value guarantees object retention.
+- The [reflog expiration defaults](https://git-scm.com/docs/git-reflog#_options_for_expire) are 90 days for ordinary entries and 30 days for entries unreachable from the current tip. Configuration or deliberate pruning can shorten recovery; neither value guarantees object retention.
 - The Linux kernel's [patch submission guide](https://www.kernel.org/doc/html/latest/process/submitting-patches.html#separate-your-changes) asks contributors to separate logical changes and keep every patch in a series buildable, so reviewers and `git bisect` can inspect intermediate states.
 - `git rebase --exec` can run a command after each replayed commit, so a fast manifest check can catch the exact commit that first breaks a Kubernetes 1.35+ deployment example.
 
@@ -402,31 +404,31 @@ When the decision involves sensitive data, add one more question: has the value 
 
 ## Quiz
 
-<details><summary>Question 1: Your team is reviewing a private branch with six commits: a Deployment, an indentation fix, probes, a Service, a ConfigMap with a temporary password, and a password removal. How would you reconstruct the history so the reviewer sees the final intent and the password never appears in a surviving commit?</summary>
+<details><summary><span>Question 1: Your team is reviewing a private branch with six commits: a Deployment, an indentation fix, probes, a Service, a ConfigMap with a temporary password, and a password removal. How would you reconstruct the history so the reviewer sees the final intent and the password never appears in a surviving commit?</span></summary>
 Use interactive rebase and group each repair directly under the commit it completes. The Deployment should be marked `reword`, with the indentation fix and probe commit marked `fixup` below it so the final Deployment commit is coherent. The ConfigMap password addition and removal should be adjacent, with the removal fixed up into the addition so the net surviving commit never contains the password. This tests whether you can reconstruct fragmented commit history into a logical narrative while preserving the secure final state.
 </details>
 
-<details><summary>Question 2: Midway through a rebase, Git reports a conflict in `service.yaml`. You resolve the markers and save the file. What should you do next, and why should you avoid a normal commit?</summary>
+<details><summary><span>Question 2: Midway through a rebase, Git reports a conflict in <code>service.yaml</code>. You resolve the markers and save the file. What should you do next, and why should you avoid a normal commit?</span></summary>
 Stage the resolved file with `git add service.yaml`, check `git status`, and run `git rebase --continue`. A normal `git commit` is wrong because the rebase engine is already in the middle of creating the replacement commit for the failed replay step. Manual commits can add an extra commit outside the planned sequence, which makes the rewritten history harder to reason about. `--continue` tells Git that the index now contains the resolved version for the commit it was applying.
 </details>
 
-<details><summary>Question 3: A local-only commit three steps back introduced an API token, and a later commit removed it. How do you formulate a safe strategy for removing accidentally committed sensitive data from this unpublished branch?</summary>
+<details><summary><span>Question 3: A local-only commit three steps back introduced an API token, and a later commit removed it. How do you formulate a safe strategy for removing accidentally committed sensitive data from this unpublished branch?</span></summary>
 Leaving both commits preserves the token in the earlier snapshot, even though the final file no longer contains it. Fixing up the removal into the addition makes the rewritten commit represent the secure net result, so the token is absent from surviving branch history. Because the branch has not been pushed, rewriting the commits does not disrupt collaborators, but the strategy is only safe if you also ask whether the sensitive data escaped through logs, remotes, screenshots, or CI. If there is any chance the token left your machine, rotate it because Git cleanup does not undo external exposure.
 </details>
 
-<details><summary>Question 4: You marked a large "service and ingress" commit with `edit`, and Git stopped at that commit. You want two commits instead of one. What sequence replaces the original commit without duplicating it?</summary>
+<details><summary><span>Question 4: You marked a large "service and ingress" commit with <code>edit</code>, and Git stopped at that commit. You want two commits instead of one. What sequence replaces the original commit without duplicating it?</span></summary>
 Run `git reset HEAD~1` so the large commit is undone while its file changes remain in the working tree. Then stage only the Service files and commit them with a focused message, stage only the Ingress files and commit them with a separate focused message, and run `git rebase --continue`. This replaces the paused commit with two better commits at the same historical position. If you skip the reset, the original large commit remains and your new commits merely add more history after it.
 </details>
 
-<details><summary>Question 5: Your colleague pulled your branch yesterday to test authentication flows. Today you want to clean up five WIP commits before opening the pull request. Should you interactive rebase and force-push?</summary>
+<details><summary><span>Question 5: Your colleague pulled your branch yesterday to test authentication flows. Today you want to clean up five WIP commits before opening the pull request. Should you interactive rebase and force-push?</span></summary>
 Not without explicit coordination. Once your colleague has based work on the branch, rewriting the commit SHAs will make their local history diverge from the remote branch. The safer default is to keep the shared history and use a merge or follow the team's agreed recovery process. If the team decides the cleanup is worth it, coordinate a planned force-push and tell your colleague exactly how to reset or rebase their local work.
 </details>
 
-<details><summary>Question 6: A dependent branch was based on `feature-db-migration`, but that base branch was squash-merged into `main`. A normal `git rebase main` now tries to replay old database commits and creates conflicts. Which operation should you use?</summary>
+<details><summary><span>Question 6: A dependent branch was based on <code>feature-db-migration</code>, but that base branch was squash-merged into <code>main</code>. A normal <code>git rebase main</code> now tries to replay old database commits and creates conflicts. Which operation should you use?</span></summary>
 Use `git rebase --onto main feature-db-migration feature-api-update`, substituting the real branch names from your repository. The old upstream argument marks the commits that should be excluded from the replay, while `main` is the new base. This moves only the commits unique to the dependent branch onto the squashed result. The command is correct because it compares reachability boundaries rather than assuming the old commit SHAs still exist on `main`.
 </details>
 
-<details><summary>Question 7: During a complex rebase, you realize the instruction sheet selected the wrong range and conflict resolution is becoming unsafe. What is the safest recovery action, and what should you inspect before trying again?</summary>
+<details><summary><span>Question 7: During a complex rebase, you realize the instruction sheet selected the wrong range and conflict resolution is becoming unsafe. What is the safest recovery action, and what should you inspect before trying again?</span></summary>
 Run `git rebase --abort` to return the branch, index, and working tree to the state they had before the rebase started. After aborting, inspect `git status`, confirm the current branch, and review the intended range with a log command such as `git log --oneline main..HEAD`. That inspection helps you identify whether the problem was the wrong base, the wrong branch, or an overly large rewrite. Retrying after a clean abort is much safer than improvising through conflicts you no longer trust.
 </details>
 
@@ -492,6 +494,8 @@ git add service.yaml && git commit -m "finish service ports"
 
 You currently have six messy commits on the `feature-web-app` branch. Your goal is to use `git rebase -i main` to reduce this history to exactly two clean commits after the initial README commit. The first clean commit should contain the Deployment with its label repair, and the second clean commit should contain the Service plus the ConfigMap in its secure final state.
 
+Before opening the solution or following the numbered guidance, write your own six-line plan and explain the two commit boundaries you chose. Predict what a reviewer should see in each surviving patch and why the password-removal commit alone cannot satisfy the history requirement. Use the guidance to diagnose your plan rather than copying the final sheet immediately.
+
 1. **Start the Rebase**: Initiate an interactive rebase against the `main` branch and confirm the editor shows the six feature commits in oldest-to-newest order.
 2. **Consolidate the Deployment**: Reorder the instructions so the deployment typo fix immediately follows the initial deployment commit, then use `fixup` to meld it into the Deployment commit.
 3. **Consolidate the Service**: Reorder the instructions so the service port addition immediately follows the initial service commit, then use `fixup` to meld it into the Service commit.
@@ -540,6 +544,26 @@ Failure layer: repository cleanup versus exposure. Next action: rewriting surviv
 - [ ] Run `git log -p`. Verify that the string `super-secret-admin-pass` does not appear anywhere in the diff history.
 - [ ] There should be no commits containing the messages "fix typo", "wip", or "finish service".
 - [ ] `git status` should report a clean working tree on `feature-web-app`.
+
+### Hints and Transfer
+
+<details><summary>Hint 1: Choose the review units</summary>
+
+Compare the six original patches by purpose rather than timestamp. Which changes complete the Deployment, and which belong to the Service/configuration unit? Keep those two outcomes visible while deciding which messages carry useful intent.
+
+</details>
+<details><summary>Hint 2: Trace the accumulated patch</summary>
+
+Read the proposed instruction sheet from top to bottom. Follow each repair to the surviving commit it will change; both ConfigMap steps must join the same accumulated unit. If the fake value remains in a surviving patch, revisit that grouping before trying another command.
+
+</details>
+<details><summary>Hint 3: Diagnose an unexpected result</summary>
+
+Use the command table to choose between keeping a message, editing it, or discarding a repair message. If Git reports a conflict, inspect and stage the resolution before continuing; if the selected range is wrong, abort and inspect the graph. Only consult the complete solution after explaining which check failed.
+
+</details>
+
+Transfer challenge: in a second disposable repository, create a combined two-file commit and replace it with two logical commits using an `edit` stop. Choose the file names and messages yourself; inspect each replacement patch and explain why resetting before recommitting prevents duplication. Then explain what you would change about your plan if a colleague had already based work on the original commit. Keep this challenge local and use no real credentials.
 
 <details><summary>Solution Guide</summary>
 
