@@ -355,17 +355,19 @@
     },
     {
       "path": "prerequisites/git-deep-dive/module-1-git-internals.md",
-      "page_digest": "sha256:caad64a1bca7a25b60379df0815143141a03e491fa8c9792fa30e6d5ab2caeea",
+      "page_digest": "sha256:33e201ad3c3ecbb85e96f74353d4e31f17e66bb91f04cd7570ee372d50cd0953",
       "disposition": "revise",
       "reviewer_refs": [
         "docs/content-upgrade/reviews/2026-10-28-git-state-boundaries-p12a.md",
         "docs/content-upgrade/reviews/2026-10-28-git-fsck-recovery-p12g.md",
-        "docs/content-upgrade/reviews/2026-10-28-git-state-inspection-p12h.md"
+        "docs/content-upgrade/reviews/2026-10-28-git-state-inspection-p12h.md",
+        "docs/content-upgrade/reviews/2026-10-28-git-quiz-code-render-p12i.md"
       ],
       "evidence_refs": [
         "docs/content-upgrade/reviews/2026-10-28-git-state-boundaries-p12a.md",
         "docs/content-upgrade/reviews/2026-10-28-git-fsck-recovery-p12g.md",
-        "docs/content-upgrade/reviews/2026-10-28-git-state-inspection-p12h.md"
+        "docs/content-upgrade/reviews/2026-10-28-git-state-inspection-p12h.md",
+        "docs/content-upgrade/reviews/2026-10-28-git-quiz-code-render-p12i.md"
       ],
       "independent_statuses": {
         "page_presence": "pass",
