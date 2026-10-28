@@ -39,17 +39,22 @@ That distinction becomes practical when a repository looks broken but still cont
 
 Repository metadata stores local state as well as history that can be shared. [`git push`](https://git-scm.com/docs/git-push) updates selected remote refs and sends required objects; it is not a complete backup of local repository state. Your machine may contain the only reference to useful work, so locate and preserve that state independently.
 
-Let's peek inside a fresh disposable repository with Git 2.56 and the files ref backend. Use this repository throughout the demonstrations; other ref backends can store references differently.
+These demonstrations target Git 2.56 and the files ref backend. First start a disposable child Bash shell:
 
 ```bash
-# Create a new empty directory
+bash --noprofile --norc
+```
+
+Stay inside this child for **all** practice steps. Paste the complete setup below; its `set -e` ends only this child on a failed setup command. If the child exits, **STOP: do not paste later commands into the original parent shell**. Fix the cause and start a fresh child before retrying. Check the printed Git version; use Git 2.56 for the recorded examples. Other ref backends can store references differently.
+
+```bash
+set -e
+trap 'printf "%s\n" "STOP: practice shell ended; do not continue in the parent shell."' EXIT
+git --version
 mkdir my-git-repo
 cd my-git-repo
-
-# Initialize a Git repository (pin default branch to main)
 git init -b main --ref-format=files --object-format=sha1
-
-# List the contents of the .git directory
+test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"
 ls -F .git
 ```
 
