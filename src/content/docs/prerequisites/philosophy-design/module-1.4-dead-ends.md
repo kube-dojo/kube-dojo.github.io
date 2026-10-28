@@ -33,30 +33,30 @@ This module examines technologies and deployment choices in relation to Kubernet
 
 ## Start With the Shape of a Dead End
 
-A technology becomes a dead end when its learning value, operational value, and ecosystem value fall out of alignment. It may still run. It may still have loyal users. It may even have a few job postings that pay well because legacy systems need care. The warning sign is that new teams no longer choose it for new work, adjacent tools stop integrating with it first, and community energy moves somewhere else. When that happens, every month of investment buys less future portability.
+A "dead end" is a question to investigate, not a status supplied by a product name. A project may be formally retired, a supported deployment may fail a particular requirement, or a team may need a different learning goal. Record the exact product and version, the decision being made, and the evidence that would change it. A lifecycle record alone does not measure job demand, operational suitability, or the future value of learning a tool.
 
-Cloud-native dead ends usually share three forces. First, the abstraction stops matching the workload. Second, the governance model fails to attract competitors, cloud providers, and independent vendors. Third, the ecosystem around the winner becomes so large that alternatives must be dramatically better to justify their isolation. Kubernetes won not because it was simple, but because it became the common integration target for runtimes, networking, storage, policy, observability, security, and managed cloud services.
+Investigate three separate questions: does the documented abstraction support the intended workload, who maintains the product and its integrations, and can the team operate and recover it? Governance and ecosystem support are useful evidence to seek, but they do not establish why organizations chose a product or whether it meets this team's requirements. Mark those claims unknown until appropriate evidence exists.
 
 **Pause and predict:** if your team finds a tool that is easier than Kubernetes for one narrow deployment path, what would have to be true before you would recommend it for a five-year platform bet?
 
 <details>
 <summary>Check your prediction</summary>
 
-The answer should include more than feature checklists. You would need credible governance, a healthy contributor base, support from more than one cloud provider, a migration story, a security model, and evidence that the tool's abstraction will still fit when workloads become stateful, regulated, or globally distributed.
+Consider the team's required support, security, data recovery, integrations and exit path, then identify which claims can be checked in documentation and which need tests. Multiple providers or contributors may matter to a particular plan, but their number alone cannot prove suitability. State the workload and operating constraints before judging the tool.
 
 </details>
 
 Write the conditions you would require before you continue. The next paragraph is a city-map model. It does not list those conditions.
 
-The useful mental model is a city map. A tool can be a lovely side street, but a platform needs roads, utilities, emergency services, maintenance crews, and businesses that expect the address to exist. Kubernetes is not only an orchestrator; it is the address system used by a large part of modern infrastructure. Dead ends often failed because they remained excellent side streets while the industry finished building the city somewhere else.
+Think of a platform as a map of dependencies: workloads need paths to storage, network access, recovery and operators who maintain them. The analogy stops at the planning question; a city map cannot establish a product's actual integrations, lifecycle or market adoption. Inspect those facts for the specific version and environment.
 
-Before looking at individual tools, separate four questions. Is the technology obsolete, or is only one usage pattern obsolete? Is the concept still valuable even if the product declined? Is there a modern replacement with better ecosystem alignment? Is your team solving a production problem or chasing an attractive tutorial? These questions keep you from making the two common beginner mistakes: throwing away Docker entirely because dockershim was removed, or learning Docker Swarm because it appears next to Compose in old Docker material.
+Before looking at individual tools, separate four questions. What lifecycle state is documented? Which capabilities does the intended version provide? Which operating requirements remain unverified? What learning or engineering task are you trying to complete? Use those answers to choose the depth of study. Older Swarm material may serve a specific maintenance or comparison task; its age or position beside Compose does not establish relevance. Likewise, dockershim removal alone does not justify abandoning Docker image builds.
 
 ## Diagnose Orchestration Dead Ends
 
-Container orchestration is where the most visible dead ends appeared because the industry could not support many competing control planes forever. Orchestration is not just starting containers. A production orchestrator schedules work across nodes, tracks health, rolls out new versions, routes traffic, handles secrets, coordinates storage, integrates with identity, and exposes APIs that other tools can extend. Once organizations need those capabilities, the platform with the largest ecosystem becomes safer than the platform with the cleanest first demo.
+Orchestration involves more than starting containers. For a proposed deployment, list the required scheduling, health, rollout, traffic, storage, identity and recovery responsibilities, then check which components actually provide them. A larger ecosystem or a shorter demo does not by itself establish the safer choice for a particular service.
 
-Docker Swarm is the simplest example because it was attached to the company that made Docker famous. Swarm felt natural for teams already using Docker locally: it used Docker language, Docker commands, and a friendly path from a single machine to a cluster. That simplicity was its attraction, but it also limited the room for the ecosystem to grow. Kubernetes was harder, yet it offered a more general API model, stronger extension points, and a neutral home that made it easier for cloud providers and vendors to support without strengthening a direct competitor.
+Docker documents swarm mode as part of Docker Engine. To assess it, identify the Engine version and the service, update, networking and failure behavior required by the actual deployment. Comparing a feature with Kubernetes requires documentation for both candidates and a common set of requirements; these sources do not establish comparative adoption or the reasons a team chose either one.
 
 **What it was**: Docker's native orchestration solution.
 
@@ -69,11 +69,11 @@ flowchart TD
     Engine --> Fit[Check capabilities and operating requirements]
 ```
 
-The Swarm lesson is not that vendor-built tools are automatically bad. The lesson is that infrastructure platforms need trust from organizations that compete with one another. When a single vendor controls the roadmap, every other vendor asks whether deep integration helps the platform owner more than the customer. Kubernetes avoided that trap by moving under the CNCF and becoming a neutral target. That governance shift gave the ecosystem a place to cooperate while still competing on managed services, networking, storage, and developer experience.
+For either candidate, check who maintains the release, which integrations and support agreements the team depends on, and what happens if that support changes. A governance model is one input to the decision, not proof of competitors' motives or an automatic prediction of integration quality. Record the support questions that remain unanswered.
 
 For this Kubernetes learning route, prioritize the Kubernetes concepts used by the later modules. If work requires Swarm, use documentation for the intended Engine version and inspect its service, networking, update and recovery behavior. A production tutorial is not obsolete merely because it uses Swarm; check its version, requirements and assumptions. Learning priorities for this course are recommendations, not measured career outcomes or evidence that another platform is unusable.
 
-Apache Mesos and Marathon are more subtle because Mesos was technically impressive. Mesos came from UC Berkeley and targeted large-scale resource sharing before Kubernetes reached dominance. It offered a two-level scheduling model where Mesos managed cluster resources and frameworks such as Marathon decided how to run workloads. That made sense for organizations running mixed workloads at high scale, but it made the developer and operator experience harder to standardize. Kubernetes narrowed the interface, made the workload API more approachable, and let the ecosystem build around pods, services, controllers, and declarative manifests.
+The [Mesos architecture documentation](https://mesos.apache.org/documentation/architecture/) describes a master offering resources to frameworks, whose schedulers choose offers and launch tasks through executors. The [archived Marathon README](https://github.com/d2iq-archive/marathon/blob/90619da70d79a2ecf19368a21c6a695ea981bd74/README.md) describes Marathon as a Mesos framework for container orchestration. This explains the division of responsibilities; it does not establish comparative ease of use or the reasons organizations adopted or left either system.
 
 **What it was**: Two-level resource scheduler (Mesos) with container orchestration (Marathon).
 
@@ -87,28 +87,28 @@ timeline
          : Attic move completed (October)
 ```
 
-Mesos shows that technically powerful systems can lose when the surrounding model asks too much from ordinary teams. Two-level scheduling is elegant if you have platform specialists who can reason about frameworks, resource offers, and custom schedulers. Most product teams wanted a consistent way to deploy services, attach storage, expose endpoints, and get logs without becoming scheduler experts. Kubernetes still has complexity, but its complexity created a shared vocabulary that vendors, educators, and hiring markets could reinforce.
+For an existing Mesos deployment, identify the frameworks in use, their maintenance arrangements, and how the service handles scheduling, storage, updates and recovery. Apache's retirement record is relevant to an ownership and support plan, but does not establish that a particular installation has failed or that migration is the only defensible decision. Check distribution support independently.
 
-Cloud Foundry is a different kind of dead end because the product did not simply disappear. Its original model was a highly opinionated Platform-as-a-Service for stateless twelve-factor applications. For the right application, `cf push` was magical: developers pushed code, the platform staged it, routed traffic, collected logs, and hid infrastructure details. That high abstraction became a weakness when teams needed stateful systems, custom networking, GPUs, sidecars, service meshes, and workload-specific operators. The platform hid infrastructure so well that advanced teams could not reach the knobs they needed.
+Cloud Foundry's [application deployment guide](https://docs.cloudfoundry.org/devguide/deploy-apps/deploy-app.html) describes deploying applications with `cf push`; its Diego documentation describes Tasks and Long-Running Processes. Those are starting points for assessing a particular distribution, not evidence that all workloads fit or that users migrated for a specific reason. Check version-specific capabilities and the team's required controls before comparing it with another platform.
 
-**What it was**: A heavily opinionated Platform-as-a-Service (PaaS) that predated Kubernetes, designed primarily for stateless 12-factor apps.
+**What it is**: A platform with documented application deployment workflows and a Diego container management architecture.
 
 **Status, checked October 27, 2026**: [Cloud Foundry's Diego architecture documentation](https://docs.cloudfoundry.org/concepts/diego/diego-architecture.html) describes Diego as the system managing application containers, including scheduling Tasks and Long-Running Processes. This source does not establish the previous blanket claim that Diego was deprecated in favor of Kubernetes. Evaluate the intended distribution, version and workload rather than treating every Cloud Foundry deployment as one lifecycle state.
 
-**Pause and predict:** if a platform handles routing, logging, and deployment perfectly for stateless web apps, why would users leave it for something harder like Kubernetes?
+**Pause and predict:** if a platform serves a web application and a team proposes a new database workload, what evidence would you need before deciding whether to retain or change the platform?
 
 <details>
 <summary>Check your prediction</summary>
 
-The answer is control surface. Kubernetes exposes lower-level primitives that can be composed into many shapes, while a PaaS exposes a beautiful path for a narrower class of workloads. Teams left because their workloads outgrew the path, not because the old path had never been useful.
+Name the intended distribution and version, data and recovery requirements, operating ownership, and documented capabilities. Compare those with an alternative using the same criteria and test the unresolved behavior. A new workload suggests questions to investigate; it does not prove a mismatch or explain anyone's migration.
 
 </details>
 
-Write why users would leave before you continue. The next paragraph asks where an abstraction breaks. It does not give this reason.
+Write the evidence needed before you continue, including the behavior that has not yet been tested.
 
-The practical diagnosis is to name the break in writing before you read the product history. A portfolio can stay on one path for years and then grow a workload that path was never built to host. The later paragraphs name products. Use them to check the reason you already wrote, not to discover it.
+The practical diagnosis is to state a possible gap as a hypothesis. Identify the actual requirement and compare it with documentation and observations; a product's historical description does not prove a particular deployment cannot support it.
 
-Do not learn BOSH, Diego, Mesos architecture, Marathon configuration, or Swarm service definitions as core cloud-native career skills unless a current employer pays you to maintain them. Learn the ideas they reveal: orchestration requires scheduling, health management, rollout control, and ecosystem trust. Those ideas transfer. The old product-specific workflows mostly do not.
+Choose learning depth according to your goals and the systems you maintain. Mesos offers a concrete way to study resource offers and framework scheduling; Swarm and Diego documentation can inform work on those deployments. Broader concepts such as scheduling, rollout and recovery can also be compared across systems, without claiming a particular job-market outcome.
 
 ## Separate Docker Images From the Kubernetes Runtime
 
@@ -233,11 +233,11 @@ Read the example as a service definition. It does not state a recovery-time targ
 
 Docker's production guide lists possible configuration changes involving code mounts, ports, environment variables, restart policy and logging, and explains rebuilding and recreating a service for deployment changes. Those steps do not by themselves demonstrate an availability target or successful recovery from host failure. State which failures the application must tolerate and test the actual design. Requirements for access control, secrets, traffic management and observability depend on the system; identify them explicitly instead of assuming that either a Compose file or a Kubernetes manifest supplies them automatically.
 
-Translation tools such as Kompose can help people see rough Kubernetes equivalents, but one-to-one translation is rarely a good final architecture. A Compose service does not automatically imply a production Deployment with readiness probes, resource requests, PodDisruptionBudgets, network policies, service accounts, and environment-specific configuration. The modernization task is to redesign using Kubernetes primitives, not to mechanically convert syntax and hope the missing operational requirements appear.
+If a team considers translating Compose configuration, compare the resulting resources with its actual availability, security and recovery requirements. A translated service definition alone does not establish that probes, access controls, data recovery or rollout behavior meet those requirements. Retention, revision and migration all need an explicit assessment.
 
 ## Evaluate Technology Bets With Governance, Ecosystem, and Cloud-Provider Signals
 
-The dead-end pattern becomes clearer when you compare what lost with what remains current. Kubernetes did not win every technical argument. It won the coordination argument. Once cloud providers, tooling vendors, educators, security products, storage drivers, service meshes, and hiring pipelines treated Kubernetes as the shared target, alternatives had to offer overwhelming value to overcome isolation. Most did not.
+When comparing technologies, distinguish a documented lifecycle event from a statement about adoption or the cause of a migration. The supplied records can establish particular statuses and capabilities, but they cannot rank all platforms or explain the decisions of an entire industry. Collect separate evidence for each claim the decision requires.
 
 Keep project lifecycle, capability and decision criteria separate. Apache's Mesos record establishes formal retirement; Docker's Swarm and Compose documentation describes deployment models; Cloud Foundry's documentation explains Diego's architecture. These records do not measure why organizations adopted or left each product. Governance, operating effort and integration requirements are questions for the actual team to investigate, alongside which failure paths its design can tolerate.
 
@@ -262,17 +262,17 @@ flowchart LR
     Requirements --> Test[Test critical operating and recovery paths]
 ```
 
-Use a simple evaluation routine whenever a new deployment tool appears. Ask what problem it solves that Kubernetes does not solve well enough. Check whether it is controlled by one vendor or governed in a way that competitors can trust. Look at cloud-provider support, not just GitHub stars. Read the release history and issue tracker to see whether maintainers respond to security and compatibility work. Then ask the harsh question: if this company disappeared, could your team still operate the system, hire for it, and migrate away from it?
+Use an evaluation routine whenever a deployment tool appears. Name the problem and required behavior, identify maintainers and relevant support, and inspect version-specific integrations and security responses. Ask how the team would operate or migrate the system if support changed. Record unanswered questions rather than using a star count or a governance label as a substitute for those checks.
 
-Before running a pilot, what output do you expect from that evaluation? A healthy result should name the operational problem, the risk being reduced, the ecosystem dependencies, the exit strategy, and the compatibility path with Kubernetes rather than simply saying "the demo was faster." If the proposed tool replaces the whole platform, the evidence bar should be high. If it complements Kubernetes, such as a controller, policy engine, or packaging helper, the adoption risk is smaller but still real.
+Before a pilot, record the operational problem, dependencies, expected result, rollback and evidence needed for the proposed scope. A plugin can also introduce material risk; assess its permissions, failure modes and support instead of assuming that integration is safer than replacement. A faster demo alone does not answer those questions.
 
 A useful distinction is replacement versus integration. Ask which component a proposed change replaces, which interfaces it uses, and which operating responsibilities remain. Cloud Foundry's documented Diego system is one concrete architecture to inspect; do not infer that every distribution has moved to Kubernetes. Likewise, an integration with Kubernetes establishes an interface to evaluate, not proof of why a product succeeded or that a migration is necessary.
 
 ## Worked Example: Project Phoenix Assessment
 
-Imagine that Project Phoenix is a medium-sized SaaS product with an API, a worker fleet, a PostgreSQL database, a Redis cache, and a small internal dashboard. The production environment runs on three virtual machines managed by Puppet. Docker is installed on each host, Swarm schedules containers, and a third-party conversion script turns the local Compose file into production service definitions. Nothing about this stack is imaginary in spirit; many teams built similar systems because each step felt reasonable when taken alone.
+Hypothetical scenario: Project Phoenix is a SaaS product with an API, workers, a PostgreSQL database, a Redis cache, and an internal dashboard. Three virtual machines use Puppet for host management, Docker and Swarm for containers, and a conversion script for service definitions. This authored example supplies a configuration to assess; it does not report a real deployment, incident, market pattern or result.
 
-The first diagnostic move is to separate incident risk from modernization preference. A Swarm cluster can run containers today, so saying "Swarm is old" is not enough for an engineering decision. The stronger argument is operational: if a node fails, if a security patch requires coordinated rollout, if the team needs cloud load balancer integration, or if a new engineer must debug production, the organization receives less help from the modern ecosystem than it would on Kubernetes. The age of the tool matters because it predicts support friction.
+The first diagnostic move is to separate a documented capability from the service's actual requirements. Ask what should happen when a node fails, how patches are rolled out, which load balancer integration is required, and who can debug the system. Neither the age of Swarm nor its product name establishes the answers. Gather version-specific support records and test the relevant failure and recovery paths before recommending a change.
 
 Next, examine the Puppet role with care. Its [agent applies a configuration catalog to a managed node](https://help.puppet.com/core/current/Content/PuppetCore/architecture.htm); its presence does not itself establish a workload conflict. In this hypothetical plan, if a Puppet workflow, a Swarm service definition, and a converted Compose file each assert different API replica counts, identify which one actually writes the value and which owns the intended setting. Record how the team will detect and resolve disagreement before choosing a change.
 
@@ -280,51 +280,63 @@ The Compose file deserves the same requirements check. Keep a useful local workf
 
 A useful assessment memo separates a source-backed fact, a requirement, and the missing local evidence. For example: Apache records Mesos as retired in August 2025, so a deployment that still runs Mesos needs an explicit support and maintenance plan. Docker documents single-server production use with Compose; the hypothetical service still needs evidence of data recovery and acceptable behavior after host loss. Engine swarm mode has documented orchestration capabilities, but its name alone does not establish whether the required integrations exist. Each conclusion identifies something another engineer can check instead of inventing a deprecation, hiring comparison, or universal production ban.
 
+### Worked claim audit
+
+Here is an authored planning example, not a report of a real assessment. A reviewer proposes three statements for Project Phoenix: "Mesos is retired," "Compose cannot be used in production," and "the team must migrate because Kubernetes has more support." Before accepting any statement, record the product, source, scope and date, and then separate what that source says from what the team needs to find out. The scenario does not say that Phoenix actually runs Mesos; the first statement is a comparison exercise, not an inventory finding.
+
+For the first statement, the [Apache Attic record](https://attic.apache.org/projects/mesos.html) supports Mesos's formal retirement in August 2025 and the completed move to the Attic in October 2025. That is a lifecycle fact. It does not establish the support terms for an individual distribution, prove that an installation has failed, or specify a migration deadline. If an actual team uses Mesos, the next evidence would include its installed version, support agreement, current maintainers and recovery obligations. The disposition remains open until those facts are compared with the team's requirements.
+
+For the second statement, Docker's [Compose production guide](https://docs.docker.com/compose/how-tos/production/) describes production deployment, including a single-server option, so a universal production ban does not follow. For Phoenix, the guide still does not establish how the team's data is backed up, whether a host-loss recovery meets its target, or which production settings are actually deployed. Record those as unknown and plan to inspect the configuration and test recovery. A successful startup on a laptop would be a different observation and would not answer the host-loss question.
+
+For the third statement, neither the Mesos retirement record nor the Compose guide measures comparative support for Phoenix's integrations. Write down the required versions, support response, network and storage interfaces, and operating responsibilities; request current agreements and documentation for each candidate. If a required integration is undocumented, record that gap rather than assuming that either platform provides or lacks it. A proposed migration can then name the requirement it addresses, the evidence for the gap, the cost and owner of the proposed replacement, and the test that would justify proceeding. Until those checks exist, both retention and change remain possible outcomes.
+
+Transfer the same method to Cloud Foundry: the [Diego architecture guide](https://docs.cloudfoundry.org/concepts/diego/diego-architecture.html) describes Tasks and Long-Running Processes, while the [deployment guide](https://docs.cloudfoundry.org/devguide/deploy-apps/deploy-app.html) describes `cf push`. Neither source establishes why users left, whether a particular database is supported, or whether Kubernetes is a better fit for it. Name the intended distribution and workload, then gather version-specific capability and recovery evidence. The skill is to match the strength of the conclusion to the evidence, not to force every candidate into a retain or retire category before the comparison.
+
 Now map responsibilities before selecting replacements. For each component, record what it owns, its documented lifecycle, and any operating requirement the current design cannot satisfy. The result can justify retention, a configuration change, an additional component, or migration. A Kubernetes proposal should explain who owns its infrastructure, workload declarations, upgrades, data and verification. Keep Docker image building and host-management responsibilities distinct from the decision about application orchestration.
 
-The next decision is whether to operate Kubernetes directly or use a managed service. For most teams, managed Kubernetes is the conservative choice because the control plane is not where application teams usually create business value. Running Kubernetes the hard way can be educational in a lab, but production control planes require upgrades, backups, certificates, API availability, audit configuration, and security response. If Project Phoenix lacks a platform team, EKS, GKE, AKS, or another managed offering reduces the number of sharp edges during migration.
+If Kubernetes is a candidate, compare self-managed and managed offerings against the required support, cost, control, recovery and security responsibilities. Document which party handles upgrades, backups, certificates, API availability and incident response under the actual service agreement. A managed control plane may change the division of work, but its name alone does not establish lower risk or a successful migration.
 
-The migration should start with a non-critical service, not the database. Pick the internal dashboard or a stateless worker with modest traffic and clear rollback behavior. Package it as an OCI image, define a Deployment with resource requests and readiness probes, expose it through a Service, and manage the manifest through Git review. The purpose of the first migration is not raw scale. It is teaching the organization the new operating rhythm: desired state in Git, reconciliation in the cluster, and observable rollout status.
+If the assessment supports a pilot, a dashboard or worker could be a candidate after the team checks dependencies, impact, rollback and success criteria. A proposed Kubernetes design might use a Deployment and Service, but those object names do not establish that the application works or that recovery is acceptable. Specify what would be observed and who would make the decision to proceed or stop.
 
-After one stateless service works, the team should build the platform minimums before moving the core API. That minimum includes namespaces, RBAC, secret management, ingress, logging, metrics, image scanning, base resource policies, and a GitOps controller if the organization chooses that model. Skipping these pieces makes Kubernetes look deceptively easy during the pilot and painfully incomplete during the first serious incident. Dead-end migrations often fail because teams replace the scheduler but postpone the operating model.
+Before expanding a pilot, assess access control, secrets, networking, observability, image handling and operational ownership against the service requirements. A team can consider namespaces, RBAC, logging and other controls as candidates, but a fixed list or a GitOps controller is not proof that the requirements are met. Document unresolved gaps and test the proposed operating model.
 
-Data services need a separate conversation. Moving PostgreSQL from a Compose volume to Kubernetes persistent storage may be possible, but it may not be the best first move. A managed database often gives stronger backup, failover, patching, and operational support than a self-managed database inside the cluster. The dead-end analysis does not require every workload to run in Kubernetes. It requires each workload to have an intentional home with clear ownership, recovery behavior, and support expectations.
+Data services need a separate comparison. For PostgreSQL, assess data consistency, backups, restoration, failover, patching, cost and support for each candidate, including retaining the current service. A managed database and a self-managed deployment have different agreements and responsibilities; neither label alone proves stronger recovery. Record the evidence and a restoration test before deciding.
 
-Security review is where the old stack usually reveals hidden cost. A converted Compose file may rely on broad environment variables, host-mounted paths, and implicit network trust. Kubernetes gives better primitives, but only if the team uses them: service accounts, namespace boundaries, network policies, secret handling, admission control, and workload identity where the cloud supports it. A rushed migration that ignores these controls simply moves weak assumptions into YAML.
+Review security assumptions in both the current and proposed designs. Inspect access, secrets, network boundaries and host mounts where used, then map each requirement to an implemented control and its verification. Kubernetes documents [RBAC](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/rbac/) and [NetworkPolicy](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/network-policies/), but a manifest alone does not demonstrate that a particular policy is enforced or sufficient.
 
 For the hypothetical Project Phoenix audit, identify where logs, metrics, events and alerts are collected and who responds to them. A host-local log can be unavailable after that host fails, whatever deployment tool created the container. Check the actual collection and retention design before recommending a change. Neither Compose nor Swarm use alone proves that the organization lacks centralized observability; neither a Kubernetes cluster nor a product name proves that the required evidence will be available during an incident.
 
-Training should target concepts before tools. Engineers need to learn what a Deployment controls, how a Service gives stable discovery, why readiness differs from liveness, how resource requests influence scheduling, and how rollouts interact with health checks. Helm and Kustomize are useful only after those primitives make sense. GitOps is useful only when the team agrees that Git is the desired-state source. Otherwise, new tools become decoration on top of old habits.
+Training can connect the selected tools to the responsibilities they manage. If the proposed design uses Deployments and Services, study their behavior alongside the team's rollout, access and recovery checks. If GitOps is proposed, decide which intended state it owns and how conflicting changes are handled. The sequence can reflect existing knowledge and workplace needs rather than a universal prerequisite order.
 
-The team should also plan for coexistence. A migration rarely moves every service in one weekend, and trying to force that schedule creates avoidable risk. For a period, Swarm and Kubernetes may both exist, with routing, DNS, secrets, and observability crossing the boundary. That coexistence is not a failure if it has a retirement date, ownership, and clear criteria for when new services stop landing on the old platform. Dead ends become dangerous when "temporary" becomes permanent without review.
+If the plan includes coexistence, identify routing, DNS, secrets and observability across both environments, plus an owner and review condition for each dependency. A deadline can support planning, but the right duration depends on the workload and evidence. Record rollback and ongoing support responsibilities even if the final decision is to retain the existing deployment.
 
-Success metrics should be operational, not cosmetic. Count reduced recovery time, successful rolling updates without user-visible downtime, fewer manual host repairs, clearer audit trails, and the number of services owned through declarative review. A migration that only changes the orchestrator name in a slide deck has not solved the dead-end problem. A migration that changes how the team reasons about desired state, failure, and support has created durable value.
+Define success criteria before comparing candidates: for example, an acceptable restoration time, an update behavior, and who can inspect the relevant audit trail. Measure the current and proposed designs using comparable conditions where possible. No recovery improvement or reduced workload has been observed in this hypothetical scenario.
 
-The final recommendation for Project Phoenix should read like a risk-managed modernization plan rather than an accusation against the past. The old stack was a reasonable accumulation of decisions made under earlier constraints. The new stack should keep the useful parts, such as OCI image builds and local Compose convenience, while retiring production dependencies that isolate the team from the current ecosystem. That tone matters because migrations are social systems as much as technical ones.
+The final recommendation for Project Phoenix should connect each proposed action to a requirement and evidence. Retain useful components where they satisfy the need; identify the costs, ownership and tests for any change. The scenario gives no evidence of prior decision makers' motives or a requirement to replace every production dependency.
 
 The assessment should distinguish Mesos's documented retirement from the deployment-fit questions for Engine swarm mode, Diego and Compose. Explain what the sources establish, what the hypothetical workload requires, and which tests or support information are still missing. A recommendation can retain a component or propose migration. Its value comes from that checked argument, rather than from selecting Kubernetes in advance or treating every older product as formally retired.
 
 ## Patterns & Anti-Patterns
 
-Patterns help you repeat the good decisions behind the current ecosystem, while anti-patterns help you detect when old thinking is sneaking into new platforms. Treat these as operating habits rather than trivia. A team that can explain why a tool fits the platform model is less likely to be captured by a slick demo or by nostalgia for a workflow that worked in a different era.
+These patterns are prompts for investigation, not guarantees of a better outcome. Apply them to the proposed service, its operating responsibilities and the evidence available. A convincing demo or a familiar workflow still needs to be compared with the actual requirements.
 
 | Pattern | When to Use It | Why It Works |
 |---------|----------------|--------------|
-| Prefer neutral infrastructure governance | Choosing core orchestration, runtime, networking, or policy layers | Competitors, vendors, and cloud providers are more willing to integrate when no single company controls the center. |
-| Separate concepts from products | Evaluating Docker, Compose, Cloud Foundry, or any older tool | You keep useful ideas such as image builds and developer workflows without inheriting obsolete production patterns. |
+| Examine governance and support | Choosing an infrastructure dependency | Identify maintainers, release and security responsibilities, relevant integrations and the team's exit options. |
+| Separate concepts from products | Evaluating Docker, Compose, Cloud Foundry, or another tool | Compare image builds and deployment workflows against the actual environment and its requirements. |
 | Design for declarative reconciliation | Managing Kubernetes workloads, policy, and configuration | Desired state in an API gives controllers a stable contract for healing, rollout, audit, and automation. |
-| Keep an exit strategy | Piloting any new platform component | Migration paths, data ownership, and open standards reduce the cost of being wrong. |
+| Plan an exit strategy | Piloting any new platform component | Identify data ownership, migration dependencies and the evidence needed to assess a change. |
 
-The strongest pattern is preserving portable concepts while retiring obsolete control planes. You should still learn container images, health checks, service discovery, rollout strategy, resource isolation, and declarative configuration. Those ideas matter across tools. You should not spend scarce beginner time memorizing Swarm service syntax, Mesos framework behavior, Diego internals, or Compose production tricks unless a specific maintenance role requires them.
+Preserve concepts while checking the status and fit of the particular implementation. Container images, health checks, service discovery, rollout strategy and declarative configuration provide comparison points, while product-specific details may be essential to maintaining a real system. Choose study depth from your goals and the evidence needed for your work.
 
 | Anti-Pattern | What Goes Wrong | Better Alternative |
 |--------------|-----------------|--------------------|
-| Choosing a single-vendor orchestrator for core platform work | Ecosystem support narrows when competitors avoid strengthening the owner | Use Kubernetes or another neutrally governed standard with broad provider support. |
-| Translating local Compose files directly into production | Missing probes, policies, scheduling, rollout controls, and secret boundaries stay hidden | Redesign the workload using Kubernetes objects, Helm, Kustomize, and GitOps review. |
+| Treating a governance label as proof of fit | It does not establish the actual integrations or support terms | Check the required integrations, maintenance, exit path and workload behavior. |
+| Treating a syntax translation as an operational assessment | A converted file alone does not prove recovery or access requirements are met | Compare the resulting deployment against explicit requirements and tests. |
 | Multiple workflows asserting incompatible workload state | A controller or another writer may change a value a separate workflow expects to control | Identify the controller and field owners; inspect the actual writes and agree how to resolve conflicts. |
-| Treating legacy expertise as future proof | Hiring and integration markets move away while maintenance burden grows | Convert legacy knowledge into transferable concepts and current platform practice. |
+| Assuming a tool's name predicts career value | The documents here do not measure job markets or individual opportunities | Compare the role, learning goals and current evidence available for the decision. |
 
-These patterns also explain why Kubernetes itself should not be treated as untouchable forever. A future platform could displace it if it solved real pain, offered trustworthy governance, preserved compatibility or migration paths, attracted cloud-provider support, and created an ecosystem large enough to justify the switch. Until those signals exist, "simpler than Kubernetes" is not enough. Simpler for the first day can become harder for the fifth year.
+Apply the same questions to Kubernetes and alternatives. A candidate's easier first demonstration is one observation; longer-term operations, security, support and migration require their own evidence. The choice remains conditional on the service and the team's constraints.
 
 ## Decision Framework
 
@@ -333,31 +345,31 @@ Use this framework when your team considers whether to learn, adopt, maintain, o
 | Question | Green Signal | Red Signal | Decision Guidance |
 |----------|--------------|------------|-------------------|
 | What problem does it solve? | Clear operational pain with measurable impact | Mostly novelty, aesthetic preference, or tutorial convenience | Pilot only when the problem is real and named. |
-| Who governs it? | Neutral foundation, multi-company maintainers, open roadmap | Single startup controls roadmap and trademarks | Avoid core dependency unless exit path is strong. |
-| Who integrates with it? | Major clouds, security vendors, observability tools, storage providers | Integrations are mostly first-party or community scripts | Prefer ecosystem standards for production platforms. |
-| What happens if it fails? | Data and workloads can migrate through open interfaces | Migration requires a rewrite of platform habits and tooling | Keep blast radius small or stay with current standards. |
-| Does it align with Kubernetes? | Extends, automates, or secures Kubernetes primitives | Requires replacing the cluster model without strong evidence | Treat replacement claims as high-risk architecture choices. |
+| Who governs it? | Named maintainers and support commitments for the intended version | Ownership or support terms are unclear | Examine governance alongside the actual support and exit requirements. |
+| Who integrates with it? | Required integrations are documented for the intended version | A required integration or its support is unknown | Verify the integrations the workload actually needs. |
+| What happens if it fails? | Recovery and exit paths meet stated requirements in tests | Recovery or migration behavior is untested | Identify the missing evidence and assess the proposed scope. |
+| What does it change? | Interfaces and responsibilities meet the required behavior | A required capability or operating owner is missing | Assess integration and replacement against the same criteria. |
 
-For a beginner, the simplest rule is this: learn the dominant standard deeply enough to understand why alternatives are attractive, then evaluate alternatives from that foundation. If you have never operated a Deployment, Service, ConfigMap, Secret, Ingress, and basic rollout, you cannot fairly judge a tool that claims to replace them. You may be reacting to the pain of being new rather than to an actual platform deficiency.
+For this Kubernetes route, practice its workload and networking primitives, then compare the task each alternative must perform. When a capability is unfamiliar, use versioned documentation and an appropriate test to fill the gap. A learner need not master every platform before asking a well-scoped question about fit.
 
-For a working team, the decision framework should end in one of four actions. Adopt when the tool solves a real problem, aligns with the ecosystem, and has a credible support model. Layer when it adds developer experience or policy on top of Kubernetes without replacing the core. Contain when a legacy system must be maintained but should not spread into new services. Retire when the tool creates hiring risk, migration drag, or operational fragility beyond the value it still provides.
+For a working team, possible dispositions include adopt, integrate, retain, change or retire. Justify each against the requirement, capability, support and ownership evidence; record uncertainty where a test or agreement is missing. An integration can also have costs and failure modes, and retention may be justified when the existing system meets the stated need.
 
 ## Did You Know?
 
-- **Mesos powered major production systems** at companies such as Twitter and Airbnb before Kubernetes became the common target for new container platforms.
+- **Mesos describes resource offers** to framework schedulers, which choose offered resources for tasks. That architectural model is separate from the project's retirement status.
 - **Kubernetes 1.24 removed built-in dockershim**, not Dockerfiles or image building. The external `cri-dockerd` adapter provides a separate path to Docker Engine; check the chosen versions and workload compatibility.
-- **Kubernetes moved fast because multiple competitors could still cooperate** through CNCF governance, which made it easier for clouds and vendors to support the same API surface.
+- **A maintainer's lifecycle record and a capability guide answer different questions.** Apache's Mesos retirement record does not establish whether a specific workload has a tested migration path.
 - **Ansible can manage Kubernetes API objects** using definitions supplied to its `kubernetes.core.k8s` module. Check the intended task and ownership rather than treating all configuration management as a competing controller.
 
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
-| **Learning Docker Swarm as a new orchestration skill** | Old Docker tutorials make Swarm look like the natural next step after Compose. | Skip Swarm tutorials unless you maintain an existing Swarm cluster; focus on Kubernetes orchestration. |
+| **Assuming a product name determines relevance** | Old and current documentation can describe different products and versions. | Identify the intended Swarm mode and version, learning goal and operating requirements before deciding what to study. |
 | **Assuming a local deployment proves production fit** | A successful startup can obscure host-failure and recovery requirements. | Compare the actual availability, update, data and access requirements; Docker documents Compose production use, so justify retention or replacement with evidence. |
 | **Leaving workload ownership ambiguous** | Multiple workflows can propose changes to the same object or field without an agreed owner. | Identify each writer and controller, assign responsibilities, and check how the actual write methods expose and resolve conflicts. |
-| **Ignoring managed Kubernetes services** | Teams confuse learning value with production ownership and try to operate control planes too early. | Use EKS, GKE, AKS, or another managed service unless you have a dedicated platform team. |
-| **Translating Compose to Kubernetes one-to-one** | Conversion tools make syntax migration look equivalent to architecture migration. | Design Kubernetes manifests intentionally with probes, resources, RBAC, configuration boundaries, and rollout strategy. |
+| **Assuming a managed service removes all operating work** | Provider and customer responsibilities vary by offering and agreement. | Compare the actual support, security, recovery, control and cost responsibilities with self-management. |
+| **Treating conversion as proof of fit** | Syntax conversion does not verify application or recovery behavior. | Compare the deployment and its controls against the stated requirements and tests. |
 | **Chasing abandoned or isolated projects** | Hype, old case studies, or impressive demos hide weak maintenance and governance signals. | Check foundation status, release cadence, maintainer diversity, cloud-provider support, and issue health before adopting. |
 | **Assuming Kubernetes removed all Docker use** | Built-in dockershim removal is confused with removal of image builds or every Docker Engine integration. | Separate image building from the node runtime; inspect CRI compatibility and the external adapter option. |
 
@@ -370,9 +382,9 @@ Start with the requirements that the laptop demonstration did not test. What hap
 </details>
 
 <details>
-<summary>2. A recruiter offers a highly paid contract for Apache Mesos and Marathon administration. How should you evaluate the career tradeoff?</summary>
+<summary>2. You are considering a contract maintaining Apache Mesos and Marathon. How would you evaluate the work and learning tradeoff?</summary>
 
-Legacy work can be rational when the pay and scope are explicit, but Mesos and Marathon are weak long-term learning investments for new platform skills. The ecosystem has moved toward Kubernetes, and Marathon-specific knowledge does not transfer as cleanly as broader scheduling, reliability, and migration concepts. If you accept the role, treat it as legacy maintenance and deliberately convert the experience into Kubernetes migration, platform risk, and operational design stories.
+Apache records Mesos as retired; the archived Marathon repository is separate evidence about that repository, not a complete support assessment. Ask the prospective client about the actual distribution, maintenance arrangements, responsibilities and contract terms, then compare them with your learning goals. The available sources do not establish pay, hiring demand or the career outcome of accepting the role.
 </details>
 
 <details>
@@ -390,19 +402,19 @@ Inspect which objects and fields each workflow changes, which controller manages
 <details>
 <summary>5. Your team finds a new orchestrator from one startup with no neutral governance and little cloud-provider support. What adoption signal worries you most?</summary>
 
-The governance and ecosystem signals are the main concern because core infrastructure needs broad trust. If one company controls the roadmap, competitors and cloud providers have weaker incentives to integrate deeply, and your team may inherit vendor lock-in if the company pivots or fails. A small pilot may still be acceptable for a contained problem, but replacing Kubernetes would require much stronger evidence, a credible exit strategy, and proof that the ecosystem can sustain the platform.
+Investigate the specific support and integrations the team needs, the maintainer's commitments, data ownership and an exit path. A single vendor and limited provider support are reasons to ask questions, not proof of other companies' motives or of a failure. Compare a pilot or replacement against the same workload, security and recovery requirements, and record what is unknown.
 </details>
 
 <details>
 <summary>6. Your company uses Cloud Foundry successfully for stateless web apps, then needs stateful data pipelines with GPUs and custom networking. Why might Kubernetes fit better?</summary>
 
-Cloud Foundry's original value was a high-level developer abstraction for a narrower class of applications. Stateful systems, specialized hardware, custom scheduling, and complex networking require more control over infrastructure primitives than the original PaaS model wanted to expose. Kubernetes is harder on day one, but its lower-level API, controllers, storage model, and extensibility make it a better substrate for diverse workloads that outgrow a pure `cf push` workflow.
+The workload gives the team a reason to investigate, not proof that either platform is a better fit. Check the intended Cloud Foundry distribution and Kubernetes environment for the required data recovery, GPU access, networking, support and operating responsibilities. Compare documented capabilities and test unresolved behavior before recommending retention or migration.
 </details>
 
 <details>
 <summary>7. A migration proposal mechanically converts a large Compose file into Kubernetes YAML and calls the platform modernized. What should you challenge?</summary>
 
-You should challenge the assumption that syntax conversion equals architecture design. A production Kubernetes workload needs readiness and liveness probes, resource requests, service accounts, network policies, configuration boundaries, rollout strategy, and often GitOps ownership. The right modernization plan should redesign the workload using Kubernetes primitives rather than simply preserving local Compose assumptions in a different file format.
+Challenge the assumption that syntax conversion proves the requirements are met. Identify the actual availability, security, data and update requirements; inspect the resulting configuration and verify the behavior each requires. Some designs may use probes, resource settings, service accounts or network policies, but neither those object names nor GitOps alone demonstrate a successful migration.
 </details>
 
 ## Hands-On Exercise: Technology Radar Audit
@@ -418,6 +430,16 @@ Start by writing a short risk memo with a source and applicability boundary for 
 - [ ] **Compare Docker image building with node runtime integration**: explain built-in dockershim removal, the external adapter option and the compatibility checks still needed.
 - [ ] **Design a modernization plan** that explains which components to retain or replace and what evidence supports each decision.
 - [ ] **Explain ownership and reconciliation** in one paragraph: distinguish host configuration, API-object changes, and controller-managed workload state.
+
+<details><summary>Hint 1: Separate the claims</summary>
+Which statement concerns formal lifecycle, which describes a documented capability, and which depends on the hypothetical team's requirements?
+</details>
+<details><summary>Hint 2: Find the boundary</summary>
+For each claim, name the source and version or date, then write what it does not establish about Phoenix's deployment or support.
+</details>
+<details><summary>Hint 3: Plan the missing evidence</summary>
+Choose a concrete requirement such as host-loss recovery, identify the configuration and test needed, and leave the disposition open until the evidence is available.
+</details>
 
 ### Suggested Workspace
 
@@ -441,16 +463,16 @@ A strong plan cites Apache's formal Mesos retirement, distinguishes Classic Swar
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: a feature checklist stood in for governance and fit. Next action: ask who governs it, which clouds support it, and whether the abstraction still works when the workload is stateful.
+The demonstration tested one deployment path. Next, identify required workloads, support, recovery and integrations; check the intended version and test uncertain behavior. Governance and provider support are inputs to that assessment, not a predetermined verdict.
 
 </details>
 
-**Card B: The PaaS path is perfect, until it is not.** Routing, logs, and deploys are smooth for web apps. The new workload is a database plus a custom controller. Users are leaving for Kubernetes.
+**Card B: A new PaaS workload.** A hypothetical team uses a PaaS for web apps and is considering a database plus a custom controller. The intended distribution and its capabilities have not yet been checked.
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: the control surface, not a broken old path. Next action: name the workload that no longer fits before you call the PaaS a failure.
+The evidence does not yet establish a failure or a migration cause. Name the requirements, check the actual distribution and alternatives, and test the uncertain behavior before deciding whether the workload fits.
 
 </details>
 
@@ -479,6 +501,7 @@ Failure layer: the startup demonstration did not test host failure or recovery. 
 - [ ] Your modernization plan justifies retention or migration against documented capabilities, support and explicit operating requirements.
 - [ ] Your configuration plan identifies which tool owns each intended state and how conflicting changes will be detected and resolved.
 - [ ] Your final paragraph evaluates Compose against explicit production requirements instead of assuming production use is always an anti-pattern.
+- [ ] Your claim audit cites a primary source and its applicability boundary, identifies missing local evidence, and states what would change a provisional decision.
 
 ## Sources
 
@@ -486,23 +509,17 @@ Failure layer: the startup demonstration did not test host failure or recovery. 
 - [Cloud Foundry: Diego components and architecture](https://docs.cloudfoundry.org/concepts/diego/diego-architecture.html)
 - [Docker: Use Compose in production](https://docs.docker.com/compose/how-tos/production/)
 - [Kubernetes Dockershim Removal FAQ, updated 2022](https://kubernetes.io/blog/2022/02/17/dockershim-faq/)
-- [Kubernetes Dockershim Historical Context](https://kubernetes.io/blog/2022/05/03/dockershim-historical-context/)
 - [Kubernetes 1.35 Container Runtimes](https://v1-35.docs.kubernetes.io/docs/setup/production-environment/container-runtimes/)
 - [Kubernetes 1.35 Container Runtime Interface](https://v1-35.docs.kubernetes.io/docs/concepts/containers/cri/)
 - [Kubernetes 1.5: Introducing CRI](https://kubernetes.io/blog/2016/12/container-runtime-interface-cri-in-kubernetes/)
-- [Kubernetes RuntimeClass](https://kubernetes.io/docs/concepts/containers/runtime-class/)
 - [Docker Swarm Mode Documentation](https://docs.docker.com/engine/swarm/)
-- [Apache Mesos Project](https://mesos.apache.org/)
-- [Marathon Repository](https://github.com/mesosphere/marathon)
-- [Cloud Foundry and Kubernetes](https://www.cloudfoundry.org/blog/cloud-foundry-and-kubernetes/)
-- [CNCF containerd Project](https://www.cncf.io/projects/containerd/)
-- [CRI-O Project](https://cri-o.io/)
-- [Kubernetes Declarative Management](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/)
+- [Apache Mesos architecture: resource offers](https://mesos.apache.org/documentation/architecture/)
+- [Archived Marathon README, inspected revision](https://github.com/d2iq-archive/marathon/blob/90619da70d79a2ecf19368a21c6a695ea981bd74/README.md)
+- [Cloud Foundry: deploying with cf push](https://docs.cloudfoundry.org/devguide/deploy-apps/deploy-app.html)
 - [Ansible `kubernetes.core.k8s` module](https://docs.ansible.com/projects/ansible/latest/collections/kubernetes/core/k8s_module.html)
 - [Kubernetes 1.35: Components](https://v1-35.docs.kubernetes.io/docs/concepts/overview/components/)
 - [Kubernetes 1.35: Server-Side Apply](https://v1-35.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)
 - [Kubernetes 1.35: Controllers](https://v1-35.docs.kubernetes.io/docs/concepts/architecture/controller/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
 
 ## Next Module
 

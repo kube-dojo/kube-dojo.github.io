@@ -47,6 +47,7 @@ tiers:
     - git-scm.com         # official Git command documentation
     - linuxfoundation.org
     - cloudnative.io
+    - docs.cloudfoundry.org # official Cloud Foundry docs, for its own capabilities
     - opencontainers.org
     - helm.sh
     - istio.io
