@@ -405,30 +405,37 @@ When the decision involves sensitive data, add one more question: has the value 
 ## Quiz
 
 <details><summary><span>Question 1: Your team is reviewing a private branch with six commits: a Deployment, an indentation fix, probes, a Service, a ConfigMap with a temporary password, and a password removal. How would you reconstruct the history so the reviewer sees the final intent and the password never appears in a surviving commit?</span></summary>
+
 Use interactive rebase and group each repair directly under the commit it completes. The Deployment should be marked `reword`, with the indentation fix and probe commit marked `fixup` below it so the final Deployment commit is coherent. The ConfigMap password addition and removal should be adjacent, with the removal fixed up into the addition so the net surviving commit never contains the password. This tests whether you can reconstruct fragmented commit history into a logical narrative while preserving the secure final state.
 </details>
 
 <details><summary><span>Question 2: Midway through a rebase, Git reports a conflict in <code>service.yaml</code>. You resolve the markers and save the file. What should you do next, and why should you avoid a normal commit?</span></summary>
+
 Stage the resolved file with `git add service.yaml`, check `git status`, and run `git rebase --continue`. A normal `git commit` is wrong because the rebase engine is already in the middle of creating the replacement commit for the failed replay step. Manual commits can add an extra commit outside the planned sequence, which makes the rewritten history harder to reason about. `--continue` tells Git that the index now contains the resolved version for the commit it was applying.
 </details>
 
 <details><summary><span>Question 3: A local-only commit three steps back introduced an API token, and a later commit removed it. How do you formulate a safe strategy for removing accidentally committed sensitive data from this unpublished branch?</span></summary>
+
 Leaving both commits preserves the token in the earlier snapshot, even though the final file no longer contains it. Fixing up the removal into the addition makes the rewritten commit represent the secure net result, so the token is absent from surviving branch history. Because the branch has not been pushed, rewriting the commits does not disrupt collaborators, but the strategy is only safe if you also ask whether the sensitive data escaped through logs, remotes, screenshots, or CI. If there is any chance the token left your machine, rotate it because Git cleanup does not undo external exposure.
 </details>
 
 <details><summary><span>Question 4: You marked a large "service and ingress" commit with <code>edit</code>, and Git stopped at that commit. You want two commits instead of one. What sequence replaces the original commit without duplicating it?</span></summary>
+
 Run `git reset HEAD~1` so the large commit is undone while its file changes remain in the working tree. Then stage only the Service files and commit them with a focused message, stage only the Ingress files and commit them with a separate focused message, and run `git rebase --continue`. This replaces the paused commit with two better commits at the same historical position. If you skip the reset, the original large commit remains and your new commits merely add more history after it.
 </details>
 
 <details><summary><span>Question 5: Your colleague pulled your branch yesterday to test authentication flows. Today you want to clean up five WIP commits before opening the pull request. Should you interactive rebase and force-push?</span></summary>
+
 Not without explicit coordination. Once your colleague has based work on the branch, rewriting the commit SHAs will make their local history diverge from the remote branch. The safer default is to keep the shared history and use a merge or follow the team's agreed recovery process. If the team decides the cleanup is worth it, coordinate a planned force-push and tell your colleague exactly how to reset or rebase their local work.
 </details>
 
 <details><summary><span>Question 6: A dependent branch was based on <code>feature-db-migration</code>, but that base branch was squash-merged into <code>main</code>. A normal <code>git rebase main</code> now tries to replay old database commits and creates conflicts. Which operation should you use?</span></summary>
+
 Use `git rebase --onto main feature-db-migration feature-api-update`, substituting the real branch names from your repository. The old upstream argument marks the commits that should be excluded from the replay, while `main` is the new base. This moves only the commits unique to the dependent branch onto the squashed result. The command is correct because it compares reachability boundaries rather than assuming the old commit SHAs still exist on `main`.
 </details>
 
 <details><summary><span>Question 7: During a complex rebase, you realize the instruction sheet selected the wrong range and conflict resolution is becoming unsafe. What is the safest recovery action, and what should you inspect before trying again?</span></summary>
+
 Run `git rebase --abort` to return the branch, index, and working tree to the state they had before the rebase started. After aborting, inspect `git status`, confirm the current branch, and review the intended range with a log command such as `git log --oneline main..HEAD`. That inspection helps you identify whether the problem was the wrong base, the wrong branch, or an overly large rewrite. Retrying after a clean abort is much safer than improvising through conflicts you no longer trust.
 </details>
 
