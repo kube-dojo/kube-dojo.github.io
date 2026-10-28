@@ -303,12 +303,6 @@ starlight-toc a[href*="complexity"], starlight-toc a[href*="time-to-complete"] {
 
 /* ===== DARK MODE OVERRIDES (Gemini review fixes) ===== */
 
-/* Code blocks: always dark bg */
-:root[data-theme='light'] pre,
-:root[data-theme='light'] .expressive-code .frame {
-  background-color: var(--g900) !important;
-}
-
 /* Tables: dark mode blue-tinted header and hover */
 :root[data-theme='dark'] .sl-markdown-content th { background: rgba(50, 108, 229, 0.15); color: #93B4F5; }
 :root[data-theme='dark'] .sl-markdown-content tr:hover td { background: rgba(50, 108, 229, 0.1); }
