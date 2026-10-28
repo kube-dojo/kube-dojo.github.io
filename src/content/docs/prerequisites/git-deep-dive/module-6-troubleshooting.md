@@ -618,17 +618,36 @@ In practice, investigations loop through this framework more than once. A Pickax
 
 ## Hands-On Exercise: The Case of the Broken Manifest
 
-In this exercise, you will create a fresh repository with simulated history, introduce a subtle Kubernetes-style bug, bury it under routine commits, and use automated bisection plus targeted blame to find the evidence. The lab is intentionally local and safe: it does not require a cluster, and the validation script checks the manifest text so you can focus on the Git investigation mechanics before applying the same pattern to server-side Kubernetes validation.
+Exercise scenario: a release manifest passed a text assertion at `v1.0`, but its current tip fails. The supplied fixture creates a fresh repository and places the change at an unannounced position among routine commits. Your task is to design the classifier, find the boundary, and assemble evidence without using a commit-message clue. This local simulation needs no cluster: changing `containerPort` alone does not change a process's listening port or establish a schema or runtime failure.
 
 ### Step 1: Scenario Setup
 
-First, generate a repository with a deep enough history to make manual review unattractive. The initial manifest uses `containerPort: 80`, which matches the default Nginx container behavior in this simplified scenario. Later, one commit changes the port to `8080`, and many routine commits hide that change from casual inspection.
+First start a disposable child Bash shell with this command by itself. Wait for its prompt before pasting the complete grouped setup in the next block; stay in this child for all later practice, including the optional reference.
 
 ```bash
-mkdir k8s-forensics-lab && cd k8s-forensics-lab
-git init
+bash --noprofile --norc
+```
 
-# Create the initial, perfectly working manifest
+The grouped setup stops this child if a setup command fails. If it exits, **STOP: do not paste later commands into the parent shell**. Preserve any partially created directory, fix the cause, and start a fresh child to retry. The fixture uses Bash's `RANDOM` variable and arithmetic to choose an interior change position, suppresses commit summaries, and discards the position variable afterward. Treat its history as investigation input; do not trace the setup before attempting the diagnosis. The assertion is that the declared port is exactly `80`.
+
+```bash
+{
+set -e
+trap 'printf "%s\n" "STOP: lab shell ended; do not continue in the parent shell."' EXIT
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+lab_dir=$(mktemp -d "${TMPDIR:-/tmp}/k8s-forensics.XXXXXXXX")
+case "$lab_dir" in /*) ;; *) exit 1 ;; esac
+cd "$lab_dir"
+lab_dir=$(pwd -P)
+git init
+test "$(git rev-parse --show-toplevel)" = "$lab_dir"
+test "$(git rev-parse --absolute-git-dir)" = "$lab_dir/.git"
+git config --local user.name "Lab Learner"
+git config --local user.email "lab@example.invalid"
+git config --local commit.gpgSign false
+original_branch=$(git branch --show-current)
+
+# Create the initial synthetic manifest
 cat << 'EOF' > deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -651,30 +670,32 @@ spec:
         - containerPort: 80
 EOF
 git add deployment.yaml
-git commit -m "Initial commit: working deployment"
+git commit -q -m "Initial commit: working deployment"
 git tag v1.0
 
-# Simulate 20 good, benign commits
-for i in {1..20}; do
+# Build a history without announcing where the assertion starts failing.
+change_at=$((5 + RANDOM % 41))
+for i in {1..50}; do
+  if [ "$i" -eq "$change_at" ]; then
+    sed -i.bak 's/containerPort: 80/containerPort: 8080/' deployment.yaml
+    rm deployment.yaml.bak
+  fi
   echo "# Comment $i" >> deployment.yaml
-  git commit -am "chore: minor update $i"
+  git commit -q -am "chore: synthetic update $i"
 done
-
-# INTRODUCE THE BUG (Typo in containerPort: 80 -> 8080)
-sed -i.bak 's/containerPort: 80/containerPort: 8080/' deployment.yaml
-rm deployment.yaml.bak
-git commit -am "fix: adjust port configuration for new ingress"
-
-# Simulate 30 more commits completely burying the bug
-for i in {21..50}; do
-  echo "# Comment $i" >> deployment.yaml
-  git commit -am "chore: minor update $i"
-done
+unset change_at
+test "$(git rev-parse --show-toplevel)" = "$lab_dir"
+test -z "$(git status --short)"
+printf '%s\n' "Lab ready: continue in this child shell."
+set +e
+}
 ```
+
+After successful setup, ordinary diagnostic failures leave the child open so you can inspect their exit statuses. If a later command fails unexpectedly, stop that task and resolve the error inside this child before proceeding. Clearing the five Git location selectors protects this directory-based setup from those inherited overrides; it is not a general environment sandbox.
 
 ### Step 2: Verify the Problem
 
-Inspect the current file to confirm the broken state exists at `HEAD`. This is your bad anchor. In a real Kubernetes workflow, this step might be a failed `kubectl apply --dry-run=server` or a failing integration test, but here a direct text check keeps the exercise portable.
+Inspect the current file to confirm the changed text exists at `HEAD`. This is your bad anchor. In a real Kubernetes workflow, this step might be a failed `kubectl apply --dry-run=server` or a failing integration test, but here a direct text check keeps the exercise portable.
 
 ```bash
 cat deployment.yaml | grep containerPort
@@ -683,77 +704,110 @@ cat deployment.yaml | grep containerPort
 Expected output:
 
 ```text
-containerPort: 8080
+        - containerPort: 8080
 ```
 
-### Step 3: Author the Validation Script
+### Step 3: Design and Preflight a Classifier
 
-Create a script that distinguishes the good state from the bad state. The `$` anchor matters because it prevents `8080` from being accepted as though it contained the correct value. This script is deliberately small, which makes its exit-code behavior easy to reason about during bisection.
+Create your own executable Bash script outside the repository. It must read `deployment.yaml` from its working directory and classify the required assertion: exit `0` for a match, `1` for a confirmed non-match, and `125` when the file cannot be tested. Decide how to prevent `8080` from matching `80`. Before trusting automation, demonstrate all three statuses, including a missing-file control, and preflight both `v1.0` and the saved bad tip with this same script.
 
-```bash
-#!/usr/bin/env bash
-# Location: /tmp/test-port.sh
+- [ ] Save the bad tip hash and original branch outside tracked files.
+- [ ] Record each preflight's revision or fixture, observed status, and interpretation.
+- [ ] Explain why a missing file must not become evidence of the target regression.
 
-# Check if the deployment contains the correct exact string 'containerPort: 80'
-# The '$' anchors the search to the end of the line, ensuring '8080' fails.
-grep "containerPort: 80$" deployment.yaml > /dev/null
+### Step 4: Find and Verify the Boundary
 
-# grep exits 0 if the string is found (Good commit), 1 if not found (Bad commit)
-exit $?
-```
+Use automated bisection to find the first bad commit in the selected range. Choose the commands that establish the two verified anchors and run your classifier. Preserve the bisect log outside the repository before resetting. Do not accept the reported hash merely because the command finished: test the candidate's file and its parent's file with the same classifier, and inspect their diff to connect the status change to the asserted text.
 
-Make the test script executable:
+- [ ] Record the candidate hash, both status results, and the relevant patch.
+- [ ] Explain what each anchor and midpoint classification permits Git to exclude.
+- [ ] Distinguish the tested text boundary from a claim about application behavior.
 
-```bash
-chmod +x /tmp/test-port.sh
-```
+### Step 5: Connect Attribution and Restore State
 
-### Step 4: Execute the Automated Bisect
+Restore the original branch and verify a clean working tree. Then use narrowed line attribution to inspect only the port declaration, compare its attributed commit with your candidate, and retain the command sequence as an investigation record. Explain why an attribution or a commit message alone would not prove the observed runtime symptom. Open the hints only when needed, and compare with the reference after making your own attempt.
 
-Now instruct Git to hunt down the bug. Read each command before running it and connect it to the bisection model: start the session, mark the bad endpoint, mark the good endpoint, then hand classification to the script.
-
-- [ ] Initialize the bisect process: `git bisect start`
-- [ ] Mark the current broken state: `git bisect bad HEAD`
-- [ ] Mark the known good release tag: `git bisect good v1.0`
-- [ ] Hand over execution to the automation script: `git bisect run /tmp/test-port.sh`
+- [ ] Verify that the restored branch and tip match your saved starting state.
+- [ ] Record the one-line blame output and its agreement or disagreement with the boundary evidence.
 
 <details>
-<summary><strong>View Expected Output</strong></summary>
+<summary>Hint 1: Separate the assertion from the search</summary>
 
-```bash
-running /tmp/test-port.sh
-Bisecting: 12 revisions left to test after this (roughly 4 steps)
-[some-hash] chore: minor update 26
-...
-running /tmp/test-port.sh
-[hash] is the first bad commit
-commit [hash]
-Author: Your Name <your.email@example.com>
-Date:   [Date]
+First decide what makes a single checked-out snapshot good. A midpoint's position in history does not classify it. Your script should answer only the text question; Git uses that answer to narrow the range. Revisit Section 2's exit-status contract if a tool error looks like a failed assertion.
 
-    fix: adjust port configuration for new ingress
-```
-
-Git has successfully found the exact commit that mutated the port, traversing 50 commits and executing 5 tests in a fraction of a second.
 </details>
 
-### Step 5: Clean Up and Interrogate the Code
+<details>
+<summary>Hint 2: Test the classifier before Git trusts it</summary>
 
-The first bad commit tells you when the regression entered the history, but targeted blame helps you connect the current line to the historical evidence. Reset the bisection session first, then blame only the port line instead of asking Git to annotate the whole manifest.
+Grep distinguishes a match, no match, and an error. Capture its status before another command overwrites it, then map those cases explicitly. Anchor the pattern at the end of the line. Export the tag's file to a temporary directory to test it without changing your current checkout; use an empty directory to test the error path.
 
-- [ ] Terminate the forensic session and return to reality: `git bisect reset`
-- [ ] Use targeted blame against the port line: `git blame -L '/containerPort/',+1 deployment.yaml`
-- [ ] Inspect the first bad commit with `git show --stat --patch <hash>` and confirm the diff changed only the expected line.
-- [ ] Record the command sequence and the first bad commit hash as your incident evidence.
+</details>
+
+<details>
+<summary>Hint 3: Preserve evidence at each boundary</summary>
+
+The needed command families are `git show revision:path`, `git bisect start/bad/good/run/log/reset`, and `git blame -L`. Save the reported candidate hash before resetting; the last checked-out midpoint need not be the reported first bad commit. Its parent is named by appending `^`; inspect both snapshots, not just the commit subject. If Git reports several possible commits after skips, preserve that uncertainty rather than choosing one arbitrarily.
+
+</details>
+
+<details>
+<summary>Optional reference solution: compare after your attempt</summary>
+
+This is one implementation of the evidence contract. The script stays outside the repository so historical checkouts cannot replace it. Its end-of-line anchor rejects `8080`, and explicit status mapping keeps an unreadable file separate from a confirmed assertion failure.
 
 ```bash
+bad_tip=$(git rev-parse HEAD)
+test_script="$lab_dir-test-port.sh"
+cat > "$test_script" <<'EOF'
+#!/usr/bin/env bash
+grep "containerPort: 80$" deployment.yaml > /dev/null
+status=$?
+case "$status" in
+  0) exit 0 ;;
+  1) exit 1 ;;
+  *) exit 125 ;;
+esac
+EOF
+chmod +x "$test_script"
+
+# Preflight the same classifier against both anchors and an error fixture.
+anchor_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-anchor.XXXXXXXX")
+git show v1.0:deployment.yaml > "$anchor_dir/deployment.yaml"
+(cd "$anchor_dir" && "$test_script") && echo "v1.0 is good (0)"
+if "$test_script"; then echo "Unexpected good tip"; else
+  test "$?" -eq 1 && echo "Tip is bad (1)"
+fi
+error_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-error.XXXXXXXX")
+if (cd "$error_dir" && "$test_script"); then echo "Unexpected match"; else
+  test "$?" -eq 125 && echo "Missing file is untestable (125)"
+fi
+
+git bisect start
+git bisect bad "$bad_tip"
+git bisect good v1.0
+git bisect run "$test_script"
+candidate=$(git rev-parse refs/bisect/bad)
+evidence_log="$lab_dir-bisect.log"
+git bisect log > "$evidence_log"
+
+git show "$candidate:deployment.yaml" > "$anchor_dir/deployment.yaml"
+if (cd "$anchor_dir" && "$test_script"); then echo "Unexpected good candidate"; else
+  test "$?" -eq 1 && echo "Candidate fails (1)"
+fi
+git show "$candidate^:deployment.yaml" > "$anchor_dir/deployment.yaml"
+(cd "$anchor_dir" && "$test_script") && echo "Parent passes (0)"
+git show --stat --patch "$candidate"
+
+git bisect reset
+test "$(git branch --show-current)" = "$original_branch"
+test "$(git rev-parse HEAD)" = "$bad_tip"
+test -z "$(git status --short)"
 git blame -L '/containerPort/',+1 deployment.yaml
 ```
 
-<details>
-<summary><strong>Solution Explanation</strong></summary>
+After a successful unambiguous search, `refs/bisect/bad` names the bad boundary; reading `HEAD` instead can capture the final tested midpoint. Expected evidence: the candidate fails while its parent passes, and the patch changes the port declaration alongside a routine comment. The narrowed blame output attributes the port line to that same candidate. Hashes, neutral update numbers, and midpoint selections vary with the fixture. These observations establish this synthetic text boundary; they do not establish a running service's behavior.
 
-The `git blame` command targets the regular expression `/containerPort/` and renders only that line. You will see the specific commit hash, committer identity, and timestamp associated with the port change. By chaining automated bisection with targeted line blame, you move from "the manifest is wrong" to "this commit changed this line and here is the evidence." That is the practical standard for incident forensics.
 </details>
 
 **Card A: A passing midpoint is marked bad.** The dry-run succeeds on the checked-out commit. The bisect is told `bad` anyway, because the regression is "somewhere in this history."
@@ -795,10 +849,10 @@ Failure layer: present files versus introduction commits. Next action: `git grep
 ### Success Criteria
 
 - [ ] You created a local repository with a known-good `v1.0` tag and a bad `HEAD`.
-- [ ] Your `/tmp/test-port.sh` script exits `0` for the correct port and non-zero for the bad port.
-- [ ] `git bisect run /tmp/test-port.sh` identified the commit message `fix: adjust port configuration for new ingress`.
-- [ ] You ran `git bisect reset` after the investigation.
-- [ ] You used targeted `git blame` to annotate only the `containerPort` line.
+- [ ] Your script exits `0` for the matching text, `1` for a non-match, and `125` for a grep error.
+- [ ] Automated bisection found a candidate whose file fails while its parent's file passes the same classifier; your patch explains the difference.
+- [ ] You saved the bisect log outside the repository and restored the original branch and tip with a clean working tree.
+- [ ] You annotated only the `containerPort` line and compared its attribution with the candidate rather than relying on a commit-message clue.
 
 ## Sources
 
