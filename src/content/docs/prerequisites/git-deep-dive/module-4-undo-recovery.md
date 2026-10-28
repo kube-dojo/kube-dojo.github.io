@@ -16,14 +16,14 @@ revision_pending: false
 ## What You'll Be Able to Do
 
 - Implement `git reset` with `--soft`, `--mixed`, and `--hard` flags to intentionally manipulate the working directory, staging area, and commit history in order to correct architectural mistakes.
-- Diagnose and recover from catastrophic Git mistakes, including botched rebases and accidental hard resets, using `git reflog` to trace and restore orphaned commits.
-- Evaluate when to use `git revert` versus `git reset` based on branch protection rules, collaboration constraints, and the need to preserve visible shared history.
+- Diagnose and recover from accidental hard resets using `git reflog` to trace and restore orphaned commits.
+- Choose `git revert` or `git reset` based on whether history is shared and needs a visible repair.
 - Execute surgical file-level recovery operations using `git restore` and `git checkout` to retrieve specific file states from past commits without disrupting the overall branch history.
 - Transplant specific commits across branches using `git cherry-pick` to resolve misaligned feature branches and backport critical security patches.
 
 ## Why This Module Matters
 
-On April 5, 2022, starting at 7:38 UTC, an Atlassian maintenance script ran the "delete site" path against 883 sites representing 775 customers that should have been left alone. Backups existed. Restoration still took up to 14 days for the longest-affected sites. The [incident review](https://www.atlassian.com/blog/how-we-build/post-incident-review-april-2022-outage) illustrates the gap between recoverable data and restored service. On your own laptop, Git recovery also requires knowing which commands move a pointer and which can destroy work Git never recorded.
+On April 5, 2022, starting at 7:38 UTC, an Atlassian maintenance script sent site IDs to a deletion API, deleting 883 sites representing 775 customers that should have been left alone. Backups existed. Restoration still took up to 14 days for the longest-affected sites. The [incident review](https://www.atlassian.com/blog/how-we-build/post-incident-review-april-2022-outage) illustrates the gap between recoverable data and restored service. On your own laptop, Git recovery also requires knowing which commands move a pointer and which can destroy work Git never recorded.
 
 This module turns Git undo from superstition into engineering judgment. You will learn why `reset`, `restore`, `revert`, `reflog`, and `cherry-pick` are not interchangeable synonyms for "go back." Each command edits a different part of Git's state model, and each has a different collaboration contract. By the end, you should be able to look at a broken branch, decide whether you need to move a pointer, create an inverse commit, restore one file, or copy a patch across histories, and then explain that decision to a teammate under incident pressure.
 
@@ -43,12 +43,12 @@ The important lesson is that reset does not mean "delete my work" by default. It
 
 ```mermaid
 graph LR
-    WD["Working Directory<br>(The Staging Room)"] -- "add" --> SA["Staging Area<br>(The Loading Dock)"]
+    WD["Working directory<br>(files on disk)"] -- "add" --> SA["Staging area<br>(index)"]
     SA -- "commit" --> HEAD["HEAD (History)<br>(The Moving Truck)"]
 
-    Hard["--hard wipes this<br>(and staging & HEAD)"] -.-> WD
-    Mixed["--mixed wipes this<br>(and moves HEAD)"] -.-> SA
-    Soft["--soft moves this<br>(only moves HEAD)"] -.-> HEAD
+    Hard["--hard: move HEAD, reset index<br>and working files to target"] -.-> WD
+    Mixed["--mixed: move HEAD<br>and reset index to target"] -.-> SA
+    Soft["--soft: move HEAD only"] -.-> HEAD
 ```
 
 `git reset --soft` only moves the branch tip. The index and working directory remain exactly as they were before the command, which means the changes from the commits you backed out are still staged and ready to be committed again. This is useful when the commit boundary was wrong but the staged content was mostly right. You might have committed a Deployment and Service together, then realized one environment variable belongs in the same logical change because reviewers need to inspect the application rollout as a single unit.
@@ -112,13 +112,13 @@ git commit -m "Add backend environment configuration"
 
 `git reset --hard` moves `HEAD`, resets the index, and overwrites tracked files in the working directory to match the target commit. If the changes you care about are committed and preserved elsewhere, it can return a disposable working tree to a known state. Uncommitted work can be destroyed: `git add` stores staged content as blobs, but that does not guarantee easy recovery or preserve later unstaged edits; a branch reference preserves commits, not uncommitted work.
 
-Untracked files are not generally cleared by hard reset, but untracked files or directories obstructing paths Git must write can be deleted. A scratch note may survive while an important tracked Deployment patch disappears, so inspect both tracked and untracked work before resetting and preserve anything valuable elsewhere. See the [Git reset documentation](https://git-scm.com/docs/git-reset) for the exact behavior.
+Hard reset may overwrite untracked files as well as replacing tracked files. A scratch note may survive while an important tracked Deployment patch disappears, so inspect both tracked and untracked work before resetting and preserve anything valuable elsewhere. See the [Git reset documentation](https://git-scm.com/docs/git-reset) for the exact behavior.
 
 ```bash
-# WARNING: This discards tracked changes and may remove obstructing untracked paths
+# WARNING: This discards tracked changes and may overwrite untracked files
 git reset --hard HEAD
 
-# Or, move back one commit and discard tracked changes, with the same untracked-path risk
+# Or, move back one commit and discard tracked changes, with the same untracked-file risk
 git reset --hard HEAD~1
 ```
 
@@ -194,6 +194,8 @@ Reflog recovery has an expiration window. Default Git configuration keeps reflog
 
 ## 3. `git revert`: Safe Undos for Shared History
 
+Before a revert or cherry-pick, inspect `git status` and start with a clean working tree. Preserve existing edits before proceeding, so they do not obstruct or become entangled with the operation.
+
 `git reset` changes where a branch points. That is powerful on a private branch and dangerous on a shared branch because other people may already have based work on the commits you want to remove. If you rewrite a published branch, teammates can end up with histories that no longer agree with the remote. Their next pull may require confusing reconciliation, and their next push may be rejected or, worse, may reintroduce commits you thought you had removed.
 
 `git revert` solves a different problem. Instead of erasing a commit from history, it creates a new commit whose patch is the inverse of the target commit. The old commit remains visible, the new commit records the rollback, and collaborators can fast-forward normally. That makes revert the right command for production branches, protected branches, release branches, and any history that has been pulled by other people or automation. Revert does not make the original mistake disappear; it makes the repair explicit.
@@ -234,7 +236,7 @@ Revert is not magic; it calculates an inverse patch using the current file conte
 
 Merge commits require extra care because a merge has more than one parent. To revert a merge, Git needs to know which parent is the mainline that should be preserved. The common command is `git revert -m 1 <merge-commit>`, but you should not type it blindly. Parent one is usually the branch you merged into, yet workflows differ, and the wrong mainline can reverse the wrong side of the merge. Inspect the merge commit with `git show --summary <hash>` before deciding.
 
-Hypothetical scenario: a team merges a feature into `main`, discovers database lock problems, and reverts the merge with `git revert -m 1`. Merging the unchanged feature tip again reports "Already up to date" because its commits are already ancestors of `main`, although their effects were reverted. If new fixes were committed on the feature branch, Git considers those new commits, but does not automatically restore the reverted original changes. Plan reintroduction carefully; the [Git faulty merge guide](https://github.com/git/git/blob/master/Documentation/howto/revert-a-faulty-merge.adoc) explains the alternatives.
+Hypothetical scenario: a team merges a feature into `main`, discovers database lock problems, and reverts the merge with `git revert -m 1`. Merging the unchanged feature tip again adds no feature commits because its commits are already ancestors of `main`, although their effects were reverted. If new fixes were committed on the feature branch, Git considers those new commits, but does not automatically restore the reverted original changes. Plan reintroduction carefully; the [Git faulty merge guide](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/howto/revert-a-faulty-merge.adoc) explains the alternatives.
 
 That story does not mean merge reverts are bad. It means rollback strategy should include a reintroduction plan. If you revert a feature merge, write down whether the future fix will revert the revert, rebuild the feature on a new branch with new commits, or cherry-pick a smaller corrected patch. Without that plan, the emergency rollback can become a confusing historical knot long after the incident is over.
 
@@ -435,7 +437,7 @@ For incident work, write down the chosen command before running it. A short note
 | Running `git reset --hard` on uncommitted work | Misunderstanding that `--hard` wipes tracked working-directory changes, not just the staging area. | Stop and inspect `git status --short`; if the reset already happened, check IDE local history or backups because Git may not have stored unstaged content. |
 | Reverting a commit instead of resetting locally | Treating every undo as a public rollback, even when the branch has never left the laptop. | Use `git reset --soft` or `git reset --mixed` for local commit reshaping, then use `git revert` after publication. |
 | Losing a branch after accidental deletion | Deleting an unmerged branch with `git branch -D` and assuming the commits vanished with the name. | Inspect the HEAD reflog; if it retains the tip, recreate the branch with `git branch <name> <hash>`. |
-| Cherry-picking a commit multiple times | Applying a patch that was already merged or previously backported, which creates empty picks or confusing conflicts. | Compare branches with `git log --left-right --cherry-mark main...feature-x`, substituting your target and source names, before applying the patch. |
+| Cherry-picking a commit multiple times | Applying a patch that was already merged or previously backported, which can stop on empty changes or conflicts. | Compare branches with `git log --left-right --cherry-mark main...feature-x`, substituting your target and source names, before applying the patch. |
 | Thinking the reflog is a remote backup | Assuming GitHub, GitLab, or a coworker's clone will show your local reflog entries. | Remember that reflog is local to one `.git` directory; push important branches and create durable references for valuable work. |
 | Using `git checkout` for files without the separator | Forgetting `--` and accidentally asking Git to switch branches or interpret an ambiguous name. | Prefer `git restore` for file recovery, or use `git checkout <commit> -- <path>` when reading older documentation. |
 | Reverting a merge without checking parents | Copying `git revert -m 1` from memory without confirming which parent is the mainline. | Inspect the merge with `git show --summary <hash>` and choose the parent that represents the history you intend to keep. |
@@ -443,49 +445,49 @@ For incident work, write down the chosen command before running it. A short note
 ## Quiz
 
 <details>
-<summary>Question 1: You just committed three YAML manifests, but realized you forgot to include a crucial ConfigMap in the same commit. You want to undo the commit, keep all previously committed changes staged, add the ConfigMap, and commit again. Which reset flag should you use and why?</summary>
+<summary><span>Question 1: You just committed three YAML manifests, but realized you forgot to include a crucial ConfigMap in the same commit. You want to undo the commit, keep all previously committed changes staged, add the ConfigMap, and commit again. Which reset flag should you use and why?</span></summary>
 
 Use `git reset --soft HEAD~1`. The soft reset moves `HEAD` back but leaves the staging area exactly as the removed commit prepared it, so the Deployment, Service, and other manifest changes are still ready for the next commit. After adding the missing ConfigMap, the next commit records the corrected logical snapshot. A mixed reset would also preserve the file contents, but it would unstage everything and create unnecessary restaging work during a quick correction.
 
 </details>
 
 <details>
-<summary>Question 2: You are working on a massive `deployment.yaml` file. After an hour, you realize the approach is wrong and want only that file to return to the exact state of your last commit while leaving other files alone. What command should you use?</summary>
+<summary><span>Question 2: You are working on a massive <code>deployment.yaml</code> file. After an hour, you realize the approach is wrong and want only that file to return to the exact state of your last commit while leaving other files alone. What command should you use?</span></summary>
 
-Use `git restore --source=HEAD deployment.yaml`. This copies the last commit's version into the working directory without moving the branch or changing the index. If the file has staged changes, those remain staged; inspect `git diff --staged` and unstage separately if desired. The equivalent checkout form is `git checkout HEAD -- deployment.yaml`, which also updates the index. Avoid `git reset --hard` for this one-file task.
+Use `git restore --source=HEAD deployment.yaml`. This copies the last commit's version into the working directory without moving the branch or changing the index. If the file has staged changes, those remain staged; inspect `git diff --staged` and unstage separately if desired. The alternative checkout form is `git checkout HEAD -- deployment.yaml`, which also updates the index. Avoid `git reset --hard` for this one-file task.
 
 </details>
 
 <details>
-<summary>Question 3: Your team deployed a release from a shared branch, and alerts show that a merge commit introduced a broken database migration. Other teams have already pulled the branch. What should you do first, and why?</summary>
+<summary><span>Question 3: Your team deployed a release from a shared branch, and alerts show that a merge commit introduced a broken database migration. Other teams have already pulled the branch. What should you do first, and why?</span></summary>
 
 Use `git revert -m 1 <merge-commit-hash>` after confirming the merge parents. Because the branch is shared, reset would rewrite public history and force collaborators to reconcile divergent graphs during an incident. Revert creates a new commit that counteracts the bad merge while preserving the audit trail and allowing normal pulls. The `-m` flag is necessary for a merge commit because Git needs to know which parent represents the mainline history to keep.
 
 </details>
 
 <details>
-<summary>Question 4: You meant to clear your staging area with a mixed reset, but accidentally typed `git reset --hard HEAD~2`. Two important commits are missing from `git log`. How do you recover them?</summary>
+<summary><span>Question 4: You meant to clear your staging area with a mixed reset, but accidentally typed <code>git reset --hard HEAD~2</code>. Two important commits are missing from <code>git log</code>. How do you recover them?</span></summary>
 
 Run `git reflog` and identify the entry just before the hard reset moved `HEAD`. The lost commits are likely still present as objects because Git does not immediately delete them when a branch reference moves away. Once you find the last good hash, either create a rescue branch at that hash or reset the current branch back to it with `git reset --hard <hash>`. Creating the rescue branch first is safer if you want to inspect the recovered state before moving the current branch again.
 
 </details>
 
 <details>
-<summary>Question 5: A long-running feature branch has five commits, and the third commit contains a critical memory leak fix that must reach `main` immediately. The rest of the branch is unfinished. How do you isolate and move the fix?</summary>
+<summary><span>Question 5: A long-running feature branch has five commits, and the third commit contains a critical memory leak fix that must reach <code>main</code> immediately. The rest of the branch is unfinished. How do you isolate and move the fix?</span></summary>
 
 Check out `main` or a new branch from `main`, then run `git cherry-pick <hash-of-the-fix>`. Cherry-pick copies the patch from that one commit and creates a new commit on the target branch without merging the unfinished feature branch. After the pick, run the target branch's tests because the fix is now integrated with a different parent history. If the commit depends on earlier commits, cherry-pick those dependencies first in chronological order.
 
 </details>
 
 <details>
-<summary>Question 6: You deleted `feature-ingress` with `git branch -D` and then remembered it contained three days of unmerged Kubernetes manifests. Can reflog save you, and what exact recovery shape should you prefer?</summary>
+<summary><span>Question 6: You deleted <code>feature-ingress</code> with <code>git branch -D</code> and then remembered it contained three days of unmerged Kubernetes manifests. Can reflog save you, and what exact recovery shape should you prefer?</span></summary>
 
 Possibly, if the commits and a useful HEAD reflog entry remain. Deleting the branch removes its own reflog; run `git reflog` and look for a checkout or commit at the old tip. If found, `git branch feature-ingress <hash>` recreates the label without moving the current branch. Inspect the recovered commits; uncommitted files are not restored by a branch reference.
 
 </details>
 
 <details>
-<summary>Question 7: A teammate suggests using `git reset --hard` on `main` to remove a bad ingress commit because "the history will look cleaner." The commit has already been pushed and reviewed. How do you respond?</summary>
+<summary><span>Question 7: A teammate suggests using <code>git reset --hard</code> on <code>main</code> to remove a bad ingress commit because "the history will look cleaner." The commit has already been pushed and reviewed. How do you respond?</span></summary>
 
 Reject the reset and use `git revert <bad-hash>` instead. Clean-looking history is not worth breaking every clone, deployment job, and pull request that already knows about the pushed commit. A revert records the rollback as a new commit and keeps the branch fast-forwardable for everyone else. If the team later reintroduces the change, they can do so intentionally with a follow-up commit or by reverting the revert after the corrected fix is ready.
 
@@ -498,6 +500,8 @@ In this exercise, you will simulate a catastrophic workflow error and recover th
 ### Step 1: Scenario Setup
 
 Create a fresh repository, add a stable Kubernetes-style manifest, and build a feature branch with three commits. The feature intentionally mixes one questionable Deployment change with two useful autoscaling changes so you can practice recovering a branch and then transplanting only the approved commits.
+
+If `mkdir` reports that the directory exists, stop: choose a new unused directory name in the setup commands before running `git init`. Do not practice in an existing repository.
 
 ```bash
 # 1. Create a fresh repository
@@ -550,6 +554,9 @@ Your task is to find the lost commits and restore the branch to its correct, ful
 - [ ] Identify the exact commit hash associated with the message "Feature: Set HPA CPU threshold".
 - [ ] Use a reset command to force the branch pointer back to that lost commit hash.
 
+<details><summary>Hint 1: Concept</summary>Look for a local record of earlier HEAD positions; the normal branch log only shows reachable history.</details>
+<details><summary>Hint 2: Narrow the search</summary>Find the entry immediately before the reset and confirm its commit message. If the reflog is missing or lacks the tip, stop and inspect other references or backups rather than guessing.</details>
+
 <details>
 <summary>Solution for Step 3</summary>
 
@@ -582,6 +589,9 @@ Now that you recovered the branch, imagine your tech lead asks for the two HPA c
 - [ ] View the log of the `feature-scaling` branch to get the hashes of the two specific HPA commits.
 - [ ] Use a specific command to apply *only* those two commits to the `main` branch, ensuring you apply the oldest one first.
 - [ ] Verify that `hpa.yaml` exists on `main`, but `deployment.yaml` does not have the `replicas: 3` line.
+
+<details><summary>Hint 1: Concept</summary>Copy individual changes to the target branch in dependency order, leaving the source branch intact.</details>
+<details><summary>Hint 2: Narrow the search</summary>Inspect the feature log to identify the two commits. If a pick stops empty or conflicts, inspect <code>git status</code> and the patch before deciding whether to resolve, skip, or abort.</details>
 
 <details>
 <summary>Solution for Step 4</summary>
@@ -661,6 +671,12 @@ Success criteria:
 - [ ] `main` contains the two HPA commits after cherry-pick.
 - [ ] `deployment.yaml` on `main` does not contain the unapproved `replicas: 3` line.
 - [ ] You can explain why reflog was appropriate for recovery and cherry-pick was appropriate for transplanting the approved changes.
+
+**Transfer challenge:** In a different disposable repository, a local commit combines two changes; a later edit is staged and another is only in the working file. You want to split the commit while retaining both edits. Which reset mode preserves the working file, and what happens to the staged snapshot? If a prior tip looks useful but you want to compare it before moving your current branch, would you create a rescue branch or reset immediately? Explain your choices, then inspect `git status`, `git diff`, `git diff --staged`, and both branch tips as evidence.
+
+For a stretch test, recreate your fixture in two fresh disposable copies. Predict the branch, index and working-file state after a soft reset in one and a hard reset in the other. Run those alternatives only after preserving valuable versions, then compare the observations with your mixed-reset choice. Explain which requirement each alternative fails and why a rescue branch alone cannot preserve uncommitted versions.
+
+<details><summary>Check your reasoning</summary>A mixed reset moves the branch and resets the index to the target while leaving working files intact; previously staged content remains in the working file only if it has not been superseded by later edits. Preserve distinct versions first if both matter. A rescue branch at the inspected old tip preserves it without moving the current branch; compare the tips before any reset.</details>
 
 ## Sources
 

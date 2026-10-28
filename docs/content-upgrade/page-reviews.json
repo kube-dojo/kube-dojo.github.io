@@ -399,7 +399,7 @@
     },
     {
       "path": "prerequisites/git-deep-dive/module-4-undo-recovery.md",
-      "page_digest": "sha256:12f8bd8ac7f077fc74fbeb9f61fd1466b7e3e5ac76756cc9420c0c57d72a3586",
+      "page_digest": "sha256:0a0e4239bfde25e0f4a4d517750a2f12306c32716c850143383789e9d231810c",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-28-git-recovery-safety-p13b.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-28-git-recovery-safety-p13b.md"],
