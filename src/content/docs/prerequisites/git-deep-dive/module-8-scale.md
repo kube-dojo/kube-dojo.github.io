@@ -150,7 +150,7 @@ graph TD
 git clone --filter=blob:none https://git.example.com/platform-repo.git
 ```
 
-The server must support the requested filter. If it does not, Git may warn and transfer unfiltered objects instead; check the clone output and measure the transfer. A normal checkout needs current file contents, so `blob:none` does not mean that no blobs exist locally. Historical diffs can fetch more blobs later, making remote availability part of the job's requirements.
+The server must support the requested filter. If it does not, Git may warn and transfer unfiltered objects instead; check the clone output and measure the transfer.
 
 **Pause and predict:** You run `git clone --filter=blob:none`, then run `git diff HEAD~5` on a path that changed several commits ago. What does the local repository already have, and what might it still need?
 
@@ -161,7 +161,9 @@ The local repository has the commit graph and tree information needed to locate 
 
 </details>
 
-Write offline or fetched before you continue. The next paragraph is about treeless clones. It does not describe this five-commit diff.
+Write offline or fetched before you continue, then check the practical consequence below.
+
+A normal checkout needs current file contents, so `blob:none` does not mean that no blobs exist locally. Historical diffs can fetch more blobs later, making remote availability part of the job's requirements.
 
 Treeless partial clones go further by omitting historical tree objects as well. They are useful for highly ephemeral CI jobs that need the current checkout and little else, because the runner avoids downloading old directory structures that it will never traverse. The trade-off is that history exploration becomes more dependent on on-demand network fetches. If your CI job runs in an isolated network after the checkout step, or if it performs many historical comparisons, treeless clones can move cost from the start of the job to the middle of the job, where failures are more frustrating.
 
@@ -479,18 +481,19 @@ git commit -m "Initial massive monorepo commit"
 
 ### Compare clone choices locally
 
-This separate simulation uses two commits and a local bare repository as the remote. Run the complete block in Bash; it starts a child shell with a minimal environment and creates a new disposable directory. It does not measure network transfer or model a production server.
+This separate simulation uses two commits and a local bare repository as the remote, independently of the monorepo exercise. Run the complete block in Bash; it starts a child shell with a minimal environment and creates a new disposable directory. It does not measure network transfer or model a production server. It deliberately uses Git and tools from `/usr/bin` or `/bin`; verify that system Git is available first. Choose an absolute `TMPDIR` outside repositories to keep their working trees free of lab directories. Predict which clone can compare both revisions before running the commands.
 
 ```bash
 env -i PATH=/usr/bin:/bin TMPDIR="${TMPDIR:-/tmp}" HOME=/nonexistent \
-  GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null /bin/bash --noprofile --norc <<'LAB'
+  GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_PAGER=cat /bin/bash --noprofile --norc <<'LAB'
 set -e
 unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 case "$TMPDIR" in /*) ;; *) printf 'TMPDIR must be absolute\n' >&2; exit 1 ;; esac
 lab=$(mktemp -d "$TMPDIR/git-clone-choice.XXXXXXXX")
 cd "$lab"
 lab=$(pwd -P)
-git init seed
+printf 'Lab directory: %s\n' "$lab"
+git -c init.defaultBranch=main init -q seed
 test "$(git -C seed rev-parse --absolute-git-dir)" = "$lab/seed/.git"
 git -C seed config user.name Learner
 git -C seed config user.email learner@example.invalid
@@ -501,8 +504,8 @@ printf 'new\n' > seed/policy.txt
 git -C seed commit -am new
 git clone --bare seed source.git
 git -C source.git config uploadpack.allowFilter true
-git clone --depth=1 "file://$PWD/source.git" shallow
-git clone --filter=blob:none --no-checkout "file://$PWD/source.git" partial
+git clone --depth=1 "file://$lab/source.git" shallow
+git clone --filter=blob:none --no-checkout "file://$lab/source.git" partial
 
 git -C shallow rev-list --count HEAD
 git -C partial rev-list --count HEAD
@@ -510,13 +513,12 @@ git -C partial rev-list --objects --missing=print HEAD
 git -C partial checkout
 git -C partial diff HEAD~1 HEAD -- policy.txt
 git -C partial rev-list --objects --missing=print HEAD
-printf 'Lab directory: %s\n' "$lab"
 LAB
 ```
 
-Predict which clone can compare both revisions before running the commands. The counts should be one and two, respectively. Before checkout, lines beginning with `?` identify missing blobs; checkout and the historical diff fetch the needed content from the local remote, so those missing entries disappear. The diff should show `old` replaced by `new`. The `file://` URL matters: a direct local path uses Git's local clone optimization, which ignores `--depth`; this fixture explicitly enables filtering on its bare source. In a real CI job, confirm server support and whether later fetches are permitted, then measure the job's actual history and transfer needs.
+The counts should be one and two, respectively; the shallow clone lacks `HEAD~1`, so it cannot make this historical comparison. Before checkout, lines beginning with `?` identify missing blobs; checkout and the historical diff fetch the needed content from the local remote, so those missing entries disappear. The diff should show `old` replaced by `new`. The `file://` URL matters: a direct local path uses Git's local clone optimization, which ignores `--depth`; this fixture explicitly enables filtering on its bare source. In a real CI job, confirm server support and whether later fetches are permitted, then measure the job's actual history and transfer needs.
 
-The child shell's environment changes do not alter the calling shell. If setup fails, stop and inspect the error; no later lab commands should run. The printed directory contains only the simulation and can be inspected afterward.
+The child shell's environment changes do not alter the calling shell. If setup fails, stop and inspect the error; no later lab commands should run. Once allocated, the directory is printed before Git setup so you can inspect it after a later failure. After inspection, remove only that printed directory.
 
 ### Solutions and Success Criteria
 
@@ -627,6 +629,7 @@ Failure layer: failure mode, not novelty. Next action: consider a subtree for th
 
 **Success Criteria:**
 
+- [ ] The separate clone comparison shows counts one and two, missing blobs before checkout and none after the historical diff, and `old` replaced by `new`.
 - [ ] Running `ls services/` shows exactly two directories: `service-4` and `service-12`.
 - [ ] A `.gitattributes` file exists in the root of the repository containing the line `*.tgz filter=lfs diff=lfs merge=lfs -text`.
 - [ ] `git status` reports a clean working tree after the final commit.
