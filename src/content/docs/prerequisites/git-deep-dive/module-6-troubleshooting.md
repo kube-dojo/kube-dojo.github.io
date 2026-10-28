@@ -757,6 +757,7 @@ The needed command families are `git show revision:path`, `git bisect start/bad/
 This is one implementation of the evidence contract. The script stays outside the repository so historical checkouts cannot replace it. Its end-of-line anchor rejects `8080`, and explicit status mapping keeps an unreadable file separate from a confirmed assertion failure.
 
 ```bash
+{
 bad_tip=$(git rev-parse HEAD)
 test_script="$lab_dir-test-port.sh"
 cat > "$test_script" <<'EOF'
@@ -773,37 +774,40 @@ chmod +x "$test_script"
 
 # Preflight the same classifier against both anchors and an error fixture.
 anchor_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-anchor.XXXXXXXX")
-git show v1.0:deployment.yaml > "$anchor_dir/deployment.yaml"
-(cd "$anchor_dir" && "$test_script") && echo "v1.0 is good (0)"
-if "$test_script"; then echo "Unexpected good tip"; else
-  test "$?" -eq 1 && echo "Tip is bad (1)"
+git show v1.0:deployment.yaml > "$anchor_dir/deployment.yaml" || { echo "STOP: missing good anchor"; exit 1; }
+(cd "$anchor_dir" && "$test_script") || { echo "STOP: good anchor did not pass"; exit 1; }
+if "$test_script"; then echo "STOP: unexpected good tip"; exit 1; else
+  test "$?" -eq 1 || { echo "STOP: bad tip untestable"; exit 1; }
 fi
 error_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-error.XXXXXXXX")
-if (cd "$error_dir" && "$test_script"); then echo "Unexpected match"; else
-  test "$?" -eq 125 && echo "Missing file is untestable (125)"
+if (cd "$error_dir" && "$test_script"); then echo "STOP: unexpected match"; exit 1; else
+  test "$?" -eq 125 || { echo "STOP: missing file was not skipped"; exit 1; }
 fi
+echo "Preflight checks passed."
 
-git bisect start
-git bisect bad "$bad_tip"
-git bisect good v1.0
-git bisect run "$test_script"
-candidate=$(git rev-parse refs/bisect/bad)
+git bisect start || { echo "STOP: bisect start failed"; exit 1; }
+git bisect bad "$bad_tip" || { echo "STOP: bad anchor failed"; exit 1; }
+git bisect good v1.0 || { echo "STOP: good anchor failed"; exit 1; }
+git bisect run "$test_script" || { echo "STOP: bisect inconclusive"; exit 1; }
+candidate=$(git rev-parse refs/bisect/bad) || { echo "STOP: missing boundary"; exit 1; }
 evidence_log="$lab_dir-bisect.log"
-git bisect log > "$evidence_log"
+git bisect log > "$evidence_log" || { echo "STOP: could not save bisect log"; exit 1; }
 
-git show "$candidate:deployment.yaml" > "$anchor_dir/deployment.yaml"
-if (cd "$anchor_dir" && "$test_script"); then echo "Unexpected good candidate"; else
-  test "$?" -eq 1 && echo "Candidate fails (1)"
+git show "$candidate:deployment.yaml" > "$anchor_dir/deployment.yaml" || { echo "STOP: missing candidate"; exit 1; }
+if (cd "$anchor_dir" && "$test_script"); then echo "STOP: unexpected good candidate"; exit 1; else
+  test "$?" -eq 1 || { echo "STOP: candidate untestable"; exit 1; }
 fi
-git show "$candidate^:deployment.yaml" > "$anchor_dir/deployment.yaml"
-(cd "$anchor_dir" && "$test_script") && echo "Parent passes (0)"
-git show --stat --patch "$candidate"
+git show "$candidate^:deployment.yaml" > "$anchor_dir/deployment.yaml" || { echo "STOP: missing parent"; exit 1; }
+(cd "$anchor_dir" && "$test_script") || { echo "STOP: parent did not pass"; exit 1; }
+git --no-pager show --stat --patch "$candidate"
 
-git bisect reset
-test "$(git branch --show-current)" = "$original_branch"
-test "$(git rev-parse HEAD)" = "$bad_tip"
-test -z "$(git status --short)"
+git bisect reset || { echo "STOP: bisect reset failed"; exit 1; }
+test "$(git branch --show-current)" = "$original_branch" || { echo "STOP: wrong branch"; exit 1; }
+test "$(git rev-parse HEAD)" = "$bad_tip" || { echo "STOP: wrong tip"; exit 1; }
+test -z "$(git status --short)" || { echo "STOP: working tree is not clean"; exit 1; }
+echo "Restoration checks passed."
 git blame -L '/containerPort/',+1 deployment.yaml
+}
 ```
 
 After a successful unambiguous search, `refs/bisect/bad` names the bad boundary; reading `HEAD` instead can capture the final tested midpoint. Expected evidence: the candidate fails while its parent passes, and the patch changes the port declaration alongside a routine comment. The narrowed blame output attributes the port line to that same candidate. Hashes, neutral update numbers, and midpoint selections vary with the fixture. These observations establish this synthetic text boundary; they do not establish a running service's behavior.
