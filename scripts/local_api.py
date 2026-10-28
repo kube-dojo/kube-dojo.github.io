@@ -7462,7 +7462,7 @@ def render_quality_board_page_html() -> str:
   <div class=\"page-head\">
     <div>
       <h1 class=\"page-title\">Quality Board</h1>
-      <div class=\"page-sub\">Canonical page evidence and legacy module pipeline progress.</div>
+      <div class=\"page-sub\">Module and book chapter review health, score bands, and gates.</div>
     </div>
     <div class=\"page-actions\">
       <span class=\"status-pill\" id=\"conn-status\"><span class=\"dot\"></span> Connected</span>
@@ -7471,21 +7471,11 @@ def render_quality_board_page_html() -> str:
     </div>
   </div>
 
-  <section class=\"panel qb-wrap\" style=\"margin-bottom:18px;overflow-wrap:anywhere\" aria-label=\"Canonical coverage\">
-    <h2>Canonical page coverage</h2>
-    <p id=\"cc-summary\" role=\"status\">Loading canonical coverage&hellip;</p><p id=\"cc-note\"></p>
-    <div class=\"qb-tools\">
-      <input class=\"qb-input\" id=\"cc-search\" type=\"search\" aria-label=\"Search page paths\" placeholder=\"Search page paths\">
-      <select class=\"qb-select\" id=\"cc-locale\" aria-label=\"Locale\"><option value=\"\">All locales</option><option value=\"en\">EN</option><option value=\"uk\">UK (parked)</option></select>
-      <select class=\"qb-select\" id=\"cc-status\" aria-label=\"Evidence status\"><option value=\"\">All evidence statuses</option><option>current</option><option>stale</option><option>invalid</option><option value=\"unreviewed\">Without current review</option><option value=\"needs_revision\">Needs revision</option><option value=\"acceptance_recorded\">Acceptance recorded</option></select>
-    </div>
-    <p id=\"cc-count\"></p><div id=\"cc-rows\" style=\"max-height:600px;overflow:auto\"></div>
-  </section>
   <div class=\"panel\">
     <div class=\"panel-header\">
       <div class=\"panel-title\">
         <span class=\"panel-icon\" style=\"background:var(--accent-muted);color:var(--accent);\">Q</span>
-        Legacy pipeline progress (done does not mean page accepted)</div>
+        Board</div>
       <span class=\"panel-badge\" id=\"qb-badge\" style=\"background:var(--accent-muted);color:var(--accent);\">&nbsp;</span>
     </div>
     <div class=\"panel-body-flush\" id=\"quality-board\"><div class=\"empty-state\">Loading&hellip;</div></div>
@@ -7494,7 +7484,6 @@ def render_quality_board_page_html() -> str:
 <script>
 {_QUALITY_BOARD_PAGE_JS}
 </script>
-<script src=\"/static/quality-coverage.js\"></script>
 {_render_poll_stale_script()}
 </body>
 </html>"""

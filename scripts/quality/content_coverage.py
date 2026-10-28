@@ -12,6 +12,14 @@ CAVEAT = (
     "Lead references must justify lab not_applicable assertions; other not_applicable layers are not counted. "
     "Program statuses are supplied assertions, not lifecycle or book unlocks."
 )
+SOURCE_REASONS = frozenset((
+    "receipt_missing", "receipt_malformed", "receipt_not_object", "schema_invalid",
+    "disposition_not_applicable", "page_digest_invalid", "page_digest_stale",
+    "seed_digest_invalid", "seed_digest_stale", "seed_malformed", "coverage_empty",
+    "coverage_incomplete", "coverage_omitted", "run_identity_missing", "reviewer_not_independent",
+    "claim_verdict:UNSUPPORTED", "claim_verdict:CONTRADICTED", "claim_verdict:UNREADABLE",
+    "run_status:failed", "run_status:partial",
+))
 
 
 def build_coverage(repo_root: Path) -> dict:
@@ -50,7 +58,8 @@ def build_coverage(repo_root: Path) -> dict:
                       int(bool(accepted)), int(evidence["receipt_status"] == "stale"),
                       int(evidence["receipt_status"] == "invalid")), strict=True))
         reasons = [f"{key}: {statuses[key]}" for key in required if statuses[key] != "pass"]
-        reasons += evidence["source_acceptance"].get("reasons", [])
+        reasons += [f"source: {reason if reason in SOURCE_REASONS else 'invalid_or_unknown'}"
+                    for reason in evidence["source_acceptance"].get("reasons", [])]
         if not current:
             reasons.append(f"receipt: {evidence['receipt_status']}")
         if evidence["disposition"] != "retain":

@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from quality.content_coverage import build_coverage
 from quality.content_inventory import EVIDENCE_LAYERS, _digest
+from test_source_acceptance import _valid
 
 
 def setup_pages(root):
@@ -146,3 +147,23 @@ def test_row_projection_stale_mdx_and_private_receipts(tmp_path):
     stale = rows[receipt["path"]]
     assert stale["stale"] and not stale["acceptance_recorded"] and stale["unreviewed"]
     assert "receipt: stale" in stale["reasons"] and "secret" not in json.dumps(report)
+
+
+def test_nested_source_run_reason_is_bounded_public_vocabulary(tmp_path):
+    _, evidence, receipt = setup_pages(tmp_path)
+    seed = b'{"claims":[{"claim_id":"C001"}]}'
+    seeds = tmp_path / "docs/citation-seeds"
+    seeds.mkdir()
+    (seeds / "linux-index.json").write_bytes(seed)
+    nested = _valid(page_digest=receipt["page_digest"], seed_digest=_digest(seed))
+    receipt["source_acceptance"] = nested
+    for status, reason in (("complete", None), ("failed", "source: run_status:failed"),
+                           ("SYNTHETIC_SECRET" * 10000, "source: invalid_or_unknown"),
+                           ({"trace": "SYNTHETIC_SECRET" * 10000}, "source: invalid_or_unknown")):
+        nested["run"]["status"] = status
+        evidence.write_text(json.dumps({"pages": [receipt]}))
+        row = next(p for p in build_coverage(tmp_path)["pages"] if p["path"] == receipt["path"])
+        assert row["receipt_status"] == "current"
+        assert row["layers"]["technical_source"] == ("pass" if reason is None else "unknown")
+        assert ([r for r in row["reasons"] if r.startswith("source: ")] == ([] if reason is None else [reason]))
+        assert "SYNTHETIC_SECRET" not in json.dumps(row)
