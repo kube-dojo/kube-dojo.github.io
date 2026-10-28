@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Compare Git recovery clues.** [Git Internals](/prerequisites/git-deep-dive/module-1-git-internals/) now shows how reflogs affect an unreachable-object search and how to preserve a commit for inspection.
 - **Check what a manifest validator proves.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) repairs its local merge exercise and separates schema checks from matching ConfigMap references and observing a running workload.
 - **Choose a Git workflow for your release needs.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) now compares branching tradeoffs and asks you to check which revision Argo CD tracks before expecting a deployment.
 - **Read a merge diff with its limits in mind.** [Advanced Merging](/prerequisites/git-deep-dive/module-2-advanced-merging/) now distinguishes merge-base candidates from the strategy's reference tree and explains what combined and remerge views can establish.

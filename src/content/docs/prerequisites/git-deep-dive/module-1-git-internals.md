@@ -621,7 +621,22 @@ Run `git hash-object configmap.yaml` twice without changing the file and confirm
 
 Make a second commit on `main` (for example, add a comment line to `configmap.yaml`, stage, and commit) so the branch has at least two commits. Note the first commit hash with `git rev-list --max-parents=0 HEAD`. Check out that commit in detached `HEAD` with `git switch --detach "$(git rev-list --max-parents=0 HEAD)"`, make a small edit, stage, and commit. Inspect `cat .git/HEAD` — it should show a raw commit hash, not `ref: refs/heads/...`. Before switching away, create a branch at the current commit with `git branch recovered-detached-work HEAD`. Switch back to `main` with `git switch main` and verify with `git rev-parse recovered-detached-work` that the preserved commit ID matches your detached commit. The success condition is that no useful commit depends only on detached `HEAD`.
 
-For a related unreachable-object check, create a throwaway branch with one commit that is not merged anywhere, delete that branch, and run `git fsck --unreachable`. The success condition is that you can identify the dangling commit or blob as recoverable evidence before any reflog expiration or pruning.
+For a related synthetic recovery check, stay in the disposable training repository on `main`. Choose unused names for `throwaway` and `recovered-fsck` if either already exists. The [`git commit` options](https://git-scm.com/docs/git-commit) `--allow-empty --only` create an empty commit without including staged work. Record its ID and return to `main` before deleting the throwaway branch:
+
+```bash
+git switch -c throwaway
+git commit --allow-empty --only -m "Practice unreachable commit"
+lost_commit=$(git rev-parse HEAD)
+git switch main
+git branch -D throwaway
+git fsck --unreachable
+git fsck --unreachable --no-reflogs
+git show --stat "$lost_commit"
+git branch recovered-fsck "$lost_commit"
+git rev-parse recovered-fsck
+```
+
+Compare the recorded ID with both diagnostic outputs and the new branch's ID. By default, [`git fsck`](https://git-scm.com/docs/git-fsck) includes reflogs among its reachability starting points; `--no-reflogs` leaves them out of that diagnostic root set. A local `HEAD` reflog may therefore keep the commit out of the default unreachable list while the second command lists it. Reflogs may be disabled or absent, and another ref may still make the commit reachable, so output can differ. Neither an absent line nor `--no-reflogs` means corruption: the option changes the reachability calculation, not the reflogs or objects. Inspect and preserve the commit before any expiration or pruning.
 </details>
 
 **Card A: `git add` is treated as a patch.** A teammate says the object database only stored the lines that changed. The file was added for the first time.
@@ -688,6 +703,7 @@ Failure layer: raw objects before names. Next action: start with `git log -- pat
 - [Git documentation: gitrevisions](https://git-scm.com/docs/gitrevisions)
 - [Git documentation: git-reflog](https://git-scm.com/docs/git-reflog)
 - [Git documentation: git-fsck](https://git-scm.com/docs/git-fsck)
+- [Git documentation: git-commit options](https://git-scm.com/docs/git-commit)
 - [Git documentation: git-gc](https://git-scm.com/docs/git-gc)
 - [Git documentation: git-repack](https://git-scm.com/docs/git-repack)
 - [Git documentation: hash-function-transition (SHA-256)](https://git-scm.com/docs/hash-function-transition)
