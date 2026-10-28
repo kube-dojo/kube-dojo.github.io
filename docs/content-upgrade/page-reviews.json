@@ -5,10 +5,13 @@
     {
       "path": "prerequisites/git-deep-dive/module-5-worktrees-stashing.md",
       "page_digest": "sha256:ad9b5c55f171bd72ce6f68300067ee77f064feb80311f7200c0c3550dc438b3d",
-      "disposition": "revise",
+      "disposition": "retain",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-28-worktrees-stashing.md"],
       "evidence_refs": ["docs/content-upgrade/reviews/2026-10-28-worktrees-stashing.md","docs/content-upgrade/reviews/2026-10-28-worktrees-stashing-source-catalog.json","docs/content-upgrade/reviews/2026-10-28-worktrees-stashing-publication.md"],
-      "independent_statuses": {"page_presence":"pass","structural_checks":"pass","technical_source":"pass","editorial_review":"pass","lab_execution":"pass","deployed_smoke":"unknown"},
+      "acceptance_refs": [
+        "docs/content-upgrade/reviews/2026-10-28-worktrees-stashing-publication.md#lead-acceptance"
+      ],
+      "independent_statuses": {"page_presence":"pass","structural_checks":"pass","technical_source":"pass","editorial_review":"pass","lab_execution":"pass","deployed_smoke":"pass"},
       "source_acceptance": {
         "schema": "kubedojo.source_acceptance.v1",
         "schema_version": 1,
