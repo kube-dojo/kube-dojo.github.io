@@ -54,21 +54,66 @@ function buildChips(complexity: string | null, time: string | null): HTMLDivElem
   return div;
 }
 
-function enhanceMetaChips(root: Element): void {
+export function enhanceMetaChips(root: Element): void {
   if (root.querySelector('.kd-meta-chips')) return; // already enhanced
 
   // Pattern 1: blockquote format (e.g. "> **Toolkit Track** | Complexity: `[COMPLEX]` | Time: 45 min")
   const firstBq = root.querySelector('blockquote');
   if (firstBq && !firstBq.closest('.kd-warstory') && !firstBq.closest('.kd-dyk')) {
-    const text = firstBq.textContent || '';
-    if (text.includes('Complexity') || text.includes('Time to Complete') || text.includes('Time:')) {
-      const complexityMatch = text.match(/\[(QUICK|MEDIUM|COMPLEX|ADVANCED|EXPERT)\]/i);
-      const timeMatch = text.match(/Time(?:\s+to\s+Complete)?:\s*(.+?)(?:\n|$|\|)/);
-      const chips = buildChips(
-        complexityMatch ? complexityMatch[1] : null,
-        timeMatch ? timeMatch[1].trim() : null,
-      );
-      if (chips) { firstBq.replaceWith(chips); return; }
+    // Parse a detached copy first so a non-metadata quote keeps its original nodes.
+    const collect = (quote: Element) => {
+      let complexity: string | null = null;
+      let time: string | null = null;
+      const removals = new Set<Node>();
+      const containers = [...quote.children].every((el) => el.tagName === 'P')
+        && quote.children.length ? [...quote.children] : [quote];
+      for (const container of containers) {
+        // Split only direct text separators; leave inline elements and links intact.
+        for (const node of [...container.childNodes]) {
+          if (node.nodeType !== Node.TEXT_NODE || !node.textContent?.includes('|')) continue;
+          const parts = node.textContent.split('|');
+          const fragment = document.createDocumentFragment();
+          parts.forEach((part, index) => {
+            if (index) fragment.appendChild(document.createTextNode('|'));
+            fragment.appendChild(document.createTextNode(part));
+          });
+          node.parentNode?.replaceChild(fragment, node);
+        }
+        const segments: Node[][] = [[]];
+        const separators: Node[] = [];
+        for (const node of [...container.childNodes]) {
+          if (node.nodeName === 'BR' || (node.nodeType === Node.TEXT_NODE && node.textContent === '|')) {
+            separators.push(node); segments.push([]);
+          } else segments[segments.length - 1].push(node);
+        }
+        segments.forEach((segment, index) => {
+          // An unfamiliar element may carry content or behavior: leave it untouched.
+          if (segment.some((node) => node instanceof Element &&
+            (node.matches(':not(strong):not(em):not(code)') || node.querySelector(':not(strong):not(em):not(code)')))) return;
+          const text = segment.map((node) => node.textContent || '').join('').trim();
+          const c = text.match(/^Complexity:\s*\[?(QUICK|MEDIUM|COMPLEX|ADVANCED|EXPERT)\]?$/i);
+          const t = text.match(/^Time(?:\s+to\s+Complete)?:\s*(.+)$/i);
+          if (!c && !t) return;
+          if (c) complexity = c[1];
+          if (t) time = t[1].trim();
+          segment.forEach((node) => removals.add(node));
+          const separator = separators[index] || separators[index - 1];
+          if (separator) removals.add(separator);
+        });
+      }
+      return { chips: buildChips(complexity, time), removals, containers };
+    };
+    const preview = collect(firstBq.cloneNode(true) as Element);
+    const { chips, removals, containers } = preview.chips
+      ? collect(firstBq) : preview;
+    if (chips) {
+      removals.forEach((node) => node.parentNode?.removeChild(node));
+      for (const container of containers) {
+        if (container !== firstBq && !container.textContent?.trim() && !container.children.length) container.remove();
+      }
+      firstBq.before(chips);
+      if (!firstBq.textContent?.trim() && !firstBq.children.length) firstBq.remove();
+      return;
     }
   }
 

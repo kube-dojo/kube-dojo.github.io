@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Suppress browser boot only while importing the real transform.
+const readyState = vi.spyOn(document, 'readyState', 'get').mockReturnValue('loading');
+const addEventListener = vi.spyOn(document, 'addEventListener').mockImplementation(() => {});
+const { enhanceMetaChips } = await import('../src/scripts/content-enhancer');
+readyState.mockRestore();
+addEventListener.mockRestore();
 
 // Test the content enhancer DOM transforms by simulating the patterns
 // it looks for and verifying the output.
@@ -9,48 +16,7 @@ function createContent(html: string): Element {
   return document.querySelector('.sl-markdown-content')!;
 }
 
-// Re-implement the enhancer functions for testing (they read from DOM)
-// These mirror the actual implementations in content-enhancer.ts
-
-function enhanceMetaChips(root: Element): void {
-  const firstBq = root.querySelector('blockquote');
-  if (!firstBq || firstBq.closest('.kd-warstory') || firstBq.closest('.kd-dyk')) return;
-
-  const text = firstBq.textContent || '';
-  if (!text.includes('Complexity') && !text.includes('Time to Complete')) return;
-  if (firstBq.classList.contains('kd-meta-enhanced')) return;
-
-  firstBq.classList.add('kd-meta-enhanced');
-
-  const complexityMatch = text.match(/\[(QUICK|MEDIUM|ADVANCED|EXPERT)\]/i);
-  const complexity = complexityMatch ? complexityMatch[1].toUpperCase() : null;
-
-  const timeMatch = text.match(/Time to Complete:\s*(.+?)(?:\n|$)/);
-  const time = timeMatch ? timeMatch[1].trim() : null;
-
-  if (complexity || time) {
-    const chipsDiv = document.createElement('div');
-    chipsDiv.className = 'kd-meta-chips';
-
-    // Reproduce the new safer buildChips logic
-    if (complexity) {
-      const cls = complexity === 'QUICK' ? 'kd-chip-quick' :
-                  complexity === 'MEDIUM' ? 'kd-chip-medium' : 'kd-chip-advanced';
-      const icon = complexity === 'QUICK' ? '✓' : complexity === 'MEDIUM' ? '⚠' : '⚡';
-      const chip = document.createElement('span');
-      chip.className = `kd-chip ${cls}`;
-      chip.textContent = `${icon} ${complexity.charAt(0) + complexity.slice(1).toLowerCase()}`;
-      chipsDiv.appendChild(chip);
-    }
-    if (time) {
-      const chip = document.createElement('span');
-      chip.className = 'kd-chip kd-chip-time';
-      chip.textContent = `⏱ ${time}`;
-      chipsDiv.appendChild(chip);
-    }
-    firstBq.replaceWith(chipsDiv);
-  }
-}
+// The other enhancer helpers below are test-local; metadata uses production code.
 
 function enhanceWarStories(root: Element): void {
   const headings = root.querySelectorAll('h2, h3, h4');
@@ -121,6 +87,58 @@ function enhanceQuizSections(root: Element): void {
 describe('Content Enhancer — Meta Chips', () => {
   beforeEach(() => { document.body.innerHTML = ''; });
 
+  it('preserves prerequisites in the captured production header', () => {
+    const root = createContent("<blockquote>\n<p><strong>Complexity</strong>: <code dir=\"auto\">[MEDIUM]</code></p>\n<p><strong>Time to Complete</strong>: 100–130 minutes (estimate for reading and practice, not measured learner timing)</p>\n<p><strong>Prerequisites</strong>: Module 3 of Git Deep Dive and Git 2.28 or later (the lab uses <code dir=\"auto\">git init -b</code>).</p>\n</blockquote>\n");
+    enhanceMetaChips(root);
+    expect(root.querySelectorAll('.kd-chip')).toHaveLength(2);
+    expect(root.querySelector('blockquote')?.textContent).toContain('Git 2.28 or later');
+    expect(root.querySelector('blockquote')?.textContent).toContain('Prerequisites');
+  });
+
+  it('preserves separate prerequisite and next-module paragraphs and links', () => {
+    const root = createContent('<blockquote><p><strong>Complexity</strong>: <code>[MEDIUM]</code></p><p><strong>Time to Complete</strong>: 45 min</p><p><strong>Prerequisites</strong>: <a href="/git/">Git</a></p><p>Next: <a href="/next/">Next module</a></p></blockquote>');
+    const links = [...root.querySelectorAll('a')];
+    enhanceMetaChips(root);
+    expect(root.querySelectorAll('.kd-chip')).toHaveLength(2);
+    expect(root.querySelector('blockquote')?.textContent).toContain('Prerequisites');
+    expect([...root.querySelectorAll('a')]).toEqual(links);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/git/', '/next/']);
+  });
+
+  it('handles BR fields and preserves inline unknown content', () => {
+    const root = createContent('<blockquote><p><strong>Complexity:</strong> <code>[COMPLEX]</code><br><strong>Time:</strong> 30 min<br>Prerequisite: <a href="/start/">Start</a></p></blockquote>');
+    const link = root.querySelector('a');
+    enhanceMetaChips(root);
+    expect(root.querySelector('.kd-chip-advanced')?.textContent).toContain('Complex');
+    expect(root.querySelector('.kd-chip-time')?.textContent).toContain('30 min');
+    expect(root.querySelector('a')).toBe(link);
+    expect(link?.getAttribute('href')).toBe('/start/');
+  });
+
+  it('does not consume a field containing an unknown inline link', () => {
+    const root = createContent('<blockquote><p>Complexity: [MEDIUM]</p><p>Time: <a href="/details/">45 min</a></p></blockquote>');
+    const link = root.querySelector('a');
+    enhanceMetaChips(root);
+    expect(root.querySelector('a')).toBe(link);
+    expect(root.querySelector('.kd-chip-time')).toBeNull();
+  });
+
+  it('preserves unknown pipe fields and removes metadata-only quotes', () => {
+    const root = createContent('<blockquote>Toolkit | Complexity: [MEDIUM] | Time: 45 min | <a href="/more/">More</a></blockquote>');
+    enhanceMetaChips(root);
+    expect(root.querySelector('blockquote')?.textContent).toContain('Toolkit');
+    expect(root.querySelector('a')?.getAttribute('href')).toBe('/more/');
+    const only = createContent('<blockquote><p>Complexity: [QUICK]</p><p>Time: 15 min</p></blockquote>');
+    enhanceMetaChips(only);
+    expect(only.querySelector('blockquote')).toBeNull();
+  });
+
+  it('retains heading fallback', () => {
+    const root = createContent('<h2>Complexity: [MEDIUM]</h2><h2>Time to Complete: 45 min</h2>');
+    enhanceMetaChips(root);
+    expect(root.querySelectorAll('.kd-chip')).toHaveLength(2);
+  });
+
   it('transforms complexity blockquote into chips', () => {
     const root = createContent(`
       <blockquote>Complexity: [MEDIUM] | Time to Complete: 45-55 min</blockquote>
@@ -157,6 +175,17 @@ describe('Content Enhancer — Meta Chips', () => {
 
     expect(root.querySelector('.kd-meta-chips')).toBeNull();
     expect(root.querySelector('blockquote')).not.toBeNull();
+  });
+
+  it('leaves original nodes untouched in a non-metadata pipe quote', () => {
+    const root = createContent('<blockquote>Alpha | <a href="/guide/">Guide</a> | Beta</blockquote>');
+    const quote = root.querySelector('blockquote')!;
+    const nodes = [...quote.childNodes];
+    enhanceMetaChips(root);
+    expect(root.querySelector('.kd-meta-chips')).toBeNull();
+    expect(root.querySelector('blockquote')).toBe(quote);
+    expect([...quote.childNodes]).toEqual(nodes);
+    expect(root.querySelector('a')?.getAttribute('href')).toBe('/guide/');
   });
 
   it('does not double-enhance', () => {
