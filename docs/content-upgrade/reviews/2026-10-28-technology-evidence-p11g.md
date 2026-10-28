@@ -1,5 +1,7 @@
 # T01-P11g: qualify technology claims and practice an evidence audit
 
+This packet note preserves its review-input snapshot. The later [lead acceptance consolidation](./2026-10-28-technology-page-acceptance.md#lead-acceptance) records the actual source, rubric, practice and publication evidence; its canonical state follows merge, not this earlier pending wording.
+
 Owner #2278; source/editorial #2275 and assessment #2277. This packet remains **revise**, pending independent whole-page source, rubric and applicable practical acceptance. It removes unsupported industry/adoption/governance/career explanations and universal managed-service/migration advice, then aligns quizzes and transfer feedback with requirement-specific decisions.
 
 The authored Phoenix claim audit separates Mesos's formal retirement, documented Compose production use, hypothetical requirements and missing local evidence. New progressive hints ask learners to identify the claim, source boundary and next test. Retention and migration remain possible; no real incident, population result, executed migration or learner-gain claim is supplied.
