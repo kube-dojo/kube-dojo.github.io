@@ -287,7 +287,7 @@ git commit -m "Merge redis-auth, resolving multi-file replicas, image, and secre
 
 Hypothetical scenario: a platform engineer resolves the core Deployment YAML manually but, feeling overwhelmed, runs `git checkout --ours kustomization.yaml` to bypass the second conflict. Git accepts the command and allows the merge to finish, yet the Deployment now expects a password Secret that the Kustomization file no longer generates. In a GitOps flow, that kind of text-level success can become a runtime failure as soon as the controller applies the reconciled tree. The lesson is not that `--ours` is forbidden; it is that whole-file conflict shortcuts must be justified against the complete resource graph, not against the file that looks most annoying in the editor.
 
-When you review this kind of merge, read the final configuration as a set of relationships rather than as two independent files. The Deployment's `env` block refers to a Secret by name, the Kustomization file decides whether that Secret is produced, and the image tag choice can alter runtime assumptions about authentication behavior. A good resolution preserves the useful intent from both branches and then proves that the references still connect. That is why the validation command comes before `git add`: once you stage the result, it becomes easy to treat the merge as finished even though the platform object has not yet been checked.
+When you review this kind of merge, read the final configuration as a set of relationships rather than as two independent files. Rendering with `kubectl kustomize` produces manifests; kubeconform checks their schema shape. Neither proves that a referenced Secret exists in the target namespace or that a container uses its value correctly. Inspect the rendered names and references separately, then use authorized server and runtime checks for the intended environment. Keep these checks distinct before treating the merge as ready for deployment.
 
 To aid in visualizing these complex situations, you can utilize `git mergetool`, which launches a specialized external visual diffing tool presenting the BASE, LOCAL, and REMOTE versions side-by-side, and then automatically writes your final resolved result directly to the MERGED file. You can also significantly alter how Git presents conflicts natively in your editor. Three distinct merge conflict styles are available via the `merge.conflictStyle` configuration: `merge` shows only the two diverging sides, `diff3` adds a `|||||||` block showing the original ancestor code to provide critical context on why the conflict happened, and `zdiff3` is functionally identical to diff3 but trims matching, unchanged lines from the outer edges of the conflict block to reduce visual noise. The highly efficient `zdiff3` conflict style was introduced in Git 2.35.0.
 
@@ -630,14 +630,14 @@ Advanced merging becomes safer when a team treats every integration as a design 
 
 One useful pattern is small, frequent integration against a protected trunk. A short-lived review branch can reduce accumulated divergence, although conflict size still depends on which changes overlap. For Kubernetes manifests, that distinction matters: a small change might ask whether `replicas` should be three or five, while a larger integration may also require reconciling probes, selectors, container names and network policy labels. Maintenance branches remain useful when they have an explicit supported-version purpose and fix-propagation policy.
 
-Another durable pattern is schema-aware validation immediately after conflict resolution. Git knows that two lines of YAML text differ, but it does not know whether a `secretKeyRef` points at a Secret that Kustomize still generates, whether a selector matches the labels inside a Pod template, or whether an API field is valid in Kubernetes 1.35. The resolver therefore has to move from text reconciliation to platform reconciliation. Running `kubeconform -summary <manifest.yaml>` (offline schema validation), `kubectl kustomize`, or an admission-style validation tool is the engineering step that converts "Git accepted the file" into "this configuration still represents a coherent cluster object."
+Another durable pattern is layered validation immediately after conflict resolution. Git combines text, `kubectl kustomize` renders resources, and [kubeconform validates schema shape](https://github.com/yannh/kubeconform#limits-of-kubeconform-validation). A schema pass does not establish referenced-object existence, admission acceptance or workload behavior. Kubeconform normally retrieves schemas remotely; cluster-free does not mean network-free. For reproducibility, choose the Kubernetes schema version explicitly, record the tool version and schema source, and configure complete local schemas when working offline. Its cache stores downloaded schemas but is not proof that every required schema is available.
 
 A third pattern is to keep merge commits reviewable and explain any additional changes. A combined diff offers one view of the result, but omits some changes and cannot identify who made an edit or why. Compare each parent and, for a two-parent merge, consider a remerge diff alongside the recorded result and review notes. Those views help investigate unexpected additions without claiming to reconstruct a person's actions.
 
 | Pattern | Use When | Why It Works | Scaling Consideration |
 | :--- | :--- | :--- | :--- |
 | **Short-lived review branches** | Engineers want frequent integration with review before merge. | Limits accumulated divergence without guaranteeing conflict-free merges. | Keep checks fast and define how incomplete behavior stays out of releases; use flags when appropriate. |
-| **Schema-aware conflict validation** | The merge touches Kubernetes YAML, Helm output, Kustomize overlays, or policy-as-code. | Git validates text ancestry, while Kubernetes tooling validates object shape and API compatibility. | Validation must be fast enough to run locally and in CI, or engineers will skip it under pressure. |
+| **Layered conflict validation** | The merge touches Kubernetes YAML, Helm output, Kustomize overlays, or policy-as-code. | Rendering, schema validation, reference inspection and runtime checks answer different questions. | Record versions and schema sources; keep applicable checks available locally and in CI. |
 | **Reviewable merge commits** | A three-way merge needed synthesis. | Parent-specific and remerge comparisons provide complementary views of the result. | Record intent and validation; no diff proves which edits were manual. |
 | **Recorded recurring resolutions** | The same branch family repeatedly conflicts during release preparation. | `rerere` can reuse a previously accepted resolution, reducing repeated manual work. | The cache should be trusted only after the team has validated the first resolution carefully. |
 
@@ -659,7 +659,7 @@ Use the following decision matrix as a practical guide when you are under pressu
 | :--- | :--- | :--- | :--- |
 | Current branch is behind and has no unique commits | `git merge --ff-only incoming` | The branch pointer can move without creating a synthetic merge commit. | Run the relevant tests or render manifests if the incoming branch was not already validated. |
 | Two fresh branches touched different files | Normal three-way merge with `ort` | Git can synthesize independent file changes cleanly while preserving both parents. | Review the merge commit and run targeted CI for changed areas. |
-| Two branches touched the same Kubernetes manifest | Manual conflict resolution with schema validation | Human intent matters more than text adjacency when selectors, probes, and generated resources interact. | Run `kubeconform -summary` on rendered manifests, `kubectl kustomize`, and any policy checks your repo requires. |
+| Two branches touched the same Kubernetes manifest | Resolve intent, then validate in layers | Text adjacency cannot establish resource relationships. | Render first, validate against the chosen schema version, inspect references, and run applicable policy/server/runtime checks. |
 | Several independent branches need one release branch | Octopus merge only if conflicts are unlikely | The history stays compact, but the operation refuses manual conflicts. | Pre-merge each branch against trunk and retry only when every pair is clean. |
 | Old branch has a stale merge base | Recreate from current `main` and cherry-pick intent | The old graph encodes obsolete assumptions about the platform. | Test each selected commit after replay, especially migrations and API changes. |
 | Pull request contains noisy local commits | Interactive rebase before review | Reviewers see a coherent story instead of temporary savepoints. | Re-run tests after rewriting and force-push only to branches you own. |
@@ -680,7 +680,7 @@ For day-to-day work, a compact flow helps prevent panic decisions. Start with `g
 | Mistake | Why It Happens | How to Fix It |
 | :--- | :--- | :--- |
 | **Panic committing unresolved markers** | Engineer feels overwhelmed, attempts to save work mid-conflict by running `git commit -a`, thereby committing `<<<<<<<` directly into the codebase. | Run `git merge --abort` immediately to reset the working directory to the pre-merge state, take a breath, and start over. |
-| **Breaking YAML indentation** | Manually deleting conflict markers and inadvertently shifting blocks of YAML, creating invalid structural relationships. | Always use `kubectl diff` or `kubeconform -summary` on the modified file before finalizing the merge commit. |
+| **Breaking YAML indentation** | Deleting conflict markers shifts YAML blocks or introduces duplicate keys. | Run strict schema validation on rendered manifests; separately check references and behavior. A schema pass is not deployment proof. |
 | **"Ostrich merging" (ignoring upstream)** | Keeping a feature branch alive for 6 weeks without pulling from main, resulting in a monolithic, unresolvable conflict later. | Merge `main` into your feature branch (or rebase against it) daily. Conflict resolution should be a continuous, small-scale tax, not a massive end-of-project penalty. |
 | **Resolving logic, breaking syntax** | Focusing so hard on getting both sets of configuration into the file that you create duplicate keys (e.g., two `spec` blocks in a pod definition). | Understand the schema of the file you are editing. Use IDE plugins with Kubernetes schema validation enabled during conflict resolution. |
 | **Accidental "Evil Merges"** | While resolving a conflict, the engineer sneaks in an unrelated fix or typo correction that was not part of either branch. | A merge commit should *only* contain the resolution of the conflict. Make unrelated fixes in a separate, discrete commit afterward. |
@@ -736,15 +736,15 @@ Attempting a direct three-way merge with a year-old base is extremely dangerous,
 
 ## Hands-On Exercise
 
-In this lab you will create a small Kubernetes manifest repository, force a real conflict that modern Git cannot safely auto-merge, inspect the merge base, resolve the conflict by synthesizing intent, and validate the final object before committing. The exercise uses a Deployment and a ConfigMap because they reveal the two failure modes you will see in platform work: one conflict is about competing runtime behavior, while the other is about a dependency between files. The goal is not to memorize conflict markers; the goal is to practice slowing down enough to identify what each branch was trying to accomplish.
+In this local lab you will create a small manifest repository, inspect a merge base and resolve competing ConfigMap settings. The Deployment auto-merges, so review whether it retained both the replica and probe changes. Then separate schema validity from the Deployment's reference to the ConfigMap. This exercise inspects files and Git history; it does not create cluster resources or demonstrate runtime behavior.
 
-Work in a scratch directory outside any production repository. The commands below assume a Unix-like shell and Git with the default `ort` merge engine. They also assume `kubeconform` is installed and available on your `PATH` (for example `brew install kubeconform` on macOS). `kubeconform -summary` validates manifest shape against Kubernetes OpenAPI schemas without contacting a cluster, which is enough for this exercise because the point is to catch broken YAML and object references before committing the merge.
+Use a Unix-like shell with Git, Perl and kubeconform on `PATH` (for example `brew install kubeconform` on macOS). Run `git --version` and `kubeconform -v` and retain those versions with your notes. Keep the commands in one shell. The setup creates a fresh scratch directory and sets a fictional Git identity only in that repository. Schema checks below target Kubernetes 1.35.0 and may download schemas; they need no cluster. A different target environment requires its own version and applicability check.
 
 - [ ] Create the repository, add the baseline Deployment and ConfigMap, and commit the initial state.
 - [ ] Create `feature/harden-api` to add a health probe and stricter ConfigMap setting.
 - [ ] Create `feature/scale-api` to change replicas and a competing ConfigMap setting.
 - [ ] Merge `feature/scale-api` into `feature/harden-api`, inspect the merge base, review the auto-merged `deployment.yaml`, and resolve the conflict in `configmap.yaml`.
-- [ ] Validate the resolved manifests with `kubeconform -summary` before committing the merge.
+- [ ] Validate both resolved manifests against the chosen schemas, then inspect the ConfigMap reference and explain why a schema pass cannot prove that reference exists in a cluster.
 - [ ] Inspect the final merge with `git show`, compare each parent and explain what the diff views can and cannot establish about the resolution.
 
 <details>
@@ -753,9 +753,13 @@ Work in a scratch directory outside any production repository. The commands belo
 Create the repository and baseline files:
 
 ```bash
-mkdir k8s-advanced-merge-lab
-cd k8s-advanced-merge-lab
+lab_dir=$(mktemp -d "${TMPDIR:-/tmp}/k8s-advanced-merge.XXXXXX")
+cd "$lab_dir" || exit
 git init --initial-branch=main
+git config --local user.name "Merge practice"
+git config --local user.email "practice@example.invalid"
+git config --local commit.gpgsign false
+printf 'Practice repository: %s\n' "$lab_dir"
 ```
 
 ```yaml
@@ -805,7 +809,7 @@ Create the hardening branch:
 ```bash
 git checkout -b feature/harden-api
 perl -0pi -e 's/FEATURE_MODE: "standard"/FEATURE_MODE: "strict"/' configmap.yaml
-perl -0pi -e 's/image: nginx:1.27.1/image: nginx:1.27.1\n        readinessProbe:\n          httpGet:\n            path: \\/\n            port: 80\n          initialDelaySeconds: 5\n          periodSeconds: 10/' deployment.yaml
+perl -0pi -e 's|image: nginx:1.27.1|image: nginx:1.27.1\n        readinessProbe:\n          httpGet:\n            path: /\n            port: 80\n          initialDelaySeconds: 5\n          periodSeconds: 10|' deployment.yaml
 git add configmap.yaml deployment.yaml
 git commit -m "feat: harden api readiness behavior"
 ```
@@ -873,11 +877,11 @@ data:
   FEATURE_MODE: "strict"
 ```
 
-Validate and commit:
+Validate the schemas, then inspect `deployment.yaml`'s `envFrom[].configMapRef.name` alongside the ConfigMap's `metadata.name`. Both should be `api-settings`; neither manifest sets a namespace, so they must be used in the same namespace if deployed. This file comparison establishes the intended local reference, not an existing cluster object. Only after recording that distinction should you commit:
 
 ```bash
-kubeconform -summary configmap.yaml
-kubeconform -summary deployment.yaml
+kubeconform -strict -kubernetes-version 1.35.0 -summary configmap.yaml deployment.yaml
+git diff --check
 git add configmap.yaml deployment.yaml
 git commit -m "Merge scale-api into harden-api resolving replicas and feature mode"
 git show --stat --summary HEAD
@@ -924,10 +928,21 @@ Failure layer: all-or-nothing versus a paused two-parent merge. Next action: do 
 
 </details>
 
-The success criteria are intentionally broader than "Git says the merge is complete." You should be able to point to the merge base, describe each branch's intent, explain why one ConfigMap value survived, show that the Deployment still references an existing ConfigMap, and demonstrate that `kubeconform -summary` accepts both objects. If you cannot explain those facts from the final commit, the merge may be mechanically complete but operationally unreviewable.
+**Check the boundary:** Before changing a file, predict whether replacing only the Deployment's reference with `absent-settings` would fail schema validation. Create a separate diagnostic file in the practice directory:
+
+```bash
+sed 's/name: api-settings/name: absent-settings/' deployment.yaml > missing-reference.yaml
+kubeconform -strict -kubernetes-version 1.35.0 -summary missing-reference.yaml
+```
+
+Expect a schema pass: the reference is still a string of the permitted shape. Compare that name with the ConfigMap definition to identify the broken relationship yourself. Keep this diagnostic file uncommitted. Server-side validation and runtime observation answer further questions; neither was performed by this local exercise.
+
+Success means recording the merge base, both branches' intent, five replicas, the retained probe, the chosen strict ConfigMap value, a schema pass and the matching local reference names. Explain why the negative reference control still passes schema validation, and distinguish those results from admission acceptance, object existence in a target namespace and a functioning workload. Keep the scratch path and evidence for review; no production repository or cluster was changed.
 
 ## Sources
 
+- [Kubeconform: validation limits, schema locations, cache and version selection](https://github.com/yannh/kubeconform)
+- [Kubernetes ConfigMap references from Pods](https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods)
 - [Git workflow manual: topic, integration and maintenance branches](https://git-scm.com/docs/gitworkflows)
 - [GitFlow's original model and author's reflection on applicability](https://nvie.com/posts/a-successful-git-branching-model/)
 - [GitHub flow: branch, pull request and merge](https://docs.github.com/en/get-started/using-github/github-flow)
