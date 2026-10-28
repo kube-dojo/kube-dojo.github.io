@@ -1,6 +1,5 @@
 ---
 title: "Module 5: Multi-Tasking Mastery - Worktrees and Stashing"
-time_to_complete: "60 minutes"
 prerequisites: "Module 4 of Git Deep Dive"
 next_module: "[Module 6: The Digital Detective](../module-6-troubleshooting/)"
 revision_pending: false
@@ -10,7 +9,7 @@ sidebar:
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: 80–110 minutes (unmeasured planning estimate for reading and local practice)
 >
 > **Prerequisites**: Module 4 of Git Deep Dive
 
@@ -28,7 +27,7 @@ By the end of this module, you will be able to:
 
 ## Why This Module Matters
 
-Hypothetical scenario: it is late afternoon at a regional payments company during a planned Kubernetes platform upgrade. A senior engineer is halfway through refactoring an ingress controller deployment for Kubernetes 1.35, with modified YAML files, half-written Go tests for a custom admission webhook, and a local cluster tuned to reproduce a routing edge case. Then security pages the team: a vulnerable production image has to be replaced immediately, before the next merchant settlement window opens. The change itself is tiny, but the operational risk is not tiny at all, because a broken hotfix could block payment authorization and put revenue at risk during a narrow production window.
+Hypothetical scenario: it is late afternoon at a regional payments company during a planned Kubernetes platform upgrade. A senior engineer is halfway through refactoring an ingress controller deployment, with modified YAML files, half-written Go tests for a custom admission webhook, and a local cluster tuned to reproduce a routing edge case. Then security pages the team: a vulnerable production image has to be replaced immediately, before the next merchant settlement window opens. The change itself is tiny, but the operational risk is not tiny at all, because a broken hotfix could block payment authorization and put revenue at risk during a narrow production window.
 
 In that hypothetical, the engineer reaches for `git stash`, switches to the production branch, makes the image update, and pushes the hotfix. That first part looks successful, but the return trip is painful. The stash does not include a newly created manifest because the file is still untracked, and `git stash pop` collides with the same deployment block that the emergency patch changed. The fix prevents customer-visible impact, yet the team pays for the rushed context switch with hours of conflict resolution, repeated local cluster resets, and a delayed review of the original ingress refactor.
 
@@ -42,17 +41,17 @@ When you run `git switch` or `git checkout`, Git rewrites the working tree to ma
 
 The practical lesson is that a branch is not the same thing as a workspace. A branch names a line of history; a workspace is a directory, an index, editor state, test artifacts, environment variables, and your own mental context. Many early Git users learned branches first and assumed they solved context switching by themselves. Branches solve the history problem, but they do not give you two independent working directories unless you create a second clone or a linked worktree.
 
-Teams traditionally used two workarounds. The first was the multiple-clone strategy: clone the repository again whenever a new task, release check, or urgent review appears. The second was the stash-and-pray strategy: sweep uncommitted work onto the stash stack, switch branches, do the interruption, switch back, and hope the saved patch still applies cleanly. Both can work in narrow cases, but both become expensive when they are the default response to every interruption.
+Compare two possible workarounds. One is to clone the repository again for a new task, release check, or urgent review. Another is to save uncommitted work in a stash, switch branches, handle the interruption, switch back, and restore it. Both are options rather than universal defaults: consider which repository state and runtime resources each approach actually separates before choosing one.
 
-Multiple clones provide strong isolation because each clone has its own object database, refs, configuration, working tree, and index. That can be useful when you truly need separate credentials, separate hooks, or a hermetic test environment. The cost is duplication and drift. Large repositories can consume several gigabytes per clone, each clone needs its own fetches, and a branch that exists locally in one clone does not automatically exist locally in another. The strategy solves workspace isolation by pretending each task is a separate universe.
+Multiple clones give you separate repository-local refs, configuration, working trees, and indexes. That can be useful when repository-level settings must differ, but a clone does not automatically isolate global credential helpers, hooks selected by global configuration, or runtime services. Local clones may also share object storage through hardlinks or explicit alternates. The cost is another repository to maintain: each clone needs its own fetches, and a local branch in one does not automatically exist in another. Choose the required boundary deliberately; a clone is not a hermetic test environment.
 
-There is also a coordination cost that does not show up in disk usage. In a multi-clone workflow, each directory can quietly develop its own local branches, remotes, ignored files, hook state, and unpushed commits. When a teammate asks which directory contains the fix, the answer may depend on memory rather than repository state. Worktrees reduce that ambiguity because the linked directories remain attached to one repository database, and `git worktree list` gives you a single inventory of the local workspaces that currently exist.
+There is also a coordination cost that does not show up in disk usage. In a multi-clone workflow, each directory can quietly develop its own local branches, remotes, ignored files, hook state, and unpushed commits. When a teammate asks which directory contains the fix, the answer may depend on memory rather than repository state. Linked worktrees remain attached to one repository database, and `git worktree list` inventories registered worktrees, including records whose directories are missing.
 
 Stash has the opposite shape. It is lightweight and local, but it stores a patch-like snapshot whose context is easy to forget. A stash entry records the state of tracked modifications, and with the right flags it can include untracked or ignored files, but it does not preserve your open terminals, local database state, running cluster, or exact mental stack. It is a temporary shelf, not a parallel desk. The longer a stash sits while the branch underneath it changes, the more likely the return path turns into conflict recovery.
 
 That distinction is why the right question is not "Is stash bad?" but "What kind of state am I saving?" If the state is a two-line formatting cleanup before a pull, stash is appropriate. If the state includes half a feature, a failing test, a running cluster, and a branch that may be interrupted for a day, stash is hiding too much context behind a single stack entry. A senior workflow makes that difference explicit before the interruption starts.
 
-**Pause and predict:** What do you think happens if you run `git stash` while a new file exists in your directory but has never been added with `git add`?
+**Pause and predict:** What do you think happens if you run `git stash` while a new file exists in your directory but has never been added with `git add`? Write kept or stashed before opening the answer.
 
 <details>
 <summary>Check your prediction</summary>
@@ -60,8 +59,6 @@ That distinction is why the right question is not "Is stash bad?" but "What kind
 By default, `git stash` saves tracked modifications and staged changes, but it leaves untracked files alone. That behavior surprises engineers because a dirty `git status` can contain both tracked and untracked state, while the plain stash command captures only part of it. If the untracked file does not collide with the branch you switch to, it remains visible in the new branch. If it does collide, Git may block the branch switch or force you to decide what to do at the worst possible moment.
 
 </details>
-
-Write kept or stashed before you continue. A dirty status can mix tracked edits with files Git has never been asked to track. The next section is about naming stash entries. It does not say which of those files the plain command saves.
 
 ## Mastering Git Stash for Micro-Interruptions
 
@@ -84,7 +81,7 @@ When your work includes new files, add the `-u` or `--include-untracked` flag. T
 git stash push -u -m "Added new redis-deployment.yaml and modified configmap"
 ```
 
-The `-a` or `--all` flag is more aggressive because it includes ignored files too. That can be useful when you need to completely sanitize a directory before reproducing a build issue, but it can also sweep large generated artifacts into the stash and make the operation slow. In most professional workflows, explicit `-u` is the better default because it captures source files that Git does not yet track while leaving caches and build directories out of the stash.
+The `-a` or `--all` flag includes ignored files too. That can help when you intentionally need to clear ignored artifacts from a directory, but those files also become Git objects in the saved state. Choose `-u` when you need untracked source files while leaving ignored caches and build directories in place; use `-a` only when including those ignored files is intentional.
 
 Every stash entry goes onto a stack, with the newest entry at `stash@{0}`. You can inspect the stack before applying anything, and you should do that whenever more than one entry exists. The command below is not just a convenience; it is a guard against applying the wrong patch to the wrong branch. A stash message that looked obvious yesterday may be ambiguous after two incident calls and a review rotation.
 
@@ -99,22 +96,20 @@ stash@{0}: On feature-auth: Added new redis-deployment.yaml and modified configm
 stash@{1}: On main: Mid-refactor of deployment.yaml resource limits
 ```
 
-Before applying a stash, inspect it as a patch. The `show -p` subcommand lets you review the exact files and hunks without changing your working directory. This is especially important when stashes contain configuration, database migrations, or Kubernetes manifests, because those files often have names that repeat across environments. You want to know whether the saved patch touches production resources, test-only manifests, or local scaffolding before it changes your current tree.
+Before applying a stash, inspect it as a patch. The `show -p --include-untracked` options let you review tracked and saved untracked content without changing your working directory. Plain `show -p` omits untracked content unless configured otherwise. This distinction matters when stashes contain migrations or manifests with similar names across environments: inspect the complete saved content before restoring it.
 
 ```bash
-git stash show -p stash@{1}
+git stash show -p --include-untracked stash@{1}
 ```
 
-**Pause and predict:** Before running this, what output do you expect if you apply `stash@{1}` rather than pop it? Think about whether the stash stack itself should change, then compare that prediction with `git stash list` after you have written it down.
+**Pause and predict:** What do you expect if you apply `stash@{1}` rather than pop it? Write whether the stash stack changes before opening the answer; then compare your prediction with `git stash list`.
 
 <details>
 <summary>Check your prediction</summary>
 
-Use `git stash apply` as the safe restoration command. `apply` takes the changes from the selected stash and attempts to put them into the current working tree, but it leaves the stash entry on the stack. If the patch applies cleanly, you can test the result before deleting the saved state. If the patch conflicts, you still have the original stash entry available, which gives you room to abort, reset, create a recovery branch, or retry in a cleaner location.
+Use `git stash apply` when you want to retain the saved entry during restoration. It attempts to put changes into the current working tree while leaving the entry on the stack. If it conflicts, stop and inspect `git status`; there is no `git stash --abort`. Preserve any unrelated edits before resolving or discarding the failed replay. The saved stash remains available for recovery from a clean directory. Add `--index` when you also intend to restore the original staged state; conflicts can prevent that restoration.
 
 </details>
-
-Write whether the stack changes before you continue. The commands below restore a stash entry. They do not print `git stash list`.
 
 ```bash
 # Applies the most recent stash
@@ -134,17 +129,23 @@ git stash drop stash@{1}
 git stash clear
 ```
 
-The best recovery command for an old or conflict-prone stash is `git stash branch`. This command creates a new branch at the commit where the stash was originally made, applies the stash there, and drops the stash if the application succeeds. That starting point matters because it reconstructs the context the patch expected, rather than forcing the patch directly onto a branch that may have changed for days. You can then commit the recovered work and merge or rebase it using normal Git techniques.
+For an old or conflict-prone stash, consider `git stash branch` from a clean working tree. It creates a branch at the original base, restores the working tree and index, and drops the entry on success when you supply a `stash@{…}` reference or omit the stash argument (which selects the latest entry). Passing a raw stash commit ID does not drop an entry from the list. This reconstructs the patch's original context. It cannot switch successfully through unresolved conflicts from a previous apply; preserve that state and use a separate clean worktree if needed. Commit the recovered work before normal integration.
 
 ```bash
 git stash branch recovered-auth-work stash@{0}
 ```
 
-Here is a small practice workflow that focuses on the untracked-file trap. It uses a throwaway repository because stash practice should never require risking real work. Notice that the example stores a file named `.env`, but it uses harmless placeholder content rather than realistic credentials. The goal is to see how Git treats tracked and untracked state, not to model secret management.
+Here is a small practice workflow for the untracked-file trap. Use a fresh temporary directory and a fictional repository-local identity; signing is disabled only in this disposable repository. Setting `core.excludesFile` to `/dev/null` prevents global ignore patterns from affecting this practice. The new `draft-config.txt` contains harmless placeholder content. Never use real credentials in stash practice: stashed files become Git objects, including files captured with `-u` or `-a`.
 
 ```bash
+stash_practice_root=$(mktemp -d)
+cd "$stash_practice_root"
 mkdir stash-practice && cd stash-practice
 git init -b main
+git config user.name "Practice Learner"
+git config user.email "learner@example.invalid"
+git config commit.gpgsign false
+git config core.excludesFile /dev/null
 ```
 
 Create an initial commit so the repository has a clean baseline. Git stash depends on a repository with commits because it needs a `HEAD` commit as the reference point for the saved changes. In a brand-new repository with no commit, many normal history operations do not yet have a stable anchor.
@@ -159,47 +160,50 @@ Now create one tracked modification and one untracked file. This gives you a rea
 
 ```bash
 echo "v2" > config.txt
-echo "example-local-value" > .env
+echo "example-local-value" > draft-config.txt
 ```
 
 Stash both pieces together with `-u`. After this command, the working tree should return to a clean state and the untracked file should disappear from the directory because it has been saved inside the stash entry. This is the behavior you want before switching into a review or a tiny branch inspection.
 
 ```bash
-git stash push -u -m "WIP on new config and local env"
+git stash push -u -m "WIP on tracked and draft config"
 ```
 
-Inspect the stash stack and the patch before restoring. This reinforces the habit of treating stash entries as named records that deserve review, not as invisible magic. The patch output will show the tracked file change; Git may summarize untracked content differently depending on version, but the file should be part of the entry.
+Inspect the stash stack and the complete saved patch before restoring. The explicit `--include-untracked` flag shows `draft-config.txt` as well as the tracked change to `config.txt`. Check both contents so you can distinguish a saved file from a file merely left behind in the working directory.
 
 ```bash
 git stash list
-git stash show -p stash@{0}
+git stash show -p --include-untracked stash@{0}
 ```
 
-Finally, restore with `apply` rather than `pop`. The working tree gets the changes back, while the stash stack still contains the saved entry. That lets you run `git status`, confirm that `config.txt` and `.env` returned as expected, and then choose whether to drop the stash or keep it until you have committed the work.
+Finally, restore with `apply`. Confirm that `config.txt` contains `v2`, `draft-config.txt` has returned, and the entry remains in `git stash list`. This separates restoration from deletion. Keep the stash until you have checked the contents; the cleanup below intentionally deletes the entire disposable practice repository, including its saved entry.
 
 ```bash
 git stash apply stash@{0}
+git status --short
+cat config.txt draft-config.txt
+git stash list
 ```
 
-When you are finished experimenting, remove the throwaway directory:
+When you are finished experimenting, remove only the generated disposable root and its contents. Do not use this command for a real worktree or repository:
 
 ```bash
-cd ../.. && rm -r stash-practice
+cd / && rm -rf -- "${stash_practice_root:?}"
 ```
 
 ## The Power of Git Worktrees
 
 If stash is a temporary shelf, a worktree is a separate desk connected to the same filing cabinet. Git introduced linked worktrees so one repository database can support multiple working directories, each with its own checked-out branch and index. The main advantage is that you do not have to clean, stash, or commit unfinished work before opening a clean directory for another task. Your feature branch can remain dirty in one terminal while a hotfix branch is clean in another.
 
-The architecture is efficient because linked worktrees share the same object database and references. A second clone copies the repository database, but a linked worktree stores only the checked-out files plus small metadata that points back to the main repository. If you fetch in one worktree, the updated remote-tracking refs are available to the others because the refs live in the shared repository. That gives you most of the isolation developers wanted from multiple clones without duplicating history or creating local synchronization drift.
+Linked worktrees share the object database and ordinary refs, including branch and remote-tracking refs; `HEAD` and certain special refs remain per-worktree. A linked worktree stores checked-out files plus small administrative metadata rather than duplicating repository history. Fetching in one updates shared remote-tracking refs, but does not update the other worktrees' checked-out files. This gives you independent file views with a shared repository inventory.
 
 The isolation is not absolute, and that distinction matters. Each worktree has its own working directory and index, so staged changes and uncommitted file edits do not bleed between them. However, global services such as a single local database, fixed ports, shared Docker networks, and editor-wide settings can still collide. A team running two Kubernetes test environments from two worktrees must still choose separate namespaces, ports, or clusters. Worktrees solve Git workspace contention; they do not automatically isolate every tool outside Git.
 
-The index isolation is one of the most underrated benefits. Staging is local to the worktree, so you can have a carefully staged patch in the feature directory while the hotfix directory has a completely different staged patch. This matters for review quality because `git diff --cached` remains focused on the task in front of you. With stash-based interruption, staged and unstaged intent can be flattened into a saved entry, and restoring that intent later takes extra attention.
+The index isolation is one of the most underrated benefits. Staging is local to the worktree, so you can have a carefully staged patch in the feature directory while the hotfix directory has a completely different staged patch. This matters for review quality because `git diff --cached` remains focused on the task in front of you. A stash records the index separately, but restoring without `--index` can lose the staged and unstaged split.
 
-Worktrees also encourage smaller, named branches for temporary tasks. Instead of leaving a hotfix as an uncommitted mutation in your primary clone, you create `hotfix/image-patch`, commit the fix, and push it from the linked directory. That branch name becomes part of the audit trail. Even if the temporary directory is removed after the pull request merges, the branch and commit history still explain what happened during the interruption.
+Use a named branch for temporary work: create `hotfix/image-patch`, commit the fix, and push it when you need backup or review. Removing the linked directory leaves its branch and commits available. A branch name may later be deleted, so preserve the relevant commit or pull-request reference rather than treating a temporary directory name as a permanent audit trail.
 
-When you run `git clone`, you create the main worktree. Inside that directory, the `.git` directory stores objects, refs, configuration, and metadata for linked worktrees. This diagram shows the normal shape before adding any linked worktree.
+When you run `git clone`, you create the main worktree. Inside that directory, the `.git` directory stores objects, refs, configuration, and, once linked worktrees are added, their administrative metadata. The diagram marks the directory created for linked worktrees as conditional.
 
 ```mermaid
 flowchart TD
@@ -210,7 +214,7 @@ flowchart TD
         
         dotgit --> objects["objects/"]
         dotgit --> refs["refs/"]
-        dotgit --> worktrees["worktrees/  <-- Sub-worktree configurations"]
+        dotgit -.-> worktrees["worktrees/  <-- Created on add; linked-worktree administrative data"]
     end
 ```
 
@@ -221,7 +225,7 @@ flowchart TD
     subgraph LinkedWorktree ["Linked Worktree: /projects/k8s-operator-hotfix"]
         deploy["deploy/"] ~~~ src["src/"]
         src ~~~ gomod["go.mod"]
-        gomod ~~~ dotgit[".git  <-- FILE pointing to main repo<br/>(gitdir: /projects/k8s-operator/.git/worktrees/hotfix)"]
+        gomod ~~~ dotgit[".git FILE points to private metadata<br/>under /projects/k8s-operator/.git/worktrees/"]
     end
 ```
 
@@ -236,7 +240,7 @@ The standard creation command is `git worktree add`. You provide a path for the 
 git worktree add -b hotfix-cve ../k8s-operator-hotfix main
 ```
 
-Git will output:
+Illustrative output; your commit ID and subject will differ:
 
 ```text
 Preparing worktree (new branch 'hotfix-cve')
@@ -245,24 +249,22 @@ HEAD is now at 8f3a9b2 Update ingress documentation
 
 At this point you have two separate directories connected to one repository database. Your original directory can contain uncommitted feature work, while `../k8s-operator-hotfix` starts clean on the hotfix branch. You can open a new terminal, run tests, commit, and push from the hotfix worktree. When the emergency ends, you remove the temporary worktree and return to the original terminal without replaying a stash or reconstructing your thought process.
 
-Git enforces one important rule: a branch can be checked out in only one worktree at a time. That rule prevents two directories from updating the same branch pointer independently, which would be a recipe for confusion. If you need another directory for the same starting point, create a new branch name or check out a detached commit intentionally. Most teams should prefer a branch name because it gives the work a clear place in history.
+By default, Git refuses to check out a branch already checked out in another worktree. This prevents competing updates to one branch pointer. Force options can override the protection, so treat it as a guardrail rather than an absolute invariant. Prefer a new branch name or a deliberately detached worktree for the same starting point; named branches make new work easier to retain.
 
-**Pause and predict:** Before running this, what output do you expect if you try to create a worktree for a branch that is already checked out in another worktree?
+**Pause and predict:** What do you expect if you try to create a worktree for a branch already checked out in another worktree? Write the result before opening the answer.
 
 <details>
 <summary>Check your prediction</summary>
 
-The command will fail with an error explaining that the branch is already checked out. That failure is protective, not annoying. Imagine two terminals both claiming to own `feature/auth-refresh`, each with a different index and different uncommitted files. Git avoids that split-brain branch state by forcing each checked-out branch name to have one active worktree. If you see this error, list your worktrees before forcing anything.
+By default the command fails. In a Git 2.56 run, the message was `fatal: 'hotfix-cve' is already used by worktree at '…'`. Imagine two terminals both claiming to own `feature/auth-refresh`, each with a different index and different uncommitted files. The default guard prevents competing checkouts; if you see this error, list your worktrees before forcing anything.
 
 </details>
-
-Write the command result before you continue. The next command lists worktrees. It does not show the error from a second checkout of the same branch.
 
 ```bash
 git worktree list
 ```
 
-The output gives you the path, commit, and branch for each attached worktree. Treat this list as your local operations dashboard. Before deleting a branch, rebasing shared work, or cleaning old directories, check the list so you know which paths still matter. It is much faster to read this state than to rediscover it through failed checkout commands.
+The output gives you the path, commit, and branch or detached state for each worktree. Before deleting branches or cleaning directories, inspect this inventory and each relevant directory's status. The paths and IDs below are illustrative; listing worktrees does not establish that their edits or unpushed commits have been preserved.
 
 ```text
 /projects/k8s-operator         8f3a9b2 [feature-auth]
@@ -272,29 +274,29 @@ The output gives you the path, commit, and branch for each attached worktree. Tr
 When you finish with a worktree, remove it through Git. The command deletes the directory and cleans the matching metadata under the main repository. Git will refuse to remove a worktree that contains uncommitted changes unless you force it, which is another useful guardrail. If the worktree contains commits that have not been pushed or merged, pause and decide whether to keep the branch before removing the directory.
 
 ```bash
-# This deletes the directory and cleans up the references in the main .git folder
+# Removes the linked directory and its metadata; keeps its branch and commits
 git worktree remove ../k8s-operator-hotfix
 ```
 
-The common failure mode is deleting the directory with the operating system, for example with `rm -rf`, instead of using `git worktree remove`. The files disappear, but the main repository still has metadata saying that the branch is checked out in that missing location. Later, when you try to use the branch somewhere else, Git refuses because it trusts its metadata until you tell it to verify the filesystem.
+The common failure mode is deleting the directory with the operating system, for example with `rm -rf`, instead of using `git worktree remove`. The files disappear, but the main repository can retain metadata saying that the branch is in use. That record can block another checkout until manually pruned or eventually removed by automatic garbage collection after expiry.
 
 ```bash
 git worktree prune
 ```
 
-`git worktree prune` asks Git to inspect registered worktree paths and discard metadata for locations that no longer exist. Use it as a repair command for orphaned worktree records, not as your normal cleanup habit. Normal cleanup should be `git worktree remove`, because it gives Git a chance to protect uncommitted work and keep the metadata consistent in the first place.
+`git worktree prune` removes stale administrative records, not lost files. Inspect `git worktree prune -n -v` first, and confirm the directory was deleted rather than temporarily unmounted. Lock portable worktrees before they become unavailable. If a directory was moved, use `git worktree repair <new-path>` to reconnect it instead. Normal cleanup uses `git worktree remove`, which protects dirty directories without requiring force.
 
 ## Kubernetes Interruption Workflow
 
-Worktrees become especially valuable in Kubernetes repositories because the source files are only part of the local state. A change to a Deployment may be tied to a running KinD cluster, a port-forward, generated manifests, and a failing integration test. Stashing the source files does not reset those external systems, and carrying dirty YAML into a production hotfix branch can produce misleading tests. A separate worktree gives the hotfix a clean file view while allowing you to decide separately how to isolate the cluster.
+Worktrees become especially valuable in Kubernetes repositories because the source files are only part of the local state. A change to a Deployment may be tied to a running cluster, a port-forward, generated manifests, and a failing integration test. Stashing the source files does not reset those external systems, and carrying dirty YAML into a production hotfix branch can produce misleading tests. A separate worktree gives the hotfix a clean file view while allowing you to decide separately how to isolate the cluster.
 
-Suppose you are developing a reliability upgrade for a Deployment that targets Kubernetes 1.35. Git itself does not require Kubernetes tooling, but platform repositories often mix Git operations with manifest validation, so command examples should be explicit rather than dependent on interactive shell configuration.
+Suppose you are developing a reliability upgrade for a Deployment. Git itself does not require Kubernetes tooling, but platform repositories often mix Git operations with manifest validation.
 
 For a local test, the unfinished feature might include probes, resource requests, and image changes. Those are exactly the fields an emergency hotfix might also need to touch. If you stash the feature, switch to `main`, update the image, and return later, you are betting that the same manifest regions did not drift in incompatible ways. If you create a worktree from `main`, the hotfix starts from the production file while the feature file stays physically open in the original directory. That physical separation is useful when your editor has multiple tabs open, your terminal history is full of feature-specific commands, and your local notes refer to paths in the original directory.
 
-The worktree does not automatically give you a second Kubernetes cluster, so design that part deliberately. For a one-line image hotfix, you might validate the manifest with a client-side dry run against the hotfix directory and run unit tests only. For a deeper controller change, you might create a separate KinD cluster or a separate namespace so the hotfix validation does not share resources with the feature branch. The Git decision and the runtime-environment decision are related, but they are not the same decision.
+The worktree does not automatically give you a second Kubernetes cluster, so design that part deliberately. For a deeper controller change, you might use a separate cluster or a separate namespace so hotfix validation does not share resources with the feature branch. The Git decision and the runtime-environment decision are related, but they are not the same decision.
 
-The strongest teams write this separation into their runbooks. An incident runbook can say, "Create a worktree from `main`, create or select a clean namespace, validate only the hotfix diff, and remove the worktree after the fix merges." That procedure reduces the chance that an engineer improvises while under pressure. It also makes reviews calmer because the pull request can be judged as an isolated production change rather than a mixture of emergency edits and unrelated feature residue.
+Consider recording this separation in a runbook: "Create a worktree from the verified production base, choose the required runtime isolation, validate the hotfix diff, and remove the worktree after preserving the fix." This is a workflow recommendation, not a measured incident-response improvement. Its purpose is to make the source and runtime boundaries explicit before an interruption; `main` is suitable only when it represents the production base you intend to patch.
 
 Exercise scenario: a realistic operator team can use this split during incident response. Alice is building automated backup support for a database operator, with many modified Go files, new CustomResourceDefinition manifests, and a local cluster configured to test backup scheduling. Production then reports a leader-election crash. The stash approach asks Alice to package a complex feature as a patch, change branch context, run a different investigation in the same directory, and later reapply the patch over a branch that may have moved. The worktree approach asks Alice to open a clean sibling directory from `main`, fix the leader-election code there, and leave the backup work untouched.
 
@@ -322,9 +324,9 @@ The last anti-pattern is using worktrees to avoid committing for too long. Workt
 
 ## Decision Framework
 
-Choose the tool by asking what kind of isolation you need and how long the interruption will last. If the interruption is measured in minutes and your dirty state is simple, stash can be appropriate. If the interruption needs a clean directory, a separate branch, tests, or review work, use a worktree. If the task needs a completely independent repository configuration, credentials, hooks, or object database, use a second clone and accept the cost intentionally.
+Choose the tool by asking what isolation you need and how long the interruption will last. For simple dirty edits, a named stash can be appropriate. For a separate file view and index, use a worktree. For per-worktree settings, consider `extensions.worktreeConfig` and `git config --worktree`; for independent repository-local refs, consider another clone. In either case, configure credentials, hooks and runtime services separately when those boundaries matter; directory creation alone does not provide that isolation.
 
-**Pause and predict:** Which approach would you choose here and why? Your colleague asks you to review a pull request that changes two files, you have no uncommitted work, and you expect the review to take ten minutes.
+**Pause and predict:** Which approach would you choose here and why? Your colleague asks you to review a pull request that changes two files, you have no uncommitted work, and you expect the review to take ten minutes. Write stash, worktree, or branch switch before opening the answer.
 
 <details>
 <summary>Check your prediction</summary>
@@ -333,26 +335,24 @@ If your working tree is clean and the review is tiny, switching branches in the 
 
 </details>
 
-Write stash, worktree, or a branch switch before you continue. The table below is a lookup for other interruptions. Read your own prediction before you use that table.
-
 | Scenario | Recommended Strategy | Technical Rationale |
 | :--- | :--- | :--- |
-| **Pulling latest changes** before pushing your local commits. | `git stash` | The interruption is measured in seconds. The context remains clear, the risk of major conflicts is low, and stash is the fastest local operation. |
+| **Pulling latest changes** with a small dirty edit. | Named stash, if needed | Inspect and save the intended files first. Pull and later stash application can both conflict; with a clean tree no stash is needed. |
 | **Emergency production hotfix** while mid-feature. | `git worktree` | The hotfix requires a clean state and may take hours. You need a strong guarantee that feature code will not leak into the hotfix. |
 | **Reviewing a colleague's massive pull request** while working on your own code. | `git worktree` | Reviews often require running code, editing configuration, and executing tests. A separate directory keeps review experiments away from feature work. |
-| **Testing a completely different Kubernetes version** locally against the codebase. | `git clone` sometimes | A worktree isolates files, but a full clone may be justified when credentials, hooks, or environment configuration must be completely independent. |
+| **Testing another Kubernetes version** with different repository settings. | Per-worktree config or `git clone` | Worktree-specific config can separate settings; a clone also separates refs. Both require deliberate runtime and credential isolation. |
 | **Trying a speculative refactor that you might throw away.** | `git branch` in the current tree | If your tree is clean, a normal branch and a WIP commit may be enough. Stash is unnecessary when you can preserve the experiment in history. |
 
-One way to operationalize the framework is to set team conventions. For incident response, create a worktree by default. For one-minute pull-before-push interruptions, use a named stash. For external customer reproductions that require different credentials or hooks, use a fresh clone. Conventions reduce decision fatigue during stressful moments and make local directories easier for teammates to interpret when they pair, debug, or review together.
+One way to operationalize the framework is to set team conventions. For incident response, consider a worktree. For a small pull-before-push interruption, consider a named stash. If a reproduction needs a fresh clone, configure credentials and hooks at the intended scope as well. Document the chosen boundaries so teammates can identify which local directory and runtime resources belong to the task.
 
 The framework should also account for the cost of return. A context-switch tool is successful only if returning to the original task is boring. Stash has a low start cost but can have a high return cost when patches conflict or messages are vague. A worktree has a slightly higher start cost because it creates a directory and often a branch, but its return cost is usually just changing terminals. A clone has the highest start and maintenance cost, so reserve it for cases where shared repository state would itself be a problem.
 
 ## Did You Know?
 
-1. Git worktrees were introduced in Git 2.5 in 2015, after years of teams using helper scripts such as `git-new-workdir` to approximate the same workflow.
-2. A stash entry is built from internal commits that record the working tree and, when needed, the index; it is not just a loose diff file tucked away on disk.
-3. Git prevents a branch from being checked out in two worktrees at the same time, which protects the branch pointer from competing updates across directories.
-4. The `git worktree prune` command repairs stale metadata when a linked worktree directory was deleted outside Git, but it is not a substitute for normal `git worktree remove` cleanup.
+1. Git 2.5 (July 2015) introduced linked worktrees experimentally as a replacement for `contrib/workdir/git-new-workdir`. The old helper is historical context; the practice below uses `git worktree`.
+2. A stash entry is built from internal commits that record the working tree and the index; it is not just a loose diff file tucked away on disk.
+3. Without force, Git rejects a second checkout of the same branch in another worktree, protecting its pointer from competing directory updates.
+4. The `git worktree prune` command removes stale metadata when a linked worktree directory was deleted outside Git, but it is not a substitute for normal `git worktree remove` cleanup.
 
 ## Common Mistakes
 
@@ -360,9 +360,9 @@ The framework should also account for the cost of return. A context-switch tool 
 | :--- | :--- | :--- |
 | **Losing new files in a stash** | Running `git stash` without `-u` leaves newly created untracked files in the working directory, so they follow you into the next branch. | Use `git stash push -u -m "clear context"` when the dirty state includes new source files. |
 | **Stash stack amnesia** | Bare `git stash` creates generic messages that do not explain why the entry exists once more work has happened. | Always use `git stash push -m "specific task and file context"` and inspect with `git stash list`. |
-| **Orphaned worktree directories** | Deleting a worktree folder with `rm -rf` removes files but leaves Git metadata that still locks the branch. | Prefer `git worktree remove <path>`; use `git worktree prune` only to repair stale metadata. |
+| **Orphaned worktree directories** | Deleting a worktree folder with `rm -rf` removes files but can leave metadata marking the branch as in use. | Prefer `git worktree remove <path>`; inspect and prune stale records, or repair a moved worktree. |
 | **Popping onto the wrong branch** | `git stash pop` applies and then deletes the entry after a clean application, leaving little room to reconsider. | Default to `git stash apply`, verify the result, and then run `git stash drop` deliberately. |
-| **Trying to checkout a locked branch** | A branch already checked out in another worktree cannot be checked out again under the same name. | Run `git worktree list`, switch or remove the other worktree, or create a new branch for the second directory. |
+| **Trying to check out a branch in use** | By default Git rejects a branch already checked out in another worktree. | Run `git worktree list`, switch or remove the other worktree, or create a new branch for the second directory. |
 | **Ignoring environment bleed** | Worktrees isolate Git files and indexes, but shared ports, databases, clusters, and credentials can still collide. | Pair worktree isolation with separate namespaces, ports, clusters, or local configuration when tests mutate external state. |
 | **Using detached worktrees casually** | Checking out a commit without a branch can make new commits harder to find and push. | Use `git worktree add -b <branch> <path> <start-point>` for normal team work. |
 
@@ -377,13 +377,13 @@ Use `git worktree add -b hotfix/image-patch ../project-hotfix main` and make the
 <details>
 <summary>Question 2: You stashed work before helping a colleague, then returned two days later after the target branch had changed heavily. A direct apply produces painful conflicts. What should you try next, and what problem does it solve?</summary>
 
-Try `git stash branch recovered-work stash@{0}` or the specific stash index you inspected. This creates a new branch at the commit where the stash was originally made, so the saved patch is applied in the context it expected. That avoids forcing an old patch directly onto a changed branch. After recovery, you can commit the work and integrate it with normal merge or rebase tools.
+First inspect and preserve the conflicted working tree; a direct `git stash branch` cannot switch through unresolved index entries. One recovery route is `git worktree add --detach ../stash-recovery HEAD`, followed by `git -C ../stash-recovery stash branch recovered-work stash@{0}` using the entry you inspected. The clean directory lets Git restore the stash at its original base without deleting the failed replay. Successful branch recovery drops the shared stash entry, so commit the recovered work and inspect both directories before cleanup.
 </details>
 
 <details>
-<summary>Question 3: A teammate deleted `../testing-env` with the file manager. Now Git refuses to check out `test-deployment` because it says the branch is already checked out. How do you diagnose and repair the state?</summary>
+<summary>Question 3: A teammate deleted `../testing-env` with the file manager. Now Git refuses to check out `test-deployment`, saying it "is already used by worktree at" that path. How do you diagnose and repair the state?</summary>
 
-Run `git worktree list` first so you can see the stale path Git still remembers, then run `git worktree prune` from the repository. The directory is gone, but metadata under the main repository still records that linked worktree. Prune tells Git to verify registered paths and drop records for missing directories. Future cleanup should use `git worktree remove` so Git can protect uncommitted changes and remove metadata in one operation.
+Run `git worktree list` and `git worktree prune -n -v`. Confirm the path was actually deleted, rather than moved or temporarily unmounted, then run `git worktree prune`. Prune removes stale metadata; it cannot recover deleted uncommitted files. Use `repair <new-path>` for a moved directory and lock portable worktrees before disconnection. Future cleanup should use `git worktree remove` so Git can protect dirty files and update metadata together.
 </details>
 
 <details>
@@ -395,30 +395,35 @@ Plain `git stash` does not include untracked files. The new script had no index 
 <details>
 <summary>Question 5: You need to compare behavior against a different Kubernetes version and also use different credentials and hooks. A teammate suggests a worktree because it saves disk space. What concern should you raise?</summary>
 
-A worktree isolates the working directory and index, but it still shares the repository database and may share global Git configuration, hooks strategy, credentials, editor settings, and local services. If the test truly requires independent credentials or repository-level configuration, a separate clone may be more appropriate despite the disk cost. The right decision depends on what must be isolated. Worktrees are excellent for file and branch isolation, but they are not a full sandbox for every tool around the repository.
+A worktree isolates the working directory and index, but it still shares the repository database and may share global Git configuration, hooks strategy, credentials, editor settings, and local services. Per-worktree configuration can separate settings; a clone can separate refs and repository-local configuration. Neither automatically isolates credentials or runtime services. The right decision depends on what must be isolated.
 </details>
 
 <details>
 <summary>Question 6: You have three stashes and suspect `stash@{1}` contains database migration work. Your current branch is clean, but applying the wrong stash would waste time. What should you do before restoring it?</summary>
 
-Run `git stash list` to confirm the stack and `git stash show -p stash@{1}` to inspect the patch. This changes nothing in the working directory, so it is safe even when you are unsure. The patch view tells you which files and hunks are stored in that entry. After you confirm it is the right work, use `git stash apply stash@{1}` and verify before dropping the stash.
+Run `git stash list`, then `git stash show -p --include-untracked stash@{1}`. These inspection commands leave your working files unchanged. The explicit flag includes saved untracked files, which plain `show -p` normally omits. Confirm the intended files and contents, apply the inspected entry, and verify the result before dropping it. Add `--index` if restoring its staging state matters.
 </details>
 
 <details>
 <summary>Question 7: Your team uses worktrees for every incident, but two incident worktrees keep failing tests because both try to bind the same local port and use the same namespace in a shared cluster. Did Git worktrees fail here?</summary>
 
-No. Git worktrees solved the source-directory and index isolation problem, but they did not isolate external runtime resources. Shared ports, shared databases, shared clusters, and shared namespaces can still collide across directories. The fix is to pair each worktree with environment isolation such as separate namespaces, dynamic ports, or separate KinD clusters. Treat worktree creation as one part of the incident workspace, not the whole workspace.
+No. Git worktrees solved the source-directory and index isolation problem, but they did not isolate external runtime resources. Shared ports, shared databases, shared clusters, and shared namespaces can still collide across directories. The fix is to pair each worktree with environment isolation such as separate namespaces, dynamic ports, or separate clusters. Treat worktree creation as one part of the incident workspace, not the whole workspace.
 </details>
 
 ## Hands-On Exercise: The Mid-Flight Hotfix
 
-In this exercise, you will simulate a real-world interruption using Kubernetes manifests. You will begin a reliability upgrade, leave it uncommitted, create a clean hotfix worktree from `main`, commit a production image patch there, and then return to the original directory. The exercise is intentionally small, but the workflow is the same one you would use for a controller change, a chart review, or an emergency configuration fix.
+In this local Git simulation, you will leave a reliability upgrade uncommitted, create a clean hotfix worktree from `main`, commit an image-tag edit there, and return. You need Git, a POSIX shell, `mktemp`, and file utilities including `mkdir`, `cat`, `sed`, and `mv`; the commands were tested with Git 2.56. Kubernetes tools, a cluster, and network access are not required. The `fleet-api` images and health endpoint are fictional placeholders: this exercise proves file/history separation, not image availability, manifest acceptance, security remediation, or application health.
 
 Start in a temporary directory so the practice repository can be deleted when you are done. The first repository represents your normal development workspace. It begins with a stable production Deployment so there is a clean `main` branch to patch during the interruption.
 
 ```bash
+worktree_practice_root=$(mktemp -d)
+cd "$worktree_practice_root"
 mkdir k8s-fleet-manager && cd k8s-fleet-manager
 git init -b main
+git config user.name "Practice Learner"
+git config user.email "learner@example.invalid"
+git config commit.gpgsign false
 ```
 
 Create the stable base state. This manifest is intentionally minimal so the difference between production and unfinished feature work is easy to see. Commit it before starting the feature branch because the hotfix worktree needs a real `main` commit as its starting point.
@@ -501,6 +506,15 @@ Your interruption is a production bug in `fleet-api:v1.0.0`. You need to patch t
 - [ ] Return to your original directory and verify your reliability upgrades are still exactly as you left them.
 
 <details>
+<summary>Hints: choose the boundary, then inspect it</summary>
+
+1. Keep the dirty feature directory in place; the interruption needs files from the committed `main`, not from your index.
+2. Use `git worktree add -b <new-branch> <sibling-path> main`. If Git says a branch is already checked out, inspect `git worktree list` rather than forcing it.
+3. In the hotfix directory, inspect `git status --short` and the image before editing. If removal refuses a dirty directory, preserve and inspect those edits instead of adding `-f`.
+
+</details>
+
+<details>
 <summary>Solution</summary>
 
 Create the worktree while leaving your dirty feature directory exactly as it is. This command makes a sibling directory, creates a new branch, and starts that branch from `main`.
@@ -516,14 +530,10 @@ cd ../fleet-manager-hotfix
 cat deployment.yaml
 ```
 
-Apply and commit the hotfix. The macOS and Linux `sed` examples differ, so use the one that matches your environment. If you prefer, edit the file manually and then continue with the same Git commands.
+Apply and commit the hotfix. Write the changed manifest to a temporary file before replacing the original.
 
 ```bash
-# macOS
-sed -i '' 's/v1.0.0/v1.0.1/g' deployment.yaml
-
-# Linux
-# sed -i 's/v1.0.0/v1.0.1/g' deployment.yaml
+sed 's/fleet-api:v1\.0\.0/fleet-api:v1.0.1/' deployment.yaml > deployment.yaml.tmp && mv deployment.yaml.tmp deployment.yaml
 
 git add deployment.yaml
 git commit -m "Hotfix: update API image to v1.0.1"
@@ -541,12 +551,19 @@ Verify that the original feature work is still present and uncommitted. You shou
 ```bash
 cat deployment.yaml
 git status
+git show hotfix/image-patch:deployment.yaml
+git worktree list
+git stash list
 ```
 </details>
 
-These cards freeze four wrong moves from this module before the checklist asks you to run the hotfix lab. Read the mistaken action, commit to a failure layer, and only then open the reveal. Do not treat the lab script as the answer key for these cases.
+Read the checks as separate questions. In the feature directory, `git status` asks whether unfinished work is still local. Reading the hotfix branch's committed manifest asks what the emergency commit contains. `git worktree list` asks whether the temporary checkout remains registered. A clean hotfix directory alone cannot establish that the original feature edits survived, because its status describes a different index and working tree.
 
-**Card A: The plain stash captured the new file.** A never-added manifest disappeared from the working tree after `git stash`, with no `-u` flag. The engineer expected every dirty path to move onto the stack.
+Before cleanup, explain which command answers each question and predict its result. Expect the original file to remain modified, the committed hotfix image to be `v1.0.1`, and the removed sibling path to be absent from the inventory. If a result disagrees, keep the directories and branch while you investigate. Successful directory removal does not mean the branch was pushed or its work reviewed; preserving history and removing a checkout are separate decisions.
+
+Use these cards to retrieve and transfer the module's ideas. Read each mistaken expectation, identify the failure layer, and then open the reveal.
+
+**Card A: The plain stash captured the new file.** An engineer expects a never-added manifest to disappear from the working tree after `git stash`, with no `-u` flag. They expect every dirty path to move onto the stack.
 
 <details>
 <summary>Check your prediction</summary>
@@ -590,21 +607,42 @@ Success criteria:
 - [ ] The original `feature/reliability-upgrade` directory still has uncommitted reliability changes.
 - [ ] No stash entry was required to survive the interruption.
 
+**Transfer challenge:** Keep the dirty feature work and create another named worktree from `main` for a documentation-only review. Explain which committed image it sees, why its index is independent, and which ports or clusters would still be shared. Inspect the review directory before removing it with Git. Keep the original practice repository until you have inspected the retained hotfix commit; remove the temporary parent only when you intentionally want to discard all practice history.
+
+**Lifecycle stretch:** Create another clean review worktree, then move its directory with `mv`. Predict which path `git worktree list` will report before repairing the connection with `git worktree repair <new-path>`. Verify the inventory and status from both directories, then remove the review worktree through Git. Explain why pruning its record would be the wrong response while the moved files still exist. This extends the interruption workflow into diagnosing a filesystem change rather than repeating branch creation.
+
+After checking the results and deciding to discard all practice history and unfinished feature edits, remove only the generated hotfix-practice parent with `cd / && rm -rf -- "${worktree_practice_root:?}"`. The variable must still identify the temporary root created for this exercise; the guard rejects an unset or empty value, not an incorrectly reassigned nonempty path.
+
 ## Sources
 
+Git behavior was checked against the [Git 2.56 documentation snapshot](https://github.com/git/git/tree/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation); the 2.5 links provide historical context.
+
 - [Git documentation: git-worktree](https://git-scm.com/docs/git-worktree)
+- [Git documentation: git-clone](https://git-scm.com/docs/git-clone)
 - [Git documentation: git-stash](https://git-scm.com/docs/git-stash)
 - [Git documentation: git-switch](https://git-scm.com/docs/git-switch)
 - [Git documentation: git-checkout](https://git-scm.com/docs/git-checkout)
 - [Git documentation: git-branch](https://git-scm.com/docs/git-branch)
-- [Git documentation: git-prune](https://git-scm.com/docs/git-prune)
+- [Git documentation: git-config](https://git-scm.com/docs/git-config)
+- [Git documentation: gitcredentials](https://git-scm.com/docs/gitcredentials)
+- [Git documentation: git-fetch](https://git-scm.com/docs/git-fetch)
+- [Git documentation: git-init](https://git-scm.com/docs/git-init)
 - [Git documentation: git-clean](https://git-scm.com/docs/git-clean)
 - [Git documentation: gitrepository-layout](https://git-scm.com/docs/gitrepository-layout)
+- [Git 2.5 release notes](https://github.com/git/git/blob/v2.5.0/Documentation/RelNotes/2.5.0.txt)
+- [Git 2.5 worktree documentation](https://github.com/git/git/blob/v2.5.0/Documentation/git-worktree.txt)
 - [Pro Git book: Stashing and Cleaning](https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning)
 - [Pro Git book: Advanced Merging](https://git-scm.com/book/en/v2/Git-Tools-Advanced-Merging)
 - [Pro Git book: Branches in a Nutshell](https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell)
 - [Kubernetes documentation: Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 - [Kubernetes documentation: Liveness, readiness, and startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+- [Kubernetes documentation: Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+- [Kubernetes documentation: Resource management](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+- [POSIX shell language](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html)
+- [POSIX sed](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/sed.html)
+- [POSIX mv](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html)
+- [POSIX rm](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html)
+- [GNU coreutils: mktemp manual source](https://github.com/coreutils/coreutils/blob/9e804edddb8a0c9d45da87519ae6274c35793ce0/doc/coreutils.texi#L14370)
 
 ## Next Module
 

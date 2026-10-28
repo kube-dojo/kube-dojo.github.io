@@ -8,6 +8,7 @@ sidebar:
 
 ## October 2026
 
+- **Practice Git interruptions with clear state checks.** [Worktrees and Stashing](/prerequisites/git-deep-dive/module-5-worktrees-stashing/) now includes disposable setup, portable hotfix practice, recovery hints, and a move-and-repair stretch exercise.
 - **Plan Git study with clearer expectations.** The [Git Deep Dive overview](/prerequisites/git-deep-dive/) sets out lesson topics, reading and practice estimates, recovery limits, and routes for continuing your study.
 - **Choose the Git state you intend to recover.** [Undo and Recovery](/prerequisites/git-deep-dive/module-4-undo-recovery/) now distinguishes the index from the last commit, explains hard-reset risks to untracked files, and keeps destructive practice in a disposable repository.
 - **Shape Git history safely.** [Interactive Rebasing](/prerequisites/git-deep-dive/module-3-interactive-rebasing/) clarifies squash-merge transplants and private-history cleanup, with graduated exercise hints and readable quiz commands.
