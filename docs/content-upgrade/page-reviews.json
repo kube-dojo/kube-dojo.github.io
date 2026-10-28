@@ -374,7 +374,7 @@
     },
     {
       "path": "prerequisites/git-deep-dive/module-2-advanced-merging.md",
-      "page_digest": "sha256:5b20f40f770b1b9ee6cc1388a87ad90217797a20a8332fd07dca3aced0f0374e",
+      "page_digest": "sha256:9a3a0b9dfb0d14298342317bfc58eef1c9de4e732108fc07930e0b4ef472fef7",
       "disposition": "revise",
       "reviewer_refs": [
         "docs/content-upgrade/reviews/2026-10-28-merge-evidence-p12b.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-render-p12c.md", "docs/content-upgrade/reviews/2026-10-28-merge-quiz-summary-p12d.md", "docs/content-upgrade/reviews/2026-10-28-git-workflow-boundaries-p12e.md"
