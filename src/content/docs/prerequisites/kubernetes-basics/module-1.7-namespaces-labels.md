@@ -96,7 +96,7 @@ Kubernetes creates several namespaces before you add your own. For `kubectl` out
 
 Mature clusters treat `default` as a warning light rather than a convenient home. If production workloads, experiments, and one-off debugging Pods all live there, ownership becomes ambiguous and destructive commands become harder to review. A better habit is to create purpose-built namespaces such as `team-frontend`, `team-backend`, `observability`, `payments-prod`, or `payments-staging`, then put the namespace in every manifest. Explicit placement makes the desired boundary reviewable in Git and visible in incident output.
 
-Namespace names must be valid DNS labels, and you should avoid the `kube-` prefix because Kubernetes reserves that convention for system namespaces. You should also avoid names that look like public top-level domains, such as `com` or `org`, because Kubernetes DNS search behavior can make short names confusing. Starting in modern Kubernetes versions, the control plane automatically applies the immutable label `kubernetes.io/metadata.name` to every namespace, which gives policies and selectors a stable way to identify a namespace by name.
+Namespace names must be valid DNS labels, and you should avoid the `kube-` prefix because Kubernetes reserves that convention for system namespaces. Namespaces matching public top-level domains, such as `com` or `org`, can let Service DNS names overlap public records: matching lookups without a trailing dot can resolve to those Services before public DNS. Restrict namespace creation to trusted users and consider admission controls that block public TLD names. Starting in modern Kubernetes versions, the control plane automatically applies the immutable label `kubernetes.io/metadata.name` to every namespace, which gives policies and selectors a stable way to identify a namespace by name.
 
 ```bash
 kubectl create namespace team-frontend
@@ -317,7 +317,7 @@ metadata:
     cost-center: "finance-ops"
   annotations:
     builder/author: "jane.doe@example.com"
-    build/commit-sha: "a1b2c3d4e5f6g7h8i9j0"
+    build/commit-sha: "3f2a9c1e7b4d" # illustrative placeholder
     prometheus.io/scrape: "true"
     prometheus.io/port: "8080"
 spec:
@@ -582,11 +582,18 @@ Success criteria:
 
 Set `KUBEDOJO_LAB_CONTEXT` to the independently confirmed lab context before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, all tasks, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer. It prints the generated namespace and pins each request to it without switching the active context or changing saved preferences.
 
+Setup also requires that lab context to be the current context. If you switch it yourself, record the previous name so you can restore it afterward; cleanup does not restore that separate change.
+
 <details><summary><strong>Solution</strong></summary>
 
 ```bash
 NS_READY=no NS_NEW=no
-readonly NS_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" NS_NAME="namespace-lab-$(date +%s)-$$" && { NS_NEW=yes; NS_UID=; }
+if [ -n "${NS_CONTEXT+x}" ] || [ -n "${NS_NAME+x}" ] || [ -n "${NS_UID+x}" ] ||
+   readonly -p | grep -E '(^| )NS_(CONTEXT|NAME|UID)(=|$)' >/dev/null; then
+  echo 'Existing exercise variables detected; preserve any UID and use a fresh terminal' >&2
+else
+  readonly NS_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" NS_NAME="namespace-lab-$(date +%s)-$$" && { NS_NEW=yes; NS_UID=; }
+fi
 ns_lab() {
   [ "$NS_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
   command kubectl --context "$NS_CONTEXT" --namespace "$NS_NAME" "$@"
@@ -799,7 +806,7 @@ start_selector_stretch() {
 start_selector_stretch
 ```
 
-Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until only the three stable Pods appear; do not rerun `start_selector_stretch`. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
+Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until only the three stable Pods appear; do not rerun `start_selector_stretch`. If the initial Service UID read fails, the one-shot stretch guard stays set: stop and use namespace cleanup rather than unsetting the guard to retry. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
 
 ```bash
 restore_selector_stretch() {
@@ -834,7 +841,7 @@ cleanup_ns_lab() {
     command kubectl --context "$NS_CONTEXT" delete namespace "$NS_NAME" --ignore-not-found=true --wait=true --timeout=120s || return 1
   fi
   NS_READY=no
-  echo 'Exercise namespace is gone; kubeconfig preferences were unchanged'
+  echo 'Exercise namespace is gone'
 }
 cleanup_ns_lab
 ```
