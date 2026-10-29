@@ -10,7 +10,7 @@ revision_pending: false
 >
 > **Time to Complete**: Approximately 90–120 minutes (estimate for reading and the exercise)
 >
-> **Prerequisites**: [Module 5 of Git Deep Dive](../module-5-worktrees-stashing/) and a local Bash shell with Git installed
+> **Prerequisites**: [Module 5 of Git Deep Dive](../module-5-worktrees-stashing/) and a local Bash shell with Git installed. The Git controls used version 2.56; check your Git supports `--since-as-filter` before using it.
 
 ---
 
@@ -193,7 +193,7 @@ git bisect good v2.4.0
 git bisect run /tmp/test-manifest.sh
 ```
 
-The following output is illustrative; actual commits and step counts will differ. Git is not forming opinions about likely authors, commit messages, or suspicious-looking diffs. It is repeatedly asking one question: does this checked-out tree pass the test? That discipline is why automated bisection is useful during emotional incidents.
+The following output is illustrative; actual commits and step counts will differ. An unclassified BAD makes the reported boundary untrustworthy: investigate the failure and rerun with a verified classifier. Git interprets the test's exit status, so the test must faithfully answer the historical question.
 
 ```text
 running '/tmp/test-manifest.sh'
@@ -279,7 +279,7 @@ Whitespace-only rewrites are where naive blame becomes actively misleading. A fo
 git blame -w k8s/deployment.yaml
 ```
 
-A repository can make this policy durable with `.git-blame-ignore-revs`. If the team performed a repository-wide YAML reformat, put its full, unabbreviated commit object name on a line in the ignore file and configure Git to skip it during blame. This keeps future investigations focused on meaningful authorship instead of repeatedly rediscovering the same formatting event.
+A repository can share a `.git-blame-ignore-revs` file. If the team performed a repository-wide YAML reformat, put its full, unabbreviated commit object name on a line in the file and configure Git to skip it during blame. The configuration is local to each clone; configure it there and ensure the file exists, because a missing ignore file causes an error.
 
 ```bash
 git config blame.ignoreRevsFile .git-blame-ignore-revs
@@ -357,7 +357,7 @@ diff --git a/k8s/frontend-deployment.yaml b/k8s/frontend-deployment.yaml
 index 32f6435..e432064 100644
 --- a/k8s/frontend-deployment.yaml
 +++ b/k8s/frontend-deployment.yaml
-@@ -46,4 +46,4 @@ resources:
+@@ -46,4 +46,4 @@
    requests:
      cpu: 100m
    limits:
@@ -379,7 +379,7 @@ Write yes or no before you continue. Two search questions can sound alike during
 
 | Command | What it Searches | Use Case |
 | :--- | :--- | :--- |
-| **`git log -S "password"`** | Searches diffs reachable from the selected revision (HEAD by default). | "Find me the commit where this string was added or removed." |
+| **`git log -S "password"`** | Searches diffs reachable from the selected revision (HEAD by default); merge diffs are not shown by default. | "Find me the commit where this string was added or removed." |
 | **`git grep "password"`** | Searches tracked working-tree files by default, or a specified tree object. | "Does this string exist in the codebase right now?" |
 
 Security investigations make this difference concrete. Suppose the synthetic token `EXAMPLE_ONLY_CREDENTIAL` was committed in a tutorial manifest and removed later. `git grep` may return nothing from tracked working files, while `git log -S "EXAMPLE_ONLY_CREDENTIAL"` can reveal add and remove commits reachable from the selected revision. This placeholder is not a live credential. If actual credentials were exposed, investigate their validity and remediation separately; deleting text from the current branch does not erase earlier commits.
@@ -392,7 +392,7 @@ When the evidence exists in the current tree, use `git grep` to search tracked w
 
 `git grep` also searches arbitrary Git tree objects without checking them out. That ability is valuable when a teammate asks you to review a branch, when you need to compare a release tag with `main`, or when you want to search a remote tracking branch while keeping your local changes untouched. You are searching Git's stored snapshots directly rather than rearranging your working directory.
 
-Suppose a teammate says they added a `PodDisruptionBudget` on their feature branch but cannot remember the path. You do not need to stash your work, switch branches, and risk disrupting your local context. Search the remote branch object directly.
+Suppose a teammate says they added a `PodDisruptionBudget` on their feature branch but cannot remember the path. A remote-tracking ref can be stale: fetch the relevant remote first, then search the updated local ref without switching branches.
 
 ```bash
 git grep "kind: PodDisruptionBudget" origin/feature-ha-setup
@@ -404,13 +404,13 @@ Illustrative output:
 origin/feature-ha-setup:k8s/infra/pdb-frontend.yaml:kind: PodDisruptionBudget
 ```
 
-`git grep --and` combines expressions on the same line. To find files containing both patterns on possibly different lines, use `--all-match` with `-l` and separate `-e` patterns. A file may contain multiple YAML objects, so inspect the result to establish whether both fields belong to the same Service.
+`git grep --and` combines expressions on the same line. To find files containing both patterns on possibly different lines, use `--all-match` with `-l` and separate `-e` patterns. The `-w` option avoids matching `ServiceAccount` as `Service`; this is text search, so inspect whether both fields belong to the same Service.
 
 ```bash
-git grep --all-match -l -e "kind: Service" -e "type: LoadBalancer"
+git grep --all-match -l -w -e "kind: Service" -e "type: LoadBalancer"
 ```
 
-You can push the idea further by asking Git for every commit and searching those trees. The command below searches commits reachable from all refs for the historical `policy/v1beta1` API spelling. Prefer a bounded revision list when investigating a specific release. For example, PodDisruptionBudget stopped being served at `policy/v1beta1` in Kubernetes 1.25; searching history does not establish current release readiness.
+You can push the idea further by asking Git for every commit and searching those trees. The command below searches commits reachable from all refs for the historical `policy/v1beta1` API spelling. A large revision list can exceed the shell's argument-length limit; prefer a bounded revision list when investigating a specific release. PodDisruptionBudget stopped being served at `policy/v1beta1` in Kubernetes 1.25; searching history does not establish current release readiness.
 
 ```bash
 git grep "apiVersion: policy/v1beta1" $(git rev-list --all)
@@ -421,7 +421,7 @@ git grep "apiVersion: policy/v1beta1" $(git rev-list --all)
 <details>
 <summary>Check your prediction</summary>
 
-For the current release, search the relevant branch or tag with `git grep`. For introduction history, use `git log -S` or `-G` so the result points to commits rather than merely showing present-day files.
+For the current release, search the relevant branch or tag with `git grep` as a text screen, then validate rendered manifests against the target API. For introduction history, use `git log -S` or `-G` so the result points to commits rather than merely showing present-day files.
 
 </details>
 
@@ -480,7 +480,7 @@ M	k8s/prod/frontend-deployment.yaml
 For a readable report, format the selected metadata directly from Git rather than hand-copying terminal output. The `--pretty=format` placeholders below produce short hash, author name, author date, and subject separated by commas. This is a display format, not escaped CSV: names and subjects can themselves contain commas. For automated ingestion, define an unambiguous record format and parser instead of splitting this display on commas.
 
 ```bash
-git log --since="2024-01-01T00:00:00+00:00" --pretty=format:"%h,%an,%ad,%s" --date=short -- k8s/
+git log --since-as-filter="2024-01-01T00:00:00+00:00" --pretty=format:"%h,%an,%ad,%s" --date=short -- k8s/
 ```
 
 Illustrative output:
@@ -492,7 +492,7 @@ e4f5a6b,Bob Developer,2024-01-12,Fix typo in deployment
 
 A strong audit trail usually includes the question, the command, the boundaries, and the interpretation. For example, "all commits touching `k8s/prod/` during the holiday change freeze" is stronger than "recent manifest changes" because it defines a path and a date range. If the team later challenges the result, you can rerun the exact command and discuss whether the boundary was right instead of arguing from memory.
 
-Hypothetical scenario: after a platform outage, the team discovers a missing readiness probe and asks whether its removal bypassed review. Without a readiness probe, the kubelet's readiness check treats a started, running container as ready. A filtered log for the production overlay shows the removal in a commit labeled as an image tag update, and `--name-status` identifies an overlay patch file changed by that commit. Inspecting the patch establishes the removed field; deployment evidence and application tests must establish its role in the outage. The review can then address automation write paths and manifest field removal.
+Hypothetical scenario: after a platform outage, the team discovers a missing readiness probe and asks whether its removal bypassed review. Without a readiness probe, the kubelet's readiness check treats a started, running container as ready. A filtered log identifies an overlay patch file in a commit labeled as an image tag update. Inspecting the patch establishes the removed field; deployment evidence and application tests must establish its role in the outage. The review can then address automation write paths and manifest field removal.
 
 Filtered history should use explicit timestamp and timezone boundaries that match the operational policy. Git documents `--since` as more recent than its date and `--until` as older than its date. These filters compare committer timestamps; the default log's `Date:` line displays the author timestamp. Unlike `--since`, which can stop traversal at an older commit, `--since-as-filter` visits the whole range before filtering. Use it for exhaustive audits when timestamps may be out of order. Inspect both dates with `git show --no-patch --format=fuller <commit>` when checking boundaries. Record the intended interval, verify the resolved boundary, and restrict paths and inspect patches when the policy applies only to production overlays.
 
@@ -502,12 +502,12 @@ The strongest Git troubleshooting workflows combine a narrow symptom, a determin
 
 | Pattern | When to Use It | Why It Works | Scaling Consideration |
 | :--- | :--- | :--- | :--- |
-| Bisect with a single failing assertion | The system was good at one known point and bad at another. | It converts many commits into a logarithmic search with reproducible labels. | Keep the script narrow, and preflight it against both anchors before the run. |
+| Bisect with a single failing assertion | The system was good at one known point and bad at another. | It narrows the history using the classifier's labels. | Preflight both anchors and representative error cases; anchors alone do not make midpoints safe. |
 | Targeted blame after finding a suspicious line | You need context for a current line in a manifest or template. | It connects text to the commit that last changed it, then lets you inspect intent. | Use `-w`, `-C`, and ignore-revs files when formatting or movement obscures authorship. |
 | Pickaxe for vanished or fluctuating text | A variable, policy exception, limit, or secret-like string is gone now. | It searches diffs, so deleted evidence still leaves a historical trail. | Prefer `-G` for patterns and `-S` for exact lifecycle changes. |
 | Filtered log for incident reports | Stakeholders need a timeline of specific paths, people, or dates. | It turns commit history into a bounded report rather than a narrative guess. | Store the exact command with the report so reviewers can reproduce the boundary. |
 
-Anti-patterns usually come from using a familiar command for the wrong evidence type. `git grep` is excellent for present snapshots, but it is the wrong tool for deleted code. `git blame` is useful for current lines, but misleading after a mass reformat unless you account for whitespace. `git bisect run` is powerful, but dangerous when the script confuses "the test could not run" with "the bug exists."
+Anti-patterns usually come from using a familiar command for the wrong evidence type. Searching the current snapshot with `git grep` cannot explain when deleted text changed; searching a historical tree can find its old contents. `git blame` is useful for current lines, but misleading after a mass reformat unless you account for whitespace. `git bisect run` is powerful, but dangerous when the script confuses "the test could not run" with "the bug exists."
 
 | Anti-pattern | What Goes Wrong | Better Alternative |
 | :--- | :--- | :--- |
@@ -521,37 +521,14 @@ Anti-patterns usually come from using a familiar command for the wrong evidence 
 Choose the tool by asking where the evidence lives. If the symptom reproduces only when you check out historical commits and run a test, use bisection. If the suspicious line exists now, use targeted blame. If the text is missing now but may have existed before, use Pickaxe. If the question is who touched a path during a window, use filtered log queries.
 
 ```text
-                 +------------------------------+
-                 | What evidence do you have?   |
-                 +---------------+--------------+
-                                 |
-             +-------------------+-------------------+
-             |                                       |
-     Current line exists?                    Line/value missing now?
-             |                                       |
-     +-------+-------+                       +-------+-------+
-     | git blame -L |                       | git log -S/-G |
-     +-------+-------+                       +-------+-------+
-             |                                       |
-     Need true author through moves?         Need exact patch context?
-             |                                       |
-     Use -w, -C, ignore revs                 Add -p or run git show
-             |
-             +-------------------+
-                                 |
-                  Behavior changed over time?
-                                 |
-                         +-------+-------+
-                         | git bisect    |
-                         | git bisect run|
-                         +-------+-------+
-                                 |
-                         Need stakeholder timeline?
-                                 |
-                         +-------+-------+
-                         | git log filters|
-                         | --name-status  |
-                         +---------------+
+  +-----------------------------------------------+
+  | What question are you investigating?          |
+  +-----------------------------------------------+
+       |              |              |              |
+  Current line   Vanished text   Historical     Bounded timeline
+       |              |          reproduction       |
+  git blame -L   git log -S/-G       |          filtered git log
+                                git bisect run   --name-status
 ```
 
 | Investigation Question | Primary Tool | Confirmation Step |
@@ -559,7 +536,7 @@ Choose the tool by asking where the evidence lives. If the symptom reproduces on
 | "Which commit introduced this reproducible failure?" | `git bisect run` | Inspect `git show` for the first bad commit and rerun the test around its parent. |
 | "Who last changed this current manifest line?" | `git blame -L` | Use `-w` or `-C` if formatting or movement may hide the original author. |
 | "When was this deleted variable removed?" | `git log -S` | Add `--patch` or inspect the removal commit directly. |
-| "Which manifests changed during the freeze?" | `git log --since --until --name-status -- path/` | Compare the Git timeline with deployment and review records. |
+| "Which manifests changed during the freeze?" | `git log --since-as-filter --until --name-status -- path/` | Compare the Git timeline with deployment and review records. |
 | "Does a teammate's branch contain this resource?" | `git grep pattern branch` | Confirm whether that branch was deployed or merged. |
 
 The framework is intentionally simple because incident response rewards repeatable decisions. Do not start with the most impressive command; start with the question that eliminates the most uncertainty. When the answer shifts the evidence type, change tools rather than forcing one command to do every job.
@@ -568,17 +545,17 @@ In practice, investigations loop through this framework more than once. A Pickax
 
 ## Did You Know?
 
-1. **The Pickaxe name is old Git culture**: `git log -S` is commonly called Pickaxe because it digs through patch history for string additions and removals rather than searching only the current checkout.
-2. **`git bisect visualize` can show your current search state**: during a complicated bisection, `git bisect visualize` or `git bisect view` opens a viewer such as `gitk` so you can inspect commits marked good, bad, and untested.
-3. **Reverse blame can search deletion history**: `git blame --reverse START..END file` can help identify where a line disappeared across a bounded range, which is useful when normal blame cannot see removed text.
-4. **Kubernetes dry-run modes changed operational habits**: server-side dry runs (available since roughly Kubernetes 1.18, including modern 1.35+ clusters) let teams validate manifests against the API server without persisting objects, which makes Git bisection safer when a reachable cluster is available.
+1. **Bisect has a reserved skip code**: a test exit status of `125` tells `git bisect run` that the current revision cannot be classified.
+2. **Bisect checks executable failures**: `128` or greater aborts `git bisect run`. The first `126` or `127` triggers a known-good check; the same code there rejects the run, while ordinary classification maps `126` and `127` to bad.
+3. **Blame has three copy-search scopes**: repeating `-C` up to three times broadens the commits and files considered for copied lines; inspect the heuristic result.
+4. **A blame range has a count**: `-L` with `+10` selects ten lines including its starting line, rather than ten additional lines.
 
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
 | :--- | :--- | :--- |
-| Forgetting `git bisect reset` | After finding the bug, engineers celebrate and leave the repository in a detached historical checkout. | Run `git bisect reset` immediately after recording the first bad commit so later work returns to the original branch. |
-| Testing dirty working trees | Uncommitted changes make Git unable to move safely between historical commits. | Commit, stash, or discard unrelated local changes before starting the bisection session. |
+| Forgetting `git bisect reset` | After finding the bug, engineers celebrate and leave the repository in a detached historical checkout. | Run `git bisect reset` after recording the first bad commit to restore the pre-bisect checkout; that is a branch only if you started on one. |
+| Testing dirty working trees | Uncommitted changes can obstruct historical checkout or contaminate the test. | Preserve unrelated local work before starting the bisection session. |
 | Using `git grep` to find deleted code | The command searches snapshots, so removed text is invisible in the current tree. | Use `git log -S` for exact strings or `git log -G` for regular-expression changes in historical diffs. |
 | Trusting blame on reformatted files | A formatter commit can appear to author every line even though it changed only whitespace. | Use `git blame -w`, configure `.git-blame-ignore-revs`, and inspect the underlying commit before drawing conclusions. |
 | Writing bisect scripts that exit `1` on compile errors | The script treats an untestable commit as proof of the target regression. | Detect setup or build failures separately and exit `125` when the commit cannot answer the investigation question. |
@@ -597,24 +574,24 @@ In practice, investigations loop through this framework more than once. A Pickax
 **Answer**: Use `git log -S "specific-policy-string"` when you can identify exact text from the exception, or `git log -G "regex-pattern"` if the shape is known but values changed. These commands search historical diffs, so they can reveal commits where the text was removed and later re-added. `git grep` would only tell you whether the current snapshot contains the exception, which cannot prove the temporary removal. After finding candidate commits, inspect their patches and review context before concluding intent.
 </details>
 
-<details><summary><strong>Question 3</strong>: `git blame` says a junior engineer wrote a dangerous storage stanza yesterday, but they claim they only moved the manifest during a repository reorganization. How do you verify the claim?</summary>
+<details><summary><strong>Question 3</strong>: `git blame` attributes a dangerous storage stanza to an engineer who says they copied it between files during a reorganization. How do you investigate the attribution?</summary>
 
-**Answer**: Run targeted blame with copy or movement detection, such as `git blame -C` on the current file and the suspicious line range. If the block was moved from another file, Git can look past the reorganization commit and show the earlier author and commit that introduced the text. If the move happened across several steps, repeated `-C` options can make the search more aggressive. You should then inspect the original commit because authorship alone does not explain whether the stanza was correct for its original context.
+**Answer**: Plain blame follows whole-file renames. If a block moved between files, run targeted blame with copy detection, such as `git blame -C` on the current file and the suspicious line range. Git may trace the text to an earlier commit. A second `-C` also searches other files when the target was created, and a third considers other files in any commit. Inspect the attributed commit and its context; heuristic attribution alone does not explain whether the stanza was correct.
 </details>
 
-<details><summary><strong>Question 4</strong>: Your API is broken at `HEAD` and stable at tag `v2.0`. You automate bisection with a script that curls the live production health endpoint at `https://api.production.com/health`. Why will this not find the Git regression?</summary>
+<details><summary><strong>Question 4</strong>: Your API is broken at `HEAD` and stable at tag `v2.0`. You automate bisection with a script that curls the live production health endpoint at `https://api.example.com/health`. Why will this not find the Git regression?</summary>
 
 **Answer**: Bisection changes the local repository checkout, but it does not redeploy each historical commit to production. The script would keep testing the same live system regardless of which commit Git checked out, so every classification would describe current production rather than the historical tree. A valid script must build, render, or run an isolated artifact from the currently checked-out commit and test that artifact. For Kubernetes manifests, that might mean rendering the chart and running a server-side dry run against a safe validation cluster.
 </details>
 
-<details><summary><strong>Question 5</strong>: You need to investigate an AWS example key, `AKIAIOSFODNN7EXAMPLE`, that may have been committed and later removed. `git grep` returns nothing. What does that result prove, and what command should come next?</summary>
+<details><summary><strong>Question 5</strong>: You need to investigate the synthetic token `EXAMPLE_ONLY_CREDENTIAL` that may have been committed and later removed. `git grep` returns nothing. What does that result prove, and what command should come next?</summary>
 
-**Answer**: The empty `git grep` result proves only that the searched snapshot does not currently contain the string. It does not prove the string never existed in repository history. The next command should be `git log -S "AKIAIOSFODNN7EXAMPLE"` so Git searches diffs where the occurrence count changed. If matches appear, inspect the add and remove commits to determine exposure, remediation timing, and whether similar examples exist elsewhere.
+**Answer**: The empty `git grep` result proves only that the searched tracked working-tree files do not contain the string. It does not prove the string never existed in repository history. The next command should be `git log -S "EXAMPLE_ONLY_CREDENTIAL"` so Git searches diffs where the occurrence count changed. If matches appear, inspect the add and remove commits within that revision's reachable history; this synthetic example establishes no real credential exposure.
 </details>
 
 <details><summary><strong>Question 6</strong>: An auditor asks for all commits by `platform-team` that modified files in `k8s/networking/`, including whether each file was added, modified, or deleted. What command produces that report?</summary>
 
-**Answer**: Use `git log --author="platform-team" --name-status -- k8s/networking/`. The author filter narrows the result to the named identity, while the pathspec after `--` limits the report to the networking directory. `--name-status` adds the file-level change type, which is the detail the auditor requested. For a real compliance packet, record the exact command and time window so the report can be reproduced.
+**Answer**: Use `git log --author="platform-team" --name-status -- k8s/networking/`. The author filter matches a regular expression against the author header, including longer headers containing `platform-team`; it does not authenticate an identity. The pathspec after `--` limits the report to the networking directory, and `--name-status` adds each file's change type. For a real compliance packet, record the exact command and time window so the report can be reproduced.
 </details>
 
 <details><summary><strong>Question 7</strong>: A teammate says their remote branch contains a new `PodDisruptionBudget`, but you have local work you do not want to stash. How can you find the file path without checking out their branch?</summary>
@@ -825,7 +802,26 @@ After a successful unambiguous search, `refs/bisect/bad` names the bad boundary;
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: which half still contains the bug. Next action: `git bisect good`. Success means the regression is newer than this commit, so the older half can be ignored.
+Failure layer: recorded bisect state. A passing midpoint is good, but the mistaken `bad` mark has already moved the checkout. Do not label that new, untested commit. Save the log outside the repository:
+
+```bash
+{
+recovery_log=$(mktemp "${TMPDIR:-/tmp}/git-bisect-log.XXXXXXXX") || { echo "STOP: cannot create recovery log"; exit 1; }
+git bisect log > "$recovery_log" || { echo "STOP: cannot capture bisect log"; exit 1; }
+}
+```
+
+Edit that file to remove only the mistaken `git bisect bad <commit>` command line, preserving the anchors and other correct marks. Then rebuild the search state:
+
+```bash
+{
+test -s "$recovery_log" || { echo "STOP: recovery log is empty or missing"; exit 1; }
+git bisect reset || { echo "STOP: bisect reset failed"; exit 1; }
+git bisect replay "$recovery_log" || { echo "STOP: bisect replay failed"; exit 1; }
+}
+```
+
+Retest the selected checkout before marking it. A passing target test can now justify `good`; repairing the log does not test any commit for you.
 
 </details>
 
@@ -852,7 +848,7 @@ Failure layer: this snapshot versus history. Next action: do not close the searc
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: present files versus introduction commits. Next action: `git grep` on the release branch or tag for a current readiness check. Use `git log -S` when the question is when the API was introduced.
+Failure layer: present files versus introduction commits. Next action: use `git grep` on the release branch or tag as a text screen, then validate rendered manifests against the target API. Use `git log -S` when the question is when the API was introduced.
 
 </details>
 
@@ -864,6 +860,15 @@ Failure layer: present files versus introduction commits. Next action: `git grep
 - [ ] You saved the bisect log outside the repository and restored the original branch and tip with a clean working tree.
 - [ ] You annotated only the `containerPort` line and compared its attribution with the candidate rather than relying on a commit-message clue.
 
+### Transfer Challenge
+
+Suppose a different repository has a known-good tag and a bad tip, but an intermediate revision cannot be read by your test. Design a classifier for a different text assertion and explain how you would distinguish a missing match from an unreadable file. Predict what a skipped revision means for the certainty of the reported boundary before inspecting the answer.
+
+<details><summary>Hint 1</summary>Identify the exit statuses of the search command before mapping them to Git's classifications.</details>
+<details><summary>Hint 2</summary>Map a confirmed match to good, a confirmed absence to bad, and an untestable revision to skip.</details>
+<details><summary>Hint 3</summary>Preflight both anchors, then inspect the candidate and its parents after resetting the session.</details>
+<details><summary>Self-check</summary>A classifier may map grep statuses 0, 1, and other errors to 0, 1, and 125 respectively. Skipping avoids a false classification but can leave several possible first bad commits; investigate the skipped revisions before asserting an exact boundary.</details>
+
 ## Sources
 
 - [Git documentation: git-bisect](https://git-scm.com/docs/git-bisect)
@@ -872,13 +877,26 @@ Failure layer: present files versus introduction commits. Next action: `git grep
 - [Git documentation: git-grep](https://git-scm.com/docs/git-grep)
 - [Git documentation: git-show](https://git-scm.com/docs/git-show)
 - [Git documentation: git-rev-list](https://git-scm.com/docs/git-rev-list)
-- [Git documentation: git-config](https://git-scm.com/docs/git-config)
+- [Git documentation: git-config](https://git-scm.com/docs/git-config) and [Git environment variables](https://git-scm.com/docs/git)
+- [Git 2.56 implementation: bisect exit safeguards](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/builtin/bisect.c), [revision filtering](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/revision.c), and [committer-date parsing](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/commit.c)
+- [Git revision/date parsing](https://git-scm.com/docs/git-rev-parse), [date input formats](https://git-scm.com/docs/git-commit#_date_formats), and [Helm local template rendering](https://helm.sh/docs/helm/helm_template/)
+- [Git pickaxe internals](https://git-scm.com/docs/gitdiffcore), [branch inspection](https://git-scm.com/docs/git-branch), and [historical checkout](https://git-scm.com/docs/git-checkout)
+- [Bash maintainer: reference manual](https://tiswww.case.edu/php/chet/bash/bashref.html)
+- [FreeBSD grep manual: matches and exit status](https://man.freebsd.org/cgi/man.cgi?query=grep&sektion=1&format=html)
+- [FreeBSD regular expression syntax](https://man.freebsd.org/cgi/man.cgi?query=re_format&sektion=7&format=html), [sed](https://man.freebsd.org/cgi/man.cgi?query=sed&sektion=1&format=html), and [mktemp](https://man.freebsd.org/cgi/man.cgi?query=mktemp&sektion=1&format=html)
 - [Git book: Debugging with Git](https://git-scm.com/book/en/v2/Git-Tools-Debugging-with-Git)
 - [Kubernetes documentation: kubectl](https://kubernetes.io/docs/reference/kubectl/)
 - [Kubernetes documentation: kubectl apply](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
 - [Kubernetes documentation: API overview](https://kubernetes.io/docs/reference/using-api/)
-- [Kubernetes documentation: server-side apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/)
+- [Kubernetes documentation: API dry-run](https://kubernetes.io/docs/reference/using-api/api-concepts/#dry-run) and [kubectl describe](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_describe/)
+- [Kubernetes API: container port fields](https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container)
+- [Kubernetes API deprecation guide](https://kubernetes.io/docs/reference/using-api/deprecation-guide/) and [kubectl get reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/)
+- [Kubernetes Services](https://kubernetes.io/docs/concepts/services-networking/service/) and [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [Kubernetes controllers](https://kubernetes.io/docs/concepts/architecture/controller/) and [orphaned dependents](https://kubernetes.io/docs/concepts/architecture/garbage-collection/#orphaned-dependents)
+- [Kubernetes manifest organization](https://kubernetes.io/docs/concepts/configuration/overview/) and [Kustomize resources](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/)
+- [Argo CD automatic synchronization](https://github.com/argoproj/argo-cd/blob/stable/docs/user-guide/auto_sync.md) and [Kubernetes readiness probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes)
+- [Kubelet v1.35.0 readiness default when no probe exists](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/kubelet/prober/prober_manager.go)
 
 ## Next Module
 
-Now that you can dissect history to locate regressions and build forensic audit trails, look outward to collaboration workflows. Learn how to synchronize local work with external servers, handle complex merge conflicts, and manage upstream changes safely in [Module 7: Professional Collaboration - Remotes and PRs](../module-7-remotes-prs/).
+Now that you can dissect history to locate regressions and build forensic audit trails, look outward to collaboration workflows. Examine remote-tracking branches, fetch versus pull, and pull request workflows in [Module 7: Professional Collaboration - Remotes and PRs](../module-7-remotes-prs/).
