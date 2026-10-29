@@ -826,6 +826,7 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 * [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 * [Kubernetes volumes](https://kubernetes.io/docs/concepts/storage/volumes/)
 * [kubectl explain reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/)
+* [kubectl v1.35 explain implementation](https://github.com/kubernetes/kubernetes/blob/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/kubectl/pkg/explain/v2/explain.go) and [recursive output template](https://github.com/kubernetes/kubernetes/blob/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/kubectl/pkg/explain/v2/templates/plaintext.tmpl)
 * [Kubernetes v1.35 kubectl apply reference](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
 * [Kubernetes v1.35 API dry-run and field validation](https://v1-35.docs.kubernetes.io/docs/reference/using-api/api-concepts/#dry-run)
 * [Kubernetes v1.35 CRD versions](https://v1-35.docs.kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/)
