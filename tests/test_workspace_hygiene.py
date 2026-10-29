@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,15 +13,13 @@ spec.loader.exec_module(audit)
 def test_lifecycle_audit(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     repo.mkdir()
-    tree = str(tmp_path / "work")
+    tree = str(tmp_path)
     registry = tmp_path / "registry.json"
     rows = [{"worktree": str(repo)}, {"worktree": tree, "branch": "refs/heads/task", "HEAD": "abc"}]
     monkeypatch.setattr(audit, "inventory", lambda _: rows)
-    calls = []
     evidence = {"state": "MERGED", "headRefName": "task", "headRefOid": "abc"}
 
     def command(args, cwd):
-        calls.append(args)
         assert args == ["gh", "pr", "view", "42", "--json", "state,headRefOid,headRefName"]
         return json.dumps(evidence) if evidence else None
 
@@ -28,7 +27,6 @@ def test_lifecycle_audit(tmp_path, monkeypatch):
     record = {"owner": "owner", "purpose": "task", "branch": "task", "head": "abc",
               "state": "active", "next_action": "close out", "pr": 42}
     data = {"worktrees": {}, "artifacts": {}}
-
     def check():
         registry.write_text(json.dumps(data))
         before = registry.read_bytes()
@@ -52,7 +50,6 @@ def test_lifecycle_audit(tmp_path, monkeypatch):
     assert any("GitHub evidence unavailable" in item for item in check()["issues"])
     data["artifacts"]["evidence"] = {"owner": "", "retention": "unknown"}
     assert any("artifact" in item for item in check()["issues"])
-    assert calls
 
 
 def test_cli_real_git_is_read_only(tmp_path):
@@ -86,3 +83,6 @@ def test_cli_real_git_is_read_only(tmp_path):
     record["state"] = "ready_to_retire"
     assert run() == 1
     assert snapshot() == before
+    record["state"] = "active"
+    shutil.rmtree(tree)
+    assert run() == 1

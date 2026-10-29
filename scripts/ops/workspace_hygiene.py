@@ -29,7 +29,6 @@ def inventory(repo):
         rows.append(row)
     return rows
 
-
 def audit(repo, registry_path=None, github=False):
     issues = []
     rows = inventory(repo)
@@ -46,6 +45,8 @@ def audit(repo, registry_path=None, github=False):
     live = {row["worktree"]: row for row in rows[1:]}
     for name in sorted(live.keys() | records.keys()):
         row, record = live.get(name), records.get(name)
+        if row and ("prunable" in row or not Path(name).is_dir()):
+            issues.append(f"{name}: worktree missing or prunable")
         if not isinstance(record, dict):
             issues.append(f"{name}: unregistered or invalid record")
             continue
@@ -94,7 +95,6 @@ def audit(repo, registry_path=None, github=False):
         if record.get("retention") not in ("retain", "archive", "discard"):
             issues.append(f"{name}: invalid artifact retention")
     return {"ok": not issues, "issues": issues, "worktrees": sorted(live), "artifacts": sorted(data["artifacts"])}
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
