@@ -495,11 +495,11 @@
     },
     {
       "path": "prerequisites/zero-to-terminal/index.md",
-      "page_digest": "sha256:5be0298565845a2195e00d413b9b11b34d33d40989fd6e22082801bdccf7af48",
-      "disposition": "retain",
-      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6420001065"],
-      "independent_statuses": {"technical_source": "pending", "editorial_review": "pending", "deployed_smoke": "pass"}
+      "page_digest": "sha256:d027176eef7c73d76c21f381afa3a4d487df7c9871dfa5a9b2ef9c68f96cc807",
+      "disposition": "revise",
+      "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "docs/content-upgrade/reviews/2026-10-29-zero-to-terminal-pending-source.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6420001065", "docs/content-upgrade/reviews/2026-10-29-zero-to-terminal-pending-source.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3658#issuecomment-6485768715"],
+      "independent_statuses": {"technical_source": "unknown", "editorial_review": "pass", "lab_execution": "not_applicable", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/zero-to-terminal/module-0.1-what-is-a-computer.md",
