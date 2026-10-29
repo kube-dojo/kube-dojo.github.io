@@ -66,14 +66,14 @@ graph TD
     SEC[Secret]:::secret
 
     CM --> CM1[Non-sensitive data]:::configMap
-    CM --> CM2[Plain text storage]:::configMap
+    CM --> CM2[No secrecy by default]:::configMap
     CM --> CM3[Environment, config files]:::configMap
     CM --> CM4["Examples:<br>• Log levels<br>• Feature flags<br>• Config file content"]:::configMap
 
     SEC --> SEC1[Sensitive data]:::secret
     SEC --> SEC2[Base64 encoded]:::secret
     SEC --> SEC3[Passwords, tokens, keys]:::secret
-    SEC --> SEC4["Examples:<br>• Database passwords<br>• API keys<br>• TLS certificates"]:::secret
+    SEC --> SEC4["Examples:<br>• Database passwords<br>• API keys<br>• TLS private keys"]:::secret
 
     N["Note: Secrets are NOT encrypted by default!<br>Base64 is encoding, not encryption."]:::note
     SEC -.-> N
@@ -628,11 +628,18 @@ Use a `configMap` item for key `LOG_LEVEL` at path `log-level`, a `secret` item 
 
 In this synthetic incident, a team needs to change a logging level without rebuilding its image and explain where a placeholder credential is visible. Start with an empty disposable namespace: Task 1 creates the objects and Pod you will investigate. Compare the API value, the running process environment, and a mounted file before deciding what each observation proves. Use only the non-real placeholder shown here: environment values and the Pod's startup logs expose plaintext, so never use real credentials in this exercise.
 
-Use a context you have independently confirmed is a dedicated disposable lab, and set `KUBEDOJO_LAB_CONTEXT` to its name before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, every task, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer.
+Use a context you have independently confirmed is a dedicated disposable lab, and set `KUBEDOJO_LAB_CONTEXT` to its name before setup; that context must also be the current kubeconfig context. The literal name `default` is refused. Use one fresh Bash terminal for setup, every task, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer.
 
 ```bash
 CFG_READY=no CFG_NEW=no
-readonly CFG_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" CFG_NS="config-lab-$(date +%s)-$$" && { CFG_NEW=yes; CFG_UID=; }
+if [ -z "${CFG_SETUP_SEEN+x}" ]; then
+  readonly CFG_SETUP_SEEN=1
+  if readonly CFG_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" CFG_NS="config-lab-$(date +%s)-$$"; then
+    CFG_NEW=yes; CFG_UID=
+  fi
+else
+  echo 'Setup was already attempted; preserve the receipt and clean up' >&2
+fi
 cfg_lab() {
   [ "$CFG_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
   command kubectl --context "$CFG_CONTEXT" --namespace "$CFG_NS" "$@"
@@ -671,6 +678,8 @@ Compare the Secret object, the Pod's environment and its startup logs.
 After creating the objects, inspect them with `cfg_lab get secret app-secret -o yaml` and `cfg_lab logs config-test`.
 
 </details>
+
+<details><summary>One possible solution for Task 1</summary>
 
 ```bash
 # 1. Create ConfigMap
@@ -711,6 +720,8 @@ cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s
 cfg_lab logs config-test | grep -E "LOG_LEVEL|APP_NAME|DB_PASSWORD"
 ```
 
+</details>
+
 <details><summary>Solution notes for Task 1</summary>
 
 The commands create one ConfigMap, one Secret, and one Pod in the exercise namespace. Useful inspection commands are `cfg_lab get configmap app-config -o yaml`, `cfg_lab get secret app-secret -o yaml`, and `cfg_lab logs config-test`. The Pod logs show plaintext environment values from startup; that visibility is risky for real credentials.
@@ -736,10 +747,14 @@ Inspect the Secret's `data` field, then decode its `DB_PASS` entry.
 Use `cfg_lab get secret app-secret` and the guarded decoding pipeline below; stop if either command fails.
 </details>
 
+<details><summary>One possible solution for Task 2</summary>
+
 ```bash
 cfg_lab get secret app-secret -o yaml
 (set -o pipefail; cfg_lab get secret app-secret -o jsonpath='{.data.DB_PASS}' | base64 -d) && printf '\n'
 ```
+
+</details>
 
 <details><summary>Solution notes for Task 2</summary>
 
@@ -790,7 +805,7 @@ Use `cfg_lab describe pod config-diagnosis` and `cfg_lab get configmap app-confi
 
 <details><summary>After your attempt: one repair</summary>
 
-The Pod refers to `MODE` in `app-config`, which initially has `LOG_LEVEL` and `APP_NAME`. Events can identify the missing key; timing varies, so wait for an event rather than infer the cause from Waiting alone. Add a synthetic value and check the same UID and readiness:
+The Pod refers to `MODE` in `app-config`, which initially has `LOG_LEVEL` and `APP_NAME`. Events can identify the missing key; timing varies, so inspect the evidence rather than infer the cause from Waiting alone. The Kubernetes v1.35 kubelet reports a missing required key and retries Pod synchronization; other faults or a timeout can still prevent readiness. Add a synthetic value and check the same UID and readiness:
 
 Before patching, run `cfg_lab describe pod config-diagnosis` and inspect its Events for the missing `MODE` key; stop if the evidence indicates a different cause.
 
@@ -801,7 +816,7 @@ cfg_lab get pod config-diagnosis -o jsonpath='{.metadata.uid}{"\n"}'
 cfg_lab exec config-diagnosis -- printenv MODE
 ```
 
-Compare the UID with your earlier record and the value with the patch. A timeout does not establish the cause; inspect events and stop before cleanup if you cannot explain the result. The `MODE` key remains in `app-config` and appears as a file in Task 4; `config-diagnosis` remains until namespace cleanup.
+Compare the UID with your earlier record and the value with the patch. A timeout does not establish the cause; inspect events and stop before cleanup if you cannot explain the result. Task 3 explicitly includes `MODE`, which appears as a file in Task 4; `config-diagnosis` remains until namespace cleanup.
 </details>
 
 **Transfer:** If a Pod instead references a ConfigMap that exists only in another namespace, would adding a key to that other object resolve the reference? Explain which namespace and object you would inspect first.
@@ -835,15 +850,20 @@ Use `cfg_lab get configmap`, `cfg_lab exec ... printenv` and `cfg_lab logs` as s
 
 Update the ConfigMap and compare those observations. The API should show the new value while the already-started container reports the old one.
 
+<details><summary>One possible solution for Task 3</summary>
+
 ```bash
 cfg_lab create configmap app-config \
   --from-literal=LOG_LEVEL=info \
   --from-literal=APP_NAME=myapp \
+  --from-literal=MODE=practice \
   --dry-run=client -o yaml | cfg_lab apply -f -
 cfg_lab get configmap app-config -o jsonpath='{.data.LOG_LEVEL}{"\n"}'
 cfg_lab exec config-test -- printenv LOG_LEVEL
 cfg_lab logs config-test | grep LOG_LEVEL
 ```
+
+</details>
 
 <details><summary>Solution notes for Task 3</summary>
 
@@ -855,7 +875,7 @@ The first `apply` may warn that the ConfigMap lacks its last-applied-configurati
 
 ### Task 4: Rework the Pod to mount the ConfigMap as files
 
-Delete the original Pod and recreate it with the ConfigMap mounted at `/etc/app-config`. Then inspect the directory to see how keys become files.
+Write your own Pod manifest in a here-document with the ConfigMap mounted at `/etc/app-config`. Delete the original Pod, then apply your manifest with `cfg_lab apply -f -`; use the hints before comparing your manifest with the solution. Inspect the directory to see how keys become files.
 
 <details><summary>Hint 1: Concept</summary>
 
@@ -871,6 +891,8 @@ Connect a ConfigMap volume to the container with a directory mount, then inspect
 
 After applying the Pod, wait for Ready and use `cfg_lab exec config-test -- ls -l /etc/app-config`.
 </details>
+
+<details><summary>One possible solution for Task 4</summary>
 
 ```bash
 cfg_lab delete pod config-test
@@ -896,6 +918,8 @@ cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s
 cfg_lab exec config-test -- ls -l /etc/app-config
 cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL && printf '\n'
 ```
+
+</details>
 
 <details><summary>Solution notes for Task 4</summary>
 
@@ -1045,7 +1069,7 @@ Success criteria:
 - [ ] Pod `config-test` reached the Ready condition and displayed the expected environment values.
 - [ ] Pod `config-diagnosis` was diagnosed from its missing `MODE` Event, repaired with one targeted ConfigMap change, and reached Ready with the same UID recorded before and after.
 - [ ] Updating the ConfigMap did not change the already-running environment variable.
-- [ ] The ConfigMap was mounted as files under `/etc/app-config`.
+- [ ] A learner-written Pod manifest mounted the ConfigMap as files under `/etc/app-config`.
 - [ ] The mounted-file check recorded the Pod UID, times and API/file observations, or reported an inconclusive timeout.
 - [ ] The owned exercise namespace and its resources were removed after verification.
 
@@ -1054,6 +1078,8 @@ Success criteria:
 - [Kubernetes v1.35 documentation: ConfigMaps](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/)
 - [Kubernetes v1.35 documentation: Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/)
 - [Kubernetes v1.35: request namespaces](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#setting-the-namespace-for-a-request) and [object UIDs](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids)
+- [Kubernetes v1.35: deleting a namespace](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/namespaces/)
+- [Kubernetes v1.35.0 kubelet: ConfigMap key lookup](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/kubelet_pods.go), [container error events](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/kuberuntime/kuberuntime_container.go), and [Pod synchronization retries](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/pod_workers.go)
 - [Kubernetes v1.35: Configure a Pod to use a ConfigMap](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
 - [Kubernetes v1.35: Distribute credentials using Secrets](https://v1-35.docs.kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/)
 - [Kubernetes v1.35: Encrypt data at rest](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) and [KMS provider](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
