@@ -207,7 +207,7 @@ body[data-kd-modal-open='true'] { overflow: hidden; }
   background: var(--g50) !important; border: none !important;
   font-size: 0.875rem; border-radius: 0 !important;
   border-bottom: 1px solid transparent !important;
-  display: flex; align-items: center; gap: 0.625rem;
+  display: block;
 }
 :root[data-theme='dark'] .sl-markdown-content details > summary { background: var(--g800) !important; }
 .sl-markdown-content details > summary:hover { background: var(--kube-blue-light) !important; }
