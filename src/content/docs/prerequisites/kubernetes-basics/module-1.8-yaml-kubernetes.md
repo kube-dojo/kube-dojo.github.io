@@ -67,7 +67,7 @@ users:
 
 Read that example as a tree rather than as text. The root contains three mapping keys, `server`, `port`, and `is_active`, followed by two larger keys whose values contain nested structures. `allowed_origins` is a sequence of scalar strings, while `users` is a sequence of mappings, and each user mapping contains another sequence under `permissions`. Kubernetes uses exactly this nesting style for fields like `containers`, `env`, `ports`, `volumeMounts`, and `rules`, so the ability to identify the expected shape is more valuable than memorizing a particular manifest.
 
-The most important rule is also the easiest to underestimate: YAML indentation uses spaces, not tabs, and the Kubernetes convention is two spaces per level. Tabs are not a stylistic disagreement in YAML; they are invalid indentation. A one-space drift can also change meaning without looking dramatic in a pull request, especially when a nested sequence item is visually close to the field above it. Configure your editor to render whitespace, convert tabs to spaces, and format YAML with two-space indentation before you rely on visual review.
+YAML indentation uses spaces, not tabs. The indentation width is a presentation choice; this lesson uses a consistent two-space style. Tabs are invalid as indentation, rather than merely a style disagreement. A one-space drift can change meaning without looking dramatic in a pull request, especially when a nested sequence item is visually close to the field above it. Configure your editor to show whitespace, convert tabs to spaces and use a consistent style before relying on visual review.
 
 **Pause and predict:** in the `users` block above, how many items are in the `users` sequence, and what type of data does `permissions` hold?
 
@@ -117,7 +117,7 @@ Write the operator and the reason before you continue. The next section is about
 
 ### Advanced YAML: Anchors (`&`) and Aliases (`*`)
 
-YAML also includes anchors and aliases, a native reuse feature that lets one part of a document refer to another part. An anchor, marked with `&`, names a reusable mapping or value. An alias, marked with `*`, expands that anchored value elsewhere. Combined with the merge key `<<`, anchors can reduce repeated labels or configuration fragments in hand-authored YAML, although many Kubernetes teams prefer Kustomize, Helm, or another purpose-built tool for larger reuse patterns.
+YAML anchors (`&`) and aliases (`*`) let one part of a document refer to another. An anchor names a reusable mapping or value; an alias refers to that anchored value elsewhere in the document. The merge key `<<` comes from a [YAML 1.1 working draft](https://yaml.org/type/merge.html), not the YAML 1.2 core schema. Support depends on the parser: Kubernetes v1.35.0 vendors `sigs.k8s.io/yaml` v1.6.0 and `go.yaml.in/yaml/v2` v2.4.3; check the parser your tool uses before relying on a merge. For larger reuse patterns, purpose-built templating tools may make the generated documents easier to inspect.
 
 ```yaml
 # Define an anchor named 'common_labels'
@@ -138,7 +138,7 @@ backend_pod:
     name: node-api
 ```
 
-When a YAML parser resolves that document, it expands the alias before Kubernetes receives the object. The API server does not store an anchor as a special Kubernetes feature; it receives the resulting mapping. That distinction matters when debugging because an error from the API server refers to the expanded object shape, not to your reuse shortcut. Anchors can be useful in a small local exercise, but in shared production repositories they can make review harder if teammates are not expecting implicit expansion.
+With a parser that supports merge keys, the alias is expanded into the resulting mapping before submission. A different parser can reject or interpret the extension differently. This distinction matters when debugging because validation concerns the resulting object shape, not an anchor as a special Kubernetes API field. The JSON below illustrates the intended expansion; inspect your tool's output before using this technique in a shared repository. In a shared repository, explain the reuse pattern so reviewers do not have to guess where the keys came from.
 
 ```json
 {
@@ -154,7 +154,7 @@ When a YAML parser resolves that document, it expands the alias before Kubernete
 <details>
 <summary>Check your prediction</summary>
 
-It contains the three shared labels from `common_labels` plus the explicit `name: react-frontend` key. The merge keeps the mapping flat, which is why the JSON representation above has four sibling keys rather than a nested `base_labels` object.
+With merge support, it contains the three shared keys plus `name: react-frontend`, as four siblings rather than a nested `base_labels` object.
 
 </details>
 
@@ -181,9 +181,9 @@ flowchart LR
     style D text-align:left
 ```
 
-The `apiVersion` field selects the API group and version that define the resource schema. Core resources such as Pods, Services, ConfigMaps, and Secrets use `v1` because they belong to the core API group. Deployments use `apps/v1`, Ingresses use `networking.k8s.io/v1`, and many operators add custom API groups for their own resources. The slash in `apps/v1` is not a path separator in a file system; it separates the group from the version so Kubernetes can choose the correct schema and storage strategy.
+The `apiVersion` field selects the API group and version that define the resource schema. Core resources such as Pods, Services, ConfigMaps, and Secrets use `v1`; Deployments use `apps/v1`. The slash separates group from version rather than naming a file-system path. Operators can add custom resources with their own API groups and versions. Use discovery to check which group and version your target cluster serves instead of assuming an example from another cluster applies unchanged.
 
-The `kind` field names the type of object inside that API version. `Deployment`, `Service`, `Pod`, `Job`, `StatefulSet`, and `Ingress` are different kinds, and each one has its own expected `spec` structure. A common beginner error is pairing a valid kind with the wrong API version, such as `kind: Deployment` under `apiVersion: v1`. That is not a small typo; it asks the core API group to recognize an object it does not own, so the server returns a "no matches for kind" error.
+The `kind` field names the type of object inside that API version. `Deployment`, `Service`, `Pod`, `Job`, `StatefulSet`, and `Ingress` have different schemas and object-specific fields. Pairing `kind: Deployment` with `apiVersion: v1` asks for a Deployment in the wrong group. Kubectl cannot map that group/version/kind through discovery and can report "no matches for kind" before submitting an object. Discovery requests may still reach the API server, so failure before object submission does not imply that no network request occurred.
 
 The `metadata` field gives the object identity and the metadata that other controllers and tools use to find it. The `name` must be unique for that resource kind within a namespace. The `namespace` scopes names and policies, and omitting it means the object lands in the current or default namespace, depending on the command context. Labels are structured key-value pairs used by selectors, while annotations hold non-identifying metadata for tools, controllers, and humans. Treat labels as routing and grouping inputs, and treat annotations as descriptive or integration metadata unless a specific controller documents otherwise.
 
@@ -206,14 +206,14 @@ Write the replaced field and its replacement before you continue. The next secti
 
 You should not try to memorize the full Kubernetes API. Even the built-in resources have deeply nested fields, and production clusters often add CustomResourceDefinitions for ingress controllers, certificate managers, policy engines, database operators, service meshes, and delivery systems. Kubernetes gives you a better approach: query the OpenAPI schema through `kubectl explain`. This turns the cluster itself into the version-matched reference for the fields it accepts, and using the full command name keeps examples portable between your terminal, shell scripts, and CI jobs.
 
-The basic habit is to traverse from a kind to the field you want to inspect. If you need to know what belongs directly under a Pod `spec`, ask for that exact path. The output includes a description and field list, and the type hints tell you whether the field expects a scalar, a mapping, or a sequence. Those hints map directly back to YAML structure: `<string>` means a scalar, `<Object>` means a mapping, `<[]Object>` means a sequence of mappings, and `<map[string]string>` means a mapping from string keys to string values.
+Traverse from a kind to the field you want to inspect. For a Pod, ask for `pod.spec` to see its field descriptions and type hints before choosing a nested path. The hints describe the expected shape: `<string>` is a string scalar, a named type such as `<Probe>` is an object, a `[]` prefix denotes a list, and `<map[string]string>` is a mapping of string keys to string values. Translate those shapes into YAML scalars, mappings and sequences; inspect the actual output for the field and cluster version rather than memorizing a generic placeholder type.
 
 ```bash
 # General syntax: kubectl explain <kind>.<field>.<field>
 kubectl explain pod.spec
 ```
 
-When you want more of the field tree at once, use the same field path with `--recursive`. The important habit is not memorizing a snippet from an old blog post; it is using the live schema instead of guessing from memory. That habit matters even more on clusters with CRDs, because the reference that matches your target cluster may be the API server itself rather than a public website.
+Use `--recursive` to request fields of fields; the reference describes this as currently one level deep. For deeper details, query the exact path rather than assuming a complete tree. The important habit is using the available schema instead of guessing from memory. This is especially useful for CRDs that publish an OpenAPI schema, because the reference matching the target cluster may differ from an old public example.
 
 ```bash
 kubectl explain pod.spec --recursive
@@ -250,11 +250,7 @@ You can continue drilling down even further to see the exact parameters required
 kubectl explain pod.spec.containers.livenessProbe.httpGet
 ```
 
-The `--recursive` flag is useful when you want the structural outline without reading a long description for every field. It is not a replacement for targeted field lookup, because a full recursive dump can be large, but it is excellent when you are trying to see the rough shape of a resource before authoring a manifest. For a Deployment, the recursive view quickly reminds you that the container list is inside `spec.template.spec`, not directly under the Deployment root.
-
-```bash
-kubectl explain deployment --recursive
-```
+The `--recursive` flag gives a structural outline without requiring a separate lookup for every immediate field, but it is not a substitute for targeted lookup. For a Deployment's container list, query `deployment.spec.template.spec.containers` directly. The path reminds you that the Pod template is nested under the Deployment spec, while container fields belong under the template's Pod spec.
 
 ```bash
 kubectl explain deployment --recursive
@@ -266,7 +262,7 @@ Before running this, what output do you expect if you ask for `kubectl explain p
 kubectl explain pod.spec.nodeSelector
 ```
 
-This schema-first workflow is especially valuable in air-gapped environments. If your production cluster has no internet access, the API server still knows its own schema, including installed CRDs and admission-time expectations that generic web examples cannot cover. A senior Kubernetes engineer does not memorize every field; they know how to ask the cluster precise questions, then translate the returned types into YAML shapes that the API server can validate.
+This schema-first workflow is useful in air-gapped environments when the target cluster publishes the relevant schema, including a CRD's schema. A generic example may describe a different version from the one installed in the cluster. Admission policies and runtime behavior need separate checks, even after a field appears in the schema. Ask the cluster precise questions, then translate the returned types into YAML shapes and use an appropriate validation step before deployment.
 
 ## 4. Common YAML Patterns in Kubernetes
 
@@ -295,7 +291,7 @@ spec:
             key: api-key
 ```
 
-Notice that every environment variable starts with a hyphen at the same indentation level. If you remove one of those hyphens, you are no longer providing a sequence item, even if the text looks close to correct. Kubernetes will reject the manifest with a type mismatch because the OpenAPI schema expects a list of `EnvVar` objects. That is why `kubectl explain pod.spec.containers.env` is more useful than visual guessing when you are unsure.
+Every environment variable starts with a hyphen at the same indentation level. Removing one can merge keys into the preceding item or create another unintended shape, even if the file still looks close to correct. The resulting validation error depends on the data produced; a duplicate key and a list-versus-mapping error are not interchangeable diagnoses. Inspect that shape and use `kubectl explain pod.spec.containers.env` rather than guessing.
 
 Volumes demonstrate a different source of mistakes because the configuration is split across two parts of the pod. The pod-level `spec.volumes` sequence declares volume sources, such as ConfigMaps, Secrets, empty directories, projected volumes, or persistent volume claims. Each container-level `volumeMounts` sequence decides where a named volume appears inside that container's filesystem. The link between those blocks is the volume name, so the names must match exactly.
 
@@ -319,7 +315,7 @@ spec:
       name: my-app-config
 ```
 
-The split design is intentional. One pod can define several volumes, and different containers can mount different subsets of those volumes at different paths. The tradeoff is that a typo in the shared name is not a YAML error and may not be caught by client-side validation. The pod is syntactically valid but cannot mount what it references, so you diagnose the problem by reading pod events with `kubectl describe pod <name>` after creation or by reviewing the two name fields together before deployment.
+One pod can define several volumes and containers can mount different subsets at different paths. This split allows one source to be presented differently to different containers, but it makes the shared name worth checking carefully. A mount name with no matching volume is valid YAML but fails API validation; server dry run can catch it. Compare both name fields before deployment. Pod events are useful for runtime dependency problems, such as a missing referenced ConfigMap, after an object is accepted.
 
 Labels and selectors are mappings that connect resources without hard-coding pod names. A Service does not send traffic to a specific pod identity; it watches for pods whose labels match its selector. That indirection is what lets Kubernetes replace pods during rollouts while the Service remains stable. It also means a one-character label mismatch can create a healthy-looking Service with no endpoints.
 
@@ -371,9 +367,9 @@ spec:
   # ... service details ...
 ```
 
-Order matters less than beginners often fear, but it still matters for clean rollouts and readable logs. `kubectl` sends documents in file order, while controllers reconcile asynchronously after the objects exist. If a Deployment appears before the ConfigMap it references, the Deployment object can be accepted and the first pods may fail until the ConfigMap is created. Kubernetes will often recover once the dependency exists, but a pipeline that creates avoidable crash-loop events is harder to monitor and harder to trust.
+`kubectl` processes documents in file order, while controllers reconcile asynchronously after objects exist. A Deployment can be accepted before its referenced ConfigMap exists, leaving containers unable to start until the dependency is available. This distinction explains why acceptance of the first document is not proof that its dependent workload is ready. Ordering dependencies first reduces avoidable startup errors and makes the first rollout easier to observe.
 
-For that reason, put foundational dependencies first: Namespaces, ServiceAccounts, ConfigMaps, Secrets, PersistentVolumeClaims, then workload controllers, then Services and ingress-facing resources as appropriate for your delivery system. GitOps tools such as Argo CD and Flux add their own ordering and health concepts, but they still consume manifests that must be valid Kubernetes objects. Multi-document files are not a substitute for dependency design; they are a packaging format for related desired state.
+Put foundational dependencies before workloads where practical. Multi-document files package related objects; they do not replace dependency design or make reconciliation synchronous.
 
 **Pause and predict:** does document order matter when you run `kubectl apply -f combined.yaml`?
 
@@ -398,31 +394,19 @@ Client-side dry run is a useful first pass while editing. It may contact the API
 kubectl apply -f my-pod.yaml --dry-run=client
 ```
 
-```bash
-kubectl apply -f my-pod.yaml --dry-run=client
-```
-
 Server-side dry run asks the actual API server to process the request through authentication, authorization, schema validation, defaulting, and admission control, but it stops before persisting the object. That makes it the better preflight for shared clusters, CRDs, and policy-heavy environments. If your CI system has cluster access, server-side dry run gives you confidence that the real control plane can accept the manifest under current conditions.
 
 ```bash
 kubectl apply -f my-pod.yaml --dry-run=server
 ```
 
-```bash
-kubectl apply -f my-pod.yaml --dry-run=server
-```
-
-The `diff` command answers a different question: what would change compared with live state? This is vital for updates because a valid manifest can still make an unsafe change. For example, changing a Deployment selector can orphan existing ReplicaSets, and changing Service selector labels can remove endpoints from a traffic path. A dry run tells you whether the server accepts the request; a diff helps you judge whether the accepted change is the one you intended.
+The `diff` command asks what would change compared with live state. This matters because an object can pass validation while still changing a relationship the operator meant to keep. An `apps/v1` Deployment selector is immutable after creation, while a Service selector change can remove endpoints. A dry run checks acceptance under current conditions; a diff helps you assess whether the proposed change matches the intended operational outcome.
 
 ```bash
 kubectl diff -f my-updated-deployment.yaml
 ```
 
-```bash
-kubectl diff -f my-updated-deployment.yaml
-```
-
-The best debugging workflow is deliberate. Start with the exact error message and decide which layer it belongs to. If the parser says it cannot convert YAML to JSON, inspect indentation, colons, tabs, and missing hyphens around the reported line and the lines immediately above it. If Kubernetes reports an invalid field or type, use `kubectl explain` to inspect the expected path. If server-side dry run fails after client-side dry run succeeds, look for cluster-specific causes such as a missing namespace, CRD version, RBAC denial, or admission policy.
+Start with the exact error and identify the layer. For YAML-to-JSON parsing errors, inspect nearby indentation, colons, tabs and sequence markers. For an invalid field or type, inspect the expected path with `kubectl explain`. With a Kubernetes 1.27+ server, client dry run can succeed while ordinary schema errors appear during server dry run; also investigate namespace, CRD, RBAC and admission causes. Keep the error and the command that produced it together, because a validation response and a workload event describe different stages of the request lifecycle.
 
 Treat each verifier result as evidence about where the manifest failed, not as a personal judgment about the author. A parser error says the text did not become a data tree, so editing the `apiVersion` will not help until the indentation or scalar syntax is repaired. A schema error says the data tree exists but does not match the object contract, so adding more document separators will not fix a misplaced `image` field. An admission error says the object is valid Kubernetes data but violates something true about the target cluster, such as a policy requiring ownership labels or a namespace quota limiting resource requests. This separation prevents frantic trial-and-error edits and makes review conversations more precise.
 
@@ -430,32 +414,32 @@ Treat each verifier result as evidence about where the manifest failed, not as a
 error: error parsing deployment.yaml: error converting YAML to JSON: yaml: line 15: mapping values are not allowed in this context
 ```
 
-This usually means the YAML parser hit a structural contradiction before Kubernetes validation even began. The line number is a clue, not a verdict, because the actual mistake is often on the previous line. Missing hyphens under sequences, inconsistent indentation, or an unquoted colon inside a string can make the parser expect a key where it finds something else.
+This illustrative message describes a YAML parsing failure before Kubernetes validation. Use the line as a clue and inspect surrounding structure: indentation, sequence markers and unquoted colons can change what the parser expects.
 
 ```text
 The Deployment "my-app" is invalid: spec.replicas: Invalid value: "3": spec.replicas must be an integer
 ```
 
-This is a schema type mismatch. YAML accepted `"3"` as a string, but the Deployment schema requires an integer for `spec.replicas`. The fix is not to silence validation; it is to represent the value with the type the schema expects, which means `replicas: 3` without quotes.
+This illustrative message describes a schema type mismatch; actual 1.35 diagnostics differ. YAML accepted `"3"` as a string, but `spec.replicas` requires an integer. Use `replicas: 3` without quotes. The repair changes the value's type to the one the schema expects; it does not require disabling validation or changing the Deployment's API group.
 
 ```text
 error: unable to recognize "pod.yaml": no matches for kind "Pod" in version "apps/v1"
 ```
 
-This points to the root contract. Pods are core resources under `apiVersion: v1`, while `apps/v1` owns higher-level workload controllers such as Deployments, ReplicaSets, StatefulSets, and DaemonSets. When `apiVersion` and `kind` do not belong together, the server cannot choose a schema.
+This illustrative message points to the root contract. Pods use `v1`; `apps/v1` includes controllers such as Deployments. Kubectl cannot map an unmatched group/version/kind through discovery before submitting the object; discovery itself can contact the server.
 
 ```text
 error: error parsing config.yaml: error converting YAML to JSON: yaml: unmarshal errors:
   line 12: mapping key "port" already defined at line 10
 ```
 
-Mappings require unique keys at the same indentation level. Duplicate keys are dangerous because some parsers historically allowed later values to overwrite earlier ones. Modern Kubernetes tooling rejects duplicates to prevent silent configuration loss, so the correct fix is to use a sequence when you need multiple ports or to remove the duplicate key when only one value is valid.
+This message is illustrative. YAML mappings require unique keys; non-strict conversion can silently retain one duplicate in an undefined order. Strict validation can reject duplicates. Use a sequence when multiple ports are intended or remove the duplicate key.
 
 ```text
 error: error validating "deployment.yaml": error validating data: ValidationError(Deployment.spec.template.spec): unknown field "image" in io.k8s.api.core.v1.PodSpec;
 ```
 
-Unknown field errors usually mean the field is real but misplaced, or the field belongs to a different API version. In this example, `image` belongs inside a container object under `spec.template.spec.containers[]`, not directly under the pod spec. Follow the path in the error message, then use `kubectl explain deployment.spec.template.spec.containers` to confirm the valid structure.
+This illustrative legacy-format message identifies an unknown field; actual strict 1.35 output differs. Here `image` belongs inside a container under `spec.template.spec.containers[]`, not directly under the pod spec. Follow the reported path and inspect the schema with `kubectl explain`.
 
 Exercise scenario: a platform team adds a new `podLabels` field copied from a Helm chart values file directly into a rendered Deployment manifest. The field makes sense in the chart input, but it is not part of the Kubernetes Deployment schema. Client-side checks on one developer laptop miss it because the local script skips validation for generated files, while server-side dry run in CI rejects it before production. The right repair is to fix the chart template or values mapping instead of weakening validation, because the problem is a boundary mistake between a templating interface and the Kubernetes API.
 
@@ -472,7 +456,7 @@ Strong Kubernetes YAML practice is less about memorizing snippets and more about
 
 | Anti-Pattern | What Goes Wrong | Why Teams Fall Into It | Better Alternative |
 | :--- | :--- | :--- | :--- |
-| Guessing list versus mapping shape | The file is valid YAML but fails schema validation or creates the wrong object shape | Examples look visually similar, especially around `containers`, `env`, and `ports` | Read the schema type and map `<[]Object>` to hyphenated sequence items |
+| Guessing list versus mapping shape | The file is valid YAML but fails schema validation or creates the wrong object shape | Examples look visually similar, especially around `containers`, `env`, and `ports` | Read the schema type: a list needs sequence items |
 | Copying chart values into manifests | Fields that belong to a templating tool are rejected by the Kubernetes API | The chart input and rendered output both use YAML, so the boundary feels blurry | Render the chart, inspect the output, and validate the actual Kubernetes manifest |
 | Quoting every scalar defensively | Integers and booleans become strings where the schema requires native types | Teams try to avoid YAML type surprises by treating everything as text | Quote ambiguous strings, but leave numeric fields unquoted when the schema expects numbers |
 | Treating client dry run as final proof | Cluster-specific policy, RBAC, CRDs, and admission failures appear later | Client validation gives useful early feedback | Use client dry run for editing and server-side dry run before merge or release |
@@ -528,8 +512,8 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 ## Did You Know?
 
-* **YAML version differences caused real surprises:** YAML 1.1 treated several unquoted words, including `NO`, as booleans. That surprised teams using country codes and other short identifiers, which is why quoting ambiguous strings remains a practical habit even when modern tooling follows YAML 1.2 more closely.
-* **Kubernetes stores object state through etcd limits:** Large ConfigMaps and Secrets are constrained by the API server and etcd storage path, and Kubernetes documents a 1 MiB limit for individual ConfigMap data. If configuration approaches that size, use mounted files, object storage, or another delivery pattern instead of forcing everything into one manifest.
+* **YAML version differences:** YAML 1.2's core schema treats `yes` and `no` as strings, but Kubernetes 1.35's vendored YAML-to-JSON library documents YAML 1.1-style boolean conversion. Quote ambiguous strings and check the parser used by your tool.
+* **ConfigMap data is bounded:** Kubernetes documents a 1 MiB limit for ConfigMap data. Consider another configuration delivery mechanism when data approaches that limit.
 * **JSON is valid YAML:** YAML is designed so JSON documents are also valid YAML documents. `kubectl` can apply JSON files directly, which is useful for generated payloads and API integrations where human editing is not the main goal.
 * **The API server cares about structure, not formatting taste:** Two manifests can look similar in a review while producing different data trees. A missing sequence hyphen under `containers` changes the data type, and the API server validates the data tree after parsing, not your visual intention.
 
@@ -539,7 +523,7 @@ The framework also tells you when YAML is not the real problem. If server-side d
 | :--- | :--- | :--- |
 | **Using tabs for indentation** | Copying from chat tools, browsers, or editors that insert tabs makes YAML invalid before Kubernetes sees it. | Configure the editor to insert two spaces for YAML files and show whitespace during review. |
 | **Pairing the wrong `apiVersion` with a `kind`** | Engineers guess from nearby examples, such as using `v1` for a Deployment because Pods use `v1`. | Run `kubectl api-resources` or `kubectl explain <kind>` and verify the API group before writing the manifest. |
-| **Missing hyphens for sequences** | Fields like `containers`, `env`, `ports`, and `volumeMounts` look like nested mappings until you inspect their schema. | If `kubectl explain` shows `<[]Object>`, write a hyphenated list item at the correct indentation level. |
+| **Missing hyphens for sequences** | Fields like `containers`, `env`, `ports`, and `volumeMounts` look like nested mappings until you inspect their schema. | If `kubectl explain` shows a list type, write sequence items at the correct indentation. |
 | **Quoting values with the wrong type** | Teams quote every value to avoid YAML surprises, then fields like `replicas` or `port` become strings. | Quote ambiguous strings, but leave numeric schema fields unquoted when Kubernetes expects integers. |
 | **Forgetting `---` between resources** | Multiple resources are pasted into one file and the parser treats them as one broken or overwritten document. | Place `---` on a line by itself between complete Kubernetes objects in a multi-document file. |
 | **Mismatching Service selectors and pod labels** | Each resource validates locally, but the relationship between them is semantic and easy to miss. | Review Service selectors beside Deployment pod-template labels and confirm endpoints after apply. |
@@ -555,17 +539,17 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 <details><summary>2. Scenario: During a production hotfix, an engineer runs `kubectl apply -f hotfix.yaml` and receives `error converting YAML to JSON: yaml: line 22: did not find expected key`. Line 22 contains `image: nginx:alpine`, which looks harmless. What should they inspect first?</summary>
 
-**Answer:** They should inspect the indentation and sequence structure around the `containers` block, including the lines immediately before line 22. YAML parser errors often point to the line where parsing became impossible, not necessarily the line where the mistake began. A missing hyphen before a container item or an incorrectly indented `name` field can make `image` appear where the parser expected a different key. This maps to the diagnostic outcome because the fix comes from reasoning about YAML structure before assuming the image value is wrong.
+**Answer:** Inspect indentation and sequence structure around `containers`, including nearby lines. A parser diagnostic locates where the parser detected a problem; inspect the surrounding text before deciding which edit is needed. A misplaced sequence marker or `name` field can change the resulting structure.
 </details>
 
 <details><summary>3. Scenario: You are in an air-gapped cluster and need to mount a PersistentVolumeClaim, but you cannot remember whether `readOnly` belongs under `volumes` or `volumeMounts`. How do you find the correct field path without web access?</summary>
 
-**Answer:** Use `kubectl explain` to query the cluster's OpenAPI schema for the relevant nested fields. Compare `kubectl explain pod.spec.volumes.persistentVolumeClaim` with `kubectl explain pod.spec.containers.volumeMounts` and read the field descriptions and types. The cluster's schema is authoritative for that Kubernetes version and installed resources, so it is safer than memory or old examples. This evaluates the ability to diagnose and design manifests by traversing schema paths rather than guessing.
+**Answer:** Compare `kubectl explain pod.spec.volumes.persistentVolumeClaim` with `kubectl explain pod.spec.containers.volumeMounts`. A PVC volume source and a container mount both have `readOnly`; the source setting can force mounts read-only, while the mount setting applies to that mount. Read the descriptions and types for your target version.
 </details>
 
 <details><summary>4. Scenario: A Custom Resource manifest is rejected immediately, and the error says the object cannot be recognized. The YAML syntax is valid and indentation is clean. Which root-level Kubernetes contract should you verify?</summary>
 
-**Answer:** Verify `apiVersion` and `kind` first, then confirm `metadata.name` exists and the resource uses the expected object body such as `spec`. The API server uses `apiVersion` and `kind` to locate the schema and handler for the object, so a typo or wrong version prevents deeper validation. For CRDs, the installed version in the cluster must match the manifest version. This tests deconstruction of the root manifest fields and their role in API routing.
+**Answer:** Verify `apiVersion` and `kind`, then `metadata.name` and the expected body. Kubectl uses discovery to map a group/version/kind before submitting an object. For a custom resource, confirm the version is served by the installed CRD; discovery may itself contact the API server.
 </details>
 
 <details><summary>5. Scenario: A 500-line application bundle passes `kubectl apply --dry-run=client -f app.yaml`, but the real apply is rejected by an admission policy for a required label. Why did client-side validation miss it, and what should the pipeline do?</summary>
@@ -587,7 +571,7 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 In this synthetic exercise, you will build a small multi-resource application manifest, intentionally encounter structural failures, and use server dry runs to repair them. Server dry run sends requests through validation and admission without persisting the objects. Use an independently confirmed dedicated disposable Kubernetes 1.35+ lab context and an existing namespace in that lab. The conceptual examples earlier in this module are separate from this dry-run exercise.
 
-Set `KUBEDOJO_LAB_CONTEXT` and `KUBEDOJO_LAB_NAMESPACE` to the confirmed context and existing namespace before setup; the literal context name `default` is refused (a namespace named `default` is allowed). Use one fresh Bash terminal. The guard cannot prove the cluster is disposable, and it does not change kubeconfig preferences. Setup creates and enters a fresh scratch directory so `dojo-app.yaml` cannot overwrite an existing file; retain the directory for inspection and remove it manually when no longer needed.
+Set `KUBEDOJO_LAB_CONTEXT` and `KUBEDOJO_LAB_NAMESPACE` to the confirmed context and existing namespace before setup; the literal context name `default` is refused (a namespace named `default` is allowed). Use one fresh Bash terminal. The guard cannot prove the cluster is disposable, and it does not change kubeconfig preferences. Setup uses `mktemp -d` to create and enter a fresh scratch directory so `dojo-app.yaml` cannot overwrite an existing file; retain it for inspection and remove it manually when no longer needed. See the [FreeBSD](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1) and [GNU](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html) manuals.
 
 ```bash
 YAML_READY=no YAML_NEW=no
@@ -655,7 +639,7 @@ should become:
     image: nginx:1.27
 ```
 
-The exact line number in the parser error may vary, but the structural issue is the missing sequence item under `containers`.
+The original YAML can parse: `name` and `image` become siblings of `containers`. Strict server field validation rejects those unknown PodSpec fields; adding the hyphen puts them inside the container sequence. Diagnostic wording can vary.
 </details>
 
 ### Task 3: Adding a Service Safely
@@ -767,7 +751,16 @@ service/web-app-svc created (server dry run)
 This checks the requests through the server validation and admission path; it does not prove scheduling, image availability, Service reachability, or application behavior. Server dry runs do not persist the ConfigMap for a dependent object, so they cannot establish that the running bundle will find its dependency. Inspect references and selectors separately; this exercise never persists the objects.
 </details>
 
-**Card A: The sequence count is off by one.** A reviewer counts every hyphen in the `users` block, including the ones under `permissions`, and reports four users.
+### Task 6: Design and Check a Label Contract
+
+Choose a new `tier` value and add it to the Deployment's Pod template labels. First predict what happens if the Service instead selects a different `tier` value. Make that mismatch in your scratch file, run `yaml_check`, and compare the two mappings: server dry run can succeed even when no Pods match the Service selector, so its success does not prove endpoint membership. Correct the Service selector to match your chosen value and run `yaml_check` again. Record the value you chose, the mismatch, both outcomes, and why the matched mappings matter. Keep using server dry run; do not apply the bundle.
+
+<details><summary>Hint 1</summary>Which two mappings connect a Service to Pods?</details>
+<details><summary>Hint 2</summary>Compare every Service selector key and value with the Pod template labels; do not change the Deployment selector.</details>
+<details><summary>Hint 3</summary>After trying a mismatch, align the Service's <code>tier</code> with the template label, then run <code>yaml_check</code> again.</details>
+<details><summary>After your attempt: one possible approach</summary>A template label <code>tier: web</code> and Service selector <code>tier: api</code> do not match. Change the Service value to <code>web</code>, inspect both mappings, and repeat the dry run. Other label values work if the mappings agree.</details>
+
+**Card A: The sequence count is off.** A reviewer counts every hyphen in the `users` block, including the ones under `permissions`, and reports five users.
 
 <details>
 <summary>Check your prediction</summary>
@@ -790,7 +783,7 @@ Failure layer: the folded scalar turned newlines into spaces. Next action: switc
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: the merge key flattens the alias into the parent mapping. Next action: read the expanded keys, and do not look for a nested `base_labels` object.
+With a parser that supports the YAML 1.1 merge extension, the alias contributes keys to the parent mapping. Check your parser's output rather than assuming every YAML implementation supports it.
 
 </details>
 
@@ -820,6 +813,7 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 - [ ] You appended a Service as a separate YAML document using `---`.
 - [ ] You prepended a ConfigMap dependency and referenced it from the Deployment environment.
 - [ ] You ran the server dry run and identified its limits for the ConfigMap, Deployment, and Service.
+- [ ] You chose a `tier`, diagnosed a selector mismatch, aligned the mappings and recorded why dry run alone cannot prove endpoint membership.
 
 ## Sources
 
@@ -834,9 +828,12 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 * [kubectl explain reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/)
 * [Kubernetes v1.35 kubectl apply reference](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
 * [Kubernetes v1.35 API dry-run and field validation](https://v1-35.docs.kubernetes.io/docs/reference/using-api/api-concepts/#dry-run)
+* [Kubernetes v1.35 CRD versions](https://v1-35.docs.kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/)
 * [kubectl v1.35.0 apply implementation](https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go)
 * [kubectl diff reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/)
 * [YAML 1.2.2 specification](https://yaml.org/spec/1.2.2/)
+* [YAML 1.1 specification](https://yaml.org/spec/1.1/), [merge working draft](https://yaml.org/type/merge.html), [Kubernetes v1.35.0 vendored YAML converter](https://github.com/kubernetes/kubernetes/blob/66452049f3d692768c39c797b21b793dce80314e/vendor/sigs.k8s.io/yaml/yaml.go), and [vendored YAML v2 decoder](https://github.com/kubernetes/kubernetes/blob/66452049f3d692768c39c797b21b793dce80314e/vendor/go.yaml.in/yaml/v2/decode.go)
+* [FreeBSD mktemp](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1), [GNU mktemp](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html)
 
 ## Next Module
 
