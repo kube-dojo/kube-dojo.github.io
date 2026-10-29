@@ -721,15 +721,90 @@ The commands create one ConfigMap, one Secret, and one Pod in the exercise names
 
 Read the stored Secret and decode the single value so you can see exactly where base64 applies. This step builds the habit of distinguishing Kubernetes serialization from actual confidentiality.
 
+<details><summary>Hint 1: Concept</summary>
+
+Compare the stored representation with the bytes a consumer receives; encoding is not secrecy.
+</details>
+
+<details><summary>Hint 2: Component</summary>
+
+Inspect the Secret's `data` field, then decode its `DB_PASS` entry.
+</details>
+
+<details><summary>Hint 3: Command</summary>
+
+Use `cfg_lab get secret app-secret` and the guarded decoding pipeline below; stop if either command fails.
+</details>
+
 ```bash
 cfg_lab get secret app-secret -o yaml
-cfg_lab get secret app-secret -o jsonpath='{.data.DB_PASS}' | base64 -d && printf '\n'
+(set -o pipefail; cfg_lab get secret app-secret -o jsonpath='{.data.DB_PASS}' | base64 -d) && printf '\n'
 ```
 
 <details><summary>Solution notes for Task 2</summary>
 
 The YAML view shows encoded data under `.data.DB_PASS`, while the decode command prints the original lab value. That proves base64 is reversible by anyone with read access. In a production review, this is the point where you verify RBAC, encryption at rest, and whether the Secret manifest itself was ever committed in plaintext.
 
+</details>
+
+### Diagnose a waiting Pod
+
+Create this deliberately broken Pod in the same exercise namespace after Task 2. Investigate why it cannot start, compare its references with the existing objects, make a targeted repair, and verify the **same Pod** becomes Ready. Record the Pod UID before and after. Do not delete and recreate it to hide the symptom; if a command fails, stop and use the owned cleanup.
+
+```bash
+cat <<'EOF' | cfg_lab apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-diagnosis
+spec:
+  containers:
+  - name: test
+    image: busybox:1.36.1
+    command: ['sh', '-c', 'sleep 3600']
+    env:
+    - name: MODE
+      valueFrom:
+        configMapKeyRef:
+          name: app-config
+          key: MODE
+EOF
+```
+
+<details><summary>Hint 1: Concept</summary>
+
+A waiting container has several possible causes. Use evidence before changing configuration.
+</details>
+
+<details><summary>Hint 2: Component</summary>
+
+Compare the Pod's event and environment reference with the ConfigMap in the exercise namespace.
+</details>
+
+<details><summary>Hint 3: Command</summary>
+
+Use `cfg_lab describe pod config-diagnosis` and `cfg_lab get configmap app-config -o yaml`; record its UID with `cfg_lab get pod config-diagnosis -o jsonpath='{.metadata.uid}'`.
+</details>
+
+<details><summary>After your attempt: one repair</summary>
+
+The Pod refers to `MODE` in `app-config`, which initially has `LOG_LEVEL` and `APP_NAME`. Events can identify the missing key; timing varies, so wait for an event rather than infer the cause from Waiting alone. Add a synthetic value and check the same UID and readiness:
+
+```bash
+cfg_lab patch configmap app-config --type=merge -p '{"data":{"MODE":"practice"}}'
+cfg_lab wait --for=condition=Ready pod/config-diagnosis --timeout=120s
+cfg_lab get pod config-diagnosis -o jsonpath='{.metadata.uid}{"\n"}'
+cfg_lab exec config-diagnosis -- printenv MODE
+```
+
+Compare the UID with your earlier record and the value with the patch. A timeout does not establish the cause; inspect events and stop before cleanup if you cannot explain the result.
+</details>
+
+**Transfer:** If a Pod instead references a ConfigMap that exists only in another namespace, would adding a key to that other object resolve the reference? Explain which namespace and object you would inspect first.
+
+<details><summary>Check your transfer reasoning</summary>
+
+No. Inspect the Pod's namespace and its referenced object name and key there. Ordinary ConfigMap references do not cross namespaces; arrange the needed object in the Pod's namespace rather than assuming the other one is visible.
 </details>
 
 ### Task 3: Prove environment variables are static
@@ -778,6 +853,21 @@ The first `apply` may warn that the ConfigMap lacks its last-applied-configurati
 
 Delete the original Pod and recreate it with the ConfigMap mounted at `/etc/app-config`. Then inspect the directory to see how keys become files.
 
+<details><summary>Hint 1: Concept</summary>
+
+The application needs files rather than a startup environment snapshot.
+</details>
+
+<details><summary>Hint 2: Component</summary>
+
+Connect a ConfigMap volume to the container with a directory mount, then inspect that directory.
+</details>
+
+<details><summary>Hint 3: Command</summary>
+
+After applying the Pod, wait for Ready and use `cfg_lab exec config-test -- ls -l /etc/app-config`.
+</details>
+
 ```bash
 cfg_lab delete pod config-test
 cat << 'EOF' | cfg_lab apply -f -
@@ -812,6 +902,21 @@ Each ConfigMap key appears as a file under `/etc/app-config`. This layout is bet
 ### Observe a mounted file update
 
 Task 4 created a Pod that mounts the ConfigMap as files. Predict what changes in the API and the mounted file when you update the object, and whether that alone proves an application reloaded it. The check below records the Pod UID, API values, file reads and UTC times. After its baseline read, the loop makes at most 30 reads with five-second waits; a timeout is an inconclusive observation, not proof that propagation cannot happen. On any error or timeout, stop and use the same-shell cleanup below.
+
+<details><summary>Hint 1: Concept</summary>
+
+Separate the API update, file delivery and application reload into distinct observations.
+</details>
+
+<details><summary>Hint 2: Component</summary>
+
+Compare the object value and file reads in the same Pod, using its UID to detect replacement.
+</details>
+
+<details><summary>Hint 3: Command</summary>
+
+The check uses `cfg_lab get`, `cfg_lab patch` and repeated `cfg_lab exec ... cat`; record its output and times.
+</details>
 
 ```bash
 observe_cfg_file() {
@@ -848,6 +953,21 @@ The repeated `cat` reads the file in the same Pod; it does not prove that an app
 ### Task 5: Clean up and record success criteria
 
 Run cleanup in the same terminal, including after an interruption. It compares the live namespace UID with the successful creation response before deleting the namespace and its resources. Failed cleanup retains the receipt for a same-shell retry. This check is not atomic with deletion and assumes no concurrent namespace replacement.
+
+<details><summary>Hint 1: Concept</summary>
+
+Only remove the namespace you can identify as the one created for this exercise.
+</details>
+
+<details><summary>Hint 2: Component</summary>
+
+Compare the saved creation UID and context with the live namespace; a changed UID or failed read stops deletion.
+</details>
+
+<details><summary>Hint 3: Command</summary>
+
+Run the same-shell `cleanup_cfg_lab` function below; after failure, inspect before retrying.
+</details>
 
 ```bash
 cleanup_cfg_lab() {
@@ -918,7 +1038,7 @@ Success criteria:
 
 - [ ] ConfigMap `app-config` was created and inspected successfully.
 - [ ] Secret `app-secret` was created and decoded without confusing base64 for encryption.
-- [ ] Pod `config-test` reached the Running state and displayed the expected environment values.
+- [ ] Pod `config-test` reached the Ready condition and displayed the expected environment values.
 - [ ] Updating the ConfigMap did not change the already-running environment variable.
 - [ ] The ConfigMap was mounted as files under `/etc/app-config`.
 - [ ] The mounted-file check recorded the Pod UID, times and API/file observations, or reported an inconclusive timeout.
