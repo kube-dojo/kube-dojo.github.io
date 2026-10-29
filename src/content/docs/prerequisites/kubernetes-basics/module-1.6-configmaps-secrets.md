@@ -326,7 +326,7 @@ Tools can automate the restart side of this problem by changing the Pod template
 
 ## Worked Example: Refactoring Hardcoded Config
 
-Imagine a small web service that was originally built for a single developer laptop. It connects to a database at `localhost:5432`, uses a cache time-to-live of `3600`, and reads a password from a checked-in file. That design might work for a demo, but it fails the moment the same image needs to run in separate namespaces or clusters. The database location changes by environment, the cache policy may change during troubleshooting, and the password must rotate without producing a new application image.
+Imagine a small web service that was originally built for a single developer laptop. It connects to a database at `localhost:5432`, uses a cache time-to-live of `3600`, and reads a password from a checked-in file. That design might work for a demo, but its fixed settings can fail when the same image runs in environments with different dependencies. The database location may change by environment, the cache policy may change during troubleshooting, and the password must rotate without producing a new application image.
 
 The first step is to classify the values by sensitivity and update behavior. The cache TTL is not confidential, so it belongs in a ConfigMap. The database password is confidential, so it belongs in a Secret. A database host might be non-sensitive in a small lab but sensitive in a production environment where topology disclosure matters; this module keeps the example simple, but production teams should classify that value deliberately rather than by habit.
 
@@ -469,7 +469,7 @@ A third pattern is to match structured configuration to the application's file i
 
 The most common anti-pattern is treating Secrets as a complete vault. Kubernetes Secrets are API objects protected by Kubernetes controls; they are not a replacement for credential lifecycle management, short-lived tokens, access review, or external key management. Another anti-pattern is granting broad namespace permissions because a CI job or developer "just needs to deploy." If that role can create Pods, it may be able to extract Secrets indirectly. Review least-privilege RBAC, Pod-creation rights, namespace separation, and which containers receive each Secret.
 
-These patterns scale because they reduce ambiguity. A new engineer can inspect a Deployment and infer whether a value is safe configuration, sensitive credential material, dynamically refreshed file data, or versioned rollout input. That readability is not cosmetic; it lowers operational risk. During an outage, teams make fewer mistakes when the YAML expresses intent clearly enough that the next action is obvious.
+These patterns make ownership and delivery choices easier to inspect. A new engineer can review a Deployment and its referenced objects to understand whether a value is configuration, credential material, mounted file data, or a versioned rollout input. Clear intent can help an operator choose a next step during an outage, but a manifest alone cannot prove how an application handles the value.
 
 | Pattern or Anti-Pattern | When It Appears | Operational Consequence | Better Practice |
 |---|---|---|---|
@@ -632,34 +632,55 @@ Use a context you have independently confirmed is a dedicated disposable lab, an
 
 ```bash
 CFG_READY=no CFG_NEW=no
-if [ -z "${CFG_SETUP_SEEN+x}" ]; then
-  readonly CFG_SETUP_SEEN=1
-  if readonly CFG_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" CFG_NS="config-lab-$(date +%s)-$$"; then
-    CFG_NEW=yes; CFG_UID=
+if [ -n "${CFG_SETUP_SEEN+x}" ]; then
+  if [ -n "${CFG_UID:-}" ]; then
+    echo 'Setup already ran; preserve the UID, clean up, then use a fresh terminal' >&2
+  elif [ "${CFG_CREATE_ATTEMPTED:-unknown}" = no ]; then
+    echo 'No namespace creation was attempted; fix the context and use a fresh terminal' >&2
+  else
+    echo 'No UID recorded; a namespace may exist. Inspect it and do not delete without verified ownership' >&2
   fi
+elif [ -n "${CFG_CONTEXT+x}" ] || [ -n "${CFG_NS+x}" ] || [ -n "${CFG_UID+x}" ] ||
+     [ -n "${CFG_CREATE_ATTEMPTED+x}" ] ||
+     readonly -p | grep -Eq '(^| )CFG_(SETUP_SEEN|CONTEXT|NS|UID|CREATE_ATTEMPTED)(=|$)'; then
+  echo 'Existing CFG variables detected; preserve them and use a fresh terminal' >&2
 else
-  echo 'Setup was already attempted; preserve the receipt and clean up' >&2
+  readonly CFG_SETUP_SEEN=1
+  readonly CFG_CONTEXT="${KUBEDOJO_LAB_CONTEXT:-}" CFG_NS="config-lab-$(date +%s)-$$"
+  CFG_NEW=yes CFG_UID= CFG_CREATE_ATTEMPTED=no
 fi
 cfg_lab() {
   [ "$CFG_READY" = yes ] || { echo 'Setup incomplete; stop' >&2; return 1; }
   command kubectl --context "$CFG_CONTEXT" --namespace "$CFG_NS" "$@"
 }
-if [ "$CFG_NEW" = yes ] && [ -n "$CFG_CONTEXT" ] && [ "$CFG_CONTEXT" != default ] && CFG_CURRENT="$(command kubectl config current-context)" && [ "$CFG_CURRENT" = "$CFG_CONTEXT" ]; then
-  printf 'Exercise context/namespace: %s / %s\n' "$CFG_CONTEXT" "$CFG_NS"
-  if CFG_CREATED_UID="$(command kubectl --context "$CFG_CONTEXT" create namespace "$CFG_NS" -o jsonpath='{.metadata.uid}')" && [ -n "$CFG_CREATED_UID" ]; then
-    CFG_UID="$CFG_CREATED_UID"; CFG_READY=yes
+if [ "$CFG_NEW" = yes ]; then
+  if [ -z "$CFG_CONTEXT" ] || [ "$CFG_CONTEXT" = default ]; then
+    echo 'A non-default lab context is required; no namespace creation was attempted' >&2
+  elif ! CFG_CURRENT="$(command kubectl config current-context)"; then
+    echo 'Cannot read current context; no namespace creation was attempted' >&2
+  elif [ "$CFG_CURRENT" != "$CFG_CONTEXT" ]; then
+    printf 'Current context %s differs from lab context %s; no namespace creation was attempted\n' "$CFG_CURRENT" "$CFG_CONTEXT" >&2
+  else
+    printf 'Exercise context/namespace: %s / %s\n' "$CFG_CONTEXT" "$CFG_NS"
+    CFG_CREATE_ATTEMPTED=yes
+    if CFG_CREATED_UID="$(command kubectl --context "$CFG_CONTEXT" create namespace "$CFG_NS" -o jsonpath='{.metadata.uid}')" && [ -n "$CFG_CREATED_UID" ]; then
+      CFG_UID="$CFG_CREATED_UID"; CFG_READY=yes
+    else
+      echo 'Create failed or returned no UID; the namespace may exist. Inspect it; do not delete without verified ownership' >&2
+    fi
   fi
 fi
-[ "$CFG_READY" = yes ] || echo 'Setup failed; stop and inspect the error before continuing' >&2
 ```
 
-Continue only after setup succeeds. `cfg_lab` pins requests to the recorded context and namespace without changing kubeconfig preferences. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. Stop on a failed task command and clean up before retrying in a fresh terminal. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
+Continue only after setup succeeds. `cfg_lab` pins requests to the recorded context and namespace without changing kubeconfig preferences. Run setup once: re-pasting disables the helper while preserving any earlier UID for cleanup. After a refusal before creation, fix the context and use a fresh terminal. If a create request fails or returns no UID, it may still have created the namespace; inspect the printed name and do not delete without independently verified ownership. Stop on a failed task command and clean up before retrying in a fresh terminal.
 
 Record the printed context and namespace and the successful creation UID (`printf '%s\n' "$CFG_UID"`) somewhere you can retrieve if the terminal closes. If the shell is lost, the helper and its receipt are lost too: do not re-paste setup as a recovery procedure. Independently verify the intended context, namespace and saved creation UID against the live namespace before arranging deletion. If the saved UID or ownership is uncertain, do not delete it; ask the lab owner to investigate. This comparison still assumes no concurrent replacement and is not atomic with deletion.
 
 ### Task 1: Create the configuration objects
 
 Before looking at the commands, choose how you would create and inspect the settings and placeholder credential. What would the YAML view and Pod logs expose? Write your reasoning, then use the hints if needed. The following block is one possible solution, not a production credential pattern.
+
+**Required end state:** ConfigMap `app-config` has `LOG_LEVEL=debug` and `APP_NAME=myapp`; Secret `app-secret` has key `DB_PASS` with the synthetic value `secretpassword`. Long-running Pod `config-test` uses `busybox:1.36.1`, imports all `app-config` keys via `envFrom`, reads `DB_PASS` as `DB_PASSWORD`, and logs its startup environment. Use no real credential.
 
 <details><summary>Hint 1: Concept</summary>
 
@@ -744,7 +765,7 @@ Inspect the Secret's `data` field, then decode its `DB_PASS` entry.
 
 <details><summary>Hint 3: Command</summary>
 
-Use `cfg_lab get secret app-secret` and the guarded decoding pipeline below; stop if either command fails.
+Use `cfg_lab get secret app-secret` and the decoding pipeline below. `pipefail` catches command failures, but a missing key can produce empty output with success; an empty value may also be valid. Inspect the YAML for `DB_PASS` before interpreting the decode.
 </details>
 
 <details><summary>One possible solution for Task 2</summary>
@@ -848,7 +869,7 @@ Use `cfg_lab get configmap`, `cfg_lab exec ... printenv` and `cfg_lab logs` as s
 
 </details>
 
-Update the ConfigMap and compare those observations. The API should show the new value while the already-started container reports the old one.
+**Required end state:** update `app-config` to `LOG_LEVEL=info`, keep `APP_NAME=myapp`, and include `MODE=practice`. Compare those observations: the API should show the new log level while the already-started container reports the old one.
 
 <details><summary>One possible solution for Task 3</summary>
 
@@ -875,7 +896,7 @@ The first `apply` may warn that the ConfigMap lacks its last-applied-configurati
 
 ### Task 4: Rework the Pod to mount the ConfigMap as files
 
-Write your own Pod manifest in a here-document with the ConfigMap mounted at `/etc/app-config`. Delete the original Pod, then apply your manifest with `cfg_lab apply -f -`; use the hints before comparing your manifest with the solution. Inspect the directory to see how keys become files.
+Write your own manifest for a long-running Pod named `config-test`. Mount the whole `app-config` ConfigMap at `/etc/app-config`, without `subPath` or an `items` filter. Delete the original Pod, then apply your manifest with `cfg_lab apply -f -`; use the hints before comparing your manifest with the solution. Inspect the directory to see how keys become files.
 
 <details><summary>Hint 1: Concept</summary>
 
@@ -928,6 +949,8 @@ Each ConfigMap key appears as a file under `/etc/app-config`. This layout is bet
 </details>
 
 ### Observe a mounted file update
+
+Before continuing, wait for Ready with `cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s`, then inspect `cfg_lab get pod config-test -o yaml`. Verify the volume refers to `app-config`, the container mounts that volume at `/etc/app-config`, and neither `items` nor `subPath` restricts it. Finally, `cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL` should show `info`; correct the manifest or state before the observation if it does not.
 
 Task 4 created a Pod that mounts the ConfigMap as files. Predict what changes in the API and the mounted file when you update the object, and whether that alone proves an application reloaded it. The check below records the Pod UID, API values, file reads and UTC times. After its baseline read, the loop makes at most 30 reads with five-second waits; a timeout is an inconclusive observation, not proof that propagation cannot happen. On any error or timeout, stop and use the same-shell cleanup below.
 
@@ -1079,7 +1102,8 @@ Success criteria:
 - [Kubernetes v1.35 documentation: Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/)
 - [Kubernetes v1.35: request namespaces](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#setting-the-namespace-for-a-request) and [object UIDs](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids)
 - [Kubernetes v1.35: deleting a namespace](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/namespaces/)
-- [Kubernetes v1.35.0 kubelet: ConfigMap key lookup](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/kubelet_pods.go), [container error events](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/kuberuntime/kuberuntime_container.go), and [Pod synchronization retries](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/pod_workers.go)
+- Kubernetes v1.35.0 kubelet: [ConfigMap key lookup, raw](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/kubelet_pods.go) ([lines 867–893](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/kubelet/kubelet_pods.go#L867-L893)); [container error events, raw](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/kuberuntime/kuberuntime_container.go) ([lines 254–261](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/kubelet/kuberuntime/kuberuntime_container.go#L254-L261)).
+- Kubernetes v1.35.0 kubelet: [SyncPod, raw](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/kubelet.go) ([lines 1892–1902](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/kubelet/kubelet.go#L1892-L1902)); [retry scheduling, raw](https://raw.githubusercontent.com/kubernetes/kubernetes/v1.35.0/pkg/kubelet/pod_workers.go) ([lines 1508–1533](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/kubelet/pod_workers.go#L1508-L1533)).
 - [Kubernetes v1.35: Configure a Pod to use a ConfigMap](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
 - [Kubernetes v1.35: Distribute credentials using Secrets](https://v1-35.docs.kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/)
 - [Kubernetes v1.35: Encrypt data at rest](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) and [KMS provider](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
