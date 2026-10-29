@@ -138,7 +138,7 @@ Manual bisection teaches the concept, while automation lets one classifier run a
 
 The exit-code contract is simple and strict. When your command exits `0`, Git marks the commit good. Statuses `1` through `124` and `126` through `127` map to bad; `125` means untestable, so Git skips that revision without treating it as proof of the bug. Statuses of `128` or greater abort. On the first `126` or `127` result in a run, Git retries the command on a known-good revision and rejects the run if it returns the same code there. Preflight the command rather than relying on that safeguard to identify unrelated failures.
 
-Suppose a `StatefulSet` manifest began failing Kubernetes API server validation after many changes to storage templates. A useful bisect script should perform only the smallest test that proves or disproves the target behavior at the currently checked-out commit. The following illustrative script assumes a prevalidated environment where every nonzero result is known to be the target schema failure. This narrow assumption is unsafe in general: credentials, connectivity, admission, and missing-file errors must be distinguished and skipped or abort the investigation. Do not run this classifier until both anchors and error cases have been checked. Place it outside the repository, such as `/tmp/test-manifest.sh`, so historical checkouts cannot delete or modify the script while bisection is running.
+Suppose a `StatefulSet` manifest began failing Kubernetes API server validation after many changes to storage templates. A useful bisect script should perform only the smallest test that proves or disproves the target behavior at the currently checked-out commit. The following classifier is an incomplete illustration: it skips a missing or unreadable file, but still treats every `kubectl` failure as bad. It cannot distinguish the target schema failure from missing context, authentication, connectivity, or admission failures. Implement and verify error-specific handling before using it in a bisect; do not rely on this illustration as a safe classifier. Place the script outside the repository so historical checkouts cannot replace it.
 
 ```bash
 #!/usr/bin/env bash
@@ -149,8 +149,11 @@ Suppose a `StatefulSet` manifest began failing Kubernetes API server validation 
 
 echo "Testing commit: $(git rev-parse --short HEAD)"
 
+# A missing or unreadable file cannot classify this revision.
+[ -r k8s/production/statefulset.yaml ] || exit 125
+
 # Run a dry-run apply against the API server to validate the YAML schema
-kubectl apply -f k8s/production/statefulset.yaml --dry-run=server > /dev/null 2>&1
+kubectl apply -f k8s/production/statefulset.yaml --dry-run=server > /dev/null
 
 # Capture the exit code of the kubectl command
 EXIT_CODE=$?
@@ -160,7 +163,7 @@ if [ $EXIT_CODE -eq 0 ]; then
     echo "Validation passed. Returning GOOD."
     exit 0 # Tells Git this commit is Good
 else
-    echo "Validation failed. Returning BAD."
+    echo "Validation failed; cause not classified. Returning BAD."
     exit 1 # Tells Git this commit is Bad
 fi
 ```
@@ -171,9 +174,12 @@ Make the script executable before starting the run. This is a mundane step, but 
 chmod +x /tmp/test-manifest.sh
 ```
 
-With the script ready, define the boundaries and let Git drive the loop. The bisection session checks out commits, runs the script, reads the exit code, and chooses the next midpoint without asking for manual labels. Your job shifts from repeatedly typing `good` or `bad` to verifying that the test itself is a faithful model of the production symptom.
+Before starting a real run, preflight the finished classifier against the known-good and known-bad anchors and representative error cases. A missing cluster context, stale credentials, or an overly broad test can make a result misleading. Passing both anchors does not make every midpoint safe: an unrelated failure can still occur later, so the classifier must distinguish it from the target failure at each revision.
+
+The following is an **invocation template only**. Do not run it with the illustrative all-errors-as-bad classifier above. Once error-specific handling has been implemented and verified, define the boundaries and let Git drive the loop.
 
 ```bash
+# Invocation template: use only a verified classifier
 # 1. Initialize
 git bisect start
 
@@ -197,14 +203,12 @@ Bisecting: 67 revisions left to test after this (roughly 6 steps)
 ...
 running '/tmp/test-manifest.sh'
 Testing commit: 1d2e3f4
-Validation failed. Returning BAD.
+Validation failed; cause not classified. Returning BAD.
 Bisecting: 33 revisions left to test after this (roughly 5 steps)
 ...
 f8e7d6c5b4a3c2d1e0f9a8b7c6d5e4f3a2b1c0d9 is the first 'bad' commit
 ...
 ```
-
-Before running this against a real repository, ask yourself what output you expect from the known-good tag and the known-bad `HEAD`. If the script cannot clearly distinguish those two anchors before bisection begins, it will not become more reliable in the middle of history. A quick preflight against both endpoints can expose missing cluster context, stale credentials, or tests that are too broad for the regression you are isolating.
 
 One failure mode is treating every non-zero result as the target bug. Consider a range where one historical commit temporarily broke the `Makefile`, while your actual investigation concerns ingress routing. If `make test` fails at that commit and your script exits `1`, Git marks the commit bad for the routing bug even though routing was never tested. That false classification can eliminate the half of history containing the real regression.
 
