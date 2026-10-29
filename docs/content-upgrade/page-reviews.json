@@ -498,7 +498,7 @@
       "page_digest": "sha256:d027176eef7c73d76c21f381afa3a4d487df7c9871dfa5a9b2ef9c68f96cc807",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "docs/content-upgrade/reviews/2026-10-29-zero-to-terminal-pending-source.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6420001065", "docs/content-upgrade/reviews/2026-10-29-zero-to-terminal-pending-source.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-26-zero-to-terminal-p01.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/2278#issuecomment-6420001065", "docs/content-upgrade/reviews/2026-10-29-zero-to-terminal-pending-source.md", "https://github.com/kube-dojo/kube-dojo.github.io/issues/3658#issuecomment-6485768715"],
       "independent_statuses": {"technical_source": "unknown", "editorial_review": "pass", "lab_execution": "not_applicable", "deployed_smoke": "pass"}
     },
     {
