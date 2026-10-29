@@ -573,42 +573,42 @@ Use `git log` to inspect local commit IDs, authors, dates, and messages. `git lo
 </details>
 
 <details>
-<summary>2. You modified `service.yaml` and ran `git commit -m "expose port 8080"`, but Git said nothing was added to commit. What state did you forget to change, and how should you recover?</summary>
+<summary>2. You modified <code>service.yaml</code> and ran <code>git commit -m "expose port 8080"</code>, but Git said nothing was added to commit. What state did you forget to change, and how should you recover?</summary>
 
 The file was still in the working directory and had not been moved into the staging area. Git does not automatically include every modified file in a commit, because the staging area is where you choose the next snapshot's contents. Run `git status` to confirm the file state, then `git add service.yaml`, inspect status again, and rerun the commit. This preserves the deliberate two-step model that keeps unrelated edits out of history.
 
 </details>
 
 <details>
-<summary>3. You are about to stage `configMap.yaml`, but you are unsure whether a real database password is still present in the edited lines. What should you inspect before staging, and what decision should follow?</summary>
+<summary>3. You are about to stage <code>configMap.yaml</code>, but you are unsure whether a real database password is still present in the edited lines. What should you inspect before staging, and what decision should follow?</summary>
 
 Run `git diff` before staging so you can inspect the exact unstaged line changes. If the diff contains a real password, do not stage or commit it; remove the secret, replace it with a safe placeholder or external reference, and verify the diff again. `git log` would not help because the risky content is not committed yet. The safest decision is to make the patch clean before it enters the staging area.
 
 </details>
 
 <details>
-<summary>4. You cloned a repository and Git asks you to configure `user.name` and `user.email` before committing. Later, `git push` asks for remote credentials. Why are these two prompts different?</summary>
+<summary>4. You cloned a repository and Git asks you to configure <code>user.name</code> and <code>user.email</code> before committing. Later, <code>git push</code> asks for remote credentials. Why are these two prompts different?</summary>
 
 `user.name` and `user.email` are local commit metadata that identify the author recorded inside new commits. Remote credentials prove to the hosting service that you are allowed to upload commits to that repository. The first setting affects the saved snapshot's attribution, while the second controls network access. Confusing them leads learners to think a successful local commit means the remote will also accept a push, which is not guaranteed.
 
 </details>
 
 <details>
-<summary>5. You created `aws-credentials.json` for a local test and never want it committed. What should you do before staging other work, and what limitation must you remember?</summary>
+<summary>5. You created <code>aws-credentials.json</code> for a local test and never want it committed. What should you do before staging other work, and what limitation must you remember?</summary>
 
 Add `aws-credentials.json` to the repository's `.gitignore` file before broad staging, then run `git status` to confirm the file no longer appears as an untracked candidate. The limitation is that `.gitignore` only applies to untracked files. If already committed, remove it from tracking and address the earlier history: revoke or rotate a pushed credential promptly; for a local-only commit, remove it from every unpushed commit containing it before pushing and assess other exposure with its owner. The safer workflow is to prevent tracking before the file ever reaches a commit.
 
 </details>
 
 <details>
-<summary>6. A learner deletes the hidden `.git` directory to "reset" a broken project, then runs `git status`. What happens, and why is this not a safe recovery method?</summary>
+<summary>6. A learner deletes the hidden <code>.git</code> directory to "reset" a broken project, then runs <code>git status</code>. What happens, and why is this not a safe recovery method?</summary>
 
 Git reports that the directory is not a repository unless a parent directory is itself a Git repository, in which case Git may use that parent instead. The deleted `.git` contained local history and metadata; deleting it is not a safe reset. Start recovery with observation commands and a clear goal, such as unstaging a file or reverting a commit.
 
 </details>
 
 <details>
-<summary>7. You and a colleague committed different edits to the same `replicas` line. Their commit reached the remote first, and your push is rejected. After fetching and inspecting the divergent histories, you choose `git pull --no-rebase origin main`. What might happen, and how would you resolve it?</summary>
+<summary>7. You and a colleague committed different edits to the same <code>replicas</code> line. Their commit reached the remote first, and your push is rejected. After fetching and inspecting the divergent histories, you choose <code>git pull --no-rebase origin main</code>. What might happen, and how would you resolve it?</summary>
 
 Git may stop with a merge conflict; it cannot choose the operationally correct replica count. Check `git status`, read the conflict markers, agree on the intended value, remove the markers, and stage the resolved file with `git add`. Inspect the staged resolution and complete the merge with `git commit`, then verify the result before retrying the push. If you chose rebase instead, follow its status instructions and use `git rebase --continue` after staging. If an editor opens during either operation, read and save the message and close it using that editor's instructions; `git status` shows whether the operation remains in progress. A conflict is not guaranteed for every pair of edits.
 
