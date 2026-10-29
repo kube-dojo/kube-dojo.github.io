@@ -70,7 +70,7 @@ The working directory is the current project folder on disk. When you edit `name
 
 The staging area, also called the index, is a deliberate selection of what the next commit will contain. You can stage one file while leaving another modified file unstaged, or even stage only some hunks from a file with more advanced commands later. That separation is valuable when real work is messy. A debugging session might touch authentication, deployment YAML, and local notes, but the commit should capture one coherent reason for change.
 
-The repository is the local database, stored inside `.git`, where commits live. A commit records a snapshot of file contents, author and committer metadata with timestamps, a message, and zero or more parent pointers; the first commit has none. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
+In the ordinary repository you will initialize for this practice, `.git` holds the local repository database where commits live. Other repository layouts can place that data elsewhere. A commit records a snapshot of file contents, author and committer metadata with timestamps, a message, and zero or more parent pointers; the first commit has none. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
 
 Pause and predict: you fixed a database connection bug in `db.py`, but while searching for it you also added temporary print statements to `auth.py` and `api.py`. Which part of Git lets you save only the real fix while keeping the temporary debug code on disk? Decide which area of Git you would use and which exact command moves only the intended file before opening the reveal.
 
@@ -85,7 +85,7 @@ The staging area (or index) lets you save only the real fix while keeping the te
 
 Git is a command-line tool at its core, even when teams use graphical clients or web interfaces around it. Platform engineers must be comfortable with the terminal version because many workflows happen over SSH, inside automation logs, or on machines where a graphical client is unavailable. The goal is not to memorize every option. The goal is to become fluent enough that repository state is visible instead of mysterious.
 
-Start by checking that Git is installed. The version matters because options such as `git restore` and `git init --initial-branch` may be unavailable in older installations. If a command or option is unavailable, consult the documentation for your version or update Git before continuing.
+Start by checking that Git is installed. This lesson's local practice was tested with Git 2.56.0. Older versions may lack commands or options used here; consult your installed version's documentation or update Git before continuing. If Git is missing, follow the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
 ```bash
 git --version
@@ -94,7 +94,7 @@ git --version
 Expected output should include the Git version installed on your machine; the exact number may differ from this example.
 
 ```text
-git version 2.39.2
+git version 2.56.0
 ```
 
 Before creating commits, configure the identity Git will place into commit metadata. This is not the same thing as authenticating to GitHub during a push. The name and email configured here answer the question, "Who authored this snapshot?" Remote authentication answers a different question: "Is this person allowed to upload to that server?" Keeping those concepts separate prevents confusion when a commit succeeds locally but a push later asks for credentials.
@@ -111,13 +111,13 @@ git config --get user.email
 
 The `--global` flag changes account-wide configuration, usually in `~/.gitconfig`; this lesson does not change it. After successful initialization, `--local` writes only to that repository. The deliberately fictional training identity below is for disposable local commits, not publication. Before publishing real work, deliberately choose the appropriate author identity for that repository.
 
-Choose a practice directory under your control, outside a real work repository. Start a disposable child Bash with the following command alone and wait for its prompt before pasting the entire grouped setup below. Stay in that child for the theory practice.
+Choose a practice directory under your control, outside a real work repository. Start a disposable child Bash with the following command alone and wait for its prompt before pasting the entire grouped setup below. The prompt may look like your previous prompt. Stay in that child for the theory practice; when finished, type `exit` to return to its parent shell.
 
 ```bash
 bash --noprofile --norc
 ```
 
-The group stops this child if setup fails. If it exits, **STOP: do not paste later commands into the parent shell**. Leave any existing `k8s-webapp` file, directory, or symlink untouched; choose an unused name consistently or retry in another practice location. The five cleared Git location selectors and root checks guard this setup's location; they do not sandbox every environment setting.
+The group stops this child if setup fails. If it exits, **STOP: do not paste later commands into the parent shell**. Leave any existing `k8s-webapp` file, directory, or symlink untouched; choose an unused name consistently or retry in another practice location with a new child shell. The five cleared Git location selectors and root checks guard this setup's location; they do not sandbox every environment setting.
 
 ```bash
 {
@@ -142,6 +142,7 @@ Expected output should confirm that Git created an empty repository database in 
 
 ```text
 Initialized empty Git repository in /home/alex/k8s-webapp/.git/
+Practice repository ready: /home/alex/k8s-webapp
 ```
 
 What exactly changed? Git created a hidden `.git` directory inside `k8s-webapp`. That hidden directory is not decorative; it is the repository database for this project. It contains objects, references, local configuration, and the machinery Git uses to know which branch you are on. If you delete `.git`, your current files may remain on disk, but the local history, branches, and repository identity are gone.
@@ -214,7 +215,7 @@ Move the file into the staging area with `git add`. This command is easy to unde
 git add namespace.yaml
 ```
 
-Run `git status` again and compare the wording. The file has moved from "Untracked files" to "Changes to be committed." That wording tells you the next commit will include the file as it existed when you staged it. Nothing has been permanently saved yet; you have only prepared the next snapshot.
+Run `git status` again and compare the wording. The file has moved from "Untracked files" to "Changes to be committed." That wording tells you the next commit will include the file as it existed when you staged it. The content is staged, but you have not created a commit for it yet.
 
 ```bash
 git status
@@ -246,7 +247,7 @@ The output should report the root commit, the commit subject, and the number of 
  create mode 100644 namespace.yaml
 ```
 
-Check status after the commit. A clean status means no staged changes, no unstaged changes to tracked files, and no untracked files that are not ignored. Ignored files can still exist. Clean does not mean the project is correct, secure, or ready for production.
+Check status after the commit. With normal untracked-file reporting, a clean status means Git reports no staged or unstaged tracked changes and no non-ignored untracked files. Configured options can hide untracked files, and ignored files can still exist. Clean does not mean the project is correct, secure, or ready for production.
 
 ```bash
 git status
@@ -264,11 +265,11 @@ Pause and predict: while testing locally, an engineer places a real access token
 <details>
 <summary>Check your prediction</summary>
 
-No, the credential is not safe. Git records permanent snapshots, so deleting the secret in a later commit leaves the token visible in the earlier commit's history for anyone who clones or inspects the repository. Once a real secret is committed and pushed, the token must be treated as immediately compromised and rotated at the provider level, and the repository history must be cleaned or rewritten. The operational lesson is direct: always inspect state with `git status` and patches with `git diff` before staging and committing configuration files.
+No. Deleting the token in a later commit does not remove it from the earlier history. If it was pushed, promptly revoke or rotate it with its provider and follow the repository's incident process. History cleanup can reduce further exposure, but it cannot remove copies from other people's clones; coordinate cleanup where appropriate. For a local-only commit, remove the credential from every unpushed commit containing it before pushing; assess any other exposure and follow its owner's response process. See [GitHub's sensitive-data guidance](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
 
 </details>
 
-The safer professional habit is to make each commit earn its place in history. Before staging, ask whether the patch has one reason that a reviewer can evaluate. Before committing, ask whether the staged content is the exact content you want attached to the message. Before pushing, ask whether the branch contains only work you are ready to share. These questions slow you down by seconds and can save hours of cleanup when a repository becomes the input to deployment automation.
+Before staging, ask whether the patch has one reason that a reviewer can evaluate. Before committing, ask whether the staged content is the exact content you want attached to the message. Before pushing, ask whether the branch contains only work you are ready to share. Answer these questions before moving to the next operation.
 
 Now modify the Namespace by adding a label. This is a realistic kind of infrastructure edit because labels help teams organize objects, select resources, and drive automation. The Git workflow, however, remains the same: make the change, inspect the difference, stage only the intended content, and commit a focused snapshot.
 
@@ -308,20 +309,20 @@ Diff output has a compact grammar. The `---` and `+++` lines name the old and ne
 
 When you review a diff for infrastructure files, read it like a deployment plan, not like a spelling check. A one-line image tag change can move workloads to a different binary. A replica count change can alter cost, availability, and load on dependencies. A namespace or label change can affect automation that selects objects by metadata. Git's diff format is simple, but the operational interpretation of those lines requires attention to what the changed fields control.
 
-Pause and predict: imagine the next diff appears in a Deployment file. Before reading the answer, decide whether this is a new field, a deleted field, or a changed value, and describe the operational effect in plain language. Commit to your answer before opening the reveal.
+Pause and predict: imagine the next diff is an excerpt from `spec.template.spec.containers` in a Deployment. It omits other required fields and is not a complete manifest. Decide whether this is a new field, a deleted field, or a changed value, and describe the possible operational effect before opening the reveal.
 
 ```text
-@@ -10,3 +10,3 @@
- spec:
-   replicas: 3
--  image: nginx:1.14
-+  image: nginx:1.24
+@@ -14,3 +14,3 @@
+       containers:
+       - name: web
+-        image: nginx:1.14
++        image: nginx:1.24
 ```
 
 <details>
 <summary>Check your prediction</summary>
 
-The engineer changed an existing image value from `nginx:1.14` to `nginx:1.24`. That is not merely a formatting update; it changes which container image Kubernetes will pull and run for this workload. In a real pull request review, you would ask whether this ten-minor-version jump is intentional, whether the target tag exists in the registry, and whether the application configuration was tested against that newer version.
+The image value changed from `nginx:1.14` to `nginx:1.24`. A Deployment's Pod template specifies the image for its Pods; the result depends on the rollout, registry, and runtime. In a real review, check whether the target image exists and whether the workload was tested. See the [Kubernetes Deployment example](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
 
 </details>
 
@@ -363,18 +364,18 @@ History is most useful when commits are small enough to inspect and messages are
 git log
 ```
 
-The output should show the most recent commit first, followed by the earlier root commit.
+This illustrative output shows the most recent commit first, followed by the earlier root commit. The hashes and dates are examples; the author matches the disposable training identity.
 
 ```text
 commit 9f8e7d6c5b4a39281716151413121110abcdef12 (HEAD -> main)
-Author: Your Name <you@example.com>
-Date:   Wed Oct 12 10:45:12 2023 -0400
+Author: KubeDojo Learner <learner@example.invalid>
+Date:   Thu Oct 12 10:45:12 2023 -0400
 
     chore: add environment label to namespace
 
 commit a1b2c3d4e5f60718293a4b5c6d7e8f9012345678
-Author: Your Name <you@example.com>
-Date:   Wed Oct 12 10:15:30 2023 -0400
+Author: KubeDojo Learner <learner@example.invalid>
+Date:   Thu Oct 12 10:15:30 2023 -0400
 
     feat: add production namespace definition
 ```
@@ -405,7 +406,7 @@ Pause and predict: you just ran `git commit -m "chore: add environment label to 
 <details>
 <summary>Check your prediction</summary>
 
-If you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`. That means no staged or unstaged tracked changes and no non-ignored untracked files; ignored files may still exist. If it reports anything else, inspect the changes before making another commit.
+With normal untracked-file reporting, if you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`. Git is reporting no staged or unstaged tracked changes and no non-ignored untracked files; ignored files may still exist, and configured options can hide untracked files. If the result differs from your expectation, inspect the state before making another commit.
 
 </details>
 
@@ -474,7 +475,7 @@ There is also a difference between remote synchronization and deployment. Pushin
 
 Real projects generate files that do not belong in version control. Build directories, logs, local cache files, operating system metadata, editor swap files, downloaded dependencies, Terraform state, and private environment files can all appear beside source files. If those files enter Git history, they create different kinds of damage: large binaries bloat the repository, generated files cause noisy reviews, and secrets create immediate security incidents.
 
-Git handles this with `.gitignore`, a plain text file usually stored at the repository root. Each line is a pattern for files Git should ignore when they are untracked. The "untracked" part is crucial. `.gitignore` prevents new matching files from being noticed as candidates for staging, but it does not make Git forget a file that is already tracked in history. If a secret was committed, you must treat the secret as compromised and rotate it, not merely add it to `.gitignore`.
+Git handles this with `.gitignore`, a plain text file usually stored at the repository root. Each line is a pattern for files Git should ignore when they are untracked. The "untracked" part is crucial. `.gitignore` prevents new matching files from being noticed as candidates for staging, but it does not make Git forget a file that is already tracked in history. For a real exposed credential, respond with the provider and repository process described above; adding an ignore rule alone does not remove it from history.
 
 Create an ignore file for the practice repository. The exact patterns below are intentionally small so you can reason about them. They show operating system noise, local secrets, a local kubeconfig-style file, and Terraform state. In a production repository, you would adapt patterns to the tools actually used by the project and review them just like any other infrastructure policy.
 
@@ -507,7 +508,7 @@ Only `secret-keys.txt` will show up as untracked under `git status`. `main.tfsta
 
 </details>
 
-Now consider a late ignore rule. You committed `database-creds.txt` last week, then today you add that filename to `.gitignore` and edit the file. Git will still report the modification because the file is already tracked. To stop tracking the file while keeping the local copy, you would need a command such as `git rm --cached database-creds.txt`, followed by a commit, and you would still rotate any credential that was ever committed.
+Now consider a late ignore rule. You committed `database-creds.txt` last week, then today you add that filename to `.gitignore` and edit the file. Git will still report the modification because the file is already tracked. To stop tracking the file while keeping the local copy, use an index-only removal such as `git rm --cached database-creds.txt`, followed by a commit. This does not erase earlier history. For a real credential, use the exposure assessment and owner/provider response process described above.
 
 This is why a strong Git workflow is both technical and behavioral. The technical controls are `.gitignore`, `git status`, `git diff`, and secret scanning on the server side. The behavior is slower and more deliberate: do not stage blindly, do not store real credentials in practice manifests, and do not assume a later cleanup commit erases exposure. Git history is useful because it remembers, and that same remembering makes leaked secrets persistent.
 
@@ -545,29 +546,29 @@ The decision framework also helps you avoid destructive commands early in your G
 
 ## Did You Know?
 
-1. **Git was built in 2005 under intense pressure.** The Linux kernel project lost its free BitKeeper arrangement, which pushed Linus Torvalds and contributors to create a replacement quickly for a very large distributed project.
-2. **The name is intentionally cheeky.** Torvalds has joked about the name ["Git" in public talks and interviews](https://en.wikipedia.org/wiki/Git), and the name stuck because the tool solved a real collaboration problem better than the alternatives available to the kernel community.
-3. **Git does not track empty directories.** Git tracks file content, so teams that need an otherwise empty directory usually add a small placeholder file such as `.gitkeep` by convention.
-4. **Object identifiers are part of Git's integrity model.** Many repositories still display 40-character SHA-1 object names, while modern Git also includes support for SHA-256 repositories for stronger long-term collision resistance.
+1. **Git began in 2005.** The Linux kernel community's free BitKeeper arrangement ended, and the project developed a distributed replacement. [Pro Git's history](https://github.com/progit/progit2/blob/a013e3230a1207cfa5ae94d28ba7d2021063c337/book/01-introduction/sections/history.asc) describes the context.
+2. **The name is intentionally cheeky.** The [Git project README](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/README.md) includes a playful explanation of the name.
+3. **Try an empty directory.** In a local Git 2.56 practice repository, an empty directory did not appear in `git status` or the index. Adding an ordinary file inside made the directory appear as untracked with default reporting; `git status --untracked-files=all` listed the file, and staging it added the file to the index.
+4. **Object identifiers are part of Git's integrity model.** Git supports SHA-1 and SHA-256 repositories; the [Git 2.56 documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/object-format-disclaimer.adoc) notes they do not currently interoperate.
 
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
 | :--- | :--- | :--- |
-| Accidentally committing a password or secret | The learner stages broadly without reading `git status` and `git diff`, so a local `.env` or credential file enters the commit. | If it was pushed, rotate the credential immediately and follow the repository's secret-removal process. If it was only local, remove it from history before sharing and add an ignore rule. |
+| Accidentally committing a password or secret | The learner stages broadly without reading `git status` and `git diff`, so a local `.env` or credential file enters the commit. | If pushed, revoke or rotate it promptly and follow the incident process. For a local-only commit, remove the credential from every unpushed commit containing it before pushing; assess other exposure and follow its owner's process. An ignore rule does not remove history. |
 | Seeing "fatal: refusing to merge unrelated histories" | A repository was initialized locally, while the hosting service also created its own first commit such as a README. | Prefer cloning an existing remote. If combining histories is truly intended, use the explicit unrelated-histories option only after reviewing why the histories differ. |
 | Getting "updates were rejected" during push | The remote branch may have commits the local branch lacks. | Inspect the error, fetch and compare histories, then choose how to integrate before retrying. |
 | Writing empty or meaningless commit messages | The learner treats commits as checkpoints for themselves rather than messages to future maintainers. | Amend an unpushed commit message when needed and practice explaining the operational reason for each snapshot. |
 | Forgetting to stage files before committing | The working directory contains changes, but the staging area is empty when `git commit` runs. | Run `git status`, stage the intended files with `git add <file>`, inspect again, and retry the commit. |
 | Committing generated or binary artifacts | Build outputs and logs sit beside source files, and the repository has no ignore policy yet. | Remove accidental tracked artifacts with the appropriate Git command, commit the cleanup, and add patterns to `.gitignore` before more work continues. |
-| Adding an ignore rule after a file is already tracked | The learner expects `.gitignore` to override history for files already committed. | Remove the file from tracking with an index-only removal such as `git rm --cached <file>`, commit that change, and rotate secrets if sensitive content was ever committed. |
+| Adding an ignore rule after a file is already tracked | The learner expects `.gitignore` to override history for files already committed. | Remove the file from tracking with an index-only removal such as `git rm --cached <file>` and commit that change. Follow the incident process for any real exposed credential; this does not remove earlier history. |
 
 ## Quiz
 
 <details>
 <summary>1. Your team deployed a Kubernetes configuration and behavior changed immediately. You need to identify the recent commits, authors, and messages before deciding what to inspect next. Which Git command gives you the timeline, and why is it the right starting point?</summary>
 
-Use `git log`, or `git log --oneline` when you need a compact scan. The log shows committed history in reverse chronological order, so it answers who created recent snapshots and what messages they left. `git status` would only describe uncommitted local state, and `git diff` would only show unstaged line changes. During incident triage, the timeline narrows the search before you inspect individual patches.
+Use `git log` to inspect local commit IDs, authors, dates, and messages. `git log --oneline` is a compact hash-and-subject scan and does not show authors. `git status` describes workspace and index state; plain `git diff` compares working files with the index. To identify a deployed change, establish the deployed revision and inspect an up-to-date fetched ref as appropriate; local history alone cannot prove what was deployed.
 
 </details>
 
@@ -595,7 +596,7 @@ Run `git diff` before staging so you can inspect the exact unstaged line changes
 <details>
 <summary>5. You created `aws-credentials.json` for a local test and never want it committed. What should you do before staging other work, and what limitation must you remember?</summary>
 
-Add `aws-credentials.json` to the repository's `.gitignore` file before broad staging, then run `git status` to confirm the file no longer appears as an untracked candidate. The limitation is that `.gitignore` only applies to untracked files. If the file was already committed, Git will continue tracking it until you explicitly remove it from the index, and any real secret inside should be considered exposed. The safer workflow is to prevent tracking before the file ever reaches a commit.
+Add `aws-credentials.json` to the repository's `.gitignore` file before broad staging, then run `git status` to confirm the file no longer appears as an untracked candidate. The limitation is that `.gitignore` only applies to untracked files. If already committed, remove it from tracking and address the earlier history: revoke or rotate a pushed credential promptly; for a local-only commit, remove it from every unpushed commit containing it before pushing and assess other exposure with its owner. The safer workflow is to prevent tracking before the file ever reaches a commit.
 
 </details>
 
@@ -609,19 +610,19 @@ Git reports that the directory is not a repository unless a parent directory is 
 <details>
 <summary>7. You and a colleague committed different edits to the same `replicas` line. Their commit reached the remote first, and your push is rejected. After fetching and inspecting the divergent histories, you choose `git pull --no-rebase origin main`. What might happen, and how would you resolve it?</summary>
 
-Git may stop with a merge conflict; it cannot choose the operationally correct replica count. Check `git status`, read the conflict markers, agree on the intended value, remove the markers, and stage the resolved file with `git add`. Inspect the staged resolution and complete the merge with `git commit`, then verify the result before retrying the push. If an editor opens, read and save the merge message and close it using that editor's instructions; `git status` shows whether the merge remains in progress. If you chose rebase instead, follow its status instructions and use `git rebase --continue` after staging. A conflict is not guaranteed for every pair of edits.
+Git may stop with a merge conflict; it cannot choose the operationally correct replica count. Check `git status`, read the conflict markers, agree on the intended value, remove the markers, and stage the resolved file with `git add`. Inspect the staged resolution and complete the merge with `git commit`, then verify the result before retrying the push. If you chose rebase instead, follow its status instructions and use `git rebase --continue` after staging. If an editor opens during either operation, read and save the message and close it using that editor's instructions; `git status` shows whether the operation remains in progress. A conflict is not guaranteed for every pair of edits.
 
 </details>
 
 ## Hands-On Exercise
 
-In this exercise, you will create a local repository from scratch, simulate a standard engineering workflow by making multiple logical commits, and observe the resulting history. The files are small Kubernetes-style examples, not cluster tests. Before Task 1, return to a practice directory under your control; if you followed the theory setup, `cd ..` inside that child returns to its parent directory. Read `git status` after each step and do not use real credentials.
+In this exercise, you will create a local repository from scratch, simulate a standard engineering workflow by making multiple logical commits, and observe the resulting history. The files are small Kubernetes-style examples, not cluster tests. Before Task 1, return to a practice directory under your control. If still in the theory child, `exit` returns to the shell and directory where you started it; alternatively, `cd ..` moves within that child to the practice parent. Read `git status` after each step and do not use real credentials.
 
 ### Task 1: Initialization
 
 Create a new directory named `dojo-k8s-project`, navigate into it, and initialize an empty Git repository so you can observe the first status report from a clean practice workspace.
 
-Start another disposable child Bash from that practice directory with `bash --noprofile --norc` alone, then wait for its prompt. Paste the full grouped solution only inside that child and stay there for Tasks 2–7. A repeat run needs an unused name. If setup fails, the child exits: **STOP and do not paste later tasks into its parent**.
+Start another disposable child Bash from that practice directory with `bash --noprofile --norc` alone, then wait for its prompt. Paste the full grouped solution only inside that child and stay there for Tasks 2–7. When finished, `exit` returns to its parent shell; if you started it inside the theory child, a second `exit` returns to the original shell. A repeat run needs an unused name. If setup fails, the child exits: **STOP and do not paste later tasks into its parent**.
 
 - [ ] Directory created and navigated into.
 - [ ] Git repository initialized.
@@ -674,7 +675,7 @@ git commit -m "docs: add initial readme"
 
 ### Task 3: Simulating Infrastructure Development
 
-Create a file named `deployment.yaml` and add the following dummy content so the repository has an infrastructure-style file to track:
+Create a file named `deployment.yaml` and add the following dummy content so the repository has an infrastructure-style file to track. This is an incomplete Git practice fragment, not a deployable Deployment; do not apply it to a cluster.
 
 ```yaml
 apiVersion: apps/v1
@@ -763,7 +764,7 @@ Run a command to view your complete commit history in a compact, single-line for
 git log --oneline
 ```
 
-Output should look similar to:
+Output should look similar to the following example; the hashes are illustrative:
 
 ```text
 3b2a1c4 fix: set deployment replicas to 3
@@ -779,7 +780,7 @@ You are working on a new application that generates numerous log files ending in
 
 - [ ] `.gitignore` file created with appropriate wildcard and exclusion rules.
 - [ ] Dummy files created to test the rules.
-- [ ] `git status` shows `.gitignore` and `audit-trail.log` as untracked; the other logs are ignored.
+- [ ] `git status` shows `.gitignore` and the root `audit-trail.log` as untracked; the other logs, including `logs/audit-trail.log`, are ignored.
 
 <details>
 <summary>Solution: Task 6</summary>
@@ -788,27 +789,29 @@ You are working on a new application that generates numerous log files ending in
 # Create the .gitignore file
 cat << 'EOF' > .gitignore
 *.log
-!audit-trail.log
+!/audit-trail.log
 EOF
 
 # Create dummy files
 touch app.log
 touch database.log
 touch audit-trail.log
+mkdir -p logs
+touch logs/audit-trail.log
 
 # Check status
 git status
 ```
 
-Git will show `.gitignore` and `audit-trail.log` as untracked files. The other `.log` files will be successfully ignored.
+Git will show `.gitignore` and the root `audit-trail.log` as untracked files. The other `.log` files, including the nested namesake, are ignored.
 
 </details>
 
-### Task 7: Unguided Git-State Diagnostic
+### Task 7: Git-State Diagnostic
 
-In this final challenge, there is no step-by-step command list to copy. You are presented with two realistic scenarios that test whether you can interpret Git state and choose the correct operational action: `git add`, `git commit`, ignore configuration, `git fetch`/`git pull`, or do nothing.
+Attempt this final challenge before opening the progressive hints or full solution. Two realistic scenarios test whether you can interpret Git state and choose the correct operational action: `git add`, `git commit`, ignore configuration, `git fetch`/`git pull`, or do nothing. Record which hints you needed, then repeat the diagnosis without them.
 
-Challenge 1: The Planted Workspace Trap. Run the following setup snippet inside your `dojo-k8s-project` directory to plant a realistic messy state with staged modifications, unstaged modifications, and untracked files:
+Challenge 1: The Planted Workspace Trap. Run the following setup snippet inside your `dojo-k8s-project` directory to plant staged modifications, unstaged modifications, and untracked files. The `incident-token.env` file is an empty dummy; never put a real credential in this exercise. The appended text is incomplete scratch content, not a deployable manifest.
 
 ```bash
 # Plant messy workspace state
@@ -819,11 +822,34 @@ touch temp-notes.txt
 touch incident-token.env
 ```
 
-Before running any fix or commit, use your diagnostic commands (`git status`, `git diff`, and `git diff --staged`) to answer these four questions in your notes:
+Before running any fix or commit, inspect the repository state and answer these four questions in your notes:
 1. Why does `deployment.yaml` appear twice in the output of `git status`?
 2. How do you view the change that is staged for commit versus the change that is only in your working directory?
 3. Which files must be kept out of version control, and what action ensures they are ignored?
 4. What is the precise command sequence to safely ignore the credential and scratch files, unstage the incomplete YAML edit, and return the working tree to clean?
+
+Try the questions first. If you are stuck, open the hints one at a time before reading the solution.
+
+<details>
+<summary>Hint 1: think about copies</summary>
+
+The working file and the index can hold different versions. Which copy would the next commit use, and which copy can you still edit?
+
+</details>
+
+<details>
+<summary>Hint 2: choose what to inspect</summary>
+
+Look at the workspace status and both comparisons: index against the last commit, and working file against the index. Consider which untracked paths should stay out of history.
+
+</details>
+
+<details>
+<summary>Hint 3: choose commands</summary>
+
+Use `git status`, `git diff --staged`, and `git diff` to inspect before changing anything. To remove this already-tracked file's staged change from the next commit, consider `git restore --staged deployment.yaml`; inspect the result before discarding or committing any work.
+
+</details>
 
 Challenge 2: The Divergent Timelines Diagnostic. A colleague reports that `git push origin main` was rejected. After a fetch, they share an illustrative local log and `origin/main`, their local record of the server branch at that moment:
 
@@ -854,18 +880,26 @@ Without running commands, diagnose the repository state:
 For Challenge 1 (The Planted Workspace):
 1. `deployment.yaml` appears twice in `git status` because it has two distinct states simultaneously: one line addition (`port: 8080`) was staged with `git add`, and a subsequent comment addition (`# verify container port`) was made in the working directory after staging. The staging area holds a snapshot of how the file looked at the moment `git add` ran.
 2. Run `git diff --staged` to inspect the changes staged for the next commit (`port: 8080`), and run plain `git diff` to inspect the unstaged working tree modification (`# verify container port`).
-3. `incident-token.env` contains sensitive credential material and must never be staged or committed. `temp-notes.txt` is scratch documentation. Both should be added to `.gitignore` (or deleted from disk).
+3. The empty `incident-token.env` is a dummy standing in for a credential file and must not be committed. `temp-notes.txt` is scratch documentation. Both should be added to `.gitignore` (or deleted from disk).
 4. To clean up safely:
    - Add narrow ignore patterns: append `incident-token.env` and `temp-notes.txt` to `.gitignore`.
-   - Unstage the incomplete YAML change: run `git restore --staged deployment.yaml`. On Git versions older than 2.23, the equivalent for this already-tracked file is `git reset HEAD deployment.yaml`; `git rm --cached deployment.yaml` would remove the file from tracking entirely, which is not what you want here.
+   - Unstage the incomplete YAML change: run `git restore --staged deployment.yaml`. For this already-tracked file, `git reset HEAD deployment.yaml` is an alternative; `git rm --cached deployment.yaml` would remove the file from tracking entirely, which is not what you want here.
    - Discard the unwanted scratch edits from the working copy: run `git restore deployment.yaml` (or remove the extra lines in `nano`).
-   - Remove the untracked scratch files: `rm temp-notes.txt incident-token.env`.
+   - Leave the empty dummy files ignored, or remove them if you no longer need them.
    - Review `.gitignore` and stage it with `git add .gitignore`. If you completed Task 6, also review and stage the empty dummy `audit-trail.log`; otherwise there is no audit file to stage. Commit these intended files with `git commit -m "chore: record practice ignore rules"`, then run `git status` to confirm a clean working tree. Ignoring scratch files alone does not commit the ignore rules or the audit exception.
 
 For Challenge 2 (The Divergent Timelines):
 1. The shown local and fetched tips diverge: `d4e5f6a` is not in the local branch. That is consistent with a non-fast-forward rejection, although the server may have moved since the fetch.
-2. Run `git fetch origin` to refresh the local record, then inspect `git log HEAD..origin/main` for remote-only commits and `git diff HEAD...origin/main` for the fetched side's changes since the merge base. Agree on merge or rebase, verify the result, and only then retry the push.
+2. Run `git fetch origin` to refresh the local record, then inspect `git log HEAD..origin/main` for remote-only commits, `git log origin/main..HEAD` for local-only commits, and `git diff HEAD...origin/main` for the fetched side's changes since the merge base. Agree on merge or rebase, verify the result, and only then retry the push.
 3. A force push can move the shared branch away from the teammate's commit, making it unreachable from that branch. Other clones may retain it, but recovery depends on available copies and cleanup. Avoid forcing a shared branch without coordination. `--force-with-lease` compares the expected remote value, not whether the teammate's commit is included locally. Both manual and background fetches can update the tracking ref used as that expectation. Here, after fetching, a lease could succeed while dropping the teammate's commit from the branch. It does not replace integration. See the [Git 2.56 push documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc).
+
+</details>
+
+**Transfer check:** A teammate stages an edit to `config.yaml`, then makes another edit without staging it. Which command displays each change, and what would the next commit include?
+
+<details><summary>Check your answer</summary>
+
+`git diff --staged` compares the index with HEAD; `git diff` compares the working file with the index. The commit includes the staged version, not the later unstaged edit. If both edits are intended, stage the file again and inspect the staged diff before committing.
 
 </details>
 
@@ -875,8 +909,8 @@ For Challenge 2 (The Divergent Timelines):
 - [ ] You created at least three focused commits with meaningful messages.
 - [ ] You inspected a diff before staging a Kubernetes-style YAML change.
 - [ ] You used `git log --oneline` to verify the resulting history.
-- [ ] You created and tested a `.gitignore` rule that ignores a broad pattern while allowing one exception.
-- [ ] You diagnosed complex repository states and divergent timelines using status, diff, and log without guidance.
+- [ ] Optional Task 6: you created and tested a `.gitignore` rule that ignores a broad pattern while allowing one exception.
+- [ ] You diagnosed complex repository states and divergent timelines using status, diff, and log, recording any hints used.
 
 ## Sources
 
