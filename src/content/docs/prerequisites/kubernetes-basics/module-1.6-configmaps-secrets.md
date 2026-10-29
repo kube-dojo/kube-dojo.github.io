@@ -738,12 +738,12 @@ Failure layer: configuration is still coupled to the artifact. Next action: keep
 
 </details>
 
-**Card B: Debug logging cannot wait five minutes.** The process takes five minutes to start. It reloads a config file. It does not reload environment variables. You need `debug` for this incident only.
+**Card B: Debug logging cannot wait five minutes.** The current Pod receives `LOG_LEVEL` through `envFrom` and has no ConfigMap volume. The process takes five minutes to start and can reread a config file, but cannot reload environment variables. You need `debug` for this incident only. Can changing delivery avoid the startup delay now?
 
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: the value was delivered as an environment variable, so a file reload cannot see it. Next action: mount the key as a file the process already reloads, and do not roll a new image.
+Changing the ConfigMap does not update this process's environment. Adding a file mount requires a replacement Pod and its startup delay; reusing the image avoids a rebuild, not a restart. With the stated capabilities, plan that restart rather than promise an immediate file-based fix. For future incidents, design a normal ConfigMap volume mount and application reread path before they are needed.
 
 </details>
 
