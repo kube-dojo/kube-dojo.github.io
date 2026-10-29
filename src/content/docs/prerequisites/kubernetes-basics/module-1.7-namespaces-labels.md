@@ -602,7 +602,7 @@ fi
 
 Continue only after setup succeeds. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
 
-Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. This uses `mktemp -d` with a template ending in `X` characters; see the [FreeBSD](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1) and [GNU](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html) manuals. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
+Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. This uses `mktemp -d` with a template ending in at least three `X` characters; see the [FreeBSD](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1) and [GNU](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html) manuals. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
 
 ```bash
 NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && printf 'Manifest directory: %s\n' "$NS_DIR" && cd "$NS_DIR"
@@ -772,7 +772,7 @@ Repeat the endpoint check until it lists `web-v2-canary` and three `web-v1` Pod 
 
 ### Optional Stretch: Change the Service Selector
 
-Predict the ready endpoint names if `version=v1` is added to the Service selector. Record the Service UID, narrow the selector, and repeat the endpoint check from Task 5 until only the three stable Pods appear. Restore the original selector, then repeat until all three stable Pods and the canary appear. Check that the Service UID is unchanged; stop and investigate if either observation does not converge. Endpoint membership alone does not measure traffic distribution.
+Predict the ready endpoint names if `version=v1` is added to the Service selector. Record the Service UID, narrow the selector, and repeat only the `ns_lab get endpoints web-svc` JSONPath command from Task 5 until only the three stable Pods appear. Restore the original selector, then repeat that query until all three stable Pods and the canary appear. Check that the Service UID is unchanged; stop and investigate if either observation does not converge. Endpoint membership alone does not measure traffic distribution.
 
 <details><summary>Hint 1</summary>Which label distinguishes stable Pods from the canary?</details>
 <details><summary>Hint 2</summary>A Service selector is a map: narrowing it requires both app and version to match.</details>
@@ -789,6 +789,8 @@ check_service_uid() {
   printf 'Service UID: recorded=%s current=%s\n' "$NS_SERVICE_UID" "$current_uid"
 }
 start_selector_stretch() {
+  [ -z "${NS_STRETCH_STARTED:-}" ] || { echo 'Stretch already started; original Service UID retained; stop' >&2; return 1; }
+  NS_STRETCH_STARTED=yes
   NS_SERVICE_UID="$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" || { echo 'Cannot record Service UID; stop' >&2; return 1; }
   check_service_uid || return 1
   ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":"v1"}}}' || { echo 'Selector patch failed; stop' >&2; return 1; }
@@ -797,7 +799,7 @@ start_selector_stretch() {
 start_selector_stretch
 ```
 
-Repeat the endpoint check until only the three stable Pods appear before restoring the selector. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
+Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until only the three stable Pods appear; do not rerun `start_selector_stretch`. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
 
 ```bash
 restore_selector_stretch() {
@@ -809,7 +811,7 @@ restore_selector_stretch() {
 restore_selector_stretch
 ```
 
-Repeat the second endpoint check until all four appear. A timeout or unexpected UID means stop and investigate, not that the selector change has converged.
+Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until all four appear. If the expected endpoints do not appear or the UID differs, stop and investigate; do not assume the selector change has converged.
 </details>
 
 **Transfer:** Another Service should select production API Pods but exclude debug Pods. Which labels would you use, and how would you verify the resulting membership before relying on it?
@@ -852,6 +854,8 @@ cleanup_ns_lab
 - [Kubernetes documentation: Well-Known Labels, Annotations and Taints](https://kubernetes.io/docs/reference/labels-annotations-taints/)
 - [Kubernetes documentation: Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
 - [Kubernetes kubectl reference: config set-context](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_set-context/)
+- [RFC 7396: JSON Merge Patch](https://www.rfc-editor.org/rfc/rfc7396.txt), [YAML 1.2.2 core schema](https://yaml.org/spec/1.2.2/#1032-tag-resolution)
+- [FreeBSD mktemp](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1), [GNU mktemp](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html)
 
 ## Next Module
 
