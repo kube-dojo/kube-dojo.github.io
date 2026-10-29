@@ -1253,7 +1253,7 @@ def _worktree_dirty_counts(worktree_path: Path) -> dict[str, Any] | None:
     """
     try:
         result = subprocess.run(
-            ["git", "status", "--porcelain=v1"],
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
             cwd=worktree_path,
             capture_output=True,
             text=True,
@@ -1296,14 +1296,11 @@ def _worktree_dirty_counts(worktree_path: Path) -> dict[str, Any] | None:
 
 
 def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
-    """Local branches + worktrees safe to prune.
+    """Report review candidates; no entry authorizes deletion.
 
-    A branch is prunable if it's merged into ``main`` (explicit merge commit)
-    OR its upstream is marked ``[gone]`` — the repo has ``delete_branch_on_merge``
-    enabled on GitHub, so a gone upstream means a squash/rebase-merged PR.
-
-    A worktree is prunable if its branch is prunable AND it has zero
-    TRACKED dirty entries (untracked ``.venv``/``.cache`` artifacts are ignored).
+    Merge ancestry is required; a gone upstream alone proves nothing about
+    the branch. Ignored files are not included in status and must be preserved
+    or inspected separately before any retirement.
     """
     merged: set[str] = set()
     try:
@@ -1335,9 +1332,13 @@ def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
     except (OSError, subprocess.TimeoutExpired):
         pass
 
-    prunable = sorted(merged | gone)
+    wt_result = build_worktrees_list(repo_root)
+    wt_list = wt_result.get("worktrees", [])
+    checked_out = {wt.get("branch") for wt in wt_list}
+    # A failed worktree inventory cannot establish whether a branch is active.
+    prunable = sorted(merged - checked_out) if wt_result.get("ok") and wt_list else []
     reasons: dict[str, list[str]] = {}
-    for b in prunable:
+    for b in merged:
         r_ = []
         if b in merged:
             r_.append("merged")
@@ -1345,35 +1346,52 @@ def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
             r_.append("upstream-gone")
         reasons[b] = r_
 
-    wt_list = build_worktrees_list(repo_root).get("worktrees", [])
     prunable_worktrees: list[dict[str, Any]] = []
-    primary = str(repo_root)
+    review_worktrees: list[dict[str, Any]] = []
+    primary = wt_list[0].get("path") if wt_list else None
     for wt in wt_list:
-        if wt.get("path") == primary:
-            continue
         br = wt.get("branch")
-        counts = wt.get("counts") or {}
-        tracked_dirty = (
-            counts.get("staged", 0)
-            + counts.get("unstaged", 0)
-            + counts.get("conflicted", 0)
-        )
-        if br and br in (merged | gone) and not tracked_dirty:
+        counts = wt.get("counts")
+        blockers = []
+        if not wt_result.get("ok"):
+            blockers.append("worktree-inventory-unavailable")
+        if wt.get("path") == primary:
+            blockers.append("primary-worktree")
+        if Path(wt.get("path", "")).resolve() == repo_root.resolve():
+            blockers.append("active-worktree")
+        if wt.get("locked"):
+            blockers.append("locked")
+        if wt.get("detached") or not br or not wt.get("head"):
+            blockers.append("detached-or-unknown")
+        if not isinstance(counts, dict) or not isinstance(counts.get("total"), int):
+            blockers.append("status-unknown")
+        elif counts["total"] != 0:
+            blockers.append("uncommitted-changes")
+        if br not in merged:
+            blockers.append("merge-unverified")
+        if not blockers:
             prunable_worktrees.append({
                 "path": wt["path"],
                 "branch": br,
                 "reasons": reasons.get(br, []),
             })
+        else:
+            review_worktrees.append({"path": wt.get("path"), "branch": br, "blockers": blockers})
 
     return {
         "ok": True,
         "prunable_branches": [{"name": b, "reasons": reasons[b]} for b in prunable],
         "prunable_worktrees": prunable_worktrees,
+        "review_worktrees": review_worktrees,
+        "review_branches": [
+            {"name": b, "blockers": ["merge-unverified"]} for b in sorted(gone - merged)
+        ],
+        "blockers": [] if wt_result.get("ok") and wt_list else ["worktree-inventory-unavailable"],
         "counts": {
             "branches": len(prunable),
             "worktrees": len(prunable_worktrees),
         },
-        "hint": "git cleanup-merged  # aliased; removes gone-upstream local branches",
+        "hint": "Review inventory only; inspect and preserve ignored artifacts before retirement.",
     }
 
 
@@ -8654,7 +8672,7 @@ def build_session_briefing(repo_root: Path) -> dict[str, Any]:
         if cb >= 5 or cw >= 2:
             alerts.append(
                 f"git hygiene: {cb} prunable branch(es), {cw} prunable worktree(s) "
-                "— run `git cleanup-merged` (see /api/git/cleanup)"
+                "— review /api/git/cleanup and preserve ignored artifacts"
             )
     except Exception:
         logging.getLogger(__name__).debug("Git cleanup report unavailable", exc_info=True)
@@ -9072,7 +9090,7 @@ def build_api_schema() -> dict[str, Any]:
             {"path": "/api/ztt/status", "desc": "Zero-to-Terminal pilot status"},
             {"path": "/api/git/worktree", "desc": "Dirty entries in the PRIMARY repo only"},
             {"path": "/api/git/worktrees", "desc": "All attached worktrees (plural)"},
-            {"path": "/api/git/cleanup", "desc": "Prunable local branches + worktrees (merged or gone-upstream). Run 'git cleanup-merged' to act."},
+            {"path": "/api/git/cleanup", "desc": "Read-only merged branch and worktree review inventory; preserve ignored artifacts."},
             {
                 "path": "/api/gh/issues",
                 "desc": "Cached GitHub issue list for agent orientation",
