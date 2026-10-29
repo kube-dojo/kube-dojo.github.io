@@ -445,22 +445,24 @@ git push -u origin main
 Pull combines fetching with integration. First inspect your working state and the remote history. `origin/main` is a local remote-tracking ref: it records the remote branch as of its last update, not a live view of the server. Fetch refreshes it without integrating it into your current branch; the server can move again afterward. These commands illustrate a prepared remote named `origin` with a `main` branch; do not run them against someone else's repository.
 
 ```bash
+# Example only: requires your own prepared remote and branch
 git status
 git fetch origin
 git log --oneline HEAD..origin/main
+git log --oneline origin/main..HEAD
 git diff HEAD...origin/main
 ```
 
-The log lists commits reachable from the fetched `origin/main` but not from `HEAD`. The three-dot diff compares the merge base with `origin/main`, showing changes on the fetched side since the histories met; it is not a direct comparison of the two tips. Inspect your local commits too.
+The first log lists commits reachable from the fetched `origin/main` but not from `HEAD`; the second lists local-only commits. The three-dot diff compares the merge base with `origin/main`, showing changes on the fetched side since the histories met; it is not a direct comparison of the two tips. The initial status can show stale ahead/behind counts until you fetch.
 
-When histories diverge, choose an integration method with your team. `git pull --no-rebase origin main` merges; `git pull --rebase origin main` replays local commits on the fetched branch and changes their IDs. `git pull --ff-only origin main` refuses if a fast-forward is impossible. In Git 2.56, an unconfigured plain pull also refuses to choose a method for divergent branches; configuration and other versions can change that behavior. Ensure your working state is ready before integrating. See the [Git 2.56 pull documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc) and [diff documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-diff.adoc).
+When histories diverge, choose an integration method with your team. `git pull --no-rebase origin main` merges; `git pull --rebase origin main` replays local commits on the fetched branch and changes their IDs. Keep this rebase workflow for unshared local commits. `git pull --ff-only origin main` refuses if a fast-forward is impossible. In Git 2.56, an unconfigured plain pull also refuses to choose a method for divergent branches; configuration and other versions can change that behavior. Ensure your working state is ready before integrating. See the [Git 2.56 pull documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc) and [diff documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-diff.adoc).
 
 Pause and predict: you made two local commits while offline, and a colleague pushed three commits to the same remote branch before you reconnected. What happens if you try `git push origin main` immediately? Decide what Git will do and what your recovery sequence should be before opening the reveal.
 
 <details>
 <summary>Check your prediction</summary>
 
-The push can be rejected as non-fast-forward because the remote contains work missing locally. Fetch and inspect both histories, then choose an agreed merge or rebase, resolve any conflicts, verify the result, and retry the push. Fetching alone does not integrate the histories.
+The push can be rejected as non-fast-forward because the remote contains work missing locally; its error may say `fetch first`. Fetch and inspect both histories, then choose an agreed merge or rebase, resolve any conflicts, verify the result, and retry the push. Fetching alone does not integrate the histories.
 
 </details>
 
@@ -607,7 +609,7 @@ Git reports that the directory is not a repository unless a parent directory is 
 <details>
 <summary>7. You and a colleague committed different edits to the same `replicas` line. Their commit reached the remote first, and your push is rejected. After fetching and inspecting the divergent histories, you choose `git pull --no-rebase origin main`. What might happen, and how would you resolve it?</summary>
 
-Git may stop with a merge conflict; it cannot choose the operationally correct replica count. Check `git status`, read the conflict markers, agree on the intended value, remove the markers, and stage the resolved file with `git add`. Inspect the staged resolution and complete the merge with `git commit`, then verify the result before retrying the push. If you chose rebase instead, follow its status instructions and use `git rebase --continue` after staging. A conflict is not guaranteed for every pair of edits.
+Git may stop with a merge conflict; it cannot choose the operationally correct replica count. Check `git status`, read the conflict markers, agree on the intended value, remove the markers, and stage the resolved file with `git add`. Inspect the staged resolution and complete the merge with `git commit`, then verify the result before retrying the push. If an editor opens, read and save the merge message and close it using that editor's instructions; `git status` shows whether the merge remains in progress. If you chose rebase instead, follow its status instructions and use `git rebase --continue` after staging. A conflict is not guaranteed for every pair of edits.
 
 </details>
 
@@ -863,7 +865,7 @@ For Challenge 1 (The Planted Workspace):
 For Challenge 2 (The Divergent Timelines):
 1. The shown local and fetched tips diverge: `d4e5f6a` is not in the local branch. That is consistent with a non-fast-forward rejection, although the server may have moved since the fetch.
 2. Run `git fetch origin` to refresh the local record, then inspect `git log HEAD..origin/main` for remote-only commits and `git diff HEAD...origin/main` for the fetched side's changes since the merge base. Agree on merge or rebase, verify the result, and only then retry the push.
-3. A force push can move the shared branch away from the teammate's commit, making it unreachable from that branch. Other clones may retain it, but recovery depends on available copies and cleanup. Avoid forcing a shared branch without coordination. `--force-with-lease` can refuse an unexpected remote value, but does not prove the teammate's work is included: background fetches can update the tracking ref used for the expected value. See the [Git 2.56 push documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc).
+3. A force push can move the shared branch away from the teammate's commit, making it unreachable from that branch. Other clones may retain it, but recovery depends on available copies and cleanup. Avoid forcing a shared branch without coordination. `--force-with-lease` compares the expected remote value, not whether the teammate's commit is included locally. Both manual and background fetches can update the tracking ref used as that expectation. Here, after fetching, a lease could succeed while dropping the teammate's commit from the branch. It does not replace integration. See the [Git 2.56 push documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc).
 
 </details>
 
@@ -890,6 +892,8 @@ For Challenge 2 (The Divergent Timelines):
 - [Git documentation: git-diff](https://git-scm.com/docs/git-diff)
 - [Git documentation: git-log](https://git-scm.com/docs/git-log)
 - [Git documentation: gitignore](https://git-scm.com/docs/gitignore)
+- [Git 2.56: fetch](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-fetch.adoc), [pull](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc), and [push and leases](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc)
+- [Git 2.56: merge](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-merge.adoc) and [rebase](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-rebase.adoc)
 - [GitHub Git Guide](https://github.com/git-guides)
 - [GitHub Git Guide: git pull](https://github.com/git-guides/git-pull)
 - [GitHub gitignore templates](https://github.com/github/gitignore)
