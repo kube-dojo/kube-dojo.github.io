@@ -29,7 +29,7 @@ After completing this module, you will be able to:
 
 ## Why This Module Matters
 
-A credential that should have lived as runtime configuration becomes part of an application artifact the moment it is baked into a container image, committed into source control, or hardcoded in a deployment manifest. Once that happens, rotation is no longer a single operation — the team must find every copy, invalidate every leaked credential, rebuild every artifact that contains it, retest every deployment that uses it, and hope no old image is still running in a forgotten environment. The CKS-track module on [secrets management](/k8s/cks/part4-microservice-vulnerabilities/module-4.3-secrets-management/) explores this failure mode further for exam-focused security work. <!-- incident-xref: uber-2022-hardcoded-creds --> The lesson for prerequisites is simpler: the choice between treating a value as configuration or as code is the choice between rotating in seconds and rotating in weeks.
+A credential that should have lived as runtime configuration becomes part of an application artifact the moment it is baked into a container image, committed into source control, or hardcoded in a deployment manifest. Once that happens, rotation is no longer a single operation — the team must find every copy, invalidate every leaked credential, rebuild every artifact that contains it, retest every deployment that uses it, and hope no old image is still running in a forgotten environment. The CKS-track module on [secrets management](/k8s/cks/part4-microservice-vulnerabilities/module-4.3-secrets-management/) explores this failure mode further for exam-focused security work. <!-- incident-xref: uber-2022-hardcoded-creds --> Externalizing a credential can avoid rebuilding the image, but rotation still requires updating the credential and rolling or reloading its consumers.
 
 Kubernetes gives you two built-in resources for avoiding that trap: ConfigMaps for non-sensitive configuration and Secrets for sensitive data. They let the same container image run in development, staging, and production while the cluster supplies the values that vary between those environments. That design is powerful, but it also creates a new responsibility: you must know exactly how those resources are stored, delivered, refreshed, and protected, because moving a password into a Secret does not automatically make the surrounding workflow secure.
 
@@ -41,7 +41,7 @@ The Third Factor of the influential "Twelve-Factor App" methodology states: stor
 
 Think about artifact promotion as a chain of custody. If a web application image is built once and promoted unchanged from a developer namespace to staging and then production, every environment is testing the same executable payload. If the production database URL is hardcoded into the image, the chain breaks, because production now needs a different build. That difference makes debugging harder because a staging success no longer proves that the production artifact behaves the same way.
 
-ConfigMaps and Secrets are both core `v1` Kubernetes API resources, but they are not interchangeable. A ConfigMap is appropriate for non-sensitive values such as log levels, feature flags, application properties, Nginx snippets, or JSON configuration files. A Secret is appropriate for passwords, private keys, API tokens, TLS private material, and image pull credentials. The difference is not that Secrets are magically invisible; the difference is that Kubernetes applies different intent, access patterns, optional encryption support, and specialized types around data that should be treated as confidential.
+ConfigMaps and Secrets are both core `v1` Kubernetes API resources, but they are not interchangeable. A ConfigMap is appropriate for non-sensitive values such as log levels, feature flags, application properties, Nginx snippets, or JSON configuration files. A Secret is appropriate for passwords, private keys, API tokens, TLS private material, and image pull credentials. Secrets have specialized types and receive additional handling: Kubernetes sends a Secret only to nodes whose Pods need it, and [Linux nodes](https://v1-35.docs.kubernetes.io/docs/concepts/security/linux-security/#protection-for-secret-data-on-nodes) use memory-backed volumes for mounted Secret data. [Encryption at rest](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) can be configured for Secrets and other API resources, including ConfigMaps.
 
 **Pause and predict:** if a team changes only a ConfigMap key used by a Deployment, should the container image digest change?
 
@@ -85,15 +85,15 @@ This diagram captures the first decision boundary, but it is only the beginning.
 
 ConfigMaps and Secrets are namespaced objects. A Pod can reference only a ConfigMap or Secret in its own namespace through ordinary environment variable or volume configuration. That boundary is deliberate because namespace-scoped RBAC, resource quotas, and application ownership often line up with team or environment boundaries. If a frontend Pod in the `web` namespace could mount a Secret from the `payments` namespace by accident, a small YAML mistake could become a cross-team credential leak.
 
-Both object types are also limited to 1 MiB per object. That limit exists because these resources live in the Kubernetes API and are stored in etcd, which is designed for cluster state rather than bulk payload delivery. Large blobs force the API server, kubelet, watch caches, and etcd to move data that should have been served by an image layer, object store, persistent volume, or initialization workflow. When a configuration file grows beyond that limit, the right answer is usually to change the delivery mechanism, not to split the file into dozens of fragile keys.
+ConfigMap data and Secret payloads each have a 1 MiB limit. ConfigMaps are not designed for large data, and the Secret limit discourages very large objects that could exhaust API server and kubelet memory. When a configuration file grows beyond that limit, consider a different delivery mechanism, such as an image layer, object store, persistent volume, or initialization workflow, rather than splitting it into dozens of fragile keys. See the [ConfigMap](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/) and [Secret](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/#restriction-data-size) documentation.
 
-A ConfigMap has two payload fields. The `data` field stores UTF-8 strings, which is what you use for normal application settings and text configuration files. The `binaryData` field stores base64-encoded binary payloads for non-UTF-8 bytes. Kubernetes rejects a ConfigMap when the same key appears in both fields, because a consuming volume cannot safely decide which payload should become the file with that name.
+A ConfigMap has two payload fields. The `data` field stores UTF-8 strings, which is what you use for normal application settings and text configuration files. The `binaryData` field stores base64-encoded binary payloads for non-UTF-8 bytes. Kubernetes validates that a key does not appear in both fields.
 
 A Secret has a similar `data` field, but every value in that field must be base64-encoded. This is a serialization requirement, not encryption. Anyone who can read the Secret object can decode those bytes. Kubernetes also offers `stringData`, a write-only convenience field that accepts plaintext values during create or update and stores them under `data` after encoding. When you read the Secret back, `stringData` is gone, which is why GitOps tools and server-side apply workflows sometimes need careful handling around field ownership.
 
 The built-in Secret types add validation and intent. The default `Opaque` type is a generic key-value container, while specialized types represent service account tokens, Docker registry credentials, basic authentication credentials, SSH keys, TLS certificate pairs, and bootstrap tokens. Those types do not replace access control; they tell Kubernetes and operators what shape of credential the object is supposed to hold. For example, a TLS Secret has conventional `tls.crt` and `tls.key` keys, making it easier for Ingress controllers and other components to consume it consistently.
 
-Static Pods are the exception that reveals why the API boundary matters. A static Pod is defined directly on a node and managed by the kubelet rather than created through the normal API server workflow. Because that path bypasses the normal Secret retrieval and authorization process, Secrets cannot be used with static Pods. If a node-level component needs sensitive material, the design must use a different secure delivery mechanism and should be reviewed as node administration, not as an ordinary Pod configuration pattern.
+Static Pods are an exception to ordinary Pod configuration. A static Pod is defined directly on a node and managed by the kubelet rather than created through the normal API server workflow. Its spec cannot reference API objects such as ConfigMaps, Secrets, or ServiceAccounts. If a node-level component needs sensitive material, use a different secure delivery mechanism and review it as node administration. See [static Pod restrictions](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/static-pod/).
 
 Optional references are another boundary worth designing deliberately. Kubernetes lets you mark some ConfigMap or Secret references as optional, which can be helpful during phased rollouts when a value may not exist in every environment yet. The risk is that optional references can hide a real deployment error until application startup, where the symptom looks like a confusing missing file or empty variable. Use optional references for planned compatibility windows, not as a way to silence manifest validation.
 
@@ -110,16 +110,16 @@ kubectl create configmap app-config \
   --from-literal=ENVIRONMENT=staging
 
 # From file
-kubectl create configmap nginx-config --from-file=nginx.conf
+kubectl create configmap nginx-config --from-file=default.conf
 
-# From directory (each file becomes a key)
+# From directory (regular files with valid key names become keys)
 kubectl create configmap configs --from-file=./config-dir/
 
 # View ConfigMap
 kubectl get configmap app-config -o yaml
 ```
 
-The commands above show the basic creation modes exactly: literal keys, a single file, an entire directory, and a YAML inspection step. Keeping the full `kubectl` command in examples makes the workflow unambiguous for readers who paste commands into scripts, terminals, or runbooks. A generated ConfigMap from a directory maps every file name to a key, which is convenient for configuration directories but dangerous if the directory contains editor backups, local overrides, or files that were never meant to leave your workstation.
+The commands above show literal keys, a single file, a directory, and a YAML inspection step. For a directory, kubectl packages regular files whose basenames are valid keys; it ignores subdirectories, symlinks, devices, and pipes. Inspect the command status and resulting keys before using the object. Review the directory first: a validly named backup or local override can still be included. The [ConfigMap task](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#create-configmaps-from-directories) describes these rules. Here `default.conf` is an Nginx server-block snippet, not a complete `nginx.conf`.
 
 ```yaml
 apiVersion: v1
@@ -145,9 +145,8 @@ kubectl create secret generic db-creds \
   --from-literal=password=secret123
 
 # From file
-kubectl create secret generic tls-cert \
-  --from-file=cert.pem \
-  --from-file=key.pem
+kubectl create secret generic api-token \
+  --from-file=token.txt
 
 # View secret (base64 encoded)
 kubectl get secret db-creds -o yaml
@@ -232,9 +231,11 @@ spec:
       name: nginx-config
 ```
 
-Mounted ConfigMaps and Secrets behave differently because the kubelet manages files on the node. When the API object changes, the kubelet eventually updates the projected files for regular volume mounts. The delay is not instantaneous; it can be as high as the kubelet sync period plus the cache propagation delay, which is commonly described as roughly two minutes under default behavior. Applications that watch files or reload on signal can use this path for dynamic configuration, while applications that read files only at startup still need a restart.
+Mounted ConfigMaps and Secrets behave differently because the kubelet manages files on the node. When the API object changes, the kubelet eventually updates files for regular volume mounts. The delay can be as long as the kubelet sync period plus a cache propagation delay. The default cache strategy is Watch; TTL-based caching and direct API reads have different delays. A one-minute sync period plus a one-minute TTL is an example for a TTL cache, not a typical Watch timing. Applications must reread or reload the file to use the new value. See [mounted ConfigMap updates](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically).
 
-The `subPath` option is the major exception. Teams often use `subPath` to mount a single ConfigMap key into a directory without hiding the rest of the directory contents. That convenience creates a static bind mount and breaks the kubelet's normal symlink rotation mechanism, so updates to the ConfigMap or Secret do not appear in the running container. If dynamic refresh matters, mount a directory without `subPath` and arrange the application path accordingly.
+The `nginx-config` example assumes `default.conf` contains an appropriate server-block snippet. Mounting over `/etc/nginx/conf.d` hides any files already present in that image directory, so include the configuration the container needs. A complete main `nginx.conf` is a different file, not this snippet.
+
+The `subPath` option is the major exception. Teams often use `subPath` to mount a single ConfigMap key into a directory without hiding the rest of the directory contents. A container using a ConfigMap or Secret through `subPath` does not receive updates to that mount. If dynamic refresh matters, mount a directory without `subPath` and arrange the application path accordingly. See [volumes and subPath](https://v1-35.docs.kubernetes.io/docs/concepts/storage/volumes/#using-subpath).
 
 **Pause and predict:** your application takes five minutes to start and you need to temporarily change logging from `info` to `debug` during an incident. Which delivery method lets you change that level without waiting through another full start, if the application can reload a file but cannot reload environment variables?
 
@@ -269,7 +270,7 @@ spec:
           key: password
 ```
 
-Secret environment variables are common but deserve extra caution. Many crash reporters, debug endpoints, support bundles, and process-inspection tools include environment variables by default. If a password appears in the environment, it may leak into logs or diagnostics even when RBAC around the Secret object is correct. Mounting a Secret as a file narrows that accidental exposure path because tooling usually does not read arbitrary credential files unless configured to do so.
+Secret environment variables are common but deserve extra caution. Some diagnostics, crash tooling, or process-inspection tools can capture environment variables. A password may therefore leak into logs or diagnostics even when RBAC around the Secret object is correct. A file mount may avoid an environment-specific exposure path, but check the actual tooling and remember that a process with access to the file can still read it.
 
 ```yaml
 apiVersion: v1
@@ -290,7 +291,7 @@ spec:
       secretName: db-creds
 ```
 
-When mounted as files, Secret payloads are delivered on the node through memory-backed storage rather than written as ordinary image-layer files. That implementation detail reduces the chance of accidental disk persistence on the node, but it does not protect the data from the running container. If an attacker gets a shell inside the application container, the Secret is available through the same filesystem path the application uses. Secrets protect against some storage and API exposure paths; they do not protect against a compromised workload that legitimately needs the credential.
+On Linux nodes, mounted Secret data uses a memory-backed `tmpfs` volume; node configuration can still affect persistence. On Windows, Secret data is written to local storage. See the Kubernetes guidance for [Linux](https://v1-35.docs.kubernetes.io/docs/concepts/security/linux-security/#protection-for-secret-data-on-nodes) and [Windows](https://v1-35.docs.kubernetes.io/docs/concepts/security/windows-security/#protection-for-secret-data-on-nodes). Neither delivery method protects the data from a compromised container that can read it: an attacker with a shell has the same filesystem access the application uses.
 
 ```mermaid
 graph TD
@@ -300,7 +301,7 @@ graph TD
 
     CS["ConfigMap / Secret<br><br>data:<br>KEY1: value1<br>KEY2: value2"]:::source
     
-    ENV["As Environment Variables<br><br>env:<br>KEY1=val1<br>KEY2=val2"]:::env
+    ENV["As Environment Variables<br><br>env:<br>KEY1=value1<br>KEY2=value2"]:::env
     VOL["As Volume (Files)<br><br>/etc/config/<br>├── KEY1 (file)<br>└── KEY2 (file)"]:::vol
     
     CS -->|envFrom / valueFrom| ENV
@@ -315,7 +316,7 @@ graph TD
 
 This flow explains why a rollout plan must include both the Kubernetes delivery mechanism and the application reload mechanism. Kubernetes can update a file, but it cannot force arbitrary application code to reread that file. Kubernetes can create an environment variable, but it cannot change a process environment after startup. The best production designs make that behavior explicit by using versioned object names, checksums in Pod template annotations, reload sidecars, or application-native reload endpoints depending on the reliability requirements.
 
-Controllers often automate the restart side of this problem by changing the Pod template whenever a referenced ConfigMap or Secret changes. Helm charts commonly add a checksum annotation derived from rendered configuration, and some operators watch objects directly and trigger rollouts. That pattern is powerful because it converts an invisible dependency into a visible Deployment change. The tradeoff is that every configuration edit can now restart workloads, so teams should decide whether the value is safe for live reload, restart-based rollout, or a manual maintenance window.
+Tools can automate the restart side of this problem by changing the Pod template when a referenced object changes. For example, [Kustomize's ConfigMap generator](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#generate-configmaps-from-files) adds a content hash to the generated name. Updating a workload reference to the new name makes the dependency visible in its Pod template. The tradeoff is that configuration edits can restart workloads, so decide whether a value needs live reload, a rollout, or a maintenance window.
 
 ## Worked Example: Refactoring Hardcoded Config
 
@@ -378,9 +379,9 @@ The most important sentence in this module is simple: base64 is not encryption. 
 
 Encryption at rest addresses a different threat: the exposure of stored API data in etcd or backups. Cluster administrators can configure the API server with `--encryption-provider-config`, causing selected resource data such as Secrets to be encrypted before being written to disk. Providers include `identity`, which performs no encryption; local encryption providers such as `aescbc`, `aesgcm`, and `secretbox`; and KMS providers that integrate with an external key-management system.
 
-The KMS story matters for Kubernetes 1.35 because older KMS v1 behavior had serious performance drawbacks. KMS v1 was deprecated in Kubernetes v1.28 and disabled by default beginning in v1.29 because it required remote provider interaction in ways that could add latency and fragility to API server operations. KMS v2 reached stable status in Kubernetes v1.29 and is the modern path for external key management because it improves performance while keeping the root of trust outside the cluster.
+The KMS story matters for Kubernetes 1.35. KMS v1 was deprecated in Kubernetes v1.28 and disabled by default beginning in v1.29. KMS v2 reached stable status in v1.29 and offers significantly better performance than v1. See the [KMS provider documentation](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kms-provider/).
 
-Encryption at rest does not protect plaintext manifests before they reach the API server. If a team commits a Secret YAML with `stringData` into a public repository, KMS v2 cannot help; the leak happened in Git, not in etcd. If a developer sends a Secret manifest through an unprotected chat channel, the cluster storage provider never gets a chance to reduce that exposure. The security boundary begins only after the API server receives and persists the object.
+Encryption at rest does not protect plaintext manifests before they reach the API server. If a team commits a Secret YAML with `stringData` into a public repository, KMS v2 cannot help; the leak happened in Git, not in etcd. If a developer sends a Secret manifest through an unprotected chat channel, the cluster storage provider never gets a chance to reduce that exposure. Encryption at rest protects selected persisted API data; authentication, authorization, and admission are separate controls.
 
 RBAC is the second major boundary, and it is easy to underestimate. Granting `get` on a named Secret allows direct retrieval of that Secret. Granting `list` on Secrets in a namespace is broader because list responses include full object payloads, not just names. Granting a user permission to create Pods in a namespace can also become indirect Secret access, because the user can create a Pod that mounts a Secret and then read it from inside the container.
 
@@ -401,11 +402,11 @@ This is why Secret design should be paired with credential design. A long-lived 
 
 ## Projected Volumes, Immutability, and Rollout Strategy
 
-Configuration delivery becomes more interesting as clusters grow. A single namespace might contain many Deployments that share common settings, and a large platform might have thousands of Pods watching the same stable object. If every kubelet is watching mutable ConfigMaps and Secrets that almost never change, the control plane spends resources maintaining update paths that the application does not need. Kubernetes supports immutable ConfigMaps and Secrets to reduce that ongoing watch and polling pressure.
+Configuration delivery becomes more interesting as clusters grow. A single namespace might contain many Deployments that share common settings. Kubernetes documents a performance benefit from immutable objects for clusters with at least tens of thousands of unique ConfigMap-to-Pod mounts: kubelets can close watches for objects that cannot change.
 
-Setting `immutable: true` on a ConfigMap or Secret tells Kubernetes that the object data cannot be changed after creation. The kubelet can stop watching for updates to that object, which reduces load in high-churn clusters. The tradeoff is deliberate: a change now requires creating a new object and updating the workload to reference the new name. That pattern looks slightly more verbose, but it creates a safer rollout history because each versioned object represents a specific configuration snapshot.
+Setting `immutable: true` on a ConfigMap or Secret prevents changes to its data. The kubelet can stop watching for updates to that object, reducing API server load in large clusters. To change the data, delete and recreate the object; Kubernetes recommends recreating existing consuming Pods because they maintain a mount point to the deleted object. A versioned replacement name and workload update is another pattern that preserves the old object for a controlled rollout. See [immutable ConfigMaps](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/#configmap-immutable) and [immutable Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/#secret-immutable).
 
-Immutable ConfigMaps and Secrets became stable in Kubernetes v1.21 after earlier alpha and beta stages. The original enhancement planning documents included earlier target dates, but release announcements and current documentation are the source of truth for operational decisions. In Kubernetes 1.35, immutability is normal production behavior, not an experimental trick. It is especially useful for global constants, application defaults, certificate bundles, and config that should change only through a controlled rollout.
+Immutable ConfigMaps and Secrets became stable in Kubernetes v1.21. In Kubernetes 1.35, immutability is a stable feature. It can be useful for global constants, application defaults, certificate bundles, and config that should change only through a controlled rollout.
 
 Versioned names are the practical companion to immutability. Instead of editing `app-config`, create `app-config-2026-05-03` or another release-specific name, update the Deployment, and let the rollout controller replace Pods gradually. The old object can stay in place while old Pods drain, and cleanup can happen after the rollout is complete. This makes rollback easier because the previous object still exists and has not been overwritten.
 
@@ -482,10 +483,10 @@ Finally, ask how often the value changes and how dangerous a bad change would be
 
 ## Did You Know?
 
-- **1 MiB Payload Limit**: ConfigMap and Secret individual object sizes cannot exceed 1 MiB to protect the etcd datastore from bloated memory consumption and unresponsive queries.
-- **KMS v2 GA Date**: The modern KMS v2 encryption provider achieved General Availability in Kubernetes v1.29, finally replacing the slow, network-heavy KMS v1 architecture that is disabled by default.
-- **Immutability GA Timeline**: Immutable ConfigMaps and Secrets reached stable status in Kubernetes v1.21, though early enhancement planning materials targeted an earlier release.
-- **Two-Minute Propagation Window**: When mounting ConfigMaps as volumes, changes can take roughly two minutes to appear because kubelet sync timing and cache propagation both matter.
+- **1 MiB Payload Limit**: ConfigMaps are not designed for large data, and the Secret limit discourages objects that could exhaust API server and kubelet memory.
+- **KMS v2 GA Date**: KMS v2 became stable in Kubernetes v1.29; KMS v1 was disabled by default in that release.
+- **Immutability GA Timeline**: Immutable ConfigMaps and Secrets reached stable status in Kubernetes v1.21.
+- **Propagation Depends on Strategy**: A mounted update can take the kubelet sync period plus cache propagation time. Watch is the default strategy; a one-minute sync plus a one-minute TTL is a TTL-cache example.
 
 ## Common Mistakes
 
@@ -515,7 +516,7 @@ The value belongs in a Secret because disclosure would create a security inciden
 
 <details><summary>A Secret mounted with `subPath` does not update after rotation, and the application keeps using the old credential. What is happening?</summary>
 
-`subPath` creates a bind mount for a specific file, which bypasses the kubelet's normal symlink rotation for ConfigMap and Secret volumes. The Secret object may be updated correctly in the API server, but the mounted file inside the existing container remains static. The immediate fix is to restart or roll the Pod. The longer-term fix is to mount a directory without `subPath` when live refresh is required, or to use versioned Secrets with intentional rollouts.
+A Secret mounted through `subPath` does not receive updates in the running container. The Secret object may be updated correctly in the API server, but the mounted file inside the existing container remains static. Restart or roll the Pod to pick up the changed value. For future live refresh, mount a directory without `subPath`, or use versioned Secrets with intentional rollouts.
 
 </details>
 
@@ -530,7 +531,7 @@ data:
   password: mysecretpassword
 ```
 
-The manifest uses the `data` field but provides raw plaintext instead of a base64-encoded value. Kubernetes Secret `data` values must be encoded byte strings, so the application will not receive the intended password. The safer hand-written version uses `stringData`, which lets the API server perform the encoding. If `data` is required, encode the exact value without an accidental trailing newline.
+The author put the intended plaintext directly in `data` instead of encoding those bytes. This particular string is also syntactically valid base64: the API can accept it, but decoding it yields different bytes, so the application will not receive the intended password. Other invalid base64 strings are rejected. Use `stringData` for plaintext input, or encode the exact intended value for `data` without an accidental trailing newline. See the [Secret data fields](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/#restriction-names-data).
 
 </details>
 
@@ -540,7 +541,7 @@ No. KMS v2 protects selected API data after the API server persists it to storag
 
 </details>
 
-<details><summary>A platform team sees heavy API server load from thousands of Pods consuming a shared ConfigMap that almost never changes. What design change should they evaluate?</summary>
+<details><summary>A platform team has tens of thousands of unique ConfigMap-to-Pod mounts, including a shared ConfigMap that almost never changes. What design change should they evaluate to reduce API server load?</summary>
 
 They should evaluate marking the ConfigMap as immutable and moving to a versioned replacement workflow. Immutability lets kubelets stop watching or polling for updates to that object, reducing control-plane load in large clusters. When the value needs to change, the team creates a new ConfigMap and updates the workload reference, which triggers a controlled rollout. This fits stable shared configuration better than repeatedly editing one mutable object.
 
@@ -554,7 +555,7 @@ Pod creation can become indirect Secret access. The user can create a Pod that r
 
 <details><summary>A legacy application needs a 5 MiB configuration file. Should you store it in a standard ConfigMap?</summary>
 
-No. ConfigMaps and Secrets have a 1 MiB object size limit, and pushing multi-mebibyte payloads through the Kubernetes API harms the wrong components. A better design uses an image layer, persistent volume, object-store download, init container, or another delivery mechanism built for larger artifacts. The deciding factor is whether the file is code-like, data-like, environment-specific, or sensitive. ConfigMaps are for configuration state, not bulk file distribution.
+No. ConfigMap data and Secret payloads each have a 1 MiB limit, and pushing multi-mebibyte payloads through the Kubernetes API harms the wrong components. A better design uses an image layer, persistent volume, object-store download, init container, or another delivery mechanism built for larger artifacts. The deciding factor is whether the file is code-like, data-like, environment-specific, or sensitive. ConfigMaps are for configuration state, not bulk file distribution.
 
 </details>
 
@@ -778,16 +779,17 @@ Success criteria:
 - [Kubernetes v1.35 documentation: ConfigMaps](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/)
 - [Kubernetes v1.35 documentation: Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/)
 - [Kubernetes v1.35: request namespaces](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#setting-the-namespace-for-a-request) and [object UIDs](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids)
-- [Kubernetes task: Configure a Pod to use a ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
-- [Kubernetes task: Distribute credentials securely using Secrets](https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/)
-- [Kubernetes task: Encrypt data at rest](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/)
-- [Kubernetes documentation: RBAC authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
-- [Kubernetes documentation: Projected volumes](https://kubernetes.io/docs/concepts/storage/projected-volumes/)
-- [Kubernetes API reference: ConfigMap v1](https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/config-map-v1/)
-- [Kubernetes API reference: Secret v1](https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/secret-v1/)
-- [Kubernetes documentation: Managing Secrets using kubectl](https://kubernetes.io/docs/tasks/configmap-secret/managing-secret-using-kubectl/)
-- [Kubernetes documentation: Immutable Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#immutable-secrets)
-- [Kubernetes documentation: ConfigMap object details](https://kubernetes.io/docs/concepts/configuration/configmap/#configmap-object)
+- [Kubernetes v1.35: Configure a Pod to use a ConfigMap](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
+- [Kubernetes v1.35: Distribute credentials using Secrets](https://v1-35.docs.kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/)
+- [Kubernetes v1.35: Encrypt data at rest](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) and [KMS provider](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kms-provider/)
+- [Kubernetes v1.35: RBAC authorization](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/rbac/)
+- [Kubernetes v1.35: Projected volumes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/projected-volumes/) and [volumes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/volumes/)
+- [Kubernetes v1.35 API: ConfigMap](https://v1-35.docs.kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/config-map-v1/) and [Secret](https://v1-35.docs.kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/secret-v1/)
+- [Kubernetes v1.35: Managing Secrets using kubectl](https://v1-35.docs.kubernetes.io/docs/tasks/configmap-secret/managing-secret-using-kubectl/)
+- [Kubernetes v1.35: Immutable Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/#secret-immutable) and [ConfigMap details](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/#configmap-object)
+- [Kubernetes v1.35: Static Pods](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/static-pod/) and [kubelet](https://v1-35.docs.kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
+- [Kubernetes v1.35: kubectl create configmap](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_configmap/) and [create secret generic](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/)
+- [The Twelve-Factor App: Config](https://12factor.net/config)
 
 ## Next Module
 
