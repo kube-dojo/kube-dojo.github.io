@@ -10,7 +10,7 @@ revision_pending: false
 >
 > **Time to Complete**: Approximately 90–120 minutes (estimate for reading and the exercise)
 >
-> **Prerequisites**: [Module 5 of Git Deep Dive](../module-5-worktrees-stashing/) and a local Bash shell with Git installed. The Git controls used version 2.56; check your Git supports `--since-as-filter` before using it.
+> **Prerequisites**: [Module 5 of Git Deep Dive](../module-5-worktrees-stashing/) and a local Bash shell with Git installed. In a repository, check that `git log --since-as-filter=now -1` is accepted by your Git before using this option.
 
 ---
 
@@ -279,7 +279,7 @@ Whitespace-only rewrites are where naive blame becomes actively misleading. A fo
 git blame -w k8s/deployment.yaml
 ```
 
-A repository can share a `.git-blame-ignore-revs` file. If the team performed a repository-wide YAML reformat, put its full, unabbreviated commit object name on a line in the file and configure Git to skip it during blame. The configuration is local to each clone; configure it there and ensure the file exists, because a missing ignore file causes an error.
+A repository can share a `.git-blame-ignore-revs` file. If the team performed a repository-wide YAML reformat, put its full, unabbreviated commit object name on a line in the file and configure Git to skip it during blame. The command below writes clone-local configuration; ensure the file exists because a missing ignore file causes an error. A global setting can affect other repositories that lack that file.
 
 ```bash
 git config blame.ignoreRevsFile .git-blame-ignore-revs
@@ -445,7 +445,7 @@ Troubleshooting often ends with a broader accountability question: what changed 
 Author and date filters are straightforward when the question is about a person or team. The command below asks for commits by a contractor account since the beginning of a month in UTC. In real environments, remember that author names are not identity proof by themselves; they are useful Git metadata that should be correlated with pull request review, signed commits, deployment logs, or access-control records when the stakes are high.
 
 ```bash
-git log --author="contractor.name" --since="2024-10-01T00:00:00+00:00" --oneline
+git log --author="contractor.name" --since-as-filter="2024-10-01T00:00:00+00:00" --oneline
 ```
 
 Path filters keep the report focused on the files that matter. If the production incident concerns `config/settings.yaml`, the application source commits are distracting even if they happened in the same week. The double dash separates revision options from paths, which prevents ambiguous names from being interpreted as branches or flags.
@@ -537,7 +537,7 @@ Choose the tool by asking where the evidence lives. If the symptom reproduces on
 | "Who last changed this current manifest line?" | `git blame -L` | Use `-w` or `-C` if formatting or movement may hide the original author. |
 | "When was this deleted variable removed?" | `git log -S` | Add `--patch` or inspect the removal commit directly. |
 | "Which manifests changed during the freeze?" | `git log --since-as-filter --until --name-status -- path/` | Compare the Git timeline with deployment and review records. |
-| "Does a teammate's branch contain this resource?" | `git grep pattern branch` | Confirm whether that branch was deployed or merged. |
+| "Does a teammate's branch contain this resource?" | `git grep pattern branch` | Fetch the relevant remote ref first, then confirm whether it was deployed or merged. |
 
 The framework is intentionally simple because incident response rewards repeatable decisions. Do not start with the most impressive command; start with the question that eliminates the most uncertainty. When the answer shifts the evidence type, change tools rather than forcing one command to do every job.
 
@@ -576,7 +576,7 @@ In practice, investigations loop through this framework more than once. A Pickax
 
 <details><summary><strong>Question 3</strong>: `git blame` attributes a dangerous storage stanza to an engineer who says they copied it between files during a reorganization. How do you investigate the attribution?</summary>
 
-**Answer**: Plain blame follows whole-file renames. If a block moved between files, run targeted blame with copy detection, such as `git blame -C` on the current file and the suspicious line range. Git may trace the text to an earlier commit. A second `-C` also searches other files when the target was created, and a third considers other files in any commit. Inspect the attributed commit and its context; heuristic attribution alone does not explain whether the stanza was correct.
+**Answer**: Plain blame follows whole-file renames. If a block was copied from an unchanged file, try `-C -C` when the target file was created in that commit, or `-C -C -C` for a broader search. Git may trace the text to an earlier commit; inspect that commit and its context because heuristic attribution alone does not establish whether the stanza was correct.
 </details>
 
 <details><summary><strong>Question 4</strong>: Your API is broken at `HEAD` and stable at tag `v2.0`. You automate bisection with a script that curls the live production health endpoint at `https://api.example.com/health`. Why will this not find the Git regression?</summary>
@@ -596,7 +596,7 @@ In practice, investigations loop through this framework more than once. A Pickax
 
 <details><summary><strong>Question 7</strong>: A teammate says their remote branch contains a new `PodDisruptionBudget`, but you have local work you do not want to stash. How can you find the file path without checking out their branch?</summary>
 
-**Answer**: Run `git grep "kind: PodDisruptionBudget" origin/their-branch`, replacing the branch name with the actual remote tracking branch. `git grep` can search Git tree objects directly, so it does not need to change your working directory. The result includes the branch, file path, and matching line, which is enough to start review. You should still confirm whether that branch was deployed before treating it as cluster truth.
+**Answer**: Fetch the relevant remote first, for example `git fetch origin`, then run `git grep "kind: PodDisruptionBudget" origin/their-branch` with the actual remote-tracking branch. `git grep` can search Git tree objects without changing your working directory. The result includes the branch, file path, and matching line; confirm whether it was deployed before treating it as cluster truth.
 </details>
 
 ## Hands-On Exercise: The Case of the Broken Manifest
@@ -802,26 +802,27 @@ After a successful unambiguous search, `refs/bisect/bad` names the bad boundary;
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: recorded bisect state. A passing midpoint is good, but the mistaken `bad` mark has already moved the checkout. Do not label that new, untested commit. Save the log outside the repository:
+Failure layer: recorded bisect state. The mistaken `bad` mark may have moved the checkout or ended the search with a wrong boundary; do not label an untested checkout. This is a separate scenario, not the next step after the reference reset: use these blocks only while a bisection is active and you know the passing midpoint's hash. Run them in the disposable lab child; outside the lab, first start a disposable child Bash in the relevant repository. The failure guards exit that child, so do not paste the blocks into your top-level terminal.
 
 ```bash
 {
 recovery_log=$(mktemp "${TMPDIR:-/tmp}/git-bisect-log.XXXXXXXX") || { echo "STOP: cannot create recovery log"; exit 1; }
-git bisect log > "$recovery_log" || { echo "STOP: cannot capture bisect log"; exit 1; }
+git bisect log > "$recovery_log" || { echo "STOP: cannot capture bisect log; path: $recovery_log"; exit 1; }
+printf 'Recovery log: %s\n' "$recovery_log"
 }
 ```
 
-Edit that file to remove only the mistaken `git bisect bad <commit>` command line, preserving the anchors and other correct marks. Then rebuild the search state:
+Record the printed path outside the child. Edit that file to remove only the `git bisect bad <commit>` command whose hash matches the passing midpoint; preserve the anchors and other correct marks. Then rebuild the search state:
 
 ```bash
 {
 test -s "$recovery_log" || { echo "STOP: recovery log is empty or missing"; exit 1; }
-git bisect reset || { echo "STOP: bisect reset failed"; exit 1; }
-git bisect replay "$recovery_log" || { echo "STOP: bisect replay failed"; exit 1; }
+git bisect reset || { echo "STOP: bisect reset failed; log: $recovery_log"; exit 1; }
+git bisect replay "$recovery_log" || { echo "STOP: bisect replay failed; log: $recovery_log"; exit 1; }
 }
 ```
 
-Retest the selected checkout before marking it. A passing target test can now justify `good`; repairing the log does not test any commit for you.
+If replay fails, preserve the printed log path, correct the cause, and run `git bisect replay <path>` in the repository again. Retest the selected checkout before marking it. A passing target test can now justify `good`; repairing the log does not test any commit for you.
 
 </details>
 
@@ -865,9 +866,9 @@ Failure layer: present files versus introduction commits. Next action: use `git 
 Suppose a different repository has a known-good tag and a bad tip, but an intermediate revision cannot be read by your test. Design a classifier for a different text assertion and explain how you would distinguish a missing match from an unreadable file. Predict what a skipped revision means for the certainty of the reported boundary before inspecting the answer.
 
 <details><summary>Hint 1</summary>Identify the exit statuses of the search command before mapping them to Git's classifications.</details>
-<details><summary>Hint 2</summary>Map a confirmed match to good, a confirmed absence to bad, and an untestable revision to skip.</details>
-<details><summary>Hint 3</summary>Preflight both anchors, then inspect the candidate and its parents after resetting the session.</details>
-<details><summary>Self-check</summary>A classifier may map grep statuses 0, 1, and other errors to 0, 1, and 125 respectively. Skipping avoids a false classification but can leave several possible first bad commits; investigate the skipped revisions before asserting an exact boundary.</details>
+<details><summary>Hint 2</summary>Map a confirmed passing assertion to good, a confirmed failing assertion to bad, and an untestable revision to skip. Decide whether presence or absence is the passing condition.</details>
+<details><summary>Hint 3</summary>Preflight both anchors; save the reported candidates and bisect log before resetting, then inspect each candidate and its parents.</details>
+<details><summary>Self-check</summary>If presence is the passing condition, a classifier may map grep statuses 0, 1, and other errors to 0, 1, and 125 respectively; reverse the first two for an absence assertion. Skipping can leave several possible first bad commits, so investigate skipped revisions before asserting an exact boundary.</details>
 
 ## Sources
 
