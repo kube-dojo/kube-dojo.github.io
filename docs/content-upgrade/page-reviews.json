@@ -640,7 +640,7 @@
     {
       "path": "prerequisites/git-deep-dive/module-1-git-internals.md",
       "page_digest": "sha256:13c452febb9b558340c7feb3667f9a2514602261c481eaa8dd12884341e3dc94",
-      "disposition": "revise",
+      "disposition": "retain",
       "reviewer_refs": [
         "docs/content-upgrade/reviews/2026-10-28-git-state-boundaries-p12a.md",
         "docs/content-upgrade/reviews/2026-10-28-git-fsck-recovery-p12g.md",
@@ -655,13 +655,14 @@
         "docs/content-upgrade/reviews/2026-10-28-git-quiz-code-render-p12i.md",
         "docs/content-upgrade/reviews/2026-10-28-git-internals-full-source-p12j.md"
       ],
+      "acceptance_refs": ["docs/content-upgrade/reviews/2026-10-29-git-internals-acceptance.md"],
       "independent_statuses": {
         "page_presence": "pass",
         "structural_checks": "pass",
         "technical_source": "pass",
         "editorial_review": "pass",
-        "lab_execution": "unknown",
-        "deployed_smoke": "pending"
+        "lab_execution": "pass",
+        "deployed_smoke": "pass"
       },
       "source_acceptance": {
         "schema": "kubedojo.source_acceptance.v1",
