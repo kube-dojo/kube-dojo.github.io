@@ -31,7 +31,7 @@ Hypothetical scenario: a financial platform prepares for a trading window with c
 
 The distinction matters during review: a parser can accept a mapping even when a particular Kubernetes field expects a sequence. Compare the field's expected type with the structure produced by the indentation, then validate the corrected request. A visually plausible file is not enough to establish that its fields have the intended shapes.
 
-That kind of incident feels unfair until you remember what YAML does in Kubernetes. YAML is not just a convenient file format for humans; it is the front door to the API server's declarative contract. A manifest is converted into structured data, validated, admitted through policy, persisted as desired state, and then reconciled by controllers. If the structure says the wrong thing, Kubernetes will faithfully pursue the wrong instruction or reject the request at the point where it can no longer interpret your intent. The discipline you build here is the discipline that keeps routine configuration work from becoming a production event.
+The validation catch illustrates why YAML matters in Kubernetes. YAML is not just a convenient file format for humans; it is the front door to the API server's declarative contract. A manifest is converted into structured data, validated, admitted through policy, persisted as desired state, and then reconciled by controllers. If the structure says the wrong thing, Kubernetes will faithfully pursue the wrong instruction or reject the request at the point where it can no longer interpret your intent. The discipline you build here is the discipline that keeps routine configuration work from becoming a production event.
 
 Hypothetical scenario: a team rotates a TLS certificate through a Kubernetes Secret and uses YAML's folded block scalar by mistake. The file is valid YAML, the Secret is created, and the rollout continues, but the folded scalar replaces certificate newlines with spaces. In this scenario the ingress controller rejects the altered PEM text and cannot load the certificate; another consumer may respond differently. A single character, `>` instead of `|`, does not break YAML syntax; it changes the application data that YAML carries, so a failure may appear later in the system.
 
@@ -86,7 +86,7 @@ Write the count and the type before you continue. The next section is about mult
 
 YAML becomes especially useful in Kubernetes when you need to carry text that already has internal structure. ConfigMaps can contain application configuration files, shell scripts, or web server snippets. Secrets can contain certificate material, private key text, or configuration fragments that must keep exact line boundaries after decoding. JSON can represent that data, but it forces escaped newline characters into a single string, while YAML can embed the text in a readable block.
 
-YAML has two block scalar operators that look similar and behave very differently. The literal block scalar, `|`, preserves ordinary line breaks; the folded block scalar, `>`, folds ordinary line breaks into spaces while preserving paragraph breaks around blank lines. Block indentation is removed, and chomping controls trailing line breaks. Check those details when exact text matters. Use `|` when the consumer needs the embedded line structure, such as in a script or certificate; `>` can be useful for a flowing description.
+YAML has two block scalar operators that look similar and behave very differently. The literal block scalar, `|`, preserves ordinary line breaks; the folded block scalar, `>`, folds ordinary line breaks into spaces while preserving paragraph breaks around blank lines. The content indentation is removed, while additional indentation remains part of the content; chomping controls trailing line breaks. Check those details when exact text matters. Use `|` when the consumer needs the embedded line structure, such as in a script or certificate; `>` can be useful for a flowing description.
 
 ```yaml
 # Literal (|) - Preserves the script's line breaks in this example
@@ -330,7 +330,7 @@ metadata:
   name: frontend-svc
 spec:
   selector:              # Select Pods...
-    app: frontend        # ...that has this exact label
+    app: frontend        # ...that have this exact label
     tier: web            # ...AND this exact label.
   ports:
   - port: 80
@@ -370,7 +370,7 @@ spec:
   # ... service details ...
 ```
 
-`kubectl` processes documents in file order, while controllers reconcile asynchronously after objects exist. A Deployment can be accepted before its referenced ConfigMap exists; a Pod cannot start while a required ConfigMap reference is missing. This distinction explains why acceptance of the first document is not proof that its dependent workload is ready. Ordering dependencies first reduces avoidable startup errors and makes the first rollout easier to observe.
+`kubectl` processes documents in file order, while controllers reconcile asynchronously after objects exist. A Deployment can be accepted before its referenced ConfigMap exists; a Pod cannot start while a required ConfigMap reference is missing, as the [ConfigMap restrictions](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#restrictions) explain. This distinction explains why acceptance of the first document is not proof that its dependent workload is ready. Ordering dependencies first reduces avoidable startup errors and makes the first rollout easier to observe.
 
 Put foundational dependencies before workloads where practical. Multi-document files package related objects; they do not replace dependency design or make reconciliation synchronous.
 
@@ -379,7 +379,7 @@ Put foundational dependencies before workloads where practical. Multi-document f
 <details>
 <summary>Check your prediction</summary>
 
-The client processes documents in order, but the cluster reconciles them over time. A missing required ConfigMap can leave containers waiting; a later startup attempt may succeed after the ConfigMap exists. Order the file to reduce noisy transitional failures and make first-apply behavior easier to reason about.
+The client processes documents in order, but the cluster reconciles them over time. A Pod cannot start while a required ConfigMap is missing. Order dependencies first to reduce avoidable startup errors and make first-apply behavior easier to reason about.
 
 </details>
 
@@ -566,7 +566,7 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 <details><summary>7. Scenario: A release file contains a ConfigMap, a Deployment that consumes it as an environment variable, and a Service. A teammate wants the Deployment first because it is the "main" resource. How would you evaluate that choice?</summary>
 
-**Answer:** Dependency-first ordering can reduce startup errors and make diagnostics easier. For a required ConfigMap reference, containers cannot start while the ConfigMap is absent. Creating it later can allow a subsequent startup attempt to succeed, but does not prove application readiness; optional references behave differently. Put the ConfigMap before the Deployment, then put the Service where it best fits the review flow. This tests the design outcome around multi-resource manifests and the tradeoff between asynchronous reconciliation and a clean first apply.
+**Answer:** Dependency-first ordering can reduce startup errors and make diagnostics easier. A Pod cannot start while a required ConfigMap is absent; optional references behave differently. Put the ConfigMap before the Deployment, then put the Service where it best fits the review flow. This tests the design outcome around multi-resource manifests and the tradeoff between asynchronous reconciliation and a clean first apply.
 </details>
 
 ## Hands-On Exercise
@@ -798,7 +798,7 @@ Failure layer: a data object was given a workload body. Next action: move the ke
 
 </details>
 
-**Card E: Apply is treated as one transaction.** `combined.yaml` lists the Deployment before its required ConfigMap. The first containers wait for the missing reference; a later startup attempt succeeds after the ConfigMap is created. The pipeline calls that a broken apply.
+**Card E: Apply is treated as one transaction.** `combined.yaml` lists the Deployment before its required ConfigMap. A Pod cannot start while the required reference is missing. The pipeline calls that a broken apply.
 
 <details>
 <summary>Check your prediction</summary>
@@ -826,6 +826,7 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 * [Kubernetes labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
 * [Kubernetes annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
 * [Kubernetes ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/)
+* [Configure Pods with a ConfigMap: restrictions](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#restrictions)
 * [RFC 7468: Textual Encodings of PKIX, PKCS, and CMS Structures](https://www.rfc-editor.org/rfc/rfc7468.txt)
 * [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 * [Kubernetes volumes](https://kubernetes.io/docs/concepts/storage/volumes/)
