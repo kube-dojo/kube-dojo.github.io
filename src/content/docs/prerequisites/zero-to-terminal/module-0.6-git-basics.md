@@ -322,7 +322,7 @@ Pause and predict: imagine the next diff is an excerpt from `spec.template.spec.
 <details>
 <summary>Check your prediction</summary>
 
-The image value changed from `nginx:1.14` to `nginx:1.24`. A Deployment's Pod template specifies the image for its Pods; the result depends on the rollout, registry, and runtime. In a real review, check whether the target image exists and whether the workload was tested. See the [Kubernetes Deployment example](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
+The image value changed from `nginx:1.14` to `nginx:1.24`. A Deployment's Pod template specifies the image for its Pods; the result depends on the rollout, registry, and runtime. In a real review, check whether the target image exists and whether the workload was tested. See the [Kubernetes Deployment example](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/).
 
 </details>
 
@@ -481,7 +481,14 @@ Git handles this with `.gitignore`, a plain text file usually stored at the repo
 
 If a credential was pushed, promptly revoke or rotate it with its provider and follow the repository's incident process. For any exposure, involve the credential owner. See [GitHub's sensitive-data guidance](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
 
-For this course, first privately inspect every commit you intend to push, for example with `git log -p <known-base>..HEAD`; choose the actual shared base, and do not paste sensitive output into tickets or chat. If the credential is only in the latest unpushed commit, remove it from the file, stage the correction, inspect `git diff --staged` for the intended correction and unrelated changes, then use `git commit --amend --no-edit`. Inspect the commits to share again before pushing. If an older commit contains it, or you cannot establish the base and exposure, stop and ask the owner or an experienced teammate for help. An amend replaces the latest commit; it does not clean older commits or other copies. See [Git's amend documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-commit.adoc).
+For this course, stop before pushing. With the repository owner, identify the last trusted shared commit: its hash is the base for privately inspecting `git log -p <base>..HEAD`. Replace `<base>` with that agreed hash; do not paste sensitive output into tickets or chat. If you cannot establish the base and exposure, the range contains a merge commit, or the credential appears in an older commit, stop and ask the owner or an experienced teammate for help.
+
+Only when the credential occurs in the latest unpushed commit, choose the matching correction:
+
+- If that commit added a whole private file such as `.env`, use `git rm --cached .env` to keep the local file while removing it from the index. Add a narrow `.env` ignore rule and stage `.gitignore`.
+- If the credential is inside a file that should remain tracked, replace it with a placeholder and stage that named file.
+
+Inspect `git diff --staged` for the intended correction and unrelated staged changes, then use `git commit --amend --no-edit`. Inspect the commits to share again before pushing. The replaced commit can remain in your local repository, including through the reflog, and on other branches or tags that contain it; amend does not erase those copies. Ask for help if other refs contain the credential. See [Git's amend documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-commit.adoc) and [reflog reference](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reflog.adoc).
 
 Create an ignore file for the practice repository. The exact patterns below are intentionally small so you can reason about them. They show operating system noise, local secrets, a local kubeconfig-style file, and Terraform state. In a production repository, you would adapt patterns to the tools actually used by the project and review them just like any other infrastructure policy.
 
@@ -554,7 +561,7 @@ The decision framework also helps you avoid destructive commands early in your G
 
 1. **Git began in 2005.** The Linux kernel community's free BitKeeper arrangement ended, and the project developed a distributed replacement. [Pro Git's history](https://github.com/progit/progit2/blob/a013e3230a1207cfa5ae94d28ba7d2021063c337/book/01-introduction/sections/history.asc) describes the context.
 2. **The name is intentionally cheeky.** The [Git project README](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/README.md) includes a playful explanation of the name.
-3. **Empty directories.** In this lesson's local Git 2.56 practice repository, an empty directory did not appear in `git status` or the index. Adding an ordinary file inside made the directory appear as untracked with default reporting; `git status --untracked-files=all` listed the file, and staging it added the file to the index. This is the observed result in that local fixture.
+3. **Empty directories.** In the course authors' Git 2.56 test repository, an empty directory did not appear in `git status` or the index. Adding an ordinary file inside made the directory appear as untracked with default reporting; `git status --untracked-files=all` listed the file, and staging it added the file to the index. This is the observed result in that local fixture.
 4. **Object identifiers are part of Git's integrity model.** Git supports SHA-1 and SHA-256 repositories; the [Git 2.56 documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/object-format-disclaimer.adoc) notes they do not currently interoperate.
 
 ## Common Mistakes
@@ -567,7 +574,7 @@ The decision framework also helps you avoid destructive commands early in your G
 | Writing empty or meaningless commit messages | The learner treats commits as checkpoints for themselves rather than messages to future maintainers. | Amend an unpushed commit message when needed and practice explaining the operational reason for each snapshot. |
 | Forgetting to stage files before committing | The working directory contains changes, but the staging area is empty when `git commit` runs. | Run `git status`, stage the intended files with `git add <file>`, inspect again, and retry the commit. |
 | Committing generated or binary artifacts | Build outputs and logs sit beside source files, and the repository has no ignore policy yet. | Remove accidental tracked artifacts with the appropriate Git command, commit the cleanup, and add patterns to `.gitignore` before more work continues. |
-| Adding an ignore rule after a file is already tracked | The learner expects `.gitignore` to override history for files already committed. | Remove the file from tracking with an index-only removal such as `git rm --cached <file>` and commit that change. Follow the incident process for any real exposed credential; this does not remove earlier history. |
+| Adding an ignore rule after a file is already tracked | The learner expects `.gitignore` to override history for files already committed. | Remove the file from tracking with an index-only removal such as `git rm --cached <file>` and commit that change. If a real credential was pushed, revoke or rotate it; for local-only history, stop before pushing and follow the [credential response steps](#credential-response). This does not remove earlier history. |
 
 ## Quiz
 
@@ -595,7 +602,7 @@ Run `git diff` before staging so you can inspect the exact unstaged line changes
 <details>
 <summary>4. You cloned a repository and Git asks you to configure <code>user.name</code> and <code>user.email</code> before committing. Later, <code>git push</code> asks for remote credentials. Why are these two prompts different?</summary>
 
-`user.name` and `user.email` supply commit attribution; they do not authenticate a push. Remote credentials authenticate to the host, and the host separately decides whether that identity is authorized to push. A successful local commit does not guarantee the remote will accept a push.
+`user.name` and `user.email` supply commit attribution; they do not authenticate a push. Remote credentials authenticate to the host, and the host separately decides whether that identity is authorized to push. For example, [GitHub repository roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/repository-roles-for-an-organization) distinguish read access from permission to push. A successful local commit does not guarantee the remote will accept a push.
 
 </details>
 
@@ -934,7 +941,7 @@ For Challenge 2 (The Divergent Timelines):
 
 ### Task 8: Design Your Own Two-Commit Workflow
 
-Continue in the same disposable repository after Task 7 is clean. Choose a new replica count for the practice `deployment.yaml` fragment and explain your choice in a new line of `README.md`. The fragment is incomplete and must not be applied to a cluster. Use the already ignored `temp-notes.txt` for a scratch note; do not put credentials in it.
+Continue in the same disposable repository after Task 7 is clean. Choose a new replica count for the practice `deployment.yaml` fragment and explain your choice in a new line of `README.md`. The fragment is incomplete and must not be applied to a cluster. Recreate `temp-notes.txt` if you removed it and confirm `git check-ignore temp-notes.txt` prints its path. If it does not, add a narrow ignore pattern, review and commit `.gitignore` first. Use that ignored file for a scratch note; do not put credentials in it.
 
 Before editing, write down the two commit purposes and predict which files will be staged, unstaged, and ignored. Make both edits, then stage only the replica change. Inspect the index against HEAD and the working tree against the index before the first commit: explain why the README is still outside that commit. Commit the configuration change, then review and commit the README change separately. Check that both patches contain only the intended file, the scratch note is ignored and untracked, and normal `git status` is clean. Record which hints you used and what you would change in your workflow next time.
 
@@ -995,6 +1002,7 @@ One possible approach is to choose two replicas for a smaller practice configura
 - [Git 2.56: clone](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-clone.adoc), [restore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-restore.adoc), [reset](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reset.adoc), and [remote](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-remote.adoc)
 - [GitHub: removing sensitive data](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
 - [GitHub: authentication](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github)
+- [GitHub: repository roles and push permissions](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/repository-roles-for-an-organization)
 - Kubernetes v1.35: [labels](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 - [GitHub Git Guide](https://github.com/git-guides)
 - [GitHub Git Guide: git pull](https://github.com/git-guides/git-pull)
