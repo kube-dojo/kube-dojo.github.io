@@ -435,26 +435,32 @@ git remote add origin https://github.com/yourusername/k8s-webapp.git
 
 If the repository already exists on the server, do not create a new local repository and try to glue the histories together. Use `git clone <url>` instead. Cloning initializes the local `.git` directory, downloads the repository history, checks out a working tree, and records the remote as `origin`. Most professional work starts from cloning because the team history already exists before you arrive.
 
-Pushing uploads your local commits to the remote branch. The first push of a new branch often includes `-u`, which sets an upstream tracking relationship so future `git push` and `git pull` commands can infer the remote branch. This convenience is useful, but only after you understand what is being tracked. If the branch relationship is wrong, Git may push somewhere unexpected or ask you to be more explicit.
+Pushing uploads your local commits to the remote branch. The first push of a new branch often includes `-u`, which sets an upstream tracking relationship so future `git push` and `git pull` commands can infer the remote branch. Check that the destination and branch relationship match your intention before sharing work.
 
 ```bash
-# Push your main branch to the origin remote for the first time
+# Example only: requires your own prepared remote and branch
 git push -u origin main
 ```
 
-Pulling downloads remote commits and integrates them into your current branch. Conceptually, `git pull` is `git fetch` followed by an integration step such as merge or rebase, depending on configuration. Beginners can treat it as "bring the remote branch into my local branch," but it is worth remembering the two-part nature because `git fetch` alone is safer when you only want to inspect remote changes before modifying your working branch.
+Pull combines fetching with integration. First inspect your working state and the remote history. `origin/main` is a local remote-tracking ref: it records the remote branch as of its last update, not a live view of the server. Fetch refreshes it without integrating it into your current branch; the server can move again afterward. These commands illustrate a prepared remote named `origin` with a `main` branch; do not run them against someone else's repository.
 
 ```bash
-# Fetch changes from the remote and merge them into your local branch
-git pull origin main
+git status
+git fetch origin
+git log --oneline HEAD..origin/main
+git diff HEAD...origin/main
 ```
+
+The log lists commits reachable from the fetched `origin/main` but not from `HEAD`. The three-dot diff compares the merge base with `origin/main`, showing changes on the fetched side since the histories met; it is not a direct comparison of the two tips. Inspect your local commits too.
+
+When histories diverge, choose an integration method with your team. `git pull --no-rebase origin main` merges; `git pull --rebase origin main` replays local commits on the fetched branch and changes their IDs. `git pull --ff-only origin main` refuses if a fast-forward is impossible. In Git 2.56, an unconfigured plain pull also refuses to choose a method for divergent branches; configuration and other versions can change that behavior. Ensure your working state is ready before integrating. See the [Git 2.56 pull documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc) and [diff documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-diff.adoc).
 
 Pause and predict: you made two local commits while offline, and a colleague pushed three commits to the same remote branch before you reconnected. What happens if you try `git push origin main` immediately? Decide what Git will do and what your recovery sequence should be before opening the reveal.
 
 <details>
 <summary>Check your prediction</summary>
 
-Git will reject the push with an error stating that updates were rejected because the remote contains work that you do not have locally (non-fast-forward push). Git refuses to let your push overwrite the remote timeline by accident. To recover, you must run `git fetch` or `git pull` to bring in the colleague's commits, inspect the combined history, resolve any merge conflicts if the same lines were touched, and then push your updated branch.
+The push can be rejected as non-fast-forward because the remote contains work missing locally. Fetch and inspect both histories, then choose an agreed merge or rebase, resolve any conflicts, verify the result, and retry the push. Fetching alone does not integrate the histories.
 
 </details>
 
@@ -528,8 +534,8 @@ When Git feels confusing, choose the next command based on the state you need to
 | You want to review exact line changes | What would surprise a reviewer? | `git diff` | Stage only the intended files after reading the patch. |
 | You already staged changes but want to inspect staged content | What is in the next snapshot? | `git diff --staged` | Commit if it is correct, or unstage and revise. |
 | You want a local save point | Does the staged change have one coherent reason? | `git commit -m "message"` | Write a message that explains intent, not just mechanics. |
-| You need work from the remote | Has my local branch got uncommitted work? | `git status` then `git pull` | Pull only when the local state is understood and ready. |
-| You need to share local commits | Does the remote have work I lack? | `git push` or explicit `git push -u origin main` | If rejected, fetch or pull, integrate, and push again. |
+| You need work from the remote | Has my local branch got uncommitted work? | `git status` then `git fetch origin` | Inspect the fetched ref and choose how to integrate. |
+| You need to share local commits | Does the remote have work I lack? | `git push` or explicit `git push -u origin main` | If rejected, inspect the error and fetched history before integrating and retrying. |
 
 Use `git init` when you are starting a brand-new local repository in a directory that does not already have history. Use `git clone` when the project already exists somewhere else and you want your local copy to share that existing history. Use `.gitignore` before local files pile up, especially when a project touches credentials or generated artifacts. Use `git log` when behavior changed and you need a timeline, not when you are trying to inspect uncommitted edits.
 
@@ -548,7 +554,7 @@ The decision framework also helps you avoid destructive commands early in your G
 | :--- | :--- | :--- |
 | Accidentally committing a password or secret | The learner stages broadly without reading `git status` and `git diff`, so a local `.env` or credential file enters the commit. | If it was pushed, rotate the credential immediately and follow the repository's secret-removal process. If it was only local, remove it from history before sharing and add an ignore rule. |
 | Seeing "fatal: refusing to merge unrelated histories" | A repository was initialized locally, while the hosting service also created its own first commit such as a README. | Prefer cloning an existing remote. If combining histories is truly intended, use the explicit unrelated-histories option only after reviewing why the histories differ. |
-| Getting "updates were rejected" during push | The remote branch has commits that the local branch lacks, often because someone pushed while you were offline. | Fetch or pull the remote work, resolve any conflicts, verify the combined history, and push again only after the local branch includes the remote commits. |
+| Getting "updates were rejected" during push | The remote branch may have commits the local branch lacks. | Inspect the error, fetch and compare histories, then choose how to integrate before retrying. |
 | Writing empty or meaningless commit messages | The learner treats commits as checkpoints for themselves rather than messages to future maintainers. | Amend an unpushed commit message when needed and practice explaining the operational reason for each snapshot. |
 | Forgetting to stage files before committing | The working directory contains changes, but the staging area is empty when `git commit` runs. | Run `git status`, stage the intended files with `git add <file>`, inspect again, and retry the commit. |
 | Committing generated or binary artifacts | Build outputs and logs sit beside source files, and the repository has no ignore policy yet. | Remove accidental tracked artifacts with the appropriate Git command, commit the cleanup, and add patterns to `.gitignore` before more work continues. |
@@ -599,9 +605,9 @@ Git reports that the directory is not a repository unless a parent directory is 
 </details>
 
 <details>
-<summary>7. You and a colleague both changed the same `replicas` line in `nginx-deployment.yaml`. Their change reached the remote first, your push is rejected, and then you pull. What should you expect and how do you resolve it?</summary>
+<summary>7. You and a colleague committed different edits to the same `replicas` line. Their commit reached the remote first, and your push is rejected. After fetching and inspecting the divergent histories, you choose `git pull --no-rebase origin main`. What might happen, and how would you resolve it?</summary>
 
-Git may stop with a merge conflict because two histories changed the same line differently, and it cannot know which replica count is operationally correct. Open the file, read the conflict markers, choose or combine the intended value, and remove the markers. Then stage the resolved file and complete the merge commit before pushing. The important point is that Git detects the unsafe overlap, but a human still owns the infrastructure decision.
+Git may stop with a merge conflict; it cannot choose the operationally correct replica count. Check `git status`, read the conflict markers, agree on the intended value, remove the markers, and stage the resolved file with `git add`. Inspect the staged resolution and complete the merge with `git commit`, then verify the result before retrying the push. If you chose rebase instead, follow its status instructions and use `git rebase --continue` after staging. A conflict is not guaranteed for every pair of edits.
 
 </details>
 
@@ -817,7 +823,7 @@ Before running any fix or commit, use your diagnostic commands (`git status`, `g
 3. Which files must be kept out of version control, and what action ensures they are ignored?
 4. What is the precise command sequence to safely ignore the credential and scratch files, unstage the incomplete YAML edit, and return the working tree to clean?
 
-Challenge 2: The Divergent Timelines Diagnostic. A colleague on your infrastructure team reports that running `git push origin main` fails with a rejection error. They share the following output comparing their local commit log with the remote tracking branch on the shared server:
+Challenge 2: The Divergent Timelines Diagnostic. A colleague reports that `git push origin main` was rejected. After a fetch, they share an illustrative local log and `origin/main`, their local record of the server branch at that moment:
 
 ```text
 Local log:
@@ -834,7 +840,7 @@ d4e5f6a (origin/main) chore: update prometheus scrape annotations
 Without running commands, diagnose the repository state:
 1. Why was `git push` rejected, and what does the divergence between `HEAD` and `origin/main` indicate?
 2. What should the engineer do next: `git commit`, `git push --force`, `git fetch` followed by inspection, or `git init`?
-3. What catastrophic risk would `git push --force` introduce for the rest of the team?
+3. What risk could `git push --force` introduce for the shared branch?
 
 - [ ] Planted workspace state diagnosed using `git status`, `git diff`, and `git diff --staged`.
 - [ ] Appropriate action chosen for each file (stage, unstage, or ignore).
@@ -855,9 +861,9 @@ For Challenge 1 (The Planted Workspace):
    - Review `.gitignore` and stage it with `git add .gitignore`. If you completed Task 6, also review and stage the empty dummy `audit-trail.log`; otherwise there is no audit file to stage. Commit these intended files with `git commit -m "chore: record practice ignore rules"`, then run `git status` to confirm a clean working tree. Ignoring scratch files alone does not commit the ignore rules or the audit exception.
 
 For Challenge 2 (The Divergent Timelines):
-1. `git push` was rejected because the remote branch `origin/main` contains commit `d4e5f6a` ("chore: update prometheus scrape annotations"), which is not present in the local history. Git prevents non-fast-forward pushes to protect remote history from being silently overwritten.
-2. The engineer should run `git fetch origin` to download the remote commit objects, then compare the branches with `git log HEAD..origin/main` or `git diff HEAD..origin/main`. Once understood, they can run `git pull origin main` (or `git pull --rebase origin main`) to integrate the remote changes, verify the resulting configuration, and then push.
-3. Running `git push --force` would overwrite `origin/main` with the local branch, permanently erasing commit `d4e5f6a` from the shared branch and destroying the teammate's Prometheus monitoring configuration. Force-pushing to shared branches should be forbidden by branch protection rules.
+1. The shown local and fetched tips diverge: `d4e5f6a` is not in the local branch. That is consistent with a non-fast-forward rejection, although the server may have moved since the fetch.
+2. Run `git fetch origin` to refresh the local record, then inspect `git log HEAD..origin/main` for remote-only commits and `git diff HEAD...origin/main` for the fetched side's changes since the merge base. Agree on merge or rebase, verify the result, and only then retry the push.
+3. A force push can move the shared branch away from the teammate's commit, making it unreachable from that branch. Other clones may retain it, but recovery depends on available copies and cleanup. Avoid forcing a shared branch without coordination. `--force-with-lease` can refuse an unexpected remote value, but does not prove the teammate's work is included: background fetches can update the tracking ref used for the expected value. See the [Git 2.56 push documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc).
 
 </details>
 
