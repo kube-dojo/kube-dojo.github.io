@@ -125,7 +125,7 @@ set -e
 trap 'printf "%s\n" "STOP: setup failed; do not continue in the parent shell."' EXIT
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 mkdir k8s-webapp
-cd k8s-webapp
+cd ./k8s-webapp
 practice_dir=$(pwd -P)
 git init --initial-branch=main
 test "$(git rev-parse --show-toplevel)" = "$practice_dir"
@@ -627,7 +627,7 @@ set -e
 trap 'printf "%s\n" "STOP: setup failed; do not continue in the parent shell."' EXIT
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 mkdir dojo-k8s-project
-cd dojo-k8s-project
+cd ./dojo-k8s-project
 practice_dir=$(pwd -P)
 git init --initial-branch=main
 test "$(git rev-parse --show-toplevel)" = "$practice_dir"
