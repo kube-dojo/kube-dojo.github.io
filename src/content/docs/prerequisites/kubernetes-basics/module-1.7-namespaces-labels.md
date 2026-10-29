@@ -92,7 +92,7 @@ The strongest namespace guarantees are API scoping guarantees. A namespaced obje
 
 The weakest namespace guarantee is network isolation, because there is none by default. Kubernetes networking starts from a flat model where every Pod can usually reach every other Pod IP, regardless of namespace, unless a Container Network Interface plugin and `NetworkPolicy` objects enforce stricter rules. This default makes service discovery simple for beginners, but it means a production hardening plan cannot stop at namespaces. A namespace is the place where you attach policy; it is not the policy itself.
 
-Kubernetes creates several namespaces before you add your own. For `kubectl` outside a cluster, a command without an explicit namespace uses the current context's namespace; if that is unset, it falls back to `default`. In-cluster authentication can use the ServiceAccount namespace. The `kube-system` namespace holds cluster services such as CoreDNS, networking components, and infrastructure controllers. The `kube-public` namespace is readable by all users and is now rarely central to application work. The `kube-node-lease` namespace contains Lease objects used for node heartbeats.
+Kubernetes creates several namespaces before you add your own. For `kubectl` outside a cluster, a command without an explicit namespace uses the current context's namespace; if that is unset, it falls back to `default`. With in-cluster authentication, `kubectl` defaults to the ServiceAccount namespace unless `POD_NAMESPACE` overrides it. The `kube-system` namespace holds cluster services such as CoreDNS, networking components, and infrastructure controllers. The `kube-public` namespace is readable by all users and is now rarely central to application work. The `kube-node-lease` namespace contains Lease objects used for node heartbeats.
 
 Mature clusters treat `default` as a warning light rather than a convenient home. If production workloads, experiments, and one-off debugging Pods all live there, ownership becomes ambiguous and destructive commands become harder to review. A better habit is to create purpose-built namespaces such as `team-frontend`, `team-backend`, `observability`, `payments-prod`, or `payments-staging`, then put the namespace in every manifest. Explicit placement makes the desired boundary reviewable in Git and visible in incident output.
 
@@ -403,7 +403,7 @@ Which approach would you choose here and why: a quota that allows `4` CPU cores 
 ```bash
 kubectl describe quota frontend-quota -n team-frontend
 kubectl describe limitrange frontend-limits -n team-frontend
-kubectl get pods -n team-frontend -o custom-columns=NAME:.metadata.name,CPU_REQ:.spec.containers[*].resources.requests.cpu,CPU_LIM:.spec.containers[*].resources.limits.cpu
+kubectl get pods -n team-frontend -o 'custom-columns=NAME:.metadata.name,CPU_REQ:.spec.containers[*].resources.requests.cpu,CPU_LIM:.spec.containers[*].resources.limits.cpu'
 ```
 
 Admission timing is another critical detail. Newly created or updated objects are evaluated against current LimitRanges and ResourceQuotas, but existing running Pods are not retroactively rewritten just because a new LimitRange appears. This protects production from surprise throttling, yet it also means a namespace may contain older workloads that do not match current policy until they are restarted or redeployed. During a rollout, platform teams should communicate when defaults take effect and how teams can inspect injected resources.
@@ -574,8 +574,8 @@ Success criteria:
 - [ ] The stable `web-v1` Deployment creates three ready Pods with `app=web` and `version=v1`.
 - [ ] The `web-svc` Service has endpoints for the stable Pods before the canary is added.
 - [ ] The canary Pod uses `app=web` and `version=v2`, then appears in the Service endpoint set.
-- [ ] In the optional stretch, observe three stable endpoints after narrowing the selector and all four after restoring it, with the same Service UID.
-- [ ] Explain how to choose a selector for a different rollout and how to verify its membership.
+- [ ] Optional stretch: observe three stable endpoints after narrowing the selector and all four after restoring it, with the same Service UID.
+- [ ] Explain how to select production API Pods while excluding debug Pods, and how to verify membership.
 - [ ] Cleanup removes the owned exercise namespace without changing kubeconfig preferences.
 
 ### Task 1: Create the Isolation Zone
@@ -602,7 +602,7 @@ fi
 
 Continue only after setup succeeds. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
 
-Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. This uses `mktemp -d` with a template ending in `X` characters; see the [FreeBSD mktemp manual](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1). If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
+Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. This uses `mktemp -d` with a template ending in `X` characters; see the [FreeBSD](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1) and [GNU](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html) manuals. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
 
 ```bash
 NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && printf 'Manifest directory: %s\n' "$NS_DIR" && cd "$NS_DIR"
@@ -661,7 +661,7 @@ Deploy a simple NGINX application representing the stable version of your app. I
 
 <details><summary>Hint 1</summary>Which controller maintains the requested number of Pods?</details>
 <details><summary>Hint 2</summary>Compare its selector with the Pod template labels.</details>
-<details><summary>Hint 3</summary>Apply <code>web-v1.yaml</code> with <code>ns_lab apply -f web-v1.yaml</code>, then use <code>ns_lab rollout status deployment/web-v1 --timeout=120s</code> before inspecting labels.</details>
+<details><summary>Hint 3</summary>Apply <code>web-v1.yaml</code> with <code>ns_lab apply -f web-v1.yaml</code>, then use <code>ns_lab rollout status deployment/web-v1 --timeout=90s</code> before inspecting labels.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -704,7 +704,7 @@ Create a Service named `web-svc` that routes traffic to your application. The Se
 
 <details><summary>Hint 1</summary>Which label is shared by both versions?</details>
 <details><summary>Hint 2</summary>Use that label in the Service selector and expose port 80.</details>
-<details><summary>Hint 3</summary>Use <code>ns_lab apply -f web-svc.yaml</code>, then repeat <code>ns_lab get endpoints web-svc</code> until the three stable Pods appear.</details>
+<details><summary>Hint 3</summary>Use <code>ns_lab apply -f web-svc.yaml</code>, then repeat the full endpoint name-and-address check shown in the solution until the three stable Pods appear.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -739,7 +739,7 @@ Deploy a single Pod representing the new `v2` version of your application. Label
 
 <details><summary>Hint 1</summary>Which label makes the Pod eligible for the existing Service?</details>
 <details><summary>Hint 2</summary>Give it the shared app label and a distinct version label.</details>
-<details><summary>Hint 3</summary>Apply <code>web-v2-canary.yaml</code>, use <code>ns_lab wait --for=condition=Ready pod/web-v2-canary --timeout=120s</code>, then compare endpoint names with the previous check.</details>
+<details><summary>Hint 3</summary>Use <code>ns_lab apply -f web-v2-canary.yaml</code>, then <code>ns_lab wait --for=condition=Ready pod/web-v2-canary --timeout=90s</code>, and compare endpoint names with the previous check.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -781,17 +781,32 @@ Predict the ready endpoint names if `version=v1` is added to the Service selecto
 <details><summary>After your attempt: example commands</summary>
 
 ```bash
-NS_SERVICE_UID="$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" && [ -n "$NS_SERVICE_UID" ]
-[ -n "${NS_SERVICE_UID:-}" ] && [ "$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" = "$NS_SERVICE_UID" ] && ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":"v1"}}}'
-ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}'
+check_service_uid() {
+  local current_uid
+  [ -n "${NS_SERVICE_UID:-}" ] || { echo 'No recorded Service UID; stop' >&2; return 1; }
+  current_uid="$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" || { echo 'Cannot read Service UID; stop' >&2; return 1; }
+  [ "$current_uid" = "$NS_SERVICE_UID" ] || { echo "Service UID changed or missing: recorded=$NS_SERVICE_UID current=$current_uid; stop" >&2; return 1; }
+  printf 'Service UID: recorded=%s current=%s\n' "$NS_SERVICE_UID" "$current_uid"
+}
+start_selector_stretch() {
+  NS_SERVICE_UID="$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" || { echo 'Cannot record Service UID; stop' >&2; return 1; }
+  check_service_uid || return 1
+  ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":"v1"}}}' || { echo 'Selector patch failed; stop' >&2; return 1; }
+  ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}' || { echo 'Endpoint check failed; stop' >&2; return 1; }
+}
+start_selector_stretch
 ```
 
-Repeat the endpoint check until only the three stable Pods appear before restoring the selector. Then run:
+Repeat the endpoint check until only the three stable Pods appear before restoring the selector. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
 
 ```bash
-[ -n "${NS_SERVICE_UID:-}" ] && [ "$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" = "$NS_SERVICE_UID" ] && ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":null}}}'
-ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}'
-[ -n "${NS_SERVICE_UID:-}" ] && [ "$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" = "$NS_SERVICE_UID" ]
+restore_selector_stretch() {
+  check_service_uid || return 1
+  ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":null}}}' || { echo 'Selector restore failed; stop' >&2; return 1; }
+  ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}' || { echo 'Endpoint check failed; stop' >&2; return 1; }
+  check_service_uid || return 1
+}
+restore_selector_stretch
 ```
 
 Repeat the second endpoint check until all four appear. A timeout or unexpected UID means stop and investigate, not that the selector change has converged.
