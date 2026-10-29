@@ -1,6 +1,6 @@
 ---
 title: "Module 6: The Digital Detective — Troubleshooting and Search"
-description: "Master advanced Git search, forensics, and troubleshooting techniques to diagnose broken Kubernetes deployments."
+description: "Use Git search, blame, and bisection to investigate configuration changes and test a historical regression."
 sidebar:
   order: 6
 revision_pending: false
@@ -8,9 +8,9 @@ revision_pending: false
 
 > **Complexity**: `[MEDIUM]`
 >
-> **Time to Complete**: 90–120 minutes (long-form read + hands-on exercise)
+> **Time to Complete**: Approximately 90–120 minutes (estimate for reading and the exercise)
 >
-> **Prerequisites**: Module 5 of Git Deep Dive
+> **Prerequisites**: [Module 5 of Git Deep Dive](../module-5-worktrees-stashing/) and a local Bash shell with Git installed
 
 ---
 
@@ -18,19 +18,19 @@ revision_pending: false
 
 After completing this module, you will be able to:
 
-- **Diagnose** the exact commit that introduced a subtle Kubernetes configuration regression by combining `git bisect run` with a deterministic validation script.
-- **Evaluate** the true lineage of suspicious code blocks across whitespace-only rewrites, file movement, and refactors by applying advanced `git blame` options.
+- **Diagnose** the first bad commit in a selected good-to-bad range by combining `git bisect run` with a deterministic validation script.
+- **Evaluate** Git's line attribution across whitespace-only rewrites, file movement, and refactors by applying advanced `git blame` options and checking their heuristic limits.
 - **Compare** historical diff search, snapshot search, and filtered log queries so you can choose the right troubleshooting tool for a live incident.
-- **Design** targeted audit trails for Kubernetes manifests that answer who changed what, when it changed, and why the change mattered.
-- **Implement** a repeatable Git troubleshooting workflow that moves from broken cluster symptoms to evidence-backed remediation.
+- **Design** targeted audit trails for Kubernetes manifests that report recorded authors, timestamps, paths, and diffs for comparison with deployment and review records.
+- **Implement** a repeatable Git troubleshooting workflow that preserves search commands, test results, and the identified boundary for follow-up investigation.
 
 ## Why This Module Matters
 
 Hypothetical scenario: at 3:14 AM on a holiday retail weekend, a payment platform that had been stable for months started dropping a measurable slice of checkout traffic with `503 Service Unavailable` responses. The Kubernetes control plane was healthy, the nodes were ready, and the application images had passed their normal checks, yet the customer-facing path was failing often enough that revenue dashboards turned into incident evidence. The latest revert did not help, because the release also contained compliance patches that could not be rolled back casually, and the only visible clue was that the `payment-gateway` manifests had been touched by several teams across hundreds of commits.
 
-In that kind of incident, Git is no longer a place where finished work is stored. It becomes a queryable timeline of operational decisions, and the team that can interrogate that timeline calmly has a different outage experience from the team that scrolls through pull requests in panic. A single YAML line can route traffic to the wrong port, remove a readiness gate, weaken a `NetworkPolicy`, or hide a resource limit change behind a formatting commit. The practical skill is not memorizing more commands; it is learning how to turn an unreliable symptom into a narrow historical question that Git can answer.
+In that kind of incident, Git is no longer a place where finished work is stored. It becomes a queryable timeline of operational decisions, and the team that can interrogate that timeline calmly has a different outage experience from the team that scrolls through pull requests in panic. A YAML edit can change a Service's `targetPort`, remove a readiness gate, broaden a `NetworkPolicy` rule, or hide a resource limit change behind a formatting commit. The practical skill is not memorizing more commands; it is learning how to turn an unreliable symptom into a narrow historical question that Git can answer.
 
-This module teaches that investigative workflow using the same tools you already have installed. You will use binary search to find the first bad commit, automate that search so human judgment does not contaminate the result, trace line authorship through refactors, search deleted history with Pickaxe queries, scan current and historical snapshots with `git grep`, and assemble an audit trail that an incident commander or compliance reviewer can trust. For Kubernetes examples, assume a current cluster target of Kubernetes 1.35 or newer, and use the full `kubectl` command in runnable examples so every command can be copied into a script without depending on an interactive shell alias.
+This module teaches that investigative workflow using the same tools you already have installed. You will use binary search to find a first bad commit, automate its exit-status classifications with a validated test, inspect line attribution through refactors, search deleted history with Pickaxe queries, scan current and historical snapshots with `git grep`, and preserve an evidence trail that reviewers can reproduce and compare with deployment records. For Kubernetes examples, assume a current cluster target of Kubernetes 1.35 or newer, and use the full `kubectl` command in runnable examples so every command can be copied into a script without depending on an interactive shell alias.
 
 The lesson also changes how you think about time during troubleshooting. A live cluster shows the present, dashboards show recent symptoms, and Git shows the sequence of intended state changes that led there. The strongest investigators move between those views deliberately instead of letting one view dominate the story. If the cluster says a service is broken, Git can tell you when the intended service definition changed; if Git says nothing changed, the cluster can reveal deployment drift, controller lag, or an out-of-band edit. Treating those timelines as separate but comparable records keeps the investigation grounded.
 
@@ -40,7 +40,7 @@ When a system fails but you do not know when the failure was introduced, reviewi
 
 `git bisect` exists because this problem has a mathematical shape. You provide Git with two anchors: one commit that is definitely bad and one commit that is definitely good. Git then checks out a midpoint commit and asks you to classify it. Each answer discards roughly half of the remaining history, just like finding a word in a dictionary by opening near the middle instead of reading every page from the front. The result is not magic; it is disciplined narrowing of a search space that would otherwise overwhelm human attention.
 
-The key operational decision is choosing anchors that describe the bug honestly. A good commit must be a state where the specific behavior under investigation truly worked, not merely a date when nobody remembers complaints. A bad commit must be a state where the exact failure reproduces, not a general feeling that `main` is unhealthy. If the anchors are sloppy, the binary search still runs, but it answers the wrong question with impressive speed.
+Bisection assumes a repeatable classification with a good-to-bad transition in the selected history. With fixes and reintroductions, the selected boundary need not be the earliest appearance of the bug anywhere in history; merges and skipped commits can also complicate or leave the boundary ambiguous. Inspect the relevant parents and rerun the test before concluding causation. A good commit must be a state where the specific behavior under investigation truly worked, not merely a date when nobody remembers complaints. A bad commit must reproduce the target failure, not a general feeling that `main` is unhealthy. Sloppy anchors make the search answer the wrong question.
 
 Good anchors often come from operational records rather than memory. A release tag tied to a successful deployment, a commit recorded by a GitOps controller, or a build artifact linked to a passing smoke test is better than "sometime before lunch." Bad anchors should be equally concrete: the commit currently deployed to a failing environment, the branch tip whose rendered manifests fail validation, or the exact revision that reproduces a unit test failure. When you cannot establish both sides, spend time improving observability before starting bisection, because a precise algorithm cannot repair imprecise evidence.
 
@@ -51,22 +51,16 @@ flowchart TD
         C1[C1: Good] --- C2[C2: ?] --- C3[C3: ?] --- C4{C4: Test} --- C5[C5: ?] --- C6[C6: ?] --- C7[C7: Bad]
     end
 
-    subgraph S2 [Step 2: C4 is BAD, Test Midpoint C2]
+    subgraph S2 [Step 2: C4 is BAD, Test Midpoint C3]
         direction LR
-        C1_2[C1: Good] --- C2_2{C2: Test} --- C3_2[C3: ?] --- C4_2[C4: Bad]
-    end
-
-    subgraph S3 [Step 3: C2 is GOOD, Test Midpoint C3]
-        direction LR
-        C2_3[C2: Good] --- C3_3{C3: Test} --- C4_3[C4: Bad]
+        C1_2[C1: Good] --- C2_2[C2: ?] --- C3_2{C3: Test} --- C4_2[C4: Bad]
     end
     
     S1 -->|Result: BAD| S2
-    S2 -->|Result: GOOD| S3
-    S3 -->|Result: GOOD| R[Conclusion: C4 is the first bad commit]
+    S2 -->|Result: GOOD| R[Conclusion: C4 is the first bad commit]
 ```
 
-Imagine a `Deployment` manifest that suddenly fails server-side validation after a sequence of infrastructure-as-code changes. The cluster is available, the API server is responding, and your working theory is that a schema field, indentation block, or API version changed at some point after the last release. Before you begin, create a clean local state, because bisection repeatedly checks out historical commits and Git must be free to move your working tree without destroying uncommitted work.
+Imagine a `Deployment` manifest that suddenly fails server-side validation after a sequence of infrastructure-as-code changes. The cluster is available, the API server is responding, and your working theory is that a schema field, indentation block, or API version changed at some point after the last release. Before you begin, preserve unrelated local work and create a clean state: conflicting uncommitted changes can block historical checkout, while changes carried into a checkout can contaminate its test.
 
 ```bash
 git bisect start
@@ -86,9 +80,11 @@ git bisect good v1.2.0
 
 After those anchors are set, Git checks out a midpoint commit and reports roughly how many revisions remain. The repository is now in a detached `HEAD` state, which is expected during bisection. You are not on your normal branch; you are visiting a historical snapshot so you can classify it as good or bad for this one behavior.
 
-```bash
+Illustrative output:
+
+```text
 Bisecting: 125 revisions left to test after this (roughly 7 steps)
-[a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0] Update resource requests
+[a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4] Update resource requests
 ```
 
 **Pause and predict:** If you run a Kubernetes validation against this checked-out commit and it succeeds, what should you tell Git next, and what does that answer mean for the remaining history?
@@ -96,7 +92,7 @@ Bisecting: 125 revisions left to test after this (roughly 7 steps)
 <details>
 <summary>Check your prediction</summary>
 
-The correct answer is `git bisect good`, because success proves the regression was introduced after the current midpoint. Git can then ignore the older half of the range and continue searching only in the newer half.
+The correct answer is `git bisect good` if this validation faithfully detects the target regression. Under the single-transition assumption, a passing midpoint places the introduction later in the selected range. Git excludes that commit and its ancestors, then continues toward the bad anchor; one passing test alone does not establish the whole regression history.
 
 </details>
 
@@ -112,18 +108,21 @@ If the same validation fails with the exact symptom you are investigating, mark 
 git bisect bad
 ```
 
-After several rounds, Git prints the first bad commit. That phrase matters: it is not merely a commit where the bug exists, but the earliest commit in the selected history range where the bad behavior appears after a known-good predecessor. That commit becomes your main evidence artifact for deeper investigation, review, or rollback planning.
+After several rounds, Git may identify a first bad commit in the selected history. Its significance depends on the accuracy of the classifications and the shape of that history. That commit becomes your main evidence artifact for deeper investigation, review, or rollback planning.
 
-```bash
-b9c8d7e6f5g4h3i2j1k0l9m8n7o6p5q4r3s2t1u0 is the first bad commit
-commit b9c8d7e6f5g4h3i2j1k0l9m8n7o6p5q4r3s2t1u0
+Illustrative output:
+
+```text
+b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0 is the first 'bad' commit
+commit b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0
 Author: Alex Engineer <alex@example.com>
-Date:   Tue Oct 24 14:32:11 2025 -0400
+...
 
     chore: update apiVersion for HorizontalPodAutoscaler
+...
 ```
 
-Always end the session deliberately. During an incident, engineers often celebrate the culprit and forget that the repository is still checked out somewhere in the past. `git bisect reset` returns you to the branch and commit where the session began, which prevents later commands from accidentally running against historical code.
+End the session deliberately after recording its result. An investigation can leave the repository checked out somewhere in the past, so confirm the checkout before doing further work. `git bisect reset` restores the pre-bisect checkout, which prevents later commands from accidentally running against an unintended historical snapshot.
 
 ```bash
 git bisect reset
@@ -131,15 +130,15 @@ git bisect reset
 
 Hypothetical scenario: a platform team managing tenant onboarding uses this workflow when default `NetworkPolicy` objects stop rendering from a Helm chart. The pipeline is green, the chart still installs, and a visual diff of recent pull requests does not reveal the missing indentation inside a helper template. A manual bisection using `helm template` as the classification test can narrow more than two hundred commits to a single chart refactor in eight checks, which gives the incident channel a specific commit, author, and rationale instead of another hour of speculative review.
 
-The team learned an important secondary lesson from that incident: bisection is most useful when the test can be run against historical code without requiring the whole production system. Rendering a chart, validating a manifest, running a focused unit test, or starting a small local service gives Git something repeatable to classify. If the only way to observe the bug is to wait for production traffic, the first task is to design a smaller reproduction. That reproduction becomes the bridge between operational symptoms and historical proof.
+This scenario illustrates a useful principle: bisection is most useful when the test can be run against historical code without requiring the whole production system. Rendering a chart, validating a manifest, running a focused unit test, or starting a small local service gives Git something repeatable to classify. If the only way to observe the bug is to wait for production traffic, the first task is to design a smaller reproduction. That reproduction becomes the bridge between operational symptoms and historical proof.
 
 ## Section 2: Automating the Investigation with `git bisect run`
 
-Manual bisection teaches the concept, but automation is where the tool becomes trustworthy under pressure. Humans are slow classifiers, especially when each midpoint requires building an artifact, rendering manifests, starting a local test cluster, or reading noisy validation output. Worse, fatigue creates inconsistent answers: an engineer may mark a commit bad because the setup was annoying, or mark it good because a flaky test happened to pass once. `git bisect run` removes that inconsistency by letting a script classify each checked-out commit through exit codes.
+Manual bisection teaches the concept, while automation lets one classifier run at each historical checkout. Manual classification can be slow when each midpoint requires building an artifact, rendering manifests, starting a local test cluster, or reading noisy validation output. An investigator might mark a commit bad because setup failed, or good because a flaky test passed once. `git bisect run` consistently interprets a script's exit codes, but the script must still distinguish the target behavior from unrelated failures.
 
-The exit-code contract is simple and strict. When your command exits `0`, Git marks the commit good. When it exits from `1` through `124`, or `126` through `127`, Git marks the commit bad. Exit `125` has a special meaning: the commit cannot be tested for this question, so Git should skip it and choose a nearby candidate without treating it as proof of the bug. That distinction is the difference between a robust forensic run and an automated path to the wrong answer.
+The exit-code contract is simple and strict. When your command exits `0`, Git marks the commit good. Statuses `1` through `124` and `126` through `127` map to bad; `125` means untestable, so Git skips that revision without treating it as proof of the bug. Statuses of `128` or greater abort. On the first `126` or `127` result in a run, Git retries the command on a known-good revision and rejects the run if it returns the same code there. Preflight the command rather than relying on that safeguard to identify unrelated failures.
 
-Suppose a `StatefulSet` manifest began failing Kubernetes API server validation after many changes to storage templates. A useful bisect script should perform only the smallest test that proves or disproves the target behavior at the currently checked-out commit. The script below validates one manifest and converts the `kubectl` result into the classification Git expects. Place it outside the repository, such as `/tmp/test-manifest.sh`, so historical checkouts cannot delete or modify the script while bisection is running.
+Suppose a `StatefulSet` manifest began failing Kubernetes API server validation after many changes to storage templates. A useful bisect script should perform only the smallest test that proves or disproves the target behavior at the currently checked-out commit. The following classifier is an incomplete illustration: it skips a missing or unreadable file, but still treats every `kubectl` failure as bad. It cannot distinguish the target schema failure from missing context, authentication, connectivity, or admission failures. Implement and verify error-specific handling before using it in a bisect; do not rely on this illustration as a safe classifier. Place the script outside the repository so historical checkouts cannot replace it.
 
 ```bash
 #!/usr/bin/env bash
@@ -150,8 +149,11 @@ Suppose a `StatefulSet` manifest began failing Kubernetes API server validation 
 
 echo "Testing commit: $(git rev-parse --short HEAD)"
 
+# A missing or unreadable file cannot classify this revision.
+[ -r k8s/production/statefulset.yaml ] || exit 125
+
 # Run a dry-run apply against the API server to validate the YAML schema
-kubectl apply -f k8s/production/statefulset.yaml --dry-run=server > /dev/null 2>&1
+kubectl apply -f k8s/production/statefulset.yaml --dry-run=server > /dev/null
 
 # Capture the exit code of the kubectl command
 EXIT_CODE=$?
@@ -161,7 +163,7 @@ if [ $EXIT_CODE -eq 0 ]; then
     echo "Validation passed. Returning GOOD."
     exit 0 # Tells Git this commit is Good
 else
-    echo "Validation failed. Returning BAD."
+    echo "Validation failed; cause not classified. Returning BAD."
     exit 1 # Tells Git this commit is Bad
 fi
 ```
@@ -172,9 +174,12 @@ Make the script executable before starting the run. This is a mundane step, but 
 chmod +x /tmp/test-manifest.sh
 ```
 
-With the script ready, define the boundaries and let Git drive the loop. The bisection session checks out commits, runs the script, reads the exit code, and chooses the next midpoint without asking for manual labels. Your job shifts from repeatedly typing `good` or `bad` to verifying that the test itself is a faithful model of the production symptom.
+Before starting a real run, preflight the finished classifier against the known-good and known-bad anchors and representative error cases. A missing cluster context, stale credentials, or an overly broad test can make a result misleading. Passing both anchors does not make every midpoint safe: an unrelated failure can still occur later, so the classifier must distinguish it from the target failure at each revision.
+
+The following is an **invocation template only**. Do not run it with the illustrative all-errors-as-bad classifier above. Once error-specific handling has been implemented and verified, define the boundaries and let Git drive the loop.
 
 ```bash
+# Invocation template: use only a verified classifier
 # 1. Initialize
 git bisect start
 
@@ -188,25 +193,24 @@ git bisect good v2.4.0
 git bisect run /tmp/test-manifest.sh
 ```
 
-During the run, the output may feel fast and impersonal, which is exactly the point. Git is not forming opinions about likely authors, commit messages, or suspicious-looking diffs. It is repeatedly asking one question: does this checked-out tree pass the test? That discipline is why automated bisection is useful during emotional incidents.
+The following output is illustrative; actual commits and step counts will differ. Git is not forming opinions about likely authors, commit messages, or suspicious-looking diffs. It is repeatedly asking one question: does this checked-out tree pass the test? That discipline is why automated bisection is useful during emotional incidents.
 
 ```text
-running /tmp/test-manifest.sh
+running '/tmp/test-manifest.sh'
 Testing commit: 7a8b9c0
 Validation passed. Returning GOOD.
 Bisecting: 67 revisions left to test after this (roughly 6 steps)
 ...
-running /tmp/test-manifest.sh
+running '/tmp/test-manifest.sh'
 Testing commit: 1d2e3f4
-Validation failed. Returning BAD.
+Validation failed; cause not classified. Returning BAD.
 Bisecting: 33 revisions left to test after this (roughly 5 steps)
 ...
-f8e7d6c5b4a3c2d1e0f9a8b7c6d5e4f3a2b1c0d9 is the first bad commit
+f8e7d6c5b4a3c2d1e0f9a8b7c6d5e4f3a2b1c0d9 is the first 'bad' commit
+...
 ```
 
-Before running this against a real repository, ask yourself what output you expect from the known-good tag and the known-bad `HEAD`. If the script cannot clearly distinguish those two anchors before bisection begins, it will not become more reliable in the middle of history. A quick preflight against both endpoints often catches missing cluster context, stale credentials, or tests that are too broad for the regression you are isolating.
-
-The most common failure mode is treating every non-zero result as the target bug. Consider a range where one historical commit temporarily broke the `Makefile`, while your actual investigation concerns ingress routing. If `make test` fails at that commit and your script exits `1`, Git marks the commit bad for the routing bug even though routing was never tested. That false classification can eliminate the half of history containing the real regression.
+One failure mode is treating every non-zero result as the target bug. Consider a range where one historical commit temporarily broke the `Makefile`, while your actual investigation concerns ingress routing. If `make test` fails at that commit and your script exits `1`, Git marks the commit bad for the routing bug even though routing was never tested. That false classification can eliminate the half of history containing the real regression.
 
 ```bash
 #!/usr/bin/env bash
