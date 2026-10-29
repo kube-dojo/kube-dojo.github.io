@@ -85,7 +85,7 @@ The staging area (or index) lets you save only the real fix while keeping the te
 
 Git is a command-line tool at its core, even when teams use graphical clients or web interfaces around it. Platform engineers must be comfortable with the terminal version because many workflows happen over SSH, inside automation logs, or on machines where a graphical client is unavailable. The goal is not to memorize every option. The goal is to become fluent enough that repository state is visible instead of mysterious.
 
-Start by checking that Git is installed. This lesson's local practice was tested with Git 2.56.0. Older versions may lack commands or options used here; consult your installed version's documentation or update Git before continuing. If Git is missing, follow the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+Start by checking that Git is installed. This lesson's local practice was tested with Git 2.56.0; the [Git 2.56.0 release commit](https://github.com/git/git/commit/a018953688f1b10bddf91bff8747068f5f4746a4) pins the documentation used below. Older versions may lack commands or options used here; consult your installed version's documentation or update Git before continuing. If Git is missing, follow the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
 ```bash
 git --version
@@ -239,7 +239,7 @@ Commit the staged change. The message should explain the reason for the snapshot
 git commit -m "feat: add production namespace definition"
 ```
 
-The output should report the root commit, the commit subject, and the number of inserted lines.
+For this first commit, normal output can show a root-commit label, the commit subject, and a change summary with the number of inserted lines. The object ID and output can differ; quiet mode suppresses the summary. See Git 2.56's [commit command](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/builtin/commit.c) and [summary implementation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/sequencer.c).
 
 ```text
 [main (root-commit) a1b2c3d] feat: add production namespace definition
@@ -456,14 +456,14 @@ git diff HEAD...origin/main
 
 The first log lists commits reachable from the fetched `origin/main` but not from `HEAD`; the second lists local-only commits. The three-dot diff compares the merge base with `origin/main`, showing changes on the fetched side since the histories met; it is not a direct comparison of the two tips. The initial status can show stale ahead/behind counts until you fetch.
 
-When histories diverge, choose an integration method with your team. `git pull --no-rebase origin main` merges; `git pull --rebase origin main` replays local commits on the fetched branch and changes their IDs. Keep this rebase workflow for unshared local commits. `git pull --ff-only origin main` refuses if a fast-forward is impossible. In Git 2.56, an unconfigured plain pull also refuses to choose a method for divergent branches; configuration and other versions can change that behavior. Ensure your working state is ready before integrating. See the [Git 2.56 pull documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc) and [diff documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-diff.adoc).
+When histories diverge, choose an integration method with your team. `git pull --no-rebase origin main` merges; `git pull --rebase origin main` replays local commits on the fetched branch and changes their IDs. Keep this rebase workflow for unshared local commits. `git pull --ff-only origin main` refuses if a fast-forward is impossible. Git 2.56 documents fast-forward-only as the default; an unconfigured plain pull therefore refuses divergent branches. Configuration and other versions can change that behavior. Ensure your working state is ready before integrating. See the [Git 2.56 pull documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc) and [diff documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-diff.adoc).
 
 Pause and predict: you made two local commits while offline, and a colleague pushed three commits to the same remote branch before you reconnected. What happens if you try `git push origin main` immediately? Decide what Git will do and what your recovery sequence should be before opening the reveal.
 
 <details>
 <summary>Check your prediction</summary>
 
-The push can be rejected as non-fast-forward because the remote contains work missing locally; its error may say `fetch first`. Fetch and inspect both histories, then choose an agreed merge or rebase, resolve any conflicts, verify the result, and retry the push. Fetching alone does not integrate the histories.
+The push can be rejected because the remote contains work missing locally; the rejection may say `fetch first` or `non-fast-forward`, depending on the situation. See the [Git 2.56 push status implementation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/transport.c). Fetch and inspect both histories, then choose an agreed merge or rebase, resolve any conflicts, verify the result, and retry the push. Fetching alone does not integrate the histories.
 
 </details>
 
@@ -517,7 +517,7 @@ Pause and predict: with the `.gitignore` file configured above containing `*.tfs
 <details>
 <summary>Check your prediction</summary>
 
-Only `secret-keys.txt` will show up as untracked under `git status`. `main.tfstate` is ignored because it matches the `*.tfstate` wildcard pattern, and `secret-keys.yaml` is ignored because it matches the exact filename pattern. The file `secret-keys.txt` does not match any rule in `.gitignore`, so Git reports it as an untracked candidate ready to be staged.
+Of those three files, only `secret-keys.txt` will show up as untracked under `git status`. The newly created `.gitignore` may also appear if it has not been staged or committed. `main.tfstate` is ignored because it matches the `*.tfstate` wildcard pattern, and `secret-keys.yaml` is ignored because it matches the exact filename pattern. The file `secret-keys.txt` does not match any rule in `.gitignore`, so Git reports it as an untracked candidate ready to be staged.
 
 </details>
 
@@ -538,7 +538,7 @@ Git patterns are useful when they make history easier to review and safer to aut
 | Pattern: repository-root `.gitignore` | A project has generated files, logs, state files, or local credentials | Shared ignore policy prevents common local noise from appearing for every contributor. | Review ignore patterns with the same care as build or deployment configuration. |
 | Anti-pattern: broad staging by reflex | A learner types `git add .` after every edit | Git may stage files the learner forgot existed, including generated files or local configuration. | Use named files first; use broad staging only after reading status and diff carefully. |
 | Anti-pattern: vague commit messages | A branch has messages such as "update" or "fix" | Incident review becomes slower because history no longer explains intent. | Write a short subject that names the operational reason for the snapshot. |
-| Anti-pattern: treating pull as harmless | A local branch has uncommitted work and the remote moved | Pull may create conflicts or merge commits before the learner understands local state. | Start with `git status`; commit, stash, or discard local work deliberately before integrating remote history. |
+| Anti-pattern: treating pull as harmless | A local branch has uncommitted work and the remote moved | Pull may create conflicts or merge commits before the learner understands local state. | Start with `git status`; commit, stash, or discard local work deliberately before integrating remote history. See [Git's pre-merge checks](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-merge.adoc#pre-merge-checks). |
 
 ## Decision Framework
 
@@ -573,7 +573,7 @@ The decision framework also helps you avoid destructive commands early in your G
 | Getting "updates were rejected" during push | The remote branch may have commits the local branch lacks. | Inspect the error, fetch and compare histories, then choose how to integrate before retrying. |
 | Writing empty or meaningless commit messages | The learner treats commits as checkpoints for themselves rather than messages to future maintainers. | Amend an unpushed commit message when needed and practice explaining the operational reason for each snapshot. |
 | Forgetting to stage files before committing | The working directory contains changes, but the staging area is empty when `git commit` runs. | Run `git status`, stage the intended files with `git add <file>`, inspect again, and retry the commit. |
-| Committing generated or binary artifacts | Build outputs and logs sit beside source files, and the repository has no ignore policy yet. | Remove accidental tracked artifacts with the appropriate Git command, commit the cleanup, and add patterns to `.gitignore` before more work continues. |
+| Committing generated or binary artifacts | Build outputs and logs sit beside source files, and the repository has no ignore policy yet. | To stop tracking a file while keeping its local copy, use `git rm --cached -- <file>`, review and commit the cleanup, and add a suitable `.gitignore` pattern. This does not erase earlier history. |
 | Adding an ignore rule after a file is already tracked | The learner expects `.gitignore` to override history for files already committed. | Remove the file from tracking with an index-only removal such as `git rm --cached <file>` and commit that change. If a real credential was pushed, revoke or rotate it; for local-only history, stop before pushing and follow the [credential response steps](#credential-response). This does not remove earlier history. |
 
 ## Quiz
@@ -985,21 +985,17 @@ One possible approach is to choose two replicas for a smaller practice configura
 
 ## Sources
 
-- [Git documentation](https://git-scm.com/docs)
-- [Git book: Getting Started](https://git-scm.com/book/en/v2/Getting-Started-About-Version-Control)
-- [Git book: A Short History of Git](https://git-scm.com/book/en/v2/Getting-Started-A-Short-History-of-Git)
-- [Git book: Git Basics](https://git-scm.com/book/en/v2/Git-Basics-Getting-a-Git-Repository)
-- [Git documentation: git-init](https://git-scm.com/docs/git-init)
-- [Git documentation: git-config](https://git-scm.com/docs/git-config)
-- [Git documentation: git-add](https://git-scm.com/docs/git-add)
-- [Git documentation: git-commit](https://git-scm.com/docs/git-commit)
-- [Git documentation: git-diff](https://git-scm.com/docs/git-diff)
-- [Git documentation: gitignore](https://git-scm.com/docs/gitignore)
+- Git 2.56: [init](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-init.adoc), [config](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-config.adoc), [add](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-add.adoc), [commit](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-commit.adoc), [diff](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-diff.adoc), and [gitignore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/gitignore.adoc)
 - [Git 2.56: fetch](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-fetch.adoc), [pull](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc), and [push and leases](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc)
 - [Git 2.56: merge](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-merge.adoc) and [rebase](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-rebase.adoc)
 - [Git 2.56: clone](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-clone.adoc), [restore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-restore.adoc), [reset](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reset.adoc), and [remote](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-remote.adoc)
 - [Git 2.56: check-ignore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-check-ignore.adoc), [reflog](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reflog.adoc), [rm](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-rm.adoc), and [log](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-log.adoc)
 - [Git 2.56: status](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-status.adoc), [ls-files](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-ls-files.adoc), and [index format](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/gitformat-index.adoc)
+- Git 2.56 implementation: [commit output](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/sequencer.c) and [push status](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/transport.c)
+
+Further reading (live documentation may change):
+
+- [Git documentation](https://git-scm.com/docs) and the Git book: [Getting Started](https://git-scm.com/book/en/v2/Getting-Started-About-Version-Control), [A Short History of Git](https://git-scm.com/book/en/v2/Getting-Started-A-Short-History-of-Git), and [Git Basics](https://git-scm.com/book/en/v2/Git-Basics-Getting-a-Git-Repository)
 - [GitHub: removing sensitive data](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
 - [GitHub: authentication](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github)
 - [GitHub: repository roles and push permissions](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization)
