@@ -70,7 +70,7 @@ The working directory is the current project folder on disk. When you edit `name
 
 The staging area, also called the index, is a deliberate selection of what the next commit will contain. You can stage one file while leaving another modified file unstaged, or even stage only some hunks from a file with more advanced commands later. That separation is valuable when real work is messy. A debugging session might touch authentication, deployment YAML, and local notes, but the commit should capture one coherent reason for change.
 
-The repository is the local database, stored inside `.git`, where commits live. A commit records a snapshot of file contents, author and committer metadata with timestamps, a message, and zero or more parent pointers; the first commit has none. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
+In the ordinary repository initialized for this practice, `.git` holds the local repository database where commits live. Other repository layouts can place that data elsewhere. A commit records a snapshot of file contents, author and committer metadata with timestamps, a message, and zero or more parent pointers; the first commit has none. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
 
 Pause and predict: you fixed a database connection bug in `db.py`, but while searching for it you also added temporary print statements to `auth.py` and `api.py`. Which part of Git lets you save only the real fix while keeping the temporary debug code on disk? Decide which area of Git you would use and which exact command moves only the intended file before opening the reveal.
 
@@ -215,7 +215,7 @@ Move the file into the staging area with `git add`. This command is easy to unde
 git add namespace.yaml
 ```
 
-Run `git status` again and compare the wording. The file has moved from "Untracked files" to "Changes to be committed." That wording tells you the next commit will include the file as it existed when you staged it. Nothing has been permanently saved yet; you have only prepared the next snapshot.
+Run `git status` again and compare the wording. The file has moved from "Untracked files" to "Changes to be committed." That wording tells you the next commit will include the file as it existed when you staged it. The content is staged, but you have not created a commit for it yet.
 
 ```bash
 git status
@@ -247,7 +247,7 @@ The output should report the root commit, the commit subject, and the number of 
  create mode 100644 namespace.yaml
 ```
 
-Check status after the commit. A clean status means no staged changes, no unstaged changes to tracked files, and no untracked files that are not ignored. Ignored files can still exist. Clean does not mean the project is correct, secure, or ready for production.
+Check status after the commit. With normal untracked-file reporting, a clean status means Git reports no staged or unstaged tracked changes and no non-ignored untracked files. Configured options can hide untracked files, and ignored files can still exist. Clean does not mean the project is correct, secure, or ready for production.
 
 ```bash
 git status
@@ -269,7 +269,7 @@ No. Deleting the token in a later commit does not remove it from the earlier his
 
 </details>
 
-The safer professional habit is to make each commit earn its place in history. Before staging, ask whether the patch has one reason that a reviewer can evaluate. Before committing, ask whether the staged content is the exact content you want attached to the message. Before pushing, ask whether the branch contains only work you are ready to share. These questions slow you down by seconds and can save hours of cleanup when a repository becomes the input to deployment automation.
+Before staging, ask whether the patch has one reason that a reviewer can evaluate. Before committing, ask whether the staged content is the exact content you want attached to the message. Before pushing, ask whether the branch contains only work you are ready to share. Answer these questions before moving to the next operation.
 
 Now modify the Namespace by adding a label. This is a realistic kind of infrastructure edit because labels help teams organize objects, select resources, and drive automation. The Git workflow, however, remains the same: make the change, inspect the difference, stage only the intended content, and commit a focused snapshot.
 
@@ -406,7 +406,7 @@ Pause and predict: you just ran `git commit -m "chore: add environment label to 
 <details>
 <summary>Check your prediction</summary>
 
-If you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`. That means no staged or unstaged tracked changes and no non-ignored untracked files; ignored files may still exist. If it reports anything else, inspect the changes before making another commit.
+With normal untracked-file reporting, if you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`. Git is reporting no staged or unstaged tracked changes and no non-ignored untracked files; ignored files may still exist, and configured options can hide untracked files. If the result differs from your expectation, inspect the state before making another commit.
 
 </details>
 
@@ -508,7 +508,7 @@ Only `secret-keys.txt` will show up as untracked under `git status`. `main.tfsta
 
 </details>
 
-Now consider a late ignore rule. You committed `database-creds.txt` last week, then today you add that filename to `.gitignore` and edit the file. Git will still report the modification because the file is already tracked. To stop tracking the file while keeping the local copy, you would need a command such as `git rm --cached database-creds.txt`, followed by a commit, and you would still rotate any credential that was ever committed.
+Now consider a late ignore rule. You committed `database-creds.txt` last week, then today you add that filename to `.gitignore` and edit the file. Git will still report the modification because the file is already tracked. To stop tracking the file while keeping the local copy, use an index-only removal such as `git rm --cached database-creds.txt`, followed by a commit. This does not erase earlier history. For a real credential, use the exposure assessment and owner/provider response process described above.
 
 This is why a strong Git workflow is both technical and behavioral. The technical controls are `.gitignore`, `git status`, `git diff`, and secret scanning on the server side. The behavior is slower and more deliberate: do not stage blindly, do not store real credentials in practice manifests, and do not assume a later cleanup commit erases exposure. Git history is useful because it remembers, and that same remembering makes leaked secrets persistent.
 
