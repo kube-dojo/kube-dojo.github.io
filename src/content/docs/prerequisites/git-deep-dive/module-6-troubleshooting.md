@@ -865,10 +865,10 @@ Failure layer: present files versus introduction commits. Next action: use `git 
 
 Suppose a different repository has a known-good tag and a bad tip, but an intermediate revision cannot be read by your test. Design a classifier for a different text assertion and explain how you would distinguish a missing match from an unreadable file. Predict what a skipped revision means for the certainty of the reported boundary before inspecting the answer.
 
-<details><summary>Hint 1</summary>Identify the exit statuses of the search command before mapping them to Git's classifications.</details>
-<details><summary>Hint 2</summary>Map a confirmed passing assertion to good, a confirmed failing assertion to bad, and an untestable revision to skip. Decide whether presence or absence is the passing condition.</details>
-<details><summary>Hint 3</summary>Preflight both anchors; save the reported candidates and bisect log before resetting, then inspect each candidate and its parents.</details>
-<details><summary>Self-check</summary>If presence is the passing condition, a classifier may map grep statuses 0, 1, and other errors to 0, 1, and 125 respectively; reverse the first two for an absence assertion. Skipping can leave several possible first bad commits, so investigate skipped revisions before asserting an exact boundary.</details>
+<details><summary>Hint 1</summary><p>Identify the exit statuses of the search command before mapping them to Git's classifications.</p></details>
+<details><summary>Hint 2</summary><p>Map a confirmed passing assertion to good, a confirmed failing assertion to bad, and an untestable revision to skip. Decide whether presence or absence is the passing condition.</p></details>
+<details><summary>Hint 3</summary><p>Preflight both anchors; save the reported candidates and bisect log before resetting, then inspect each candidate and its parents.</p></details>
+<details><summary>Self-check</summary><p>If presence is the passing condition, a classifier may map grep statuses 0, 1, and other errors to 0, 1, and 125 respectively; reverse the first two for an absence assertion. Skipping can leave several possible first bad commits, so investigate skipped revisions before asserting an exact boundary.</p></details>
 
 ## Sources
 
