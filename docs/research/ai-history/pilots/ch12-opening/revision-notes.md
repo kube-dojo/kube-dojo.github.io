@@ -1,0 +1,7 @@
+# Terra prose revision notes
+
+Paragraph mapping (prose paragraphs exclude heading): P1 C01–C03; P2 C01, C04; P3 C02, C05; P4 C01, C04; P5 C06; P6 C03, C07; P7 C08; P8 C09–C10; P9 C11; P10 C01, C04, C06, C10. Source identity and printed-page anchors remain in `source-map.md`; this mapping does not upgrade evidence or establish independent verification.
+
+The revision puts the hand-following limit and the paper's scope in the opening question, moves from explicit processes to the research tactic and physical realization, then uses the language problem to carry the reader toward proof search. It compresses repeated contrasts and varies paragraph and sentence rhythm. The workload comparison, significance of followability, and closing synthesis remain explanatory readings, not observed events. “Not evidence of a particular hand simulation” and “not a report of a run” make the original boundaries explicit; the paper's scope does not imply a runtime chronology. Computer capability and the machine-code assessment remain attributed to the authors; the interpretive language remains a proposed approach, and the displayed language remains distinct from the related language being coded.
+
+This is an unpublished opening pilot, not a replacement in the chapter. CBI91 remains unavailable as recorded in the source map; no CBI-derived material was added. Sol semantic review, independent source-fidelity and prose-quality review, and full-chapter replacement and cap calculation remain outstanding. No reader results or quality scores are claimed.
