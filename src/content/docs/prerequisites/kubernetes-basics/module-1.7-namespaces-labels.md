@@ -490,17 +490,17 @@ Start with the operational question
 
 ## Quiz
 
-<details><summary><strong>Question 1:</strong> Your team segments a shared Kubernetes cluster into `payments-dev` and `payments-prod`. A developer can delete Pods in both namespaces, even though the intention was namespace-scoped access only. What do you check first, and why?</summary>
+<details><summary><strong>Question 1:</strong> Your team segments a shared Kubernetes cluster into <code>payments-dev</code> and <code>payments-prod</code>. A developer can delete Pods in both namespaces, even though the intention was namespace-scoped access only. What do you check first, and why?</summary>
 
 Check whether the developer was granted a cluster-wide permission through a `ClusterRoleBinding` or an overly broad binding instead of a namespaced `RoleBinding`. Namespaces can scope ordinary application permissions, but the RBAC object must be attached at the namespace boundary for that scoping to take effect. If a `ClusterRoleBinding` grants Pod deletion, the permission applies across namespaces. The fix is to bind the needed Role in only the intended namespace and remove the cluster-wide grant unless it is truly required.
 </details>
 
-<details><summary><strong>Question 2:</strong> A frontend Pod in `default` cannot reach a backend Service named `data-sink` in `analytics` when configured with `http://data-sink:8080`. What DNS name should the application use, and what does this reveal about namespace behavior?</summary>
+<details><summary><strong>Question 2:</strong> A frontend Pod in <code>default</code> cannot reach a backend Service named <code>data-sink</code> in <code>analytics</code> when configured with <code>http://data-sink:8080</code>. What DNS name should the application use, and what does this reveal about namespace behavior?</summary>
 
 The application should use `data-sink.analytics.svc.cluster.local`, or at least `data-sink.analytics` if the cluster DNS search configuration supports that shorter form. The original short name searches the querying Pod's own namespace first, so it looks for a `data-sink` Service in `default`. Namespace-aware DNS prevents name collisions while still allowing explicit cross-namespace communication. The failure is not a network-policy denial by itself; it is an ambiguous Service name.
 </details>
 
-<details><summary><strong>Question 3:</strong> During an incident, you need to target Pods where `tier` is either `frontend` or `cache`, but you must leave `database` and `backend` alone. Which selector style should you use, and why?</summary>
+<details><summary><strong>Question 3:</strong> During an incident, you need to target Pods where <code>tier</code> is either <code>frontend</code> or <code>cache</code>, but you must leave <code>database</code> and <code>backend</code> alone. Which selector style should you use, and why?</summary>
 
 Use a set-based selector such as `kubectl get pods -l 'tier in (frontend, cache)'` before choosing a destructive action. Equality-based selectors are excellent for one exact value, but they cannot express several acceptable values for the same key in one requirement. The `in` operator captures the intended operational set without repeating commands. That reduces the chance that one command accidentally includes a tier you meant to exclude.
 </details>
@@ -510,7 +510,7 @@ Use a set-based selector such as `kubectl get pods -l 'tier in (frontend, cache)
 Use annotations because the values are descriptive metadata read by a controller or human after the object is discovered. Labels should be reserved for compact identifying values that Kubernetes and operators select against, such as application, team, environment, or component. Email addresses and runbook URLs can be longer, less stable, and not useful in selector indexes. A tool-owned annotation prefix also keeps the meaning clear and avoids collisions with other controllers.
 </details>
 
-<details><summary><strong>Question 5:</strong> A namespace has a ResourceQuota of `requests.cpu: "4"` and a LimitRange that defaults each missing CPU request to `500m`. A developer creates seven Pods without requests and then tries to create an eighth. What happens?</summary>
+<details><summary><strong>Question 5:</strong> A namespace has a ResourceQuota of <code>requests.cpu: "4"</code> and a LimitRange that defaults each missing CPU request to <code>500m</code>. A developer creates seven Pods without requests and then tries to create an eighth. What happens?</summary>
 
 Each defaulted Pod receives a `500m` CPU request, so seven Pods consume `3500m`, or `3.5` CPU cores, of the namespace request budget. The eighth Pod would add another `500m`, reaching exactly `4` CPU cores, so it should still be admitted if no other usage exists. A ninth similar Pod would exceed the budget and be rejected at admission. The important reasoning step is that the LimitRange supplies the missing per-Pod value, and the ResourceQuota sums those values across the namespace.
 </details>
@@ -520,7 +520,7 @@ Each defaulted Pod receives a `500m` CPU request, so seven Pods consume `3500m`,
 They are not right for already running Pods, because LimitRange enforcement happens when objects are created or updated through admission. Existing Pods are not retroactively modified just because a new LimitRange appears. The policy will affect new Pods, replacement Pods, or updated Pod templates that create new Pods later. This is operationally helpful because policy rollout does not suddenly rewrite running production containers, but it also means old workloads may remain noncompliant until redeployed.
 </details>
 
-<details><summary><strong>Question 7:</strong> A Service meant for production traffic selects only `app=api`. Someone creates a debug Pod with the same label and it starts receiving requests. How would you redesign the labels and selector?</summary>
+<details><summary><strong>Question 7:</strong> A Service meant for production traffic selects only <code>app=api</code>. Someone creates a debug Pod with the same label and it starts receiving requests. How would you redesign the labels and selector?</summary>
 
 Add stable labels that distinguish the intended component and environment, then make the Service selector narrow enough to match only production-serving Pods. For example, production Pods might carry `app.kubernetes.io/name=api`, `component=http`, and `environment=production`, while debug Pods either omit those labels or use `component=debug`. The Service should select the application identity plus component and environment, not a single broad label. This preserves label-based decoupling while preventing accidental endpoint membership.
 </details>
