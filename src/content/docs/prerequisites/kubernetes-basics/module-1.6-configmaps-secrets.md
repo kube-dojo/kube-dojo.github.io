@@ -642,7 +642,7 @@ if [ -n "${CFG_SETUP_SEEN+x}" ]; then
   fi
 elif [ -n "${CFG_CONTEXT+x}" ] || [ -n "${CFG_NS+x}" ] || [ -n "${CFG_UID+x}" ] ||
      [ -n "${CFG_CREATE_ATTEMPTED+x}" ] ||
-     readonly -p | grep -Eq '(^| )CFG_(SETUP_SEEN|CONTEXT|NS|UID|CREATE_ATTEMPTED)(=|$)'; then
+     readonly -p | grep -E '(^| )CFG_(SETUP_SEEN|CONTEXT|NS|UID|CREATE_ATTEMPTED)(=|$)' >/dev/null; then
   echo 'Existing CFG variables detected; preserve them and use a fresh terminal' >&2
 else
   readonly CFG_SETUP_SEEN=1
@@ -680,7 +680,7 @@ Record the printed context and namespace and the successful creation UID (`print
 
 Before looking at the commands, choose how you would create and inspect the settings and placeholder credential. What would the YAML view and Pod logs expose? Write your reasoning, then use the hints if needed. The following block is one possible solution, not a production credential pattern.
 
-**Required end state:** ConfigMap `app-config` has `LOG_LEVEL=debug` and `APP_NAME=myapp`; Secret `app-secret` has key `DB_PASS` with the synthetic value `secretpassword`. Long-running Pod `config-test` uses `busybox:1.36.1`, imports all `app-config` keys via `envFrom`, reads `DB_PASS` as `DB_PASSWORD`, and logs its startup environment. Use no real credential.
+**Required end state:** ConfigMap `app-config` has `LOG_LEVEL=debug` and `APP_NAME=myapp`; Secret `app-secret` has key `DB_PASS` with the synthetic value `secretpassword`. Long-running Pod `config-test` uses `busybox:1.36.1`, imports all `app-config` keys via `envFrom`, reads `DB_PASS` as `DB_PASSWORD`, and logs the startup values of `LOG_LEVEL`, `APP_NAME`, and `DB_PASSWORD`. Use no real credential.
 
 <details><summary>Hint 1: Concept</summary>
 
@@ -896,7 +896,7 @@ The first `apply` may warn that the ConfigMap lacks its last-applied-configurati
 
 ### Task 4: Rework the Pod to mount the ConfigMap as files
 
-Write your own manifest for a long-running Pod named `config-test`. Mount the whole `app-config` ConfigMap at `/etc/app-config`, without `subPath` or an `items` filter. Delete the original Pod, then apply your manifest with `cfg_lab apply -f -`; use the hints before comparing your manifest with the solution. Inspect the directory to see how keys become files.
+Write your own manifest for a Pod named `config-test` with one `busybox:1.36.1` container and a long-running command such as `sleep 3600`. Mount the whole `app-config` ConfigMap at `/etc/app-config`, without `subPath` or an `items` filter. Delete the original Pod, then apply your manifest with `cfg_lab apply -f -`; use the hints before comparing your manifest with the solution. Inspect the directory to see how keys become files.
 
 <details><summary>Hint 1: Concept</summary>
 
