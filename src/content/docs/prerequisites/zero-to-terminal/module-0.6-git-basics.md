@@ -40,7 +40,7 @@ Git is often described as version control, but beginners sometimes hear that phr
 
 Think of Git like a manual save system in a strategy game. You can explore, make a risky move, inspect the result, and decide whether that state deserves a save point. If you save at thoughtful moments, later decisions become easier because you can compare states and explain how you moved from one state to the next. If you save everything randomly, the history exists, but it does not help you reason during a review or incident.
 
-Historically, many version control systems were centralized. A central server held the authoritative history, and clients depended on that server to inspect history or create new commits. Git is distributed: when you clone a repository, you receive a full local history, not just the latest files. That means you can inspect commits, compare versions, and create local commits while offline, then synchronize with a remote server when connectivity and team coordination are available.
+Historically, many version control systems were centralized. A central server held the authoritative history, and clients depended on that server to inspect history or create new commits. Git is distributed: by default, a clone receives the repository's history, not just the latest files; options such as shallow or partial cloning change what is transferred. You can inspect available commits, compare versions, and create local commits while offline, then synchronize with a remote when connectivity and team coordination are available.
 
 The practical result is that Git has two personalities. Locally, it is a fast database and comparison engine for your files. Collaboratively, it is a synchronization protocol that lets multiple people exchange histories through a remote such as GitHub, GitLab, or Bitbucket. Good Git habits come from respecting both personalities: make clean local commits first, then share them only after you have checked what they contain.
 
@@ -70,7 +70,7 @@ The working directory is the current project folder on disk. When you edit `name
 
 The staging area, also called the index, is a deliberate selection of what the next commit will contain. You can stage one file while leaving another modified file unstaged, or even stage only some hunks from a file with more advanced commands later. That separation is valuable when real work is messy. A debugging session might touch authentication, deployment YAML, and local notes, but the commit should capture one coherent reason for change.
 
-The repository is the permanent local database, stored inside `.git`, where commits live. A commit records file contents, author metadata, a message, a timestamp, and a pointer to its parent commit. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
+The repository is the local database, stored inside `.git`, where commits live. A commit records a snapshot of file contents, author and committer metadata with timestamps, a message, and zero or more parent pointers; the first commit has none. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
 
 Pause and predict: you fixed a database connection bug in `db.py`, but while searching for it you also added temporary print statements to `auth.py` and `api.py`. Which part of Git lets you save only the real fix while keeping the temporary debug code on disk? Decide which area of Git you would use and which exact command moves only the intended file before opening the reveal.
 
@@ -85,7 +85,7 @@ The staging area (or index) lets you save only the real fix while keeping the te
 
 Git is a command-line tool at its core, even when teams use graphical clients or web interfaces around it. Platform engineers must be comfortable with the terminal version because many workflows happen over SSH, inside automation logs, or on machines where a graphical client is unavailable. The goal is not to memorize every option. The goal is to become fluent enough that repository state is visible instead of mysterious.
 
-Start by checking that Git is installed. Your exact version may differ from the example, and that is fine. The version number matters when you troubleshoot features, but the basic commands in this module have been stable for years. If this command fails, install Git through your operating system package manager before continuing, then reopen the terminal so the executable is available on your `PATH`.
+Start by checking that Git is installed. The version matters because options such as `git restore` and `git init --initial-branch` may be unavailable in older installations. If a command or option is unavailable, consult the documentation for your version or update Git before continuing.
 
 ```bash
 git --version
@@ -111,21 +111,31 @@ git config --get user.email
 
 The `--global` flag changes account-wide configuration, usually in `~/.gitconfig`; this lesson does not change it. After successful initialization, `--local` writes only to that repository. The deliberately fictional training identity below is for disposable local commits, not publication. Before publishing real work, deliberately choose the appropriate author identity for that repository.
 
-Now create a small project directory for the examples. The project uses Kubernetes-flavored filenames because infrastructure configuration is where Git habits quickly become operational habits. The commands below make a directory, enter it, and initialize a repository. Run them in a practice location such as your home directory or a temporary folder, not inside a real work repository.
-
-Run one line at a time and stop on any `mkdir`, `cd`, or `git init` error before proceeding. Plain `mkdir` must create a fresh directory under your exclusive control; if the name already exists as a file, directory, or symlink, leave it untouched and choose an unused name, substituting it in later paths. Never replace this check with `mkdir -p`. Confirm `pwd` and an empty `ls -a` listing (only `.` and `..`) before initialization. Keep all later writes inside this disposable repository; start fresh if ownership becomes uncertain.
+Choose a practice directory under your control, outside a real work repository. Start a disposable child Bash with the following command alone and wait for its prompt before pasting the entire grouped setup below. Stay in that child for the theory practice.
 
 ```bash
-# Create a new directory
+bash --noprofile --norc
+```
+
+The group stops this child if setup fails. If it exits, **STOP: do not paste later commands into the parent shell**. Leave any existing `k8s-webapp` file, directory, or symlink untouched; choose an unused name consistently or retry in another practice location. The five cleared Git location selectors and root checks guard this setup's location; they do not sandbox every environment setting.
+
+```bash
+{
+set -e
+trap 'printf "%s\n" "STOP: setup failed; do not continue in the parent shell."' EXIT
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 mkdir k8s-webapp
 cd k8s-webapp
-pwd
-ls -a
-
-# Tell Git to start tracking this directory
+practice_dir=$(pwd -P)
 git init --initial-branch=main
+test "$(git rev-parse --show-toplevel)" = "$practice_dir"
+test "$(git rev-parse --absolute-git-dir)" = "$practice_dir/.git"
 git config --local user.name "KubeDojo Learner"
 git config --local user.email "learner@example.invalid"
+printf 'Practice repository ready: %s\n' "$practice_dir"
+trap - EXIT
+set +e
+}
 ```
 
 Expected output should confirm that Git created an empty repository database in a hidden `.git` directory.
@@ -161,9 +171,9 @@ In a brand-new repository with no tracked files and no commits, `git status` rep
 
 ## Build Commits Deliberately
 
-The command you will use most often is `git status`, because it is the safest way to ask Git what it sees. It does not change files, create commits, or contact a remote. It simply reports which branch you are on, whether the working directory has modified files, which changes are staged, and which files are untracked. Treat it as your compass before every staging, committing, pulling, or pushing decision.
+The command you will use most often is `git status`, because it is a way to ask Git what it sees. It does not change your working files, stage anything, create commits, or contact a remote; it may refresh Git's internal index cache. It reports the branch and staged, unstaged, and untracked changes. Treat it as your compass before staging, committing, pulling, or pushing.
 
-There is another subtle reason `git status` matters: it teaches you Git's vocabulary in context. "Untracked" means Git sees a file but has no committed baseline for it. "Changes not staged" means Git tracks the file but the current working copy differs from the last commit. "Changes to be committed" means the staging area already contains content for the next snapshot. Those messages are not noise; they are a compact state machine report.
+There is another subtle reason `git status` matters: it teaches you Git's vocabulary in context. "Untracked" means a file is not in the index and is not ignored. "Changes not staged" means the working file differs from its indexed copy. "Changes to be committed" means the index differs from the last commit. Those messages are a compact state report.
 
 Create the first file in the practice repository. This file defines a Kubernetes Namespace, which is a simple object that lets us focus on Git behavior without needing a running cluster. The content is valid YAML, but the point is the workflow: write a file, inspect repository state, stage the file, and commit the staged snapshot with a message that explains the intent. You can write the file using the `cat` heredoc below, or open `nano namespace.yaml` (practiced in Module 0.5) if you prefer editing in an interactive editor.
 
@@ -196,7 +206,7 @@ Untracked files:
 nothing added to commit but untracked files present (use "git add" to track)
 ```
 
-The file is untracked, which means Git sees it in the working directory but has not been told to include it in version control. Untracked files are not part of the next commit, and Git will not compare future edits to them until you stage and commit them. This behavior is intentional. A directory often contains notes, generated artifacts, or local test files that should not automatically become project history.
+The file is untracked, which means Git sees it in the working directory but it is not in the index. Untracked files are not part of the next commit. Once you stage the file, Git can compare later working-file edits with its indexed copy. This behavior lets notes, generated artifacts, and local test files stay outside a commit unless you select them.
 
 Move the file into the staging area with `git add`. This command is easy to underestimate because it sounds like you are adding a file to Git forever. More precisely, you are adding the current content of that file to the staging area for the next commit. If you edit the file again after staging, the new edit will be unstaged until you add it too.
 
@@ -236,7 +246,7 @@ The output should report the root commit, the commit subject, and the number of 
  create mode 100644 namespace.yaml
 ```
 
-Check status after the commit. A clean working tree means the tracked files in your working directory match the latest committed snapshot and nothing is staged for the next commit. Clean does not mean the project is correct, secure, or ready for production. It only means Git has no uncommitted tracked changes to report.
+Check status after the commit. A clean status means no staged changes, no unstaged changes to tracked files, and no untracked files that are not ignored. Ignored files can still exist. Clean does not mean the project is correct, secure, or ready for production.
 
 ```bash
 git status
@@ -273,7 +283,7 @@ metadata:
 EOF
 ```
 
-Before staging, read the diff. `git diff` compares the working directory against the last committed snapshot for unstaged changes. This is one of the most protective commands in your toolbox because it shows the exact lines that would surprise a reviewer if you committed without checking. It also trains you to think in patches, which is the unit of review in most professional Git workflows.
+Before staging, read the diff. Plain `git diff` compares working files with the index, showing unstaged changes. Here nothing is staged, so it also reflects the edit since the last commit; use `git diff HEAD` to compare the working tree with that commit even when changes are staged. Read the patch before deciding what belongs in the next snapshot.
 
 ```bash
 git diff
@@ -386,7 +396,7 @@ a1b2c3d feat: add production namespace definition
 
 You can also use `git log -p` to inspect the patch introduced by each commit. That is useful when the question is not only "When did this change?" but "What exact lines did this commit add or remove?" As repositories grow, you will learn more targeted history tools, but `status`, `diff`, and `log` already give you a strong diagnostic loop: current state, uncommitted line changes, and committed timeline.
 
-Use that loop before assuming Git is broken. If a commit seems to be missing, check whether the change was ever staged and committed. If a file seems to be ignored, check whether it is already tracked or whether the ignore pattern actually matches. If a push is rejected, check whether the remote moved ahead of your local branch. Most beginner Git problems become ordinary state questions once you slow down and collect the evidence in the right order.
+Use that loop before assuming Git is broken. If a commit seems to be missing, check whether the change was ever staged and committed. If an ignore rule seems not to work, check whether the file is already tracked or the pattern matches. If a push is rejected, check whether the remote moved ahead of your local branch.
 
 The most important habit is to read these commands as a set. If `git status` says a file is modified, `git diff` explains the unstaged modification. If the working tree is clean but behavior changed recently, `git log` tells you which commits to inspect. If a file is untracked, no amount of `git commit` will include it until you stage it. The tool is consistent; confusion usually comes from asking the wrong tree the right question.
 
@@ -395,13 +405,13 @@ Pause and predict: you just ran `git commit -m "chore: add environment label to 
 <details>
 <summary>Check your prediction</summary>
 
-If you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`. That indicates that every tracked file matches the latest committed snapshot and no untracked files are present in the directory. If it reports anything else, pause and inspect the remaining changes rather than making another commit immediately, because the mismatch tells you there is still unrecorded state in your workspace.
+If you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`. That means no staged or unstaged tracked changes and no non-ignored untracked files; ignored files may still exist. If it reports anything else, inspect the changes before making another commit.
 
 </details>
 
 ## Work With Remotes Without Losing the Plot
 
-Everything so far has happened on your local machine. That is enough to practice Git, but it is not enough for team work or backup. A remote is another repository reachable over a network, usually hosted by a service such as GitHub, GitLab, or Bitbucket. Because Git is distributed, the remote is not magic; it is another copy of the repository history that your local repository can fetch from and push to when the histories are compatible.
+Everything so far has happened on your local machine. That is enough to practice Git, but it is not enough for team work or backup. A remote is another repository, often hosted on a network service such as GitHub, GitLab, or Bitbucket; a local filesystem path can also be a remote. It is another repository your local repository can fetch from and push to when the histories are compatible.
 
 ```text
 +-----------------------+                    +-----------------------+
@@ -584,7 +594,7 @@ Add `aws-credentials.json` to the repository's `.gitignore` file before broad st
 <details>
 <summary>6. A learner deletes the hidden `.git` directory to "reset" a broken project, then runs `git status`. What happens, and why is this not a safe recovery method?</summary>
 
-Git reports that the directory is not a Git repository, because the `.git` directory contained the repository database, branches, references, and local history. Deleting it does not create a clean Git history; it destroys the local repository metadata while leaving ordinary working files behind. A safer recovery starts with observation commands and a clear goal, such as unstaging a file or reverting a commit. Removing `.git` should not be treated as a normal troubleshooting step.
+Git reports that the directory is not a repository unless a parent directory is itself a Git repository, in which case Git may use that parent instead. The deleted `.git` contained local history and metadata; deleting it is not a safe reset. Start recovery with observation commands and a clear goal, such as unstaging a file or reverting a commit.
 
 </details>
 
@@ -597,13 +607,13 @@ Git may stop with a merge conflict because two histories changed the same line d
 
 ## Hands-On Exercise
 
-In this exercise, you will create a local repository from scratch, simulate a standard engineering workflow by making multiple logical commits, and observe the resulting history. The files are small Kubernetes-style examples so you can focus on Git's state transitions rather than cluster behavior. Work in a disposable directory, read `git status` after each meaningful step, and do not use real credentials anywhere in the practice files.
+In this exercise, you will create a local repository from scratch, simulate a standard engineering workflow by making multiple logical commits, and observe the resulting history. The files are small Kubernetes-style examples, not cluster tests. Before Task 1, return to a practice directory under your control; if you followed the theory setup, `cd ..` inside that child returns to its parent directory. Read `git status` after each step and do not use real credentials.
 
 ### Task 1: Initialization
 
 Create a new directory named `dojo-k8s-project`, navigate into it, and initialize an empty Git repository so you can observe the first status report from a clean practice workspace.
 
-Start from your home directory and apply the same fresh-directory and manual-stop checks as above. A repeat run needs an unused name, not an existing repository. After successful initialization, set the local training identity; do not change your account-wide Git configuration.
+Start another disposable child Bash from that practice directory with `bash --noprofile --norc` alone, then wait for its prompt. Paste the full grouped solution only inside that child and stay there for Tasks 2–7. A repeat run needs an unused name. If setup fails, the child exits: **STOP and do not paste later tasks into its parent**.
 
 - [ ] Directory created and navigated into.
 - [ ] Git repository initialized.
@@ -612,15 +622,23 @@ Start from your home directory and apply the same fresh-directory and manual-sto
 <summary>Solution: Task 1</summary>
 
 ```bash
-cd ~
+{
+set -e
+trap 'printf "%s\n" "STOP: setup failed; do not continue in the parent shell."' EXIT
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
 mkdir dojo-k8s-project
 cd dojo-k8s-project
-pwd
-ls -a
+practice_dir=$(pwd -P)
 git init --initial-branch=main
+test "$(git rev-parse --show-toplevel)" = "$practice_dir"
+test "$(git rev-parse --absolute-git-dir)" = "$practice_dir/.git"
 git config --local user.name "KubeDojo Learner"
 git config --local user.email "learner@example.invalid"
 git status
+printf 'Practice repository ready: %s\n' "$practice_dir"
+trap - EXIT
+set +e
+}
 ```
 
 </details>
