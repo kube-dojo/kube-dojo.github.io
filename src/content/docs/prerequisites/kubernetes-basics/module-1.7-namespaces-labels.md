@@ -25,7 +25,7 @@ After completing this module, you will be able to:
 
 ## Why This Module Matters
 
-Imagine a 2 a.m. page: checkout latency crosses the customer-facing error budget and internal APIs start timing out. The first suspect is the payment service, but the real cause is quieter: a load-testing job was launched in the same shared Kubernetes cluster as production, without a dedicated namespace budget, without default resource limits, and without a label scheme that made ownership obvious. The job was meant to run against a staging endpoint, but it landed in `default`, consumed most allocatable CPU on several nodes, and forced the team to burn precious minutes asking a basic question: whose workload is this?
+Hypothetical scenario: a 2 a.m. page reports checkout latency crossing the customer-facing error budget and internal APIs timing out. The first suspect is the payment service, but the real cause is quieter: a load-testing job was launched in the same shared Kubernetes cluster as production, without a dedicated namespace budget, without default resource limits, and without a label scheme that made ownership obvious. The job was meant to run against a staging endpoint, but it landed in `default`, consumed most allocatable CPU on several nodes, and forced the team to burn precious minutes asking a basic question: whose workload is this?
 
 The outage is not really about one careless command. It is about a cluster that has grown past the point where memory, discipline, and naming conventions can protect it. A single physical Kubernetes cluster is attractive because it centralizes capacity, networking, observability, and operational skill, but that same centralization creates a shared fate unless the cluster is divided into understandable operating zones. Without namespaces, teams collide over names and permissions; without labels, controllers and humans cannot reliably find the objects they mean to affect; without quotas and defaults, one tenant can unintentionally starve another.
 
@@ -92,7 +92,7 @@ The strongest namespace guarantees are API scoping guarantees. A namespaced obje
 
 The weakest namespace guarantee is network isolation, because there is none by default. Kubernetes networking starts from a flat model where every Pod can usually reach every other Pod IP, regardless of namespace, unless a Container Network Interface plugin and `NetworkPolicy` objects enforce stricter rules. This default makes service discovery simple for beginners, but it means a production hardening plan cannot stop at namespaces. A namespace is the place where you attach policy; it is not the policy itself.
 
-Kubernetes creates several namespaces before you add your own. The `default` namespace is the catch-all destination when a manifest or command does not specify a namespace. The `kube-system` namespace holds cluster services such as CoreDNS, networking components, and infrastructure controllers. The `kube-public` namespace is readable by all users and is now rarely central to application work. The `kube-node-lease` namespace contains lightweight heartbeat Lease objects that let nodes report liveness without constantly rewriting large Node status documents.
+Kubernetes creates several namespaces before you add your own. For `kubectl` outside a cluster, a command without an explicit namespace uses the current context's namespace; if that is unset, it falls back to `default`. With in-cluster authentication, `kubectl` defaults to the ServiceAccount namespace unless `POD_NAMESPACE` overrides it. The `kube-system` namespace holds cluster services such as CoreDNS, networking components, and infrastructure controllers. The `kube-public` namespace is readable by all users and is now rarely central to application work. The `kube-node-lease` namespace contains Lease objects used for node heartbeats.
 
 Mature clusters treat `default` as a warning light rather than a convenient home. If production workloads, experiments, and one-off debugging Pods all live there, ownership becomes ambiguous and destructive commands become harder to review. A better habit is to create purpose-built namespaces such as `team-frontend`, `team-backend`, `observability`, `payments-prod`, or `payments-staging`, then put the namespace in every manifest. Explicit placement makes the desired boundary reviewable in Git and visible in incident output.
 
@@ -136,7 +136,7 @@ There is a cost to making namespaces too granular. A namespace per developer, pe
 
 | Namespace behavior | What it gives you | What it does not give you |
 | :--- | :--- | :--- |
-| Name scoping | Same object names can exist in different namespaces | Automatic protection from deleting the wrong namespace |
+| Name scoping | Same namespaced object names can exist in different namespaces | Namespacing cluster-scoped objects |
 | RBAC boundary | Roles and RoleBindings can be limited to one namespace | Permissions over cluster-scoped resources |
 | DNS search scope | Short Service names resolve locally first | Network isolation between namespaces |
 | Quota attachment | Namespace budgets for resource requests, limits, and counts | Guaranteed node reservation without scheduling policy |
@@ -168,7 +168,7 @@ spec:
 
 A label key has an optional DNS-subdomain prefix and a required name, separated by a slash. The prefixes `kubernetes.io/` and `k8s.io/` are reserved for Kubernetes components, while your organization should use its own domain-style prefixes when automated tools add labels. The unprefixed labels in the example, such as `tier` and `environment`, are readable and common, but they are more likely to collide with another tool's assumptions in a large platform. The prefixed application labels are better for shared conventions.
 
-Values are strings, even when they look numeric. Quoting values such as `"2.1.4"` or `"finance-ops"` keeps YAML parsers and human reviewers from guessing about types. Labels also have size and character constraints because the API server indexes them for fast selection. That indexing is the reason labels should stay compact, stable, and identifying; it is also the reason large release notes, JSON blobs, and controller-specific directives belong somewhere else.
+Label values are strings. Quote a value such as `"true"` so YAML does not resolve the plain scalar as a boolean; see the [YAML 1.2.2 core schema](https://yaml.org/spec/1.2.2/#1032-tag-resolution). Labels have size and character constraints and support efficient queries and watches. Keep them compact and identifying; put large release notes, JSON blobs, and controller-specific directives in annotations.
 
 ```bash
 # Find all backend pods in the current namespace
@@ -213,7 +213,7 @@ spec:
     targetPort: 8080
 ```
 
-Set-based selectors add operators such as `in`, `notin`, `exists`, and `doesnotexist`. They are essential when the question is operational rather than structural, such as "show me production and staging Pods" or "find everything with a release label." Kubernetes selectors do not provide a general top-level OR operator, so `in` is the normal way to express several acceptable values for one key. The value lists for `in` and `notin` must be non-empty.
+Set-based selectors use `in` and `notin`; in a `-l` selector, `key` tests existence and `!key` tests absence. In `matchExpressions`, the corresponding operators are `Exists` and `DoesNotExist`. They are useful for questions such as "show me production and staging Pods" or "find everything with a release label." Kubernetes selectors do not provide a general top-level OR operator, so `in` is the normal way to express several acceptable values for one key. The value lists for `in` and `notin` must be non-empty.
 
 ```bash
 # Select pods where environment is either 'production' or 'staging'
@@ -226,7 +226,7 @@ kubectl get pods -l release
 kubectl get pods -l 'tier notin (cache),release'
 ```
 
-Newer workload controllers such as Deployments, ReplicaSets, Jobs, and DaemonSets use the richer selector structure with `matchLabels` and `matchExpressions`. `matchLabels` is syntactic convenience for exact matching, while `matchExpressions` exposes the set-based operators. The critical rule is that the selector must match the Pod template labels, and for Deployments the selector is effectively immutable after creation. Kubernetes protects that immutability because changing the selector could make a Deployment lose track of its existing ReplicaSets.
+Deployments and ReplicaSets use the richer selector structure with `matchLabels` and `matchExpressions`. `matchLabels` is syntactic convenience for exact matching, while `matchExpressions` exposes the set-based operators. Their selectors must match the Pod template labels; a Deployment selector is immutable after creation. Changing a selector could make a Deployment lose track of its existing ReplicaSets.
 
 ```yaml
 apiVersion: apps/v1
@@ -260,7 +260,7 @@ Design label taxonomies from the queries you expect to run under pressure. Durin
 
 Avoid encoding too much hierarchy into one label value. A value like `payments-prod-backend-v2` looks tidy until you need to select every production workload across all applications or every backend workload across all environments. Separate keys such as `app.kubernetes.io/name=payments`, `environment=production`, `tier=backend`, and `app.kubernetes.io/version=v2` let selectors combine dimensions. Kubernetes selectors are simple, so label design should keep each dimension explicit.
 
-Labels also enable canary releases because Services route by selector, not by version unless you include version in the Service selector. Imagine a Service selecting only `app=frontend`. Version one has ten Pods labeled `app=frontend, version=v1`, and version two has one Pod labeled `app=frontend, version=v2`. Both versions match the Service, so the endpoint set contains eleven Pods and a small portion of traffic reaches the canary without editing the Service.
+Labels also enable canary releases because Services select by labels, not by version unless you include version in the Service selector. Imagine a Service selecting only `app=frontend`. Version one has ten ready Pods labeled `app=frontend, version=v1`, and version two has one ready Pod labeled `app=frontend, version=v2`. Both versions match the Service, so the endpoint set can contain all eleven Pods without editing the Service.
 
 ```mermaid
 graph TD
@@ -279,10 +279,10 @@ graph TD
     SVC-->P1
     SVC-->P2
     SVC-->P3
-    SVC-. "small traffic share" .->P4
+    SVC-. "also eligible endpoint" .->P4
 ```
 
-This canary pattern is simple, but it has a sharp edge. Kubernetes Services do not guarantee percentage-based traffic splitting by label; they load-balance across ready endpoints according to implementation details. Counting Pods gives you only a rough traffic share, and uneven connection reuse can skew it further. For precise progressive delivery you would use a service mesh, Gateway API implementation, or ingress controller feature, but understanding label-based routing is still the foundation beneath those tools.
+This canary pattern is simple, but it has a sharp edge: a Service selector determines endpoint membership, not a guaranteed percentage of requests. Observe actual traffic separately when evaluating a rollout.
 
 Hypothetical scenario: a team adds `app=api` to a one-off debug Pod because they want it to appear in a familiar dashboard. Their production Service also selects `app=api`, so a Pod running a diagnostic container becomes a backend endpoint. The fix is not just deleting the Pod; it is tightening the Service selector to include `component=http` and `environment=production`, then documenting which labels are safe for ad hoc resources.
 
@@ -290,16 +290,16 @@ Selectors also shape cleanup safety. A command such as `kubectl delete pod -l ap
 
 ## Section 3: Annotations - Metadata for Machines and Humans
 
-Labels and annotations both live under object metadata, but they are designed for different jobs. Labels identify objects for selection and grouping. Annotations attach extra information that Kubernetes stores but does not index for selector queries. The practical rule is simple: if Kubernetes, a controller, or an operator needs to select objects by the value, use a label; if a tool only needs to read configuration, history, or descriptive context from the object it already found, use an annotation.
+Labels and annotations both live under object metadata, but they are designed for different jobs. Labels identify objects for selection and grouping. Annotations attach extra information that is not used to select objects. The practical rule is simple: if Kubernetes, a controller, or an operator needs to select objects by the value, use a label; if a tool only needs to read configuration, history, or descriptive context from the object it already found, use an annotation.
 
-This distinction protects the API server as well as your future self. Labels are indexed so selectors remain fast across large clusters, which means labels should remain short, bounded, and meaningful. Annotations can hold much larger strings, including JSON fragments or controller directives, because they are not part of the selector index. A backup controller, ingress controller, monitoring agent, or release tool can read annotations after watching objects without turning every piece of metadata into a cluster-wide search key.
+Labels support efficient queries and watches, while annotations can hold descriptive strings such as JSON fragments or controller directives. A tool can read annotations after finding an object without using them as selection criteria.
 
 **Pause and predict:** consider these five metadata items: team name for filtering, Git SHA of the commit, Prometheus scrape configuration, cost center for billing grouping, and an SSL certificate directive for an ingress controller. Which items should be labels because you will select or group by them, and which should be annotations because a tool reads them after discovering the object?
 
 <details>
 <summary>Check your prediction</summary>
 
-Team name and cost center usually belong in labels when operators use them for filtering, chargeback, or policy selection. The Git SHA, Prometheus scrape directive, and ingress certificate instruction usually belong in annotations because they are descriptive or controller-specific metadata rather than identity. Prometheus annotations are a common historical pattern, although some modern monitoring stacks prefer ServiceMonitors or PodMonitors. The key lesson is not the specific tool; it is the selection-versus-description decision.
+Team name and cost center usually belong in labels when operators use them for filtering, chargeback, or policy selection. The Git SHA, scrape directive, and ingress certificate instruction can belong in annotations when a tool reads them as descriptive or controller-specific metadata rather than identity. The key lesson is the selection-versus-description decision.
 
 </details>
 
@@ -328,7 +328,7 @@ spec:
 
 The example keeps selection keys short and descriptive while placing longer or tool-specific details beside them. An operator who needs a selector must put that key where selectors can read it. A large JSON blob does not belong in a label, because label values are length-constrained. If a value you later need in a selector is stored only where selectors cannot read it, the lookup returns nothing.
 
-Annotations are also useful for human-facing context, but they should not become a junk drawer. A runbook URL, owner contact, deployment SHA, or controller directive can be extremely helpful during an incident. A long, stale paragraph explaining why an object existed three quarters ago is usually better placed in Git history or a change ticket. The line is not about whether humans or machines read the field; it is about whether the API server should index it for selection.
+Annotations are also useful for human-facing context, but they should not become a junk drawer. A runbook URL, owner contact, deployment SHA, or controller directive can be extremely helpful during an incident. A long, stale paragraph explaining why an object existed three quarters ago is usually better placed in Git history or a change ticket. The distinction is whether the value is needed for selection, not whether humans or machines read it.
 
 When you are unsure, ask whether changing the value should change membership in some group. If changing `environment` from `staging` to `production` changes which policies, dashboards, or Services should include the object, it is label territory. If changing `build/commit-sha` only changes the forensic record of how the object was produced, it is annotation territory. This test keeps metadata decisions tied to behavior rather than preference.
 
@@ -403,12 +403,12 @@ Which approach would you choose here and why: a quota that allows `4` CPU cores 
 ```bash
 kubectl describe quota frontend-quota -n team-frontend
 kubectl describe limitrange frontend-limits -n team-frontend
-kubectl get pods -n team-frontend -o custom-columns=NAME:.metadata.name,CPU_REQ:.spec.containers[*].resources.requests.cpu,CPU_LIM:.spec.containers[*].resources.limits.cpu
+kubectl get pods -n team-frontend -o 'custom-columns=NAME:.metadata.name,CPU_REQ:.spec.containers[*].resources.requests.cpu,CPU_LIM:.spec.containers[*].resources.limits.cpu'
 ```
 
 Admission timing is another critical detail. Newly created or updated objects are evaluated against current LimitRanges and ResourceQuotas, but existing running Pods are not retroactively rewritten just because a new LimitRange appears. This protects production from surprise throttling, yet it also means a namespace may contain older workloads that do not match current policy until they are restarted or redeployed. During a rollout, platform teams should communicate when defaults take effect and how teams can inspect injected resources.
 
-Quota events are often misunderstood because controllers keep trying to reconcile desired state. A Deployment may say it wants more replicas, the ReplicaSet may try to create Pods, and the API server may reject each new Pod because the namespace is over quota. From a distance, this can look like a scheduling problem, but the scheduler never receives the rejected Pod. Reading ReplicaSet events and `k describe quota` output saves time because it shows whether the failure happened at admission or placement.
+Quota events are often misunderstood because controllers keep trying to reconcile desired state. A Deployment may say it wants more replicas, the ReplicaSet may try to create Pods, and the API server may reject each new Pod because the namespace is over quota. From a distance, this can look like a scheduling problem, but the scheduler never receives the rejected Pod. Read ReplicaSet events and `kubectl describe quota frontend-quota -n team-frontend` to investigate admission and quota usage.
 
 Resource requests also deserve cultural care. If requests are set too low, the scheduler packs too many Pods onto nodes and runtime contention appears later as latency. If requests are set too high, quota is exhausted by capacity that applications do not actually use. A good platform team treats requests as measured engineering data. They provide defaults to keep beginners safe, then encourage mature teams to tune values from metrics, load tests, and production observations.
 
@@ -465,16 +465,16 @@ Start with the operational question
 | :--- | :--- | :--- | :--- |
 | Naming a workload home | `metadata.namespace: payments-prod` | Letting it fall into `default` | Explicit placement is reviewable and repeatable. |
 | Finding all backend Pods | `kubectl get pods -l tier=backend` | Searching names with shell filters | Labels survive Pod recreation and naming changes. |
-| Passing controller configuration | Annotation with a tool-owned prefix | Long JSON in a label | Annotations are not selector indexes and allow larger values. |
+| Passing controller configuration | Annotation with a tool-owned prefix | Long JSON in a label | Annotations are not used for selection and allow larger values. |
 | Budgeting a team namespace | ResourceQuota plus LimitRange | Quota alone | Defaults prevent admission failures for manifests missing resources. |
 | Canary routing | Shared Service selector plus version labels | Editing endpoint IPs manually | Label selection lets controllers update endpoints dynamically. |
 
 ## Did You Know?
 
 - Kubernetes Service DNS uses the pattern `<service>.<namespace>.svc.cluster.local` by default, so `data.analytics.svc.cluster.local` and `data.prod.svc.cluster.local` can refer to different Services without a naming collision.
-- Label keys and values are constrained around the DNS label tradition, including the familiar 63-character name segment limit, because Kubernetes labels are designed to be compact identifiers that the API server can index efficiently.
+- Label keys and values have character and length constraints, including the 63-character name segment limit.
 - Namespace deletion is asynchronous: Kubernetes removes the namespace's objects and waits for finalizers, so a broken finalizer can leave the namespace in `Terminating` until the object is repaired.
-- Lease objects in `kube-node-lease` reduce control-plane load by letting each node update a small heartbeat object instead of constantly rewriting the larger Node status object.
+- Lease objects in `kube-node-lease` carry node heartbeats.
 
 ## Common Mistakes
 
@@ -482,11 +482,11 @@ Start with the operational question
 | :--- | :--- | :--- |
 | Assuming namespaces isolate network traffic | The namespace boundary is visible in the API, so teams assume it also controls packet flow. | Add CNI-supported `NetworkPolicy` objects and test cross-namespace ingress and egress paths. |
 | Letting workloads land in `default` | Quick commands and copied manifests omit `metadata.namespace`. | Put the namespace in manifests, set explicit contexts for interactive work, and alert on unexpected objects in `default`. |
-| Using labels for large controller configuration | Labels and annotations look similar in YAML, so long metadata gets placed in the indexed field. | Keep selectable identity in labels and move JSON, URLs, release notes, and directives into annotations. |
+| Using labels for large controller configuration | Labels and annotations look similar in YAML, so long metadata gets placed in a label. | Keep selectable identity in labels and move JSON, URLs, release notes, and directives into annotations. |
 | Creating ResourceQuotas without LimitRanges | Platform teams focus on the total budget but forget that quota admission needs resource values to count. | Apply defaults with a LimitRange before or alongside quota, then publish examples for application teams. |
 | Making Service selectors too broad | A simple selector such as `app=api` works in early demos and later matches debug or canary Pods accidentally. | Include enough stable labels to identify the intended component and environment without overfitting to one version. |
 | Trying to mutate immutable Deployment selectors | Teams discover a better label taxonomy after the Deployment already owns ReplicaSets. | Plan selectors before rollout; if the selector must change, recreate the workload through a controlled migration. |
-| Treating quota failures like scheduler failures | Pending Pods look similar from a distance, even when admission rejected creation before scheduling. | Read ReplicaSet events and namespace quota usage before debugging node capacity or affinity rules. |
+| Treating quota failures like scheduler failures | A Deployment can be short of replicas when admission rejects Pod creation, before a Pending Pod exists. | Read ReplicaSet events and namespace quota usage before debugging node capacity or affinity rules. |
 
 ## Quiz
 
@@ -507,7 +507,7 @@ Use a set-based selector such as `kubectl get pods -l 'tier in (frontend, cache)
 
 <details><summary><strong>Question 4:</strong> A new alerting controller needs a contact email and runbook URL for every Deployment, but operators never select resources by those exact values. Should the metadata be labels or annotations?</summary>
 
-Use annotations because the values are descriptive metadata read by a controller or human after the object is discovered. Labels should be reserved for compact identifying values that Kubernetes and operators select against, such as application, team, environment, or component. Email addresses and runbook URLs can be longer, less stable, and not useful in selector indexes. A tool-owned annotation prefix also keeps the meaning clear and avoids collisions with other controllers.
+Use annotations because the values are descriptive metadata read by a controller or human after the object is discovered. Labels should be reserved for compact identifying values that Kubernetes and operators select against, such as application, team, environment, or component. Email addresses and runbook URLs can be longer, less stable, and not useful as selectors. A tool-owned annotation prefix also keeps the meaning clear and avoids collisions with other controllers.
 </details>
 
 <details><summary><strong>Question 5:</strong> A namespace has a ResourceQuota of <code>requests.cpu: "4"</code> and a LimitRange that defaults each missing CPU request to <code>500m</code>. A developer creates seven Pods without requests and then tries to create an eighth. What happens?</summary>
@@ -536,7 +536,7 @@ These four cases are the ones to write down before you run the sandbox. Each one
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: DNS searched the caller's namespace first. Next action: query the explicit cross-namespace name, and do not recreate the Service in `test` until you meant to.
+Failure layer: DNS searched the caller's namespace first. Next action: query the explicit cross-namespace name, and do not create a copy of the Service in `test` unless you intend to.
 
 </details>
 
@@ -574,6 +574,8 @@ Success criteria:
 - [ ] The stable `web-v1` Deployment creates three ready Pods with `app=web` and `version=v1`.
 - [ ] The `web-svc` Service has endpoints for the stable Pods before the canary is added.
 - [ ] The canary Pod uses `app=web` and `version=v2`, then appears in the Service endpoint set.
+- [ ] Optional stretch: observe three stable endpoints after narrowing the selector and all four after restoring it, with the same Service UID.
+- [ ] Explain how to select production API Pods while excluding debug Pods, and how to verify membership.
 - [ ] Cleanup removes the owned exercise namespace without changing kubeconfig preferences.
 
 ### Task 1: Create the Isolation Zone
@@ -600,7 +602,7 @@ fi
 
 Continue only after setup succeeds. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
 
-Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
+Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. This uses `mktemp -d` with a template ending in at least three `X` characters; see the [FreeBSD](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1) and [GNU](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html) manuals. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
 
 ```bash
 NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && printf 'Manifest directory: %s\n' "$NS_DIR" && cd "$NS_DIR"
@@ -610,6 +612,10 @@ NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && printf 'Manife
 ### Task 2: Establish the Guardrails
 
 Apply a `LimitRange` to the exercise namespace so missing CPU requests and limits receive defaults, then add a small `ResourceQuota` so the namespace has a visible budget. The default values are intentionally modest because this exercise runs on small learning clusters.
+
+<details><summary>Hint 1</summary>Which policy sets per-container defaults, and which sets the namespace total?</details>
+<details><summary>Hint 2</summary>Compare <code>defaultRequest</code> and <code>default</code> with the quota's <code>requests.cpu</code> and <code>limits.cpu</code>.</details>
+<details><summary>Hint 3</summary>Use <code>ns_lab apply -f guardrails.yaml</code>, then <code>ns_lab describe limitrange cpu-guardrails</code> and <code>ns_lab describe quota alpha-budget</code>.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -653,6 +659,10 @@ ns_lab describe quota alpha-budget
 
 Deploy a simple NGINX application representing the stable version of your app. It should consist of three replicas, and the Pod template should carry both `app: web` and `version: v1` labels so later selectors can distinguish identity from rollout version.
 
+<details><summary>Hint 1</summary>Which controller maintains the requested number of Pods?</details>
+<details><summary>Hint 2</summary>Compare its selector with the Pod template labels.</details>
+<details><summary>Hint 3</summary>Apply <code>web-v1.yaml</code> with <code>ns_lab apply -f web-v1.yaml</code>, then use <code>ns_lab rollout status deployment/web-v1 --timeout=90s</code> before inspecting labels.</details>
+
 <details><summary><strong>Solution</strong></summary>
 
 ```yaml
@@ -692,6 +702,10 @@ The described Pods should show CPU values injected by the LimitRange, even thoug
 
 Create a Service named `web-svc` that routes traffic to your application. The Service should select traffic based only on the `app: web` label, because this lab intentionally lets both stable and canary versions become endpoints.
 
+<details><summary>Hint 1</summary>Which label is shared by both versions?</details>
+<details><summary>Hint 2</summary>Use that label in the Service selector and expose port 80.</details>
+<details><summary>Hint 3</summary>Use <code>ns_lab apply -f web-svc.yaml</code>, then repeat the full endpoint name-and-address check shown in the solution until the three stable Pods appear.</details>
+
 <details><summary><strong>Solution</strong></summary>
 
 ```yaml
@@ -723,6 +737,10 @@ Endpoint updates are asynchronous: repeat the endpoint check until three stable 
 
 Deploy a single Pod representing the new `v2` version of your application. Label it with `app: web` and `version: v2`, then observe how the Service handles the new Pod without any Service manifest change.
 
+<details><summary>Hint 1</summary>Which label makes the Pod eligible for the existing Service?</details>
+<details><summary>Hint 2</summary>Give it the shared app label and a distinct version label.</details>
+<details><summary>Hint 3</summary>Use <code>ns_lab apply -f web-v2-canary.yaml</code>, then <code>ns_lab wait --for=condition=Ready pod/web-v2-canary --timeout=90s</code>, and compare endpoint names with the previous check.</details>
+
 <details><summary><strong>Solution</strong></summary>
 
 ```yaml
@@ -751,6 +769,54 @@ ns_lab get pods --show-labels
 
 Repeat the endpoint check until it lists `web-v2-canary` and three `web-v1` Pod names with their IPs; investigate if it does not converge. The deprecation warning is expected and separate from this membership check. Because the Service selector checks only `app=web`, both versions qualify for traffic.
 </details>
+
+### Optional Stretch: Change the Service Selector
+
+Predict the ready endpoint names if `version=v1` is added to the Service selector. Record the Service UID, narrow the selector, and repeat only the `ns_lab get endpoints web-svc` JSONPath command from Task 5 until only the three stable Pods appear. Restore the original selector, then repeat that query until all three stable Pods and the canary appear. Check that the Service UID is unchanged; stop and investigate if either observation does not converge. Endpoint membership alone does not measure traffic distribution.
+
+<details><summary>Hint 1</summary>Which label distinguishes stable Pods from the canary?</details>
+<details><summary>Hint 2</summary>A Service selector is a map: narrowing it requires both app and version to match.</details>
+<details><summary>Hint 3</summary>Patch the selector, inspect endpoints, then patch it back to only <code>app=web</code>.</details>
+
+<details><summary>After your attempt: example commands</summary>
+
+```bash
+check_service_uid() {
+  local current_uid
+  [ -n "${NS_SERVICE_UID:-}" ] || { echo 'No recorded Service UID; stop' >&2; return 1; }
+  current_uid="$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" || { echo 'Cannot read Service UID; stop' >&2; return 1; }
+  [ "$current_uid" = "$NS_SERVICE_UID" ] || { echo "Service UID changed or missing: recorded=$NS_SERVICE_UID current=$current_uid; stop" >&2; return 1; }
+  printf 'Service UID: recorded=%s current=%s\n' "$NS_SERVICE_UID" "$current_uid"
+}
+start_selector_stretch() {
+  [ -z "${NS_STRETCH_STARTED:-}" ] || { echo 'Stretch already started; original Service UID retained; stop' >&2; return 1; }
+  NS_STRETCH_STARTED=yes
+  NS_SERVICE_UID="$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" || { echo 'Cannot record Service UID; stop' >&2; return 1; }
+  check_service_uid || return 1
+  ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":"v1"}}}' || { echo 'Selector patch failed; stop' >&2; return 1; }
+  ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}' || { echo 'Endpoint check failed; stop' >&2; return 1; }
+}
+start_selector_stretch
+```
+
+Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until only the three stable Pods appear; do not rerun `start_selector_stretch`. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
+
+```bash
+restore_selector_stretch() {
+  check_service_uid || return 1
+  ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":null}}}' || { echo 'Selector restore failed; stop' >&2; return 1; }
+  ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}' || { echo 'Endpoint check failed; stop' >&2; return 1; }
+  check_service_uid || return 1
+}
+restore_selector_stretch
+```
+
+Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until all four appear. If the expected endpoints do not appear or the UID differs, stop and investigate; do not assume the selector change has converged.
+</details>
+
+**Transfer:** Another Service should select production API Pods but exclude debug Pods. Which labels would you use, and how would you verify the resulting membership before relying on it?
+
+<details><summary>After your attempt: one possible approach</summary>Use stable application, component, and environment labels shared by intended Pods but absent from debug Pods. Inspect the selected Pods and ready endpoints, then investigate any unexpected member or missing Pod before relying on the Service.</details>
 
 ### Task 6: Cleanup
 
@@ -788,6 +854,8 @@ cleanup_ns_lab
 - [Kubernetes documentation: Well-Known Labels, Annotations and Taints](https://kubernetes.io/docs/reference/labels-annotations-taints/)
 - [Kubernetes documentation: Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
 - [Kubernetes kubectl reference: config set-context](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_set-context/)
+- [RFC 7396: JSON Merge Patch](https://www.rfc-editor.org/rfc/rfc7396.txt), [YAML 1.2.2 core schema](https://yaml.org/spec/1.2.2/#1032-tag-resolution)
+- [FreeBSD mktemp](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1), [GNU mktemp](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html)
 
 ## Next Module
 
