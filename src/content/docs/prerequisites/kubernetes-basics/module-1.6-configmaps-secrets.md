@@ -630,6 +630,8 @@ In this synthetic incident, a team needs to change a logging level without rebui
 
 Use a context you have independently confirmed is a dedicated disposable lab, and set `KUBEDOJO_LAB_CONTEXT` to its name before setup; that context must also be the current kubeconfig context. The literal name `default` is refused. Use one fresh Bash terminal for setup, every task, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer.
 
+If you switch the current context yourself before setup, record its previous name so you can restore it afterward. Cleanup does not restore that separate kubeconfig change.
+
 ```bash
 CFG_READY=no CFG_NEW=no
 if [ -n "${CFG_SETUP_SEEN+x}" ]; then
@@ -950,7 +952,7 @@ Each ConfigMap key appears as a file under `/etc/app-config`. This layout is bet
 
 ### Observe a mounted file update
 
-Before continuing, wait for Ready with `cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s`, then inspect `cfg_lab get pod config-test -o yaml`. Verify the volume refers to `app-config`, the container mounts that volume at `/etc/app-config`, and neither `items` nor `subPath` restricts it. Finally, `cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL` should show `info`; correct the manifest or state before the observation if it does not.
+Before continuing, wait for Ready with `cfg_lab wait --for=condition=Ready pod/config-test --timeout=60s`, then inspect `cfg_lab get pod config-test -o yaml`. Find the volume whose `configMap.name` is `app-config`: that ConfigMap source must have no `items` selection, and its matching container mount at `/etc/app-config` must have no `subPath`. Apply these checks only to that volume and mount. Finally, `cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL` should show `info`; correct the manifest or state before the observation if it does not.
 
 Task 4 created a Pod that mounts the ConfigMap as files. Predict what changes in the API and the mounted file when you update the object, and whether that alone proves an application reloaded it. The check below records the Pod UID, API values, file reads and UTC times. After its baseline read, the loop makes at most 30 reads with five-second waits; a timeout is an inconclusive observation, not proof that propagation cannot happen. On any error or timeout, stop and use the same-shell cleanup below.
 
@@ -1030,7 +1032,7 @@ cleanup_cfg_lab() {
     command kubectl --context "$CFG_CONTEXT" delete namespace "$CFG_NS" --ignore-not-found=true --wait=true --timeout=120s || return 1
   fi
   CFG_READY=no
-  echo 'Exercise namespace is gone; kubeconfig preferences were unchanged'
+  echo 'Exercise namespace is gone'
 }
 cleanup_cfg_lab
 ```
