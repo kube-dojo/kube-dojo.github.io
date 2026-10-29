@@ -529,7 +529,7 @@ The framework also tells you when YAML is not the real problem. If server-side d
 | **Quoting values with the wrong type** | Teams quote every value to avoid YAML surprises, then fields like `replicas` or `port` become strings. | Quote ambiguous strings, but leave numeric schema fields unquoted when Kubernetes expects integers. |
 | **Forgetting `---` between resources** | Multiple resources are pasted into one file and the parser treats them as one broken or overwritten document. | Place `---` on a line by itself between complete Kubernetes objects in a multi-document file. |
 | **Mismatching Service selectors and pod labels** | Each resource validates locally, but the relationship between them is semantic and easy to miss. | Review Service selectors beside Deployment pod-template labels and confirm endpoints after apply. |
-| **Using `>` for structured multi-line data** | Folded scalars are readable, but they replace ordinary line breaks with spaces. | Use `|` for scripts, certificates, kubeconfig fragments, and any data where newlines are syntax. |
+| **Using `>` for structured multi-line data** | Folded scalars are readable, but they replace ordinary line breaks with spaces. | Use <code>&#124;</code> for scripts, certificates, kubeconfig fragments, and any data where newlines are syntax. |
 | **Treating client dry run as production proof** | Client validation is fast, so teams promote it to the only gate even when clusters use CRDs and policies. | Keep client dry run for authoring, then run server-side dry run against the target cluster before release. |
 
 ## Quiz
