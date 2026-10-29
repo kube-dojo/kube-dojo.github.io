@@ -1,8 +1,8 @@
 # Changelog history
 
-This archive preserves the full historical English What’s New entries. Their descriptions reflect their original dates and are not a statement of current status or quality acceptance.
+This archive preserves the historical English What’s New entries; earlier internal records remain in [internal-changelog.md](internal-changelog.md). Their descriptions reflect their original dates and are not a statement of current status or quality acceptance.
 
-Add detailed patch notes to this Git archive. Keep the web What’s New page to 3–5 curated recent highlights, grouping related updates for readers.
+Add detailed patch notes here, newest first, with absolute `https://kube-dojo.github.io/` links. Keep the web What’s New page to 3–5 curated recent highlights, grouping related updates for readers.
 
 ## October 2026
 

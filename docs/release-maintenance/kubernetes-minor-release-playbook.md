@@ -64,7 +64,8 @@ Re-verified **2026-09-13**: CKA, CKAD, and CKS still state **Kubernetes v1.35**.
 
 - `src/content/docs/k8s/releases/**`
 - `docs/pins/kubernetes.yaml` — `latest_stable_track` and `kind_node_images` only
-- `src/content/docs/changelog.md` — one What’s New bullet
+- `docs/changelog-history.md` — detailed release notes, newest first, using absolute site URLs
+- `src/content/docs/changelog.md` — curate a reader highlight when warranted; keep 3–5 recent highlights total
 - `src/content/docs/k8s/index.md` — hub version list only if the supported set changed
 
 **Process / playbook packet** (standing trigger and discovery hooks; may ship alone or with Track B) — allow:
@@ -122,7 +123,7 @@ Then:
 
 1. Update `latest_stable_track.supported_minors` and `as_of`.
 2. Sidebar order: newest first (current convention: 1.37 = 3, 1.36 = 4, 1.35 = 5).
-3. Add a What’s New (`src/content/docs/changelog.md`) bullet.
+3. Add detailed notes to `docs/changelog-history.md`. For a reader-significant change, curate `src/content/docs/changelog.md`, grouping related updates and keeping 3–5 recent highlights total.
 4. English only. One minor (or one retire) per PR when possible.
 
 ## Review / merge
