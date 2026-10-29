@@ -8,6 +8,8 @@ class Element {
   replaceChildren(...children) { this.children = children; }
   addEventListener(event, callback) { this.events[event] = callback; }
   setAttribute(key, value) { this[key] = value; }
+  set textContent(value) { this._text = value; this.children = []; }
+  get textContent() { return this._text || ''; }
   set innerHTML(_) { throw new Error('Unsafe HTML rendering'); }
 }
 const elements = Object.fromEntries(['cc-summary', 'cc-note', 'cc-tracks', 'cc-rows', 'cc-count', 'cc-search', 'cc-locale', 'cc-status', 'refresh'].map(id => [id, new Element(id)]));
@@ -36,19 +38,26 @@ assert.match(elements['cc-summary'].textContent, /health unknown/);
 assert.equal(elements['cc-rows'].children.length, 2);
 assert.equal(elements['cc-tracks'].children.length, 2);
 assert.match(elements['cc-tracks'].children[1].children[0].textContent, /UK \(parked\)/);
-assert.match(elements['cc-tracks'].children[0].children[1].children[0].textContent, /10\/1089 accepted · 0.9%/);
-assert.equal(elements['cc-tracks'].children[0].children[1].children[1].value, 10);
-assert.equal(elements['cc-tracks'].children[0].children[1].children[1].max, 1089);
-assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[0].textContent, /Accepted: 10/);
-assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[1].textContent, /Current unaccepted: 1/);
-assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[2].textContent, /Revision: 30/);
-assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[3].textContent, /Stale: 1/);
-assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[4].textContent, /Invalid: 0/);
-assert.match(elements['cc-tracks'].children[0].children[1].children[2].children[5].textContent, /Missing: 1047/);
+const en = elements['cc-tracks'].children[0], uk = elements['cc-tracks'].children[1];
+assert.equal(uk.open, false);
+assert.match(en.children[0].textContent, /10\/1089 accepted/);
+assert.deepEqual(en.children[1].children.map(segment => Number.parseFloat(segment.style.width)), [10, 1, 30, 1, 0, 1047].map(n => n / 1089 * 100));
+assert.match(en.children[1]['aria-label'], /Missing 1047/);
+assert.deepEqual(en.children[2].children.map(item => item.textContent), ['Accepted: 10', 'Current unaccepted: 1', 'Revision: 30', 'Stale: 1', 'Invalid: 0', 'Missing: 1047']);
+uk.open = true;
+en.children[3].children[0].events.click();
+assert.equal(elements['cc-rows'].children.length, 1);
+assert.equal(en.children[3].children[0]['aria-pressed'], 'true');
+assert.match(elements['cc-count'].children[0].textContent, /EN Shared/);
+elements['cc-count'].children[0].events.click();
+assert.equal(en.children[3].children[0]['aria-pressed'], 'false');
+elements['cc-locale'].value = ''; elements['cc-locale'].events.input();
+assert.equal(elements['cc-rows'].children.length, 2);
 const details = elements['cc-rows'].children[0];
 assert.equal(details.tag, 'details');
 assert.equal(details.children[0].tag, 'summary');
 assert.match(details.children[0].textContent, /<img onerror=alert\(1\)>/);
+assert.equal(details.className, 'cc-page cc-page3');
 assert.equal(details.children.at(-1).children[0].textContent, 'javascript:alert(1)');
 assert.equal(details.children.at(-1).children[0].tag, 'li');
 details.open = true;
@@ -61,6 +70,8 @@ assert.match(elements['cc-summary'].textContent, /refreshing/);
 assert.equal(elements['cc-rows'].children[0], details);
 releaseRefresh(data); await pending;
 assert.equal(elements['cc-rows'].children[0], details);
+assert.equal(elements['cc-tracks'].children[0].children[3].children[0], en.children[3].children[0]);
+assert.equal(elements['cc-tracks'].children[1].open, true);
 assert.equal(details.open, true);
 assert.equal(elements['cc-rows'].scrollTop, 42);
 response = {ok: true, json: async () => ({...data, pages: [{...row, disposition: 'revise'}, data.pages[1]]})};
@@ -68,7 +79,7 @@ await elements.refresh.events.click();
 assert.notEqual(elements['cc-rows'].children[0], details);
 assert.equal(elements['cc-rows'].children[0].open, true);
 assert.equal(elements['cc-rows'].scrollTop, 42);
-assert.match(elements['cc-rows'].children[0].children[0].textContent, /revise/);
+assert.match(elements['cc-rows'].children[0].children[1].textContent, /revise/);
 elements['cc-locale'].value = 'uk'; elements['cc-locale'].events.input();
 assert.equal(elements['cc-rows'].children.length, 1);
 elements['cc-status'].value = 'stale'; elements['cc-status'].events.input();
@@ -91,6 +102,36 @@ assert.equal(elements['cc-rows'].children.length, 0);
 response = {ok: true, json: async () => data};
 await elements.refresh.events.click();
 assert.equal(elements['cc-rows'].children.length, 1);
+const one = {acceptance_recorded: 0, total: 1, review_recorded: 0, needs_revision: 0, unreviewed: 1, stale: 0, invalid: 0};
+const split = {...data, pages: [row, {...row, path: 'uk/prerequisites/start.mdx', locale: 'uk'}],
+  tracks: {...data.tracks, uk: {prerequisites: one}}};
+response = {ok: true, json: async () => split};
+await elements.refresh.events.click();
+elements['cc-locale'].value = 'en'; elements['cc-locale'].events.input();
+const ukTrack = elements['cc-tracks'].children[1].children[3].children[0];
+ukTrack.events.click();
+assert.equal(elements['cc-locale'].value, 'uk');
+assert.equal(ukTrack['aria-pressed'], 'true');
+assert.equal(elements['cc-rows'].children.length, 1);
+assert.match(elements['cc-rows'].children[0].children[0].textContent, /prerequisites\/start · UK/);
+assert.match(elements['cc-count'].children[0].textContent, /UK Prerequisites/);
+elements['cc-locale'].value = 'en'; elements['cc-locale'].events.input();
+assert.equal(ukTrack['aria-pressed'], 'false');
+assert.equal(elements['cc-count'].children.length, 0);
+ukTrack.events.click();
+elements['cc-search'].value = 'absent'; elements['cc-search'].events.input();
+assert.equal(elements['cc-count'].textContent, '0 pages shown');
+elements['cc-count'].children[0].events.click();
+elements['cc-search'].value = '.mdx'; elements['cc-search'].events.input();
+const unknown = {...data, pages: [{...row, path: 'extra/index.mdx', receipt_status: 'invalid', acceptance_recorded: true}],
+  tracks: {...data.tracks, en: {extra: data.tracks.en.shared}}};
+response = {ok: true, json: async () => unknown};
+await elements.refresh.events.click();
+elements['cc-tracks'].children[0].children[3].children[0].events.click();
+assert.equal(elements['cc-rows'].children[0].className, 'cc-page cc-page4');
+assert.match(elements['cc-rows'].children[0].children[0].textContent, /extra\/index · EN · Invalid/);
+assert.match(elements['cc-rows'].children[0].children[1].textContent, /extra\/index.mdx/);
+elements['cc-count'].children[0].events.click();
 response = {ok: true, json: async () => ({...data, locales: {en: {...data.locales.en, total: -1}}})};
 await elements.refresh.events.click();
 assert.match(elements['cc-summary'].textContent, /Invalid coverage response/);
