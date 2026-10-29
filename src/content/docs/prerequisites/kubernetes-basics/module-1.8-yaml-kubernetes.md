@@ -27,19 +27,21 @@ By the end of this module, you will be able to:
 
 ## Why This Module Matters
 
-Hypothetical scenario: a financial platform enters a trading window with customer traffic already above its normal peak. A platform engineer pushes what looks like a routine Kubernetes manifest update: raise the replica count, adjust container arguments, and increase memory limits for the backend processors. One extra indentation level moves a command-line argument out of the container argument list and into a nested mapping. The YAML parser accepts the document, the review looks visually plausible, and the deployment moves forward, but the containers crash as soon as the runtime tries to start them. The incident review does not need a dramatic root cause to be expensive; the expensive part is that a small structural mistake traveled through review, validation, and rollout before anyone followed the data shape closely enough to see it.
+Hypothetical scenario: a financial platform prepares for a trading window with customer traffic already above its normal peak. A platform engineer reviews a routine Kubernetes manifest update: raise the replica count, adjust container arguments, and increase memory limits for the backend processors. An indentation mistake changes the container arguments from a sequence into a mapping. The YAML parser accepts the document, but Kubernetes validation rejects the malformed arguments structure. The team must inspect the data shape and repair the manifest before rollout.
 
-That kind of incident feels unfair until you remember what YAML does in Kubernetes. YAML is not just a convenient file format for humans; it is the front door to the API server's declarative contract. A manifest is converted into structured data, validated against an OpenAPI schema, admitted through policy, persisted as desired state, and then reconciled by controllers. If the structure says the wrong thing, Kubernetes will faithfully pursue the wrong instruction or reject the request at the point where it can no longer interpret your intent. The discipline you build here is the discipline that keeps routine configuration work from becoming a production event.
+The distinction matters during review: a parser can accept a mapping even when a particular Kubernetes field expects a sequence. Compare the field's expected type with the structure produced by the indentation, then validate the corrected request. A visually plausible file is not enough to establish that its fields have the intended shapes.
 
-Hypothetical scenario: a team rotates a TLS certificate through a Kubernetes Secret and uses YAML's folded block scalar by mistake. The file is valid YAML, the Secret is created, and the rollout continues, but the folded scalar replaces certificate newlines with spaces. The ingress controller receives a malformed PEM payload, fails to load its certificate, and repeatedly restarts while clients receive confusing connection errors. A single character, `>` instead of `|`, does not break YAML syntax; it changes the application data that YAML carries, which means the first visible failure happens later in the system.
+The validation catch illustrates why YAML matters in Kubernetes. YAML is not just a convenient file format for humans; it is the front door to the API server's declarative contract. A manifest is converted into structured data, validated, admitted through policy, persisted as desired state, and then reconciled by controllers. If the structure says the wrong thing, Kubernetes will faithfully pursue the wrong instruction or reject the request at the point where it can no longer interpret your intent. The discipline you build here is the discipline that keeps routine configuration work from becoming a production event.
+
+Hypothetical scenario: a team rotates a TLS certificate through a Kubernetes Secret and uses YAML's folded block scalar by mistake. The file is valid YAML, the Secret is created, and the rollout continues, but the folded scalar replaces certificate newlines with spaces. In this scenario the ingress controller rejects the altered PEM text and cannot load the certificate; another consumer may respond differently. A single character, `>` instead of `|`, does not break YAML syntax; it changes the application data that YAML carries, so a failure may appear later in the system.
 
 This module teaches YAML as an operational interface, not as decorative syntax. You will learn the three YAML shapes that appear in every manifest, the four root fields Kubernetes uses to route objects, the schema tools that prevent guessing, and the validation workflow that turns manifest review into an engineering practice. The goal is not memorizing every field in Kubernetes 1.35; the goal is knowing how to reason from structure to schema to controller behavior when the cluster is about to act on your file. That reasoning gives reviewers something better than visual confidence: a repeatable path from text to API behavior.
 
 ## 1. YAML Fundamentals for Infrastructure
 
-YAML exists because infrastructure configuration has to be both machine-readable and reviewable by humans under time pressure. JSON is explicit, but large JSON manifests are visually noisy because every nested object needs braces, quotes, and commas. YAML removes much of that punctuation and lets indentation carry the hierarchy, which makes ordinary review easier but also makes whitespace part of the data model. A Kubernetes manifest is therefore closer to a carefully folded map than a casual note: the shape of each line tells the parser what belongs to what.
+YAML is useful for configuration that people need to read and machines need to parse. JSON uses braces and quoted object-member names, with commas separating members. YAML can express nesting with indentation and less punctuation, a presentation some readers find easier to review. That choice also makes whitespace significant: the shape of each line helps the parser determine what belongs to what.
 
-At the lowest level, YAML gives you three building blocks. A scalar is a single value such as `nginx:1.27`, `8080`, `true`, or `"production"`. A mapping is a collection of unique keys and values, the same idea as a dictionary or hash map in a programming language. A sequence is an ordered list, and every item in that list begins with a hyphen at the correct indentation level. Kubernetes resources combine these three shapes again and again until they describe a complete workload.
+At the lowest level, YAML gives you three building blocks. A scalar is a single value such as `nginx:1.27`, `8080`, `true`, or `"production"`. A mapping is a collection of unique keys and values, the same idea as a dictionary or hash map in a programming language. A sequence is an ordered collection. In the block-style sequences used here, each item begins with a hyphen at the appropriate indentation level. Kubernetes resources combine these three shapes again and again until they describe a complete workload.
 
 ```yaml
 # This is a Mapping at the root level
@@ -82,12 +84,12 @@ Write the count and the type before you continue. The next section is about mult
 
 ### Multi-Line Strings: The `|` and `>` Operators
 
-YAML becomes especially useful in Kubernetes when you need to carry text that already has internal structure. ConfigMaps often contain application configuration files, shell scripts, or web server snippets. Secrets can contain certificate material, private key text, or configuration fragments that must keep exact line boundaries after decoding. JSON can represent that data, but it forces escaped newline characters into a single string, while YAML can embed the text in a readable block.
+YAML becomes especially useful in Kubernetes when you need to carry text that already has internal structure. ConfigMaps can contain application configuration files, shell scripts, or web server snippets. Secrets can contain certificate material, private key text, or configuration fragments that must keep exact line boundaries after decoding. JSON can represent that data, but it forces escaped newline characters into a single string, while YAML can embed the text in a readable block.
 
-YAML has two block scalar operators that look similar and behave very differently. The literal block scalar, `|`, preserves newlines and indentation inside the block. The folded block scalar, `>`, folds ordinary line breaks into spaces while preserving paragraph breaks around blank lines. That makes `>` useful for long descriptions and almost always wrong for scripts, certificates, kubeconfig fragments, and any data where the receiving program treats newlines as syntax.
+YAML has two block scalar operators that look similar and behave very differently. The literal block scalar, `|`, preserves ordinary line breaks; the folded block scalar, `>`, folds ordinary line breaks into spaces while preserving paragraph breaks around blank lines. The content indentation is removed, while additional indentation remains part of the content; chomping controls trailing line breaks. Check those details when exact text matters. Use `|` when the consumer needs the embedded line structure, such as in a script or certificate; `>` can be useful for a flowing description.
 
 ```yaml
-# Literal (|) - Preserves structure perfectly for a script
+# Literal (|) - Preserves the script's line breaks in this example
 setup_script: |
   #!/bin/bash
   echo "Starting setup..."
@@ -102,14 +104,14 @@ description: >
   continuous string of text.
 ```
 
-The operational consequence is simple: choose the scalar based on what the application expects, not on what is easier to read in your editor. A shell script mounted from a ConfigMap needs `|` because the shell reads one command line after another. A TLS certificate needs `|` because PEM boundaries and base64 line breaks are meaningful to many parsers. A human-readable annotation that an external dashboard displays as a paragraph can use `>` because the consumer wants one flowing string.
+The operational consequence is simple: choose the scalar based on what the application expects, not on what is easier to read in your editor. Use `|` for a shell script when its command lines need to remain separate. Use `|` to preserve the line structure of PEM certificate text: RFC 7468 specifies line-oriented boundaries and encoded data, while parser tolerance varies. A human-readable annotation that an external dashboard displays as a paragraph can use `>` because the consumer wants one flowing string.
 
 **Pause and predict:** if you are embedding a `.pem` certificate key into a Kubernetes Secret, which operator must you use and why?
 
 <details>
 <summary>Check your prediction</summary>
 
-Use the literal block scalar, `|`, because a certificate is structured text with newline boundaries that must survive serialization. If you use `>`, the manifest may pass YAML parsing and still deliver corrupt application data, which is more dangerous than a syntax error because the failure appears later in the rollout.
+Use the literal block scalar, `|`, to preserve the certificate's line structure. If you use `>`, the manifest may pass YAML parsing while delivering altered text that a consumer may reject; parser tolerance varies. Compare the decoded value with the intended input.
 
 </details>
 
@@ -204,7 +206,7 @@ Write the replaced field and its replacement before you continue. The next secti
 
 ## 3. Exploring the Schema with `kubectl explain`
 
-You should not try to memorize the full Kubernetes API. Even the built-in resources have deeply nested fields, and production clusters often add CustomResourceDefinitions for ingress controllers, certificate managers, policy engines, database operators, service meshes, and delivery systems. Kubernetes gives you a better approach: query the OpenAPI schema through `kubectl explain`. This turns the cluster itself into the version-matched reference for the fields it accepts, and using the full command name keeps examples portable between your terminal, shell scripts, and CI jobs.
+You should not try to memorize the full Kubernetes API. Even the built-in resources have deeply nested fields, and clusters can add CustomResourceDefinitions for tools such as certificate managers, policy engines, and database operators. Kubernetes gives you a better approach: query the OpenAPI schema through `kubectl explain`. This turns the cluster itself into the version-matched reference for the fields it accepts, and using the full command name keeps examples portable between your terminal, shell scripts, and CI jobs.
 
 Traverse from a kind to the field you want to inspect. For a Pod, ask for `pod.spec` to see its field descriptions and type hints before choosing a nested path. The hints describe the expected shape: `<string>` is a string scalar, a named type such as `<Probe>` is an object, a `[]` prefix denotes a list, and `<map[string]string>` is a mapping of string keys to string values. Translate those shapes into YAML scalars, mappings and sequences; inspect the actual output for the field and cluster version rather than memorizing a generic placeholder type.
 
@@ -213,7 +215,7 @@ Traverse from a kind to the field you want to inspect. For a Pod, ask for `pod.s
 kubectl explain pod.spec
 ```
 
-Use `--recursive` to request a field outline. In a Kubernetes 1.35 client/server test, `pod.spec --recursive` displayed several nested levels, even though the command reference describes one level. Output can vary by resource and version, so query an exact path for details rather than assuming a complete tree. This is especially useful for CRDs that publish an OpenAPI schema, because the reference matching the target cluster may differ from an old public example.
+Use `--recursive` to request a field outline. Output can vary by resource and version, so query an exact path for details rather than assuming a complete tree. This is especially useful for CRDs that publish an OpenAPI schema, because the reference matching the target cluster may differ from an old public example.
 
 ```bash
 kubectl explain pod.spec --recursive
@@ -234,8 +236,7 @@ VERSION:    v1
 RESOURCE:   livenessProbe <Probe>
 
 DESCRIPTION:
-     Periodic probe of container liveness. Container will be restarted if the
-     probe fails. Cannot be updated...
+     Periodic probe of container liveness.
 
 FIELDS:
    exec <ExecAction>
@@ -268,9 +269,9 @@ This schema-first workflow is useful in air-gapped environments when the target 
 
 ## 4. Common YAML Patterns in Kubernetes
 
-The same small set of YAML structures appears repeatedly in real manifests, but the consequences differ by field. A list under `containers` creates one or more container definitions. A mapping under `selector` controls which pods receive traffic. A two-part relationship between `volumes` and `volumeMounts` decides whether a pod can start at all. Once you train yourself to identify those shapes, error messages become clues instead of noise.
+The same small set of YAML structures appears repeatedly in real manifests, but the consequences differ by field. A list under `containers` describes container definitions. A Service `selector` mapping identifies matching pods. A two-part relationship between `volumes` and `volumeMounts` affects whether a pod can start. Once you train yourself to identify those shapes, error messages become clues instead of noise.
 
-Environment variables show the most common nested pattern: a sequence of mappings. The `env` field under a container does not accept a single mapping of names to values. It accepts a list, and each list item is a mapping with a `name` field plus either a direct `value` or a `valueFrom` reference. This design lets each environment variable carry additional structure, such as references to ConfigMaps, Secrets, fields, or resource values.
+Environment variables illustrate a sequence of mappings. The `env` field under a container does not accept a single mapping of names to values. It accepts a list, and each list item is a mapping with a `name` field plus either a direct `value` or a `valueFrom` reference. This design lets each environment variable carry additional structure, such as references to ConfigMaps, Secrets, fields, or resource values.
 
 ```yaml
 apiVersion: v1
@@ -319,7 +320,7 @@ spec:
 
 One pod can define several volumes and containers can mount different subsets at different paths. This split allows one source to be presented differently to different containers, but it makes the shared name worth checking carefully. A mount name with no matching volume is valid YAML but fails API validation; server dry run can catch it. Compare both name fields before deployment. Pod events are useful for runtime dependency problems, such as a missing referenced ConfigMap, after an object is accepted.
 
-Labels and selectors are mappings that connect resources without hard-coding pod names. A Service does not send traffic to a specific pod identity; it watches for pods whose labels match its selector. That indirection is what lets Kubernetes replace pods during rollouts while the Service remains stable. It also means a one-character label mismatch can create a healthy-looking Service with no endpoints.
+Labels and selectors are mappings that connect resources without hard-coding pod names. For a selector-based Service, Kubernetes uses the selector to identify matching pods and manage backend endpoint information. That indirection lets Kubernetes replace pods during rollouts while the Service remains stable. Labels must match, but readiness and networking also affect whether traffic succeeds. A one-character label mismatch can leave a Service without matching endpoints.
 
 ```yaml
 # A Service looking for specific pods
@@ -328,22 +329,22 @@ kind: Service
 metadata:
   name: frontend-svc
 spec:
-  selector:              # The Service will route traffic to any Pod...
-    app: frontend        # ...that has this exact label
+  selector:              # Select Pods...
+    app: frontend        # ...that have this exact label
     tier: web            # ...AND this exact label.
   ports:
   - port: 80
 ```
 
-The selector above is an AND relationship across mapping keys. A pod must have both `app: frontend` and `tier: web` to receive traffic. This is why Deployment pod-template labels and Service selectors deserve careful review together. If the Deployment creates pods with `tier: frontend` while the Service selects `tier: web`, both resources can be valid and still fail as a system because the intended relationship is broken.
+The selector above is an AND relationship across mapping keys. A pod must have both `app: frontend` and `tier: web` to match this selector; matching alone does not prove it can receive traffic. This is why Deployment pod-template labels and Service selectors deserve careful review together. If the Deployment creates pods with `tier: frontend` while the Service selects `tier: web`, both resources can be valid and still fail as a system because the intended relationship is broken.
 
 Which approach would you choose here and why: hard-code pod names into a client configuration file, or use a Service selector that matches stable labels? Use selectors for normal Kubernetes networking because pods are disposable and labels are the stable contract. Hard-coded pod names turn routine rollouts into configuration churn, while selectors let controllers replace pods without forcing clients to learn new identities.
 
 ## 5. Multi-Resource Files and CI/CD
 
-A production application rarely consists of one Kubernetes object. Even a small web service may need a ConfigMap for configuration, a Deployment for compute, a Service for stable networking, an Ingress for external routing, and perhaps a ServiceAccount or Secret. Keeping each object in a separate file can be clear for large repositories, but for a compact teaching example or a small application unit, a multi-document YAML file keeps related resources together while still preserving separate Kubernetes objects.
+An application can combine several Kubernetes objects. Even a small web service may need a ConfigMap for configuration, a Deployment for compute, a Service for stable networking, an Ingress for external routing, and perhaps a ServiceAccount or Secret. Keeping each object in a separate file can be clear for large repositories, but for a compact teaching example or a small application unit, a multi-document YAML file keeps related resources together while still preserving separate Kubernetes objects.
 
-YAML uses `---` as the document separator. Three hyphens on a line by themselves end one YAML document and begin the next document in the same stream. `kubectl apply -f combined.yaml` reads that stream, splits it into individual objects, and submits them in order. Each object still has its own `apiVersion`, `kind`, `metadata`, and object-specific state. The separator does not merge objects; it lets one file carry several independent objects.
+YAML uses `---` as a document-start marker. In these multi-document examples, three hyphens on a line by themselves start a new document and separate it from the preceding one. `kubectl apply -f combined.yaml` reads that stream, splits it into individual objects, and submits them in order. Each object still has its own `apiVersion`, `kind`, `metadata`, and object-specific state. The separator does not merge objects; it lets one file carry several independent objects.
 
 ```text
 apiVersion: v1
@@ -369,7 +370,7 @@ spec:
   # ... service details ...
 ```
 
-`kubectl` processes documents in file order, while controllers reconcile asynchronously after objects exist. A Deployment can be accepted before its referenced ConfigMap exists, leaving containers unable to start until the dependency is available. This distinction explains why acceptance of the first document is not proof that its dependent workload is ready. Ordering dependencies first reduces avoidable startup errors and makes the first rollout easier to observe.
+`kubectl` processes documents in file order, while controllers reconcile asynchronously after objects exist. A Deployment can be accepted before its referenced ConfigMap exists; a Pod cannot start while a required ConfigMap reference is missing, as the [ConfigMap restrictions](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#restrictions) explain. This distinction explains why acceptance of the first document is not proof that its dependent workload is ready. Ordering dependencies first reduces avoidable startup errors and makes the first rollout easier to observe.
 
 Put foundational dependencies before workloads where practical. Multi-document files package related objects; they do not replace dependency design or make reconciliation synchronous.
 
@@ -378,17 +379,17 @@ Put foundational dependencies before workloads where practical. Multi-document f
 <details>
 <summary>Check your prediction</summary>
 
-The client processes documents in order, but the cluster reconciles them over time. A missing dependency may cause a temporary pod failure even if the later document creates the dependency moments afterward. Order the file to reduce noisy transitional failures and make first-apply behavior easier to reason about.
+The client processes documents in order, but the cluster reconciles them over time. A Pod cannot start while a required ConfigMap is missing. Order dependencies first to reduce avoidable startup errors and make first-apply behavior easier to reason about.
 
 </details>
 
 Write whether order matters, and to whom, before you continue. The next paragraph treats the file as one validation unit. It does not say whether the client waits for reconciliation.
 
-CI/CD validation should treat multi-resource files as a single deployment unit but inspect each object separately. A syntax error near the top can prevent the entire file from parsing. A schema error in one resource can fail the apply even if other resources are valid. A selector mismatch can pass validation entirely because it is a semantic relationship between objects rather than a local schema violation. This is why mature pipelines combine YAML parsing, server-side dry runs, and sometimes policy checks or integration tests.
+CI/CD validation should treat multi-resource files as a single deployment unit but inspect each object separately. A syntax error near the top can prevent the entire file from parsing. A schema error in one resource can fail the apply even if other resources are valid. A selector mismatch can pass validation entirely because it is a semantic relationship between objects rather than a local schema violation. Combine YAML parsing, server-side dry runs, and appropriate policy or integration checks to examine different failure layers.
 
 ## 6. Validating YAML and Real Debugging
 
-Debugging manifests becomes manageable when you separate four failure layers. The first layer is YAML syntax: can the text be parsed into data at all? The second layer is Kubernetes schema: does the data match the `apiVersion` and `kind` you declared? The third layer is cluster admission: do namespaces, CRDs, permissions, and policies allow the request? The fourth layer is runtime behavior: do controllers and workloads actually reach the desired state after the object is accepted?
+Debugging manifests becomes manageable when you distinguish failure types. Can YAML syntax be parsed into data? Does the data match the declared Kubernetes resource schema? Can discovery, authorization, and admission process the request in the target cluster? After acceptance, do controllers and workloads reach the desired state? These checks involve distinct stages; use the actual response to identify where a request failed.
 
 Client-side dry run is a useful first pass while editing. It may contact the API server for discovery or schema information, but it does not send the object through server-side dry-run admission. Client dry run may accept invalid fields, so success is not reliable proof of schema correctness; use server dry run for the exercise below. Neither dry run proves runtime behavior or dependency availability.
 
@@ -402,7 +403,7 @@ Server-side dry run asks the actual API server to process the request through au
 kubectl apply -f my-pod.yaml --dry-run=server
 ```
 
-The `diff` command asks what would change compared with live state. This matters because an object can pass validation while still changing a relationship the operator meant to keep. An `apps/v1` Deployment selector is immutable after creation, while a Service selector change can remove endpoints. A dry run checks acceptance under current conditions; a diff helps you assess whether the proposed change matches the intended operational outcome.
+The `diff` command asks what would change compared with live state. This matters because an object can pass validation while still changing a relationship the operator meant to keep. An `apps/v1` Deployment selector is immutable after creation, while a Service selector change can remove endpoints. A server dry run checks the server's acceptance under current conditions; a diff helps you assess whether the proposed change matches the intended operational outcome.
 
 ```bash
 kubectl diff -f my-updated-deployment.yaml
@@ -410,7 +411,7 @@ kubectl diff -f my-updated-deployment.yaml
 
 Start with the exact error and identify the layer. For YAML-to-JSON parsing errors, inspect nearby indentation, colons, tabs and sequence markers. For an invalid field or type, inspect the expected path with `kubectl explain`. With a Kubernetes 1.27+ server, client dry run can succeed while ordinary schema errors appear during server dry run; also investigate namespace, CRD, RBAC and admission causes. Keep the error and the command that produced it together, because a validation response and a workload event describe different stages of the request lifecycle.
 
-Treat each verifier result as evidence about where the manifest failed, not as a personal judgment about the author. A parser error says the text did not become a data tree, so editing the `apiVersion` will not help until the indentation or scalar syntax is repaired. A schema error says the data tree exists but does not match the object contract, so adding more document separators will not fix a misplaced `image` field. An admission error says the object is valid Kubernetes data but violates something true about the target cluster, such as a policy requiring ownership labels or a namespace quota limiting resource requests. This separation prevents frantic trial-and-error edits and makes review conversations more precise.
+Treat each verifier result as evidence about where the manifest failed, not as a personal judgment about the author. A parser error says the text did not become a data tree, so editing the `apiVersion` will not help until the indentation or scalar syntax is repaired. A schema error says the data tree exists but does not match the object contract, so adding more document separators will not fix a misplaced `image` field. An admission rejection can identify a cluster policy constraint, such as a required ownership label or a resource quota. Diagnose the specific request stage from the response rather than inferring complete schema correctness from one message.
 
 ```text
 error: error parsing deployment.yaml: error converting YAML to JSON: yaml: line 15: mapping values are not allowed in this context
@@ -431,8 +432,7 @@ error: unable to recognize "pod.yaml": no matches for kind "Pod" in version "app
 This illustrative message points to the root contract. Pods use `v1`; `apps/v1` includes controllers such as Deployments. Kubectl cannot map an unmatched group/version/kind through discovery before submitting the object; discovery itself can contact the server.
 
 ```text
-error: error parsing config.yaml: error converting YAML to JSON: yaml: unmarshal errors:
-  line 12: mapping key "port" already defined at line 10
+Illustrative diagnostic: duplicate mapping key "port"
 ```
 
 This message is illustrative. YAML mappings require unique keys; non-strict conversion can silently retain one duplicate in an undefined order. Strict validation can reject duplicates. Use a sequence when multiple ports are intended or remove the duplicate key.
@@ -452,16 +452,16 @@ Strong Kubernetes YAML practice is less about memorizing snippets and more about
 | Pattern | When to Use It | Why It Works | Scaling Considerations |
 | :--- | :--- | :--- | :--- |
 | Schema-first authoring | Any time you add an unfamiliar field or nested structure | `kubectl explain` tells you the expected Kubernetes type before you write YAML | Works for built-ins and well-defined CRDs; supplement with vendor docs when CRD schemas are sparse |
-| Dependency-first multi-document files | Small app bundles with ConfigMaps, Secrets, workloads, and Services | Foundational resources exist before pods reference them, reducing noisy initial failures | Larger systems may move ordering into GitOps waves or separate Kustomize bases |
+| Dependency-first multi-document files | Small app bundles with ConfigMaps, Secrets, workloads, and Services | Successfully creating prerequisites first can reduce missing-dependency startup errors | Larger systems may move ordering into GitOps waves or separate Kustomize bases |
 | Stable label contracts | Services, Deployments, NetworkPolicies, and observability selection | Labels provide durable relationships while pods remain disposable | Define label conventions centrally so teams do not invent incompatible keys |
 | Server-side dry run in CI | Shared clusters, CRDs, namespaces, RBAC, and admission policies | The real API server validates the request without persisting it | Requires safe CI credentials and representative target clusters |
 
 | Anti-Pattern | What Goes Wrong | Why Teams Fall Into It | Better Alternative |
 | :--- | :--- | :--- | :--- |
 | Guessing list versus mapping shape | The file is valid YAML but fails schema validation or creates the wrong object shape | Examples look visually similar, especially around `containers`, `env`, and `ports` | Read the schema type: a list needs sequence items |
-| Copying chart values into manifests | Fields that belong to a templating tool are rejected by the Kubernetes API | The chart input and rendered output both use YAML, so the boundary feels blurry | Render the chart, inspect the output, and validate the actual Kubernetes manifest |
+| Copying chart values into manifests | Tool-specific input fields absent from the target API schema can fail strict validation | The chart input and rendered output both use YAML, so the boundary feels blurry | Render the chart, inspect the output, and validate the actual Kubernetes manifest |
 | Quoting every scalar defensively | Integers and booleans become strings where the schema requires native types | Teams try to avoid YAML type surprises by treating everything as text | Quote ambiguous strings, but leave numeric fields unquoted when the schema expects numbers |
-| Treating client dry run as final proof | Cluster-specific policy, RBAC, CRDs, and admission failures appear later | Client validation gives useful early feedback | Use client dry run for editing and server-side dry run before merge or release |
+| Treating client dry run as final proof | Client dry run does not reproduce every server validation or admission check; some constraints surface during server processing | Client validation gives useful early feedback | Use client dry run for editing and server-side dry run before merge or release |
 
 The most reliable pattern is to keep the intended object relationships near each other during review. If a Service selects `app: web`, reviewers should be able to see the pod template labels that satisfy that selector. If a container mounts `config-store`, reviewers should be able to see the pod-level volume named `config-store`. If an environment variable references `app-config`, reviewers should be able to see whether that ConfigMap is created by the same release unit or by a documented external dependency.
 
@@ -501,7 +501,7 @@ Are you updating existing live resources?
                                        +-- no ---> Apply through the normal release workflow
 ```
 
-Use client-side dry run when you are still editing and want immediate feedback on obvious syntax or schema problems. Use server-side dry run when the live cluster's view matters, which includes CRDs, namespaces, RBAC, admission controllers, defaulting, and version-specific validation. Use diff when the object already exists and the important question is not "is this valid?" but "what exactly will change?" A healthy pipeline often uses all three because they answer different questions.
+Use client-side dry run when you are still editing and want immediate feedback on obvious syntax or schema problems. Use server-side dry run when the live cluster's view matters, which includes CRDs, namespaces, RBAC, admission controllers, defaulting, and version-specific validation. Use diff when the object already exists and the important question is not "is this valid?" but "what exactly will change?" These checks answer different questions; choose those needed for the change.
 
 | Situation | Preferred Tool | Reason |
 | :--- | :--- | :--- |
@@ -536,7 +536,7 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 <details><summary>1. Scenario: A colleague asks you to review a pull request where a Kubernetes Secret containing a private TLS certificate fails to parse in the ingress controller. You notice the certificate data is defined with the `>` YAML operator. Why is this causing the failure, and how do you fix it?</summary>
 
-**Answer:** The folded block scalar `>` converts ordinary line breaks into spaces, which corrupts PEM certificate structure even though the YAML document can still parse successfully. The ingress controller receives a single malformed certificate string instead of line-preserved certificate data, so it cannot load the credential. Use the literal block scalar `|` for certificate material because it preserves newlines exactly. This answer tests the outcome about constructing manifests with the correct multi-line string form and diagnosing failures where valid YAML carries invalid application data.
+**Answer:** The folded block scalar `>` converts ordinary line breaks into spaces, altering the PEM text even though the YAML document can still parse successfully. In this scenario the consumer rejects that altered text; other parsers may behave differently. Use the literal block scalar `|` to preserve the line structure, and compare the decoded value with the intended certificate. This answer tests the outcome about constructing manifests with the correct multi-line string form and diagnosing failures where valid YAML carries altered application data.
 </details>
 
 <details><summary>2. Scenario: During a production hotfix, an engineer runs `kubectl apply -f hotfix.yaml` and receives `error converting YAML to JSON: yaml: line 22: did not find expected key`. Line 22 contains `image: nginx:alpine`, which looks harmless. What should they inspect first?</summary>
@@ -566,7 +566,7 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 <details><summary>7. Scenario: A release file contains a ConfigMap, a Deployment that consumes it as an environment variable, and a Service. A teammate wants the Deployment first because it is the "main" resource. How would you evaluate that choice?</summary>
 
-**Answer:** Kubernetes may eventually reconcile the application either way, but dependency-first ordering produces cleaner rollout behavior and easier diagnostics. If Pods are created before the ConfigMap exists, their containers cannot start until it becomes available, which can generate noisy events. Put the ConfigMap before the Deployment, then put the Service where it best fits the review flow. This tests the design outcome around multi-resource manifests and the operational tradeoff between eventual reconciliation and clean first-apply behavior.
+**Answer:** Dependency-first ordering can reduce startup errors and make diagnostics easier. A Pod cannot start while a required ConfigMap is absent; optional references behave differently. Put the ConfigMap before the Deployment, then put the Service where it best fits the review flow. This tests the design outcome around multi-resource manifests and the tradeoff between asynchronous reconciliation and a clean first apply.
 </details>
 
 ## Hands-On Exercise
@@ -798,7 +798,7 @@ Failure layer: a data object was given a workload body. Next action: move the ke
 
 </details>
 
-**Card E: Apply is treated as one transaction.** `combined.yaml` lists the Deployment before the ConfigMap. The first Pods fail, then recover. The pipeline calls that a broken apply.
+**Card E: Apply is treated as one transaction.** `combined.yaml` lists the Deployment before its required ConfigMap. A Pod cannot start while the required reference is missing. The pipeline calls that a broken apply.
 
 <details>
 <summary>Check your prediction</summary>
@@ -826,6 +826,8 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 * [Kubernetes labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
 * [Kubernetes annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
 * [Kubernetes ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/)
+* [Configure Pods with a ConfigMap: restrictions](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#restrictions)
+* [RFC 7468: Textual Encodings of PKIX, PKCS, and CMS Structures](https://www.rfc-editor.org/rfc/rfc7468.txt)
 * [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 * [Kubernetes volumes](https://kubernetes.io/docs/concepts/storage/volumes/)
 * [Kubernetes v1.35 Services and EndpointSlices](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/)
