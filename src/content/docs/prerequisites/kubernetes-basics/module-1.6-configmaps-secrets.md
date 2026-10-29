@@ -241,7 +241,7 @@ spec:
 
 Mounted ConfigMaps and Secrets behave differently because the kubelet manages files on the node. When the API object changes, the kubelet eventually updates files for regular volume mounts. The delay can be as long as the kubelet sync period plus a cache propagation delay. The default cache strategy is Watch; TTL-based caching and direct API reads have different delays. A one-minute sync period plus a one-minute TTL is an example for a TTL cache, not a typical Watch timing. Applications must reread or reload the file to use the new value. See [mounted ConfigMap updates](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically).
 
-The `nginx-config` example assumes `default.conf` contains an appropriate server-block snippet. It mounts the ConfigMap at `/etc/nginx/conf.d`; supply the files this example expects and inspect that directory in the running container before relying on its configuration. A complete main `nginx.conf` is a different file, not this snippet.
+The `nginx-config` example assumes `default.conf` contains an appropriate server-block snippet. Mounting the ConfigMap at `/etc/nginx/conf.d` makes files already in that image directory inaccessible to the container; supply the files this example expects and inspect the directory. A complete main `nginx.conf` is a different file, not this snippet. See [Configure a Pod to use a ConfigMap](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/).
 
 The `subPath` option is the major exception. It selects a path within a volume for a particular mount. A container using a ConfigMap or Secret through `subPath` does not receive updates to that mount. If dynamic refresh matters, mount a directory without `subPath` and arrange the application path accordingly. See [volumes and subPath](https://v1-35.docs.kubernetes.io/docs/concepts/storage/volumes/#using-subpath).
 
@@ -426,7 +426,7 @@ Encryption at rest addresses a different threat: the exposure of stored API data
 
 The KMS story matters for Kubernetes 1.35. KMS v1 was deprecated in Kubernetes v1.28 and disabled by default beginning in v1.29. KMS v2 reached stable status in v1.29 and offers significantly better performance than v1. See the [KMS provider documentation](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kms-provider/).
 
-Encryption at rest does not protect plaintext manifests before they reach the API server. If a team commits a Secret YAML with `stringData` into a public repository, KMS v2 cannot help; the leak happened in Git, not in etcd. Sharing a manifest also shares its base64-encoded Secret values with anyone who can read and decode it. Storage encryption does not replace access control or application-side protection after the value is read.
+Encryption at rest does not protect plaintext manifests before they reach the API server. If a team commits a Secret YAML with `stringData` into a public repository, KMS v2 cannot help; the leak happened in Git, not in etcd. Sharing a manifest also shares its Secret values, whether plaintext `stringData` or base64-encoded `data`, with anyone who can read it. Storage encryption does not replace access control or application-side protection after the value is read.
 
 RBAC is the second major boundary, and it is easy to underestimate. Granting `get` on a named Secret allows direct retrieval of that Secret. Granting `list` on Secrets in a namespace is broader because list responses include full object payloads, not just names. Granting a user permission to create Pods in a namespace can also become indirect Secret access, because the user can create a Pod that mounts a Secret and then read it from inside the container.
 
@@ -441,7 +441,7 @@ No. Once the workload is compromised, the credential is available through the sa
 
 </details>
 
-This is why Secret design should be paired with credential design. TokenRequest credentials expire, and the kubelet rotates projected service account tokens; legacy service-account token Secrets do not expire or rotate automatically. Review the audience and permissions as well as the lifetime: a shorter lifetime alone does not determine what the credential can access. See [service account credentials](https://v1-35.docs.kubernetes.io/docs/concepts/security/service-accounts/#get-a-token).
+Workloads may also receive service account credentials, so review their lifetime and permissions. TokenRequest credentials expire, and the kubelet rotates projected service account tokens; legacy service-account token Secrets do not expire or rotate automatically. Review the audience and permissions as well as the lifetime: a shorter lifetime alone does not determine what the credential can access. See [service account credentials](https://v1-35.docs.kubernetes.io/docs/concepts/security/service-accounts/#get-a-token).
 
 ## Projected Volumes, Immutability, and Rollout Strategy
 
@@ -771,6 +771,8 @@ spec:
 EOF
 ```
 
+Record the UID now with `cfg_lab get pod config-diagnosis -o jsonpath='{.metadata.uid}'` before opening the hints or making a repair.
+
 <details><summary>Hint 1: Concept</summary>
 
 A waiting container has several possible causes. Use evidence before changing configuration.
@@ -790,6 +792,8 @@ Use `cfg_lab describe pod config-diagnosis` and `cfg_lab get configmap app-confi
 
 The Pod refers to `MODE` in `app-config`, which initially has `LOG_LEVEL` and `APP_NAME`. Events can identify the missing key; timing varies, so wait for an event rather than infer the cause from Waiting alone. Add a synthetic value and check the same UID and readiness:
 
+Before patching, run `cfg_lab describe pod config-diagnosis` and inspect its Events for the missing `MODE` key; stop if the evidence indicates a different cause.
+
 ```bash
 cfg_lab patch configmap app-config --type=merge -p '{"data":{"MODE":"practice"}}'
 cfg_lab wait --for=condition=Ready pod/config-diagnosis --timeout=120s
@@ -797,7 +801,7 @@ cfg_lab get pod config-diagnosis -o jsonpath='{.metadata.uid}{"\n"}'
 cfg_lab exec config-diagnosis -- printenv MODE
 ```
 
-Compare the UID with your earlier record and the value with the patch. A timeout does not establish the cause; inspect events and stop before cleanup if you cannot explain the result.
+Compare the UID with your earlier record and the value with the patch. A timeout does not establish the cause; inspect events and stop before cleanup if you cannot explain the result. The `MODE` key remains in `app-config` and appears as a file in Task 4; `config-diagnosis` remains until namespace cleanup.
 </details>
 
 **Transfer:** If a Pod instead references a ConfigMap that exists only in another namespace, would adding a key to that other object resolve the reference? Explain which namespace and object you would inspect first.
@@ -809,7 +813,7 @@ No. Inspect the Pod's namespace and its referenced object name and key there. Or
 
 ### Task 3: Prove environment variables are static
 
-The Pod is running with the objects from Task 1. If `LOG_LEVEL` changes in the ConfigMap, what would you inspect first, and what do you predict the running process will report? Write your prediction before opening the hints or using the commands.
+The Pod is running with the Task 1 objects, including the ConfigMap updated during diagnosis. If `LOG_LEVEL` changes in the ConfigMap, what would you inspect first, and what do you predict the running process will report? Write your prediction before opening the hints or using the commands.
 
 <details><summary>Hint 1: Concept</summary>
 
@@ -1039,6 +1043,7 @@ Success criteria:
 - [ ] ConfigMap `app-config` was created and inspected successfully.
 - [ ] Secret `app-secret` was created and decoded without confusing base64 for encryption.
 - [ ] Pod `config-test` reached the Ready condition and displayed the expected environment values.
+- [ ] Pod `config-diagnosis` was diagnosed from its missing `MODE` Event, repaired with one targeted ConfigMap change, and reached Ready with the same UID recorded before and after.
 - [ ] Updating the ConfigMap did not change the already-running environment variable.
 - [ ] The ConfigMap was mounted as files under `/etc/app-config`.
 - [ ] The mounted-file check recorded the Pod UID, times and API/file observations, or reported an inconclusive timeout.
