@@ -213,7 +213,7 @@ Traverse from a kind to the field you want to inspect. For a Pod, ask for `pod.s
 kubectl explain pod.spec
 ```
 
-Use `--recursive` to request fields of fields; the reference describes this as currently one level deep. For deeper details, query the exact path rather than assuming a complete tree. The important habit is using the available schema instead of guessing from memory. This is especially useful for CRDs that publish an OpenAPI schema, because the reference matching the target cluster may differ from an old public example.
+Use `--recursive` to request a field outline. In a Kubernetes 1.35 client/server test, `pod.spec --recursive` displayed several nested levels, even though the command reference describes one level. Output can vary by resource and version, so query an exact path for details rather than assuming a complete tree. This is especially useful for CRDs that publish an OpenAPI schema, because the reference matching the target cluster may differ from an old public example.
 
 ```bash
 kubectl explain pod.spec --recursive
