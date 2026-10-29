@@ -225,6 +225,8 @@ A liveness probe is a good example because it has several nested options, and on
 kubectl explain pod.spec.containers.livenessProbe
 ```
 
+The following is an abridged legacy-format illustration; the exact header and wording can differ from current `kubectl` output.
+
 ```text
 KIND:       Pod
 VERSION:    v1
@@ -253,7 +255,7 @@ kubectl explain pod.spec.containers.livenessProbe.httpGet
 The `--recursive` flag gives a structural outline without requiring a separate lookup for every immediate field, but it is not a substitute for targeted lookup. For a Deployment's container list, query `deployment.spec.template.spec.containers` directly. The path reminds you that the Pod template is nested under the Deployment spec, while container fields belong under the template's Pod spec.
 
 ```bash
-kubectl explain deployment --recursive
+kubectl explain deployment.spec.template.spec.containers
 ```
 
 Before running this, what output do you expect if you ask for `kubectl explain pod.spec.nodeSelector`? You should expect a field description and a type that behaves like a mapping from string keys to string values. That means the YAML shape is not a list of selector objects; it is a mapping such as `disktype: ssd`, where each key and value correspond to node labels.
@@ -506,7 +508,7 @@ Use client-side dry run when you are still editing and want immediate feedback o
 | You cannot remember where `readOnly` belongs for a volume mount | `kubectl explain pod.spec.containers.volumeMounts` | The schema shows the exact nested field path and expected type |
 | You are editing a local Pod example and want fast feedback | `kubectl apply --dry-run=client -f pod.yaml` | Client checks give early feedback, may contact the API, and may accept invalid fields |
 | You are validating an operator CRD before merge | `kubectl apply --dry-run=server -f resource.yaml` | The API server validates the installed CRD version and admission policy |
-| You are changing selectors on a live Deployment or Service | `kubectl diff -f service.yaml` | The diff exposes destructive relationship changes before they are applied |
+| You are changing a live Service selector | `kubectl diff -f service.yaml` | The diff exposes relationship changes before they are applied |
 
 The framework also tells you when YAML is not the real problem. If server-side dry run accepts a Service but traffic still fails, inspect endpoints and labels rather than rewriting indentation. If a ConfigMap is valid but the application ignores it, inspect how the pod consumes it through environment variables or mounted files. YAML is the delivery format for desired state, but runtime debugging still requires following the controller and workload behavior after the API accepts the object.
 
@@ -559,12 +561,12 @@ The framework also tells you when YAML is not the real problem. If server-side d
 
 <details><summary>6. Scenario: A Service is valid and a Deployment is valid, but the Service has no endpoints after deployment. The Service selector is `app: frontend` and `tier: web`, while the pod template labels are `app: frontend` and `tier: ui`. What is wrong?</summary>
 
-**Answer:** The YAML and schemas can both be valid while the semantic relationship is broken. A Service selector is an AND match across all selector keys, so pods must have both `app: frontend` and `tier: web` to become endpoints. Since the pods have `tier: ui`, the Service selects nothing. Fix either the Service selector or the pod template labels so the intended label contract matches, then confirm endpoints with `kubectl get endpoints` or EndpointSlice inspection.
+**Answer:** The YAML and schemas can both be valid while the semantic relationship is broken. A Service selector is an AND match across all selector keys, so pods must have both `app: frontend` and `tier: web` to become endpoints. Since the pods have `tier: ui`, the Service selects nothing. Fix either the Service selector or the pod template labels so the intended label contract matches, then inspect membership for a Service named `frontend-svc` in the current namespace with `kubectl get endpointslices -l kubernetes.io/service-name=frontend-svc`. The legacy Endpoints API has been deprecated since Kubernetes 1.33.
 </details>
 
 <details><summary>7. Scenario: A release file contains a ConfigMap, a Deployment that consumes it as an environment variable, and a Service. A teammate wants the Deployment first because it is the "main" resource. How would you evaluate that choice?</summary>
 
-**Answer:** Kubernetes may eventually reconcile the application either way, but dependency-first ordering produces cleaner rollout behavior and easier diagnostics. If pods start before the ConfigMap exists, they can fail temporarily, generate noisy events, and obscure real problems. Put the ConfigMap before the Deployment, then put the Service where it best fits the review flow. This tests the design outcome around multi-resource manifests and the operational tradeoff between eventual reconciliation and clean first-apply behavior.
+**Answer:** Kubernetes may eventually reconcile the application either way, but dependency-first ordering produces cleaner rollout behavior and easier diagnostics. If Pods are created before the ConfigMap exists, their containers cannot start until it becomes available, which can generate noisy events. Put the ConfigMap before the Deployment, then put the Service where it best fits the review flow. This tests the design outcome around multi-resource manifests and the operational tradeoff between eventual reconciliation and clean first-apply behavior.
 </details>
 
 ## Hands-On Exercise
@@ -753,7 +755,7 @@ This checks the requests through the server validation and admission path; it do
 
 ### Task 6: Design and Check a Label Contract
 
-Choose a new `tier` value and add it to the Deployment's Pod template labels. First predict what happens if the Service instead selects a different `tier` value. Make that mismatch in your scratch file, run `yaml_check`, and compare the two mappings: server dry run can succeed even when no Pods match the Service selector, so its success does not prove endpoint membership. Correct the Service selector to match your chosen value and run `yaml_check` again. Record the value you chose, the mismatch, both outcomes, and why the matched mappings matter. Keep using server dry run; do not apply the bundle.
+Choose a valid label value such as `qa` and add it as `tier` to the Deployment's Pod template labels; leave the Deployment selector unchanged. Write down your prediction of what happens if the Service selects a different value. In your scratch file, add `tier` with a different valid value such as `preview` to the Service's `spec.selector`, then run `yaml_check` and compare the mappings: server dry run can succeed even when no Pods match the Service selector, so its success does not prove endpoint membership. Correct the Service selector to match your chosen value and run `yaml_check` again. Record the mismatch, both outcomes, and why the matched mappings matter. Keep using server dry run; do not apply the bundle.
 
 <details><summary>Hint 1</summary>Which two mappings connect a Service to Pods?</details>
 <details><summary>Hint 2</summary>Compare every Service selector key and value with the Pod template labels; do not change the Deployment selector.</details>
@@ -819,12 +821,14 @@ Failure layer: the client sent documents in order, and the controllers reconcile
 
 * [Kubernetes API overview](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)
 * [Kubernetes objects](https://kubernetes.io/docs/concepts/overview/working-with-objects/)
+* [Kubernetes v1.35 Deployments: label selector updates](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/#label-selector-updates)
 * [Kubernetes object management](https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/)
 * [Kubernetes labels and selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
 * [Kubernetes annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
 * [Kubernetes ConfigMaps](https://kubernetes.io/docs/concepts/configuration/configmap/)
 * [Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 * [Kubernetes volumes](https://kubernetes.io/docs/concepts/storage/volumes/)
+* [Kubernetes v1.35 Services and EndpointSlices](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/)
 * [kubectl explain reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_explain/)
 * [kubectl v1.35 explain implementation](https://github.com/kubernetes/kubernetes/blob/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/kubectl/pkg/explain/v2/explain.go) and [recursive output template](https://github.com/kubernetes/kubernetes/blob/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/kubectl/pkg/explain/v2/templates/plaintext.tmpl)
 * [Kubernetes v1.35 kubectl apply reference](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_apply/)
