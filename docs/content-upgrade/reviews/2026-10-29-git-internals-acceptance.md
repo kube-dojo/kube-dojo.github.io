@@ -17,20 +17,38 @@ and the source binding received independent review in [PR 3659](https://github.c
 The applicable hands-on work is local Git practice, not a required cluster lab.
 The frozen practice run bound all 15 Bash fences to the page. The first starts
 the child shell; the runner sent the other 14 literal blocks sequentially to
-that subprocess and observed each completion marker. Controls covered 12
-setup and selector cases, four CDPATH cases across Bash 3.2 and 5.3, two real
+that subprocess and observed each completion marker. Between blocks, the harness
+set the prose identity and performed Tasks 3–5 with synthetic edits, hash checks,
+commits, a detached commit and its protective branch. This was local macOS Git
+2.56 practice; the all-fence receipt does not record its resolved Bash version.
+Controls covered 12 setup and selector cases, two current-page CDPATH cases
+across Bash 3.2 and 5.3 plus two historical R6 escape reproductions, two real
 macOS parent/child PTY cases, five recovery cases, six ref/pack/reset cases,
 prose controls, and a synthetic transfer solution. Expected failure cases were
 retained; init and some setup faults were simulated. The PTY run did not capture
 child status separately. The two optional ConfigMap YAML bodies match historical
 cluster fixtures byte for byte; this is not a new cluster or service-behavior run.
-Detailed local receipts are under `.agent/session228/internals-takeover/`.
+Detailed gitignored local receipts are under `.agent/session228/internals-takeover/`.
 
 The primary build passed at `e7b73f6`; [Pages run 40785784418](https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/40785784418)
 deployed the unchanged page and seed with the dark diagram readability repair.
 Desktop native checks covered the expanded Auto/dark body, diagram inline and
-modal, targeted Light rendering, complete setup-code copy, and navigation. The
+modal, targeted Light rendering, and complete setup-code copy. Navigation checks
+were reused from Pages run 40776803484 at `4fa49d7`, with unchanged target bytes. The
 full trace and scoped limits are in `.agent/session229/m1-native-fixed/receipt.md`
 and the preceding navigation receipt in `.agent/session229/m1-native/receipt.md`.
 This is not a claim of full Light or mobile coverage, exhaustive accessibility,
 a human learner study, measured learning outcomes, or Ukrainian acceptance.
+
+## Lead acceptance
+
+The lead records **retain** for this exact English page and seed identified above,
+subject to independent approval and passing CI at the final metadata head before
+merge. Applicable layers pass within these boundaries: page presence and structural
+checks cover the current source; technical source and editorial review use the
+unchanged genuine R7 receipt (module 35/40, lab exactly 21/25, every dimension at
+least 4); lab execution covers the local Git practice and disclosed controls;
+deployed smoke covers the completed publication and desktop checks above.
+The local evidence does not establish unrestricted paste behavior or new cluster
+execution. Learner data and Ukrainian fidelity remain unknown. This acceptance
+does not close parent #2278, program #2272, Git P12, or translation work.

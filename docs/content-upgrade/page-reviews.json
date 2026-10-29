@@ -655,7 +655,7 @@
         "docs/content-upgrade/reviews/2026-10-28-git-quiz-code-render-p12i.md",
         "docs/content-upgrade/reviews/2026-10-28-git-internals-full-source-p12j.md"
       ],
-      "acceptance_refs": ["docs/content-upgrade/reviews/2026-10-29-git-internals-acceptance.md"],
+      "acceptance_refs": ["docs/content-upgrade/reviews/2026-10-29-git-internals-acceptance.md#lead-acceptance"],
       "independent_statuses": {
         "page_presence": "pass",
         "structural_checks": "pass",
