@@ -97,6 +97,12 @@ Static Pods are an exception to ordinary Pod configuration. A static Pod is defi
 
 Optional references are another boundary worth designing deliberately. Kubernetes lets you mark some ConfigMap or Secret references as optional, which can be helpful during phased rollouts when a value may not exist in every environment yet. The risk is that optional references can hide a real deployment error until application startup, where the symptom looks like a confusing missing file or empty variable. Use optional references for planned compatibility windows, not as a way to silence manifest validation.
 
+When a required ConfigMap or key is missing, a Pod cannot start with that
+reference; a missing required Secret or Secret key can also prevent startup.
+Inspect the Pod's events and compare the object name, key and namespace before
+changing anything. A missing reference is one possible cause, not a conclusion
+from the waiting state alone. Revisit [Pod diagnosis](../module-1.3-pods/#diagnosing-pod-failures-without-guessing).
+
 Before running this, what output do you expect from a Secret created with `stringData`? The important prediction is that a later `kubectl get secret -o yaml` will not show `stringData`; it will show base64 values under `data`. If that surprises you, pause before putting Secrets into review workflows, because reviewers may see encoded text and incorrectly assume it is protected from disclosure.
 
 ## Creating ConfigMaps and Secrets
@@ -312,7 +318,7 @@ graph TD
     VOL --- N2
 ```
 
-This flow explains why a rollout plan must include both the Kubernetes delivery mechanism and the application reload mechanism. Kubernetes can update a file, but it cannot force arbitrary application code to reread that file. Kubernetes can create an environment variable, but it cannot change a process environment after startup. The best production designs make that behavior explicit by using versioned object names, checksums in Pod template annotations, reload sidecars, or application-native reload endpoints depending on the reliability requirements.
+This flow explains why a rollout plan must include both the Kubernetes delivery mechanism and the application reload mechanism. Kubernetes can update a file, but it cannot force arbitrary application code to reread that file. Kubernetes can create an environment variable, but it cannot change a process environment after startup. Make that behavior explicit with versioned object names, reload sidecars, or application-native reload endpoints according to the application's needs.
 
 Tools can automate the restart side of this problem by changing the Pod template when a referenced object changes. For example, [Kustomize's ConfigMap generator](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#generate-configmaps-from-files) adds a content hash to the generated name. Updating a workload reference to the new name makes the dependency visible in its Pod template. The tradeoff is that configuration edits can restart workloads, so decide whether a value needs live reload, a rollout, or a maintenance window.
 
@@ -367,9 +373,53 @@ spec:
 
 This Pod keeps the original application interface simple: the process receives the cache setting and password as environment variables. That is acceptable for many beginner labs, but a production review should ask whether the password could appear in crash output, thread dumps, or debugging bundles. If the application supports reading a credential file, a mounted Secret is often preferable. If the application can reload configuration files, a mounted ConfigMap may reduce restart pressure during incident response.
 
-The operational win is that the image `myapp:v1` can move through environments without being rebuilt. A staging namespace can provide one ConfigMap and Secret, while production provides different objects with the same keys. If the production password rotates, the Secret changes and the workload rolls; the application image remains the same. That is the difference between configuration as an operational input and configuration as a hidden dependency inside a release artifact.
+The operational win is that the image `myapp:v1` can move through environments without being rebuilt. A staging namespace can provide one ConfigMap and Secret, while production provides different objects with the same keys. If the production password rotates, update the Secret and intentionally roll the workload so its environment-based credential is refreshed; changing the Secret alone does not start a rollout. The application image remains the same.
 
-When an application expects several files in one directory, projected volumes prevent awkward directory juggling. A projected volume can combine ConfigMaps, Secrets, service account tokens, and downward API data into a single mounted path. The application sees one directory, while Kubernetes preserves the separate ownership and sensitivity of each source object. That is especially useful for older software that expects `/opt/app/config` to contain a config file, a certificate, and a password file side by side.
+When an application expects several files in one directory, a projected volume can combine ConfigMaps, Secrets, service account tokens, and downward API data into a single mounted path. The source objects remain separate API resources, but a process that can read the projected Secret file can read its contents. Combining sources does not make that file safe to expose. This layout can serve software that expects configuration and credential files side by side.
+
+This reference Pod combines three sources into one directory. It assumes the
+synthetic `app-config` with key `LOG_LEVEL` and `app-secret` with key `DB_PASS`
+from Task 1 already exist in the same exercise namespace. The distinct paths
+avoid overwriting one another: `log-level` comes from the ConfigMap, `password`
+from the placeholder Secret, and `pod-name` from the Pod's own metadata. Use
+only the lab's non-real placeholder; access to the mounted file exposes it.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: projection-demo
+spec:
+  containers:
+  - name: demo
+    image: busybox:1.36.1
+    command: ['sh', '-c', 'sleep 3600']
+    volumeMounts:
+    - name: settings
+      mountPath: /etc/demo-settings
+      readOnly: true
+  volumes:
+  - name: settings
+    projected:
+      sources:
+      - configMap:
+          name: app-config
+          items:
+          - key: LOG_LEVEL
+            path: log-level
+      - secret:
+          name: app-secret
+          items:
+          - key: DB_PASS
+            path: password
+      - downwardAPI:
+          items:
+          - path: pod-name
+            fieldRef:
+              fieldPath: metadata.name
+```
+
+The [projected-volume documentation](https://v1-35.docs.kubernetes.io/docs/concepts/storage/projected-volumes/) describes the supported sources and namespace boundary. Seeing a file shows what is available to the container; it does not show that an application has reread it.
 
 ## Security Reality: Secrets Are a Boundary, Not a Vault
 
@@ -431,7 +481,7 @@ These patterns scale because they reduce ambiguity. A new engineer can inspect a
 | Pattern: immutable shared config | Many Pods consume a value that rarely changes. | Kubelet and API server watch pressure decreases in large clusters. | Set `immutable: true` and replace the object with a new version when needed. |
 | Anti-pattern: plaintext Secrets in Git | Teams want declarative manifests but skip secret-specific tooling. | Repository access becomes credential access, and history keeps old leaked values. | Use sealed, external, or operator-synchronized secret workflows. |
 | Anti-pattern: broad Pod creation rights | A user or job needs deployment convenience in a shared namespace. | Pod creation can become indirect access to mounted Secrets. | Scope RBAC, separate namespaces, and enforce admission policies. |
-| Anti-pattern: `subPath` for live config | A team wants one file mounted into an existing directory. | The file stops receiving kubelet refreshes after the initial bind mount. | Mount the whole directory or roll Pods intentionally after updates. |
+| Anti-pattern: `subPath` for live config | A team wants one file mounted into an existing directory. | The mounted file does not receive updates in the running container. | Mount the whole directory or roll Pods intentionally after updates. |
 
 ## Decision Framework
 
@@ -552,6 +602,39 @@ Pod creation can become indirect Secret access. The user can create a Pod that r
 <details><summary>A legacy application needs a 5 MiB configuration file. Should you store it in a standard ConfigMap?</summary>
 
 No. ConfigMap data and Secret payloads each have a 1 MiB limit, and pushing multi-mebibyte payloads through the Kubernetes API harms the wrong components. A better design uses an image layer, persistent volume, object-store download, init container, or another delivery mechanism built for larger artifacts. The deciding factor is whether the file is code-like, data-like, environment-specific, or sensitive. ConfigMaps are for configuration state, not bulk file distribution.
+
+</details>
+
+## Apply the Concepts
+
+Use these checks to practice diagnosing references and composing a projected volume.
+
+<details><summary>A Pod cannot start after a ConfigMap key was renamed. The Pod still requests the old required key. What should you inspect and change?</summary>
+
+Inspect the Pod's events and compare its referenced object and key with the
+ConfigMap in the Pod's namespace. If the key is missing and the reference is
+required, correct the reference or restore the intended key after confirming
+ownership. A waiting Pod alone does not prove that this is the cause.
+
+</details>
+
+<details><summary>A Pod in namespace A needs a ConfigMap that exists only in namespace B. Would a cross-namespace reference work? Would making this a static Pod solve it?</summary>
+
+Ordinary Pod ConfigMap references use an object in the Pod's own namespace.
+Provide the intended configuration in namespace A through an authorized
+workflow. A static Pod is not a workaround: its spec cannot reference API
+objects such as ConfigMaps or Secrets. Choose a compatible node-level delivery
+design if a static Pod is required.
+
+</details>
+
+<details><summary>Configure one projected directory with `LOG_LEVEL` as `log-level`, `DB_PASS` as `password`, and the Pod name as `pod-name`. Which source and field belongs in each entry? Does seeing an updated file prove the application reloaded it?</summary>
+
+Use a `configMap` item for key `LOG_LEVEL` at path `log-level`, a `secret` item
+for key `DB_PASS` at path `password`, and a `downwardAPI` item with
+`fieldRef.fieldPath: metadata.name` at path `pod-name`. The paths are separate
+within the same mount. Reading a changed file does not prove the application
+reread or applied it.
 
 </details>
 
@@ -784,6 +867,7 @@ Success criteria:
 - [Kubernetes v1.35: Managing Secrets using kubectl](https://v1-35.docs.kubernetes.io/docs/tasks/configmap-secret/managing-secret-using-kubectl/)
 - [Kubernetes v1.35: Immutable Secrets](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/secret/#secret-immutable) and [ConfigMap details](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/configmap/#configmap-object)
 - [Kubernetes v1.35: Static Pods](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/static-pod/) and [kubelet](https://v1-35.docs.kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
+- [Kubernetes v1.35: Linux node security](https://v1-35.docs.kubernetes.io/docs/concepts/security/linux-security/) and [Windows node security](https://v1-35.docs.kubernetes.io/docs/concepts/security/windows-security/)
 - [Kubernetes v1.35: kubectl create configmap](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_configmap/) and [create secret generic](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_secret_generic/)
 - [The Twelve-Factor App: Config](https://12factor.net/config)
 
