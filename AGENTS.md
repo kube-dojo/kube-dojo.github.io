@@ -30,6 +30,10 @@ review gates below. Preserve the requested scope and any explicit LOC budget.
   Preserve unrelated pre-existing primary dirty files. Full READY closeout
   (remove worktree, delete branches) is in
   `agents_extensions/shared/skills/drive-epic/SKILL.md` → Worktree criteria.
+- Register each new worktree and task-owned temporary/evidence path before
+  creation, and follow `docs/ops/workspace-hygiene.md` for audit, retention and
+  closeout. Run the read-only audit at packet, merge and handoff milestones;
+  audit output is not deletion authority.
 - Use `apply_patch` for manual edits. Do not revert others' work or delete files
   or worktrees without explicit instructions.
 - Stage explicit files. Exclude runtime output: `.pipeline/state.yaml`,
