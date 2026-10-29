@@ -3231,11 +3231,14 @@ def test_git_cleanup_report_fails_closed(tmp_path: Path, monkeypatch) -> None:
     _git(repo, "config", "branch.bare_gone.remote", "origin")
     _git(repo, "config", "branch.bare_gone.merge", "refs/heads/bare_gone")
     _git(repo, "branch", "bare_merged", "main")
+    _git(repo, "tag", "main", "gone")
+    _git(repo, "tag", "clean", "refs/heads/clean")
+    _git(repo, "tag", "dirty", "refs/heads/dirty")
     locked = tmp_path / "locked"
     detached = tmp_path / "detached"
-    _git(repo, "worktree", "add", "-b", "locked", str(locked), "main")
+    _git(repo, "worktree", "add", "-b", "locked", str(locked), "refs/heads/main")
     _git(repo, "worktree", "lock", str(locked))
-    _git(repo, "worktree", "add", "--detach", str(detached), "main")
+    _git(repo, "worktree", "add", "--detach", str(detached), "refs/heads/main")
     real_counts = local_api._worktree_dirty_counts
     monkeypatch.setattr(
         local_api, "_worktree_dirty_counts",
@@ -3277,6 +3280,27 @@ def test_git_cleanup_inventory_failure_blocks_branches(tmp_path: Path, monkeypat
     assert report["prunable_worktrees"] == []
     assert "worktree-inventory-unavailable" in report["review_worktrees"][1]["blockers"]
     assert report["blockers"] == ["worktree-inventory-unavailable"]
+
+
+def test_git_cleanup_reports_failed_git_probes(tmp_path: Path, monkeypatch) -> None:
+    _seed_commit(tmp_path)
+    _git(tmp_path, "branch", "merged")
+    run = local_api.subprocess.run
+    failed = {"command": "worktree"}
+
+    def failing(cmd, **kwargs):
+        if cmd[1] == failed["command"] or (failed["command"] == "upstream" and "--format=%(refname)\t%(upstream:track)" in cmd):
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="unavailable")
+        return run(cmd, **kwargs)
+
+    monkeypatch.setattr(local_api.subprocess, "run", failing)
+    for command, blocker in (("worktree", "worktree-inventory-unavailable"),
+                             ("for-each-ref", "merge-inventory-unavailable"),
+                             ("upstream", "upstream-inventory-unavailable")):
+        failed["command"] = command
+        report = local_api.build_git_cleanup_report(tmp_path)
+        assert not report["prunable_branches"] and not report["prunable_worktrees"]
+        assert blocker in report["blockers"]
 
 
 def _stash_with_date(repo: Path, ts: int, message: str) -> None:

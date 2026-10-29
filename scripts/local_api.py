@@ -1303,24 +1303,27 @@ def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
     or inspected separately before any retirement.
     """
     merged: set[str] = set()
+    probe_blockers: list[str] = []
     try:
         r = subprocess.run(
-            ["git", "branch", "--merged", "main", "--format=%(refname:short)"],
+            ["git", "for-each-ref", "--merged", "refs/heads/main", "--format=%(refname)", "refs/heads/"],
             cwd=repo_root, capture_output=True, text=True, check=False, timeout=5,
         )
         if r.returncode == 0:
             for name in r.stdout.splitlines():
                 name = name.strip()
-                if name and name != "main":
+                if name and name != "refs/heads/main":
                     merged.add(name)
+        else:
+            probe_blockers.append("merge-inventory-unavailable")
     except (OSError, subprocess.TimeoutExpired):
-        pass
+        probe_blockers.append("merge-inventory-unavailable")
 
     gone: set[str] = set()
     try:
         r = subprocess.run(
             ["git", "for-each-ref",
-             "--format=%(refname:short)\t%(upstream:track)",
+             "--format=%(refname)\t%(upstream:track)",
              "refs/heads/"],
             cwd=repo_root, capture_output=True, text=True, check=False, timeout=5,
         )
@@ -1329,19 +1332,21 @@ def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
                 parts = line.rstrip().split("\t", 1)
                 if len(parts) == 2 and "[gone]" in parts[1]:
                     gone.add(parts[0])
+        else:
+            probe_blockers.append("upstream-inventory-unavailable")
     except (OSError, subprocess.TimeoutExpired):
-        pass
+        probe_blockers.append("upstream-inventory-unavailable")
 
     wt_result = build_worktrees_list(repo_root)
     wt_list = wt_result.get("worktrees", [])
-    checked_out = {wt.get("branch") for wt in wt_list}
+    checked_out = {f"refs/heads/{wt['branch']}" for wt in wt_list if wt.get("branch")}
     # A failed worktree inventory cannot establish whether a branch is active.
-    prunable = sorted(merged - checked_out) if wt_result.get("ok") and wt_list else []
+    if not wt_result.get("ok") or not wt_list:
+        probe_blockers.append("worktree-inventory-unavailable")
+    prunable = sorted(merged - checked_out) if not probe_blockers else []
     reasons: dict[str, list[str]] = {}
     for b in merged:
-        r_ = []
-        if b in merged:
-            r_.append("merged")
+        r_ = ["merged"]
         if b in gone:
             r_.append("upstream-gone")
         reasons[b] = r_
@@ -1351,10 +1356,9 @@ def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
     primary = wt_list[0].get("path") if wt_list else None
     for wt in wt_list:
         br = wt.get("branch")
+        ref = f"refs/heads/{br}" if br else None
         counts = wt.get("counts")
-        blockers = []
-        if not wt_result.get("ok"):
-            blockers.append("worktree-inventory-unavailable")
+        blockers = probe_blockers.copy()
         if wt.get("path") == primary:
             blockers.append("primary-worktree")
         if Path(wt.get("path", "")).resolve() == repo_root.resolve():
@@ -1367,26 +1371,26 @@ def build_git_cleanup_report(repo_root: Path) -> dict[str, Any]:
             blockers.append("status-unknown")
         elif counts["total"] != 0:
             blockers.append("uncommitted-changes")
-        if br not in merged:
+        if ref not in merged:
             blockers.append("merge-unverified")
         if not blockers:
             prunable_worktrees.append({
                 "path": wt["path"],
                 "branch": br,
-                "reasons": reasons.get(br, []),
+                "reasons": reasons.get(ref, []),
             })
         else:
             review_worktrees.append({"path": wt.get("path"), "branch": br, "blockers": blockers})
 
     return {
         "ok": True,
-        "prunable_branches": [{"name": b, "reasons": reasons[b]} for b in prunable],
+        "prunable_branches": [{"name": b.removeprefix("refs/heads/"), "reasons": reasons[b]} for b in prunable],
         "prunable_worktrees": prunable_worktrees,
         "review_worktrees": review_worktrees,
         "review_branches": [
-            {"name": b, "blockers": ["merge-unverified"]} for b in sorted(gone - merged)
+            {"name": b.removeprefix("refs/heads/"), "blockers": ["merge-unverified"]} for b in sorted(gone - merged)
         ],
-        "blockers": [] if wt_result.get("ok") and wt_list else ["worktree-inventory-unavailable"],
+        "blockers": probe_blockers,
         "counts": {
             "branches": len(prunable),
             "worktrees": len(prunable_worktrees),
@@ -8669,9 +8673,11 @@ def build_session_briefing(repo_root: Path) -> dict[str, Any]:
         cleanup = build_git_cleanup_report(repo_root)
         cb = cleanup.get("counts", {}).get("branches", 0)
         cw = cleanup.get("counts", {}).get("worktrees", 0)
+        if cleanup.get("blockers"):
+            alerts.append(f"git hygiene inventory unavailable: {', '.join(cleanup['blockers'])}")
         if cb >= 5 or cw >= 2:
             alerts.append(
-                f"git hygiene: {cb} prunable branch(es), {cw} prunable worktree(s) "
+                f"git hygiene: {cb} branch and {cw} worktree candidate(s) for review "
                 "— review /api/git/cleanup and preserve ignored artifacts"
             )
     except Exception:
