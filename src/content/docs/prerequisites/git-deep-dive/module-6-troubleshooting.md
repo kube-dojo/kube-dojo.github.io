@@ -251,11 +251,11 @@ The raw form is intentionally simple. It prints a revision, author, date, and li
 git blame k8s/deployment.yaml
 ```
 
-Output:
+Illustrative output:
 
 ```text
-^e2f3g4h (Alice     2024-01-10 09:00:00 -0400   1) apiVersion: apps/v1
-^e2f3g4h (Alice     2024-01-10 09:00:00 -0400   2) kind: Deployment
+^e2f3a4b (Alice     2024-01-10 09:00:00 -0400   1) apiVersion: apps/v1
+^e2f3a4b (Alice     2024-01-10 09:00:00 -0400   2) kind: Deployment
 b9c8d7e6 (Bob       2024-02-15 14:30:00 -0400   3) metadata:
 b9c8d7e6 (Bob       2024-02-15 14:30:00 -0400   4)   name: payment-gateway
 ... (800 more lines)
@@ -267,7 +267,7 @@ Targeted blame is the practical version. If a readiness probe, `resources` block
 git blame -L 45,50 k8s/deployment.yaml
 ```
 
-The regular-expression form is especially helpful in Kubernetes manifests because the same concepts appear repeatedly across containers, init containers, sidecars, and templates. The command below finds the first `resources:` line and annotates it plus the next ten lines, which is often enough to cover requests and limits without manually counting from the top of the file.
+The regular-expression form is especially helpful in Kubernetes manifests because the same concepts appear repeatedly across containers, init containers, sidecars, and templates. The command below finds the first `resources:` line and annotates ten lines total, beginning with that match, which is often enough to cover requests and limits without manually counting from the top of the file.
 
 ```bash
 git blame -L '/resources:/',+10 k8s/deployment.yaml
@@ -279,34 +279,40 @@ Whitespace-only rewrites are where naive blame becomes actively misleading. A fo
 git blame -w k8s/deployment.yaml
 ```
 
-Large repositories often make this policy durable with `.git-blame-ignore-revs`. If the team performed a repository-wide YAML reformat, you can place that commit hash in the ignore file and configure Git to skip it during blame. This keeps future investigations focused on meaningful authorship instead of repeatedly rediscovering the same formatting event.
+A repository can make this policy durable with `.git-blame-ignore-revs`. If the team performed a repository-wide YAML reformat, put its full, unabbreviated commit object name on a line in the ignore file and configure Git to skip it during blame. This keeps future investigations focused on meaningful authorship instead of repeatedly rediscovering the same formatting event.
 
 ```bash
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
-Movement is the second trap. A standard blame follows the current file path, so it may credit the person who moved a block into a new file rather than the person who designed the block. That distinction matters when a Helm helper, storage stanza, or security policy was copied during a refactor and later becomes suspicious during an outage.
+Movement is the second trap. Standard blame automatically follows whole-file renames, but it may credit the person who moved a block into a new file rather than the person who designed the block. That distinction matters when a Helm helper, storage stanza, or security policy was copied during a refactor and later becomes suspicious during an outage.
 
 ```bash
-git blame -C k8s/charts/payment/_ingress.tpl
+git blame -C -C k8s/charts/payment/_ingress.tpl
 ```
 
-The `-C` option asks Git to detect copied or moved lines. Repeating it makes the search more aggressive across commits and files, which costs more time on very large repositories but can recover authorship through complicated refactors. Use the expensive form when the answer is operationally important enough to justify the extra work.
+The `-C` option asks Git to detect copied or moved lines. One `-C` examines other files modified in the same commit; a second also considers other files when the target was created, and a third considers other files in any commit. These are similarity heuristics, not guaranteed provenance. Choose the scope that matches the suspected refactor, then inspect the attributed source commit before treating the result as an explanation.
 
-```bash
-# Standard blame shows the refactoring commit:
-c8d7e6f5 (Bob       2024-03-01 10:00:00 -0400 12) {{ include "mychart.labels" . | nindent 4 }}
+Illustrative comparison (only the last line shown; hashes vary):
 
-# Blame with -C -C pierces the veil to find the true author:
-a1b2c3d4 (Alice     2023-11-15 09:15:00 -0400 12) {{ include "mychart.labels" . | nindent 4 }}
+```text
+# Standard blame:
+...
+8458a05 (Bob 2024-03-01 10:00:00 -0400 12) {{ include "mychart.labels" . | nindent 4 }}
+
+# With -C -C:
+...
+^4f5866d k8s/charts/payment/_helpers.tpl (Alice 2023-11-15 09:15:00 -0400 12) {{ include "mychart.labels" . | nindent 4 }}
 ```
+
+When blame attributes a line to a different file, its default output includes that source path. The extra path column identifies where Git traced the line; inspect that source commit before drawing a conclusion.
 
 **Pause and predict:** You are auditing a `securityContext` block that appears to allow a container to run with more privilege than expected. Standard blame names a Jenkins user, and the commit message says it converted YAML indentation from four spaces to two. Which approach would you choose here and why?
 
 <details>
 <summary>Check your prediction</summary>
 
-A defensible answer combines `git blame -w` with `-C` when movement is possible, because whitespace ignores the formatter while copy detection follows the block through refactors.
+A defensible answer combines `git blame -w` with `-C` when movement is possible, because `-w` ignores whitespace-only formatter changes and copy detection may trace the block through refactors; inspect the candidate commits.
 
 </details>
 
@@ -314,7 +320,7 @@ Write the flags before you continue. The next paragraph is about what to do afte
 
 The outcome you want from blame is a better next question. Once you identify the original commit, read the commit message, inspect the surrounding diff, and look for the linked issue or pull request. A suspicious line may have been a legitimate emergency workaround that never received a cleanup issue, or it may reveal a misunderstanding that deserves a test. Blame gives you coordinates in history; engineering judgment decides what to do with them.
 
-Blame also benefits from path awareness. If a file was renamed, a plain command against the current path can miss context that lived under an older name, while log commands with `--follow` or copy-detection options can provide clues about the rename boundary. In review conversations, present blame output with humility: "this line last changed here" is a fact, but "this person caused the outage" is a much larger claim. The goal is to recover design intent, not to reduce a complex system failure to a name beside a line.
+Blame also benefits from path awareness. Plain blame follows whole-file renames automatically; copied or moved portions between files require additional heuristics such as `-C`. Log commands with `--follow` can provide further clues about rename boundaries. In review conversations, present blame output with humility: "this line last changed here" is a fact, but "this person caused the outage" is a much larger claim. The goal is to recover design intent, not to reduce a complex system failure to a name beside a line.
 
 ## Section 4: Searching Ghost Changes with Pickaxe Queries
 
@@ -326,7 +332,7 @@ The `-S` option searches historical diffs for commits where the number of occurr
 git log -S "DB_MAX_CONNECTIONS" --oneline
 ```
 
-Output:
+Illustrative output:
 
 ```text
 f9a8b7c Remove legacy database connection limits
@@ -335,33 +341,29 @@ a1b2c3d Add explicit connection limits for stability
 
 That result gives you a concise timeline, but an incident investigator usually needs the patch as well. Pairing Pickaxe with `--patch` or following up with `git show` reveals the exact context. The goal is not only to know who removed `DB_MAX_CONNECTIONS`, but to understand whether the removal was part of a planned connection-pooling change, an accidental cleanup, or a risky attempt to reduce resource pressure.
 
-The `-G` option answers a broader question. Instead of counting occurrences of one exact string, it searches diff lines with a regular expression. This is useful when the value changes over time or the exact text is unknown. CPU limits, memory quantities, port numbers, hostnames, and API versions are often better searched by pattern than by one literal value.
+The `-G` option answers a different question. Instead of counting occurrences of one exact string, it matches added or removed diff lines with a regular expression; unchanged context lines do not select a commit. Use a pattern when investigating changing values such as CPU limits, memory quantities, port numbers, hostnames, or API versions.
 
-`git log -G` and `git log -S` use POSIX extended regular expressions (ERE), not PCRE, so use `[[:space:]]` instead of `\s` for whitespace.
+`git log -G` uses POSIX extended regular expressions (ERE), so use `[[:space:]]` instead of `\s` for whitespace. `-S` searches a literal string by default; `--pickaxe-regex` changes it to an extended regular expression.
 
 ```bash
 git log -G "cpu:[[:space:]]*[0-9]+m" --oneline -p
 ```
 
-Output snippet:
+Illustrative output snippet:
 
 ```diff
-commit e4d3c2b1
-Author: SRE Team <sre@example.com>
-Date:   Mon Nov 05 11:20:00 2024 -0400
-
-    feat: scale up frontend resources for holiday traffic
-
+06984f7 feat: scale up frontend resources for holiday traffic
 diff --git a/k8s/frontend-deployment.yaml b/k8s/frontend-deployment.yaml
+index 32f6435..e432064 100644
 --- a/k8s/frontend-deployment.yaml
 +++ b/k8s/frontend-deployment.yaml
-@@ -45,7 +45,7 @@
-         resources:
-           requests:
-             cpu: 100m
-           limits:
--            cpu: 200m
-+            cpu: 500m
+@@ -46,4 +46,4 @@ resources:
+   requests:
+     cpu: 100m
+   limits:
+-    cpu: 200m
++    cpu: 500m
+...
 ```
 
 **Pause and predict:** If `git grep "DB_MAX_CONNECTIONS"` returns no matches, does that prove the repository never contained the variable?
@@ -369,7 +371,7 @@ diff --git a/k8s/frontend-deployment.yaml b/k8s/frontend-deployment.yaml
 <details>
 <summary>Check your prediction</summary>
 
-It does not. It proves only that the currently searched snapshot lacks the string. A Pickaxe query against history is the right tool when the suspected evidence may have been added and removed before you looked. A snapshot search answers whether the text exists in this tree. A Pickaxe search answers which commits changed the presence of that text.
+It does not. It proves only that the searched tracked working-tree files lack the string. A Pickaxe query against history is the right tool when the suspected evidence may have been added and removed before you looked. A snapshot search answers whether the text exists in a selected tree. `-S` selects occurrence-count changes, while `-G` selects matching added or removed lines.
 
 </details>
 
@@ -377,16 +379,16 @@ Write yes or no before you continue. Two search questions can sound alike during
 
 | Command | What it Searches | Use Case |
 | :--- | :--- | :--- |
-| **`git log -S "password"`** | Searches the *history of changes* (diffs) across all commits. | "Find me the commit where this string was added or removed." |
-| **`git grep "password"`** | Searches the *current snapshot* (the files) of the specified commit. | "Does this string exist in the codebase right now?" |
+| **`git log -S "password"`** | Searches diffs reachable from the selected revision (HEAD by default). | "Find me the commit where this string was added or removed." |
+| **`git grep "password"`** | Searches tracked working-tree files by default, or a specified tree object. | "Does this string exist in the codebase right now?" |
 
-Security investigations make this difference concrete. If an AWS example key such as `AKIAIOSFODNN7EXAMPLE` was committed in a tutorial manifest and removed later, `git grep` may return nothing from the current tree. `git log -S "AKIAIOSFODNN7EXAMPLE"` can still reveal the add and remove commits, which lets the team evaluate exposure, credential rotation needs, and whether similar patterns exist elsewhere in history. Treat historical secrets as incidents even when the current branch is clean.
+Security investigations make this difference concrete. Suppose the synthetic token `EXAMPLE_ONLY_CREDENTIAL` was committed in a tutorial manifest and removed later. `git grep` may return nothing from tracked working files, while `git log -S "EXAMPLE_ONLY_CREDENTIAL"` can reveal add and remove commits reachable from the selected revision. This placeholder is not a live credential. If actual credentials were exposed, investigate their validity and remediation separately; deleting text from the current branch does not erase earlier commits.
 
 Pickaxe queries become even more powerful when you combine them with path limits and date filters. If a deprecated API version appears in old Kubernetes overlays, searching the entire repository history may return too much noise. Adding `-- k8s/prod/` or narrowing the date range makes the result closer to the operational question you need answered. Start broad when you are not sure where the evidence lives, then narrow only after you see enough matches to understand the shape of the history.
 
 ## Section 5: Scanning Snapshots Quickly with `git grep`
 
-When the evidence exists in the current tree, `git grep` is usually the right search tool. It understands the repository, searches tracked content efficiently, and avoids many irrelevant directories that a generic recursive `grep` command may stumble through. In infrastructure repositories, that matters because generated output, dependency directories, virtual environments, and build artifacts can be large enough to make ordinary search slow and noisy.
+When the evidence exists in the current tree, use `git grep` to search tracked working-tree files by default. Untracked build output, dependency directories, and virtual environments are excluded from that default search; tracked generated files are still included. Check this scope before interpreting an empty result, because it says nothing about untracked files or earlier snapshots.
 
 `git grep` also searches arbitrary Git tree objects without checking them out. That ability is valuable when a teammate asks you to review a branch, when you need to compare a release tag with `main`, or when you want to search a remote tracking branch while keeping your local changes untouched. You are searching Git's stored snapshots directly rather than rearranging your working directory.
 
@@ -396,19 +398,19 @@ Suppose a teammate says they added a `PodDisruptionBudget` on their feature bran
 git grep "kind: PodDisruptionBudget" origin/feature-ha-setup
 ```
 
-Output:
+Illustrative output:
 
 ```text
 origin/feature-ha-setup:k8s/infra/pdb-frontend.yaml:kind: PodDisruptionBudget
 ```
 
-`git grep` also supports boolean expressions. If you are auditing services and need to find manifests that include both `kind: Service` and `type: LoadBalancer`, an ordinary search for either string is too broad. Combining expressions lets you turn a noisy text scan into a practical infrastructure query.
+`git grep --and` combines expressions on the same line. To find files containing both patterns on possibly different lines, use `--all-match` with `-l` and separate `-e` patterns. A file may contain multiple YAML objects, so inspect the result to establish whether both fields belong to the same Service.
 
 ```bash
-git grep -e "kind: Service" --and -e "type: LoadBalancer"
+git grep --all-match -l -e "kind: Service" -e "type: LoadBalancer"
 ```
 
-You can push the idea further by asking Git for every commit and searching those trees, although this should be used deliberately on large repositories. The command below searches all reachable commits for a deprecated Kubernetes API version, which is useful during upgrade readiness work when you need to find old branches or historical manifests that still mention a removed API.
+You can push the idea further by asking Git for every commit and searching those trees. The command below searches commits reachable from all refs for the historical `policy/v1beta1` API spelling. Prefer a bounded revision list when investigating a specific release. For example, PodDisruptionBudget stopped being served at `policy/v1beta1` in Kubernetes 1.25; searching history does not establish current release readiness.
 
 ```bash
 git grep "apiVersion: policy/v1beta1" $(git rev-list --all)
@@ -432,18 +434,18 @@ kubectl get deploy,svc,pdb -n payments
 kubectl describe deploy payment-gateway -n payments
 ```
 
-Do not confuse repository search with cluster truth. A manifest branch may contain a `PodDisruptionBudget`, while the cluster lacks it because the branch was never applied, a GitOps controller is paused, or an overlay excludes the file. Strong troubleshooting usually alternates between Git evidence and Kubernetes evidence until the two timelines line up.
+Do not confuse repository search with cluster truth. A manifest branch may contain a `PodDisruptionBudget` that was never applied. Automatic sync might be disabled in Argo CD, or the deployment's Kustomize configuration might not include that manifest among its resources. Compare the rendered configuration, synchronization settings, and current API objects to locate where the intended state stopped reaching the cluster.
 
-The reverse is also true: a cluster can contain resources that the current repository no longer describes. Someone may have applied a hotfix manually, an old controller may have left orphaned objects behind, or a migration may have moved ownership to another repository. When Git search and cluster inspection disagree, resist the urge to declare one side wrong immediately. Instead, ask which reconciliation mechanism should connect them, then inspect that mechanism's logs, commit references, and applied revision metadata.
+The reverse is also true: a cluster can contain resources that the current repository no longer describes. Someone may have applied a hotfix manually, or deletion of an owner object may have explicitly orphaned its dependents. Kubernetes ownership here means API owner references, not which repository maintains a manifest. When Git search and cluster inspection disagree, ask which reconciliation mechanism should connect them, then inspect that mechanism's logs, commit references, and applied revision metadata.
 
 ## Section 6: Building Audit Trails with Filtered History
 
 Troubleshooting often ends with a broader accountability question: what changed in the production manifests during the period when risk increased? Git's log filters let you answer that question without exporting the whole repository history into a spreadsheet first. You can filter by author, date, path, and output format, then combine those filters into a report that is narrow enough for an auditor or incident lead to read.
 
-Author and date filters are straightforward when the question is about a person or team. The command below asks for commits by a contractor account since the beginning of a month. In real environments, remember that author names are not identity proof by themselves; they are useful Git metadata that should be correlated with pull request review, signed commits, deployment logs, or access-control records when the stakes are high.
+Author and date filters are straightforward when the question is about a person or team. The command below asks for commits by a contractor account since the beginning of a month in UTC. In real environments, remember that author names are not identity proof by themselves; they are useful Git metadata that should be correlated with pull request review, signed commits, deployment logs, or access-control records when the stakes are high.
 
 ```bash
-git log --author="contractor.name" --since="2024-10-01" --oneline
+git log --author="contractor.name" --since="2024-10-01T00:00:00+00:00" --oneline
 ```
 
 Path filters keep the report focused on the files that matter. If the production incident concerns `config/settings.yaml`, the application source commits are distracting even if they happened in the same week. The double dash separates revision options from paths, which prevents ambiguous names from being interpreted as branches or flags.
@@ -456,43 +458,43 @@ For a compliance report, commit messages are rarely enough. You often need the c
 
 ```bash
 git log \
-  --since="2023-12-20" \
-  --until="2024-01-02" \
+  --since-as-filter="2023-12-20T00:00:00+00:00" \
+  --until="2024-01-02T23:59:59+00:00" \
   --name-status \
   -- k8s/prod/
 ```
 
-Output:
+Illustrative output:
 
 ```text
-commit d4c3b2a1
+commit d4c3b2a1d4c3b2a1d4c3b2a1d4c3b2a1d4c3b2a1
 Author: DevOps Bot <bot@example.com>
-Date:   Wed Dec 27 03:00:00 2023 -0400
+Date:   Tue Jan 2 14:05:00 2024 +0000
 
     Automated image tag update for frontend
 
-M       k8s/prod/frontend-deployment.yaml
-A       k8s/prod/frontend-configmap.yaml
+A	k8s/prod/frontend-configmap.yaml
+M	k8s/prod/frontend-deployment.yaml
 ```
 
-If the report needs to flow into a SIEM, spreadsheet, or incident database, format it directly from Git rather than hand-copying terminal output. The `--pretty=format` placeholders below produce a simple comma-separated view with short hash, author name, author date, and subject. For richer automation, prefer a delimiter that cannot appear in commit subjects, but this form is easy to read during a module exercise.
+For a readable report, format the selected metadata directly from Git rather than hand-copying terminal output. The `--pretty=format` placeholders below produce short hash, author name, author date, and subject separated by commas. This is a display format, not escaped CSV: names and subjects can themselves contain commas. For automated ingestion, define an unambiguous record format and parser instead of splitting this display on commas.
 
 ```bash
-git log --since="2024-01-01" --pretty=format:"%h,%an,%ad,%s" --date=short -- k8s/
+git log --since="2024-01-01T00:00:00+00:00" --pretty=format:"%h,%an,%ad,%s" --date=short -- k8s/
 ```
 
-Output:
+Illustrative output:
 
 ```text
 a1b2c3d,Alice Engineer,2024-01-15,Update ingress rules
-e4f5g6h,Bob Developer,2024-01-12,Fix typo in deployment
+e4f5a6b,Bob Developer,2024-01-12,Fix typo in deployment
 ```
 
 A strong audit trail usually includes the question, the command, the boundaries, and the interpretation. For example, "all commits touching `k8s/prod/` during the holiday change freeze" is stronger than "recent manifest changes" because it defines a path and a date range. If the team later challenges the result, you can rerun the exact command and discuss whether the boundary was right instead of arguing from memory.
 
-Hypothetical scenario: after a platform outage caused by a missing readiness probe, the team initially argues about whether the change bypassed review. A filtered log for the production overlay shows that the probe was removed in a small commit labeled as an image tag update, and `--name-status` reveals that the same commit changed an overlay patch file. The evidence shifts the conversation from personal suspicion to process repair: image automation needs a narrower write path, and review rules need to flag manifest field removal separately from image changes.
+Hypothetical scenario: after a platform outage, the team discovers a missing readiness probe and asks whether its removal bypassed review. Without a readiness probe, the kubelet's readiness check treats a started, running container as ready. A filtered log for the production overlay shows the removal in a commit labeled as an image tag update, and `--name-status` identifies an overlay patch file changed by that commit. Inspecting the patch establishes the removed field; deployment evidence and application tests must establish its role in the outage. The review can then address automation write paths and manifest field removal.
 
-Filtered history is most persuasive when it is paired with boundaries that match the operational policy. If the organization has a change freeze from one date to another, use those exact dates. If the freeze applies only to production overlays, filter only those paths. If automation is allowed to update image tags but not probes, include file names and patches so the distinction is visible. A report that mirrors the policy language is easier for reviewers to evaluate than a broad dump of nearby commits.
+Filtered history should use explicit timestamp and timezone boundaries that match the operational policy. Git documents `--since` as more recent than its date and `--until` as older than its date. These filters compare committer timestamps; the default log's `Date:` line displays the author timestamp. Unlike `--since`, which can stop traversal at an older commit, `--since-as-filter` visits the whole range before filtering. Use it for exhaustive audits when timestamps may be out of order. Inspect both dates with `git show --no-patch --format=fuller <commit>` when checking boundaries. Record the intended interval, verify the resolved boundary, and restrict paths and inspect patches when the policy applies only to production overlays.
 
 ## Patterns & Anti-Patterns
 
