@@ -557,7 +557,7 @@ The value belongs in a Secret because disclosure would create a security inciden
 
 </details>
 
-<details><summary>A Secret mounted with `subPath` does not update after rotation, and the application keeps using the old credential. What is happening?</summary>
+<details><summary>A Secret mounted with <code>subPath</code> does not update after rotation, and the application keeps using the old credential. What is happening?</summary>
 
 A Secret mounted through `subPath` does not receive updates in the running container. The Secret object may be updated correctly in the API server, but the mounted file inside the existing container remains static. Restart or roll the Pod to pick up the changed value. For future live refresh, mount a directory without `subPath`, or use versioned Secrets with intentional rollouts.
 
@@ -618,7 +618,7 @@ Ordinary Pod ConfigMap references use an object in the Pod's own namespace. Prov
 
 </details>
 
-<details><summary>Configure one projected directory with `LOG_LEVEL` as `log-level`, `DB_PASS` as `password`, and the Pod name as `pod-name`. Which source and field belongs in each entry? Does seeing an updated file prove the application reloaded it?</summary>
+<details><summary>Configure one projected directory with <code>LOG_LEVEL</code> as <code>log-level</code>, <code>DB_PASS</code> as <code>password</code>, and the Pod name as <code>pod-name</code>. Which source and field belongs in each entry? Does seeing an updated file prove the application reloaded it?</summary>
 
 Use a `configMap` item for key `LOG_LEVEL` at path `log-level`, a `secret` item for key `DB_PASS` at path `password`, and a `downwardAPI` item with `fieldRef.fieldPath: metadata.name` at path `pod-name`. The paths are separate within the same mount. Reading a changed file does not prove the application reread or applied it.
 
