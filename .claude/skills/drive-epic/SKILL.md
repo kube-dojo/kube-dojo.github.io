@@ -52,6 +52,10 @@ criteria are proven — never on a single slice merge.
 Implementation, docs, skill, and script edits for a packet happen in a
 **git worktree**, never as WIP on primary `main`.
 
+Before any reap or READY removal, follow `docs/ops/workspace-hygiene.md`.
+Merged or detached status alone gives no removal authority; after verified
+removal, mark the worktree registry record `archived`.
+
 | Rule | Requirement |
 | --- | --- |
 | **Where** | Site: `.worktrees/<short-name>/`. Labs sister repo: `kubedojo-labs/.worktrees/<short-name>/`. |
@@ -59,7 +63,7 @@ Implementation, docs, skill, and script edits for a packet happen in a
 | **Primary** | Stays on `main` (or stated base). **Never** `checkout` / `switch` a feature branch in the primary dir; **never** commit packet WIP on primary `main`; **never** push to `main`. |
 | **Create** | `git fetch origin && git worktree add -b codex/<name> .worktrees/<name> origin/main` |
 | **One concern** | One worktree ≈ one PR / one packet. Do not pile unrelated epics into one tree. |
-| **Cap** | Honor the epic’s worktree/disk cap; quote it from the issue. Before fan-out: `git worktree list` + `df -h`; reap merged/detached trees first. |
+| **Cap** | Honor the epic’s worktree/disk cap; quote it from the issue. Before fan-out: `git worktree list` + `df -h`; assess eligible closeout under the hygiene policy. |
 | **Build exception** | `npm run build` / Astro validation runs from the **primary** checkout against the **intended revision** (worktree `node_modules` layout is shallow). Fetch/test that revision; do not pretend a primary build validates unmerged worktree files still only on disk. |
 | **Danger / dispatch** | `dispatch_smart` danger-mode and authors/reviewers run **in** the worktree path. |
 | **Closeout** | READY requires that packet’s worktree **removed** and branch deleted locally+remotely (see **C** below). |
@@ -207,11 +211,11 @@ Precedence: correctness → safety/resource bounds → critical path →
 utilization. After any dispatch or review ask, **before** holding, fill every
 free *compatible* lane. Idle free lane + ready item = utilization failure.
 Never manufacture busywork. Disk wins: `df -h` + `git worktree list` before
-fan-out; reap first.
+fan-out; assess closeout under the hygiene policy first.
 
 Honor the **active epic's** stated worktree/disk cap (quote it from the
 issue body — do not remember a number). Labs worktrees live in
-`kubedojo-labs/.worktrees/` and count separately — still reap merged ones.
+`kubedojo-labs/.worktrees/` and count separately — apply the same safety proof.
 Remove local `dist/` after validation.
 
 ### 3. Route by activity × live capacity

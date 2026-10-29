@@ -5,15 +5,22 @@ record ownership and next actions. Its `worktrees` object maps absolute paths
 to `owner`, `purpose`, `branch`, `head`, `state`, `next_action`, and `pr`
 (number or null). States are `active`, `blocked`, `ready_to_retire`, and
 `archived`. A blocked record also needs a concrete `reason`; its next action
-must name a check and a date or milestone. Do not infer legacy ownership.
+must name a check and a date or milestone. A triage owner is accountable for
+the next check; that assignment does not establish task ownership of the work.
+Do not infer legacy ownership.
 
 Before creating a worktree, record its intended path, owner, purpose, branch,
 starting head, state and next action; use a null PR until known. Confirm its
 actual branch and head immediately after creation and keep the record current.
+Sequence: audit existing work, register, create, confirm, then audit again.
+The accountable lead serializes registry writes to avoid lost updates.
 Before creating task-owned temporary or evidence paths, register their owner,
 purpose, retention (`retain`, `archive`, or `discard`) and next action in the
-`artifacts` object. A directory entry may cover a named evidence group; inventory
-its exact members before cleanup. Associate it with its packet and revision.
+`artifacts` object. A directory or pattern entry may cover an inventory group;
+the CLI does not expand patterns. Inventory exact members before cleanup. An
+exact-path entry governs that path; resolve conflicting overlapping groups
+manually before acting. Record packet and revision in the entry's purpose or
+next action, or in a linked manifest; the CLI does not validate that link.
 Retention is a decision record, not deletion authority. Prefer managed session
 storage for reusable helpers instead of accumulating unowned `/tmp` copies.
 
@@ -22,6 +29,10 @@ From the primary checkout run:
 ```sh
 .venv/bin/python scripts/ops/workspace_hygiene.py --check --github
 ```
+
+For another repository, including labs, use its own primary-checkout registry
+and inventory: invoke the site CLI with `--repo <labs-primary> --registry
+<labs-primary>/.agent/workspace-hygiene.json`. Do not mix repository records.
 
 Run it before creating the next packet, after merge and before declaring a
 packet complete, before a pause or handoff, and periodically during long runs.
