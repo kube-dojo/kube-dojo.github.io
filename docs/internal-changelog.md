@@ -4,6 +4,8 @@ This file mirrors the detailed per-module ship records that used to live in `src
 
 Cutoff: content prior to 2026-05-07 moved here on 2026-05-07.
 
+For the archived English What's New history and future detailed patch notes, see [changelog history](changelog-history.md).
+
 ---
 
 ---
