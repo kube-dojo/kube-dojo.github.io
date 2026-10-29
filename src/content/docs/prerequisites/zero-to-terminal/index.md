@@ -57,7 +57,7 @@ Several modules use a **restaurant kitchen** analogy to introduce these terms:
 | Server | A restaurant kitchen (handles requests) |
 | Cloud | Renting a commercial kitchen instead of building your own |
 
-Use the kitchen table as an optional orientation aid, not a literal model. A terminal presents a text interface; a shell interprets commands, and permissions control what they can do. CPUs can have many cores, not just one chef. A server may be a program serving requests or the computer running it. Cloud services can be public or private, and renting a kitchen does not capture that distinction. Disk storage can outlast a power-off, but can still fail or be lost: keep backups of important data. The technical explanations, platform notes, and exercises give the details; skip the analogy if it obscures them.
+Use the kitchen table as an optional orientation aid, not a literal model. A terminal presents a text interface; a shell interprets commands, and permissions control what they can do. CPUs [can have many cores](https://www.apple.com/newsroom/2024/10/apple-introduces-m4-pro-and-m4-max/), not just one chef. A server may be a program serving requests or the computer running it. Cloud services can be public or private, and renting a kitchen does not capture that distinction. Disk storage can outlast a power-off, but can still fail or be lost: keep backups of important data. The technical explanations, platform notes, and exercises give the details; skip the analogy if it obscures them.
 
 ---
 
@@ -75,7 +75,7 @@ Use the kitchen table as an optional orientation aid, not a literal model. A ter
 | 0.8 | [Servers and SSH](module-0.8-servers-and-ssh/) | 80–100 min | What servers are, how to connect remotely |
 | 0.9 | [Software and Packages](module-0.9-software-and-packages/) | 80–100 min | Installing and managing software from the terminal |
 | 0.10 | [What is the Cloud?](module-0.10-what-is-the-cloud/) | 80–100 min | Cloud computing, AWS/Azure/GCP, where K8s fits |
-| 0.11 | [Your First Server -- Putting It All Together](module-0.11-your-first-server/) | 90–120 min | Capstone: deploy a real website using everything you've learned |
+| 0.11 | [Your First Server -- Putting It All Together](module-0.11-your-first-server/) | 90–120 min | Capstone: serve and check a small website |
 
 These are planning estimates copied from the eleven module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **940–1220 minutes (about 15 hours 40 minutes–20 hours 20 minutes)**; individual setup, reading, and practice time will vary.
 
