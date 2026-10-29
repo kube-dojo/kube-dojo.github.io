@@ -97,13 +97,9 @@ Static Pods are an exception to ordinary Pod configuration. A static Pod is defi
 
 Optional references are another boundary worth designing deliberately. Kubernetes lets you mark some ConfigMap or Secret references as optional, which can be helpful during phased rollouts when a value may not exist in every environment yet. The risk is that optional references can hide a real deployment error until application startup, where the symptom looks like a confusing missing file or empty variable. Use optional references for planned compatibility windows, not as a way to silence manifest validation.
 
-When a required ConfigMap or key is missing, a Pod cannot start with that
-reference; a missing required Secret or Secret key can also prevent startup.
-Inspect the Pod's events and compare the object name, key and namespace before
-changing anything. A missing reference is one possible cause, not a conclusion
-from the waiting state alone. Revisit [Pod diagnosis](../module-1.3-pods/#diagnosing-pod-failures-without-guessing).
+When a required ConfigMap or key is missing, a Pod cannot start with that reference; a missing required Secret or Secret key can also prevent startup. Inspect the Pod's events and compare the object name, key and namespace before changing anything. A missing reference is one possible cause, not a conclusion from the waiting state alone. Revisit [Pod diagnosis](../module-1.3-pods/#diagnosing-pod-failures-without-guessing).
 
-Before running this, what output do you expect from a Secret created with `stringData`? Write your prediction before opening the answer.
+Before trying the `stringData` manifest in the next section, what output do you expect when you read the Secret back? Write your prediction before opening the answer.
 
 <details><summary>Check your prediction</summary>
 
@@ -383,12 +379,7 @@ The operational win is that the image `myapp:v1` can move through environments w
 
 When an application expects several files in one directory, a projected volume can combine ConfigMaps, Secrets, service account tokens, and downward API data into a single mounted path. The source objects remain separate API resources, but a process that can read the projected Secret file can read its contents. Combining sources does not make that file safe to expose. This layout can serve software that expects configuration and credential files side by side.
 
-This reference Pod combines three sources into one directory. It assumes the
-synthetic `app-config` with key `LOG_LEVEL` and `app-secret` with key `DB_PASS`
-from Task 1 already exist in the same exercise namespace. The distinct paths
-avoid overwriting one another: `log-level` comes from the ConfigMap, `password`
-from the placeholder Secret, and `pod-name` from the Pod's own metadata. Use
-only the lab's non-real placeholder; access to the mounted file exposes it.
+This reference Pod combines three sources into one directory. It assumes the synthetic `app-config` with key `LOG_LEVEL` and `app-secret` with key `DB_PASS` from Task 1 already exist in the same exercise namespace. The distinct paths avoid overwriting one another: `log-level` comes from the ConfigMap, `password` from the placeholder Secret, and `pod-name` from the Pod's own metadata. Use only the lab's non-real placeholder; access to the mounted file exposes it.
 
 ```yaml
 apiVersion: v1
@@ -425,7 +416,7 @@ spec:
               fieldPath: metadata.name
 ```
 
-The [projected-volume documentation](https://v1-35.docs.kubernetes.io/docs/concepts/storage/projected-volumes/) describes the supported sources and namespace boundary. Seeing a file shows what is available to the container; it does not show that an application has reread it.
+After Task 1 and before cleanup, you can save the exact manifest above as `projection-demo.yaml` in a directory you control and apply it with `cfg_lab apply -f projection-demo.yaml` in the same lab terminal. The [projected-volume documentation](https://v1-35.docs.kubernetes.io/docs/concepts/storage/projected-volumes/) describes the supported sources and namespace boundary. Seeing a file shows what is available to the container; it does not show that an application has reread it.
 
 ## Security Reality: Secrets Are a Boundary, Not a Vault
 
@@ -615,32 +606,21 @@ No. ConfigMap data and Secret payloads each have a 1 MiB limit, and pushing mult
 
 Use these checks to practice diagnosing references and composing a projected volume.
 
-<details><summary>A Pod cannot start after a ConfigMap key was renamed. The Pod still requests the old required key. What should you inspect and change?</summary>
+<details><summary>A Pod remains waiting after a configuration change. What should you inspect before deciding what to change?</summary>
 
-Inspect the Pod's events and compare its referenced object and key with the
-ConfigMap in the Pod's namespace. If the key is missing and the reference is
-required, correct the reference or restore the intended key after confirming
-ownership. A waiting Pod alone does not prove that this is the cause.
+Inspect the Pod's events and compare its referenced object and key with the ConfigMap in the Pod's namespace. If the key is missing and the reference is required, correct the reference or restore the intended key after confirming ownership. A waiting Pod alone does not prove that this is the cause.
 
 </details>
 
 <details><summary>A Pod in namespace A needs a ConfigMap that exists only in namespace B. Would a cross-namespace reference work? Would making this a static Pod solve it?</summary>
 
-Ordinary Pod ConfigMap references use an object in the Pod's own namespace.
-Provide the intended configuration in namespace A through an authorized
-workflow. A static Pod is not a workaround: its spec cannot reference API
-objects such as ConfigMaps or Secrets. Choose a compatible node-level delivery
-design if a static Pod is required.
+Ordinary Pod ConfigMap references use an object in the Pod's own namespace. Provide the intended configuration in namespace A through an authorized workflow. A static Pod is not a workaround: its spec cannot reference API objects such as ConfigMaps or Secrets. Choose a compatible node-level delivery design if a static Pod is required.
 
 </details>
 
 <details><summary>Configure one projected directory with `LOG_LEVEL` as `log-level`, `DB_PASS` as `password`, and the Pod name as `pod-name`. Which source and field belongs in each entry? Does seeing an updated file prove the application reloaded it?</summary>
 
-Use a `configMap` item for key `LOG_LEVEL` at path `log-level`, a `secret` item
-for key `DB_PASS` at path `password`, and a `downwardAPI` item with
-`fieldRef.fieldPath: metadata.name` at path `pod-name`. The paths are separate
-within the same mount. Reading a changed file does not prove the application
-reread or applied it.
+Use a `configMap` item for key `LOG_LEVEL` at path `log-level`, a `secret` item for key `DB_PASS` at path `password`, and a `downwardAPI` item with `fieldRef.fieldPath: metadata.name` at path `pod-name`. The paths are separate within the same mount. Reading a changed file does not prove the application reread or applied it.
 
 </details>
 
@@ -831,7 +811,7 @@ Each ConfigMap key appears as a file under `/etc/app-config`. This layout is bet
 
 ### Observe a mounted file update
 
-Task 4 created a Pod that mounts the ConfigMap as files. Predict what changes in the API and the mounted file when you update the object, and whether that alone proves an application reloaded it. The check below records the Pod UID, API values, file reads and UTC times. It makes at most 30 reads with five-second waits; a timeout is an inconclusive observation, not proof that propagation cannot happen. On any error or timeout, stop and use the same-shell cleanup below.
+Task 4 created a Pod that mounts the ConfigMap as files. Predict what changes in the API and the mounted file when you update the object, and whether that alone proves an application reloaded it. The check below records the Pod UID, API values, file reads and UTC times. After its baseline read, the loop makes at most 30 reads with five-second waits; a timeout is an inconclusive observation, not proof that propagation cannot happen. On any error or timeout, stop and use the same-shell cleanup below.
 
 ```bash
 observe_cfg_file() {
@@ -863,7 +843,7 @@ observe_cfg_file() {
 observe_cfg_file
 ```
 
-The repeated `cat` reads the file in the same Pod; it does not prove that an application reread or applied it. A file update can lag behind the API update, and an application that reads only at startup may still need a rollout.
+The repeated `cat` reads the file in the same Pod; it does not prove that an application reread or applied it. After a successful check, you can compare `cfg_lab get pod config-test -o jsonpath='{.metadata.uid}'` with the recorded UID and, if it still matches, reread the file with `cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL` before cleanup. Do not rerun the check: its starting-value guard expects `info`. A file update can lag behind the API update, and an application that reads only at startup may still need a rollout.
 
 ### Task 5: Clean up and record success criteria
 
@@ -941,6 +921,7 @@ Success criteria:
 - [ ] Pod `config-test` reached the Running state and displayed the expected environment values.
 - [ ] Updating the ConfigMap did not change the already-running environment variable.
 - [ ] The ConfigMap was mounted as files under `/etc/app-config`.
+- [ ] The mounted-file check recorded the Pod UID, times and API/file observations, or reported an inconclusive timeout.
 - [ ] The owned exercise namespace and its resources were removed after verification.
 
 ## Sources
