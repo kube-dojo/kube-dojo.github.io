@@ -70,7 +70,7 @@ The working directory is the current project folder on disk. When you edit `name
 
 The staging area, also called the index, is a deliberate selection of what the next commit will contain. You can stage one file while leaving another modified file unstaged, or even stage only some hunks from a file with more advanced commands later. That separation is valuable when real work is messy. A debugging session might touch authentication, deployment YAML, and local notes, but the commit should capture one coherent reason for change.
 
-In the ordinary repository initialized for this practice, `.git` holds the local repository database where commits live. Other repository layouts can place that data elsewhere. A commit records a snapshot of file contents, author and committer metadata with timestamps, a message, and zero or more parent pointers; the first commit has none. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
+In the ordinary repository you will initialize for this practice, `.git` holds the local repository database where commits live. Other repository layouts can place that data elsewhere. A commit records a snapshot of file contents, author and committer metadata with timestamps, a message, and zero or more parent pointers; the first commit has none. In common repositories, each commit is named by a hash such as a SHA-1 object identifier, and newer Git versions can also support SHA-256 repositories. The important beginner idea is simpler than the cryptography: if the content or metadata changes, the identifier changes too.
 
 Pause and predict: you fixed a database connection bug in `db.py`, but while searching for it you also added temporary print statements to `auth.py` and `api.py`. Which part of Git lets you save only the real fix while keeping the temporary debug code on disk? Decide which area of Git you would use and which exact command moves only the intended file before opening the reveal.
 
@@ -103,10 +103,10 @@ First inspect the existing identity without changing it. An unset value may prin
 
 ```bash
 # Read your configured name
-git config get user.name
+git config --get user.name
 
 # Read your configured email address
-git config get user.email
+git config --get user.email
 ```
 
 The `--global` flag changes account-wide configuration, usually in `~/.gitconfig`; this lesson does not change it. After successful initialization, `--local` writes only to that repository. The deliberately fictional training identity below is for disposable local commits, not publication. Before publishing real work, deliberately choose the appropriate author identity for that repository.
@@ -265,7 +265,7 @@ Pause and predict: while testing locally, an engineer places a real access token
 <details>
 <summary>Check your prediction</summary>
 
-No. Deleting the token in a later commit does not remove it from the earlier history. If it was pushed, promptly revoke or rotate it with its provider and follow the repository's incident process. History cleanup can reduce further exposure, but it cannot remove copies from other people's clones; coordinate cleanup where appropriate. For a local-only commit, assess whether the credential was exposed and follow its owner's response process before sharing. See [GitHub's sensitive-data guidance](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
+No. Deleting the token in a later commit does not remove it from the earlier history. If it was pushed, promptly revoke or rotate it with its provider and follow the repository's incident process. History cleanup can reduce further exposure, but it cannot remove copies from other people's clones; coordinate cleanup where appropriate. For a local-only commit, remove the credential from every unpushed commit containing it before pushing; assess any other exposure and follow its owner's response process. See [GitHub's sensitive-data guidance](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
 
 </details>
 
@@ -548,14 +548,14 @@ The decision framework also helps you avoid destructive commands early in your G
 
 1. **Git began in 2005.** The Linux kernel community's free BitKeeper arrangement ended, and the project developed a distributed replacement. [Pro Git's history](https://github.com/progit/progit2/blob/a013e3230a1207cfa5ae94d28ba7d2021063c337/book/01-introduction/sections/history.asc) describes the context.
 2. **The name is intentionally cheeky.** The [Git project README](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/README.md) includes a playful explanation of the name.
-3. **Try an empty directory.** In a local Git 2.56 practice repository, an empty directory did not appear in `git status` or the index. Adding an ordinary file inside made that file visible as untracked; staging it added the file to the index.
+3. **Try an empty directory.** In a local Git 2.56 practice repository, an empty directory did not appear in `git status` or the index. Adding an ordinary file inside made the directory appear as untracked with default reporting; `git status --untracked-files=all` listed the file, and staging it added the file to the index.
 4. **Object identifiers are part of Git's integrity model.** Git supports SHA-1 and SHA-256 repositories; the [Git 2.56 documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/object-format-disclaimer.adoc) notes they do not currently interoperate.
 
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
 | :--- | :--- | :--- |
-| Accidentally committing a password or secret | The learner stages broadly without reading `git status` and `git diff`, so a local `.env` or credential file enters the commit. | If pushed, revoke or rotate it promptly and follow the incident process. For a local-only commit, assess exposure and follow the credential owner's process before sharing; an ignore rule does not remove history. |
+| Accidentally committing a password or secret | The learner stages broadly without reading `git status` and `git diff`, so a local `.env` or credential file enters the commit. | If pushed, revoke or rotate it promptly and follow the incident process. For a local-only commit, remove the credential from every unpushed commit containing it before pushing; assess other exposure and follow its owner's process. An ignore rule does not remove history. |
 | Seeing "fatal: refusing to merge unrelated histories" | A repository was initialized locally, while the hosting service also created its own first commit such as a README. | Prefer cloning an existing remote. If combining histories is truly intended, use the explicit unrelated-histories option only after reviewing why the histories differ. |
 | Getting "updates were rejected" during push | The remote branch may have commits the local branch lacks. | Inspect the error, fetch and compare histories, then choose how to integrate before retrying. |
 | Writing empty or meaningless commit messages | The learner treats commits as checkpoints for themselves rather than messages to future maintainers. | Amend an unpushed commit message when needed and practice explaining the operational reason for each snapshot. |
@@ -596,7 +596,7 @@ Run `git diff` before staging so you can inspect the exact unstaged line changes
 <details>
 <summary>5. You created `aws-credentials.json` for a local test and never want it committed. What should you do before staging other work, and what limitation must you remember?</summary>
 
-Add `aws-credentials.json` to the repository's `.gitignore` file before broad staging, then run `git status` to confirm the file no longer appears as an untracked candidate. The limitation is that `.gitignore` only applies to untracked files. If the file was already committed, Git will continue tracking it until you explicitly remove it from the index, and any real secret inside should be considered exposed. The safer workflow is to prevent tracking before the file ever reaches a commit.
+Add `aws-credentials.json` to the repository's `.gitignore` file before broad staging, then run `git status` to confirm the file no longer appears as an untracked candidate. The limitation is that `.gitignore` only applies to untracked files. If already committed, remove it from tracking and address the earlier history: revoke or rotate a pushed credential promptly; for a local-only commit, remove it from every unpushed commit containing it before pushing and assess other exposure with its owner. The safer workflow is to prevent tracking before the file ever reaches a commit.
 
 </details>
 
@@ -807,9 +807,9 @@ Git will show `.gitignore` and the root `audit-trail.log` as untracked files. Th
 
 </details>
 
-### Task 7: Unguided Git-State Diagnostic
+### Task 7: Git-State Diagnostic
 
-In this final challenge, there is no step-by-step command list to copy. You are presented with two realistic scenarios that test whether you can interpret Git state and choose the correct operational action: `git add`, `git commit`, ignore configuration, `git fetch`/`git pull`, or do nothing.
+Attempt this final challenge before opening the progressive hints or full solution. Two realistic scenarios test whether you can interpret Git state and choose the correct operational action: `git add`, `git commit`, ignore configuration, `git fetch`/`git pull`, or do nothing. Record which hints you needed, then repeat the diagnosis without them.
 
 Challenge 1: The Planted Workspace Trap. Run the following setup snippet inside your `dojo-k8s-project` directory to plant staged modifications, unstaged modifications, and untracked files. The `incident-token.env` file is an empty dummy; never put a real credential in this exercise. The appended text is incomplete scratch content, not a deployable manifest.
 
@@ -898,7 +898,9 @@ For Challenge 2 (The Divergent Timelines):
 **Transfer check:** A teammate stages an edit to `config.yaml`, then makes another edit without staging it. Which command displays each change, and what would the next commit include?
 
 <details><summary>Check your answer</summary>
+
 `git diff --staged` compares the index with HEAD; `git diff` compares the working file with the index. The commit includes the staged version, not the later unstaged edit. If both edits are intended, stage the file again and inspect the staged diff before committing.
+
 </details>
 
 ### Success Criteria
@@ -908,7 +910,7 @@ For Challenge 2 (The Divergent Timelines):
 - [ ] You inspected a diff before staging a Kubernetes-style YAML change.
 - [ ] You used `git log --oneline` to verify the resulting history.
 - [ ] Optional Task 6: you created and tested a `.gitignore` rule that ignores a broad pattern while allowing one exception.
-- [ ] You diagnosed complex repository states and divergent timelines using status, diff, and log without guidance.
+- [ ] You diagnosed complex repository states and divergent timelines using status, diff, and log, recording any hints used.
 
 ## Sources
 
