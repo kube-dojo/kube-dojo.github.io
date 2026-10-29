@@ -9,11 +9,13 @@ sidebar:
 >
 > **Time to Complete**: 60–90 minutes (long-form read)
 >
-> **Prerequisites**: Module 1.3 (Pods)
+> **Prerequisites**: [Module 1.3: Pods](../module-1.3-pods/) and [Module 1.4: Deployments](../module-1.4-deployments/)
 
 ---
 
 This module targets Kubernetes 1.35 and examines configuration delivery, credential visibility, and update behavior. Earlier examples are reference material: check their required files, object names, permissions, and request scope before trying them in a disposable lab.
+
+For Pod startup problems, revisit [diagnosing Pod failures](../module-1.3-pods/#diagnosing-pod-failures-without-guessing). For changes that require replacing Pods, review [Deployment rolling updates](../module-1.4-deployments/#rolling-updates-and-rollbacks).
 
 For hands-on practice, run setup once in a fresh Bash terminal and keep that terminal for every `cfg_lab` command and cleanup. The helper supplies the recorded context and namespace; the exercise blocks depend on that setup.
 
@@ -43,7 +45,7 @@ Think about artifact promotion as a chain of custody. If a web application image
 
 ConfigMaps and Secrets are both core `v1` Kubernetes API resources, but they are not interchangeable. A ConfigMap is appropriate for non-sensitive values such as log levels, feature flags, application properties, Nginx snippets, or JSON configuration files. A Secret is appropriate for passwords, private keys, API tokens, TLS private material, and image pull credentials. Secrets have specialized types and receive additional handling: Kubernetes sends a Secret only to nodes whose Pods need it, and [Linux nodes](https://v1-35.docs.kubernetes.io/docs/concepts/security/linux-security/#protection-for-secret-data-on-nodes) use memory-backed volumes for mounted Secret data. [Encryption at rest](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) can be configured for Secrets and other API resources, including ConfigMaps.
 
-**Pause and predict:** if a team changes only a ConfigMap key used by a Deployment, should the container image digest change?
+**Pause and predict:** if a team changes only a ConfigMap key used by a Deployment, should the container image digest change? Write yes or no before opening the answer.
 
 <details>
 <summary>Check your prediction</summary>
@@ -51,8 +53,6 @@ ConfigMaps and Secrets are both core `v1` Kubernetes API resources, but they are
 If the digest changes, the configuration is still coupled to the artifact. The design Kubernetes is trying to support keeps the image fixed while the runtime object changes.
 
 </details>
-
-Write yes or no before you continue. The next paragraph is about rotating a leaked password. It does not answer this digest question.
 
 There is also a practical incident-response reason to separate configuration from code. If a leaked database password is baked into an image, the response path includes a new build, a registry push, a Deployment update, and cleanup of any Pods still running the old image. If the password is externalized into a Secret, the team can rotate the credential, update the Secret object, and restart the consuming Pods without changing the application binary. That difference does not remove the need for disciplined rollout automation, but it shortens the path between detection and containment.
 
@@ -237,7 +237,7 @@ The `nginx-config` example assumes `default.conf` contains an appropriate server
 
 The `subPath` option is the major exception. Teams often use `subPath` to mount a single ConfigMap key into a directory without hiding the rest of the directory contents. A container using a ConfigMap or Secret through `subPath` does not receive updates to that mount. If dynamic refresh matters, mount a directory without `subPath` and arrange the application path accordingly. See [volumes and subPath](https://v1-35.docs.kubernetes.io/docs/concepts/storage/volumes/#using-subpath).
 
-**Pause and predict:** your application takes five minutes to start and you need to temporarily change logging from `info` to `debug` during an incident. Which delivery method lets you change that level without waiting through another full start, if the application can reload a file but cannot reload environment variables?
+**Pause and predict:** your application takes five minutes to start and you need to temporarily change logging from `info` to `debug` during an incident. Which delivery method lets you change that level without waiting through another full start, if the application can reload a file but cannot reload environment variables? Write your choice before opening the answer.
 
 <details>
 <summary>Check your prediction</summary>
@@ -245,8 +245,6 @@ The `subPath` option is the major exception. Teams often use `subPath` to mount 
 The mounted-file design is operationally better when the application can reload a file and cannot reload environment variables. If the application reads configuration only once at startup, both delivery methods still require a restart, so the deciding factor becomes readability, leak risk, and application convention.
 
 </details>
-
-Write which delivery method you would choose before you continue. The next manifest is an example. It does not settle this incident.
 
 ```yaml
 apiVersion: v1
@@ -387,7 +385,7 @@ RBAC is the second major boundary, and it is easy to underestimate. Granting `ge
 
 That last point changes how you should review access requests. A role that cannot read Secrets directly may still be too powerful if it can run arbitrary workloads in the same namespace as valuable credentials. Admission policies, namespace design, service account scoping, and workload identity all help narrow that blast radius. In production, the question is not merely "who can read Secret objects?" but also "who can cause a workload to run with access to those Secret objects?"
 
-**Pause and predict:** an attacker has a shell inside your application container, and the application reads its database password from `/etc/secrets/password`. Will the attacker be stopped because the value came from a Secret rather than a ConfigMap?
+**Pause and predict:** an attacker has a shell inside your application container, and the application reads its database password from `/etc/secrets/password`. Will the attacker be stopped because the value came from a Secret rather than a ConfigMap? Write yes or no before opening the answer.
 
 <details>
 <summary>Check your prediction</summary>
@@ -395,8 +393,6 @@ That last point changes how you should review access requests. A role that canno
 No. Once the workload is compromised, the credential is available through the same path the workload uses. The stronger controls are runtime hardening, least privilege, short-lived credentials, network policy, and rapid rotation.
 
 </details>
-
-Write yes or no before you continue. The next paragraph is about credential scope. It does not answer whether the Secret object stops the attacker.
 
 This is why Secret design should be paired with credential design. A long-lived database password mounted into every replica creates a larger blast radius than a short-lived token scoped to one service account and rotated automatically. Kubernetes can deliver either value, but it cannot decide whether the credential itself is overpowered. Good teams review the consumer, the namespace, the service account, the network path, the database permissions, and the rotation mechanism as one system.
 
