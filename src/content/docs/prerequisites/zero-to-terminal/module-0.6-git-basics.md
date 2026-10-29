@@ -97,7 +97,7 @@ Expected output should include the Git version installed on your machine; the ex
 git version 2.56.0
 ```
 
-Before creating commits, configure the identity Git will place into commit metadata. This is not the same thing as authenticating to GitHub during a push. The name and email configured here answer the question, "Who authored this snapshot?" Remote authentication answers a different question: "Is this person allowed to upload to that server?" Keeping those concepts separate prevents confusion when a commit succeeds locally but a push later asks for credentials.
+Before creating commits, configure the identity Git will place into commit metadata. This is not the same thing as authenticating to GitHub during a push. The name and email configured here answer the question, "Who authored this snapshot?" Remote authentication proves an identity; the host's permissions separately decide whether that identity may push. Keeping those concepts separate prevents confusion when a commit succeeds locally but a push later asks for credentials.
 
 First inspect the existing identity without changing it. An unset value may print nothing and return a nonzero status; the disposable repositories below will receive their own local training identity before you commit.
 
@@ -395,7 +395,7 @@ The compact output should preserve the same order while reducing each commit to 
 a1b2c3d feat: add production namespace definition
 ```
 
-You can also use `git log -p` to inspect the patch introduced by each commit. That is useful when the question is not only "When did this change?" but "What exact lines did this commit add or remove?" As repositories grow, you will learn more targeted history tools, but `status`, `diff`, and `log` already give you a strong diagnostic loop: current state, uncommitted line changes, and committed timeline.
+You can also use `git log -p` to inspect commit patches. That is useful when the question is not only "When did this change?" but "What exact lines did this commit add or remove?" By default, merge commits do not show a patch; options such as `--diff-merges` or `--first-parent` change how merge differences are shown. As repositories grow, you will learn more targeted history tools, but `status`, `diff`, and `log` already give you a strong diagnostic loop: current state, uncommitted line changes, and committed timeline.
 
 Use that loop before assuming Git is broken. If a commit seems to be missing, check whether the change was ever staged and committed. If an ignore rule seems not to work, check whether the file is already tracked or the pattern matches. If a push is rejected, check whether the remote moved ahead of your local branch.
 
@@ -561,7 +561,7 @@ The decision framework also helps you avoid destructive commands early in your G
 
 1. **Git began in 2005.** The Linux kernel community's free BitKeeper arrangement ended, and the project developed a distributed replacement. [Pro Git's history](https://github.com/progit/progit2/blob/a013e3230a1207cfa5ae94d28ba7d2021063c337/book/01-introduction/sections/history.asc) describes the context.
 2. **The name is intentionally cheeky.** The [Git project README](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/README.md) includes a playful explanation of the name.
-3. **Empty directories.** In the course authors' Git 2.56 test repository, an empty directory did not appear in `git status` or the index. Adding an ordinary file inside made the directory appear as untracked with default reporting; `git status --untracked-files=all` listed the file, and staging it added the file to the index. This is the observed result in that local fixture.
+3. **Empty directories.** In one isolated Git 2.56 test repository, the authors created an empty directory: `git status` did not list it, and `git ls-files` printed no entry for it. In that same local test, adding a file made the directory appear as untracked with default reporting; `git status --untracked-files=all` listed the file, and staging it added the file to the index. These are observations from that fixture. Git's [status documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-status.adoc) describes reporting modes, and [ls-files](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-ls-files.adoc) describes listing index entries. The pinned [status implementation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/wt-status.c#L810-L834) and [directory traversal code](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/dir.c#L2124-L2147) show how normal reporting handles empty directories. Index entries typically represent files rather than directories; the [index format](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/gitformat-index.adoc) also describes the sparse-index directory-entry exception.
 4. **Object identifiers are part of Git's integrity model.** Git supports SHA-1 and SHA-256 repositories; the [Git 2.56 documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/object-format-disclaimer.adoc) notes they do not currently interoperate.
 
 ## Common Mistakes
@@ -602,7 +602,7 @@ Run `git diff` before staging so you can inspect the exact unstaged line changes
 <details>
 <summary>4. You cloned a repository and Git asks you to configure <code>user.name</code> and <code>user.email</code> before committing. Later, <code>git push</code> asks for remote credentials. Why are these two prompts different?</summary>
 
-`user.name` and `user.email` supply commit attribution; they do not authenticate a push. Remote credentials authenticate to the host, and the host separately decides whether that identity is authorized to push. For example, [GitHub repository roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/repository-roles-for-an-organization) distinguish read access from permission to push. A successful local commit does not guarantee the remote will accept a push.
+`user.name` and `user.email` supply commit attribution; they do not authenticate a push. Remote credentials authenticate to the host, and the host separately decides whether that identity is authorized to push. For example, [GitHub repository roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization) distinguish read access from permission to push. A successful local commit does not guarantee the remote will accept a push.
 
 </details>
 
@@ -941,7 +941,7 @@ For Challenge 2 (The Divergent Timelines):
 
 ### Task 8: Design Your Own Two-Commit Workflow
 
-Continue in the same disposable repository after Task 7 is clean. Choose a new replica count for the practice `deployment.yaml` fragment and explain your choice in a new line of `README.md`. The fragment is incomplete and must not be applied to a cluster. Recreate `temp-notes.txt` if you removed it and confirm `git check-ignore temp-notes.txt` prints its path. If it does not, add a narrow ignore pattern, review and commit `.gitignore` first. Use that ignored file for a scratch note; do not put credentials in it.
+Continue in the same disposable repository after Task 7 is clean. Choose a new replica count for the practice `deployment.yaml` fragment and explain your choice in a new line of `README.md`. The fragment is incomplete and must not be applied to a cluster. Recreate `temp-notes.txt` if you removed it. Run `git ls-files -- temp-notes.txt` first: if it prints the path or the command fails, stop and investigate before changing ignore rules. See [Git 2.56: ls-files](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-ls-files.adoc). For an untracked path, run `git check-ignore temp-notes.txt`, then immediately run `echo "$?"` as the next command to display its exit status. Status 0 with the printed path means it is ignored; tracked files are not reported by default. If the check exits with status 1 and prints nothing, add a narrow ignore pattern, review and commit `.gitignore` first; stop on other errors. Use that ignored file for a scratch note; do not put credentials in it. See [Git 2.56: check-ignore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-check-ignore.adoc).
 
 Before editing, write down the two commit purposes and predict which files will be staged, unstaged, and ignored. Make both edits, then stage only the replica change. Inspect the index against HEAD and the working tree against the index before the first commit: explain why the README is still outside that commit. Commit the configuration change, then review and commit the README change separately. Check that both patches contain only the intended file, the scratch note is ignored and untracked, and normal `git status` is clean. Record which hints you used and what you would change in your workflow next time.
 
@@ -962,7 +962,7 @@ After staging one file, compare the index to the last commit and the working fil
 <details>
 <summary>Hint 3: choose commands</summary>
 
-Use `git status`, `git diff`, `git add deployment.yaml`, `git diff --staged`, and `git check-ignore temp-notes.txt`. After the first commit, inspect and stage `README.md`, then compare the two commits with `git log -p -2`.
+Use `git ls-files -- temp-notes.txt` first; if it prints the path or fails, stop and investigate before changing ignore rules. For an untracked path, run `git check-ignore temp-notes.txt` and immediately run `echo "$?"` to distinguish an ignored path (0), no match (1), and other errors. See the [check-ignore reference](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-check-ignore.adoc). Use `git status`, `git diff`, `git add deployment.yaml`, and `git diff --staged` for the two-copy check. After the first commit, inspect and stage `README.md`, then compare the two commits with `git log -p -2`.
 
 </details>
 
@@ -991,18 +991,18 @@ One possible approach is to choose two replicas for a smaller practice configura
 - [Git book: Git Basics](https://git-scm.com/book/en/v2/Git-Basics-Getting-a-Git-Repository)
 - [Git documentation: git-init](https://git-scm.com/docs/git-init)
 - [Git documentation: git-config](https://git-scm.com/docs/git-config)
-- [Git documentation: git-status](https://git-scm.com/docs/git-status)
 - [Git documentation: git-add](https://git-scm.com/docs/git-add)
 - [Git documentation: git-commit](https://git-scm.com/docs/git-commit)
 - [Git documentation: git-diff](https://git-scm.com/docs/git-diff)
-- [Git documentation: git-log](https://git-scm.com/docs/git-log)
 - [Git documentation: gitignore](https://git-scm.com/docs/gitignore)
 - [Git 2.56: fetch](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-fetch.adoc), [pull](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc), and [push and leases](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc)
 - [Git 2.56: merge](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-merge.adoc) and [rebase](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-rebase.adoc)
 - [Git 2.56: clone](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-clone.adoc), [restore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-restore.adoc), [reset](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reset.adoc), and [remote](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-remote.adoc)
+- [Git 2.56: check-ignore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-check-ignore.adoc), [reflog](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reflog.adoc), [rm](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-rm.adoc), and [log](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-log.adoc)
+- [Git 2.56: status](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-status.adoc), [ls-files](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-ls-files.adoc), and [index format](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/gitformat-index.adoc)
 - [GitHub: removing sensitive data](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository)
 - [GitHub: authentication](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github)
-- [GitHub: repository roles and push permissions](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/repository-roles-for-an-organization)
+- [GitHub: repository roles and push permissions](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization)
 - Kubernetes v1.35: [labels](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/labels/) and [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 - [GitHub Git Guide](https://github.com/git-guides)
 - [GitHub Git Guide: git pull](https://github.com/git-guides/git-pull)
