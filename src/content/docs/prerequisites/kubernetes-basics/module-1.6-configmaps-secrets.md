@@ -50,7 +50,7 @@ ConfigMaps and Secrets are both core `v1` Kubernetes API resources, but they are
 <details>
 <summary>Check your prediction</summary>
 
-If the digest changes, the configuration is still coupled to the artifact. The design Kubernetes is trying to support keeps the image fixed while the runtime object changes.
+No. If the digest changes, the configuration is still coupled to the artifact. The design Kubernetes is trying to support keeps the image fixed while the runtime object changes.
 
 </details>
 
@@ -103,7 +103,13 @@ Inspect the Pod's events and compare the object name, key and namespace before
 changing anything. A missing reference is one possible cause, not a conclusion
 from the waiting state alone. Revisit [Pod diagnosis](../module-1.3-pods/#diagnosing-pod-failures-without-guessing).
 
-Before running this, what output do you expect from a Secret created with `stringData`? The important prediction is that a later `kubectl get secret -o yaml` will not show `stringData`; it will show base64 values under `data`. If that surprises you, pause before putting Secrets into review workflows, because reviewers may see encoded text and incorrectly assume it is protected from disclosure.
+Before running this, what output do you expect from a Secret created with `stringData`? Write your prediction before opening the answer.
+
+<details><summary>Check your prediction</summary>
+
+A later `kubectl get secret -o yaml` will not show `stringData`; it will show base64 values under `data`. Encoded text is not protected from disclosure.
+
+</details>
 
 ## Creating ConfigMaps and Secrets
 
@@ -243,7 +249,7 @@ The `nginx-config` example assumes `default.conf` contains an appropriate server
 
 The `subPath` option is the major exception. Teams often use `subPath` to mount a single ConfigMap key into a directory without hiding the rest of the directory contents. A container using a ConfigMap or Secret through `subPath` does not receive updates to that mount. If dynamic refresh matters, mount a directory without `subPath` and arrange the application path accordingly. See [volumes and subPath](https://v1-35.docs.kubernetes.io/docs/concepts/storage/volumes/#using-subpath).
 
-**Pause and predict:** your application takes five minutes to start and you need to temporarily change logging from `info` to `debug` during an incident. Which delivery method lets you change that level without waiting through another full start, if the application can reload a file but cannot reload environment variables? Write your choice before opening the answer.
+**Pause and predict:** your application takes five minutes to start and you need to temporarily change logging from `info` to `debug` during an incident. The file is already mounted in the running Pod. Which delivery method lets you change that level without waiting through another full start, if the application can reload a file but cannot reload environment variables? Write your choice before opening the answer.
 
 <details>
 <summary>Check your prediction</summary>
@@ -640,7 +646,7 @@ reread or applied it.
 
 ## Hands-On Exercise
 
-This synthetic exercise uses a disposable namespace to inspect ConfigMaps and Secrets. You will create non-sensitive application settings, create a Secret, run a Pod that consumes both, and then practice file-based delivery. Use only the non-real placeholder shown here: environment values and the Pod's startup logs expose plaintext, so never use real credentials in this exercise.
+In this synthetic incident, a team needs to change a logging level without rebuilding its image and explain where a placeholder credential is visible. Start with an empty disposable namespace: Task 1 creates the objects and Pod you will investigate. Compare the API value, the running process environment, and a mounted file before deciding what each observation proves. Use only the non-real placeholder shown here: environment values and the Pod's startup logs expose plaintext, so never use real credentials in this exercise.
 
 Use a context you have independently confirmed is a dedicated disposable lab, and set `KUBEDOJO_LAB_CONTEXT` to its name before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, every task, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer.
 
@@ -662,9 +668,29 @@ fi
 
 Continue only after setup succeeds. `cfg_lab` pins requests to the recorded context and namespace without changing kubeconfig preferences. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. Stop on a failed task command and clean up before retrying in a fresh terminal. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it.
 
+Record the printed context and namespace and the successful creation UID (`printf '%s\n' "$CFG_UID"`) somewhere you can retrieve if the terminal closes. If the shell is lost, the helper and its receipt are lost too: do not re-paste setup as a recovery procedure. Independently verify the intended context, namespace and saved creation UID against the live namespace before arranging deletion. If the saved UID or ownership is uncertain, do not delete it; ask the lab owner to investigate. This comparison still assumes no concurrent replacement and is not atomic with deletion.
+
 ### Task 1: Create the configuration objects
 
-Use the quick path to create a ConfigMap and Secret, then inspect them with `cfg_lab get ... -o yaml` commands. The literal Secret value is intentionally a lab placeholder, not a production credential pattern.
+Before looking at the commands, choose how you would create and inspect the settings and placeholder credential. What would the YAML view and Pod logs expose? Write your reasoning, then use the hints if needed. The following block is one possible solution, not a production credential pattern.
+
+<details><summary>Hint 1: Concept</summary>
+
+Encoding a value does not make it confidential; consider each place a value is displayed.
+
+</details>
+
+<details><summary>Hint 2: Component</summary>
+
+Compare the Secret object, the Pod's environment and its startup logs.
+
+</details>
+
+<details><summary>Hint 3: Command</summary>
+
+After creating the objects, inspect them with `cfg_lab get secret app-secret -o yaml` and `cfg_lab logs config-test`.
+
+</details>
 
 ```bash
 # 1. Create ConfigMap
@@ -728,7 +754,27 @@ The YAML view shows encoded data under `.data.DB_PASS`, while the decode command
 
 ### Task 3: Prove environment variables are static
 
-Update the ConfigMap after the Pod is running, then compare the API object with the container's current environment and its startup log snapshot. You should see the new value in the ConfigMap and the old value inside the already-started container.
+The Pod is running with the objects from Task 1. If `LOG_LEVEL` changes in the ConfigMap, what would you inspect first, and what do you predict the running process will report? Write your prediction before opening the hints or using the commands.
+
+<details><summary>Hint 1: Concept</summary>
+
+Distinguish the stored object from values captured when a container starts.
+
+</details>
+
+<details><summary>Hint 2: Component</summary>
+
+Compare the ConfigMap's current value, the existing container environment and its startup log snapshot.
+
+</details>
+
+<details><summary>Hint 3: Command</summary>
+
+Use `cfg_lab get configmap`, `cfg_lab exec ... printenv` and `cfg_lab logs` as shown below.
+
+</details>
+
+Update the ConfigMap and compare those observations. The API should show the new value while the already-started container reports the old one.
 
 ```bash
 cfg_lab create configmap app-config \
@@ -783,6 +829,42 @@ Each ConfigMap key appears as a file under `/etc/app-config`. This layout is bet
 
 </details>
 
+### Observe a mounted file update
+
+Task 4 created a Pod that mounts the ConfigMap as files. Predict what changes in the API and the mounted file when you update the object, and whether that alone proves an application reloaded it. The check below records the Pod UID, API values, file reads and UTC times. It makes at most 30 reads with five-second waits; a timeout is an inconclusive observation, not proof that propagation cannot happen. On any error or timeout, stop and use the same-shell cleanup below.
+
+```bash
+observe_cfg_file() {
+  local uid current before after value attempt
+  uid="$(cfg_lab get pod config-test -o jsonpath='{.metadata.uid}')" || return 1
+  [ -n "$uid" ] || { echo 'Missing Pod UID; stop' >&2; return 1; }
+  before="$(cfg_lab get configmap app-config -o jsonpath='{.data.LOG_LEVEL}')" || return 1
+  value="$(cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL)" || return 1
+  current="$(cfg_lab get pod config-test -o jsonpath='{.metadata.uid}')" || return 1
+  [ "$current" = "$uid" ] && [ "$before" = info ] && [ "$value" = info ] || { echo 'Unexpected starting state; stop' >&2; return 1; }
+  printf 'Before: %s Pod UID=%s API=%s file=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$uid" "$before" "$value"
+  cfg_lab patch configmap app-config --type=merge -p '{"data":{"LOG_LEVEL":"trace"}}' || return 1
+  after="$(cfg_lab get configmap app-config -o jsonpath='{.data.LOG_LEVEL}')" || return 1
+  [ "$after" = trace ] || { echo 'API value did not update; stop' >&2; return 1; }
+  printf 'After: %s API=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$after"
+  for attempt in {1..30}; do
+    current="$(cfg_lab get pod config-test -o jsonpath='{.metadata.uid}')" || return 1
+    [ "$current" = "$uid" ] || { echo 'Pod changed; stop' >&2; return 1; }
+    value="$(cfg_lab exec config-test -- cat /etc/app-config/LOG_LEVEL)" || return 1
+    current="$(cfg_lab get pod config-test -o jsonpath='{.metadata.uid}')" || return 1
+    [ "$current" = "$uid" ] || { echo 'Pod changed; stop' >&2; return 1; }
+    printf 'Read: %s Pod UID=%s file=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$current" "$value"
+    [ "$value" = trace ] && return 0
+    sleep 5 || return 1
+  done
+  echo 'Inconclusive: file update not observed in 30 reads' >&2
+  return 1
+}
+observe_cfg_file
+```
+
+The repeated `cat` reads the file in the same Pod; it does not prove that an application reread or applied it. A file update can lag behind the API update, and an application that reads only at startup may still need a rollout.
+
 ### Task 5: Clean up and record success criteria
 
 Run cleanup in the same terminal, including after an interruption. It compares the live namespace UID with the successful creation response before deleting the namespace and its resources. Failed cleanup retains the receipt for a same-shell retry. This check is not atomic with deletion and assumes no concurrent namespace replacement.
@@ -808,7 +890,15 @@ Cleanup deletes the owned exercise namespace after the UID check. If it is alrea
 
 </details>
 
-**Card A: The image was rebuilt for a log level.** A team changes one ConfigMap key. The pipeline also publishes a new image digest and rolls the Deployment onto it.
+**Transfer:** A different application reads a mounted certificate only at startup. The Secret file later changes. What could you observe in the file, what would that leave unknown about the application, and how would you plan a safe rotation?
+
+<details><summary>Check your transfer reasoning</summary>
+
+An updated file is evidence of delivery, not that the process loaded it. Verify the application's reload behavior and use a controlled restart or rollout if it only reads the certificate at startup.
+
+</details>
+
+**Card A: The image was rebuilt for a log level.** A team changes one ConfigMap key. The pipeline also publishes a new image digest and rolls the Deployment onto it. What should the team change in its workflow?
 
 <details>
 <summary>Check your prediction</summary>
@@ -826,7 +916,7 @@ Changing the ConfigMap does not update this process's environment. Adding a file
 
 </details>
 
-**Card C: A shell reads `/etc/secrets/password`.** The container is compromised. The password was mounted from a Secret. Someone argues the attacker is stuck because Secrets are protected.
+**Card C: A shell reads `/etc/secrets/password`.** The container is compromised. The password was mounted from a Secret. Someone argues the attacker is stuck because Secrets are protected. Can the attacker read the credential?
 
 <details>
 <summary>Check your prediction</summary>
@@ -835,7 +925,7 @@ Failure layer: the workload is already inside the trust boundary. Next action: t
 
 </details>
 
-**Card D: The ConfigMap changed and the Pod did not.** `app-config` is updated. `kubectl exec` still prints the old environment value. The Pod was not recreated.
+**Card D: The ConfigMap changed and the Pod did not.** `app-config` is updated. `kubectl exec` still prints the old environment value. The Pod was not recreated. Why does the old value remain?
 
 <details>
 <summary>Check your prediction</summary>
