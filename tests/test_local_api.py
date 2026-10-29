@@ -3209,6 +3209,100 @@ def _seed_commit(repo: Path) -> None:
     _git(repo, "branch", "-M", "main")
 
 
+def test_git_cleanup_report_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _seed_commit(repo)
+    clean = tmp_path / "clean"
+    dirty = tmp_path / "dirty"
+    unknown = tmp_path / "unknown"
+    for path in (clean, dirty, unknown):
+        _git(repo, "worktree", "add", "-b", path.name, str(path), "main")
+    _write(dirty / "untracked.txt", "keep me")
+    _git(repo, "branch", "gone")
+    _git(repo, "worktree", "add", str(tmp_path / "gone"), "gone")
+    _write(tmp_path / "gone" / "new.txt", "unmerged")
+    _git(tmp_path / "gone", "add", "new.txt")
+    _git(tmp_path / "gone", "commit", "-m", "unmerged")
+    _git(repo, "config", "branch.gone.remote", "origin")
+    _git(repo, "config", "branch.gone.merge", "refs/heads/gone")
+    _git(repo, "remote", "add", "origin", str(tmp_path / "missing-remote"))
+    _git(repo, "branch", "bare_gone", "gone")
+    _git(repo, "config", "branch.bare_gone.remote", "origin")
+    _git(repo, "config", "branch.bare_gone.merge", "refs/heads/bare_gone")
+    _git(repo, "branch", "bare_merged", "main")
+    _git(repo, "tag", "main", "gone")
+    _git(repo, "tag", "clean", "refs/heads/clean")
+    _git(repo, "tag", "dirty", "refs/heads/dirty")
+    locked = tmp_path / "locked"
+    detached = tmp_path / "detached"
+    _git(repo, "worktree", "add", "-b", "locked", str(locked), "refs/heads/main")
+    _git(repo, "worktree", "lock", str(locked))
+    _git(repo, "worktree", "add", "--detach", str(detached), "refs/heads/main")
+    real_counts = local_api._worktree_dirty_counts
+    monkeypatch.setattr(
+        local_api, "_worktree_dirty_counts",
+        lambda path: None if path == unknown else real_counts(path),
+    )
+
+    status, report, _ = local_api.route_request(repo, "/api/git/cleanup")
+    assert status == 200 and report["ok"] is True
+    assert {wt["branch"] for wt in report["prunable_worktrees"]} == {"clean"}
+    assert report["counts"]["worktrees"] == 1
+    assert not {"clean", "dirty", "unknown", "gone"} & {
+        branch["name"] for branch in report["prunable_branches"]
+    }
+    assert {branch["name"] for branch in report["prunable_branches"]} == {"bare_merged"}
+    review = {wt["branch"]: wt["blockers"] for wt in report["review_worktrees"]}
+    assert "uncommitted-changes" in review["dirty"]
+    assert "status-unknown" in review["unknown"]
+    assert "merge-unverified" in review["gone"]
+    assert "primary-worktree" in review["main"]
+    assert "locked" in review["locked"]
+    assert "detached-or-unknown" in review[None]
+    assert {branch["name"] for branch in report["review_branches"]} == {"gone", "bare_gone"}
+    assert "preserve ignored artifacts" in report["hint"]
+
+
+def test_git_cleanup_inventory_failure_blocks_branches(tmp_path: Path, monkeypatch) -> None:
+    _seed_commit(tmp_path)
+    _git(tmp_path, "branch", "merged")
+    partial = {
+        "path": str(tmp_path / "partial"), "branch": "merged", "head": "abc",
+        "counts": {"total": 0}, "locked": False, "detached": False,
+    }
+    primary = {**partial, "path": str(tmp_path), "branch": "main"}
+    monkeypatch.setattr(
+        local_api, "build_worktrees_list", lambda _: {"ok": False, "worktrees": [primary, partial]},
+    )
+    report = local_api.build_git_cleanup_report(tmp_path)
+    assert report["prunable_branches"] == []
+    assert report["prunable_worktrees"] == []
+    assert "worktree-inventory-unavailable" in report["review_worktrees"][1]["blockers"]
+    assert report["blockers"] == ["worktree-inventory-unavailable"]
+
+
+def test_git_cleanup_reports_failed_git_probes(tmp_path: Path, monkeypatch) -> None:
+    _seed_commit(tmp_path)
+    _git(tmp_path, "branch", "merged")
+    run = local_api.subprocess.run
+    failed = {"command": "worktree"}
+
+    def failing(cmd, **kwargs):
+        if cmd[1] == failed["command"] or (failed["command"] == "upstream" and "--format=%(refname)\t%(upstream:track)" in cmd):
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="unavailable")
+        return run(cmd, **kwargs)
+
+    monkeypatch.setattr(local_api.subprocess, "run", failing)
+    for command, blocker in (("worktree", "worktree-inventory-unavailable"),
+                             ("for-each-ref", "merge-inventory-unavailable"),
+                             ("upstream", "upstream-inventory-unavailable")):
+        failed["command"] = command
+        report = local_api.build_git_cleanup_report(tmp_path)
+        assert not report["prunable_branches"] and not report["prunable_worktrees"]
+        assert blocker in report["blockers"]
+
+
 def _stash_with_date(repo: Path, ts: int, message: str) -> None:
     """Create a stash whose committer timestamp is `ts` (unix seconds).
 
