@@ -614,7 +614,7 @@ NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && printf 'Manife
 Apply a `LimitRange` to the exercise namespace so missing CPU requests and limits receive defaults, then add a small `ResourceQuota` so the namespace has a visible budget. The default values are intentionally modest because this exercise runs on small learning clusters.
 
 <details><summary>Hint 1</summary>Which policy sets per-container defaults, and which sets the namespace total?</details>
-<details><summary>Hint 2</summary>Compare `defaultRequest` and `default` with the quota's `requests.cpu` and `limits.cpu`.</details>
+<details><summary>Hint 2</summary>Compare <code>defaultRequest</code> and <code>default</code> with the quota's <code>requests.cpu</code> and <code>limits.cpu</code>.</details>
 <details><summary>Hint 3</summary>Apply both objects, then describe each one in the exercise namespace.</details>
 
 <details><summary><strong>Solution</strong></summary>
@@ -776,7 +776,7 @@ Predict the ready endpoint names if `version=v1` is added to the Service selecto
 
 <details><summary>Hint 1</summary>Which label distinguishes stable Pods from the canary?</details>
 <details><summary>Hint 2</summary>A Service selector is a map: narrowing it requires both app and version to match.</details>
-<details><summary>Hint 3</summary>Patch the selector, inspect endpoints, then patch it back to only `app=web`.</details>
+<details><summary>Hint 3</summary>Patch the selector, inspect endpoints, then patch it back to only <code>app=web</code>.</details>
 
 <details><summary>After your attempt: example commands</summary>
 
