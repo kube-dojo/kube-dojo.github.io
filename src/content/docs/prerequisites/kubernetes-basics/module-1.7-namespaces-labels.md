@@ -615,7 +615,7 @@ Apply a `LimitRange` to the exercise namespace so missing CPU requests and limit
 
 <details><summary>Hint 1</summary>Which policy sets per-container defaults, and which sets the namespace total?</details>
 <details><summary>Hint 2</summary>Compare <code>defaultRequest</code> and <code>default</code> with the quota's <code>requests.cpu</code> and <code>limits.cpu</code>.</details>
-<details><summary>Hint 3</summary>Apply both objects, then describe each one in the exercise namespace.</details>
+<details><summary>Hint 3</summary>Use <code>ns_lab apply -f guardrails.yaml</code>, then <code>ns_lab describe limitrange cpu-guardrails</code> and <code>ns_lab describe quota alpha-budget</code>.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -661,7 +661,7 @@ Deploy a simple NGINX application representing the stable version of your app. I
 
 <details><summary>Hint 1</summary>Which controller maintains the requested number of Pods?</details>
 <details><summary>Hint 2</summary>Compare its selector with the Pod template labels.</details>
-<details><summary>Hint 3</summary>Set three replicas, apply the manifest, and wait for the rollout before inspecting labels.</details>
+<details><summary>Hint 3</summary>Apply <code>web-v1.yaml</code> with <code>ns_lab apply -f web-v1.yaml</code>, then use <code>ns_lab rollout status deployment/web-v1 --timeout=120s</code> before inspecting labels.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -704,7 +704,7 @@ Create a Service named `web-svc` that routes traffic to your application. The Se
 
 <details><summary>Hint 1</summary>Which label is shared by both versions?</details>
 <details><summary>Hint 2</summary>Use that label in the Service selector and expose port 80.</details>
-<details><summary>Hint 3</summary>Apply the Service and repeat its endpoint check until the three stable Pods appear.</details>
+<details><summary>Hint 3</summary>Use <code>ns_lab apply -f web-svc.yaml</code>, then repeat <code>ns_lab get endpoints web-svc</code> until the three stable Pods appear.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -739,7 +739,7 @@ Deploy a single Pod representing the new `v2` version of your application. Label
 
 <details><summary>Hint 1</summary>Which label makes the Pod eligible for the existing Service?</details>
 <details><summary>Hint 2</summary>Give it the shared app label and a distinct version label.</details>
-<details><summary>Hint 3</summary>Wait for the Pod to become Ready, then compare endpoint names with the previous check.</details>
+<details><summary>Hint 3</summary>Apply <code>web-v2-canary.yaml</code>, use <code>ns_lab wait --for=condition=Ready pod/web-v2-canary --timeout=120s</code>, then compare endpoint names with the previous check.</details>
 
 <details><summary><strong>Solution</strong></summary>
 
