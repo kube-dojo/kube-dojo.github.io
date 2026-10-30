@@ -6,6 +6,8 @@ Add detailed patch notes here, newest first, with absolute `https://kube-dojo.gi
 
 ## October 2026
 
+- **2026-10-30 — Find related lessons while planning study scope.** [Plan Study Scope by Goal](https://kube-dojo.github.io/prerequisites/philosophy-design/module-1.3-what-we-dont-cover/) replaces misleading site-wide exclusion wording with goal-based planning and links to existing cloud, operations, networking and tooling lessons. The original lesson URL and section bookmark remain available.
+
 - **2026-10-30 — Choose shared labels and check quota defaults.** [Namespaces and Labels](https://kube-dojo.github.io/prerequisites/kubernetes-basics/module-1.7-namespaces-labels/) explains application label conventions and why a Pod can be rejected when required requests or limits are missing after defaulting.
 
 - **2026-10-30 — Understand namespace boundaries and budgets.** [Namespaces and Labels](https://kube-dojo.github.io/prerequisites/kubernetes-basics/module-1.7-namespaces-labels/) clarifies system namespaces, quota requirements, memory limits and endpoint checks.

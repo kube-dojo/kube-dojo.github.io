@@ -1,0 +1,13 @@
+# Study scope and existing lesson navigation
+
+This correction under #2278 follows the user's report that Module 1.3's “What We Deliberately Skip” section names subjects already taught elsewhere on the site. The title becomes “Plan Study Scope by Goal,” the section becomes “Plan Scope by Goal,” and the tables link to existing English lessons. The original slug and `#what-we-deliberately-skip` bookmark are preserved. The Philosophy & Design index and learner news use the corrected framing.
+
+The inspected source lessons establish actual coverage of EKS, GKE, AKS, cloud IAM, multi-cluster architecture, node provisioning, Kubernetes disaster recovery, cloud costs, BGP, service mesh, Cilium, ArgoCD, Terraform, Prometheus and Grafana. Their presence does not establish complete coverage of every product feature or a quality verdict for those lessons. Custom CNI authorship, project-specific federation and organization-wide recovery requirements remain additional depth to assess. The existing task-by-task certification cautions and executable examples are unchanged; no new exam-version claim is introduced.
+
+The changed module SHA-256 is `55086e2e9645781fabee44049a5e023b2122722eac1d90e1a8c99d767fc99413`; the changed section-index SHA-256 is `3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5`. All 16 unique table-link targets were checked against existing frontmatter slugs. Astro's Markdown processor retained the compatibility anchor and generated the new heading ID. Full branch CI, exact-head independent scoped review and subsequent deployment/native navigation checks are separate delivery gates.
+
+## Acceptance boundary
+
+The [previous module acceptance](2026-10-28-study-page-acceptance.md) binds the earlier module digest `0e3e62739367de024926a29e0c38ce1d3b39bd9fc18988335c058d7077f45acc`. The previous index record likewise binds its older bytes. Both original ledger rows and source receipts remain unchanged, so the canonical reporter must mark them stale after this correction, exclude their old acceptance assertions from current totals, and require genuine current-page evidence before acceptance returns. This preserves historical evidence without rebinding it to changed content.
+
+This is a scoped framing/navigation delivery, not a new whole-page source/editorial verdict, score, practice run or acceptance decision. Historical whole-page invocation counts are being reconciled and are unknown here; no whole-page review is invoked or allowance reset. The new scoped PR review has its own five-attempt ceiling and has not yet been invoked at preparation time. The wider site upgrade remains active, with reader-feedback features deferred.
