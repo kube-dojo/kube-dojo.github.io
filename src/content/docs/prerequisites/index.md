@@ -23,7 +23,7 @@ This hub is the front door to KubeDojo. It covers the terminal, containers, Kube
 
 This layer gives later tracks a shared foundation; use it when these topics are unfamiliar.
 
-> **Optional first-terminal preview:** You can preview the existing [terminal opening and prompt guide](zero-to-terminal/module-0.2-what-is-a-terminal/#opening-the-terminal-and-reading-the-prompt) and [first safe-command exercise](zero-to-terminal/module-0.2-what-is-a-terminal/#hands-on-exercise-your-first-terminal-session) before starting the full sequence. Return here and follow [Zero to Terminal](zero-to-terminal/) in order; the preview does not replace its modules. Use Module 0.2's own platform guidance before attempting its exercise.
+> **Optional first-terminal preview:** You can preview the existing [terminal opening and prompt guide](zero-to-terminal/module-0.2-what-is-a-terminal/#opening-the-terminal-and-reading-the-prompt) and [first-terminal-session exercise](zero-to-terminal/module-0.2-what-is-a-terminal/#hands-on-exercise-your-first-terminal-session). Then start [Zero to Terminal](zero-to-terminal/) at [Module 0.1](zero-to-terminal/module-0.1-what-is-a-computer/) and follow it in order; the preview does not replace its modules. Before exercises, read the section's setup and each module's platform and cost notes where applicable.
 
 ---
 
@@ -72,17 +72,17 @@ The practical Kubernetes starter path with `kubectl`, Pods, Deployments, Service
 | 1.8 | [YAML for Kubernetes](kubernetes-basics/module-1.8-yaml-kubernetes/) |
 
 ### [Philosophy & Design](philosophy-design/) — 4 modules
-Why Kubernetes works the way it does, and which legacy patterns are not worth your time.
+Kubernetes design choices and the topics this curriculum skips or defers; assess a technology's value in your own context.
 
 | Module | Topic |
 |--------|-------|
 | 1.1 | [Why Kubernetes Won](philosophy-design/module-1.1-why-kubernetes-won/) |
 | 1.2 | [Declarative vs Imperative](philosophy-design/module-1.2-declarative-vs-imperative/) |
 | 1.3 | [What We Don't Cover](philosophy-design/module-1.3-what-we-dont-cover/) |
-| 1.4 | [Dead Ends - Technologies to Avoid](philosophy-design/module-1.4-dead-ends/) |
+| 1.4 | [Dead Ends - Technologies We Skip](philosophy-design/module-1.4-dead-ends/) |
 
 ### [Git Deep Dive](git-deep-dive/) — 10 modules
-The professional Git path. Internals, rebasing, recovery, scale, collaboration, and the bridge into GitOps.
+Explore Git internals, rebasing, recovery, scale, collaboration, and the bridge into GitOps.
 
 | Module | Topic |
 |--------|-------|
@@ -129,9 +129,9 @@ Git Deep Dive
 Modern DevOps
 ```
 
-Use `Git Deep Dive` after you are comfortable with basic Git from `Zero to Terminal`. It is not required before `Cloud Native 101` or `Kubernetes Basics`, but it should be treated as a practical prerequisite before serious IaC, GitOps, CI/CD, and team workflows.
+Use [Git Deep Dive](git-deep-dive/) after you are comfortable with basic Git from [Zero to Terminal](zero-to-terminal/). It is not required before Cloud Native 101 or Kubernetes Basics; this curriculum recommends it before Modern DevOps and its IaC, GitOps, and CI/CD topics.
 
-The practical rule is simple:
+For this curriculum, the suggested sequence is:
 
 ```text
 0.6 Git Basics
@@ -141,25 +141,22 @@ Git Deep Dive
 Modern DevOps / IaC / GitOps / CI-CD
 ```
 
-## Git Is Not Optional For Modern Infrastructure Work
+## Recommended Git Preparation for Modern DevOps
 
-The sequence matters:
-- `0.6 Git Basics` in `Zero to Terminal` gives you the minimum viable workflow
-- `Git Deep Dive` turns Git into an operational tool rather than just a backup mechanism
-- only after that do `Modern DevOps`, `IaC`, and `GitOps` become much easier to use correctly
-
-If a learner skips the Git path, they can still read later modules, but they will be missing one of the core skills behind modern infrastructure practice.
+Start with [Git Basics](zero-to-terminal/module-0.6-git-basics/), then use [Git Deep Dive](git-deep-dive/) to practice repository history, collaboration, and recovery before continuing to [Modern DevOps](modern-devops/).
 
 ## Common Next Routes
 
-- `Prerequisites -> Linux` if you want stronger systems depth before operations-heavy work
-- `Prerequisites -> Kubernetes Certifications` if you want external goals and hands-on pressure
-- `Prerequisites -> Cloud` if your main goal is hyperscaler fluency after cluster basics
-- `Prerequisites -> AI` if you want a true beginner-friendly path into AI literacy and disciplined AI use
-- `Prerequisites -> AI/ML Engineering` if you already know you want to build AI systems, run local models, or move toward MLOps
-- `Prerequisites -> Modern DevOps` should usually mean `Zero to Terminal -> Git Deep Dive -> Modern DevOps`, not a direct jump that skips Git maturity
+- [Linux](../linux/) for deeper systems knowledge before operations-heavy work
+- [Kubernetes Certifications](../k8s/) for certification-oriented study
+- [Cloud](../cloud/) for provider-specific cloud foundations and managed Kubernetes topics
+- [AI](../ai/) for beginner-oriented AI literacy and AI working habits
+- [AI/ML Engineering](../ai-ml-engineering/) for building AI systems, local models, or MLOps
+- [Modern DevOps](modern-devops/) after the recommended Git preparation above
 
-For a beginner route, place `Platform Engineering` after Kubernetes, Linux, or Cloud foundations rather than making it the immediate next stop.
+Before [Platform Engineering](../platform/), build comfort with Kubernetes, Linux troubleshooting, Git collaboration, and cloud-native vocabulary. Use its [entry checklist](../platform/#do-not-start-here-yet) to assess your readiness.
+
+Check each destination's entry requirements and choose the foundations that fit your goal. The full cloud-native route is a suggestion, not a requirement to complete all 44 modules before every path, including beginner AI.
 
 ---
 

@@ -16,7 +16,7 @@ Explore recent improvements to practice and troubleshooting:
 
 - **See how configuration reaches a container.** [ConfigMaps and Secrets](/prerequisites/kubernetes-basics/module-1.6-configmaps-secrets/) compares configuration changes with what a running container uses, in a separate practice namespace.
 
-- **Practice terminal files with clearer boundaries.** [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) uses a disposable workspace and helps you diagnose permissions and filenames.
+- **Plan foundational study and practice terminal files.** [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) uses a disposable workspace and helps you diagnose permissions and filenames. Plan your next step with [Prerequisites](/prerequisites/) and the [Platform entry checklist](/platform/#do-not-start-here-yet).
 
 - **Investigate Linux problems systematically.** [Systematic Troubleshooting](/linux/operations/troubleshooting/module-6.1-systematic-troubleshooting/) guides you from observations to hypotheses and bounded tests.
 
