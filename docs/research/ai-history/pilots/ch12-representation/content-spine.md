@@ -4,17 +4,17 @@ Source-only author proposal, not narrative prose, a source grade, independent ap
 
 ## Reader question and documented constraint
 
-**Question:** when a program needs the right-hand part of a formula, how does it identify that part and bring it into working memory?
-**Constraint:** the structural tree and the storage list are different organizations. A identifies the whole expression's storage location; P records an element's path in the tree. Storage order is arbitrary in this specification and supports searching, rather than supplying the expression's tree structure (RP05, RP07, RP10). Do not imply the program reads mathematical prose or that a computer run is being reconstructed.
+**Question:** how does the program identify the element heading a formula's right-hand subexpression and bring that single element into working memory?
+**Constraint:** in the paper's model, information to be processed is brought from storage into working memory and then returned (p. 11 / RP09). A identifies the whole expression's storage location; P records an element's tree path. Storage order is arbitrary and used only for searching, because each element's own information locates it in the tree (RP05, RP07, RP10). Retrieval transfers one element, not its entire associated subexpression.
 
 ## Forward content sequence
 
-1. Bridge from LL to representation: LL is an IPS of memories/processes; LT is a particular IPP with rules for when processes occur. Determinate behavior is conditioned on initial/boundary information (RP01).
-2. Introduce the paper's actual X(1.7), not an invented theorem. Contrast an element with symbols recording its properties; negation is represented by G rather than an extra element (RP02–RP06).
-3. Follow the same expression from its tree into the paper's explicitly possible storage list. Explain A versus P before giving a memory operation (RP07–RP10).
-4. Use the source's FR operation for a transparent reader walkthrough, with explicit assumed input memory. Separate this derived instantiation from what the paper itself directly prints (D01).
-5. Put the operation in its language context: working-memory reference places, special T/P/Q lists, processing/control components, routine sequencing and limits on defining new IPs (RP11–RP21). A routine is not automatically a new IP.
-6. Handoff: locating and transferring part of an expression makes a representation inspectable; choosing a successful proof-search method is a further question. These pages alone do not supply an executed proof of X(1.7).
+1. Give retrieval its documented reason: processing uses working memory, not just the storage list (RP09). LL/LT formal definitions may be shortened; if retained, keep their specification/IPP sense and initial/boundary-information condition (RP01).
+2. Introduce X(1.7) as the paper's name for the whole expression beside the formula (p. 9); introduce A(1.7) as its storage location when A first appears (pp. 10, 12), before the lookup. Preserve declared glyph normalization and G as a count of negation signs (RP02–RP07).
+3. Follow the tree into the explicitly possible storage list. Add one RP11-backed introduction: specially located lists hold main elements of axioms/proved theorems (T), active problems (P), and inactive problems (Q). Say that list name P differs from position field P; do not imply these lists store entire expressions inside one working element (pp. 11–13).
+4. Demonstrate exactly one derived `FR x y` lookup. After transfer, state that y holds only the ∨ element, carrying P=R and A(1.7), not the entire q ∨ ¬p subexpression. Reaching its child elements would require further operations; none are demonstrated. Use one clear illustrative-not-reported-run boundary, not repeated proof disclaimers (D01 / RP09, RP14–RP15).
+5. Put the operation in its language context without an inventory of new terms: processing/control distinction and routine definition (RP17–RP19). If new-IP conditions are retained, preserve the source's format-to-conditions reasoning and subsequent-reference scope (RP21); a routine is not automatically a new IP.
+6. Keep the handoff honest: this retrieval does not explain heuristic proof-search choices. The old section's search explanation is not dispensable merely because this example is accurate; the adoption blocker in budget-and-open-questions.md must be resolved before replacement.
 
 ## Source-derived example data
 
@@ -37,8 +37,7 @@ The two occurrences named p occupy different positions. The source gives H=3 var
 | Input | Suppose working memory x holds the main element of X(1.7), including A(1.7) and position none. | Author-chosen initial condition using the p. 9 tree and pp. 10–11 fields; not a reported execution. |
 | Locate | Apply the source's `FR x y`; append R to the empty/no-direction root path, yielding R. | Generic FR rule printed on p. 13; do not concatenate the literal word none into a new path. |
 | Search | Search A(1.7)'s possible list in order until the element with P=R is found. | pp. 13–14 algorithm plus p. 12's possible order; that list's third element is v/R. |
-| Transfer | Put that element into working memory y. | p. 14's transfer completes this one source-derived operation; it does not change or prove the formula. |
-| Optional second lookup | If the writer needs it, apply the same rule from y's P=R to a fresh working memory z, obtaining RR and the -p element. | Derived repetition of the same rule, not a source-printed trace or proof routine; omit if it costs words without new explanation. |
+| Transfer | Put only the ∨ element into y, with P=R and whole-expression location A(1.7). | pp. 10–11, 14: one element, not the entire q ∨ ¬p subexpression. Its references support later child lookups; no further operation is demonstrated here. |
 
 **Hard limit:** Figure 2 on p. 15 is a generic control network with numbered instructions; it does not label these instructions FR or apply them to X(1.7). Explain the routine concept separately. Do not present the walkthrough as an actual LT routine, a proof, machine output, or a historical hand session. How FR sets H/J/K or handles a missing right subelement is UNKNOWN within the selected passage; do not invent those behaviors.
 
@@ -46,8 +45,8 @@ The two occurrences named p occupy different positions. The source gives H=3 var
 
 The existing published opening's line 70 contrasts an early machine name with later theorist usage and suggests a historical shift. P-868 printed p. 3 already names the system logic theorist (LT). Propose removing the implied chronology and recording only contemporaneous labels. This is a source-backed correction proposal, not a site edit or a claim about why either name was chosen (RP22).
 
-## Before any Terra prose pass
+## Terra revision handoff after independent R1
 
-Root should resolve the permitted scope of D01, adopt a replacement budget, and review the atomic proposals/qualifier lock. Terra may reorder and explain verified material, not invent a proof trace, runtime, memory-update rule or motive. Any full executed routine would require a new source scope. Full-chapter GPS/implementation/secondary-source gates remain open; no new source or chapter grade is assigned here.
+Terra revised only terra-prose.md using steps 1–4's source-backed clarity/coverage changes, retaining one lookup and a natural length below900. No proof strategy was invented to fill the adoption gap. A full executed routine would require new scope. Root owns the adoption budget and independent R2; no source grade or chapter clearance is assigned here.
 
-**Prose-stage lead decision:** authorize exactly one explicitly derived root-to-R lookup, omit the optional second lookup, and use ≤900 words as a ceiling rather than a target. Terra's resulting557-word draft is in terra-prose.md. Sol's same-family semantic author check found no material errors; independent source/prose review and actual reviewer scan inspection remain pending. H/J/K and a new diagram are omitted from the prose; no full-chapter contract or source clearance follows.
+**Revision checkpoint:** the 557-word R1 draft is historical at `5158aac9d1f81ce46bbc15fd6dc6ab8299c5834a`; revised Terra prose has589 words. Genuine independent R1 returned NEEDS_CHANGES for adoption coverage (F1) and element/subexpression clarity (F2), while confirming source fidelity through text and actual scan Reads. The earlier same-family check missed these material issues and remains historical. H/J/K values and a new diagram remain omitted; independent exact-head R2 is required, and adoption remains blocked on the search-coverage decision.

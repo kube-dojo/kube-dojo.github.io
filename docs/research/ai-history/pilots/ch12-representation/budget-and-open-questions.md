@@ -15,27 +15,29 @@ Use `src/content/docs/ai-history/ch-12-logic-theorist-gps.md` at base `ccf781c6b
 | Remaining headroom versus historical cap | 4,500 − 4,369 = 131; not a prose expansion allocation |
 | Current How LT Represented Logic | 836 |
 | If that section were replaced by 900 words | 4,369 − 836 + 900 = 4,433; 67 remaining |
-| Actual Terra replacement draft | 557 words; 4,369 − 836 + 557 = 4,090; no formal cap or section-range clearance |
+| Historical R1 draft at 5158aac9 | 557 words; then 4,369 − 836 + 557 = 4,090; not adoption clearance |
+| Revised lookup draft | 589 words; hypothetical replacement alone gives 4,369 − 836 + 589 = 4,122; retained/moved search prose still needs budgeting |
 | 1,100-word representation section | 4,633, exceeding 4,500 by 133 if everything else remains unchanged |
 
-**Proposal:** replace the existing 836-word representation section, do not append this example to it. Use 900 as a cautious planning ceiling only; supported natural length is not yet known. Reconcile the historical 900–1,100 section allowance with the whole-chapter cap and any other planned edits before prose signoff. Do not manufacture words to reach 900 or assume that arithmetic confers source clearance.
+**Conditional proposal, adoption blocked (R1-F1):** a full replacement would remove the old section's theorem/problem-list introduction and its explanation of heuristic search versus blind enumeration, subgoals and similarity. Terra must add one RP11-backed T/P/Q introduction with P-list/P-position disambiguation. Root must separately keep, move or source-verify a rewrite of the search explanation and allocate its words before adopting any replacement; the approved opening's brief algorithmic/heuristic contrast does not provide that explanation. Until then, keep the existing published search paragraphs in place; this unpublished pilot is not an adoption-ready whole-section replacement.
 
 ## Content substitution, not accumulated length
 
 - Replace the generic paper-workspace illustration with X(1.7)'s actual tree/list and one explicitly derived FR lookup. Let A/P and repeated p positions do the explanatory work.
-- Consolidate repeated inventories of lists, memories and routines around the single example rather than repeating them in several paragraphs.
+- Restore one source-backed introduction of specially located T/P/Q main-element lists; consolidate other repeated inventories around the example, without deleting coverage needed later in the chapter.
 - Replace broad novelty/cognition/representation summaries with precise working/storage and process/control distinctions; any historical or psychological interpretation needs its own source authority.
 - Preserve only the routine conditions needed to prevent a false claim that any sequence is a new IP. Figure 2 can be explained conceptually; it cannot become the lookup's supposed original execution trace.
 - The narrow naming-chronology correction belongs in a separate adoption decision about the old opening; the approved 725-word opening already avoids that chronology. No approved pilot edit is proposed.
+- **Search-coverage hold:** preserve the old representation paragraphs beginning The program also had to choose and That guidance was the historical novelty until Root names a retained location or a source-verified move/rewrite (for example, in What LT Did and Did Not Prove). This hold does not certify those old claims. No new search strategy is authorized in this source scope; adoption needs a dependency check of the later theorem/problem-list and heuristic references, plus revised word accounting.
 
-## Questions Root must resolve before Terra
+## Questions and status after independent R1
 
-1. Is D01's openly derived FR instantiation acceptable as a reader walkthrough? If an actual recorded LT proof routine is required, this source scope is insufficient.
-2. Which count/exclusion contract governs the full chapter, including inline reader aids? The 131-word operational margin cannot be treated as formal clearance.
-3. Can the replacement use a ≤900 ceiling with supported length only, or must the historical layer plan be explicitly revised? This packet changes no contract/status file.
-4. Should H/J/K be briefly mentioned with the paper's 3/2/3 values, or omitted to keep focus? Do not infer FR updates for those spaces.
-5. Are tree/list/FR sufficient without reproducing a diagram? Any future diagram must preserve the actual expression, positions and possible-order qualifier, and needs separate visual verification.
+1. **Resolved for the pilot:** Root allows one explicitly derived FR lookup, with no second lookup. An actual recorded proof routine remains outside scope. R1-F2 still requires the revised prose to state single-element transfer with A/P, not whole-subexpression transfer.
+2. **Open for adoption:** full-chapter count/exclusion contract and search-coverage disposition above. The 131-word margin is not formal clearance or a complete post-adoption budget.
+3. **Resolved for drafting / open for adoption:** ≤900 is a ceiling, not a target; supported natural length is allowed. The historical layer allowance and future retained/moved search words still need Root's reconciliation.
+4. **Resolved for this pass:** omit H/J/K numeric values; never infer FR updates for those spaces.
+5. **Resolved for this pass:** no new diagram. Any future diagram needs exact expression/positions/possible-order and separate visual verification.
 
 Full-chapter P-1584/GPS61 originals and claim verification, NSS57 performance/run evidence, early IPL/Programming-LT implementation sources, CBI91 access (still HTTP 403), and the contract's secondary-source minimum remain unresolved. No new fetching, grades, readiness promotion, independent review, reader results or chapter acceptance is claimed. The approved opening and published site are unchanged; Root owns any next prose/review packet.
 
-**Prose-stage decisions:** Root allowed D01 as one explicit teaching instantiation and a ≤900 ceiling, with no padding. The resulting557 words use the actual tree/list/FR operation without H/J/K or a new diagram. Questions about the formal full-chapter count and historical section allowance remain open before adoption; this draft is not permission to publish or alter the contract.
+**Revision checkpoint:** Terra's revised draft is 589 words, SHA-256 `a16718ecae46465a77be91f7f4fe9be98f19f0017676651538da735a85d39c14`, counted by excluding the heading and splitting prose on whitespace. It addresses F1/F2 with T/P/Q, precise X/A introductions, the p. 11 working-memory reason, a single-element result and one clear D01 boundary. Independent R1 remains NEEDS_CHANGES; exact-head R2 is required. No publication, contract change or chapter adoption is authorized.
