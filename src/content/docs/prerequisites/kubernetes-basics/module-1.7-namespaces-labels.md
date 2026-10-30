@@ -31,7 +31,7 @@ The outage is not really about one careless command. It is about a cluster that 
 
 This module teaches the two organizational primitives that make Kubernetes usable beyond toy demos. Namespaces divide the API into logical rooms, while labels attach structured identity to the objects inside those rooms. You will learn what those boundaries actually isolate, what they absolutely do not isolate, how selectors allow decoupled controllers to cooperate, and how namespace-level policy turns a shared cluster into a platform that can survive normal human mistakes. That shared vocabulary also makes incident review faster because ownership, blast radius, and cleanup scope become visible in ordinary commands.
 
-Throughout the commands, this module uses the full `kubectl` binary name so every copied example works in interactive shells and scripts without relying on local aliases. The Kubernetes examples target version 1.35 or newer behavior, and the concepts are stable across modern clusters even when individual cloud distributions add their own admission policies or default labels.
+Throughout the commands, this module spells out `kubectl` rather than relying on local aliases. The Kubernetes examples target version 1.35, although individual cloud distributions can add their own admission policies or default labels.
 
 ```bash
 kubectl version --client
@@ -69,7 +69,7 @@ graph TD
     end
 ```
 
-The diagram shows the boundary that often surprises new operators. `Pods`, `Services`, `ConfigMaps`, `Secrets`, `Roles`, and most application-level objects belong to one namespace. `Nodes`, `PersistentVolumes`, `StorageClasses`, `CustomResourceDefinitions`, `ClusterRoles`, and many admission policies are cluster-scoped, so a namespace-scoped `Role` cannot grant access to them. This split is why a monitoring agent can run as a `DaemonSet` in `monitoring` while still needing a `ClusterRole` if it must list every `Node` in the cluster.
+The diagram shows the boundary that often surprises new operators. `Pods`, `Services`, `ConfigMaps`, `Secrets`, `Roles`, and most application-level objects belong to one namespace. `Nodes`, `PersistentVolumes`, `StorageClasses`, `CustomResourceDefinitions`, `ClusterRoles`, and `ValidatingAdmissionPolicies` are cluster-scoped, so a namespace-scoped `Role` cannot grant access to them. This split is why a monitoring agent can run as a `DaemonSet` in `monitoring` while still needing a `ClusterRole` if it must list every `Node` in the cluster.
 
 ```text
 +------------------------------------------------------------+
@@ -92,7 +92,7 @@ The strongest namespace guarantees are API scoping guarantees. A namespaced obje
 
 The weakest namespace guarantee is network isolation, because there is none by default. Kubernetes networking starts from a flat model where every Pod can usually reach every other Pod IP, regardless of namespace, unless a Container Network Interface plugin and `NetworkPolicy` objects enforce stricter rules. This default makes service discovery simple for beginners, but it means a production hardening plan cannot stop at namespaces. A namespace is the place where you attach policy; it is not the policy itself.
 
-Kubernetes creates several namespaces before you add your own. For `kubectl` outside a cluster, a command without an explicit namespace uses the current context's namespace; if that is unset, it falls back to `default`. With in-cluster authentication, `kubectl` defaults to the ServiceAccount namespace unless `POD_NAMESPACE` overrides it. The `kube-system` namespace holds cluster services such as CoreDNS, networking components, and infrastructure controllers. The `kube-public` namespace is readable by all users and is now rarely central to application work. The `kube-node-lease` namespace contains Lease objects used for node heartbeats.
+Kubernetes creates several namespaces before you add your own. For `kubectl` outside a cluster, a command without an explicit namespace uses the current context's namespace; if that is unset, it falls back to `default`. With in-cluster authentication, `kubectl` defaults to the ServiceAccount namespace unless `POD_NAMESPACE` overrides it. The `kube-system` namespace contains objects created by the Kubernetes system; for example, the DNS debugging guide checks for DNS Pods there. The `kube-public` namespace is conventionally readable by all users, including unauthenticated users; that convention does not require public access to every resource there. The `kube-node-lease` namespace contains Lease objects used for node heartbeats.
 
 Mature clusters treat `default` as a warning light rather than a convenient home. If production workloads, experiments, and one-off debugging Pods all live there, ownership becomes ambiguous and destructive commands become harder to review. A better habit is to create purpose-built namespaces such as `team-frontend`, `team-backend`, `observability`, `payments-prod`, or `payments-staging`, then put the namespace in every manifest. Explicit placement makes the desired boundary reviewable in Git and visible in incident output.
 
@@ -349,7 +349,7 @@ In that metadata block, `dept=it` is a label because the IT department wants to 
 
 Namespaces become operationally serious when you attach resource policy to them. Without policy, a namespace is mostly an organizational boundary: useful for names, RBAC, and visibility, but not enough to stop a runaway workload. A Pod without CPU and memory requests can be difficult for the scheduler to place responsibly, and a Pod without limits can consume far more than the developer expected. In a shared cluster, that behavior becomes a noisy-neighbor problem.
 
-Kubernetes resource management starts with two numbers. A request is the amount of CPU or memory a container asks the scheduler to reserve when placing the Pod. A limit is the ceiling the runtime enforces when the container consumes resources. If a container exceeds its memory limit, it may be terminated with an OOMKilled reason. If it exceeds its CPU limit, it is throttled rather than immediately killed. Requests influence placement; limits influence runtime behavior.
+Kubernetes resource management starts with two numbers. A request is the amount of CPU or memory a container asks the scheduler to reserve when placing the Pod. CPU limits are enforced by throttling. Memory limit enforcement is reactive: under memory pressure, a container exceeding its limit may be terminated with an OOMKilled reason rather than stopped at an instantaneous ceiling. Requests influence placement; limits influence runtime behavior.
 
 ResourceQuotas set aggregate budgets for a namespace. They can limit total requested CPU, total requested memory, total limits, object counts, storage claims, LoadBalancer Services, and other resources. The quota is enforced by admission control when an object is created or updated. If a new Pod would push the namespace over budget, the API server rejects the request before the scheduler ever sees it. This is a hard policy gate, not a background recommendation.
 
@@ -371,7 +371,7 @@ spec:
 
 If the `team-frontend` namespace is already using `3.5` CPU cores in requests, a new Pod requesting `1` additional CPU core would exceed the `requests.cpu: "4"` budget. The API server returns a forbidden error, and the Deployment or ReplicaSet remains unable to create the extra Pod. That failure is intentional. The quota protects the rest of the cluster from an unplanned expansion and forces the team to either reduce usage, right-size requests, or negotiate a larger namespace budget.
 
-LimitRanges solve a different problem. Once you enforce CPU or memory quota, every admitted container generally needs resource requests and limits so Kubernetes can calculate the budget impact. Many developers forget those fields, especially in early learning environments or copied manifests. A LimitRange can inject defaults, enforce minimums and maximums, and prevent one container from consuming the entire namespace budget. It is a guardrail for each object, while ResourceQuota is the shared account balance.
+LimitRanges solve a different problem. Depending on the CPU or memory resources specified in a quota, containers may need requests, limits, or both so Kubernetes can calculate their budget impact. A LimitRange can inject defaults, enforce minimums and maximums, and prevent one container from consuming the entire namespace budget. It is a guardrail for each object, while ResourceQuota is the shared account balance.
 
 ```yaml
 apiVersion: v1
@@ -582,7 +582,7 @@ Success criteria:
 
 Set `KUBEDOJO_LAB_CONTEXT` to the independently confirmed lab context before setup; the literal name `default` is refused. Use one fresh Bash terminal for setup, all tasks, and cleanup. The guard cannot prove ownership or disposability; do not share the exercise namespace with another writer. It prints the generated namespace and pins each request to it without switching the active context or changing saved preferences.
 
-Setup also requires that lab context to be the current context. If you switch it yourself, record the previous name so you can restore it afterward; cleanup does not restore that separate change.
+Setup also requires that lab context to be the current context. If you switch it yourself, record the previous name so you can restore it afterward; cleanup does not restore that separate change. The generated name also assumes an external `date` command that supports `+%s`, as in the linked FreeBSD manual; check your environment before starting.
 
 <details><summary><strong>Solution</strong></summary>
 
@@ -609,7 +609,7 @@ fi
 
 Continue only after setup succeeds. Run setup once: re-pasting disables the helper while preserving the earlier UID for cleanup. If creation fails or returns no UID, inspect the printed namespace manually: cleanup has no ownership evidence to delete it. Stop on any failed task command and clean up before retrying in a fresh terminal.
 
-Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. This uses `mktemp -d` with a template ending in at least three `X` characters; see the [FreeBSD](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1) and [GNU](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html) manuals. If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
+Create a fresh scratch directory for the four manifest files and enter it before copying the YAML solutions into their named files. This uses `mktemp -d` with a template ending in eight `X` characters; see the [FreeBSD manual](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1). If this fails, stop and run cleanup; the namespace receipt remains available. Keep the directory for inspection and remove it manually only when you no longer need it.
 
 ```bash
 NS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/namespace-lab.XXXXXXXX")" && printf 'Manifest directory: %s\n' "$NS_DIR" && cd "$NS_DIR"
@@ -737,7 +737,7 @@ ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targ
 ns_lab get pods -l app=web,version=v1
 ```
 
-Endpoint updates are asynchronous: repeat the endpoint check until three stable Pod names and addresses appear before adding the canary; investigate if they do not converge. This prints every ready member instead of truncating a table. The legacy Endpoints API has been deprecated since Kubernetes 1.33; its warning is expected and EndpointSlices are its replacement.
+Endpoint updates are asynchronous: repeat the endpoint check until three stable Pod names and addresses appear before adding the canary; investigate if they do not converge. This prints every ready member instead of truncating a table. The legacy Endpoints API has been deprecated since Kubernetes 1.33; a warning may be displayed, and EndpointSlices are its replacement.
 </details>
 
 ### Task 5: The Canary Release
@@ -774,7 +774,7 @@ ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targ
 ns_lab get pods --show-labels
 ```
 
-Repeat the endpoint check until it lists `web-v2-canary` and three `web-v1` Pod names with their IPs; investigate if it does not converge. The deprecation warning is expected and separate from this membership check. Because the Service selector checks only `app=web`, both versions qualify for traffic.
+Repeat the endpoint check until it lists `web-v2-canary` and three `web-v1` Pod names with their IPs; investigate if it does not converge. A deprecation warning may be displayed and is separate from this membership check. Because the Service selector checks only `app=web`, both versions qualify for traffic.
 </details>
 
 ### Optional Stretch: Change the Service Selector
@@ -850,6 +850,9 @@ cleanup_ns_lab
 ## Sources
 
 - [Kubernetes v1.35 documentation: Namespaces](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)
+- [Kubernetes source: CustomResourceDefinition scope](https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition/strategy.go) and [ValidatingAdmissionPolicy scope](https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/pkg/registry/admissionregistration/validatingadmissionpolicy/strategy.go)
+- [Kubernetes source: DNS debugging](https://raw.githubusercontent.com/kubernetes/website/8817d358864b70a9710c5ad34f78df6a239be33d/content/en/docs/tasks/administer-cluster/dns-debugging-resolution.md)
+- [FreeBSD date manual](https://man.freebsd.org/cgi/man.cgi?query=date&sektion=&manpath=FreeBSD+15.1-RELEASE+and+Ports.quarterly)
 - [Kubernetes v1.35 documentation: Labels and Selectors](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
 - [Kubernetes documentation: Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
 - [Kubernetes v1.35 documentation: Resource Quotas](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/)
@@ -862,7 +865,7 @@ cleanup_ns_lab
 - [Kubernetes documentation: Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
 - [Kubernetes kubectl reference: config set-context](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/kubectl_config_set-context/)
 - [RFC 7396: JSON Merge Patch](https://www.rfc-editor.org/rfc/rfc7396.txt), [YAML 1.2.2 core schema](https://yaml.org/spec/1.2.2/#1032-tag-resolution)
-- [FreeBSD mktemp](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1), [GNU mktemp](https://www.gnu.org/software/coreutils/manual/html_node/mktemp-invocation.html)
+- [FreeBSD mktemp](https://github.com/freebsd/freebsd-src/blob/b2c76c41be32f904179efed29c0ca04d53f3996c/usr.bin/mktemp/mktemp.1)
 
 ## Next Module
 
