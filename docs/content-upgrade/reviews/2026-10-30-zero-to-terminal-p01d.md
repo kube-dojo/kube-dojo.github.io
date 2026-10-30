@@ -24,8 +24,9 @@ Previous page SHA-256: `8bf989be5319347e1071d62226fb1db4a381c64b9cae8bcbc802c5fb
 - Quiz5 explicitly supplies comparable machines, sufficient storage and a
   memory-demanding workload. Terminal/shell roles and normal saved-data retention
   have boundaries; the laptop/server OS model is no longer a universal claim.
-- Existing history, conditional ProfilesA/B, substantive explanations, outcomes,
-  route/frontmatter and optional Kubernetes preview are preserved.
+- Existing history, conditional ProfilesA/B, substantive explanations,
+  route/frontmatter and optional Kubernetes preview are preserved. Outcome1 is
+  refined to identify missing evidence; the other outcomes remain unchanged.
 
 ## Author evidence and checks
 
@@ -38,9 +39,10 @@ Primary locators: GNU `df` DESCRIPTION/`-i`; systemd `os-release` PRETTY_NAME an
 optional VERSION fields; Apple Storage's version-specific paths; Microsoft device
 information and Storage; Get-PSDrive's logical-drive examples; POSIX.1-2024 Shell
 Introduction and Microsoft's terminal FAQ; procps `top` memory/swap totals and
-page-fault fields; minikube requirements; `write(2)` NOTES.
-The module's Sources links identify these documents. Two unrelated/unavailable
-vendor links are replaced. The archived AI Shell definition was replaced by
+page-fault fields; `write(2)` NOTES. These documents are linked in Sources.
+Minikube requirements informed Quiz5's assumptions but are research context,
+not a module citation. Two unrelated/unavailable vendor links are replaced.
+An unshipped author draft's archived AI Shell citation was replaced by
 the complete primary POSIX chapter and maintained Microsoft terminal FAQ; its
 fragment exists. POSIX supports the command-language-interpreter definition,
 not terminal emulation or Bash extensions. A retrieved GNU topic was excluded
