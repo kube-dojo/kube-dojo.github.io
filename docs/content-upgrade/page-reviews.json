@@ -332,7 +332,7 @@
       "disposition": "revise",
       "reviewer_refs": ["https://github.com/kube-dojo/kube-dojo.github.io/issues/3685#issuecomment-6511455537"],
       "evidence_refs": ["https://github.com/kube-dojo/kube-dojo.github.io/issues/3685#issuecomment-6511460792", "docs/content-upgrade/reviews/2026-10-27-yaml-validation-p09c.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "fail", "editorial_review": "fail", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "independent_statuses": {"structural_checks": "unknown", "technical_source": "fail", "editorial_review": "unknown", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
       "path": "prerequisites/philosophy-design/index.md",
