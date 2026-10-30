@@ -668,8 +668,8 @@
       "page_digest": "sha256:f4a194ad83a8e1d31fb8b65e5327ce4cb19147e8a7fde28619085dd7913cf188",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md", "docs/content-upgrade/reviews/2026-10-30-namespace-source4-followup.md", "docs/content-upgrade/reviews/2026-10-30-namespace-claim-precision.md"],
-      "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md", "docs/content-upgrade/reviews/2026-10-30-namespace-source4-followup.md", "docs/content-upgrade/reviews/2026-10-30-namespace-claim-precision.md", "docs/content-upgrade/reviews/2026-10-30-namespace-publication-status.md"],
+      "independent_statuses": {"page_presence": "pass", "structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pass"}
     },
     {
       "path": "prerequisites/kubernetes-basics/module-1.6-configmaps-secrets.md",
