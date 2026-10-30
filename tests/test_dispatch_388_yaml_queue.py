@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -15,13 +15,15 @@ from scripts.quality import dispatch_388_pilot as pilot
 
 @pytest.fixture(autouse=True)
 def isolated_pilot(tmp_path, monkeypatch):
-    """Patch every route and make an unexpected provider/process call fatal."""
+    """Mock current provider routes; guard invoke and subprocess.run/Popen."""
     reviewers = ("claude", "agy", "qwen", "deepseek")
     originals = {name: getattr(pilot, f"dispatch_{name}_review") for name in reviewers}
     originals["codex"] = pilot.dispatch_codex
+    for name in ("make_worktree", "post_review_comment", "dispatch_backfill"):
+        originals[name] = getattr(pilot, name)
 
     def forbidden(*args, **kwargs):
-        # pytest.fail raises a BaseException, so provider wrappers cannot swallow it.
+        # pytest.fail escapes the current wrappers' except Exception handlers.
         pytest.fail("unexpected provider or process dispatch", pytrace=False)
 
     monkeypatch.setattr(pilot, "invoke", forbidden)
@@ -32,6 +34,10 @@ def isolated_pilot(tmp_path, monkeypatch):
     monkeypatch.setattr(pilot, "PRIMARY_REPO", tmp_path)
     monkeypatch.setattr(pilot, "PILOT_FILE", tmp_path / "scripts/quality/pilot-2026-05-02.txt")
     monkeypatch.setattr(pilot, "LOG", tmp_path / "dispatch.log")
+    for name in ("BRIEF", "WRITER_BRIEF"):
+        prompt = tmp_path / f"{name}.md"
+        prompt.write_text("Test brief: {{BODY_WORDS_TARGET}}\n", encoding="utf-8")
+        monkeypatch.setattr(pilot, name, prompt)
     codex = MagicMock(return_value=MagicMock(ok=True, response="Opened PR: https://github.com/org/repo/pull/1"))
     monkeypatch.setattr(pilot, "dispatch_codex", codex)
     mocks = {name: MagicMock(return_value=("VERDICT: APPROVE", "APPROVE")) for name in reviewers}
@@ -41,10 +47,15 @@ def isolated_pilot(tmp_path, monkeypatch):
     monkeypatch.setattr(pilot, "dispatch_backfill", MagicMock(return_value=True))
     monkeypatch.setattr(pilot, "make_worktree", MagicMock(return_value=tmp_path))
     monkeypatch.setattr(pilot, "post_review_comment", MagicMock())
+    source_recheck = MagicMock(return_value={"status": "unverified"})
+    monkeypatch.setattr(pilot, "recheck_module_source_acceptance", source_recheck)
     monkeypatch.setattr(pilot.time, "sleep", MagicMock())
     log = MagicMock()
     monkeypatch.setattr(pilot, "log", log)
-    return {"reviewers": mocks, "codex": codex, "log": log, "originals": originals}
+    return {
+        "reviewers": mocks, "codex": codex, "log": log,
+        "originals": originals, "source_recheck": source_recheck,
+    }
 
 
 @pytest.fixture
@@ -79,6 +90,14 @@ def test_yaml_queue_dispatch_writes_budget_sidecar_and_defaults_to_5000(
     )
     assert isolated_pilot["codex"].call_args_list[0].args[3] == 3000
     assert isolated_pilot["codex"].call_args_list[1].args[3] == 5000
+    assert isolated_pilot["source_recheck"].call_args_list == [
+        call(tmp_path, "src/content/docs/ai/module-a.md"),
+        call(tmp_path, "src/content/docs/cloud/module-b.md"),
+    ]
+    assert sum(
+        call.args[0]["event"] == "source_acceptance_unverified"
+        for call in isolated_pilot["log"].call_args_list
+    ) == 2
     assert isolated_pilot["reviewers"]["claude"].call_count == 2
     for name in ("agy", "qwen", "deepseek"):
         isolated_pilot["reviewers"][name].assert_not_called()
@@ -121,7 +140,11 @@ def test_real_provider_wrappers_stop_at_invoke_guard(tmp_path, isolated_pilot, n
             real_dispatch(1, "src/content/docs/ai/module-a.md", "module-a")
 
 
-@pytest.mark.parametrize("name", ["run", "Popen"])
-def test_process_guard_fails_before_spawn(isolated_pilot, name) -> None:
+@pytest.mark.parametrize("name", ["make_worktree", "post_review_comment", "dispatch_backfill"])
+def test_real_process_paths_stop_at_subprocess_guard(isolated_pilot, name) -> None:
+    real_call = isolated_pilot["originals"][name]
     with pytest.raises(pytest.fail.Exception, match="unexpected provider or process dispatch"):
-        getattr(pilot.subprocess, name)(["unexpected-command"])
+        if name == "post_review_comment":
+            real_call(1, "test review")
+        else:
+            real_call("module-a", "src/content/docs/ai/module-a.md")
