@@ -11,13 +11,13 @@ Honesty over output is the highest rule. The team should still strive for the in
 - Human editor: sets ambition and book-level direction, resolves material scope or taste disagreements, and spot-reads within available time. Record the material actually read and any decisions; never infer a whole-chapter read or a human verdict.
 - GPT-6.1 Sol: owns the verified factual and conceptual spine, chapter contract, evidence boundaries and author-side semantic check of the prose and its qualifiers.
 - GPT-6.1 Terra: writes and revises clear prose within the verified spine and anchored capacity plan.
-- Claude Opus 5.5: independently challenges OpenAI-authored work, using separate fresh contexts for the mandatory source-fidelity and prose-quality judgments. A reviewer must not review its own authorship. Both contexts have access to the relevant source material, contract and exact prose revision.
+- Claude Opus 5.5: independently challenges eligible OpenAI-authored work, using separate fresh contexts for the mandatory source-fidelity and prose-quality judgments. Both contexts require the relevant source material, contract and exact prose revision.
 
-Sol and Terra are one author family; Sol's semantic check is author QA, not independent review. The two Opus contexts share a reviewer family: this provides two-family, not three-family, diversity. Once this policy change is independently reviewed and merged, it explicitly replaces the historical requirement that the source-fidelity and prose-quality reviewers also be from different families from each other, using the models the user permits; this is not evidence of equivalent empirical quality. Sonnet, Astra, Fable and a third-family route are not authorized by this workflow.
+Sol and Terra are one author family; Sol's semantic check is author QA, not independent review. The two Opus contexts share a reviewer family: this provides two-family, not three-family, diversity. When #3719's policy PR #3720 has been independently reviewed and merged, it explicitly replaces the historical requirement that the source-fidelity and prose-quality reviewers also be from different families from each other, using the models the user permits; this is not evidence of equivalent empirical quality. Sonnet, Astra, Fable and a third-family route are not authorized by this workflow.
 
-If authorship or provider availability prevents an eligible independent assignment within the permitted models, keep that review blocked; do not self-review or infer a third-family grant.
+Authorship is assessed by family: all Claude models share the Claude family; Sol, Terra and earlier Codex models share the OpenAI family. For each review, record the families that authored the retained contract and prose, and assign a reviewer outside every family that authored the material being reviewed. For these Opus stages, retained Claude-authored material is ineligible for Opus review; Claude-authored, mixed-family and unknown-provenance material stays blocked under #2288 pending an explicit eligible review plan. Preserve good content and provenance: rewriting or relabeling does not erase authorship. Do not infer a third-family grant.
 
-Once this policy change is independently reviewed and merged, the former human final pass as a full-chapter prerequisite is replaced by editorial direction and recorded spot reading. Material unresolved scope or taste choices still require the user's decision. A feedback platform or recurring digest is not a gate. This policy change does not promote any chapter or pilot, reset spent review invocations, or change the separate source, editorial, applicable execution and publication gates.
+When #3719's policy PR #3720 has been independently reviewed and merged, the former human final pass as a full-chapter prerequisite is replaced by editorial direction and recorded spot reading. Material unresolved scope or taste choices still require the user's decision. A feedback platform or recurring digest is not a gate. This policy change clears no legacy chapter or pilot, resets no spent invocation count, and does not change the separate canonical whole-page source/editorial audit, applicable execution, publication or lead gates.
 
 Agents should help each other by naming gaps plainly. A useful refusal or downgrade is better than a confident but unsupported expansion.
 
@@ -26,7 +26,7 @@ Agents should help each other by naming gaps plainly. A useful refusal or downgr
 ### 0. GitOps Coordination: One Branch, One PR, One Phase
 
 To prevent merge conflicts, keep cross-family reviews isolated, and protect `main`, all agents must strictly follow the "One Branch, One PR, One Phase" model:
-- **Research Phase PR:** Use a fresh branch from `origin/main`; complete the contract and extract real anchors. Sol checks the anchors as author QA, and an independent Opus context checks research gaps and prose capacity. Both must be green for the research deliverable; contract approval alone does not unlock prose. Never fabricate historical data or page numbers.
+- **Research Phase PR:** Use a fresh branch from `origin/main`; complete the contract and extract real anchors. Sol checks anchors as author QA; an eligible independent Opus context verifies capacity-plan anchors, research gaps and prose capacity. Both must be green for the research deliverable; contract approval alone does not unlock prose. Never fabricate historical data or page numbers.
 - **Prose Phase PR:** Once the research PR is merged and the chapter is prose-ready, use a new branch. Draft within the approved Prose Capacity Plan without padding. Separate source-fidelity and prose-quality reviews at the exact prose revision are required before merge.
 - **NEVER** use massive batch PRs or long-lived epic branches.
 
@@ -97,7 +97,7 @@ Do not upgrade a claim to Green just because a source is famous. Upgrade it only
 
 ### 4. Prose-Readiness Review
 
-Ask a cross-family reviewer to review the full contract plus gap analysis. The expected verdicts are:
+Ask a reviewer outside all families that authored the reviewed material to review the full contract plus gap analysis, including capacity-plan anchors. Record retained contract and prose author families for the assignment. The expected verdicts are:
 
 - `READY_TO_DRAFT`: page anchors and gaps are sufficient for a faithful chapter.
 - `READY_TO_DRAFT_WITH_CAP`: draft, but cap the word count below the target.
@@ -109,7 +109,7 @@ Only `READY_TO_DRAFT` and `READY_TO_DRAFT_WITH_CAP` unlock prose drafting.
 
 ### 5. Drafting and author-side meaning check
 
-Sol prepares the verified factual/conceptual spine and Terra turns it into readable prose. Sol then checks the changed claims, attribution, tense and qualifications against the anchored sources; correct mismatches before independent review. Revisions follow the source-backed capacity plan, not a word-filling quota.
+Sol prepares the verified factual/conceptual spine and Terra turns it into readable prose. Sol then checks the changed claims, attribution, tense and qualifications against the anchored sources and produces an exact-prose-revision material-claim inventory with the owning review; correct mismatches before independent review. Revisions follow the source-backed capacity plan, not a word-filling quota.
 
 **Strict source rule (applies throughout drafting):**
 
@@ -123,7 +123,7 @@ The executable verifier's 5,000-word default and any conflict with a chapter cap
 
 ### 6. Source-Fidelity Review (independent Opus context)
 
-An independent fresh Opus 5.5 context reviews the exact prose revision and its complete material-claim inventory against accessible source material and the anchored contract:
+An independent fresh Opus 5.5 context, outside all families that authored the reviewed material, reviews the exact prose revision and its material-claim inventory against accessible source material and the anchored contract. The reviewer independently checks inventory completeness against the prose; a missing or incomplete inventory makes the judgment incomplete:
 
 - factual overclaims vs the contract's anchored claims
 - unsupported scenes / unanchored beats
@@ -136,7 +136,7 @@ Verify the actual source passages and locators, not just URLs or titles. Unavail
 
 ### 7. Prose-Quality Review (separate independent Opus context)
 
-A separate fresh Opus 5.5 context, outside the OpenAI author family, reviews the same exact prose revision and has access to its contract and supporting sources. It checks:
+A separate fresh Opus 5.5 context, outside all families that authored the reviewed material, reviews the same exact prose revision with its contract and supporting sources. Missing contract or needed source material makes the judgment incomplete. It checks:
 
 - narrative coherence scene-to-scene
 - pacing, sentence variety, paragraph rhythm
@@ -144,11 +144,11 @@ A separate fresh Opus 5.5 context, outside the OpenAI author family, reviews the
 - word-count inflation vs cap discipline
 - book-level continuity
 
-Record its identity, revision, findings and verdict separately from source fidelity. The two contexts are independent judgments, not different reviewer families; do not describe them as three-family review. Preserve prior failed or incomplete reviews and existing spent invocation counts across revisions.
+Record its identity, exact prose/source bindings, findings and verdict separately from source fidelity. Neither context receives the other's findings or verdict before its own independent verdict. They are separate judgments, not different reviewer families; do not describe them as three-family review. Preserve prior failed or incomplete reviews and existing spent invocation counts across revisions.
 
-Source-fidelity and prose-quality contexts share the existing whole-page source/editorial invocation counter; purpose, context and phase labels do not reset it. PR review counters remain separate. Follow `agents_extensions/shared/skills/review-loop/SKILL.md` for the applicable limits and spent calls.
+Source-fidelity and prose-quality contexts share the existing whole-page source/editorial invocation counter; purpose, context and phase labels do not reset it. PR review counters remain separate. Each paired cycle consumes two whole-page calls; the usual five-call ceiling allows at most two full pairs plus one call. Exhaustion grants no clearance; a further invocation needs an explicit user grant unless an existing larger grant covers it. Follow `agents_extensions/shared/skills/review-loop/SKILL.md` for applicable limits and spent calls.
 
-Do not merge prose on tests alone. Both review steps (6 and 7) must approve the same unchanged final prose/source revision with material findings resolved. Changed prose or source bindings require the applicable review again within the existing invocation budgets.
+Do not merge prose on tests alone. Both review steps (6 and 7) must approve the same unchanged final prose/source revision with material findings resolved. Any prose or source-binding change invalidates both verdicts; both contexts must review the new exact revision within the existing shared budget.
 
 ### 8. Human editorial direction and spot reading
 
@@ -159,7 +159,7 @@ The editor sets direction and decides material unresolved scope or taste disagre
 - whether tone and pacing match the book
 - whether unresolved questions can remain as future work
 
-Spot-read selected material as time permits and record the actual scope and any decision. A full human read of every chapter is not required by this policy; never claim human acceptance or reader response that was not given. Source, prose, applicable execution and publication checks remain separate.
+The editor chooses what to spot-read; agents may suggest material but not restrict that choice. Record the actual chapter, revision, sections, date and any decision on the owning issue or PR; unread material remains recorded as unread. A full human read of every chapter is not required; never invent human acceptance or reader response. A pending material scope or taste referral blocks `accepted` and merge, and the chapter stays in `prose_review`. Neither author nor reviewer decides for the editor. Record the referral and editor's decision with chapter, revision and date on the owning issue or PR.
 
 ## Status Terms
 
@@ -172,7 +172,9 @@ Spot-read selected material as time permits and record the actual scope and any 
 - `prose_ready`: reviewer says drafting may begin.
 - `drafting`: prose is being written.
 - `prose_review`: draft is under cross-family review.
-- `accepted`: applicable source-fidelity and prose-quality reviews have cleared the exact chapter revision. This workflow status is not canonical full-page acceptance or a publication unlock; applicable execution, publication and lead gates remain separately required. Record editorial decisions and actual spot reads without inferring a full human read.
+- `accepted`: applicable source-fidelity and prose-quality reviews have cleared the exact chapter revision and no material scope or taste referral to the editor remains undecided. This workflow status is not canonical full-page acceptance or a publication unlock; applicable execution, publication and lead gates remain separately required. Record editorial decisions and actual spot reads without inferring a full human read.
+
+Labels recorded before this policy used earlier definitions and are not re-evidenced by it; reconciliation remains under #2288.
 
 A drafted chapter (prose already exists) whose `brief.md` plan is templated, not anchored, regresses to `capacity_plan_drafted` until sources.md is upgraded. The existing prose stays on disk; it just cannot be cited as "accepted" while the contract behind it is incomplete.
 
