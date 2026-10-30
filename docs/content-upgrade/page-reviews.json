@@ -665,10 +665,10 @@
     },
     {
       "path": "prerequisites/kubernetes-basics/module-1.7-namespaces-labels.md",
-      "page_digest": "sha256:9b0ecb9bd9f32873d1f60249cab030100a0c21de03cc903fbfad507b0b7c6bda",
+      "page_digest": "sha256:f4a194ad83a8e1d31fb8b65e5327ce4cb19147e8a7fde28619085dd7913cf188",
       "disposition": "revise",
       "reviewer_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md"],
-      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md", "docs/content-upgrade/reviews/2026-10-30-namespace-source4-followup.md"],
+      "evidence_refs": ["docs/content-upgrade/reviews/2026-10-27-namespace-scope-p09b.md", "docs/content-upgrade/reviews/2026-10-30-namespace-source4-followup.md", "docs/content-upgrade/reviews/2026-10-30-namespace-claim-precision.md"],
       "independent_statuses": {"structural_checks": "pass", "technical_source": "unknown", "editorial_review": "pending", "lab_execution": "unknown", "deployed_smoke": "pending"}
     },
     {
