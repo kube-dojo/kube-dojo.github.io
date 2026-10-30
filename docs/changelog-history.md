@@ -6,6 +6,7 @@ Add detailed patch notes here, newest first, with absolute `https://kube-dojo.gi
 
 ## October 2026
 
+- **2026-10-30 — Choose foundations for your next route.** [Prerequisites](https://kube-dojo.github.io/prerequisites/) clarifies Git preparation, the optional Linux fork, and the [Platform entry checklist](https://kube-dojo.github.io/platform/#do-not-start-here-yet).
 - **Practice Git interruptions with clear state checks.** [Worktrees and Stashing](https://kube-dojo.github.io/prerequisites/git-deep-dive/module-5-worktrees-stashing/) now includes disposable setup, portable hotfix practice, recovery hints, and a move-and-repair stretch exercise.
 - **Plan Git study with clearer expectations.** The [Git Deep Dive overview](https://kube-dojo.github.io/prerequisites/git-deep-dive/) sets out lesson topics, reading and practice estimates, recovery limits, and routes for continuing your study.
 - **See prerequisites before you start.** Module pages keep prerequisite and next-lesson information visible alongside difficulty and study time.
