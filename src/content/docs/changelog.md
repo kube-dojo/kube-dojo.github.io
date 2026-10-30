@@ -16,7 +16,7 @@ Explore recent improvements to practice and troubleshooting:
 
 - **Follow declarative changes.** [Declarative vs Imperative](/prerequisites/philosophy-design/module-1.2-declarative-vs-imperative/) explains recorded intent, ownership and reconciliation, with guided practice.
 
-- **See how configuration reaches a container.** [ConfigMaps and Secrets](/prerequisites/kubernetes-basics/module-1.6-configmaps-secrets/) compares configuration changes with what a running container uses, in a separate practice namespace.
+- **Explore Kubernetes configuration and boundaries.** [ConfigMaps and Secrets](/prerequisites/kubernetes-basics/module-1.6-configmaps-secrets/) compares configuration changes with what a running container uses. [Namespaces and Labels](/prerequisites/kubernetes-basics/module-1.7-namespaces-labels/) clarifies resource limits, quotas and system namespaces.
 
 - **Plan foundational study and practice terminal files.** [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) uses a disposable workspace and helps you diagnose permissions and filenames. Plan your next step with [Prerequisites](/prerequisites/) and the [Platform entry checklist](/platform/#do-not-start-here-yet).
 
