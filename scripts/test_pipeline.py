@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Integration tests for the v1 quality pipeline.
 
 Tests deterministic checks, state transitions, and pipeline logic
@@ -11,22 +10,25 @@ Run:  python scripts/test_pipeline.py
 
 from __future__ import annotations
 
-import json
+import copy
 import importlib
+import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
-import threading
 import textwrap
+import threading
 import unittest
-import copy
 from argparse import Namespace
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import patch
 
-import sys
 import yaml
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -35,6 +37,27 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 structural = importlib.import_module("checks.structural")
 CheckResult = structural.CheckResult
 GEMINI_WRITER_MODEL = importlib.import_module("dispatch").GEMINI_WRITER_MODEL
+
+
+class _CalibrationIsolatedCase(unittest.TestCase):
+    """Guard review-entering fixtures, without blocking unrelated CLI tests."""
+
+    def run(self, result=None):
+        import v1_pipeline as p
+
+        with ExitStack() as stack:
+            stack.enter_context(patch.dict(os.environ, {"SECOND_REVIEWER_SAMPLE_RATE": "0"}))
+            stack.enter_context(patch.object(p.random, "random", return_value=0.0))
+            guards = [stack.enter_context(patch.object(p, name, side_effect=AssertionError(f"unexpected {name}")))
+                      for name in ("dispatch_auto", "dispatch_agy", "dispatch_claude", "dispatch_codex")]
+            guards.append(stack.enter_context(patch("subprocess.Popen", side_effect=AssertionError("unexpected process"))))
+
+            def assert_guards_unused():
+                for guard in guards:
+                    guard.assert_not_called()
+
+            self.addCleanup(assert_guards_unused)
+            return super().run(result)
 
 
 def sample_fact_ledger() -> dict:
@@ -177,8 +200,8 @@ class TestCodexPushVerification(unittest.TestCase):
                 return 0
 
         class FakeWatchdogState:
-            stdout_lines = ["push: done"]
-            stderr_lines = []
+            stdout_lines: ClassVar[list[str]] = ["push: done"]
+            stderr_lines: ClassVar[list[str]] = []
 
         stale_error = "Codex danger-mode dispatch left origin stale"
         with patch.object(runner, "_load_adapter", return_value=FakeAdapter()), \
@@ -250,8 +273,8 @@ class TestRequireFileChangeGuard(unittest.TestCase):
     @staticmethod
     def _fake_watchdog_state():
         class FakeWatchdogState:
-            stdout_lines = ["wrote the module"]
-            stderr_lines = []
+            stdout_lines: ClassVar[list[str]] = ["wrote the module"]
+            stderr_lines: ClassVar[list[str]] = []
 
         return FakeWatchdogState()
 
@@ -822,7 +845,7 @@ class TestRealModules(unittest.TestCase):
     Picks one known-good module per track and verifies zero errors.
     """
 
-    KNOWN_GOOD = [
+    KNOWN_GOOD: ClassVar[list[str]] = [
         "prerequisites/zero-to-terminal/module-0.1-what-is-a-computer",
         "cloud/advanced-operations/module-8.1-multi-account",
         "k8s/cka/part1-cluster-architecture/module-1.1-control-plane",
@@ -925,7 +948,6 @@ class TestStateManagement(unittest.TestCase):
         shared_state = {"modules": {}}
         observed_local_keys: dict[str, set[str]] = {}
         results: dict[str, bool] = {}
-        failures: list[BaseException] = []
         barrier = threading.Barrier(2)
         previous_state_lock = p._PARALLEL_RUN_SECTION_STATE_LOCK
         previous_git_lock = p._PARALLEL_RUN_SECTION_GIT_LOCK
@@ -945,36 +967,20 @@ class TestStateManagement(unittest.TestCase):
             observed_local_keys[key] = set(state["modules"].keys())
             return True
 
-        def run_worker(module_path: Path) -> None:
-            key = p.module_key_from_path(module_path)
-            try:
-                results[key] = p._run_module_in_parallel(
-                    module_path,
-                    shared_state,
-                    max_retries=2,
-                )
-            except BaseException as exc:  # pragma: no cover - surfaced below
-                failures.append(exc)
-
-        with patch.multiple(p, CONTENT_ROOT=content_root, STATE_FILE=self.state_file):
+        with ExitStack() as stack:
+            stack.enter_context(patch.multiple(p, CONTENT_ROOT=content_root, STATE_FILE=self.state_file))
             with patch("v1_pipeline.run_module", side_effect=fake_run_module):
                 p._PARALLEL_RUN_SECTION_STATE_LOCK = threading.Lock()
                 p._PARALLEL_RUN_SECTION_GIT_LOCK = threading.Lock()
                 try:
-                    threads = [
-                        threading.Thread(target=run_worker, args=(module_a,)),
-                        threading.Thread(target=run_worker, args=(module_b,)),
-                    ]
-                    for thread in threads:
-                        thread.start()
-                    for thread in threads:
-                        thread.join()
+                    with ThreadPoolExecutor(max_workers=2) as executor:
+                        futures = {p.module_key_from_path(path): executor.submit(
+                            p._run_module_in_parallel, path, shared_state, max_retries=2,
+                        ) for path in (module_a, module_b)}
+                        results = {key: future.result() for key, future in futures.items()}
                 finally:
                     p._PARALLEL_RUN_SECTION_STATE_LOCK = previous_state_lock
                     p._PARALLEL_RUN_SECTION_GIT_LOCK = previous_git_lock
-
-        if failures:
-            raise failures[0]
 
         key_a = "track/module-1.1-a"
         key_b = "track/module-1.2-b"
@@ -1012,7 +1018,7 @@ class TestStateManagement(unittest.TestCase):
 # Test: Review audit log
 # ---------------------------------------------------------------------------
 
-class TestReviewAuditLog(unittest.TestCase):
+class TestReviewAuditLog(_CalibrationIsolatedCase):
     """Test per-module review audit helpers and integration points."""
 
     def setUp(self):
@@ -1343,24 +1349,24 @@ class TestStepCheck(unittest.TestCase):
         """Content significantly shorter than original should fail truncation guard."""
         import v1_pipeline as p
         truncated = GOOD_MODULE[:len(GOOD_MODULE) // 3]  # ~33% of original
-        passed, results = p.step_check(truncated, self.module_path)
+        passed, _results = p.step_check(truncated, self.module_path)
         self.assertFalse(passed, "Truncated content should fail CHECK")
 
     def test_missing_frontmatter_fails(self):
         import v1_pipeline as p
-        passed, results = p.step_check("No frontmatter here", self.module_path)
+        passed, _results = p.step_check("No frontmatter here", self.module_path)
         self.assertFalse(passed, "Content without frontmatter should fail")
 
     def test_broken_yaml_frontmatter_fails(self):
         import v1_pipeline as p
         broken = "---\ntitle: [invalid yaml\n---\nBody"
-        passed, results = p.step_check(broken, self.module_path)
+        passed, _results = p.step_check(broken, self.module_path)
         self.assertFalse(passed, "Broken YAML frontmatter should fail")
 
     def test_frontmatter_missing_title_fails(self):
         import v1_pipeline as p
         no_title = "---\nsidebar:\n  order: 1\n---\n## Content"
-        passed, results = p.step_check(no_title, self.module_path)
+        passed, _results = p.step_check(no_title, self.module_path)
         self.assertFalse(passed, "Frontmatter without title should fail")
 
 
@@ -1368,7 +1374,7 @@ class TestStepCheck(unittest.TestCase):
 # Test: Pipeline state transitions (mocked LLM)
 # ---------------------------------------------------------------------------
 
-class TestPipelineTransitions(unittest.TestCase):
+class TestPipelineTransitions(_CalibrationIsolatedCase):
     """Test run_module state transitions with mocked LLM calls."""
 
     def setUp(self):
@@ -1440,9 +1446,9 @@ class TestPipelineTransitions(unittest.TestCase):
              patch.object(p, "ensure_fact_ledger", return_value=sample_fact_ledger()), \
              patch.object(p, "step_content_aware_fact_ledger", return_value=None), \
              patch.object(p, "_compute_cite_check", return_value={"id": "CITE", "passed": True, "evidence": "ok"}), \
-             patch.object(p, "step_check_integrity", return_value=(True, [])):
-            with patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
-                p.run_module(self.module_path, state)
+             patch.object(p, "step_check_integrity", return_value=(True, [])), \
+             patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
+            p.run_module(self.module_path, state)
 
         ms = state["modules"].get("test/module-0.1-test", {})
         self.assertEqual(ms.get("phase"), "done")
@@ -1481,9 +1487,9 @@ class TestPipelineTransitions(unittest.TestCase):
 
         with patch.object(p, "STATE_FILE", self.state_file), \
              patch.object(p, "CONTENT_ROOT", Path(self.tmpdir)), \
-             patch.object(p, "save_state"):
-            with patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
-                result = p.run_module(self.module_path, state)
+             patch.object(p, "save_state"), \
+             patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
+            result = p.run_module(self.module_path, state)
 
         self.assertTrue(result, "Already-done module should return True, not False")
         # No dispatch calls — nothing should have been re-run
@@ -1525,9 +1531,9 @@ class TestPipelineTransitions(unittest.TestCase):
              patch.object(p, "ensure_fact_ledger", return_value=sample_fact_ledger()), \
              patch.object(p, "step_content_aware_fact_ledger", return_value=None), \
              patch.object(p, "_compute_cite_check", return_value={"id": "CITE", "passed": True, "evidence": "ok"}), \
-             patch.object(p, "step_check_integrity", return_value=(True, [])):
-            with patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
-                p.run_module(self.module_path, state)
+             patch.object(p, "step_check_integrity", return_value=(True, [])), \
+             patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
+            p.run_module(self.module_path, state)
 
         ms = state["modules"]["test/module-0.1-test"]
         self.assertEqual(ms.get("phase"), "done")
@@ -1763,9 +1769,9 @@ class TestPipelineTransitions(unittest.TestCase):
              patch.object(p, "ensure_fact_ledger", return_value=sample_fact_ledger()), \
              patch.object(p, "step_content_aware_fact_ledger", return_value=None), \
              patch.object(p, "_compute_cite_check", return_value={"id": "CITE", "passed": True, "evidence": "ok"}), \
-             patch.object(p, "step_check_integrity", return_value=(True, [])):
-            with patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
-                p.run_module(self.module_path, state)
+             patch.object(p, "step_check_integrity", return_value=(True, [])), \
+             patch.object(p, "module_key_from_path", return_value="test/module-0.1-test"):
+            p.run_module(self.module_path, state)
 
         ms = state["modules"]["test/module-0.1-test"]
         self.assertEqual(ms.get("phase"), "done", "Should converge after targeted fix + re-review")
@@ -2371,7 +2377,7 @@ class TestComputeSeverity(unittest.TestCase):
         )
 
 
-class TestBinaryGateIntegration(unittest.TestCase):
+class TestBinaryGateIntegration(_CalibrationIsolatedCase):
     """End-to-end: stub reviewer returns binary-gate output, pipeline routes
     correctly and converges with exactly the expected writer calls."""
 
@@ -2439,6 +2445,8 @@ class TestBinaryGateIntegration(unittest.TestCase):
         """REJECT with targeted severity + edits that all land → no second writer call."""
         import v1_pipeline as p
 
+        self.assertEqual(p._second_reviewer_sample_rate(), 0.0)
+        self.assertEqual(p.random.random(), 0.0)
         mock_state.__class__ = type(self.state_file)
         mock_root.resolve.return_value = Path(self.tmpdir).resolve()
 
@@ -2494,12 +2502,13 @@ class TestBinaryGateIntegration(unittest.TestCase):
         # without invoking the writer a second time.
         self.assertEqual(len(write_calls), 1,
                          f"Expected 1 writer call, got {len(write_calls)}")
+        self.assertIn("## Learning Outcomes (v2)", self.module_path.read_text())
         ms = state["modules"]["test/module-0.1-test"]
         self.assertEqual(ms.get("phase"), "done")
         self.assertEqual(ms.get("severity"), "clean")
 
 
-class TestLegacyStateCompat(unittest.TestCase):
+class TestLegacyStateCompat(_CalibrationIsolatedCase):
     """Legacy state fixtures must continue to load and upgrade cleanly."""
 
     def setUp(self):
@@ -2720,6 +2729,7 @@ class TestStatusFourStage(unittest.TestCase):
     def test_cmd_status_prints_four_stage_completion_table(self):
         import io
         from contextlib import redirect_stdout
+
         import v1_pipeline as p
 
         self._write("prerequisites/intro/module-1.1-alpha.md", 2400)          # written + fresh ledger + pass + UK >= 500
@@ -3218,7 +3228,7 @@ class TestKnowledgeCards(unittest.TestCase):
         self.assertNotIn("## Sources — cite these inline", seen["prompt"])
 
 
-class TestCitationGate(unittest.TestCase):
+class TestCitationGate(_CalibrationIsolatedCase):
     """Test the seeded citation gate between WRITE and REVIEW."""
 
     def setUp(self):
@@ -3930,9 +3940,9 @@ class TestCliRefreshFactLedgerFlag(unittest.TestCase):
             refresh_fact_ledger=True,
         )
         with patch.object(p, "load_state", return_value={"modules": {}}), \
-             patch.object(p, "run_module", return_value=True) as mock_run:
-            with self.assertRaises(SystemExit):
-                p.cmd_run(args)
+             patch.object(p, "run_module", return_value=True) as mock_run, \
+             self.assertRaises(SystemExit):
+            p.cmd_run(args)
 
         self.assertTrue(mock_run.call_args.kwargs.get("refresh_fact_ledger"))
 
@@ -3953,9 +3963,9 @@ class TestCliRefreshFactLedgerFlag(unittest.TestCase):
         with patch.object(p, "CONTENT_ROOT", self.content_root), \
              patch.object(p.gaps, "run_track_gap_analysis", return_value=[]), \
              patch.object(p, "load_state", return_value={"modules": {}}), \
-             patch.object(p, "run_module", return_value=True) as mock_run:
-            with self.assertRaises(SystemExit):
-                p.cmd_run_section(args)
+             patch.object(p, "run_module", return_value=True) as mock_run, \
+             self.assertRaises(SystemExit):
+            p.cmd_run_section(args)
 
         self.assertTrue(mock_run.call_args.kwargs.get("refresh_fact_ledger"))
 
@@ -4294,7 +4304,7 @@ class TestStepCheckIntegrity(unittest.TestCase):
         )
 
 
-class TestRunModuleSplitReviewer(unittest.TestCase):
+class TestRunModuleSplitReviewer(_CalibrationIsolatedCase):
     """Integration tests for split-reviewer routing in run_module."""
 
     def setUp(self):
@@ -4842,7 +4852,7 @@ class TestApplyReviewEdits(unittest.TestCase):
              "new": "## Section 1.5\n\nExtra content\n\n",
              "dim": "D6", "why": "fill gap"},
         ]
-        patched, applied, failed = p.apply_review_edits(content, edits)
+        patched, _applied, failed = p.apply_review_edits(content, edits)
         self.assertIn("## Section 1.5", patched)
         self.assertTrue("## Section 1.5\n\nExtra content\n\n## Section 2" in patched)
         self.assertEqual(len(failed), 0)
@@ -4851,7 +4861,7 @@ class TestApplyReviewEdits(unittest.TestCase):
         import v1_pipeline as p
         content = "Keep this.\nDELETE ME\nKeep this too."
         edits = [{"type": "delete", "find": "DELETE ME\n", "dim": "D3", "why": "stale"}]
-        patched, applied, failed = p.apply_review_edits(content, edits)
+        patched, _applied, failed = p.apply_review_edits(content, edits)
         self.assertEqual(patched, "Keep this.\nKeep this too.")
         self.assertEqual(len(failed), 0)
 
@@ -4918,7 +4928,7 @@ class TestApplyReviewEdits(unittest.TestCase):
             {"type": "replace", "find": "quick brown", "new": "QB", "dim": "D1"},
             {"type": "replace", "find": "brown fox", "new": "BF", "dim": "D2"},
         ]
-        patched, applied, failed = p.apply_review_edits(content, edits)
+        _patched, applied, failed = p.apply_review_edits(content, edits)
         # Both edits resolve to overlapping ranges — second one conflicts
         self.assertEqual(len(applied), 1, "One edit should apply cleanly")
         self.assertEqual(len(failed), 1, "Overlapping edit should fail")
@@ -4963,7 +4973,7 @@ class TestApplyReviewEdits(unittest.TestCase):
         self.assertEqual(len(failed), 0)
 
 
-class TestDeterministicApplyIntegration(unittest.TestCase):
+class TestDeterministicApplyIntegration(_CalibrationIsolatedCase):
     """End-to-end integration: reviewer returns structured edits, pipeline
     applies them deterministically, re-review approves. Verifies zero LLM
     writer calls happen in the common case."""
