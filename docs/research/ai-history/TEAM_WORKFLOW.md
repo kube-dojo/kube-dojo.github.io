@@ -8,12 +8,16 @@ Honesty over output is the highest rule. The team should still strive for the in
 
 ## Roles
 
-- Human editor: sets ambition, accepts scope tradeoffs, resolves taste and book-level direction.
-- Primary researcher: owns the chapter contract and keeps claims tied to evidence.
-- Cross-family reviewer: stress-tests research completeness, source choice, word-count honesty, and prose readiness. The reviewer must not be from the same model family as the primary researcher or prose writer.
-- Claude: research lead for Parts 1, 2, 3, 6, 7. Extracts anchors directly via `curl` + `pdftotext` + `pdfgrep`. **Source-fidelity reviewer of expanded prose.** Final-verdict integrator (with same-author conflict-of-interest excluded). Prose expansion only when Codex bandwidth is unavailable; when Claude does expand, the same strict-source rule applies (see § 5b).
-- Codex: research lead for Parts 4, 5, 8, 9 (Part 9 transferred from Claude on 2026-04-29). Helper for archive-blocked / scanned-PDF anchor extraction when Claude is stuck. **Default prose expander for Parts 1, 2, 3, 6, 7** (after Gemini drafts) — Codex is the cheaper compute for the "shape, tighten, enforce source discipline" pass and has the strongest source-discipline instinct. Drafts and expands prose for Codex-owned Parts 4, 5, 8, 9. Cross-family reviewer for Claude- and Gemini-authored work.
-- Gemini: gap auditor + first-draft prose writer for Parts 1, 2, 6, 7. STOPS touching sources after the 2026-04-28 hallucination self-admission (epic commit `03640e20`, Issue #421). Reviews capacity-plan honesty, narrative gaps, missing scenes — never asserts page anchors or URLs. First-draft prose is built from an approved contract; the expansion phase (Codex-default, Claude-fallback) finishes the chapter.
+- Human editor: sets ambition and book-level direction, resolves material scope or taste disagreements, and spot-reads within available time. Record the material actually read and any decisions; never infer a whole-chapter read or a human verdict.
+- GPT-6.1 Sol: owns the verified factual and conceptual spine, chapter contract, evidence boundaries and author-side semantic check of the prose and its qualifiers.
+- GPT-6.1 Terra: writes and revises clear prose within the verified spine and anchored capacity plan.
+- Claude Opus 5.5: independently challenges OpenAI-authored work, using separate fresh contexts for the mandatory source-fidelity and prose-quality judgments. A reviewer must not review its own authorship. Both contexts have access to the relevant source material, contract and exact prose revision.
+
+Sol and Terra are one author family; Sol's semantic check is author QA, not independent review. The two Opus contexts share a reviewer family: this provides two-family, not three-family, diversity. Once this policy change is independently reviewed and merged, it explicitly replaces the historical requirement that the source-fidelity and prose-quality reviewers also be from different families from each other, using the models the user permits; this is not evidence of equivalent empirical quality. Sonnet, Astra, Fable and a third-family route are not authorized by this workflow.
+
+If authorship or provider availability prevents an eligible independent assignment within the permitted models, keep that review blocked; do not self-review or infer a third-family grant.
+
+Once this policy change is independently reviewed and merged, the former human final pass as a full-chapter prerequisite is replaced by editorial direction and recorded spot reading. Material unresolved scope or taste choices still require the user's decision. A feedback platform or recurring digest is not a gate. This policy change does not promote any chapter or pilot, reset spent review invocations, or change the separate source, editorial, applicable execution and publication gates.
 
 Agents should help each other by naming gaps plainly. A useful refusal or downgrade is better than a confident but unsupported expansion.
 
@@ -22,8 +26,8 @@ Agents should help each other by naming gaps plainly. A useful refusal or downgr
 ### 0. GitOps Coordination: One Branch, One PR, One Phase
 
 To prevent merge conflicts, keep cross-family reviews isolated, and protect `main`, all agents must strictly follow the "One Branch, One PR, One Phase" model:
-- **Research Phase PR:** Create a branch `[agent]/394-chNN-research` off `main`. Complete the research contract, extract real empirical anchors, and NEVER fabricate or hallucinate historical data/page numbers. Open a PR. Ping Codex (anchor verification) and Claude (prose-capacity/gap review) **in parallel** via the Agent Bridge. Status `accepted` requires both to be Green. Merge only when approved.
-- **Prose Phase PR:** Once the research PR is merged, create a branch `[agent]/394-chNN-prose` off `main`. Draft the prose strictly adhering to the approved Prose Capacity Plan without padding. Open a new PR and request a cross-family Prose Review. Merge only when approved.
+- **Research Phase PR:** Use a fresh branch from `origin/main`; complete the contract and extract real anchors. Sol checks the anchors as author QA, and an independent Opus context checks research gaps and prose capacity. Both must be green for the research deliverable; contract approval alone does not unlock prose. Never fabricate historical data or page numbers.
+- **Prose Phase PR:** Once the research PR is merged and the chapter is prose-ready, use a new branch. Draft within the approved Prose Capacity Plan without padding. Separate source-fidelity and prose-quality reviews at the exact prose revision are required before merge.
 - **NEVER** use massive batch PRs or long-lived epic branches.
 
 ### 1. Research Contract
@@ -76,7 +80,7 @@ After research-contract approval, request or create a gap analysis before prose 
 - What word count is naturally supported by verified evidence?
 - What would be required to reach 4,000-7,000 words without bloat?
 - Which chapter ambitions should be reduced?
-- What should Gemini, Claude, Codex, or the human editor help source?
+- Which missing sources need further research or an editor's scope decision?
 
 Gap analysis should be concrete. "Need more sources" is weak. "Need Pearl 1986 page anchor for local propagation in singly connected networks" is useful.
 
@@ -103,50 +107,23 @@ Ask a cross-family reviewer to review the full contract plus gap analysis. The e
 
 Only `READY_TO_DRAFT` and `READY_TO_DRAFT_WITH_CAP` unlock prose drafting.
 
-### 5. Drafting (two phases — Gemini draft, then expansion)
+### 5. Drafting and author-side meaning check
 
-Drafting is split into two phases. The first turns the contract into running prose; the second tightens and lengthens that prose to the verdict cap. Both phases obey the same strict-source rule.
+Sol prepares the verified factual/conceptual spine and Terra turns it into readable prose. Sol then checks the changed claims, attribution, tense and qualifications against the anchored sources; correct mismatches before independent review. Revisions follow the source-backed capacity plan, not a word-filling quota.
 
-**Strict source rule (applies to BOTH phases):**
+**Strict source rule (applies throughout drafting):**
 
 > Use only the provided contract and claim matrix. If evidence is missing for a scene, leave the scene thin rather than filling it. Do not add sources, do not introduce new page anchors, do not upgrade Yellow claims, do not invent examples or institutional details, and do not expand beyond the approved Prose Capacity Plan. If you can't anchor a claim, weaken the claim — never invent a source.
-
-#### 5a. First-draft prose (Gemini, default)
-
-Gemini turns the approved contract (`brief.md` + `sources.md` + `scene-sketches.md`) into a tight ~3,000-word first draft.
-
-Gemini's whitelist:
-- narrative flow and pacing
-- scene ordering
-- making dry source material readable
-- spotting where the chapter feels thin
-
-Gemini's blacklist (the Issue #421 hallucination filter):
-- adding sources or citations not in the contract
-- introducing page anchors or URLs
-- upgrading Yellow claims to Green tone
-- inventing examples, dialogue, or institutional motives
-- expanding beyond the approved capacity plan
-
-A Gemini draft that hits a 429 mid-prose still commits a partial. The expansion phase reads the partial and completes the chapter; rate-limited drafts are not redone from scratch.
-
-#### 5b. Expansion (Codex default, Claude fallback)
-
-Codex (gpt-5.5, reasoning=high) expands the Gemini draft to the verdict cap. Codex is the default expander because:
-
-- gpt-5.5 has wider weekly bandwidth than Claude opus
-- Codex's source-discipline instinct is the strongest of the three families
-- the expansion task is "shape, tighten, enforce source discipline" — Codex's strength
-
-Claude opus is the fallback expander when Codex bandwidth is exhausted or when a chapter has already been Claude-expanded for historical reasons (the Part 1 chapters in flight at the 2026-04-29 pipeline pivot are the documented case).
 
 The expansion budget is for the layers the contract's Prose Capacity Plan named: technical density, infrastructure detail, anchored biographical scenes, conflict notes. Not for generic textbook explanation, repeated summary, modern hindsight, or unanchored deployment scale.
 
 If a chapter cannot honestly reach the cap, write the natural chapter length and document why. The target is quality, not padding.
 
-### 6. Source-Fidelity Review (Claude)
+The executable verifier's 5,000-word default and any conflict with a chapter cap remain unresolved under #2274. This workflow does not bypass or alter a runtime gate; reconcile the mismatch through separately reviewed policy and tooling work.
 
-Claude (independent fresh session) reviews the expanded prose for source fidelity:
+### 6. Source-Fidelity Review (independent Opus context)
+
+An independent fresh Opus 5.5 context reviews the exact prose revision and its complete material-claim inventory against accessible source material and the anchored contract:
 
 - factual overclaims vs the contract's anchored claims
 - unsupported scenes / unanchored beats
@@ -155,11 +132,11 @@ Claude (independent fresh session) reviews the expanded prose for source fidelit
 - boundary contract held (no later-chapter forward-references creeping in)
 - whether prose outpaced the research contract
 
-Claude verifies anchors with `curl` / `pdftotext` / `pdfgrep`. Verdict: `READY_TO_MERGE` / `NEEDS_FIX_AND_MERGE` / `NEEDS_REWRITE`.
+Verify the actual source passages and locators, not just URLs or titles. Unavailable source material leaves the affected judgment incomplete. Record reviewer identity, exact prose/source revisions, findings and verdict: `READY_TO_MERGE` / `NEEDS_FIX_AND_MERGE` / `NEEDS_REWRITE`.
 
-### 7. Prose-Quality Review (Gemini or Claude — cross-family)
+### 7. Prose-Quality Review (separate independent Opus context)
 
-A second reviewer (different family from the prose author and from the source-fidelity reviewer) checks:
+A separate fresh Opus 5.5 context, outside the OpenAI author family, reviews the same exact prose revision and has access to its contract and supporting sources. It checks:
 
 - narrative coherence scene-to-scene
 - pacing, sentence variety, paragraph rhythm
@@ -167,18 +144,22 @@ A second reviewer (different family from the prose author and from the source-fi
 - word-count inflation vs cap discipline
 - book-level continuity
 
-Gemini is the natural fit when Codex did the expansion; Claude is the fit when Gemini's drafting work was unusually load-bearing. Either way, the prose-quality reviewer must not be from the family that produced the prose.
+Record its identity, revision, findings and verdict separately from source fidelity. The two contexts are independent judgments, not different reviewer families; do not describe them as three-family review. Preserve prior failed or incomplete reviews and existing spent invocation counts across revisions.
 
-Do not merge prose on tests alone. Both review steps (6 and 7) are required.
+Source-fidelity and prose-quality contexts share the existing whole-page source/editorial invocation counter; purpose, context and phase labels do not reset it. PR review counters remain separate. Follow `agents_extensions/shared/skills/review-loop/SKILL.md` for the applicable limits and spent calls.
 
-### 8. Human Final Pass
+Do not merge prose on tests alone. Both review steps (6 and 7) must approve the same unchanged final prose/source revision with material findings resolved. Changed prose or source bindings require the applicable review again within the existing invocation budgets.
 
-The human editor decides:
+### 8. Human editorial direction and spot reading
+
+The editor sets direction and decides material unresolved scope or taste disagreements, including:
 
 - whether the chapter's natural length is acceptable
 - whether to source more material or scope down
 - whether tone and pacing match the book
 - whether unresolved questions can remain as future work
+
+Spot-read selected material as time permits and record the actual scope and any decision. A full human read of every chapter is not required by this policy; never claim human acceptance or reader response that was not given. Source, prose, applicable execution and publication checks remain separate.
 
 ## Status Terms
 
@@ -191,7 +172,7 @@ The human editor decides:
 - `prose_ready`: reviewer says drafting may begin.
 - `drafting`: prose is being written.
 - `prose_review`: draft is under cross-family review.
-- `accepted`: human/cross-family review has cleared the chapter.
+- `accepted`: applicable source-fidelity and prose-quality reviews have cleared the exact chapter revision. This workflow status is not canonical full-page acceptance or a publication unlock; applicable execution, publication and lead gates remain separately required. Record editorial decisions and actual spot reads without inferring a full human read.
 
 A drafted chapter (prose already exists) whose `brief.md` plan is templated, not anchored, regresses to `capacity_plan_drafted` until sources.md is upgraded. The existing prose stays on disk; it just cannot be cited as "accepted" while the contract behind it is incomplete.
 
