@@ -1,5 +1,5 @@
 ---
-title: "Module 1.3: What We Don't Cover (and Why)"
+title: "Module 1.3: Plan Study Scope by Goal"
 slug: prerequisites/philosophy-design/module-1.3-what-we-dont-cover
 sidebar:
   order: 4
@@ -75,18 +75,20 @@ A focused certification route and production onboarding have different goals, al
 
 ---
 
-## What We Deliberately Skip
+<a id="what-we-deliberately-skip"></a>
 
-Classify the actual task rather than treating every adjacent topic as equally urgent or automatically excluded. The checked curricula name native APIs, operational and application tasks, security controls, tools and interfaces at different depths. The categories below help separate additional specialization from required practice. Check the specific objective before deferring a resource, especially when the same product supports both a named task and a much wider feature set.
+## Plan Scope by Goal
+
+Classify the actual task rather than treating every adjacent topic as equally urgent or automatically excluded. These are planning boundaries for a selected certification goal, not a list of topics absent from KubeDojo. The checked curricula name native APIs, operational and application tasks, security controls, tools and interfaces at different depths. The categories below help separate additional specialization from required practice. Check the specific objective before deferring a resource, especially when the same product supports both a named task and a much wider feature set.
 
 ### Cloud Provider Specifics
 
 | Topic | Planning boundary to check | Where to Learn |
 |-------|-------------|----------------|
-| AWS EKS details | Compare the actual task with the chosen objective and environment | AWS documentation, eksctl docs |
-| GKE features | Separate the resource's task from additional provider features | Google Cloud documentation |
-| AKS specifics | Check the task and its verification against the chosen objective | Azure documentation |
-| Cloud IAM integration | Map the identity task and its depth before deferring it | Provider documentation |
+| AWS EKS details | Compare the actual task with the chosen objective and environment | [EKS Architecture](/cloud/eks-deep-dive/module-5.1-eks-architecture/); AWS and eksctl documentation |
+| GKE features | Separate the resource's task from additional provider features | [GKE Networking](/cloud/gke-deep-dive/module-6.2-gke-networking/); Google Cloud documentation |
+| AKS specifics | Check the task and its verification against the chosen objective | [AKS Networking](/cloud/aks-deep-dive/module-7.2-aks-networking/); Azure documentation |
+| Cloud IAM integration | Map the identity task and its depth before deferring it | [Cloud IAM Integration](/cloud/architecture-patterns/module-4.3-cloud-iam/); provider documentation |
 
 For a provider resource, inspect its identity, networking and cluster-operation assumptions. Identify the Kubernetes task and any provider-specific steps, then compare both with the chosen curriculum and environment. A provider workflow may serve a work obligation even when its relation to an exam objective needs further investigation. Record the actual steps rather than inferring coverage from the service's name.
 
@@ -96,10 +98,10 @@ For example, compare a cloud load balancer annotation with the purpose of a Serv
 
 | Topic | Planning boundary to check | Where to Learn |
 |-------|-------------|----------------|
-| Multi-cluster federation | Compare the proposed task with the chosen objective | Project documentation |
-| Cluster autoscaling | Compare node provisioning with workload replica scaling and the chosen objective | Cluster Autoscaler and provider documentation |
-| Organization-wide disaster recovery design | Separate service requirements from named exam tasks | SRE books, your company runbooks |
-| Cost optimization | Identify the cost model, system requirements and intended task | FinOps resources, cloud calculators |
+| Multi-cluster federation | Compare the proposed task with the chosen objective | [Multi-Cluster Architecture](/cloud/architecture-patterns/module-4.2-multi-cluster/); project-specific documentation |
+| Cluster autoscaling | Compare node provisioning with workload replica scaling and the chosen objective | [Karpenter](/platform/toolkits/developer-experience/scaling-reliability/module-6.1-karpenter/); Cluster Autoscaler and provider documentation |
+| Organization-wide disaster recovery design | Separate service requirements from named exam tasks | [Kubernetes Disaster Recovery](/cloud/advanced-operations/module-8.5-disaster-recovery/); SRE books and company runbooks |
+| Cost optimization | Identify the cost model, system requirements and intended task | [Cloud Cost Optimization](/cloud/advanced-operations/module-8.8-cloud-cost/); FinOps resources and cloud calculators |
 
 For a production-planning activity, write down its operating context. A recovery exercise might ask about data stores, recovery objectives, backup tooling and incident roles. A cost investigation might inspect billing, capacity policies and business priorities. A multi-cluster proposal might examine latency, tenancy, traffic management and operating permissions. These are suggested questions, not a complete design checklist or evidence that a particular system meets its requirements. Inspect the actual resource and local acceptance criteria before assigning depth; retain any task that also maps to the chosen exam objective.
 
@@ -109,10 +111,10 @@ Choose the operational task from the curriculum you actually intend to study. Th
 
 | Topic | Depth boundary to check | Where to Learn |
 |-------|-------------|----------------|
-| BGP configuration | Compare the configuration task with the chosen objective | Network engineering resources |
-| Service mesh internals | Retain the CKS encryption task naming Istio; classify other mesh depth separately | Project documentation |
-| eBPF/Cilium internals | Retain the CKS encryption task naming Cilium; classify unrelated datapath internals separately | Cilium documentation |
-| Custom CNI development | Distinguish plugin authorship from the CKA interface objective | CNI specification |
+| BGP configuration | Compare the configuration task with the chosen objective | [BGP and Core Routing](/platform/foundations/advanced-networking/module-1.4-bgp-routing/); network engineering resources |
+| Service mesh internals | Retain the CKS encryption task naming Istio; classify other mesh depth separately | [Service Mesh](/platform/toolkits/infrastructure-networking/networking/module-5.2-service-mesh/); project documentation |
+| eBPF/Cilium internals | Retain the CKS encryption task naming Cilium; classify unrelated datapath internals separately | [Cilium](/platform/toolkits/infrastructure-networking/networking/module-5.1-cilium/); Cilium documentation |
+| Custom CNI development | Distinguish plugin authorship from the CKA interface objective | [CNI and Cluster Networking](/k8s/cka/part3-services-networking/module-3.7-cni/); CNI specification for plugin authorship |
 
 For a networking resource, identify the task it supports before choosing its depth. A Service connectivity exercise can involve labels, selectors, ports, endpoints, DNS, NetworkPolicy and troubleshooting. An implementation guide may address a different objective or additional specialization. Those connections do not establish one networking syllabus for every certification; compare the exact activity with the chosen curriculum and record how you will verify its result.
 
@@ -122,10 +124,10 @@ The distinction matters during practice. If a NetworkPolicy blocks traffic, insp
 
 | Tool | Depth boundary to check | Where to Learn |
 |------|-------------|----------------|
-| ArgoCD | Separate tool-specific sync workflows from the chosen objective | ArgoCD documentation |
-| Istio | Retain the named CKS encryption task; classify other features separately | Istio documentation |
-| Terraform | Separate infrastructure provisioning from the named Kubernetes task | HashiCorp Learn |
-| Prometheus/Grafana | Map the proposed monitoring activity to the exact objective | Project documentation |
+| ArgoCD | Separate tool-specific sync workflows from the chosen objective | [ArgoCD](/platform/toolkits/cicd-delivery/gitops-deployments/module-2.1-argocd/); ArgoCD documentation |
+| Istio | Retain the named CKS encryption task; classify other features separately | [Service Mesh](/platform/toolkits/infrastructure-networking/networking/module-5.2-service-mesh/); Istio documentation |
+| Terraform | Separate infrastructure provisioning from the named Kubernetes task | [Terraform](/platform/toolkits/infrastructure-networking/iac-tools/module-7.1-terraform/); HashiCorp Learn |
+| Prometheus/Grafana | Map the proposed monitoring activity to the exact objective | [Prometheus](/platform/toolkits/observability-intelligence/observability/module-1.1-prometheus/) and [Grafana](/platform/toolkits/observability-intelligence/observability/module-1.3-grafana/); project documentation |
 
 Separate a product's full curriculum from the specific task a certification names. The checked [CKS curriculum](https://github.com/cncf/curriculum/blob/bad74bf40372cdb6fb93f0eb1a6758b59b5a2909/CKS_Curriculum%20v1.34.pdf), Minimize Microservice Vulnerabilities, names Cilium and Istio for implementing Pod-to-Pod encryption. Blanket advice to postpone both products would therefore omit relevant CKS practice. Record the required behavior, the environment and how you will verify it, then classify unrelated features deliberately; the outline does not describe the products' entire feature sets. This retrieved curriculum file is named v1.34; the separately checked FAQ lists the CKS exam environment as 1.35. A curriculum-file label and an exam runtime are distinct evidence, so recheck both before preparation.
 
@@ -144,7 +146,7 @@ Learn enough at work to avoid being dangerous in production. Do not spend certif
 
 </details>
 
-Write yes or no, and which hours you would use, before you continue. The next section is about why the curriculum makes these cuts. It does not answer the Istio question.
+Write yes or no, and which hours you would use, before you continue. The next section explains how to choose study depth for a particular goal. It does not answer the Istio question.
 
 ---
 
@@ -304,14 +306,16 @@ You can record temporary incompleteness explicitly: "I do not yet know this prov
 
 ## When You'd Use This vs Alternatives
 
-Use the KubeDojo scope boundary when the immediate outcome is certification readiness. Use vendor documentation when the immediate outcome is operating a specific managed service. Use project documentation when the immediate outcome is adopting or debugging a specific tool. Use SRE books, company runbooks, and incident reviews when the immediate outcome is production reliability. These alternatives are not competitors; they answer different questions.
+Use this certification-goal boundary when planning exam practice. KubeDojo also has lessons for provider operations, tools, networking and reliability. Combine relevant lessons with vendor and project documentation, SRE books, company runbooks, or incident reviews when the goal calls for their specific context. These resources answer different questions.
 
-| Learning Goal | Best Primary Source | Why This Source Fits |
+| Learning Goal | Starting Resources | Why These Sources Fit |
 |---------------|---------------------|----------------------|
 | Prepare for a chosen certification | Official curriculum and environment requirements, plus a checked KubeDojo route | Map the exact tasks and identify gaps; this packet checks CKA, CKAD and CKS outlines, not every certification. |
-| Operate EKS, GKE, or AKS | Provider documentation and company runbooks | Check the specific service's identity, upgrades, networking, storage, and support boundaries. |
-| Adopt ArgoCD, Istio, Terraform, or Prometheus | Project documentation and a focused lab | Check the selected project's model, commands, assumptions, and failure handling. |
-| Design multi-cluster production reliability | SRE practice, architecture reviews, and incident history | The right answer depends on risk, traffic, data, staffing, and business constraints. |
+| Operate EKS, GKE, or AKS | [EKS Architecture](/cloud/eks-deep-dive/module-5.1-eks-architecture/), [GKE Networking](/cloud/gke-deep-dive/module-6.2-gke-networking/), [AKS Networking](/cloud/aks-deep-dive/module-7.2-aks-networking/), [Cloud IAM](/cloud/architecture-patterns/module-4.3-cloud-iam/), provider documentation and company runbooks | Check the specific service's identity, upgrades, networking, storage, and support boundaries. |
+| Adopt ArgoCD, Istio, Terraform, or Prometheus | [ArgoCD](/platform/toolkits/cicd-delivery/gitops-deployments/module-2.1-argocd/), [Service Mesh](/platform/toolkits/infrastructure-networking/networking/module-5.2-service-mesh/), [Terraform](/platform/toolkits/infrastructure-networking/iac-tools/module-7.1-terraform/), [Prometheus](/platform/toolkits/observability-intelligence/observability/module-1.1-prometheus/), [Grafana](/platform/toolkits/observability-intelligence/observability/module-1.3-grafana/) and project documentation | Check the selected project's model, commands, assumptions, and failure handling. |
+| Design multi-cluster production reliability | [Multi-Cluster Architecture](/cloud/architecture-patterns/module-4.2-multi-cluster/), [Kubernetes Disaster Recovery](/cloud/advanced-operations/module-8.5-disaster-recovery/), SRE practice and company runbooks | The right answer depends on risk, traffic, data, staffing, and business constraints. |
+| Investigate scaling and cost | [Karpenter](/platform/toolkits/developer-experience/scaling-reliability/module-6.1-karpenter/), [Cloud Cost Optimization](/cloud/advanced-operations/module-8.8-cloud-cost/) and provider documentation | Compare node provisioning, workload scaling and local cost requirements. |
+| Explore networking depth | [BGP and Core Routing](/platform/foundations/advanced-networking/module-1.4-bgp-routing/), [Cilium](/platform/toolkits/infrastructure-networking/networking/module-5.1-cilium/), [CNI and Cluster Networking](/k8s/cka/part3-services-networking/module-3.7-cni/) and project documentation | Match the networking task to the goal; plugin authorship may need additional specialist resources. |
 
 Name the job before choosing the resource. "Practice the checked CKAD deployment objective," "debug our Istio ingress path," and "investigate cloud spend" need their own expected evidence. Inspect the resource against that stated job rather than assuming that general usefulness establishes a match. Check a KubeDojo route in the same way: record its target, covered activity, verification, and any missing practice. The plan is a proposal to inspect, not proof that a site or resource prepares every learner.
 

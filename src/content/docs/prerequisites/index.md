@@ -72,13 +72,13 @@ The practical Kubernetes starter path with `kubectl`, Pods, Deployments, Service
 | 1.8 | [YAML for Kubernetes](kubernetes-basics/module-1.8-yaml-kubernetes/) |
 
 ### [Philosophy & Design](philosophy-design/) — 4 modules
-Kubernetes design choices and the topics this curriculum skips or defers; assess a technology's value in your own context.
+Kubernetes design choices, goal-based study planning, and technology tradeoffs; assess a technology's value in your own context.
 
 | Module | Topic |
 |--------|-------|
 | 1.1 | [Why Kubernetes Won](philosophy-design/module-1.1-why-kubernetes-won/) |
 | 1.2 | [Declarative vs Imperative](philosophy-design/module-1.2-declarative-vs-imperative/) |
-| 1.3 | [What We Don't Cover](philosophy-design/module-1.3-what-we-dont-cover/) |
+| 1.3 | [Plan Study Scope by Goal](philosophy-design/module-1.3-what-we-dont-cover/) |
 | 1.4 | [Dead Ends - Technologies We Skip](philosophy-design/module-1.4-dead-ends/) |
 
 ### [Git Deep Dive](git-deep-dive/) — 10 modules
