@@ -6,6 +6,7 @@ Add detailed patch notes here, newest first, with absolute `https://kube-dojo.gi
 
 ## October 2026
 
+- **Inspect computer resources before choosing a fix.** [What is a Computer?](https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) adds clearer OS and storage-inventory guidance, distinguishes filesystem capacity from physical drives, and explains what evidence can support CPU, memory or filesystem-space hypotheses. Its practice now permits uncertainty and asks for a confirming check before a possible action.
 - **2026-10-30 — Choose foundations for your next route.** [Prerequisites](https://kube-dojo.github.io/prerequisites/) clarifies Git preparation, the optional Linux fork, and the [Platform entry checklist](https://kube-dojo.github.io/platform/#do-not-start-here-yet).
 - **Practice Git interruptions with clear state checks.** [Worktrees and Stashing](https://kube-dojo.github.io/prerequisites/git-deep-dive/module-5-worktrees-stashing/) now includes disposable setup, portable hotfix practice, recovery hints, and a move-and-repair stretch exercise.
 - **Plan Git study with clearer expectations.** The [Git Deep Dive overview](https://kube-dojo.github.io/prerequisites/git-deep-dive/) sets out lesson topics, reading and practice estimates, recovery limits, and routes for continuing your study.
