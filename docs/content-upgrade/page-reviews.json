@@ -328,11 +328,11 @@
     },
     {
       "path": "prerequisites/kubernetes-basics/module-1.8-yaml-kubernetes.md",
-      "page_digest": "sha256:20d3d5c004181427ded69c4bc0ffa6b0ad2b39b3319ec9fbfed5c3a836f541e2",
+      "page_digest": "sha256:5dd1d42a0cf0cd504aa4bbb00af9fb9abbed1edba0fa473f519df28628cd1854",
       "disposition": "revise",
-      "reviewer_refs": ["https://github.com/kube-dojo/kube-dojo.github.io/issues/3685#issuecomment-6511455537"],
-      "evidence_refs": ["https://github.com/kube-dojo/kube-dojo.github.io/issues/3685#issuecomment-6511460792", "docs/content-upgrade/reviews/2026-10-27-yaml-validation-p09c.md"],
-      "independent_statuses": {"structural_checks": "unknown", "technical_source": "fail", "editorial_review": "unknown", "lab_execution": "unknown", "deployed_smoke": "pending"}
+      "reviewer_refs": ["https://github.com/kube-dojo/kube-dojo.github.io/issues/3685#issuecomment-6513583723"],
+      "evidence_refs": ["https://github.com/kube-dojo/kube-dojo.github.io/issues/3685#issuecomment-6513583723", "docs/content-upgrade/reviews/2026-10-27-yaml-validation-p09c.md"],
+      "independent_statuses": {"structural_checks": "unknown", "technical_source": "fail", "editorial_review": "unknown", "lab_execution": "unknown", "deployed_smoke": "unknown"}
     },
     {
       "path": "prerequisites/philosophy-design/index.md",
