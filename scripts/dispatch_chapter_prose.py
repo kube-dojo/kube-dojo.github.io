@@ -55,6 +55,8 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
+import yaml
+
 REPO = Path("/Users/krisztiankoos/projects/kubedojo")
 
 CONTRACT_FILES = ["brief.md", "sources.md", "scene-sketches.md",
@@ -69,7 +71,7 @@ def read_branch_file(branch: str, path: str) -> str:
     )
     r = subprocess.run(
         ["git", "show", f"origin/{branch}:{path}"],
-        cwd=REPO, capture_output=True, text=True,
+        cwd=REPO, capture_output=True, text=True, check=False,
     )
     return r.stdout if r.returncode == 0 else ""
 
@@ -422,7 +424,7 @@ def _prose_committed_on_branch(worktree: Path, prose_path: str) -> bool:
     Ch07 2026-04-28). The work landed; the runner just couldn't tell."""
     r = subprocess.run(
         ["git", "log", "--oneline", "main..HEAD", "--", prose_path],
-        cwd=worktree, capture_output=True, text=True,
+        cwd=worktree, capture_output=True, text=True, check=False,
     )
     return bool(r.stdout.strip())
 
@@ -430,8 +432,8 @@ def _prose_committed_on_branch(worktree: Path, prose_path: str) -> bool:
 def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
                log_path: Path, prose_path: str) -> bool:
     sys.path.insert(0, str(REPO / "scripts"))
+    from agent_runtime.errors import AgentTimeoutError, RateLimitedError
     from agent_runtime.runner import invoke
-    from agent_runtime.errors import RateLimitedError, AgentTimeoutError
 
     if agent == "agy":
         # agy pro draft lane (replaced the retired gemini-cli, #2125/#2230).
@@ -502,18 +504,57 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
     return ok
 
 
+def _prose_within_cap(path: Path, cap: int) -> bool:
+    """Count whitespace tokens in Markdown after leading YAML frontmatter.
+
+    Headings, markup, code and references in the remaining body count; this
+    conservative upper-bound check is not a narrative-only quality measure.
+    """
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    except (OSError, UnicodeError) as exc:
+        print(f"[cap] {path}: unreadable ({type(exc).__name__}); count=unknown, cap={cap}", file=sys.stderr)
+        return False
+    if lines and lines[0].rstrip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), None)
+        if end is None:
+            print(f"[cap] {path}: unterminated frontmatter; count=unknown, cap={cap}", file=sys.stderr)
+            return False
+        try:
+            if not isinstance(yaml.safe_load("".join(lines[1:end])), dict):
+                raise TypeError("frontmatter must be a mapping")
+        except (yaml.YAMLError, TypeError):
+            print(f"[cap] {path}: invalid frontmatter; count=unknown, cap={cap}", file=sys.stderr)
+            return False
+        lines = lines[end + 1:]
+    body = "".join(lines)
+    count = len(body.split())
+    empty = not any(char.isalnum() for char in body)
+    if empty or count > cap:
+        print(f"[cap] {path}: {'empty body' if empty else 'over cap'}; count={count}, cap={cap}", file=sys.stderr)
+        return False
+    print(f"[cap] {path}: count={count}, cap={cap} (upper bound only)")
+    return True
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("ch_num", type=int)
     p.add_argument("--slug", required=True)
     p.add_argument("--research-branch", required=True)
-    p.add_argument("--cap-words", type=int, required=True)
+    p.add_argument("--cap-words", type=int, required=True,
+                   help="maximum whitespace tokens in the Markdown body, including markup and references")
     p.add_argument("--verdict-notes-pr", type=int, default=None,
                    help="PR number to fetch codex+gemini verdict notes from")
     p.add_argument("--phases", default="agy,codex",
                    help="comma-separated: agy,codex (default; agy is the Google draft lane) "
                         "or agy,claude (Claude-fallback) or any single phase")
     args = p.parse_args()
+    if args.cap_words <= 0:
+        p.error("--cap-words must be positive")
+    phases = [s.strip() for s in args.phases.split(",") if s.strip()]
+    if not phases:
+        p.error("--phases must name at least one phase")
 
     verdicts = ""
     if args.verdict_notes_pr is not None:
@@ -538,7 +579,6 @@ def main() -> int:
     print(f"[stage] {len(staged_paths)} contract files at "
           f"{worktree}/.dispatch-context/")
 
-    phases = [s.strip() for s in args.phases.split(",") if s.strip()]
     for phase in phases:
         if phase == "agy":
             prompt = agy_draft_prompt(
@@ -588,6 +628,10 @@ def main() -> int:
         else:
             print(f"[err] unknown phase: {phase}", file=sys.stderr)
             return 1
+
+        if not _prose_within_cap(worktree / prose_path, args.cap_words):
+            print(f"[main] {phase} output failed cap validation; preserved for correction", file=sys.stderr)
+            return 5
 
     print(f"[done] worktree={worktree} branch={branch}")
     print(f"[next] cd {worktree} && git push -u origin {branch} "
