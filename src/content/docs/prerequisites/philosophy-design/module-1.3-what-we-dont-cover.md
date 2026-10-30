@@ -146,7 +146,7 @@ Learn enough at work to avoid being dangerous in production. Do not spend certif
 
 </details>
 
-Write yes or no, and which hours you would use, before you continue. The next section is about why the curriculum makes these cuts. It does not answer the Istio question.
+Write yes or no, and which hours you would use, before you continue. The next section explains how to choose study depth for a particular goal. It does not answer the Istio question.
 
 ---
 
@@ -306,14 +306,16 @@ You can record temporary incompleteness explicitly: "I do not yet know this prov
 
 ## When You'd Use This vs Alternatives
 
-Use the KubeDojo scope boundary when the immediate outcome is certification readiness. Use vendor documentation when the immediate outcome is operating a specific managed service. Use project documentation when the immediate outcome is adopting or debugging a specific tool. Use SRE books, company runbooks, and incident reviews when the immediate outcome is production reliability. These alternatives are not competitors; they answer different questions.
+Use this certification-goal boundary when planning exam practice. KubeDojo also has lessons for provider operations, tools, networking and reliability. Combine relevant lessons with vendor and project documentation, SRE books, company runbooks, or incident reviews when the goal calls for their specific context. These resources answer different questions.
 
-| Learning Goal | Best Primary Source | Why This Source Fits |
+| Learning Goal | Starting Resources | Why These Sources Fit |
 |---------------|---------------------|----------------------|
 | Prepare for a chosen certification | Official curriculum and environment requirements, plus a checked KubeDojo route | Map the exact tasks and identify gaps; this packet checks CKA, CKAD and CKS outlines, not every certification. |
-| Operate EKS, GKE, or AKS | Provider documentation and company runbooks | Check the specific service's identity, upgrades, networking, storage, and support boundaries. |
-| Adopt ArgoCD, Istio, Terraform, or Prometheus | Project documentation and a focused lab | Check the selected project's model, commands, assumptions, and failure handling. |
-| Design multi-cluster production reliability | SRE practice, architecture reviews, and incident history | The right answer depends on risk, traffic, data, staffing, and business constraints. |
+| Operate EKS, GKE, or AKS | [EKS Architecture](/cloud/eks-deep-dive/module-5.1-eks-architecture/), [GKE Networking](/cloud/gke-deep-dive/module-6.2-gke-networking/), [AKS Networking](/cloud/aks-deep-dive/module-7.2-aks-networking/), [Cloud IAM](/cloud/architecture-patterns/module-4.3-cloud-iam/), provider documentation and company runbooks | Check the specific service's identity, upgrades, networking, storage, and support boundaries. |
+| Adopt ArgoCD, Istio, Terraform, or Prometheus | [ArgoCD](/platform/toolkits/cicd-delivery/gitops-deployments/module-2.1-argocd/), [Service Mesh](/platform/toolkits/infrastructure-networking/networking/module-5.2-service-mesh/), [Terraform](/platform/toolkits/infrastructure-networking/iac-tools/module-7.1-terraform/), [Prometheus](/platform/toolkits/observability-intelligence/observability/module-1.1-prometheus/), [Grafana](/platform/toolkits/observability-intelligence/observability/module-1.3-grafana/) and project documentation | Check the selected project's model, commands, assumptions, and failure handling. |
+| Design multi-cluster production reliability | [Multi-Cluster Architecture](/cloud/architecture-patterns/module-4.2-multi-cluster/), [Kubernetes Disaster Recovery](/cloud/advanced-operations/module-8.5-disaster-recovery/), SRE practice and company runbooks | The right answer depends on risk, traffic, data, staffing, and business constraints. |
+| Investigate scaling and cost | [Karpenter](/platform/toolkits/developer-experience/scaling-reliability/module-6.1-karpenter/), [Cloud Cost Optimization](/cloud/advanced-operations/module-8.8-cloud-cost/) and provider documentation | Compare node provisioning, workload scaling and local cost requirements. |
+| Explore networking depth | [BGP and Core Routing](/platform/foundations/advanced-networking/module-1.4-bgp-routing/), [Cilium](/platform/toolkits/infrastructure-networking/networking/module-5.1-cilium/), [CNI and Cluster Networking](/k8s/cka/part3-services-networking/module-3.7-cni/) and project documentation | Match the networking task to the goal; plugin authorship may need additional specialist resources. |
 
 Name the job before choosing the resource. "Practice the checked CKAD deployment objective," "debug our Istio ingress path," and "investigate cloud spend" need their own expected evidence. Inspect the resource against that stated job rather than assuming that general usefulness establishes a match. Check a KubeDojo route in the same way: record its target, covered activity, verification, and any missing practice. The plan is a proposal to inspect, not proof that a site or resource prepares every learner.
 
