@@ -29,7 +29,7 @@ Hypothetical scenario: a 2 a.m. page reports checkout latency crossing the custo
 
 The outage is not really about one careless command. It is about a cluster that has grown past the point where memory, discipline, and naming conventions can protect it. A single physical Kubernetes cluster is attractive because it centralizes capacity, networking, observability, and operational skill, but that same centralization creates a shared fate unless the cluster is divided into understandable operating zones. Without namespaces, teams collide over names and permissions; without labels, controllers and humans cannot reliably find the objects they mean to affect; without quotas and defaults, one tenant can unintentionally starve another.
 
-This module teaches the two organizational primitives that make Kubernetes usable beyond toy demos. Namespaces divide the API into logical rooms, while labels attach structured identity to the objects inside those rooms. You will learn what those boundaries actually isolate, what they absolutely do not isolate, how selectors allow decoupled controllers to cooperate, and how namespace-level policy turns a shared cluster into a platform that can survive normal human mistakes. That shared vocabulary also makes incident review faster because ownership, blast radius, and cleanup scope become visible in ordinary commands.
+This module teaches the two organizational primitives that make Kubernetes usable beyond toy demos. Namespaces divide the API into logical rooms, while labels attach structured identity to the objects inside those rooms. You will learn what those boundaries actually isolate, what they absolutely do not isolate, how selectors allow decoupled controllers to cooperate, and how namespace-level policy turns a shared cluster into a platform that can survive normal human mistakes. You will practice identifying a workload's namespace and matching labels before deciding which objects a command should inspect or remove.
 
 Throughout the commands, this module spells out `kubectl` rather than relying on local aliases. The Kubernetes examples target version 1.35, although individual cloud distributions can add their own admission policies or default labels.
 
@@ -166,7 +166,7 @@ spec:
     image: payment-app:2.1.4
 ```
 
-A label key has an optional DNS-subdomain prefix and a required name, separated by a slash. The prefixes `kubernetes.io/` and `k8s.io/` are reserved for Kubernetes components, while your organization should use its own domain-style prefixes when automated tools add labels. The unprefixed labels in the example, such as `tier` and `environment`, are readable and common, but they are more likely to collide with another tool's assumptions in a large platform. The prefixed application labels are better for shared conventions.
+A label key has an optional DNS-subdomain prefix and a required name, separated by a slash. The prefixes `kubernetes.io/` and `k8s.io/` are reserved for Kubernetes components. The example's `tier` and `environment` keys have no prefix; the label naming convention treats unprefixed keys as private to users. Automated components that add labels to end-user objects must specify a prefix, so use an appropriate domain-style prefix for your own automation.
 
 Label values are strings. Quote a value such as `"true"` so YAML does not resolve the plain scalar as a boolean; see the [YAML 1.2.2 core schema](https://yaml.org/spec/1.2.2/#1032-tag-resolution). Labels have size and character constraints and support efficient queries and watches. Keep them compact and identifying; put large release notes, JSON blobs, and controller-specific directives in annotations.
 
@@ -181,7 +181,7 @@ kubectl get pods -l app.kubernetes.io/name=payment-processor,environment=product
 kubectl get pods -A -l app.kubernetes.io/name=payment-processor
 ```
 
-Label taxonomies deserve deliberate design because they become operational contracts. A useful taxonomy usually includes application identity, component, environment, version, owner, cost center, and managed-by information. The exact keys matter less than consistency, but Kubernetes recommends the `app.kubernetes.io/*` family because many ecosystem tools already understand it. When teams improvise labels per deployment, incident response turns into archaeology: every query requires guessing which spelling somebody chose months earlier.
+Choose labels for the questions your team needs to answer: application identity, component, environment, version, owner, cost center, and managed-by information. Kubernetes recommends the `app.kubernetes.io/*` family as shared application metadata intended to support tool interoperability; these labels are not required by core tooling. Agree on keys and values before writing shared queries, so each query has an explicit convention to match.
 
 Before running this, what output do you expect from `kubectl get pods -l app.kubernetes.io/name=payment-processor,environment=production` if one Pod has the payment label but `environment=staging`? The answer should be "it will not match," because comma-separated label requirements are logical AND operations. This small rule is worth internalizing before you use selectors in cleanup commands.
 
@@ -396,7 +396,7 @@ spec:
     type: Container
 ```
 
-The interplay is easier to understand as a checkout counter. The LimitRange writes missing price tags on individual items and rejects absurdly large or tiny items. The ResourceQuota totals the basket and rejects the purchase if the namespace cannot afford it. Applying quota without defaults often breaks teams because their existing templates omit requests. Applying defaults without quota improves individual Pod shape but does not stop aggregate growth. Together, they make namespace budgets predictable.
+The interplay is easier to understand as a checkout counter. The LimitRange writes missing price tags on individual items and rejects absurdly large or tiny items. The ResourceQuota totals the basket and rejects the purchase if the namespace cannot afford it. If a new Pod still lacks a CPU or memory request or limit required by the quota, creation is rejected; a LimitRange can supply missing compute defaults during admission. Defaults alone do not cap aggregate namespace consumption, so check both the defaults and the quota when planning a namespace budget.
 
 Which approach would you choose here and why: a quota that allows `4` CPU cores with a LimitRange default request of `500m`, or the same quota with a default request of `100m` for small web workloads? The first setting admits fewer defaulted Pods but may represent capacity honestly. The second admits more Pods but can understate demand if the applications regularly need more CPU. The correct value depends on measured workload behavior, not a universal template.
 
