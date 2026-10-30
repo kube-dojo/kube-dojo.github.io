@@ -17,7 +17,7 @@ revision_pending: false
 
 After this module, you will be able to:
 
-- **Diagnose** whether a slow computer is more likely constrained by CPU, RAM, disk, or operating-system pressure.
+- **Diagnose** whether a slow computer is more likely constrained by CPU, RAM, disk, or operating-system and program behavior, and identify what evidence is still missing.
 - **Compare** RAM and storage using the kitchen model, then predict what is lost or preserved when power disappears.
 - **Evaluate** why Linux is common in cloud and Kubernetes environments while recognizing where Windows worker nodes fit.
 - **Implement** a personal spec inventory that records your CPU, RAM, disk capacity, operating system, and current resource pressure.
@@ -29,9 +29,9 @@ After this module, you will be able to:
 
 Hypothetical scenario: you join a beginner-friendly operations team and someone says, "The app is down because the server is out of memory." Another person says the disk is full, a third person says the CPU is pegged, and a fourth suggests restarting everything. If all four sentences sound like vague computer drama, you cannot yet choose the next diagnostic step. If you can tell the difference between memory, storage, processing, and the operating system, the same incident becomes a structured problem instead of a panic.
 
-Every single thing you will learn in this curriculum runs on computers. Kubernetes, containers, terminals, shell scripts, cloud servers, laptops, phones, Raspberry Pi boards, and managed databases all depend on the same basic bargain: instructions need a processor, active work needs memory, durable information needs storage, and everything needs an operating system to coordinate access. The vocabulary changes as systems get larger, but the physical constraints do not disappear.
+The systems in this curriculum run on computers. In the laptop and server environments discussed here, instructions need a processor, active work needs memory, durable information needs storage, and an operating system coordinates access. The vocabulary changes as systems get larger, but the physical constraints do not disappear.
 
-This module gives you a mental model that will keep paying rent. Later, when Kubernetes restarts a container because it exceeded a memory limit, you will already know why temporary working space matters. When a node reports disk pressure, you will already know why "more memory" is the wrong fix. When a Linux terminal appears in the next module, you will know that it is not magic, just a direct way to ask the operating system to do work.
+This module gives you a mental model that will keep paying rent. Later, when Kubernetes restarts a container because it exceeded a memory limit, you will already know why temporary working space matters. When a node reports disk pressure, you will already know why "more memory" is the wrong fix. The next module introduces the terminal and the shell that interprets commands entered through it.
 
 ---
 
@@ -61,7 +61,7 @@ The counter space is RAM, which stands for Random Access Memory. In the modern l
 
 The pantry is storage, such as an SSD or hard disk drive. It keeps photos, documents, programs, operating-system files and logs after the machine is turned off. It provides durable capacity rather than the temporary workspace of RAM. A kitchen pantry is a useful comparison for those roles, but durability still requires backups because devices and files can be lost.
 
-Programs are recipes. A web browser is a recipe for requesting pages, decoding data, drawing tabs, storing cookies, playing media, and responding to your clicks. A text editor is a recipe for displaying characters, saving changes, and tracking cursor movement. The terminal, which appears in the next module, is a recipe for talking directly to the operating system through typed commands.
+Programs are recipes. A web browser is a recipe for requesting pages, decoding data, drawing tabs, storing cookies, playing media, and responding to your clicks. A text editor is a recipe for displaying characters, saving changes, and tracking cursor movement. A terminal provides a text interface for a shell, which interprets typed commands and starts programs that can ask the operating system for work.
 
 Pause and predict: if a chef has plenty of recipes and ingredients in the pantry but almost no counter space, what happens during a busy dinner service? Commit to an answer in your own words before opening the reveal.
 
@@ -121,7 +121,7 @@ The result depends on how much memory those programs actually need; tab count al
 
 This is why "my computer is slow" is not enough information for a good diagnosis. A slow video call with a fast network may point toward CPU pressure if the machine cannot encode or decode video smoothly. A slow laptop after opening many applications may point toward RAM pressure if the system is swapping. A slow file search may point toward disk performance or indexing. The symptom matters, but the resource under pressure matters more.
 
-Before running this, what output do you expect from your own machine: a CPU model name, a large byte count for memory, or a percentage of current usage? The command depends on the operating system, but the conceptual result is the same. You are asking the manager to identify the chef, report the amount of counter space, and describe how busy the kitchen is right now.
+Before running this, what output do you expect from your own machine: a CPU model name, a large byte count for memory, or a percentage of current usage? These commands report processor and memory information and filesystem space, not a complete live performance diagnosis. Task 3 introduces observations of current activity.
 
 ```bash
 # See your CPU info on macOS
@@ -187,7 +187,7 @@ Two types of pantry:
 
 Keep units with the values in your inventory, because tools can use different scales. In decimal units, one gigabyte (GB) is one billion bytes and one terabyte is 1,000 GB. A gibibyte (GiB) is 1,073,741,824 bytes, so it is larger than a GB. [NIST's unit comparison](https://physics.nist.gov/cuu/Units/binary.html) explains the distinction; a different displayed number does not necessarily mean storage disappeared.
 
-The difference between RAM and storage becomes obvious during a power failure. Suppose you are writing a document and the power goes out before autosave runs. The original saved file survives because it was already in the pantry. The unsaved changes disappear because they were on the counter. The CPU does not remember your words, and RAM cannot keep them without power.
+The difference between RAM and storage becomes obvious during a power failure. Suppose you are writing a document and the power goes out before autosave runs. The previously saved file will normally remain on storage, while unsaved changes held in RAM are at risk. A failed or interrupted write, storage damage, or another fault can still affect saved data; backups matter.
 
 When disk space fills up, failures look different from RAM pressure. You may be unable to save files, install updates, download packages, write logs, create temporary files, or let the operating system swap memory to disk. The system may still have a fast CPU and enough RAM for current work, but the pantry has no free shelf. That is why a full disk can break programs that seem unrelated to file storage.
 
@@ -255,10 +255,10 @@ Some "recipes" you use every day:
 
   Web browser (Chrome, Firefox)  -> Recipe for displaying web pages
   Text editor (Word, Notepad)    -> Recipe for editing text
-  Terminal                       -> Recipe for talking directly to the OS
+  Terminal                       -> Text interface that hosts a command shell
 ```
 
-The terminal deserves special attention because it is the next door in this curriculum. A graphical interface lets you ask for work through windows, menus, icons, and buttons. A terminal lets you ask for work through text commands. Both paths reach the operating system, but the terminal is easier to automate, easier to document precisely, and common on remote servers where there is no graphical desktop.
+The terminal deserves special attention because it is the next door in this curriculum. A graphical interface lets you ask for work through windows, menus, icons, and buttons. A terminal hosts a shell that interprets text commands; programs launched through it can request operating-system services. Text commands are useful for automation and precise documentation, and terminals are common on remote servers without a graphical desktop.
 
 Linux is common in cloud and Kubernetes environments for practical reasons. It is scriptable, widely available, open source, efficient for server workloads, familiar to infrastructure tooling, and deeply integrated into container workflows. That does not mean Windows is irrelevant. Kubernetes supports Windows worker nodes for Windows workloads, while the control plane remains Linux-based according to the Kubernetes documentation.
 
@@ -406,7 +406,7 @@ Diagnose RAM first because the symptom appears when many active programs need co
 <details>
 <summary>2. A teammate says their unsaved document disappeared after a power outage, but older saved files are still present. How do you compare RAM and storage in this situation?</summary>
 
-The unsaved changes were likely in RAM, which is temporary and requires power to hold active work. The older files were already saved to storage, which is durable and survives shutdowns and power loss. The kitchen comparison is counter space versus pantry space: the counter is wiped when the kitchen closes, while the pantry remains. This is why saving and autosave features matter even on reliable machines.
+The unsaved changes were likely in RAM, which is temporary and requires power to hold active work. Older files saved to storage normally remain after shutdown or power loss, but an interrupted write or storage failure can still damage data. The kitchen comparison is counter space versus pantry space. Saving and autosave reduce the window of unsaved work; backups protect against other losses.
 </details>
 
 <details>
@@ -422,9 +422,9 @@ Evaluate CPU pressure and local application behavior next because real-time vide
 </details>
 
 <details>
-<summary>5. You are choosing between two used laptops for beginner Kubernetes labs. One has a small SSD and 16 GB of RAM; the other has a large HDD and 4 GB of RAM. Which tradeoff matters more for running several tools at once?</summary>
+<summary>5. Two otherwise comparably capable, supported laptops both have enough free storage for your intended beginner Kubernetes lab. One has a small SSD and 16 GB of RAM; the other has a large HDD and 4 GB of RAM. Your measured workload needs more than 4 GB of available memory. Which tradeoff matters for running it?</summary>
 
-The 16 GB of RAM matters more for running several active tools at once because those tools need temporary working space. The small SSD could become limiting if it is nearly full, but an HDD with lots of capacity does not solve active memory pressure. For labs, you want enough RAM for browsers, terminals, containers, editors, and background services. Storage still matters, but RAM is usually the first constraint in that comparison.
+Under those assumptions, the 16 GB machine has more room for the memory-demanding workload; the larger HDD does not replace RAM. Check the actual tools' CPU, memory, disk and environment requirements before choosing. If either machine lacks sufficient free storage or compatible virtualization, the comparison changes; 16 GB is not a universal lab requirement.
 </details>
 
 <details>
@@ -443,13 +443,17 @@ Use the instructions for your operating system. If you are on a managed school o
 
 - [ ] Record your CPU model or processor name.
 - [ ] Record how much RAM your computer has.
-- [ ] Record total storage size and approximate free space.
+- [ ] Record total and approximate free space for a filesystem or volume, and its mount point, drive letter, or volume name shown by the GUI.
 - [ ] Record your operating system name and version.
 
 <details>
 <summary>Solution guidance for Task 1</summary>
 
-On macOS, click the Apple menu and open **About This Mac**. On Windows, open **Settings > System > About** or search for **System Information**. On Linux, use your system settings panel or run `lscpu`, `free -h`, and `df -h` from a terminal. Write the result as plain text, for example: "CPU: Apple M-series chip; RAM: 16 GB; Storage: 512 GB SSD with 210 GB free; OS: macOS."
+On macOS, open **Apple menu > About This Mac** for the computer and OS details. For storage, use **System Settings > General > Storage** on macOS Ventura 13 or later; on earlier versions, use **About This Mac > Storage**. On Windows, use **Settings > System > About** for device and Windows details and **Settings > System > Storage** for storage. Screens can differ by version or access permissions.
+
+On Linux, use your system settings panel or run `lscpu`, `free -h`, `df -h /`, and `cat /etc/os-release` in a terminal. In the last output, look for `PRETTY_NAME` and `VERSION` or `VERSION_ID`; version fields may be absent, and `PRETTY_NAME` may omit the version. Record an unavailable field as unknown. If a command or screen is unavailable, record that rather than guessing.
+
+For example: "CPU: model shown; RAM: 16 GB; Linux root filesystem `/`: 460 GB total, 210 GB available; OS: name and version shown." This is illustrative, not output from a measured computer. A filesystem or logical volume is a way to organize and access files; its displayed capacity does not by itself identify the physical drive's type or full capacity. Record those separately only if your system reports them.
 </details>
 
 ### Task 2: Compare RAM and storage on your machine
@@ -461,7 +465,7 @@ On macOS, click the Apple menu and open **About This Mac**. On Windows, open **S
 <details>
 <summary>Solution guidance for Task 2</summary>
 
-RAM is the smaller temporary workspace number, commonly 8 GB, 16 GB, 32 GB, or another installed-memory value. Storage is the larger durable file-space number, commonly hundreds of gigabytes or more. Unsaved document changes are at risk because they live in active memory until saved, while previously saved files should remain on storage.
+Use the labels and roles, not which number is larger: installed memory or RAM is the temporary workspace; filesystem or volume capacity and free space describe file storage. Unsaved document changes are at risk because they live in active memory until saved, while previously saved files normally remain on storage, subject to failures and interrupted writes.
 </details>
 
 ### Task 3: Diagnose current pressure
@@ -469,12 +473,12 @@ RAM is the smaller temporary workspace number, commonly 8 GB, 16 GB, 32 GB, or a
 - [ ] Open Activity Monitor on macOS, Task Manager on Windows, or `top` on Linux.
 - [ ] Identify one process using noticeable CPU.
 - [ ] Identify one process using noticeable memory.
-- [ ] Decide whether your machine currently looks CPU-bound, memory-bound, disk-bound, or mostly idle.
+- [ ] Use the observations to suggest CPU or memory pressure, or record that the evidence is insufficient. Do not label the machine disk-bound without relevant I/O evidence.
 
 <details>
 <summary>Solution guidance for Task 3</summary>
 
-On macOS, Activity Monitor has CPU and Memory tabs. On Windows, Task Manager has Processes and Performance views. On Linux, `top` shows CPU and memory activity. A busy process or high used-memory number is a clue, not proof of a bottleneck. Check sustained CPU activity against available processing capacity, and memory pressure or available memory alongside ongoing paging. Cached data and allocated swap can remain when applications are responsive; record uncertainty if your evidence does not explain the slowdown.
+On macOS, Activity Monitor has CPU and Memory tabs. On Windows, Task Manager has Processes and Performance views. On Linux, `top` shows CPU and memory activity. A busy process or high used-memory number is a clue, not proof of a bottleneck. Check sustained system-wide CPU activity against available capacity, and memory pressure or available memory alongside ongoing paging when your tools expose it. A swap-usage total in `top` does not by itself establish ongoing paging; if you cannot observe ongoing activity, record that gap. Cached data and allocated swap can remain when applications are responsive. Filesystem fullness is not evidence of slow disk I/O; record insufficient evidence if the observations do not explain the slowdown.
 </details>
 
 ### Task 4: Predict an upgrade correctly
@@ -482,12 +486,12 @@ On macOS, Activity Monitor has CPU and Memory tabs. On Windows, Task Manager has
 - [ ] Write a hypothetical symptom for a CPU bottleneck.
 - [ ] Write a hypothetical symptom for a RAM bottleneck.
 - [ ] Write a hypothetical symptom for a disk-space bottleneck.
-- [ ] Choose one upgrade or cleanup action that matches each symptom.
+- [ ] For each symptom, name a confirming observation and a possible matching action; do not perform cleanup for this exercise.
 
 <details>
 <summary>Solution guidance for Task 4</summary>
 
-A CPU bottleneck might look like slow video export or a choppy video call while memory and disk are healthy. A RAM bottleneck might look like slow window switching after many apps are open. A disk-space bottleneck might look like failed updates or inability to save files. Matching actions could include closing CPU-heavy work, reducing memory-heavy applications or adding RAM, and deleting or moving files to free storage.
+A slow video export could suggest CPU contention: check sustained system-wide CPU use, then consider rescheduling CPU-heavy work. Slow window switching after opening many apps could suggest RAM pressure: check memory pressure or available memory and, if observable, ongoing paging; then consider reducing memory-heavy work. Failed updates or saves could suggest a space shortage: check available space on the relevant filesystem, then consider moving data or expanding it. These are hypothetical checks and actions, not instructions to change your machine.
 </details>
 
 ### Task 5 (optional preview): Connect your laptop to Kubernetes language
@@ -526,7 +530,7 @@ CPU contention is the leading hypothesis because the system-wide summary stays a
 <details>
 <summary>Check your diagnosis for Profile C</summary>
 
-The saturated resource is disk space, and the evidence is the root filesystem at 99% used together with failed installs and stalled logs: the pantry has no free shelf even though the chef and counter are idle. Fitting remediations include deleting or rotating old logs, removing unused packages, moving data to another volume, or expanding the filesystem. Adding CPU or memory would not help because neither is under pressure.
+Filesystem space pressure is a leading hypothesis: root is 99% used and writes are failing, but the failing paths may be on a different filesystem and fullness alone does not prove the cause. For a hypothetical GNU/Linux check, use `df -h PATH` for space and `df -i PATH` for inode availability, which is relevant to creating files. Replace `PATH` with an existing file or directory on the relevant filesystem; for a failed file creation, use its existing containing directory. Describe these checks rather than running them: this fictional profile supplies no real path. If pressure is confirmed, a possible action is to move data or expand that filesystem after checking what is safe to change. Do not delete files as part of this exercise.
 </details>
 
 ### Success Criteria
@@ -553,8 +557,14 @@ The saturated resource is disk space, and the evidence is the root filesystem at
 - [Kubernetes: Intro to Windows support](https://kubernetes.io/docs/concepts/windows/intro/)
 - [MDN Web Docs: tabs.discard()](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/discard)
 - [AWS Well-Architected Framework: Select the correct resource type, size, and number](https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/select-the-correct-resource-type-size-and-number.html)
-- [Apple Support: Find out how much storage is available on your Mac](https://support.apple.com/en-us/102212)
-- [Microsoft Support: How to check your PC's full specifications on Windows](https://support.microsoft.com/windows/how-to-check-your-pc-s-full-specifications-on-windows-7a62a74a-0ad6-3ffc-6853-c124b5a5f73f)
+- [Apple Support: Find out how much storage is available on your Mac](https://support.apple.com/en-us/102624)
+- [Microsoft Support: Find information about your Windows device](https://support.microsoft.com/en-us/windows/experience/find-information-about-your-windows-device)
+- [systemd: os-release fields](https://www.freedesktop.org/software/systemd/man/latest/os-release.html)
+- [GNU df: Filesystem space and inode information](https://man7.org/linux/man-pages/man1/df.1.html)
+- [Microsoft: Get-PSDrive filesystem drives](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-psdrive?view=powershell-7.5)
+- [The Open Group POSIX.1-2024: Shell introduction](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html)
+- [Microsoft: The difference between a shell and a terminal](https://learn.microsoft.com/en-us/windows/terminal/faq#what-is-the-difference-between-a-shell-and-a-terminal)
+- [Linux write(2): Limits of a successful write](https://man7.org/linux/man-pages/man2/write.2.html)
 - [Ubuntu Manpage: lscpu](https://manpages.ubuntu.com/manpages/noble/en/man1/lscpu.1.html)
 - [Ubuntu Manpage: free](https://manpages.ubuntu.com/manpages/noble/en/man1/free.1.html)
 - [Ubuntu Manpage: df](https://manpages.ubuntu.com/manpages/noble/en/man1/df.1.html)
@@ -566,4 +576,4 @@ The saturated resource is disk space, and the evidence is the root filesystem at
 
 ## Next Module
 
-In [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/), you will learn what the terminal is, why it exists alongside the graphical interface, and how it lets you talk directly to the operating system.
+In [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/), you will learn what the terminal is, why it exists alongside the graphical interface, and how a shell interprets commands entered through it.
