@@ -733,11 +733,11 @@ spec:
 ns_lab apply -f web-svc.yaml
 
 # Verify the service is finding the three v1 pods
-ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}'
+ns_lab get endpointslices -l kubernetes.io/service-name=web-svc -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"\t"}{.addresses[*]}{"\tready="}{.conditions.ready}{"\n"}{end}'
 ns_lab get pods -l app=web,version=v1
 ```
 
-Endpoint updates are asynchronous: repeat the endpoint check until three stable Pod names and addresses appear before adding the canary; investigate if they do not converge. This prints every ready member instead of truncating a table. The legacy Endpoints API has been deprecated since Kubernetes 1.33; a warning may be displayed, and EndpointSlices are its replacement.
+EndpointSlice updates are asynchronous. The Service label selects all its slices, and the query prints each observed endpoint's Pod name, all addresses, and `ready` condition. Repeat it until three distinct stable Pod names each have addresses and `ready=true`; investigate if they do not converge. The same endpoint can appear in more than one slice, so compare distinct names rather than counting rows. A blank `ready` value does not establish `ready=true` in this exercise; inspect it instead of counting it as a confirmed ready Pod.
 </details>
 
 ### Task 5: The Canary Release
@@ -770,16 +770,16 @@ ns_lab apply -f web-v2-canary.yaml
 ns_lab wait --for=condition=Ready pod/web-v2-canary --timeout=90s
 
 # Check the endpoints again
-ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}'
+ns_lab get endpointslices -l kubernetes.io/service-name=web-svc -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"\t"}{.addresses[*]}{"\tready="}{.conditions.ready}{"\n"}{end}'
 ns_lab get pods --show-labels
 ```
 
-Repeat the endpoint check until it lists `web-v2-canary` and three `web-v1` Pod names with their IPs; investigate if it does not converge. A deprecation warning may be displayed and is separate from this membership check. Because the Service selector checks only `app=web`, both versions qualify for traffic.
+Repeat the EndpointSlice check until `web-v2-canary` and three distinct `web-v1` Pod names each have addresses and `ready=true`; investigate if they do not converge. Because the Service selector checks only `app=web`, both versions qualify for the Service's endpoint set.
 </details>
 
 ### Optional Stretch: Change the Service Selector
 
-Predict the ready endpoint names if `version=v1` is added to the Service selector. Record the Service UID, narrow the selector, and repeat only the `ns_lab get endpoints web-svc` JSONPath command from Task 5 until only the three stable Pods appear. Restore the original selector, then repeat that query until all three stable Pods and the canary appear. Check that the Service UID is unchanged; stop and investigate if either observation does not converge. Endpoint membership alone does not measure traffic distribution.
+Predict the ready endpoint names if `version=v1` is added to the Service selector. Record the Service UID, narrow the selector, and repeat only the EndpointSlice JSONPath command from Task 5 until only the three distinct stable Pods have addresses and `ready=true`. Restore the original selector, then repeat that query until all three stable Pods and the canary have addresses and `ready=true`. Check that the Service UID is unchanged; stop and investigate if either observation does not converge. Endpoint membership alone does not measure traffic distribution.
 
 <details><summary>Hint 1</summary>Which label distinguishes stable Pods from the canary?</details>
 <details><summary>Hint 2</summary>A Service selector is a map: narrowing it requires both app and version to match.</details>
@@ -801,24 +801,24 @@ start_selector_stretch() {
   NS_SERVICE_UID="$(ns_lab get service web-svc -o jsonpath='{.metadata.uid}')" || { echo 'Cannot record Service UID; stop' >&2; return 1; }
   check_service_uid || return 1
   ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":"v1"}}}' || { echo 'Selector patch failed; stop' >&2; return 1; }
-  ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}' || { echo 'Endpoint check failed; stop' >&2; return 1; }
+  ns_lab get endpointslices -l kubernetes.io/service-name=web-svc -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"\t"}{.addresses[*]}{"\tready="}{.conditions.ready}{"\n"}{end}' || { echo 'EndpointSlice check failed; stop' >&2; return 1; }
 }
 start_selector_stretch
 ```
 
-Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until only the three stable Pods appear; do not rerun `start_selector_stretch`. If the initial Service UID read fails, the one-shot stretch guard stays set: stop and use namespace cleanup rather than unsetting the guard to retry. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
+Repeat only the `ns_lab get endpointslices` JSONPath line above until only the three distinct stable Pods have addresses and `ready=true`; do not rerun `start_selector_stretch`. If the initial Service UID read fails, the one-shot stretch guard stays set: stop and use namespace cleanup rather than unsetting the guard to retry. In a [JSON merge patch](https://www.rfc-editor.org/rfc/rfc7396.txt), `null` removes the specified key; the restore keeps `app=web` and removes `version`. Then run:
 
 ```bash
 restore_selector_stretch() {
   check_service_uid || return 1
   ns_lab patch service web-svc --type=merge -p '{"spec":{"selector":{"version":null}}}' || { echo 'Selector restore failed; stop' >&2; return 1; }
-  ns_lab get endpoints web-svc -o jsonpath='{range .subsets[*].addresses[*]}{.targetRef.name}{" "}{.ip}{"\n"}{end}' || { echo 'Endpoint check failed; stop' >&2; return 1; }
+  ns_lab get endpointslices -l kubernetes.io/service-name=web-svc -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"\t"}{.addresses[*]}{"\tready="}{.conditions.ready}{"\n"}{end}' || { echo 'EndpointSlice check failed; stop' >&2; return 1; }
   check_service_uid || return 1
 }
 restore_selector_stretch
 ```
 
-Repeat only the `ns_lab get endpoints web-svc` JSONPath line above until all four appear. If the expected endpoints do not appear or the UID differs, stop and investigate; do not assume the selector change has converged.
+Repeat only the `ns_lab get endpointslices` JSONPath line above until all four distinct Pods have addresses and `ready=true`. If the expected endpoints do not appear or the UID differs, stop and investigate; do not assume the selector change has converged.
 </details>
 
 **Transfer:** Another Service should select production API Pods but exclude debug Pods. Which labels would you use, and how would you verify the resulting membership before relying on it?
@@ -858,6 +858,7 @@ cleanup_ns_lab
 - [Kubernetes v1.35 documentation: Resource Quotas](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/)
 - [Kubernetes v1.35 documentation: Limit Ranges](https://v1-35.docs.kubernetes.io/docs/concepts/policy/limit-range/)
 - [Kubernetes v1.35: object UIDs](https://v1-35.docs.kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids) and [Endpoints deprecation](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/#endpoints-deprecated)
+- [Kubernetes v1.35 documentation: EndpointSlices](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/endpoint-slices/)
 - [Kubernetes documentation: DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 - [Kubernetes documentation: Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 - [Kubernetes documentation: Recommended Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/)
