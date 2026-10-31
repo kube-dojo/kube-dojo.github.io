@@ -39,12 +39,28 @@ def test_dispatch_smart_danger_allows_dry_run_with_worktree() -> None:
 
 
 def test_agy_review_cannot_override_unverified_read_only_isolation() -> None:
-    for mode in ("read-only", "danger"):
-        result = _run_dispatch_smart(
-            ["review", "--agent", "agy", "--mode", mode, "--dry-run", "x"]
-        )
-        assert result.returncode != 0
-        assert "read-only route disabled" in result.stderr
+    for task in ("review", "search"):
+        for mode in (None, "read-only", "workspace-write", "danger"):
+            result = _run_dispatch_smart(
+                [task, "--agent", "agy", *([] if mode is None else ["--mode", mode]), "--dry-run", "x"]
+            )
+            assert result.returncode != 0
+            assert "read-only route disabled" in result.stderr
+            assert "[dry-run]" not in result.stdout
+    result = _run_dispatch_smart(["edit", "--agent", "agy", "--worktree", ".worktrees/foo", "--dry-run", "x"])
+    assert result.returncode == 0 and "[dry-run]" in result.stdout
+
+
+def test_agy_direct_fire_cannot_bypass_review_pause() -> None:
+    import pytest
+
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    from dispatch_smart import fire
+
+    for task in ("review", "search"):
+        with pytest.raises(ValueError, match="read-only route disabled"):
+            fire(agent="agy", task_class=task, prompt="x", mode="danger", model="gemini-4-argon-high",
+                 worktree=None, task_id="must-not-spawn", timeout_s=1)
 
 
 def test_hermes_agent_is_retired_fail_closed() -> None:

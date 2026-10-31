@@ -828,6 +828,8 @@ def fire(
     timeout_s: int,
     tool_config: dict | None = None,
 ) -> int:
+    if agent == "agy" and task_class in ("review", "search"):
+        raise ValueError("Agy read-only route disabled: CLI isolation is unverified (#3746)")
     print(
         f"[smart] agent={agent} task_class={task_class} model={model} "
         f"mode={mode} timeout={timeout_s}s"

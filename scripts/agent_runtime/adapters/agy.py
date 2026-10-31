@@ -10,8 +10,8 @@ Known behavioral facts as of issue #1350:
 
 - Headless prompt mode is ``agy -p "<prompt>"``. Stdin prompts are ignored.
 - Per-invocation model is ``--model "<Display Name>"`` where the display name
-  is one of the strings printed by ``agy models`` (e.g. ``Gemini 3.1 Pro
-  (High)``). The runtime model slug (``gemini-3.1-pro-high``) and the display
+  is one of the strings printed by ``agy models`` (e.g. ``Gemini 4 Argon
+  (High)``). The runtime model slug (``gemini-4-argon-high``) and the display
   string normalize to the same key, so callers may pass either form; an
   unrecognized or empty explicit value raises instead of changing models.
 - Resume/new conversation is ``--conversation=<uuid>``.
@@ -75,8 +75,8 @@ _AGY_MODEL_NAMES: tuple[str, ...] = (
 
 def _normalize_model(value: str) -> str:
     """Collapse a model identifier to its alphanumeric-lowercase form so that a
-    slug (``gemini-3.1-pro-high``) and the CLI display string
-    (``Gemini 3.1 Pro (High)``) map to the same key."""
+    slug (``gemini-4-argon-high``) and the CLI display string
+    (``Gemini 4 Argon (High)``) map to the same key."""
     return re.sub(r"[^a-z0-9]", "", value.lower())
 
 
