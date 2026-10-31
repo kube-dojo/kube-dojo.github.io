@@ -13,7 +13,8 @@ if [[ ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-FIXTURE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/review-verifier-smoke.XXXXXX")"
+mkdir -p "$ROOT/.agent"
+FIXTURE_DIR="$(mktemp -d "${ROOT}/.agent/review-verifier-smoke.XXXXXX")"
 trap 'rm -rf "$FIXTURE_DIR"' EXIT
 
 cat >"$FIXTURE_DIR/fixture.py" <<'EOF'
@@ -22,7 +23,7 @@ beta = 2
 gamma = 3
 EOF
 
-FIXTURE_PATH="$FIXTURE_DIR/fixture.py"
+FIXTURE_PATH="${FIXTURE_DIR#"$ROOT"/}/fixture.py"
 
 REVIEW="$(cat <<EOF
 FINDING: verified quote
@@ -71,9 +72,12 @@ if ! grep -q '`quote_missing` '"$FIXTURE_PATH"':4' <<<"$CLI_OUT"; then
 fi
 
 # Anti-regression: empty stdin must not be mistaken for a clean verification pass.
-EMPTY_OUT="$("$PYTHON" scripts/verify_review.py --pr 0 </dev/null 2>&1 || true)"
-if ! grep -q '0 verified, 0 line_mismatch, 0 quote_missing' <<<"$EMPTY_OUT"; then
-  echo "smoketest_review_verifier: empty stdin did not emit expected zero-count summary" >&2
+set +e
+EMPTY_OUT="$("$PYTHON" scripts/verify_review.py --pr 0 </dev/null 2>&1)"
+EMPTY_RC=$?
+set -e
+if [[ "$EMPTY_RC" -eq 0 ]] || ! grep -q 'Review verification failed: empty review' <<<"$EMPTY_OUT"; then
+  echo "smoketest_review_verifier: empty stdin did not fail explicitly" >&2
   exit 1
 fi
 
