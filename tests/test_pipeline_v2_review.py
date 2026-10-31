@@ -197,7 +197,7 @@ def _fetch_rows(db_path: Path, sql: str, params: tuple = ()) -> list[sqlite3.Row
 
 
 @pytest.mark.parametrize("case", ["missing_plan", "scalar", "weak", "all4", "invented_quote",
-                                  "missing_topic", "must_fix", "candidate_drift", "plan_drift", "outside", "traversal"])
+                                  "missing_topic", "must_fix", "candidate_drift", "plan_drift", "outside", "traversal", "synthetic"])
 def test_teaching_approval_cannot_bypass_researched_evidence(tmp_path, case):
     plane = _make_control_plane(tmp_path)
     path = _write_module(tmp_path)
@@ -219,6 +219,8 @@ def test_teaching_approval_cannot_bypass_researched_evidence(tmp_path, case):
         payload["coverage"]["topics"] = []
     elif case == "must_fix":
         payload["must_fix"] = ["Untaught outcome"]
+    elif case == "synthetic":
+        payload["auto_approved"] = True
     def dispatch(prompt, **kwargs):
         if "Review ONLY the " in prompt:
             check = next(key for key in ("PRES", "NO_EMOJI", "K8S_API") if f"Review ONLY the {key}" in prompt)
