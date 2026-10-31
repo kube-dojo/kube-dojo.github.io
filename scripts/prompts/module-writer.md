@@ -33,6 +33,10 @@ TASK: Write a complete KubeDojo educational module.
 
 Before drafting, record prerequisites, intended outcomes, essential topics, source basis and justified exclusions in the page's researched coverage plan. Compare scope to primary references or the applicable blueprint and learner needs. Map outcomes to teaching, practice and assessment; activities may serve several outcomes. Use `docs/review-contract.md`; page-kind omissions require independent acceptance. Report missing research inputs instead of inventing a plan or sources.
 
+The lead owns this non-published input: the existing per-page JSON in `docs/citation-seeds/`, resolved by `scripts.quality.source_acceptance.load_seed_bytes`, with matching `module_path`/`module_key` and `coverage_plan` containing `module_kind`, `outcomes`, `essential_topics`, and `source_basis` entries (`uri`, `locator`, `excerpt`). Record prerequisites, scope and exclusion grounds alongside those plan fields; independent review must accept omissions. Use the supplied plan; if unavailable, return a non-module evidence-shortfall report for the lead. Never insert planning records into the lesson or invent missing inputs.
+
+Migration: until #3744 lands, legacy verifiers may still reject prose below their 1000/12/18 density thresholds, the 5000-word default, short-page tiering or source-count checks. These are not teaching targets. Report the disagreement in a non-module shortfall report instead of padding; the runner preserves a failed extraction for the lead rather than publishing the report.
+
 **REQUIRED SECTIONS** (in this exact order):
 
 1. **Frontmatter and metadata blockquote** — frontmatter `title:` + `slug:` + `sidebar.order:` (Starlight renders the page H1 from `title:`, so do NOT add a source `# Module X.Y` heading after the frontmatter — this would render as a duplicate visible title). Then a blockquote with `> **Complexity**: ...`, `> **Time to Complete**: ...`, `> **Prerequisites**: ...`, separated by `>` blank-quote lines, terminated with `---`.
@@ -109,13 +113,13 @@ Before drafting, record prerequisites, intended outcomes, essential topics, sour
 - Any value that matches a known secret pattern (Slack, AWS, GitHub, GCP, Azure) WILL be blocked by GitHub push protection
 
 **WHAT TO AVOID**:
-- Do NOT repeat the number 47 in timestamps, durations, or counts (this is a known LLM pattern — vary your numbers)
+- Use numbers only when supported by the example or verified evidence; do not invent numerical detail for variety.
 - Do NOT invent business incidents, client stories, anonymized companies, or anecdotal incident claims. Use sourced real incidents or clearly labeled hypothetical/exercise scenarios.
 - Do NOT add a mystery, clue hunt, or gamification layer solely to make a module engaging.
 - Do NOT write thin outlines — every section needs depth, examples, and explanation
 - Do NOT skip the exercise — it's the most important part for learning
 - Do NOT use emojis
-- Do NOT write quiz questions that test recall ("What is X?") — write scenario-based questions
+- Use retrieval when it supports the outcomes, with reasoning or transfer where appropriate and explanatory feedback.
 - Do NOT create "list of facts" modules — if sections are just "Header → 3 bullets", you're writing a reference doc, not a lesson
 - Do NOT back-load all active learning to the end — distribute prediction prompts and "try it" moments throughout
 

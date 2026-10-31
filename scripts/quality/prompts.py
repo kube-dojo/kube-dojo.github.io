@@ -106,6 +106,10 @@ Mandatory:
 - Use supported facts, relevant misconceptions and questions that test the outcomes. Do not manufacture trivia or fill a fixed number of rows, questions or sections.
 - Do NOT use emojis.
 
+Before writing, use the lead-supplied researched coverage_plan from this page's existing docs/citation-seeds JSON (matching module_path/module_key; outcomes, essential_topics, source_basis). Scope and omission grounds belong in that non-published plan and require independent acceptance. If these inputs are unavailable, return the evidence-shortfall report; do not invent them or insert planning records into lesson prose.
+
+Migration until #3744: legacy density rejection (1000 prose words / 12 words per line / 18 words per paragraph), the verifier's 5000-word default, short-page tiering and source-count gates may still disagree. Report that disagreement as a non-module shortfall for the lead instead of padding. The runner preserves extraction failures rather than publishing reports.
+
 **Teaching prose:**
 - Explain mechanisms, decisions, examples, tradeoffs and failure recovery in connected prose appropriate to the topic and audience. Lists are useful for genuine steps, options and comparisons.
 - Length, density and section counts are diagnostics, not evidence of learning. Avoid fragments that omit reasoning, repeated filler and long paragraphs that obscure a simple point.
@@ -149,11 +153,13 @@ def structural_prompt(
 
 ## Your task
 
-Return the COMPLETE module with the missing sections added in the correct positions. Preserve every existing line of the module verbatim. Output only the module markdown — no preamble, no fence wrap. Start with the `---` frontmatter line.
+Return the COMPLETE module with the applicable missing sections added in the correct positions. Preserve every existing line verbatim. Output only module markdown starting with `---`. If researched inputs or supported content are insufficient, instead return a non-module evidence-shortfall report; the runner records the failed extraction for the lead and preserves the existing lesson. Never manufacture a required section.
 
-If a section to add is `quiz`: outcome-aligned questions with explanatory `<details>` answers, placed after "Common Mistakes".
+Use the lead-supplied coverage_plan from this page's existing docs/citation-seeds JSON; record scope/exclusion grounds there for independent acceptance, never in published lesson prose. If the plan is unavailable, use the shortfall path. Until #3744 lands, legacy density (1000/12/18), 5000-word, short-page and source-count checks may still reject concise work; report disagreements without padding.
+
+If a section to add is `quiz`: outcome-aligned questions with explanatory `<details>` answers, after applicable concept and practice sections.
 If `hands-on-exercise`: multi-step `- [ ]` checklist, placed after the quiz.
-If `common-mistakes`: supported misconceptions with causes and fixes, placed after "Did You Know?".
+If `common-mistakes`: supported misconceptions with causes and fixes, after the relevant core content or applicable fact section.
 If `did-you-know`: only supported facts that materially aid learning, placed after the core content; report a shortfall rather than manufacture trivia.
 
 Preserve any existing `## Sources` section verbatim — do NOT modify or remove it. Do NOT add a NEW `## Sources` section if one isn't already present (citation insertion runs in a separate stage). Do NOT use emojis.
