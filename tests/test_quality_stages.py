@@ -2266,6 +2266,31 @@ def test_rebase_changed_plan_is_rechecked_before_merge(fake_repo, monkeypatch):
     assert st["stage"] == "REVIEW_PENDING" and "changed since review" in st["review_blocked"] and wt.exists()
 
 
+def test_invalidated_merge_pause_prevents_review_dispatch(fake_repo, monkeypatch):
+    slug = _bootstrap(fake_repo)
+    st = state.load_state(slug)
+    st.update({"stage": "REVIEW_APPROVED", "review": {"verdict": "approve"}})
+    state.save_state(st)
+    monkeypatch.setattr(stages, "_merge_review_error", lambda _st: "candidate changed")
+    monkeypatch.setattr(stages, "dispatch", lambda *_a, **_k: pytest.fail("unexpected dispatch"))
+    stages.merge_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_PENDING" and st["review_contract_paused"] is True
+    assert st["review_contract_version"] == 2
+    stages.review_one(slug)
+    assert state.load_state(slug)["stage"] == "REVIEW_PENDING"
+
+
+def test_legacy_unversioned_pause_prevents_review_dispatch(fake_repo, monkeypatch):
+    slug = _bootstrap(fake_repo)
+    st = state.load_state(slug)
+    st.update({"stage": "REVIEW_PENDING", "review_contract_paused": True})
+    state.save_state(st)
+    monkeypatch.setattr(stages, "dispatch", lambda *_a, **_k: pytest.fail("unexpected dispatch"))
+    stages.review_one(slug)
+    assert state.load_state(slug)["stage"] == "REVIEW_PENDING"
+
+
 def _post_review_case(fake_repo, monkeypatch):
     slug = _bootstrap(fake_repo)
     st = state.load_state(slug)

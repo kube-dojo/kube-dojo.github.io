@@ -923,7 +923,7 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
         st = lease.load()
         if st is None or st["stage"] != "REVIEW_PENDING":
             return
-        if st.get("review_contract_paused") and st.get("review_contract_version") == 2:
+        if st.get("review_contract_paused"):
             return
         wt, module_rel = worktree_dir(_primary(), slug), st["module_path"]
         try:
@@ -1312,7 +1312,7 @@ def merge_one(slug: str) -> None:
             return
         error = _merge_review_error(st)
         if error:
-            state.transition(st, "REVIEW_APPROVED", "REVIEW_PENDING", review_blocked=error, review_contract_paused=True)
+            state.transition(st, "REVIEW_APPROVED", "REVIEW_PENDING", review_blocked=error, review_contract_paused=True, review_contract_version=2)
             return
         primary = _primary()
         if current_branch(primary) != "main":
@@ -1350,7 +1350,7 @@ def merge_one(slug: str) -> None:
                     rebase_onto_main(primary, slug)
                     error = _merge_review_error(st)
                     if error:
-                        state.transition(st, "REVIEW_APPROVED", "REVIEW_PENDING", review_blocked=error, review_contract_paused=True)
+                        state.transition(st, "REVIEW_APPROVED", "REVIEW_PENDING", review_blocked=error, review_contract_paused=True, review_contract_version=2)
                         return
                     try:
                         gates.assert_visual_aids_preserved(
