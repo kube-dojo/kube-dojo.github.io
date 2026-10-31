@@ -5,16 +5,16 @@ description: Evaluate KubeDojo curriculum modules against the eight-dimension pe
 
 # Module Quality Reviewer Skill
 
-Review KubeDojo modules against repository-root `docs/quality-rubric.md`. The accountable lead owns reviewer routing and publication under current repository policy.
+Review KubeDojo modules against `docs/review-contract.md` and `docs/quality-rubric.md`. The accountable lead owns reviewer routing and publication under current repository policy.
 
 ## How to Review
 
 1. **Read the module fully** — line-by-line, not skim.
-2. **Run the verifier first**: `.venv/bin/python scripts/quality/verify_module.py <path>`. Density gates failing (median_wpp < 28, mean_wpp < 30, short-para > 20%) = immediate NEEDS WORK; report the failing gates and leave rubric scores unassessed rather than inventing them.
+2. **Run the verifier first**: `.venv/bin/python scripts/quality/verify_module.py <path>`. Report its actual results. Word, density and template counts are diagnostics, not proof of learning quality; until #3744 lands, the verifier may still enforce legacy count gates, so report that conflict and any unresolved gate separately.
 3. **Score against ALL 8 rubric dimensions** (1-5 each).
 4. **Be STRICT** — a 4 means genuinely good, a 5 is exceptional.
 5. **Flag specific issues with line numbers**.
-6. **Verify all external facts**. Burden of proof on keeping: if a citation `supports` the claim → keep; partial/no/fetch-fail/ambiguous → flag for removal.
+6. **Verify material external facts** against appropriate sources. Unsupported claims need correction or removal; a fetch failure or ambiguous source is unknown and blocks the affected verification, not proof that the claim is false.
 7. **Test runnability** — actually run `bash`/`kubectl`/`yaml` snippets in a sandbox. A verifier pass does not establish runnability.
 
 Before reporting a finding, verify the path and quote the actual reviewed file
@@ -38,21 +38,17 @@ unsupported praise and unsupported criticism.
 | **Engagement** | Memorable tone? Would you recommend this to a colleague? Or dry/robotic? |
 | **Practitioner Depth** (complexity-scaled) | Apply D8 in `docs/quality-rubric.md` for the module's complexity marker: purpose and honest tradeoffs for `[QUICK]`, patterns and decision guidance for `[MEDIUM]`, deeper failure analysis and architectural reasoning for advanced tiers. |
 
-## Structure Checklist
+## Evidence and scope checklist
 
-- [ ] Learning Outcomes (Bloom's L3+ verbs: debug, design, evaluate)
-- [ ] Why This Module Matters (clear motivation and practical relevance; any incident or scenario is cited or explicitly labeled `Hypothetical scenario:`/`Exercise scenario:`/`Simulation:`)
-- [ ] Core content (3-6 sections with code, diagrams, tables)
-- [ ] Inline active learning (at least 2 prediction/try-it prompts in the body)
-- [ ] Did You Know? (4 facts with real numbers)
-- [ ] Common Mistakes table (6-8 rows: Mistake | Why | Fix)
-- [ ] Quiz (6-8 scenario-based questions with `<details>` answers)
-- [ ] Hands-On Exercise (multi-step with success criteria)
-- [ ] Next Module link
+- [ ] Audience, prerequisites, intended scope, essential topics, source basis and deliberate exclusions are recorded. Independently compare the topic inventory with relevant sources and audience needs, not just the author's chosen outcomes.
+- [ ] Every outcome maps to exact candidate-text evidence for teaching and suitable practice and assessment. Activities may serve multiple outcomes; check meaning, not just a matching quote.
+- [ ] Explanation, examples, mechanisms, tradeoffs, misconceptions and recovery match the topic and learner; assessment feedback explains the answer.
+- [ ] Real incidents have verified support; hypothetical scenarios and simulations are explicitly labeled. Hands-on work has success criteria and applicable verification and cleanup.
+- [ ] Navigation and links suit the page. Review justified omissions and page kind independently; labs use L1–L5 (each ≥4, total ≥21/25), hubs and references follow their scoped contract, and books retain their separate workflow.
 
 Do not penalize a module solely for omitting a story or analogy. When used, verify the incident's source, the hypothetical scenario's explicit label, and the analogy's mapping and limits. A labeled simulation illustrates a concept; it is not evidence that an incident occurred or a learner improved. Engagement scores are editorial judgments, not measured learner outcomes.
 
-The author skill and this checklist share the shipping bar; illustrative templates do not lower it.
+Concise supported material can pass; long, padded or unsupported material cannot satisfy the evidence requirement by its length. Do not require numerical trivia or template counts.
 
 ## Passing Criteria
 
@@ -82,8 +78,8 @@ Per the repository-root `docs/quality-rubric.md` (D1-D8), a module passes only w
 | Practitioner Depth | /5 | (complexity-scaled) |
 | **Sum** | **/40** | pass: sum >= 33 AND every dimension >= 4 |
 
-### Structure Checklist
-- [x] or [ ] for each required element
+### Evidence and scope
+- Map outcomes to exact teaching, practice and assessment evidence; record source basis, scope and any material omissions.
 
 ### Key Strengths
 1. ...
@@ -91,7 +87,7 @@ Per the repository-root `docs/quality-rubric.md` (D1-D8), a module passes only w
 ### Must Fix
 1. ...
 
-### Verdict: PASS / NEEDS WORK / FAIL
+### Verdict: APPROVE / APPROVE_WITH_NITS / NEEDS_CHANGES / BLOCKED
 ```
 
 ## Reference Modules (Gold Standard)
