@@ -178,6 +178,7 @@ class ReviewWorker:
             current_plan, current_errors = load_research_plan(self.control_plane.repo_root, lease.module_key)
             errors = (validate_teaching_review(review_result, candidate.decode("utf-8"), plan)
                       if review_result["verdict"] == "APPROVE" else [])
+            errors += ["synthetic approval cannot authorize a stage pass"] if review_result.get("auto_approved") else []
             if (current_errors or current_plan != plan
                     or hashlib.sha256(module_path.read_bytes()).hexdigest() != candidate_digest):
                 errors.append("candidate or researched coverage plan changed during review")
@@ -333,6 +334,7 @@ class ReviewWorker:
         if not feedback:
             feedback = "All requested review checks passed." if verdict == "APPROVE" else "Review checks failed."
         return {
+            "auto_approved": deep_result.get("auto_approved"),
             **{key: deep_result.get(key) for key in (
                 "dimensions", "dimension_evidence", "must_fix", "coverage", "scope_assessment"
             )},
@@ -534,6 +536,7 @@ def _validate_review_payload(raw: str, *, expected_checks: set[str]) -> dict[str
         raise MalformedReviewerResponse(f"missing review checks: {', '.join(missing)}")
 
     return {
+        "auto_approved": payload.get("auto_approved"),
         **{key: payload.get(key) for key in (
             "dimensions", "dimension_evidence", "must_fix", "coverage", "scope_assessment"
         )},
