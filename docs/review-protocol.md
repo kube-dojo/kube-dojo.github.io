@@ -56,7 +56,7 @@ OUTPUT:
 Any orchestrator can run the review loop the same way:
 
 1. Run the reviewer with this protocol prepended to the task.
-2. Verify the review text with `.venv/bin/python scripts/verify_review.py --pr <N> --branch <ref>` or pass `--from-pr` to fetch the latest PR comment directly.
+2. Select the actual review explicitly and pass it on stdin to `.venv/bin/python scripts/verify_review.py --pr <N> --branch <reviewed-ref>`. Canonical JSON uses `verdict` (`APPROVE`, `APPROVE_WITH_NITS`, or `NEEDS_CHANGES`), full `head` SHA, and `findings` containing `id`, `severity`, relative `path`, positive `line`, exact `quote`, `why`, and `fix`. An empty `findings` list requires an approval verdict. Legacy FINDING blocks remain supported; Markdown findings without exact evidence are reported as unsupported, not verified. The legacy `--from-pr` still selects the last non-verifier comment; it does not establish comment identity or reviewed revision.
 3. Treat `quote_missing` as hallucinated evidence. Treat `line_mismatch` as a citation accuracy problem. `verified` means the quoted code exists at the cited location.
 4. Optionally post the verifier summary with `--post-comment`.
 5. Decide manually. The verifier is passive evidence-checking only; it warns, but it does not block merge automatically.
