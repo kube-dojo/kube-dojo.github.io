@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.quality import prompts  # noqa: E402
+from scripts.quality import prompts
 
 
 def test_rewrite_prompt_contains_module_path() -> None:
@@ -59,9 +59,9 @@ def test_structural_prompt_preserves_existing_sources_and_forbids_new() -> None:
     assert "NEW" in out
 
 
-def test_rewrite_prompt_forbids_47_and_emojis() -> None:
+def test_rewrite_prompt_preserves_style_without_banning_arbitrary_numbers() -> None:
     out = prompts.rewrite_prompt(module_path="x.md", module_text="x", teaching_gaps=[])
-    assert "47" in out  # called out as forbidden
+    assert "Do NOT use the number 47" not in out
     assert "emoji" in out.lower()
 
 

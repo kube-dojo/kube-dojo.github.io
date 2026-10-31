@@ -2,6 +2,8 @@
 
 **Purpose**: Measurable scoring system for rating module and lab quality. Used during audits and reviews.
 
+Apply `docs/review-contract.md` for researched scope, topic coverage and page-kind omissions. Word, density, template and citation counts are planning diagnostics, not passing evidence or targets to pad. Independently verify outcome-to-teaching/practice/assessment coverage and material topic omissions. The eight-dimension module and five-dimension lab score floors below remain unchanged; source, execution and final acceptance are separate gates. Report legacy verifier disagreements during #3744 migration explicitly.
+
 ## Citation Gate (Mandatory Before Scoring)
 
 Before a module can be counted as `4/5` or `5/5`, it must pass a citation and evidence hygiene check.

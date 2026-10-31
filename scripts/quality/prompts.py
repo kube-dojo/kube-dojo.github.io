@@ -102,24 +102,14 @@ Mandatory:
 - Preserve any existing `## Sources` section verbatim (heading, ordering, citation lines, URLs). Do NOT modify, reorder, deduplicate, or "improve" entries. Do NOT add a NEW `## Sources` section if one isn't already present — citation insertion runs in a separate downstream stage.
 - Address each gap from the audit explicitly.
 - Plan enough substantive content to address the stated outcomes, exercise, assessment, sources, and topic. Counts can inform routing and review, but are not proof of factual support, learning, or acceptance. Do not pad with repeated prose, decorative structure, or unsupported facts. If verified material cannot support the requested scope, report the shortfall rather than inventing detail or claiming completion.
-- All quiz questions scenario-based (Bloom L3+). No recall questions.
-- Exactly 4 "Did You Know?" facts. 6-8 rows in "Common Mistakes". 6-8 quiz questions.
-- Do NOT use emojis. Do NOT use the number 47.
+- Map researched outcomes to teaching, appropriate practice and assessment with explanatory feedback. Shared activities are allowed; topic scope must be checked against primary references and learner needs.
+- Use supported facts, relevant misconceptions and questions that test the outcomes. Do not manufacture trivia or fill a fixed number of rows, questions or sections.
+- Do NOT use emojis.
 
-**Prose density (v2 routing and pre-commit/merge behavior):**
-
-The unchanged v2 classifier uses these tiers: REWRITE is below 1000 prose words, 12 words per non-blank line, or 18 words per prose paragraph; PASS is at least 1500 prose words, 18 words per non-blank line, and 22 words per prose paragraph; REVIEW is intermediate. REWRITE is the density rejection tier checked before commit/merge. PASS and REVIEW do not establish factual support, source verification, learning effectiveness, or acceptance; the other review and executable gates still apply. These figures are not a total line or word quota.
-
-1. **Pad-bomb (one-sentence-per-paragraph)** — every sentence on its own line, single newlines between sentences. Looks "structured" but reads like a stack of bullets without the bullets. Fail signal: words-per-line < 12.
-2. **Punchy-bullets / fragments** — short stubs, two-clause "headers" used as paragraphs, heavy bullet-only sections with no surrounding prose. Fail signal: words-per-paragraph < 18.
-3. **Essay-filler** — paragraphs that look dense but say nothing concrete (corporate generality, no examples, no sequencing). Fail signal: w/ln passes but reviewer + audit both downgrade teaching.
-
-**Required prose shape:**
-- Prefer an average of 22 words per prose paragraph (target 25–60) and 18 words per non-blank line (target ≥20). A paragraph is text between blank lines, NOT counting code fences, lists, tables, or front-matter blocks.
-- Treat 1500 prose words as the stronger PASS classifier tier, not a total-content quota. Prose words are outside code fences, frontmatter, and tables; a REVIEW result is intermediate and is not automatically blocked.
-- If verified material cannot support the requested scope or an active gate, use the shortfall-report exception above rather than fabricating detail or claiming completion. This prompt instruction does not create a new machine-enforced publication guard.
-- A teaching paragraph should typically be 3–6 sentences long, with the first sentence stating the claim and the rest grounding it with mechanism, example, or trade-off. Do not split that into 4 separate one-sentence paragraphs.
-- Bullets are allowed for genuine lists (steps, options, anti-patterns, rules). They are NOT a substitute for explanation. A section that's 90% bullets fails. If you find yourself writing 5+ consecutive single-line bullets where each is essentially a sentence of an argument, merge them into a paragraph.
+**Teaching prose:**
+- Explain mechanisms, decisions, examples, tradeoffs and failure recovery in connected prose appropriate to the topic and audience. Lists are useful for genuine steps, options and comparisons.
+- Length, density and section counts are diagnostics, not evidence of learning. Avoid fragments that omit reasoning, repeated filler and long paragraphs that obscure a simple point.
+- If verified material cannot support the requested scope, report the evidence shortfall; never invent detail to satisfy a metric. Required source, execution, preservation and review gates remain separate.
 
 You are writing for a learner who reads the page top-to-bottom. Flowing multi-sentence paragraphs are how you teach mechanism, sequence, and nuance. Fragmented one-line "paragraphs" are how style guides for status pages are written, and that is the wrong genre.
 
@@ -161,12 +151,12 @@ def structural_prompt(
 
 Return the COMPLETE module with the missing sections added in the correct positions. Preserve every existing line of the module verbatim. Output only the module markdown — no preamble, no fence wrap. Start with the `---` frontmatter line.
 
-If a section to add is `quiz`: 6-8 scenario-based questions with `<details>` answers, placed after "Common Mistakes".
+If a section to add is `quiz`: outcome-aligned questions with explanatory `<details>` answers, placed after "Common Mistakes".
 If `hands-on-exercise`: multi-step `- [ ]` checklist, placed after the quiz.
-If `common-mistakes`: 6-8 row table, placed after "Did You Know?".
-If `did-you-know`: exactly 4 facts, placed after the core content.
+If `common-mistakes`: supported misconceptions with causes and fixes, placed after "Did You Know?".
+If `did-you-know`: only supported facts that materially aid learning, placed after the core content; report a shortfall rather than manufacture trivia.
 
-Preserve any existing `## Sources` section verbatim — do NOT modify or remove it. Do NOT add a NEW `## Sources` section if one isn't already present (citation insertion runs in a separate stage). Do NOT use emojis or the number 47.
+Preserve any existing `## Sources` section verbatim — do NOT modify or remove it. Do NOT add a NEW `## Sources` section if one isn't already present (citation insertion runs in a separate stage). Do NOT use emojis.
 """
 
 
