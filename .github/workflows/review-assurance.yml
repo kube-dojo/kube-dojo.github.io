@@ -2,7 +2,7 @@ name: Review assurance
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'codex/**']
   push:
     branches: [main]
 
@@ -37,7 +37,8 @@ jobs:
             tests/test_verify_review.py tests/test_dispatch_smart.py \
             scripts/agent_runtime/tests/test_agy_adapter.py \
             tests/test_quality_stages.py tests/test_quality_prompts.py tests/test_quality_pipeline.py \
-            tests/test_pipeline_v2_review.py tests/test_verify_module_budget.py tests/test_quality_density.py \
+            tests/test_pipeline_v2_review.py tests/test_pipeline_v2_preflight_snapshot.py \
+            tests/test_verify_module_budget.py tests/test_quality_density.py \
             scripts/quality/test_verify_module.py scripts/quality/test_verify_module_urls.py
       - name: Check pipeline invariants
         run: .venv/bin/python scripts/test_pipeline.py
