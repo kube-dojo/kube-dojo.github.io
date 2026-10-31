@@ -69,7 +69,7 @@
           bar.append(segment);
         });
         const link = el('a', names[key] || key);
-        link.href = key === 'shared' ? `/quality?locale=${locale}` : `/quality?locale=${locale}&search=${encodeURIComponent((locale === 'uk' ? 'uk/' : '') + key + '/')}`;
+        link.href = key === 'shared' ? `/quality?locale=${locale}&track=shared` : `/quality?locale=${locale}&search=${encodeURIComponent((locale === 'uk' ? 'uk/' : '') + key + '/')}`;
         row.append(link, bar,
           el('span', `${values.acceptance_recorded}/${values.total} accepted · ${values.review_recorded} reviewed`, 'track-count'));
         section.append(row);

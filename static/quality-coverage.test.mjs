@@ -162,3 +162,13 @@ await elements.refresh.events.click();
 release(data); await older;
 assert.match(elements['cc-summary'].textContent, /HTTP 503/);
 assert.equal(elements['cc-rows'].children.length, 0);
+
+// A track deep link must retain both its track and locale constraints.
+context.window.location.search = '?locale=en&track=shared';
+elements['cc-status'].value = ''; elements['cc-work'].value = '';
+response = {ok: true, json: async () => data};
+vm.runInNewContext(readFileSync(new URL('./quality-coverage.js', import.meta.url), 'utf8'), context);
+await new Promise(setImmediate);
+assert.equal(elements['cc-count'].textContent, '1 pages shown');
+assert.match(elements['cc-count'].children[0].textContent, /EN Shared/);
+assert.equal(elements['cc-locale'].value, 'en');

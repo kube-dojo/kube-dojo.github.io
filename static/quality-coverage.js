@@ -17,6 +17,7 @@
   const params = new URLSearchParams(window.location.search);
   find('cc-search').value = params.get('search') || '';
   find('cc-locale').value = ['en', 'uk'].includes(params.get('locale')) ? params.get('locale') : '';
+  if (order.includes(params.get('track'))) selectedTrack = {locale: find('cc-locale').value || 'en', name: params.get('track')};
   function meter(values, title) {
     const bar = document.createElement('div'), parts = coveragePartition(values);
     bar.className = 'cc-meter';
