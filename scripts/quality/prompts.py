@@ -92,6 +92,8 @@ def rewrite_prompt(
 
 Produce a complete, replacement module that teaches the topic from beginner to senior level. For a complete module, output ONLY its markdown — no preamble, no code-fence wrap, starting with `---` frontmatter and ending with a newline. If verified material is insufficient, return a shortfall report instead of a replacement module; do not disguise that report as publishable lesson content.
 
+Shortfall format: plain text starting `EVIDENCE_SHORTFALL:`, then `Missing inputs:` and `Next action:`. Include no frontmatter, code fences or copied lesson body; this is a blocked diagnostic for the lead, not publishable content.
+
 Mandatory:
 - Preserve the `title:` and `sidebar.order:` from existing frontmatter.
 - Do NOT add a Markdown `# Module ...` heading after frontmatter. Starlight renders the visible page H1 from `title:` frontmatter, so a source H1 creates a duplicate title in the rendered page.
@@ -154,6 +156,8 @@ def structural_prompt(
 ## Your task
 
 Return the COMPLETE module with the applicable missing sections added in the correct positions. Preserve every existing line verbatim. Output only module markdown starting with `---`. If researched inputs or supported content are insufficient, instead return a non-module evidence-shortfall report; the runner records the failed extraction for the lead and preserves the existing lesson. Never manufacture a required section.
+
+Shortfall format: plain text starting `EVIDENCE_SHORTFALL:`, then `Missing inputs:` and `Next action:`. Include no frontmatter, code fences or copied lesson body.
 
 Use the lead-supplied coverage_plan from this page's existing docs/citation-seeds JSON; record scope/exclusion grounds there for independent acceptance, never in published lesson prose. If the plan is unavailable, use the shortfall path. Until #3744 lands, legacy density (1000/12/18), 5000-word, short-page and source-count checks may still reject concise work; report disagreements without padding.
 

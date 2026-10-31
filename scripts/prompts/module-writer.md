@@ -35,6 +35,8 @@ Before drafting, record prerequisites, intended outcomes, essential topics, sour
 
 The lead owns this non-published input: the existing per-page JSON in `docs/citation-seeds/`, resolved by `scripts.quality.source_acceptance.load_seed_bytes`, with matching `module_path`/`module_key` and `coverage_plan` containing `module_kind`, `outcomes`, `essential_topics`, and `source_basis` entries (`uri`, `locator`, `excerpt`). Record prerequisites, scope and exclusion grounds alongside those plan fields; independent review must accept omissions. Use the supplied plan; if unavailable, return a non-module evidence-shortfall report for the lead. Never insert planning records into the lesson or invent missing inputs.
 
+Shortfall output is plain text starting `EVIDENCE_SHORTFALL:`, followed by `Missing inputs:` and `Next action:`; include no frontmatter, code fences or copied lesson body. The runner records this as a blocked extraction, preserving the original lesson.
+
 Migration: until #3744 lands, legacy verifiers may still reject prose below their 1000/12/18 density thresholds, the 5000-word default, short-page tiering or source-count checks. These are not teaching targets. Report the disagreement in a non-module shortfall report instead of padding; the runner preserves a failed extraction for the lead rather than publishing the report.
 
 **REQUIRED SECTIONS** (in this exact order):

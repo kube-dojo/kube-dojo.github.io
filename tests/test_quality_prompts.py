@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.quality import prompts
@@ -79,6 +81,14 @@ def test_actual_authoring_inputs_share_coverage_and_shortfall_contract(monkeypat
         assert not any(phrase in text for phrase in contradictions)
         assert "coverage_plan" in text and "shortfall" in text and "docs/citation-seeds" in text
         assert "#3744" in text and "padding" in text
+
+
+def test_defined_evidence_shortfall_cannot_be_extracted_as_a_publishable_module() -> None:
+    from scripts.quality.extractors import ModuleExtractError, extract_module_markdown
+
+    report = "EVIDENCE_SHORTFALL: Research unavailable\nMissing inputs: source_basis\nNext action: lead supplies plan"
+    with pytest.raises(ModuleExtractError):
+        extract_module_markdown(report)
 
 
 def test_structural_prompt_lists_missing_sections() -> None:
