@@ -23,7 +23,7 @@ const data = {pages: [row, {...row, path: 'uk/index.md', locale: 'uk', receipt_s
     uk: {shared: {acceptance_recorded: 0, total: 1, review_recorded: 0, needs_revision: 0, unreviewed: 1, stale: 0, invalid: 0}}},
   parked_locales: ['uk'], status: 'needs_attention', coverage_health: 'unknown', caveat: 'Supplied assertion only', work_summary: {reviewing: 2}, work_errors: []};
 let response = {ok: true, json: async () => data};
-const context = {document: {getElementById: id => elements[id], createElement: tag => new Element(tag)},
+const context = {URLSearchParams, window: {location: {search: ''}}, document: {getElementById: id => elements[id], createElement: tag => new Element(tag)},
   fetch: async () => response, setInterval() {}, Date};
 vm.runInNewContext(readFileSync(new URL('./content-coverage.js', import.meta.url), 'utf8'), context);
 const corpus = {total: 1089, acceptance_recorded: 10, review_recorded: 41, needs_revision: 30, stale: 1, invalid: 0, unreviewed: 1048};
