@@ -8,9 +8,8 @@ from typing import Any
 
 import yaml
 
-import scripts.v1_pipeline as v1_pipeline
+from scripts import v1_pipeline
 from scripts.checks.structural import check_k8s_versions, check_leaked_secrets
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LINK_CACHE_PATH = REPO_ROOT / ".pipeline" / "link-cache.json"
@@ -74,13 +73,17 @@ def run_preflight(
     *,
     repo_root: Path | None = None,
     link_cache_path: Path = DEFAULT_LINK_CACHE_PATH,
+    content: str | None = None,
 ) -> PreflightResult:
+    """Check an explicit snapshot coherently; None retains legacy live-path linting."""
     module = Path(module_path)
     root = repo_root or REPO_ROOT
-    content = module.read_text(encoding="utf-8")
+    snapshot = content
+    if content is None:
+        content = module.read_text(encoding="utf-8")
 
     findings: list[PreflightFinding] = []
-    findings.extend(_run_markdownlint(module, cwd=root))
+    findings.extend(_run_markdownlint(module, cwd=root, content=snapshot))
     findings.extend(_run_yamllint(content, cwd=root))
     findings.extend(_validate_frontmatter_schema(content, module))
     findings.extend(_structural_regex_findings(content))
@@ -88,10 +91,12 @@ def run_preflight(
     return PreflightResult(module_path=module, findings=findings)
 
 
-def _run_markdownlint(module_path: Path, *, cwd: Path) -> list[PreflightFinding]:
+def _run_markdownlint(module_path: Path, *, cwd: Path, content: str | None = None) -> list[PreflightFinding]:
     try:
         result = subprocess.run(
-            ["npx", "markdownlint-cli2", str(module_path)],
+            ["npx", "markdownlint-cli2", str(module_path) if content is None else "-"],
+            input=content,
+            encoding="utf-8",
             capture_output=True,
             text=True,
             cwd=cwd,
@@ -386,9 +391,7 @@ def _is_valid_sidebar_order(value: Any) -> bool:
         return False
     if isinstance(value, int):
         return True
-    if isinstance(value, str) and re.fullmatch(r"-?\d+", value.strip()):
-        return True
-    return False
+    return isinstance(value, str) and re.fullmatch(r"-?\d+", value.strip()) is not None
 
 
 def _has_non_empty_string(value: Any) -> bool:

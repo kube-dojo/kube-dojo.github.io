@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from pipeline_v2.preflight import _normalize_external_url, run_preflight
 
-
 REPRESENTATIVE_MARKDOWN = """---
 title: Sample Module
 slug: sample/module
@@ -58,6 +57,18 @@ def test_run_preflight_uses_relaxed_repo_markdownlint_config(tmp_path):
     markdownlint_findings = [finding for finding in result.findings if finding.id == "MARKDOWNLINT"]
     assert markdownlint_findings
     assert all(finding.passed for finding in markdownlint_findings)
+
+
+def test_real_markdownlint_checks_snapshot_stdin_and_root_configuration(tmp_path):
+    root = Path(__file__).resolve().parent.parent
+    (tmp_path / ".markdownlint-cli2.yaml").write_text((root / ".markdownlint-cli2.yaml").read_text())
+    path = tmp_path / "snapshot.md"
+    path.write_text("not the candidate")
+    for text, expected in ((REPRESENTATIVE_MARKDOWN, True), ("# Duplicate\n# Duplicate\n", False)):
+        result = run_preflight(path, repo_root=tmp_path, content=text)
+        lint = [finding for finding in result.findings if finding.id == "MARKDOWNLINT"]
+        assert lint and all(finding.passed for finding in lint) is expected
+    assert path.read_text() == "not the candidate"
 
 
 def test_run_preflight_downgrades_missing_yamllint_to_warning(tmp_path):

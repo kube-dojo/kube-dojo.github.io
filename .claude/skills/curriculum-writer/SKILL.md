@@ -9,12 +9,14 @@ Write modules under `src/content/docs/` that teach the assigned topic and satisf
 
 ## Content contract
 
-- Read `docs/quality-rubric.md` from the repository root. Target all eight dimensions: sum ≥ 33/40 and every dimension ≥ 4.
-- Preserve density gates enforced by `scripts/quality/verify_module.py`: median words per paragraph ≥ 28, mean ≥ 30, and paragraphs under 18 words ≤ 20%. Meet these through connected explanations, not padding.
+- Read `docs/review-contract.md` and `docs/quality-rubric.md` from the repository root. Target all eight module dimensions: sum ≥ 33/40 and every dimension ≥ 4.
+- Before writing, record the audience and prerequisites, intended scope, essential topics, relevant primary sources and deliberate exclusions. Compare the topic inventory with the source basis and audience needs, not only the proposed outcomes.
+- Map each outcome to actual teaching and appropriate practice and assessment. Shared examples and activities are welcome. Explain mechanisms, decisions, misconceptions and failure recovery as appropriate; use worked examples where they help.
+- Word, density, source and template counts are diagnostics, not proof of adequate coverage. Do not pad, manufacture facts or force a number of activities. Explicit page-specific workload limits need a recorded rationale. During migration, the existing verifier may still enforce legacy counts; report its actual result and the conflict separately until #3744 lands.
 - Include `title:` and `sidebar.order:` frontmatter. Filenames with dots require an explicit `slug:` preserving those dots.
 - Use `module-X.Y-topic-name.md` filenames and add new modules to the parent `index.md` table. Internal learner links use published slugs ending in `/`, never `.md`; link prerequisites to specific modules.
-- Include measurable learning outcomes, practical motivation, connected core sections, at least two inline active-learning prompts, four verified Did You Know facts, a 6–8-row Common Mistakes table, 6–8 scenario-based quiz questions with explanatory `<details>` answers, a hands-on exercise with success criteria and verification, and a Next Module link. These are the stricter shipping counts in [module-quality-reviewer](../module-quality-reviewer/SKILL.md).
-- Include a `## Sources` section immediately before `## Next Module`, with at least three primary/vendor documentation citations. The verifier counts links in that section only; inline citations alone do not satisfy it.
+- Include observable learning outcomes, practical motivation, connected explanations, suitable practice and assessment with explanatory feedback, and a Next Module link. Choose prompts, examples, quizzes, tables and exercises for the learning need; hands-on work needs success criteria and verification.
+- Cite primary or authoritative sources sufficient to support material claims and the researched scope; record exact evidence and check the applicable citation requirements. The verifier currently counts links in the `## Sources` section, so report that legacy result honestly.
 - Mark complexity as `[QUICK]`, `[MEDIUM]`, or `[COMPLEX]`; state completion time and prerequisites. Scale practitioner depth to that complexity using D8 in the rubric.
 
 ## Evidence and teaching
@@ -27,7 +29,7 @@ Teach principles through connected prose and practical decisions. Use focused AS
 
 ## Track guidance
 
-Read [module-templates.md](module-templates.md) when drafting a new module or restructuring one; load only the applicable track section. Its templates illustrate layout, while the content contract above sets shipping counts.
+Read [module-templates.md](module-templates.md) when drafting a new module or restructuring one; load only the applicable track section. Templates illustrate possible layouts, not required quantities.
 
 - Certification modules align with the official CNCF curriculum and emphasize time-boxed hands-on practice; use [k8s-cert-expert](../k8s-cert-expert/SKILL.md) for exam alignment.
 - Prerequisites assume no prior topic knowledge and build foundations for later certifications.
