@@ -7,21 +7,21 @@ import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import local_api
 from pipeline_common.review_audit import append_review_audit
-from pipeline_v2.control_plane import ControlPlane
 from pipeline_v2.cli import _build_status_report
+from pipeline_v2.control_plane import ControlPlane
 from pipeline_v2.review_worker import (
     DEEP_CHECK_IDS,
     REVIEW_FALLBACK_MODEL,
     REVIEW_MODEL,
     ReviewWorker,
 )
-
 
 GOOD_MODULE = """---
 title: Review Worker Test
@@ -43,6 +43,20 @@ This module explains why review workers should run deterministic checks first.
 
 Avoid deprecated APIs and keep the prose emoji free.
 """
+
+PLAN = {"module_kind": "module", "outcomes": ["Explain the pre-flight gate."],
+        "essential_topics": ["review gates"],
+        "source_basis": [{"uri": "git:review-worker", "locator": "run_once", "excerpt": "Run preflight first."}]}
+
+
+def _teaching_evidence():
+    quote = "This module explains why review workers should run deterministic checks first."
+    return {"dimensions": {f"D{n}": 5 for n in range(1, 9)},
+            "dimension_evidence": {f"D{n}": quote for n in range(1, 9)}, "must_fix": [],
+            "coverage": {"outcomes": [{"outcome": PLAN["outcomes"][0], "teaching": quote,
+                                        "practice": quote, "assessment": quote}],
+                         "topics": [{"topic": "review gates", "teaching": quote}]},
+            "scope_assessment": {"basis_checked": True, "unjustified_omissions": [], "rationale": "Fixture scope."}}
 
 
 def _write_budgets(path: Path) -> None:
@@ -85,6 +99,12 @@ def _write_module(tmp_path: Path, name: str = "module-1.1-review-worker.md") -> 
     module_path = tmp_path / "docs" / name
     module_path.parent.mkdir(parents=True, exist_ok=True)
     module_path.write_text(GOOD_MODULE, encoding="utf-8")
+    seeds = tmp_path / "docs/citation-seeds"
+    seeds.mkdir(parents=True, exist_ok=True)
+    (seeds / f"docs-{Path(name).stem}.json").write_text(json.dumps({
+        "module_path": f"src/content/docs/docs/{name}", "module_key": f"docs/{Path(name).stem}",
+        "coverage_plan": PLAN,
+    }))
     return module_path
 
 
@@ -160,6 +180,7 @@ def _deep_response(
     return json.dumps(
         {
             "verdict": "APPROVE" if all(item["passed"] for item in checks) else "REJECT",
+            **_teaching_evidence(),
             "checks": checks,
             "feedback": "deep checks passed" if all(item["passed"] for item in checks) else "deep checks failed",
         }
@@ -173,6 +194,67 @@ def _fetch_rows(db_path: Path, sql: str, params: tuple = ()) -> list[sqlite3.Row
         return conn.execute(sql, params).fetchall()
     finally:
         conn.close()
+
+
+@pytest.mark.parametrize("case", ["missing_plan", "scalar", "weak", "all4", "invented_quote",
+                                  "missing_topic", "must_fix", "candidate_drift", "plan_drift"])
+def test_teaching_approval_cannot_bypass_researched_evidence(tmp_path, case):
+    plane = _make_control_plane(tmp_path)
+    path = _write_module(tmp_path)
+    seed = next((tmp_path / "docs/citation-seeds").glob("*.json"))
+    plane.enqueue(str(path.relative_to(tmp_path)), phase="review", model=REVIEW_MODEL)
+    payload = json.loads(_deep_response())
+    if case == "missing_plan":
+        seed.unlink()
+    elif case == "scalar":
+        payload = {key: payload[key] for key in ("verdict", "checks", "feedback")}
+    elif case in ("weak", "all4"):
+        payload["dimensions"] = {f"D{n}": 4 for n in range(1, 9)}
+        if case == "weak":
+            payload["dimensions"]["D8"] = 3
+    elif case == "invented_quote":
+        payload["dimension_evidence"]["D2"] = "Not in this candidate."
+    elif case == "missing_topic":
+        payload["coverage"]["topics"] = []
+    elif case == "must_fix":
+        payload["must_fix"] = ["Untaught outcome"]
+    def dispatch(prompt, **kwargs):
+        if "Review ONLY the " in prompt:
+            check = next(key for key in ("PRES", "NO_EMOJI", "K8S_API") if f"Review ONLY the {key}" in prompt)
+            return True, _simple_response(check)
+        assert "review gates" in prompt and "source_basis" in prompt
+        if case == "candidate_drift":
+            path.write_text(GOOD_MODULE + "\nChanged while reviewing.\n")
+        elif case == "plan_drift":
+            seed.write_text(seed.read_text().replace("review gates", "different topic"))
+        return True, json.dumps(payload)
+    mock = Mock(side_effect=dispatch)
+    with patch("subprocess.run", side_effect=_preflight_side_effect):
+        result = ReviewWorker(plane, dispatch_fn=mock).run_once()
+    assert result.status == "blocked" and result.details["errors"]
+    assert mock.call_count == (0 if case == "missing_plan" else 4)
+    assert not _fetch_rows(plane.db_path, "SELECT * FROM jobs WHERE phase='patch'")
+    assert not plane.iter_events("check_passed")
+
+
+@pytest.mark.parametrize("reject", [False, True])
+def test_minimum_passing_rubric_is_bound_to_candidate_and_plan(tmp_path, reject):
+    plane = _make_control_plane(tmp_path)
+    path = _write_module(tmp_path)
+    plane.enqueue(str(path.relative_to(tmp_path)), phase="review", model=REVIEW_MODEL)
+    deep = json.loads(_deep_response())
+    deep["dimensions"] = {f"D{n}": 4 if n < 8 else 5 for n in range(1, 9)}
+    if reject:
+        deep["verdict"] = "REJECT"
+    responses = [_simple_response(key) for key in ("PRES", "NO_EMOJI", "K8S_API")]
+    responses.append(json.dumps(deep))
+    with patch("subprocess.run", side_effect=_preflight_side_effect):
+        result = ReviewWorker(plane, dispatch_fn=Mock(side_effect=[(True, r) for r in responses])).run_once()
+    assert result.status == ("rejected" if reject else "approved")
+    assert bool(plane.iter_events("check_passed")) is not reject
+    assert len(result.details["candidate_sha256"]) == len(result.details["coverage_plan_sha256"]) == 64
+    assert result.details["review_role"] == "stage-check"
+    assert result.details["independent_review"] is False
 
 
 def test_preflight_markdownlint_failure_skips_llm_and_enqueues_patch(tmp_path):
@@ -333,7 +415,7 @@ def test_review_worker_enforces_review_outcomes(tmp_path):
             queued = _fetch_rows(control_plane.db_path, "SELECT phase, model, queue_state FROM jobs WHERE phase = ?", (phase,))
             assert len(queued) == 1
             assert queued[0]["queue_state"] == "pending"
-        review = local_api.build_module_reviews(case_root, str(module_path.relative_to(case_root)).removesuffix(".md"))
+        review = local_api._load_local_api_monolith().build_module_reviews(case_root, str(module_path.relative_to(case_root)).removesuffix(".md"))
         assert review is not None
         assert review["fact_check_status"] == ("unverified" if failed_check == "FACT_CHECK" else "verified")
 
