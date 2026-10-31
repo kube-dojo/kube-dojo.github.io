@@ -11,7 +11,7 @@
   let summary = '';
   let selectedTrack = null, ukOpen = false;
   let trackButtons = [];
-  const labels = ['Accepted', 'Current unaccepted', 'Revision', 'Stale', 'Invalid', 'Missing'];
+  const labels = ['Accepted', 'Current unaccepted', 'Revision', 'Stale', 'Invalid', 'No review recorded'];
   const order = ['prerequisites', 'linux', 'k8s', 'cloud', 'platform', 'on-premises', 'ai', 'ai-ml-engineering', 'ai-history', 'shared'];
   const names = {'prerequisites': 'Prerequisites', 'linux': 'Linux', 'k8s': 'Kubernetes', 'cloud': 'Cloud', 'platform': 'Platform', 'on-premises': 'On-Premises', 'ai': 'AI', 'ai-ml-engineering': 'AI/ML Engineering', 'ai-history': 'AI History', 'shared': 'Shared'};
   function meter(values, title) {
@@ -82,9 +82,10 @@
     const query = find('cc-search').value.toLowerCase().trim();
     const locale = find('cc-locale').value;
     const status = find('cc-status').value;
+    const work = find('cc-work').value;
     const pages = (report?.pages || []).filter(page =>
       (!locale || page.locale === locale) && (!selectedTrack || (page.locale === selectedTrack.locale && pageTrack(page) === selectedTrack.name)) && (!query || page.path.toLowerCase().includes(query)) &&
-      (!status || page.receipt_status === status || page[status] === true));
+      (!status || page.receipt_status === status || page[status] === true) && (!work || page.work.state === work));
     find('cc-count').textContent = `${pages.length} pages shown`;
     if (selectedTrack) {
       const clear = text('button', `Track: ${selectedTrack.locale.toUpperCase()} ${names[selectedTrack.name] || selectedTrack.name} · Clear`);
@@ -97,10 +98,11 @@
       detail.open = opened.has(page.path);
       const state = page.receipt_status === 'stale' ? 3 : page.receipt_status === 'invalid' ? 4 : page.acceptance_recorded ? 0 : page.needs_revision ? 2 : page.receipt_status === 'current' ? 1 : 5;
       detail.className = `cc-page cc-page${state}`;
-      const shortPath = page.path.split('/').slice(-2).join('/').replace(/\.mdx?$/, '');
-      detail.append(text('summary', `${shortPath} · ${page.locale.toUpperCase()} · ${labels[state]}`));
+      detail.append(text('summary', `${page.path} · ${page.locale.toUpperCase()} · ${labels[state]} · work: ${page.work.state}`));
       detail.append(text('p', `${page.path} · ${page.type} · ${page.receipt_status} · ${page.disposition || 'unreviewed'} · ${page.acceptance_recorded ? 'acceptance recorded' : 'acceptance not recorded'}`));
       detail.append(text('p', `Acceptance blockers: ${page.reasons.join('; ') || 'none recorded; see supplied assertion caveat'}`));
+      detail.append(text('p', `Recorded work: ${page.work.state} · ${page.work.summary || 'No current work record'} · Next: ${page.work.next_action || 'unknown'} · Updated: ${page.work.updated_at || 'unknown'} · Review calls: ${page.work.review.spent ?? 'unknown'}/${page.work.review.ceiling ?? 'unknown'} (recorded total, not launch permission)`));
+      detail.append(text('p', `Work evidence: ${page.work.evidence_refs.join('; ') || 'none recorded'}`));
       const layers = text('pre', Object.entries(page.layers).map(([key, value]) => `${key}: ${value}`).join('\n'));
       layers.style.whiteSpace = 'pre-wrap';
       detail.append(layers);
@@ -137,7 +139,8 @@
       report = data;
       summary = `${data.status} · health ${data.coverage_health} · fetched ${new Date().toLocaleTimeString()}`;
       find('cc-summary').textContent = summary;
-      find('cc-note').textContent = [data.caveat, ...(data.errors || []), ...(data.receipt_errors || [])].join(' ');
+      find('cc-work-summary').textContent = `Recorded work: ${Object.entries(data.work_summary).map(([state, count]) => `${state} ${count}`).join(' · ')}`;
+      find('cc-note').textContent = [data.caveat, ...(data.errors || []), ...(data.receipt_errors || []), ...(data.work_errors || [])].join(' ');
       if (changed) render();
     } catch (error) {
       if (version !== requestVersion) return;
@@ -145,11 +148,12 @@
       find('cc-rows').replaceChildren();
       find('cc-tracks').replaceChildren();
       find('cc-count').textContent = '';
+      find('cc-work-summary').textContent = '';
       find('cc-summary').textContent = `Canonical coverage unavailable / unknown: ${error.message}`;
       find('cc-note').textContent = 'No current canonical result. Legacy pipeline progress below remains separate.';
     }
   }
-  for (const id of ['cc-search', 'cc-locale', 'cc-status']) find(id).addEventListener('input', () => {
+  for (const id of ['cc-search', 'cc-locale', 'cc-status', 'cc-work']) find(id).addEventListener('input', () => {
     if (id === 'cc-locale') { selectedTrack = null; updateSelection(); }
     render();
   });

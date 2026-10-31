@@ -12,16 +12,16 @@ class Element {
   get textContent() { return this._text || ''; }
   set innerHTML(_) { throw new Error('Unsafe HTML rendering'); }
 }
-const elements = Object.fromEntries(['cc-summary', 'cc-note', 'cc-tracks', 'cc-rows', 'cc-count', 'cc-search', 'cc-locale', 'cc-status', 'refresh'].map(id => [id, new Element(id)]));
+const elements = Object.fromEntries(['cc-summary', 'cc-note', 'cc-tracks', 'cc-rows', 'cc-count', 'cc-search', 'cc-locale', 'cc-status', 'cc-work', 'cc-work-summary', 'refresh'].map(id => [id, new Element(id)]));
 const row = {path: '<img onerror=alert(1)>.mdx', locale: 'en', type: 'hub', receipt_status: 'stale', disposition: null,
   acceptance_recorded: false, unreviewed: true, reasons: ['receipt: stale'], layers: {technical_source: 'unknown'},
-  references: {acceptance_refs: ['javascript:alert(1)', '<script>bad()</script>']}};
+  references: {acceptance_refs: ['javascript:alert(1)', '<script>bad()</script>']}, work: {state: 'reviewing', summary: '<script>work</script>', next_action: 'Wait', updated_at: '2026-10-31T09:00:00Z', evidence_refs: ['issue:1'], review: {spent: 4, ceiling: 5}}};
 const data = {pages: [row, {...row, path: 'uk/index.md', locale: 'uk', receipt_status: 'missing'}],
   locales: {en: {acceptance_recorded: 10, total: 1089, review_recorded: 41, needs_revision: 30, unreviewed: 1048, stale: 1, invalid: 0},
     uk: {acceptance_recorded: 0, total: 1, review_recorded: 0, needs_revision: 0, unreviewed: 1, stale: 0, invalid: 0}},
   tracks: {en: {shared: {acceptance_recorded: 10, total: 1089, review_recorded: 41, needs_revision: 30, unreviewed: 1048, stale: 1, invalid: 0}},
     uk: {shared: {acceptance_recorded: 0, total: 1, review_recorded: 0, needs_revision: 0, unreviewed: 1, stale: 0, invalid: 0}}},
-  parked_locales: ['uk'], status: 'needs_attention', coverage_health: 'unknown', caveat: 'Supplied assertion only'};
+  parked_locales: ['uk'], status: 'needs_attention', coverage_health: 'unknown', caveat: 'Supplied assertion only', work_summary: {reviewing: 2}, work_errors: []};
 let response = {ok: true, json: async () => data};
 const context = {document: {getElementById: id => elements[id], createElement: tag => new Element(tag)},
   fetch: async () => response, setInterval() {}, Date};
@@ -42,8 +42,8 @@ const en = elements['cc-tracks'].children[0], uk = elements['cc-tracks'].childre
 assert.equal(uk.open, false);
 assert.match(en.children[0].textContent, /10\/1089 accepted/);
 assert.deepEqual(en.children[1].children.map(segment => Number.parseFloat(segment.style.width)), [10, 1, 30, 1, 0, 1047].map(n => n / 1089 * 100));
-assert.match(en.children[1]['aria-label'], /Missing 1047/);
-assert.deepEqual(en.children[2].children.map(item => item.textContent), ['Accepted: 10', 'Current unaccepted: 1', 'Revision: 30', 'Stale: 1', 'Invalid: 0', 'Missing: 1047']);
+assert.match(en.children[1]['aria-label'], /No review recorded 1047/);
+assert.deepEqual(en.children[2].children.map(item => item.textContent), ['Accepted: 10', 'Current unaccepted: 1', 'Revision: 30', 'Stale: 1', 'Invalid: 0', 'No review recorded: 1047']);
 uk.open = true;
 en.children[3].children[0].events.click();
 assert.equal(elements['cc-rows'].children.length, 1);
@@ -60,6 +60,8 @@ assert.match(details.children[0].textContent, /<img onerror=alert\(1\)>/);
 assert.equal(details.className, 'cc-page cc-page3');
 assert.equal(details.children.at(-1).children[0].textContent, 'javascript:alert(1)');
 assert.equal(details.children.at(-1).children[0].tag, 'li');
+assert.match(elements['cc-work-summary'].textContent, /reviewing 2/);
+assert.match(details.children[3].textContent, /<script>work<\/script>.*Review calls: 4\/5.*not launch permission/);
 details.open = true;
 elements['cc-rows'].scrollTop = 42;
 let releaseRefresh;
@@ -80,6 +82,9 @@ assert.notEqual(elements['cc-rows'].children[0], details);
 assert.equal(elements['cc-rows'].children[0].open, true);
 assert.equal(elements['cc-rows'].scrollTop, 42);
 assert.match(elements['cc-rows'].children[0].children[1].textContent, /revise/);
+elements['cc-work'].value = 'blocked'; elements['cc-work'].events.input(); assert.equal(elements['cc-count'].textContent, '0 pages shown');
+elements['cc-work'].value = 'reviewing'; elements['cc-work'].events.input(); assert.equal(elements['cc-count'].textContent, '2 pages shown');
+elements['cc-work'].value = ''; elements['cc-work'].events.input();
 elements['cc-locale'].value = 'uk'; elements['cc-locale'].events.input();
 assert.equal(elements['cc-rows'].children.length, 1);
 elements['cc-status'].value = 'stale'; elements['cc-status'].events.input();
@@ -113,7 +118,7 @@ ukTrack.events.click();
 assert.equal(elements['cc-locale'].value, 'uk');
 assert.equal(ukTrack['aria-pressed'], 'true');
 assert.equal(elements['cc-rows'].children.length, 1);
-assert.match(elements['cc-rows'].children[0].children[0].textContent, /prerequisites\/start · UK/);
+assert.match(elements['cc-rows'].children[0].children[0].textContent, /uk\/prerequisites\/start.mdx · UK/);
 assert.match(elements['cc-count'].children[0].textContent, /UK Prerequisites/);
 elements['cc-locale'].value = 'en'; elements['cc-locale'].events.input();
 assert.equal(ukTrack['aria-pressed'], 'false');
@@ -129,7 +134,7 @@ response = {ok: true, json: async () => unknown};
 await elements.refresh.events.click();
 elements['cc-tracks'].children[0].children[3].children[0].events.click();
 assert.equal(elements['cc-rows'].children[0].className, 'cc-page cc-page4');
-assert.match(elements['cc-rows'].children[0].children[0].textContent, /extra\/index · EN · Invalid/);
+assert.match(elements['cc-rows'].children[0].children[0].textContent, /extra\/index.mdx · EN · Invalid/);
 assert.match(elements['cc-rows'].children[0].children[1].textContent, /extra\/index.mdx/);
 elements['cc-count'].children[0].events.click();
 response = {ok: true, json: async () => ({...data, locales: {en: {...data.locales.en, total: -1}}})};
