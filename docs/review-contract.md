@@ -10,17 +10,26 @@ reviewer pool. Muse (Meta) and DeepSeek are additional options. Resolve the
 actual model family, harness, health and quota before dispatch; a product name
 or API endpoint is not an independent family. Never silently substitute models.
 Use one suitable independent reviewer per bounded change, not every provider.
+Codex may independently review non-OpenAI authors; it is not independent of an
+OpenAI author. The primary pool is a preference, not proof of review quality.
 
 A fresh same-family red-team review is useful additional adversarial evidence.
 Label it `same_family_red_team`; it cannot be reported as cross-family review.
 The independent merge review remains outside the author's actual model family,
-unless the user explicitly authorizes a documented scoped exception. Security,
-privacy, permission, admission and destructive-operation changes retain the
-independent gate. Optional nits do not justify another round after valid approval.
+For low-risk scoped delivery only, explicit written user authorization may defer
+that gate: record the exact scope/revision, authorization link and expiry at
+delivery; keep final acceptance pending and never label it independent review.
+This exception does not satisfy the gate for security, privacy, permission,
+admission or destructive-operation changes. Optional nits do not justify another
+round after valid approval.
 
 The lead may exclude a model from a review role after documented material
 misses, unsupported findings or evidence-integrity failures. Record the model,
-role/scope, evidence, reason and reassessment condition. A broken route, timeout,
+role/scope, evidence, reason and reassessment condition. Substantiate a critical
+miss/integrity failure, or a repeated material error pattern, using reproducible
+checks or independent adjudication. A negative review is not grounds to exclude
+its reviewer. Exclusion is prospective; existing findings require separate
+adjudication and remain unresolved meanwhile. A broken route, timeout,
 quota or authentication failure establishes availability/completion limits,
 not a model-quality verdict. No brand receives automatic approval or exclusion.
 
@@ -32,9 +41,12 @@ budget. Preserve incomplete/negative runs; neither a new branch nor another
 provider resets a stream's allowance. Separate supplied evidence from checks
 the reviewer actually performed. A read count proves transport, not correctness.
 
-`changes_required` means a supported material defect must be fixed.
-`blocked` means required evidence is missing, stale, incomplete or inconclusive.
-`approve_with_nits` permits delivery with clearly optional follow-up suggestions.
+Canonical verdicts are `APPROVE`, `APPROVE_WITH_NITS`, `NEEDS_CHANGES`, `BLOCKED`.
+They mean requirements met, optional follow-up only, material changes required,
+or required evidence missing/stale/inconclusive, respectively. Run failures,
+unavailability and incomplete output are completion statuses, never approval.
+Legacy `REJECT`/`FAIL` mean changes required or blocked with the reason recorded;
+they are not canonical approval payloads. Narrative wording cannot override JSON.
 Every material finding needs its location, actual quote, consequence, evidence
 and proposed remedy. An uncertain finding is a question until substantiated.
 Personal preferences and equally valid alternatives are not material blockers.
@@ -46,6 +58,11 @@ For tooling, the canonical finding envelope is:
 ```
 
 Nonempty findings use `id`, `severity`, `path`, `line`, `quote`, `why`, `fix`.
+Independent approval also requires a companion record: author/reviewer identity
+and actual family; provider/model/harness and effective-route evidence; review
+kind/scope, commit/page digest, complete run identity, performed versus supplied
+checks, limits and invocation budget. Missing provenance blocks the independent
+gate. The finding envelope alone is not a merge approval or acceptance receipt.
 An unrecognized payload is not an empty approval. Quote verification validates
 the cited text, not the finding's semantic correctness or reviewer independence.
 
@@ -68,11 +85,22 @@ floor is our design inference. Actual learner-effect claims need learner data.
 
 Before authoring, state learner prerequisites, intended scope, essential topic
 concepts, source basis and deliberate exclusions. Before approval, map every
-outcome to actual teaching, a worked explanation/example, suitable learner
-practice and an assessment/verification opportunity. A missing element needs
-an explicit page-kind justification; it cannot vanish behind a high average.
+outcome to teaching and suitable practice/assessment evidence; our project design
+inference is to use worked explanations/examples where appropriate. Outcome
+clusters may share examples and assessments; do not manufacture one per bullet.
+The independent reviewer checks the topic inventory against relevant primary
+references/blueprints and audience needs, not only the author's chosen outcomes.
+Material omissions require justified scope limits or changes, despite high scores.
 Review for mechanisms, decisions, misconceptions, failure recovery, transfer,
 repetition, unsupported specificity and abrupt unexplained transitions.
+
+Modules require taught outcomes and practice/assessment mapping; labs may link
+prior theory but require executable verification/cleanup; navigation hubs may
+omit theory/quizzes/labs but require audience/route/link checks; references and
+release notes may omit exercises but require scoped source/version checks.
+Book chapters follow their separate narrative/source/editor workflow. Record
+omission grounds before authoring; the independent reviewer must accept them.
+Unjustified/unaccepted omissions are `NEEDS_CHANGES`, not self-approved exemptions.
 
 Use exact candidate-text evidence for coverage judgments. Counted headings,
 keywords, links, words or generated output cannot establish adequate coverage.
