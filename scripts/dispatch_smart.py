@@ -240,7 +240,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
     ),
     "review": TaskClassConfig(
         models={
-            "agy": "gemini-3.8-flash-high",
+            "agy": "gemini-4-argon-high",
             "claude": "claude-opus-5-5",
             "codex": "gpt-6.1-sol",
             "deepseek": "deepseek-flash",
@@ -828,6 +828,8 @@ def fire(
     timeout_s: int,
     tool_config: dict | None = None,
 ) -> int:
+    if agent == "agy" and task_class in ("review", "search"):
+        raise ValueError("Agy read-only route disabled: CLI isolation is unverified (#3746)")
     print(
         f"[smart] agent={agent} task_class={task_class} model={model} "
         f"mode={mode} timeout={timeout_s}s"
@@ -1115,6 +1117,9 @@ def main() -> int:
                 f"Drop --mode to use the default."
             )
         mode = "danger"
+
+    if args.agent == "agy" and args.task_class in ("review", "search"):
+        p.error("Agy read-only route disabled: CLI isolation is unverified (#3746); use another healthy lane")
 
     # Agy always runs in danger mode for write classes — read-only would cause
     # tool-permission prompts to hang waiting for human input in a headless
