@@ -69,6 +69,7 @@ def test_actual_authoring_inputs_share_coverage_and_shortfall_contract(monkeypat
     root = Path(__file__).resolve().parents[1]
     monkeypatch.setattr(prompts, "_RULES_PATH", root / ".claude/rules/module-quality.md")
     monkeypatch.setattr(prompts, "_FRAMEWORK_PATH", root / "docs/pedagogical-framework.md")
+    monkeypatch.setattr(prompts, "_RUBRIC_PATH", root / "docs/quality-rubric.md")
     outputs = [prompts.rewrite_prompt(module_path="x.md", module_text="47 objects", teaching_gaps=[]),
                prompts.structural_prompt(module_path="x.md", module_text="47 objects", missing_sections=["quiz"]),
                (root / "scripts/prompts/module-writer.md").read_text()]
@@ -79,6 +80,11 @@ def test_actual_authoring_inputs_share_coverage_and_shortfall_contract(monkeypat
         assert not any(phrase in text for phrase in contradictions)
         assert "coverage_plan" in text and "shortfall" in text and "docs/citation-seeds" in text
         assert "#3744" in text and "padding" in text
+    review = prompts.review_prompt(module_path="x.md", module_text="47 objects", writer_agent="codex",
+                                   track="rewrite", original_gaps=[])
+    for text in [*outputs, review]:
+        assert "content line minimums" not in text and "<100 lines" not in text
+        assert "Add missing sections per template" not in text
 
 
 def test_defined_evidence_shortfall_cannot_be_extracted_as_a_publishable_module() -> None:

@@ -176,10 +176,10 @@ A module has this problem if:
 
 | Severity | Description | Action |
 |----------|------------|--------|
-| **Critical** | Module is a stub (<100 lines) or pure outline | Full rewrite required |
-| **High** | Module lists facts without explanation (300+ lines of bullets) | Major restructure — add narrative, scenarios, exercises |
+| **Critical** | Material outcomes are untaught or the lesson is an unsupported outline | Rework the missing teaching against researched scope |
+| **High** | Facts are listed without mechanisms or explanation | Add supported reasoning, appropriate examples and practice |
 | **Medium** | Module teaches but lacks active learning (no exercises, no scenarios) | Add exercises, prediction prompts, worked examples |
-| **Low** | Module teaches well but missing polish (no "Did You Know?", thin quiz) | Add missing sections per template |
+| **Low** | A useful learning element is missing for the planned outcomes | Add supported teaching or record an independently accepted scope justification |
 
 ---
 
