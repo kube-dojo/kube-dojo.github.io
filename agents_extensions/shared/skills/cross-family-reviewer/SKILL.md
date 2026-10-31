@@ -11,11 +11,11 @@ This skill describes the **review contract**. For pedagogical content scoring ag
 
 ## Reviewer selection
 
-Grok, Gemini and Claude are the primary pool; Muse and DeepSeek are additional options. Codex can independently review non-OpenAI work. Verify the actual family, model, harness, route health and quota live; never infer independence from a product or endpoint name, or silently substitute a model.
+Grok, Gemini and Claude are the primary pool; Muse and DeepSeek are additional options. Pool order is a routing preference, not a quality ranking. Choose one suitable independent reviewer per bounded change after checking actual family, model, harness, route health and quota. Codex can independently review non-OpenAI work. Never infer independence from an endpoint name or silently substitute a model.
 
 The lead may make a scoped, prospective exclusion after an independently adjudicated critical miss or integrity failure, or a reproducible pattern of material errors. Record the evidence and reassessment condition; preserve and adjudicate prior adverse findings. Timeouts, unavailable routes and quota/authentication failures are not model-quality verdicts. A negative review alone is not grounds for exclusion.
 
-The contract permits explicitly authorized low-risk delivery with independent review deferred and final acceptance pending. High-risk security, privacy, permission, admission and destructive changes retain the independent gate. Record the scope, revision and authorization; never label a deferred or same-family review independent.
+The contract permits a named low-risk delivery with independent review deferred only under explicit written user authorization. Record the exact scope, revision, authorization link and expiry; leave final acceptance pending and label review deferred. High-risk security, privacy, permission, admission and destructive changes retain the independent gate. Never label deferred or same-family review independent.
 
 ## How to run a review (R1)
 
@@ -36,7 +36,7 @@ Report evidence-backed material findings and optional nits. Mark uncertain obser
 
 Return the canonical finding envelope and companion provenance required by `docs/review-contract.md`. Use the exact reviewed commit head or page digest and one verdict: `APPROVE`, `APPROVE_WITH_NITS`, `NEEDS_CHANGES`, or `BLOCKED`. Each finding needs its severity, path, line, actual quote, consequence and proposed fix.
 
-Record author and reviewer families, actual model/provider/harness and effective route, scope, run identity, performed versus supplied checks, limits and remaining review budget. Preserve negative, incomplete and failed runs; changing a head or provider does not reset the stream. A failed or incomplete run is not an approval. The normal per-PR maximum is five invocations, including failures; observe any stricter task limit.
+Record author and reviewer identity and actual family, model/provider/harness and effective route, review kind/scope, run identity, performed versus supplied checks, limits and remaining budget. Missing companion provenance blocks the independent gate; a finding envelope alone grants no merge or acceptance. Preserve negative, incomplete and failed runs; a new head/provider never resets the stream. The normal per-PR maximum is five invocations, including failures; observe stricter task limits.
 
 ## Evidence limits
 
