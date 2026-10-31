@@ -256,6 +256,8 @@ def test_minimum_passing_rubric_is_bound_to_candidate_and_plan(tmp_path, case):
         path.write_text(GOOD_MODULE)
         return True, responses.pop(0)
     def preflight(*args, **kwargs):
+        if args[0][:2] == ["npx", "markdownlint-cli2"]:
+            assert args[0][-1] == "-" and kwargs["input"] == GOOD_MODULE
         if case == "snapshot":
             path.write_text(GOOD_MODULE + " unreviewed replacement")
         return _preflight_side_effect(*args, **kwargs)
