@@ -75,6 +75,7 @@ def run_preflight(
     link_cache_path: Path = DEFAULT_LINK_CACHE_PATH,
     content: str | None = None,
 ) -> PreflightResult:
+    """Check an explicit snapshot coherently; None retains legacy live-path linting."""
     module = Path(module_path)
     root = repo_root or REPO_ROOT
     snapshot = content
@@ -95,6 +96,7 @@ def _run_markdownlint(module_path: Path, *, cwd: Path, content: str | None = Non
         result = subprocess.run(
             ["npx", "markdownlint-cli2", str(module_path) if content is None else "-"],
             input=content,
+            encoding="utf-8",
             capture_output=True,
             text=True,
             cwd=cwd,
