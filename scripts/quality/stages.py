@@ -132,6 +132,7 @@ def _review_digests(text: str, plan: dict) -> tuple[str, str]:
 
 
 def _defer_review_failure(st: dict[str, Any], reason: str, failure: dict) -> None:
+    failure = {**st.get("review_input", {}), **failure}
     previous = st.get("review_failures") or ([st["review_failure"]] if st.get("review_failure") else [])
     state.transition(st, "REVIEW_IN_PROGRESS", "REVIEW_PENDING", review_blocked=reason,
                      review_failure=failure, review_failures=[*previous, failure], review_contract_paused=True,
@@ -931,6 +932,7 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
                 raise ValueError("reviewer missing or worktree dirty")
             module_text, plan = _review_inputs(wt, module_rel)
             candidate_digest, plan_digest = _review_digests(module_text, plan)
+            st["review_input"] = {"candidate_sha256": candidate_digest, "plan_sha256": plan_digest}
         except (OSError, UnicodeError, ValueError, WorktreeError) as exc:
             state.transition(st, "REVIEW_PENDING", "REVIEW_PENDING", review_blocked=str(exc))
             return
@@ -953,12 +955,9 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             # but tool-use would still pollute stdout with summaries
             # instead of the verdict JSON.
             result = dispatch(reviewer, prompt, timeout=timeout, tools_disabled=True)
-        except DispatcherUnavailable:
-            # Revert to REVIEW_PENDING so the next run can re-attempt.
-            state.transition(
-                st, "REVIEW_IN_PROGRESS", "REVIEW_PENDING",
-                note="reviewer unavailable; will retry",
-            )
+        except DispatcherUnavailable as exc:
+            _defer_review_failure(st, "reviewer unavailable",
+                                  {"attempt_id": attempt_id, "error": str(exc)})
             raise
 
         if not result.ok:
@@ -973,6 +972,8 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
 
         raw = extract_last_json(result.stdout, required_keys={"verdict", "must_fix"})
         try:
+            if raw.get("auto_approved"):
+                raise ValueError("synthetic approval cannot authorize a review")
             current_text, current_plan = _review_inputs(wt, module_rel)
             if _review_digests(current_text, current_plan) != (candidate_digest, plan_digest):
                 raise ValueError("candidate or research plan changed during review")

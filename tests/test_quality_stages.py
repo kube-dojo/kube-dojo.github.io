@@ -2247,6 +2247,30 @@ def test_complete_approval_without_scalars_is_bound_unchanged(fake_repo, monkeyp
     assert stages._merge_review_error(st) is None
 
 
+@pytest.mark.parametrize("kind", ["unavailable", "synthetic"])
+def test_normal_review_failure_is_bound_and_does_not_automatically_retry(fake_repo, monkeypatch, kind):
+    slug, _ = _pending_review(fake_repo)
+    calls = []
+    def dispatch(*_args, **_kwargs):
+        calls.append(kind)
+        if kind == "unavailable":
+            raise dispatchers.DispatcherUnavailable("rate limited")
+        payload = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+        payload["auto_approved"] = True
+        return DispatchResult(ok=True, stdout=json.dumps(payload), stderr="", returncode=0,
+                              duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(stages, "dispatch", dispatch)
+    if kind == "unavailable":
+        with pytest.raises(dispatchers.DispatcherUnavailable):
+            stages.review_one(slug)
+    else:
+        stages.review_one(slug)
+    stages.review_one(slug)
+    st = state.load_state(slug)
+    assert calls == [kind] and st["stage"] == "REVIEW_PENDING" and st["review_contract_paused"] is True
+    assert st["review_failures"][-1]["candidate_sha256"] and st["review_failures"][-1]["plan_sha256"]
+
+
 def test_rebase_changed_plan_is_rechecked_before_merge(fake_repo, monkeypatch):
     slug, wt = _pending_review(fake_repo)
     st = state.load_state(slug)
