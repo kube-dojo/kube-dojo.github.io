@@ -2,6 +2,13 @@
 
 ## Reviewer Assignment (cross-family rule)
 
+The [review and coverage contract](review-contract.md) defines current roles,
+refusal states and evidence requirements. Grok/Gemini/Claude are the primary
+pool; Muse/DeepSeek are additional routes. Use live model-family resolution and
+health, not the historical examples below, to choose an executable reviewer.
+Fresh same-family red-team checks are useful and must be labeled honestly;
+they do not substitute for an explicitly required independent review.
+
 Every PR review must come from a **different model family** than the author.
 
 **Families:**
