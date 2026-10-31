@@ -75,3 +75,27 @@ def test_monitor_uses_static_data_fetchers_and_preserves_api_schema(tmp_path: Pa
     assert '/operations' in schema
     for route in ('/pipeline', '/activity', '/health'):
         assert 'redirect' in schema[route]['desc']
+
+
+def test_manifest_lists_primary_screens_and_actual_legacy_redirects(tmp_path: Path) -> None:
+    manifest = local_api.build_state_manifest()
+    categories = {category['category']: category['entries'] for category in manifest['categories']}
+    dashboards = {entry['path']: entry for entry in categories['dashboards']}
+    for route, name in (('/', 'Overview'), ('/quality', 'Curriculum'), ('/operations', 'Operations')):
+        assert dashboards[route]['name'] == name and dashboards[route]['type'] == 'html'
+        assert local_api.route_request(tmp_path, route)[0] == 200
+    for route in ('/operator', '/pipeline', '/activity', '/health'):
+        status, target, _ = local_api.route_request(tmp_path, route)
+        assert status == 302 and dashboards[route]['type'] == 'redirect'
+        assert dashboards[route]['target'] == target
+    diagnostic_apis = {entry['path'] for entry in categories['git_and_build'] if entry['type'] == 'api'}
+    assert {'/api/git/worktrees', '/api/missing-modules/status'} <= diagnostic_apis
+
+
+def test_all_monitor_entry_points_preserve_the_global_search(tmp_path: Path) -> None:
+    for route in ('/', '/dashboard', '/operations'):
+        status, page, _ = local_api.route_request(tmp_path, route)
+        assert status == 200
+        assert 'aria-label="Search messages and decisions"' in page
+        assert '/api/search' in page
+        assert len(page.encode()) < 26_624

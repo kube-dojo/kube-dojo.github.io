@@ -5844,11 +5844,13 @@ def build_state_manifest() -> dict[str, Any]:
             {
                 "category": "dashboards",
                 "entries": [
-                    {"name": "Operator dashboard", "path": "/", "purpose": "Top-level local monitor summary.", "type": "html"},
-                    {"name": "Quality board", "path": "/quality", "purpose": "Per-module quality status dashboard.", "type": "html"},
-                    {"name": "Pipeline board", "path": "/pipeline", "purpose": "Pipeline v2 queue and event dashboard.", "type": "html"},
-                    {"name": "Activity feed", "path": "/activity", "purpose": "Recent commits, pipeline events, and bridge messages.", "type": "html"},
-                    {"name": "Health dashboard", "path": "/health", "purpose": "Runtime services, worktrees, and delivery health.", "type": "html"},
+                    {"name": "Overview", "path": "/", "purpose": "Canonical coverage and separately recorded upgrade work.", "type": "html"},
+                    {"name": "Curriculum", "path": "/quality", "purpose": "Per-page acceptance evidence and recorded work.", "type": "html"},
+                    {"name": "Operations", "path": "/operations", "purpose": "Leases, pipeline, runtime services and recent activity.", "type": "html"},
+                    {"name": "Legacy operator link", "path": "/operator", "purpose": "Redirect to active leases.", "type": "redirect", "target": "/operations#leases"},
+                    {"name": "Legacy pipeline link", "path": "/pipeline", "purpose": "Redirect to the pipeline snapshot.", "type": "redirect", "target": "/operations#pipeline"},
+                    {"name": "Legacy activity link", "path": "/activity", "purpose": "Redirect to recent activity.", "type": "redirect", "target": "/operations#activity"},
+                    {"name": "Legacy health link", "path": "/health", "purpose": "Redirect to runtime services; worktrees and missing modules use their JSON APIs.", "type": "redirect", "target": "/operations#services"},
                     {"name": "Artifacts browser", "path": "/artifacts", "purpose": "Browse HTML and Markdown orchestrator artifacts.", "type": "html_artifact"},
                     {"name": "Decisions board", "path": "/decisions", "purpose": "Decision cards with lineage and pending status.", "type": "html"},
                     {"name": "Channels browser", "path": "/channels", "purpose": "Bridge conversations and deliberation threads.", "type": "html"},
@@ -5867,6 +5869,7 @@ def build_state_manifest() -> dict[str, Any]:
                 "category": "git_and_build",
                 "entries": [
                     {"name": "Git worktrees", "path": "/api/git/worktrees", "purpose": "Attached worktrees and cleanup candidates.", "type": "api"},
+                    {"name": "Missing modules", "path": "/api/missing-modules/status", "purpose": "Modules missing from navigation or sidebar.", "type": "api"},
                     {"name": "Build job status", "path": "/api/build/status", "purpose": "Poll Astro build job progress by job_id.", "type": "api"},
                 ],
             },
@@ -7834,7 +7837,8 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         from local_api_monitor import render_monitor_page
         operations = path == "/operations"
         return 200, render_monitor_page(operations=operations,
-            top_nav=_render_top_nav("operations" if operations else "home")), "text/html; charset=utf-8"
+            top_nav=_render_top_nav("operations" if operations else "home"),
+            chrome=_render_page_chrome()), "text/html; charset=utf-8"
     if path in {"/operator", "/pipeline", "/activity", "/health"}:
         anchor = {"/operator": "leases", "/pipeline": "pipeline", "/activity": "activity", "/health": "services"}[path]
         return 302, f"/operations#{anchor}", "text/plain; charset=utf-8"
