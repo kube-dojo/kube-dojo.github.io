@@ -114,8 +114,8 @@ _CONTENT_COVERAGE_LOCK = threading.Lock()
 def _content_coverage_report(repo_root: Path, *, compact: bool = False) -> dict:
     """Isolate optional coverage dependencies and reuse unchanged evidence scans."""
     try:
-        from quality.content_coverage import build_coverage
-        dependencies = [repo_root / "docs/content-upgrade/page-reviews.json"]
+        from quality.content_coverage import build_coverage, coverage_ledger
+        dependencies = [coverage_ledger(repo_root)]
         dependencies.extend(sorted((repo_root / "docs/citation-seeds").glob("*.json")))
         versions = []
         for dependency in dependencies:
@@ -5942,7 +5942,19 @@ def serve_static_file(repo_root: Path, rel_path: str) -> tuple[int, Any, str]:
     parts = decoded.split("/")
     if not decoded or any(p in ("", ".", "..") for p in parts):
         return 404, {"error": "not_found"}, "application/json; charset=utf-8"
-    static_dir = (repo_root / "static").resolve()
+    ui_root = os.environ.get('KUBEDOJO_UI_ROOT')
+    if ui_root:
+        try:
+            root = Path(ui_root).resolve()
+            relative = root.relative_to((repo_root / '.worktrees').resolve())
+            if not Path(ui_root).is_absolute() or len(relative.parts) != 1: raise ValueError('invalid UI root')
+        except ValueError:
+            return 404, {"error": "not_found"}, "application/json; charset=utf-8"
+    else:
+        root = repo_root
+    static_dir = (root / "static").resolve()
+    if ui_root and not static_dir.is_relative_to(root):
+        return 404, {"error": "not_found"}, "application/json; charset=utf-8"
     candidate = (static_dir / decoded).resolve()
     try:
         candidate.relative_to(static_dir)
@@ -7496,11 +7508,12 @@ def render_quality_board_page_html() -> str:
   <section class=\"panel qb-wrap\" style=\"margin-bottom:18px;overflow-wrap:anywhere\" aria-label=\"Canonical coverage\">
     <h2>Canonical page coverage</h2>
     <p id=\"cc-summary\" role=\"status\">Loading canonical coverage&hellip;</p><div id=\"cc-tracks\"></div>
-    <details><summary>Coverage definitions</summary><p>Accepted: current acceptance recorded. Current unaccepted: current review without acceptance or revision. Revision: current review requests revision or expansion. Stale: receipt does not match the page. Invalid: invalid receipt. Missing: no current review excluding stale and invalid.</p><p id=\"cc-note\"></p></details>
+    <p id=\"cc-work-summary\"></p><details><summary>Coverage definitions</summary><p>Accepted: current acceptance recorded. Current unaccepted: current review without acceptance or revision. Revision: current review requests revision or expansion. Stale: receipt does not match the page. Invalid: invalid receipt. No review recorded means no current review, not a missing page.</p><p id=\"cc-note\"></p></details>
     <div class=\"qb-tools\">
       <input class=\"qb-input\" id=\"cc-search\" type=\"search\" aria-label=\"Search page paths\" placeholder=\"Search page paths\">
       <select class=\"qb-select\" id=\"cc-locale\" aria-label=\"Locale\"><option value=\"\">All locales</option><option value=\"en\">EN</option><option value=\"uk\">UK (parked)</option></select>
       <select class=\"qb-select\" id=\"cc-status\" aria-label=\"Evidence status\"><option value=\"\">All evidence statuses</option><option>current</option><option>stale</option><option>invalid</option><option value=\"unreviewed\">Without current review</option><option value=\"needs_revision\">Needs revision</option><option value=\"acceptance_recorded\">Acceptance recorded</option></select>
+      <select class=\"qb-select\" id=\"cc-work\" aria-label=\"Recorded work state\"><option value=\"\">All work states</option><option>preparing</option><option>prepared</option><option>awaiting_review</option><option>reviewing</option><option>review_failed</option><option>blocked</option><option>accepted</option><option>parked</option><option>unknown</option></select>
     </div>
     <p id=\"cc-count\"></p><div id=\"cc-rows\" style=\"max-height:600px;overflow:auto\"></div>
   </section>
@@ -9893,7 +9906,8 @@ def _v_docs_frontmatter(repo_root: Path) -> tuple:
             continue
         sig.update(rel.encode("utf-8"))
         sig.update(f":{stat.st_mtime_ns}:{stat.st_size}".encode())
-    extras = [repo_root / "docs/content-upgrade/page-reviews.json"]
+    from quality.content_coverage import coverage_ledger
+    extras = [coverage_ledger(repo_root)]
     seeds = repo_root / "docs/citation-seeds"
     extras.extend(sorted(seeds.glob("*.json")) if seeds.is_dir() else [])
     for extra in extras:

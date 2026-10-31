@@ -5,6 +5,27 @@ from tests.test_content_coverage import setup_pages
 from tests.test_local_api import local_api
 
 
+def test_worktree_ledger_override_refresh_and_static_boundary(tmp_path, monkeypatch):
+    _, evidence, receipt = setup_pages(tmp_path)
+    wt = tmp_path / '.worktrees/quality'; ledger = wt / 'docs/content-upgrade/page-reviews.json'
+    ledger.parent.mkdir(parents=True); (wt / 'static').mkdir()
+    (wt / 'static/quality-coverage.js').write_text('worktree asset')
+    row = {'path': receipt['path'], 'page_digest': receipt['page_digest'], 'state': 'prepared',
+           'updated_at': '2026-10-31T09:00:00Z', 'summary': 'Prepared', 'next_action': 'Review', 'evidence_refs': ['issue:1']}
+    ledger.write_text(json.dumps({'pages': [receipt], 'work': [row]}))
+    monkeypatch.setenv('KUBEDOJO_UPGRADE_LEDGER', str(ledger)); monkeypatch.setenv('KUBEDOJO_UI_ROOT', str(wt))
+    first = local_api._content_coverage_report(tmp_path)
+    assert next(p for p in first['pages'] if p['path'] == receipt['path'])['work']['state'] == 'prepared'
+    row['state'] = 'review_failed'; ledger.write_text(json.dumps({'pages': [receipt], 'work': [row]}))
+    second = local_api._content_coverage_report(tmp_path)
+    assert next(p for p in second['pages'] if p['path'] == receipt['path'])['work']['state'] == 'review_failed'
+    assert second['locales'] == first['locales'] and evidence.exists()
+    assert local_api.serve_static_file(tmp_path, 'quality-coverage.js')[1] == b'worktree asset'
+    assert local_api.serve_static_file(tmp_path, '../outside')[0] == 404
+    monkeypatch.setenv('KUBEDOJO_UI_ROOT', str(tmp_path)); assert local_api.serve_static_file(tmp_path, 'quality-coverage.js')[0] == 404
+    monkeypatch.setenv('KUBEDOJO_UPGRADE_LEDGER', str(evidence)); assert local_api._content_coverage_report(tmp_path)['status'] == 'unavailable'
+
+
 def test_api_cache_invalidates_pages_ledger_and_seeds(tmp_path, monkeypatch):
     from quality import content_coverage
     docs, evidence, receipt = setup_pages(tmp_path)

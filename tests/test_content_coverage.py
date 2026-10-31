@@ -8,6 +8,31 @@ from quality.content_inventory import EVIDENCE_LAYERS, _digest
 from test_source_acceptance import _valid
 
 
+def test_recorded_work_is_current_isolated_and_never_promotes(tmp_path):
+    docs, evidence, receipt = setup_pages(tmp_path)
+    record = {'path': receipt['path'], 'page_digest': receipt['page_digest'], 'state': 'reviewing',
+              'updated_at': '2026-10-31T09:00:00Z', 'summary': 'Review running', 'next_action': 'Wait for result',
+              'evidence_refs': ['issue:1'], 'review': {'spent': 4, 'ceiling': 5}}
+    baseline = build_coverage(tmp_path)['locales']
+    def report(rows):
+        evidence.write_text(json.dumps({'pages': [receipt], 'work': rows}))
+        return build_coverage(tmp_path)
+    valid = report([record]); page = next(p for p in valid['pages'] if p['path'] == receipt['path'])
+    assert page['work']['state'] == 'reviewing' and page['work']['review'] == {'spent': 4, 'ceiling': 5}
+    assert valid['locales'] == baseline and not page['acceptance_recorded'] and valid['work_summary']['reviewing'] == 1
+    assert next(p for p in valid['pages'] if p['path'] == 'index.md')['work']['state'] == 'unknown'
+    assert next(p for p in valid['pages'] if p['locale'] == 'uk')['work']['state'] == 'parked'
+    for bad in ({**record, 'state': 'accepted'}, {**record, 'page_digest': 'sha256:' + '0'*64},
+                {**record, 'review': {'spent': True}}, {**record, 'updated_at': 'yesterday'}, {**record, 'summary': ''}):
+        result = report([bad]); item = next(p for p in result['pages'] if p['path'] == receipt['path'])
+        assert item['work']['state'] == 'unknown' and result['work_errors'] and result['locales'] == baseline
+    result = report([record, record]); assert result['work_errors'] and result['work_summary']['unknown'] == 3
+    result = report([{**record, 'path': 'no-such-page.md'}]); assert result['work_errors'] and result['locales'] == baseline
+    result = report('not a list'); assert result['work_errors'] and result['locales'] == baseline
+    (docs / receipt['path']).write_text('new bytes')
+    assert next(p for p in report([record])['pages'] if p['path'] == receipt['path'])['work']['state'] == 'unknown'
+
+
 def setup_pages(root):
     docs = root / "src/content/docs"
     for rel in ("index.md", "linux/index.md", "prerequisites/module-one.md", "uk/linux/index.md"):
@@ -101,6 +126,7 @@ def test_explicit_acceptance_gates(tmp_path, monkeypatch):
             for key, count in totals.items():
                 assert count == (len(rows) if key == "total" else sum(row[key] for row in rows))
         assert report["locales"]["en"]["acceptance_recorded"] == expected
+        assert next(p for p in report['pages'] if p['path'] == receipt['path'])['work']['state'] == ('accepted' if expected else 'unknown')
     receipt["independent_statuses"]["deployed_smoke"] = "unknown"
     evidence.write_text(json.dumps({"pages": [receipt]}))
     assert build_coverage(tmp_path)["locales"]["en"]["acceptance_recorded"] == 0
