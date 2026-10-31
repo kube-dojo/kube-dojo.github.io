@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from scripts.pipeline_common.research_plan import validate_research_plan
+
 DIMENSIONS = {f"D{n}" for n in range(1, 9)}
 
 
@@ -20,30 +22,15 @@ def validate_teaching_review(payload: object, module_text: object, coverage_plan
         errors.append("module_text must be nonempty")
     if not isinstance(payload, dict):
         return [*errors, "payload must be an object"]
-    if not isinstance(coverage_plan, dict):
-        return [*errors, "coverage_plan must be an object"]
+    plan_errors = validate_research_plan(coverage_plan)
+    if plan_errors:
+        return [*errors, *plan_errors]
 
     def quote(value: object, location: str) -> None:
         if not _text(value) or not isinstance(module_text, str) or value not in module_text:
             errors.append(f"{location} must quote the candidate text")
 
-    if coverage_plan.get("module_kind") != "module":
-        errors.append("coverage_plan.module_kind must be module")
-    expected: dict[str, list[str]] = {}
-    for key in ("outcomes", "essential_topics"):
-        value = coverage_plan.get(key)
-        if (not isinstance(value, list) or not value or any(not _text(item) for item in value)
-                or len({item.strip() for item in value if isinstance(item, str)}) != len(value)):
-            errors.append(f"coverage_plan.{key} must be a nonempty list of unique strings")
-            expected[key] = []
-        else:
-            expected[key] = value
-    sources = coverage_plan.get("source_basis")
-    if (not isinstance(sources, list) or not sources or any(
-        not isinstance(source, dict) or any(not _text(source.get(key)) for key in ("uri", "locator", "excerpt"))
-        for source in sources
-    )):
-        errors.append("coverage_plan.source_basis must contain uri, locator and excerpt")
+    expected = {key: coverage_plan[key] for key in ("outcomes", "essential_topics")}
 
     dimensions = payload.get("dimensions")
     if (not isinstance(dimensions, dict) or set(dimensions) != DIMENSIONS
