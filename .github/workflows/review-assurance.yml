@@ -1,0 +1,43 @@
+name: Review assurance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  review-assurance:
+    name: Review assurance (offline Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Create test environment
+        env:
+          REVIEW_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          "$REVIEW_PYTHON" -m venv .venv
+          .venv/bin/python -m pip install pytest==9.1.1 PyYAML==6.0.3 requests==2.34.2 psutil==7.2.2 Jinja2==3.1.6
+      - name: Check review and coverage boundaries
+        run: |
+          .venv/bin/python -m pytest -q \
+            tests/test_research_plan.py tests/test_teaching_contract.py \
+            tests/test_verify_review.py tests/test_dispatch_smart.py \
+            scripts/agent_runtime/tests/test_agy_adapter.py \
+            tests/test_quality_stages.py tests/test_quality_prompts.py tests/test_quality_pipeline.py \
+            tests/test_pipeline_v2_review.py tests/test_verify_module_budget.py tests/test_quality_density.py \
+            scripts/quality/test_verify_module.py scripts/quality/test_verify_module_urls.py
+      - name: Check pipeline invariants
+        run: .venv/bin/python scripts/test_pipeline.py
