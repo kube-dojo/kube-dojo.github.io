@@ -71,15 +71,17 @@ class ReviewWorker:
             },
         )
 
+        actual_calls, actual_usd = 0, 0.0
         try:
             plan, plan_errors = load_research_plan(
-                self.control_plane.repo_root, module_path.relative_to(self.control_plane.repo_root)
+                self.control_plane.repo_root, lease.module_key
             )
             if plan_errors:
                 self.control_plane.fail_lease_terminal(lease.lease_id, reason="research_input_blocked",
                                                      event_payload={"errors": plan_errors})
                 return ReviewRunOutcome("blocked", lease.module_key, lease.lease_id, {"errors": plan_errors})
-            candidate_digest = hashlib.sha256(module_path.read_bytes()).hexdigest()
+            candidate = module_path.read_bytes()
+            candidate_digest = hashlib.sha256(candidate).hexdigest()
             plan_digest = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
             preflight = run_preflight(module_path, repo_root=self.control_plane.repo_root)
             if not preflight.passed:
@@ -133,18 +135,23 @@ class ReviewWorker:
                 module_path,
                 lease=lease,
                 coverage_plan=plan,
+                module_text=candidate.decode("utf-8"),
             )
             current_plan, current_errors = load_research_plan(
-                self.control_plane.repo_root, module_path.relative_to(self.control_plane.repo_root)
+                self.control_plane.repo_root, lease.module_key
             )
-            errors = validate_teaching_review(review_result, module_path.read_text(encoding="utf-8"), plan)
+            errors = (validate_teaching_review(review_result, candidate.decode("utf-8"), plan)
+                      if review_result["verdict"] == "APPROVE" else [])
             if (current_errors or current_plan != plan
                     or hashlib.sha256(module_path.read_bytes()).hexdigest() != candidate_digest):
                 errors.append("candidate or researched coverage plan changed during review")
             if errors:
                 self.control_plane.complete_lease(
                     lease.lease_id, actual_calls=actual_calls, actual_usd=actual_usd,
-                    outcome="attempt_failed", event_payload={"reason": "teaching_review_blocked", "errors": errors},
+                    outcome="attempt_failed", event_payload={"reason": "teaching_review_blocked", "errors": errors,
+                                                            "review": review_result, "coverage_plan": plan,
+                                                            "candidate_sha256": candidate_digest,
+                                                            "coverage_plan_sha256": plan_digest},
                 )
                 self.control_plane.emit_event("needs_human_intervention", module_key=lease.module_key,
                                               lease_id=lease.lease_id, payload={"errors": errors})
@@ -161,7 +168,9 @@ class ReviewWorker:
             ]
             if review_result["verdict"] == "REJECT" and not failed_checks:
                 failed_checks.append({"id": "REVIEW_VERDICT", "passed": False,
-                                      "evidence": review_result["feedback"]})
+                                      "evidence": review_result["feedback"], "fix_hint": "Address reviewer rejection",
+                                      "line_range": [1, 1]})
+                review_result["checks"].extend(failed_checks)
             verdict = "REJECT" if failed_checks else review_result["verdict"]
             event_payload = {
                 "job_id": lease.job_id,
@@ -172,6 +181,8 @@ class ReviewWorker:
                 "coverage_plan_sha256": plan_digest,
                 "review_role": "stage-check",
                 "independent_review": False,
+                "teaching_review": review_result,
+                "coverage_plan": plan,
             }
             if unverified_fact_claims:
                 self.control_plane.emit_event(
@@ -198,6 +209,9 @@ class ReviewWorker:
                 )
                 status = "rejected"
             else:
+                if (load_research_plan(self.control_plane.repo_root, lease.module_key) != (plan, [])
+                        or hashlib.sha256(module_path.read_bytes()).hexdigest() != candidate_digest):
+                    raise MalformedReviewerResponse("review inputs changed before stage pass")
                 self.control_plane.emit_event(
                     "check_passed",
                     module_key=lease.module_key,
@@ -249,8 +263,8 @@ class ReviewWorker:
         except MalformedReviewerResponse as exc:
             self.control_plane.complete_lease(
                 lease.lease_id,
-                actual_calls=0,
-                actual_usd=0.0,
+                actual_calls=actual_calls,
+                actual_usd=actual_usd,
                 outcome="attempt_failed",
                 event_payload={"phase": "review", "reason": "malformed_json", "error": str(exc)},
             )
@@ -263,8 +277,8 @@ class ReviewWorker:
         except Exception as exc:
             self.control_plane.complete_lease(
                 lease.lease_id,
-                actual_calls=0,
-                actual_usd=0.0,
+                actual_calls=actual_calls,
+                actual_usd=actual_usd,
                 outcome="attempt_failed",
                 event_payload={"phase": "review", "reason": "worker_error", "error": str(exc)},
             )
@@ -282,8 +296,8 @@ class ReviewWorker:
         *,
         lease: Lease,
         coverage_plan: dict,
+        module_text: str,
     ) -> tuple[dict[str, Any], int, float, str]:
-        module_text = module_path.read_text(encoding="utf-8")
         aggregated_checks: list[dict[str, Any]] = []
         feedback_parts: list[str] = []
         actual_calls = 0

@@ -197,12 +197,13 @@ def _fetch_rows(db_path: Path, sql: str, params: tuple = ()) -> list[sqlite3.Row
 
 
 @pytest.mark.parametrize("case", ["missing_plan", "scalar", "weak", "all4", "invented_quote",
-                                  "missing_topic", "must_fix", "candidate_drift", "plan_drift"])
+                                  "missing_topic", "must_fix", "candidate_drift", "plan_drift", "outside", "traversal"])
 def test_teaching_approval_cannot_bypass_researched_evidence(tmp_path, case):
     plane = _make_control_plane(tmp_path)
     path = _write_module(tmp_path)
     seed = next((tmp_path / "docs/citation-seeds").glob("*.json"))
-    plane.enqueue(str(path.relative_to(tmp_path)), phase="review", model=REVIEW_MODEL)
+    key = "/outside/module.md" if case == "outside" else "../outside.md" if case == "traversal" else str(path.relative_to(tmp_path))
+    plane.enqueue(key, phase="review", model=REVIEW_MODEL)
     payload = json.loads(_deep_response())
     if case == "missing_plan":
         seed.unlink()
@@ -232,13 +233,14 @@ def test_teaching_approval_cannot_bypass_researched_evidence(tmp_path, case):
     with patch("subprocess.run", side_effect=_preflight_side_effect):
         result = ReviewWorker(plane, dispatch_fn=mock).run_once()
     assert result.status == "blocked" and result.details["errors"]
-    assert mock.call_count == (0 if case == "missing_plan" else 4)
+    assert mock.call_count == (0 if case in ("missing_plan", "outside", "traversal") else 4)
     assert not _fetch_rows(plane.db_path, "SELECT * FROM jobs WHERE phase='patch'")
     assert not plane.iter_events("check_passed")
 
 
-@pytest.mark.parametrize("reject", [False, True])
-def test_minimum_passing_rubric_is_bound_to_candidate_and_plan(tmp_path, reject):
+@pytest.mark.parametrize("case", ["minimum", "reject", "snapshot"])
+def test_minimum_passing_rubric_is_bound_to_candidate_and_plan(tmp_path, case):
+    reject = case == "reject"
     plane = _make_control_plane(tmp_path)
     path = _write_module(tmp_path)
     plane.enqueue(str(path.relative_to(tmp_path)), phase="review", model=REVIEW_MODEL)
@@ -246,15 +248,25 @@ def test_minimum_passing_rubric_is_bound_to_candidate_and_plan(tmp_path, reject)
     deep["dimensions"] = {f"D{n}": 4 if n < 8 else 5 for n in range(1, 9)}
     if reject:
         deep["verdict"] = "REJECT"
+        deep.update(dimensions={f"D{n}": 3 for n in range(1, 9)}, must_fix=["Untaught topic"], coverage={})
     responses = [_simple_response(key) for key in ("PRES", "NO_EMOJI", "K8S_API")]
     responses.append(json.dumps(deep))
-    with patch("subprocess.run", side_effect=_preflight_side_effect):
-        result = ReviewWorker(plane, dispatch_fn=Mock(side_effect=[(True, r) for r in responses])).run_once()
+    def dispatch(prompt, **kwargs):
+        assert "unreviewed replacement" not in prompt
+        path.write_text(GOOD_MODULE)
+        return True, responses.pop(0)
+    def preflight(*args, **kwargs):
+        if case == "snapshot":
+            path.write_text(GOOD_MODULE + " unreviewed replacement")
+        return _preflight_side_effect(*args, **kwargs)
+    with patch("subprocess.run", side_effect=preflight):
+        result = ReviewWorker(plane, dispatch_fn=dispatch).run_once()
     assert result.status == ("rejected" if reject else "approved")
     assert bool(plane.iter_events("check_passed")) is not reject
     assert len(result.details["candidate_sha256"]) == len(result.details["coverage_plan_sha256"]) == 64
     assert result.details["review_role"] == "stage-check"
     assert result.details["independent_review"] is False
+    assert result.details["teaching_review"]["must_fix"] == (["Untaught topic"] if reject else [])
 
 
 def test_preflight_markdownlint_failure_skips_llm_and_enqueues_patch(tmp_path):
