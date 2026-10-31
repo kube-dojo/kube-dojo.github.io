@@ -61,7 +61,7 @@ _PRINT_TIMEOUT_MARGIN_S = 10
 
 
 # Canonical model display strings accepted by ``agy --model`` (verbatim from
-# ``agy models``, refreshed 2026-09-14). The runtime passes a slug like
+# ``agy models``, refreshed for #3746). The runtime passes a slug like
 # ``gemini-3.8-flash-high``; ``_normalize_model`` collapses both that slug and
 # the display string to the same key so either form maps here.
 # Re-probe with ``agy models`` when Antigravity ships new ids — do not invent.
@@ -70,17 +70,6 @@ _AGY_MODEL_NAMES: tuple[str, ...] = (
     "Gemini 3.8 Flash (High)",
     "Gemini 3.8 Flash (Medium)",
     "Gemini 3.8 Flash (Low)",
-    "Gemini 3.7 Flash (High)",
-    "Gemini 3.7 Flash (Medium)",
-    "Gemini 3.7 Flash (Low)",
-    "Gemini 3.6 Flash (High)",
-    "Gemini 3.6 Flash (Medium)",
-    "Gemini 3.6 Flash (Low)",
-    "Gemini 3.1 Pro (High)",
-    "Gemini 3.1 Pro (Low)",
-    "Claude Sonnet 4.6 (Thinking)",
-    "Claude Opus 4.6 (Thinking)",
-    "GPT-OSS 120B (Medium)",
 )
 
 
@@ -197,7 +186,7 @@ class AgyAdapter:
         candidate = self.default_model if model is None else model
         resolved = _AGY_MODEL_BY_NORMALIZED.get(_normalize_model(candidate)) if candidate else None
         if resolved is None:
-            raise ValueError(f"AgyAdapter: unsupported explicit model {candidate!r}; no substitution")
+            raise ValueError(f"AgyAdapter: unsupported model {candidate!r}; no substitution")
         return resolved
 
     def parse_response(

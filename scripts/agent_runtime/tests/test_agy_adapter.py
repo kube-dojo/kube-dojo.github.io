@@ -65,7 +65,7 @@ def test_build_invocation_print_timeout_derived_from_dispatch_hard_timeout(
         prompt="p",
         mode="danger",
         cwd=Path("/repo/.worktrees/x"),
-        model="gemini-3.1-pro-high",
+        model="gemini-4-argon-high",
         task_id=None,
         session_id=None,
         tool_config={"hard_timeout": 3600},
@@ -84,14 +84,14 @@ def test_build_invocation_maps_model_slug(monkeypatch) -> None:
         prompt="p",
         mode="workspace-write",
         cwd=Path("/tmp"),
-        model="gemini-3.1-pro-high",
+        model="gemini-4-argon-high",
         task_id=None,
         session_id=None,
         tool_config=None,
     )
 
     assert "--model" in plan.cmd
-    assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 3.1 Pro (High)"
+    assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 4 Argon (High)"
 
 
 def test_build_invocation_accepts_display_string(monkeypatch) -> None:
@@ -103,16 +103,16 @@ def test_build_invocation_accepts_display_string(monkeypatch) -> None:
         prompt="p",
         mode="workspace-write",
         cwd=Path("/tmp"),
-        model="Gemini 3.1 Pro (High)",
+        model="Gemini 4 Argon (High)",
         task_id=None,
         session_id=None,
         tool_config=None,
     )
 
-    assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 3.1 Pro (High)"
+    assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 4 Argon (High)"
 
 
-@pytest.mark.parametrize("model", ["tui-controlled", "gemini-4-nonexistent", ""])
+@pytest.mark.parametrize("model", ["tui-controlled", "gemini-4-nonexistent", "gemini-3.1-pro-high", ""])
 def test_explicit_unknown_models_never_substitute(model) -> None:
     with pytest.raises(ValueError, match="no substitution"):
         AgyAdapter()._resolve_model_flag(model)
