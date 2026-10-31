@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import citation_backfill
 from conftest import _read_frontmatter
 
+from scripts import quality_post_review as post_review
 from scripts.quality import dispatchers, pipeline, stages, state, worktree
 from scripts.quality.citations import CitationResult
 from scripts.quality.dispatchers import DispatchResult
@@ -2263,3 +2264,81 @@ def test_rebase_changed_plan_is_rechecked_before_merge(fake_repo, monkeypatch):
     stages.merge_one(slug)
     st = state.load_state(slug)
     assert st["stage"] == "REVIEW_PENDING" and "changed since review" in st["review_blocked"] and wt.exists()
+
+
+def _post_review_case(fake_repo, monkeypatch):
+    slug = _bootstrap(fake_repo)
+    st = state.load_state(slug)
+    st.update({"stage": "COMMITTED", "writer": "codex", "reviewer": "claude",
+               "review": {"auto_approved": True}})
+    module = fake_repo / st["module_path"]
+    module.write_text(_REWRITTEN_MODULE)
+    saved, flags = [], []
+    lease = type("Lease", (), {"load": lambda self: st, "save": lambda self, value: saved.append(value)})()
+    monkeypatch.setattr(post_review.qstate, "REPO_ROOT", fake_repo)
+    monkeypatch.setattr(post_review.qstate, "load_state", lambda _slug: st)
+    monkeypatch.setattr(post_review.qstate, "state_lease", lambda *_a, **_k: nullcontext(lease))
+    monkeypatch.setattr(post_review, "clear_qa_pending_frontmatter", lambda _p: flags.append("clear"))
+    monkeypatch.setattr(post_review, "set_revision_pending_frontmatter", lambda _p: flags.append("revision") or True)
+    return slug, st, module, saved, flags
+
+
+def test_post_review_missing_plan_does_not_dispatch_or_clear(fake_repo, monkeypatch):
+    slug, st, _, saved, flags = _post_review_case(fake_repo, monkeypatch)
+    (fake_repo / "docs/citation-seeds/k8s-cka-module-1.1-pods.json").unlink()
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: pytest.fail("unexpected provider call"))
+    outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and "research input blocked" in detail
+    assert st["review"]["auto_approved"] is True and saved == flags == []
+
+
+def test_post_review_scalar_approval_cannot_clear_flags(fake_repo, monkeypatch):
+    slug, st, _, saved, flags = _post_review_case(fake_repo, monkeypatch)
+    scalar = json.dumps({"verdict": "approve", "rubric_score": 5, "teaching_score": 5, "must_fix": []})
+    result = DispatchResult(ok=True, stdout=scalar, stderr="", returncode=0, duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: result)
+    outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and "dimensions" in detail
+    assert st["review"]["auto_approved"] is True and saved == flags == []
+
+
+@pytest.mark.parametrize("changed", ["candidate", "plan"])
+def test_post_review_stale_candidate_or_plan_cannot_clear_flags(fake_repo, monkeypatch, changed):
+    slug, st, module, saved, flags = _post_review_case(fake_repo, monkeypatch)
+    def change_then_review(*_args, **_kwargs):
+        if changed == "candidate":
+            module.write_text(module.read_text() + "Changed.\n")
+        else:
+            seed_path = fake_repo / "docs/citation-seeds/k8s-cka-module-1.1-pods.json"
+            seed = json.loads(seed_path.read_text())
+            seed["coverage_plan"]["essential_topics"].append("New topic")
+            seed_path.write_text(json.dumps(seed))
+        return DispatchResult(ok=True, stdout=_review_approve_output(), stderr="", returncode=0,
+                              duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(post_review, "dispatch", change_then_review)
+    outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and "changed during review" in detail
+    assert st["review"]["auto_approved"] is True and saved == flags == []
+
+
+def test_post_review_complete_approval_binds_payload_before_clear(fake_repo, monkeypatch):
+    slug, st, _, saved, flags = _post_review_case(fake_repo, monkeypatch)
+    output = _review_approve_output()
+    payload = json.loads(output.split("My verdict:\n\n")[1])
+    result = DispatchResult(ok=True, stdout=output, stderr="", returncode=0, duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: result)
+    outcome, _ = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "approve" and st["review"]["auto_approved"] is False and saved and flags == ["clear"]
+    assert st["review"]["deferred"]["payload"] == payload
+    assert st["review"]["deferred"]["candidate_sha256"] and st["review"]["deferred"]["plan_sha256"]
+    assert st["review"]["deferred"]["prior_review"]["auto_approved"] is True
+
+
+def test_post_review_negative_keeps_historical_auto_approval(fake_repo, monkeypatch):
+    slug, st, _, saved, flags = _post_review_case(fake_repo, monkeypatch)
+    result = DispatchResult(ok=True, stdout=_review_changes_output(["fix quiz"]), stderr="", returncode=0,
+                            duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: result)
+    outcome, _ = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "changes" and st["review"]["auto_approved"] is True and saved
+    assert flags == ["clear", "revision"] and st["review"]["deferred"]["payload"]["verdict"] == "changes_requested"

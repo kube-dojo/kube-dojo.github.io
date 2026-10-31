@@ -1,10 +1,8 @@
 """Deferred-review pass for KUBEDOJO_SKIP_REVIEW=1 batches (#388).
 
-The skip-review path keeps a writer batch moving when the reviewer LLM is
-rate-limited: ``review_one`` auto-approves without dispatching, marks
-``review.auto_approved=True``, and appends the slug to
-``.pipeline/quality-pipeline/post-review-queue.txt``. This script processes
-that queue once Claude quota recovers.
+Historical skip-review batches marked ``review.auto_approved=True`` and wrote
+``.pipeline/quality-pipeline/post-review-queue.txt``. New skipped reviews remain
+pending. This script processes historical queue entries with researched coverage.
 
 For each slug at ``stage=COMMITTED`` with ``review.auto_approved=True``:
 
@@ -18,10 +16,7 @@ The queue file is rewritten atomically; un-processed slugs stay queued.
 The script does NOT commit frontmatter changes — caller inspects ``git
 status`` and commits the batch.
 
-Heuristic from the #388 batch: deterministic gates (density, visual-aid,
-code-block-balance) are the real safety net; the LLM reviewer
-rubber-stamped 4.5-5.0 on auto-approved modules. ``--limit`` lets you
-spot-sample rather than burning quota on the full queue.
+An editorial result does not replace factual-source, runtime or page acceptance.
 """
 from __future__ import annotations
 
@@ -42,7 +37,9 @@ from quality.queue import (
     clear_qa_pending_frontmatter,
     set_revision_pending_frontmatter,
 )
-from quality.stages import _parse_review_verdict
+from quality.stages import _parse_review_verdict, _review_digests, _review_inputs
+
+from scripts.pipeline_common.teaching_contract import validate_teaching_review
 
 QUEUE_PATH = Path(".pipeline/quality-pipeline/post-review-queue.txt")
 
@@ -82,11 +79,17 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
     if not reviewable(st):
         return "skip", f"stage={st.get('stage')} auto_approved={(st.get('review') or {}).get('auto_approved')}"
 
-    module_file = Path(st["module_path"])
-    if not module_file.exists():
-        return "skip", f"module missing: {module_file}"
+    module_rel = st["module_path"]
+    module_file = qstate.REPO_ROOT / module_rel
+    try:
+        module_text, plan = _review_inputs(qstate.REPO_ROOT, module_rel)
+        candidate_digest, plan_digest = _review_digests(module_text, plan)
+    except (OSError, UnicodeError, ValueError) as exc:
+        return "fail", f"review input unavailable: {exc}"
 
     reviewer = reviewer_override or st["reviewer"]
+    if not isinstance(reviewer, str) or not reviewer.strip():
+        return "fail", "reviewer is not assigned"
     track = (st.get("route") or {}).get("track", "rewrite")
 
     if dry_run:
@@ -95,10 +98,11 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
     try:
         prompt = review_prompt(
             module_path=st["module_path"],
-            module_text=module_file.read_text(encoding="utf-8"),
+            module_text=module_text,
             writer_agent=st["writer"],
             track=track,
             original_gaps=build_audit_context(st.get("audit")),
+            coverage_plan=plan,
         )
     except ValueError as exc:
         return "fail", str(exc)  # Historical post-review stays queued until its producer is upgraded.
@@ -112,6 +116,10 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
     verdict = _parse_review_verdict(result)
     if verdict is None:
         return "fail", "could not parse verdict JSON"
+    if verdict["verdict"] == "approve":
+        errors = validate_teaching_review(verdict, module_text, plan)
+        if errors:
+            return "fail", "; ".join(errors)
 
     # Update state under lease — preserve original auto-approved record in
     # review.deferred so the audit trail shows both the synthetic approve
@@ -120,8 +128,20 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
         st = lease.load()
         if st is None or not reviewable(st):
             return "skip", "state changed under us"
-        st.setdefault("review", {})["auto_approved"] = False
-        st["review"]["deferred"] = {"agent": reviewer, **verdict}
+        if st.get("module_path") != module_rel:
+            return "fail", "module path changed during review"
+        try:
+            current_text, current_plan = _review_inputs(qstate.REPO_ROOT, module_rel)
+            current_digests = _review_digests(current_text, current_plan)
+        except (OSError, UnicodeError, ValueError):
+            current_digests = None
+        if current_digests != (candidate_digest, plan_digest):
+            return "fail", "candidate or research plan changed during review"
+        prior = dict(st["review"])
+        if verdict["verdict"] == "approve":
+            st["review"]["auto_approved"] = False
+        st["review"]["deferred"] = {"agent": reviewer, "payload": verdict, "prior_review": prior,
+                                    "candidate_sha256": candidate_digest, "plan_sha256": plan_digest}
         st.setdefault("history", []).append({
             "at": qstate.now_iso(),
             "stage": "COMMITTED",
@@ -132,7 +152,7 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
 
     if verdict["verdict"] == "approve":
         clear_qa_pending_frontmatter(module_file)
-        return "approve", f"rubric={verdict.get('rubric_score')} teaching={verdict.get('teaching_score')}"
+        return "approve", "review passed on pre-banner-change candidate; source and acceptance remain separate"
 
     # CHANGES — flip qa_pending → revision_pending so learners see the rework
     # banner instead of the QA-pending banner.
