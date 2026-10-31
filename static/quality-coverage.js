@@ -14,6 +14,10 @@
   const labels = ['Accepted', 'Current unaccepted', 'Revision', 'Stale', 'Invalid', 'No review recorded'];
   const order = ['prerequisites', 'linux', 'k8s', 'cloud', 'platform', 'on-premises', 'ai', 'ai-ml-engineering', 'ai-history', 'shared'];
   const names = {'prerequisites': 'Prerequisites', 'linux': 'Linux', 'k8s': 'Kubernetes', 'cloud': 'Cloud', 'platform': 'Platform', 'on-premises': 'On-Premises', 'ai': 'AI', 'ai-ml-engineering': 'AI/ML Engineering', 'ai-history': 'AI History', 'shared': 'Shared'};
+  const params = new URLSearchParams(window.location.search);
+  find('cc-search').value = params.get('search') || '';
+  find('cc-locale').value = ['en', 'uk'].includes(params.get('locale')) ? params.get('locale') : '';
+  if (order.includes(params.get('track'))) selectedTrack = {locale: find('cc-locale').value || 'en', name: params.get('track')};
   function meter(values, title) {
     const bar = document.createElement('div'), parts = coveragePartition(values);
     bar.className = 'cc-meter';

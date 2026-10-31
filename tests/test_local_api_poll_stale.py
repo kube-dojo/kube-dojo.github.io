@@ -44,14 +44,9 @@ local_api = _load_module()
 ui_fragments = _load_ui_fragments()
 
 
-POLL_PAGES = ("/", "/operator", "/pipeline", "/activity", "/health", "/quality")
+POLL_PAGES = ("/quality",)
 
 SET_POLL_TS_CALL_SITES = (
-    ("/", "setPollTs($('#last-updated'), briefing)"),
-    ("/operator", "setPollTs($('#last-updated'), briefing)"),
-    ("/pipeline", "setPollTs($('#v2-badge'), v2Status)"),
-    ("/activity", "setPollTs($('#activity-badge'), activityData)"),
-    ("/health", "setPollTs($('#svc-badge'), services)"),
     ("/quality", "setPollTs($('#last-updated'), board)"),
 )
 

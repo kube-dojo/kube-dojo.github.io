@@ -496,8 +496,9 @@ def test_route_request_serves_dashboard_and_issue_watch(tmp_path: Path) -> None:
     assert status_code == 200
     assert content_type.startswith("text/html")
     assert "KubeDojo Local Monitor" in html
-    assert "quality-summary-counts" in html
-    assert "id=\"quality-summary-badge\"" in html
+    assert 'id="coverage-body"' in html
+    assert 'id="work-body"' in html
+    assert '/static/monitor.js' in html
     assert "id=\"quality-board\"" not in html
     assert "qb-search" not in html
 
