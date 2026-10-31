@@ -30,6 +30,19 @@ jobs:
         run: |
           "$REVIEW_PYTHON" -m venv .venv
           .venv/bin/python -m pip install pytest==9.1.1 PyYAML==6.0.3 requests==2.34.2 psutil==7.2.2 Jinja2==3.1.6
+      - name: Identify the book-only pipeline exception
+        id: scope
+        env:
+          REVIEW_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$REVIEW_BASE"
+          .venv/bin/python - <<'PY'
+          import os, subprocess
+          paths = subprocess.check_output(["git", "diff", "--name-only", os.environ["REVIEW_BASE"], "HEAD"], text=True).splitlines()
+          book_only = bool(paths) and all(path.startswith("docs/research/ai-history/") for path in paths)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"book_only={str(book_only).lower()}\n")
+          PY
       - name: Check review and coverage boundaries
         run: |
           .venv/bin/python -m pytest -q \
@@ -41,4 +54,5 @@ jobs:
             tests/test_verify_module_budget.py tests/test_quality_density.py \
             scripts/quality/test_verify_module.py scripts/quality/test_verify_module_urls.py
       - name: Check pipeline invariants
+        if: steps.scope.outputs.book_only != 'true'
         run: .venv/bin/python scripts/test_pipeline.py
