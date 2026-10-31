@@ -2295,7 +2295,7 @@ def _post_review_case(fake_repo, monkeypatch):
     slug = _bootstrap(fake_repo)
     st = state.load_state(slug)
     st.update({"stage": "COMMITTED", "writer": "codex", "reviewer": "claude",
-               "review": {"auto_approved": True}})
+               "review": {"auto_approved": True}, "post_review_calls_remaining": 1})  # Synthetic test grant.
     module = fake_repo / st["module_path"]
     module.write_text(_REWRITTEN_MODULE)
     saved, flags = [], []
@@ -2303,6 +2303,7 @@ def _post_review_case(fake_repo, monkeypatch):
     monkeypatch.setattr(post_review.qstate, "REPO_ROOT", fake_repo)
     monkeypatch.setattr(post_review.qstate, "load_state", lambda _slug: st)
     monkeypatch.setattr(post_review.qstate, "state_lease", lambda *_a, **_k: nullcontext(lease))
+    monkeypatch.setattr(post_review, "_merge_lock", lambda: nullcontext())
     monkeypatch.setattr(post_review, "clear_qa_pending_frontmatter", lambda _p: flags.append("clear"))
     monkeypatch.setattr(post_review, "set_revision_pending_frontmatter", lambda _p: flags.append("revision") or True)
     return slug, st, module, saved, flags
@@ -2318,18 +2319,67 @@ def test_post_review_missing_plan_does_not_dispatch_or_clear(fake_repo, monkeypa
 
 
 def test_post_review_scalar_approval_cannot_clear_flags(fake_repo, monkeypatch):
-    slug, st, _, saved, flags = _post_review_case(fake_repo, monkeypatch)
+    slug, st, _, _saved, flags = _post_review_case(fake_repo, monkeypatch)
     scalar = json.dumps({"verdict": "approve", "rubric_score": 5, "teaching_score": 5, "must_fix": []})
     result = DispatchResult(ok=True, stdout=scalar, stderr="", returncode=0, duration_sec=0.1, agent="claude", model=None)
     monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: result)
     outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
     assert outcome == "fail" and "dimensions" in detail
-    assert st["review"]["auto_approved"] is True and saved == flags == []
+    assert st["review"]["auto_approved"] is True and flags == []
+    assert st["post_review_calls_remaining"] == 0 and st["post_review_attempts"][0]["stdout"] == scalar
+    outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and "allowance" in detail and len(st["post_review_attempts"]) == 1
+
+
+def test_post_review_unknown_allowance_blocks_dispatch(fake_repo, monkeypatch):
+    slug, st, _, _, flags = _post_review_case(fake_repo, monkeypatch)
+    del st["post_review_calls_remaining"]
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: pytest.fail("unexpected provider call"))
+    outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and "allowance" in detail and flags == []
+
+
+def test_post_review_unavailable_dispatch_consumes_reserved_call(fake_repo, monkeypatch):
+    slug, st, _, _, flags = _post_review_case(fake_repo, monkeypatch)
+    def unavailable(*_args, **_kwargs):
+        assert st["post_review_calls_remaining"] == 0
+        raise post_review.DispatcherUnavailable("unavailable")
+    monkeypatch.setattr(post_review, "dispatch", unavailable)
+    outcome, _ = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "stop" and flags == []
+    assert st["post_review_attempts"][0]["status"] == "failed"
+
+
+def test_post_review_malformed_result_retains_history_and_raw(fake_repo, monkeypatch):
+    slug, st, _, _, flags = _post_review_case(fake_repo, monkeypatch)
+    st["post_review_attempts"] = [{"id": "old", "status": "failed", "stdout": "old negative"}]
+    result = DispatchResult(ok=True, stdout="not JSON", stderr="diagnostic", returncode=0,
+                            duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: result)
+    outcome, _ = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and flags == [] and st["post_review_calls_remaining"] == 0
+    assert st["post_review_attempts"][0]["stdout"] == "old negative"
+    latest = st["post_review_attempts"][1]
+    assert latest["stdout"] == "not JSON" and latest["stderr"] == "diagnostic"
+    assert latest["status"] == "failed" and latest["candidate_sha256"] and latest["plan_sha256"]
+
+
+def test_post_review_rejects_synthetic_complete_approval(fake_repo, monkeypatch):
+    slug, st, _, _saved, flags = _post_review_case(fake_repo, monkeypatch)
+    payload = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+    payload["auto_approved"] = True
+    result = DispatchResult(ok=True, stdout=json.dumps(payload), stderr="", returncode=0,
+                            duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: result)
+    outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and "synthetic" in detail
+    assert st["review"]["auto_approved"] is True and flags == []
+    assert st["post_review_attempts"][0]["error"] == "synthetic auto-approved review"
 
 
 @pytest.mark.parametrize("changed", ["candidate", "plan"])
 def test_post_review_stale_candidate_or_plan_cannot_clear_flags(fake_repo, monkeypatch, changed):
-    slug, st, module, saved, flags = _post_review_case(fake_repo, monkeypatch)
+    slug, st, module, _saved, flags = _post_review_case(fake_repo, monkeypatch)
     def change_then_review(*_args, **_kwargs):
         if changed == "candidate":
             module.write_text(module.read_text() + "Changed.\n")
@@ -2343,7 +2393,7 @@ def test_post_review_stale_candidate_or_plan_cannot_clear_flags(fake_repo, monke
     monkeypatch.setattr(post_review, "dispatch", change_then_review)
     outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
     assert outcome == "fail" and "changed during review" in detail
-    assert st["review"]["auto_approved"] is True and saved == flags == []
+    assert st["review"]["auto_approved"] is True and flags == []
 
 
 def test_post_review_complete_approval_binds_payload_before_clear(fake_repo, monkeypatch):
@@ -2357,6 +2407,23 @@ def test_post_review_complete_approval_binds_payload_before_clear(fake_repo, mon
     assert st["review"]["deferred"]["payload"] == payload
     assert st["review"]["deferred"]["candidate_sha256"] and st["review"]["deferred"]["plan_sha256"]
     assert st["review"]["deferred"]["prior_review"]["auto_approved"] is True
+
+
+def test_post_review_rechecks_candidate_after_primary_lock(fake_repo, monkeypatch):
+    slug, st, module, _, flags = _post_review_case(fake_repo, monkeypatch)
+    result = DispatchResult(ok=True, stdout=_review_approve_output(), stderr="", returncode=0,
+                            duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(post_review, "dispatch", lambda *_a, **_k: result)
+    calls = []
+    def changed_lock():
+        calls.append(True)
+        if len(calls) == 2:
+            module.write_text(module.read_text() + "Replacement.\n")
+        return nullcontext()
+    monkeypatch.setattr(post_review, "_merge_lock", changed_lock)
+    outcome, detail = post_review.review_slug(slug, reviewer_override=None, timeout=10, dry_run=False)
+    assert outcome == "fail" and "changed during review" in detail
+    assert st["review"]["auto_approved"] is True and flags == []
 
 
 def test_post_review_negative_keeps_historical_auto_approval(fake_repo, monkeypatch):

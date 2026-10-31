@@ -17,6 +17,8 @@ The script does NOT commit frontmatter changes — caller inspects ``git
 status`` and commits the batch.
 
 An editorial result does not replace factual-source, runtime or page acceptance.
+Dispatch requires a driver-recorded positive post_review_calls_remaining in the
+existing module state; an unknown or exhausted allowance blocks replay.
 """
 from __future__ import annotations
 
@@ -24,6 +26,7 @@ import argparse
 import random
 import signal
 import sys
+import uuid
 from pathlib import Path
 from typing import cast
 
@@ -37,11 +40,26 @@ from quality.queue import (
     clear_qa_pending_frontmatter,
     set_revision_pending_frontmatter,
 )
-from quality.stages import _parse_review_verdict, _review_digests, _review_inputs
+from quality.stages import (
+    _merge_lock,
+    _parse_review_verdict,
+    _review_digests,
+    _review_inputs,
+)
 
 from scripts.pipeline_common.teaching_contract import validate_teaching_review
 
 QUEUE_PATH = Path(".pipeline/quality-pipeline/post-review-queue.txt")
+
+
+def _record_attempt(slug: str, attempt_id: str, **details: object) -> None:
+    with qstate.state_lease(slug, timeout=5.0) as lease:
+        st = lease.load()
+        if st is None:
+            raise RuntimeError("review state disappeared")
+        attempt = next(item for item in st["post_review_attempts"] if item["id"] == attempt_id)
+        attempt.update(details)
+        lease.save(st)
 
 
 def read_queue() -> list[str]:
@@ -82,8 +100,9 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
     module_rel = st["module_path"]
     module_file = qstate.REPO_ROOT / module_rel
     try:
-        module_text, plan = _review_inputs(qstate.REPO_ROOT, module_rel)
-        candidate_digest, plan_digest = _review_digests(module_text, plan)
+        with _merge_lock():
+            module_text, plan = _review_inputs(qstate.REPO_ROOT, module_rel)
+            candidate_digest, plan_digest = _review_digests(module_text, plan)
     except (OSError, UnicodeError, ValueError) as exc:
         return "fail", f"review input unavailable: {exc}"
 
@@ -106,25 +125,49 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
         )
     except ValueError as exc:
         return "fail", str(exc)  # Historical post-review stays queued until its producer is upgraded.
+    with qstate.state_lease(slug, timeout=5.0) as lease:
+        st = lease.load()
+        if st is None or not reviewable(st) or st.get("module_path") != module_rel:
+            return "fail", "review state changed before dispatch"
+        remaining = st.get("post_review_calls_remaining")
+        if type(remaining) is not int or remaining <= 0:
+            return "fail", "review blocked: remaining call allowance unknown or exhausted"
+        attempts = st.setdefault("post_review_attempts", [])
+        if not isinstance(attempts, list):
+            return "fail", "review blocked: malformed attempt history"
+        attempt_id = uuid.uuid4().hex
+        attempts.append({"id": attempt_id, "candidate_sha256": candidate_digest,
+                         "plan_sha256": plan_digest, "reviewer": reviewer, "status": "reserved"})
+        st["post_review_calls_remaining"] = remaining - 1
+        lease.save(st)
     try:
         result = dispatch(cast(Agent, reviewer), prompt, timeout=timeout, tools_disabled=True)
     except DispatcherUnavailable as e:
+        _record_attempt(slug, attempt_id, status="failed", error=str(e))
         return "stop", str(e)
+    _record_attempt(slug, attempt_id, status="returned", stdout=result.stdout, stderr=result.stderr,
+                    returncode=result.returncode)
     if not result.ok:
+        _record_attempt(slug, attempt_id, status="failed", error="dispatch failed")
         return "fail", f"dispatch rc={result.returncode}: {result.stderr.strip()[:300]}"
 
     verdict = _parse_review_verdict(result)
     if verdict is None:
+        _record_attempt(slug, attempt_id, status="failed", error="could not parse verdict JSON")
         return "fail", "could not parse verdict JSON"
+    if verdict.get("auto_approved"):
+        _record_attempt(slug, attempt_id, status="failed", error="synthetic auto-approved review")
+        return "fail", "synthetic auto-approved review cannot clear flags"
     if verdict["verdict"] == "approve":
         errors = validate_teaching_review(verdict, module_text, plan)
         if errors:
+            _record_attempt(slug, attempt_id, status="failed", error="; ".join(errors))
             return "fail", "; ".join(errors)
 
     # Update state under lease — preserve original auto-approved record in
     # review.deferred so the audit trail shows both the synthetic approve
     # and the real (post-rate-limit) verdict.
-    with qstate.state_lease(slug, timeout=5.0) as lease:
+    with qstate.state_lease(slug, timeout=5.0) as lease, _merge_lock():
         st = lease.load()
         if st is None or not reviewable(st):
             return "skip", "state changed under us"
@@ -136,12 +179,21 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
         except (OSError, UnicodeError, ValueError):
             current_digests = None
         if current_digests != (candidate_digest, plan_digest):
+            attempt = next(item for item in st["post_review_attempts"] if item["id"] == attempt_id)
+            attempt.update(status="failed", error="candidate or research plan changed during review")
+            lease.save(st)
             return "fail", "candidate or research plan changed during review"
+        clear_qa_pending_frontmatter(module_file)
+        marked = ""
+        if verdict["verdict"] != "approve":
+            marked = "banner flipped to revision_pending" if set_revision_pending_frontmatter(module_file) else "banner already revision_pending"
         prior = dict(st["review"])
         if verdict["verdict"] == "approve":
             st["review"]["auto_approved"] = False
         st["review"]["deferred"] = {"agent": reviewer, "payload": verdict, "prior_review": prior,
                                     "candidate_sha256": candidate_digest, "plan_sha256": plan_digest}
+        attempt = next(item for item in st["post_review_attempts"] if item["id"] == attempt_id)
+        attempt.update(status="completed")
         st.setdefault("history", []).append({
             "at": qstate.now_iso(),
             "stage": "COMMITTED",
@@ -151,16 +203,10 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
         lease.save(st)
 
     if verdict["verdict"] == "approve":
-        clear_qa_pending_frontmatter(module_file)
         return "approve", "review passed on pre-banner-change candidate; source and acceptance remain separate"
 
     # CHANGES — flip qa_pending → revision_pending so learners see the rework
     # banner instead of the QA-pending banner.
-    clear_qa_pending_frontmatter(module_file)
-    if set_revision_pending_frontmatter(module_file):
-        marked = "banner flipped to revision_pending"
-    else:
-        marked = "banner already revision_pending"
     must_fix = verdict.get("must_fix") or []
     return "changes", f"{marked}; {len(must_fix)} must-fix"
 
