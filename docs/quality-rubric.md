@@ -2,6 +2,8 @@
 
 **Purpose**: Measurable scoring system for rating module and lab quality. Used during audits and reviews.
 
+Apply `docs/review-contract.md` for researched scope, topic coverage and page-kind omissions. Word, density, template and citation counts are planning diagnostics, not passing evidence or targets to pad. Independently verify outcome-to-teaching/practice/assessment coverage and material topic omissions. The eight-dimension module and five-dimension lab score floors below remain unchanged; source, execution and final acceptance are separate gates. Report legacy verifier disagreements during #3744 migration explicitly.
+
 ## Citation Gate (Mandatory Before Scoring)
 
 Before a module can be counted as `4/5` or `5/5`, it must pass a citation and evidence hygiene check.
@@ -318,7 +320,7 @@ implies a corpus-wide rescore.
 
 ## Line Count Policy
 
-Visual aids (ASCII diagrams, Mermaid charts, illustrative code blocks) do NOT count toward content line minimums. They supplement teaching but don't substitute for it. A 600-line module with 400 lines of diagrams and 200 lines of text is a 200-line module — it fails.
+Visual aids supplement explanation and must serve the taught outcomes; they do not replace reasoning or adequate coverage. Line counts, including the prose/visual split, are diagnostics. Judge completeness against the researched scope and outcome map, never a count-only pass or failure.
 
 ---
 
