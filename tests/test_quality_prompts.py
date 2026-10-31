@@ -102,9 +102,9 @@ def test_review_prompt_specifies_approve_gate() -> None:
         module_path="x.md", module_text="x", writer_agent="claude", track="structural",
         original_gaps=[], coverage_plan=_PLAN,
     )
-    # 4.0 gate on both axes — regression guard.
-    assert "teaching_score >= 4.0" in out
-    assert "rubric_score >= 4.0" in out
+    # The eight independent dimensions replace the two scalar score gates.
+    assert "teaching_score >= 4.0" not in out
+    assert "rubric_score >= 4.0" not in out
     assert all(f'"D{i}"' in out for i in range(1, 9)) and "total >=33" in out and "Explain X" in out
 
 

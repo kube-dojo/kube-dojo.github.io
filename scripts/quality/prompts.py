@@ -229,8 +229,6 @@ Return ONLY a JSON object with this exact shape. No preamble, no reasoning prose
 
 {{
   "verdict": "approve" | "changes_requested",
-  "rubric_score": <float 1.0-5.0>,
-  "teaching_score": <float 1.0-5.0>,
   "dimensions": {{"D1": <integer 1-5>, "D2": <integer 1-5>, "D3": <integer 1-5>, "D4": <integer 1-5>, "D5": <integer 1-5>, "D6": <integer 1-5>, "D7": <integer 1-5>, "D8": <integer 1-5>}},
   "dimension_evidence": {{"D1": "<exact candidate quote>", "D2": "<quote>", "D3": "<quote>", "D4": "<quote>", "D5": "<quote>", "D6": "<quote>", "D7": "<quote>", "D8": "<quote>"}},
   "coverage": {{"outcomes": [{{"outcome": "<exact planned outcome>", "teaching": "<candidate quote>", "practice": "<candidate quote>", "assessment": "<candidate quote>"}}], "topics": [{{"topic": "<exact planned topic>", "teaching": "<candidate quote>"}}]}},
@@ -242,7 +240,7 @@ Return ONLY a JSON object with this exact shape. No preamble, no reasoning prose
 }}
 
 Rules:
-- Verdict is "approve" ONLY IF teaching_score >= 4.0 AND rubric_score >= 4.0, every dimension is >=4, total >=33, every planned outcome and topic is covered with exact candidate quotes, scope has no unjustified omissions, and every original gap is addressed. Shared quotes can support multiple outcomes; never invent evidence.
+- Verdict is "approve" ONLY IF every dimension is >=4, total >=33, every planned outcome and topic is covered with exact candidate quotes, scope has no unjustified omissions, and every original gap is addressed. Shared quotes can support multiple outcomes; never invent evidence.
 - must_fix entries must be specific — "Quiz Q3 tests recall (what is a Pod?); rewrite as scenario" NOT "improve quiz".
 - Ignore the `## Sources` section for scoring — citation insertion runs in a SEPARATE downstream stage (`scripts/citation_backfill.py`), so neither the rubric's "Citation Gate" nor the absence of a Sources section should reduce the score here. The writer was instructed to preserve any pre-existing Sources verbatim and not add a new one; verify that instruction was honored (do not flag absence as a must-fix).
 - For track=structural: verify existing content was PRESERVED verbatim (zero edits to pre-existing lines). If any existing line was modified, verdict must be changes_requested.

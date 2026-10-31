@@ -1099,30 +1099,19 @@ def test_failed_modules_have_branches_cleaned_up(fake_repo, monkeypatch):
     assert not worktree.worktree_dir(fake_repo, slug).exists()
 
 
-def test_approve_verdict_demoted_when_score_below_gate() -> None:
-    """Codex must #7 regression guard.
-
-    ``verdict=approve`` with numeric rubric_score < 4.0 must be
-    demoted to ``changes_requested`` with a must_fix note.
-    """
-    payload = json.dumps({
-        "verdict": "approve",
-        "rubric_score": 3.0,
-        "teaching_score": 4.5,
-        "must_fix": [],
-    })
+def test_approve_with_weak_dimension_cannot_pass_gate() -> None:
+    payload = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+    payload["dimensions"]["D1"] = 3
     result = DispatchResult(
-        ok=True, stdout=payload, stderr="", returncode=0,
+        ok=True, stdout=json.dumps(payload), stderr="", returncode=0,
         duration_sec=0.1, agent="claude", model=None,
     )
     verdict = stages._parse_review_verdict(result)
-    assert verdict is not None
-    assert verdict["verdict"] == "changes_requested"
-    assert verdict.get("score_gate_demotion") is True
-    assert any("scores don't meet" in m or "score" in m.lower() for m in verdict["must_fix"])
+    assert verdict == payload
+    assert any("dimensions" in error for error in stages.validate_teaching_review(verdict, _QUOTE, _PLAN))
 
 
-def test_approve_verdict_demoted_when_score_missing() -> None:
+def test_scalar_approval_cannot_pass_gate() -> None:
     payload = json.dumps({
         "verdict": "approve",
         "rubric_score": "n/a",  # non-numeric
@@ -1135,24 +1124,20 @@ def test_approve_verdict_demoted_when_score_missing() -> None:
     )
     verdict = stages._parse_review_verdict(result)
     assert verdict is not None
-    assert verdict["verdict"] == "changes_requested"
+    assert stages.validate_teaching_review(verdict, _QUOTE, _PLAN)
 
 
-def test_approve_verdict_kept_when_both_scores_meet_gate() -> None:
-    payload = json.dumps({
-        "verdict": "approve",
-        "rubric_score": 4.2,
-        "teaching_score": 4.0,
-        "must_fix": [],
-    })
+def test_complete_eight_dimension_approval_needs_no_scalar_scores() -> None:
+    payload = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+    del payload["rubric_score"], payload["teaching_score"]
     result = DispatchResult(
-        ok=True, stdout=payload, stderr="", returncode=0,
+        ok=True, stdout=json.dumps(payload), stderr="", returncode=0,
         duration_sec=0.1, agent="claude", model=None,
     )
     verdict = stages._parse_review_verdict(result)
     assert verdict is not None
     assert verdict["verdict"] == "approve"
-    assert verdict.get("score_gate_demotion") is not True
+    assert stages.validate_teaching_review(verdict, _QUOTE, _PLAN) == []
 
 
 def test_merge_retries_on_transient_rebase_failure(fake_repo, monkeypatch):
@@ -2191,3 +2176,90 @@ def test_review_digests_bind_candidate_and_plan():
     candidate, plan = stages._review_digests(_REWRITTEN_MODULE, _PLAN)
     assert stages._review_digests(_REWRITTEN_MODULE + "changed", _PLAN)[0] != candidate
     assert stages._review_digests(_REWRITTEN_MODULE, {**_PLAN, "essential_topics": ["Other"]})[1] != plan
+
+
+@pytest.mark.parametrize("kind", ["weak", "scalar"])
+def test_invalid_review_remains_pending_without_duplicate_dispatch(fake_repo, monkeypatch, kind):
+    slug, wt = _pending_review(fake_repo)
+    payload = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+    if kind == "scalar":
+        del payload["dimensions"]
+    else:
+        payload["dimensions"]["D8"] = 3
+    calls = []
+    result = DispatchResult(ok=True, stdout=json.dumps(payload), stderr="", returncode=0,
+                            duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(stages, "dispatch", lambda *_a, **_k: calls.append(1) or result)
+    assert stages.run_module(slug) == "REVIEW_PENDING"
+    st = state.load_state(slug)
+    assert calls == [1] and st["review_failure"]["payload"] == payload and wt.exists()
+    stages.review_one(slug)
+    assert calls == [1]  # a failed attempt is not retried automatically
+
+
+@pytest.mark.parametrize("changed", ["candidate", "plan"])
+def test_changed_committed_input_blocks_merge(fake_repo, monkeypatch, changed):
+    slug, wt = _pending_review(fake_repo)
+    st = state.load_state(slug)
+    st["stage"] = "REVIEW_APPROVED"
+    state.save_state(st)
+    path = wt / (st["module_path"] if changed == "candidate" else "docs/citation-seeds/k8s-cka-module-1.1-pods.json")
+    if changed == "candidate":
+        path.write_text(path.read_text() + "Changed.\n")
+    else:
+        seed = json.loads(path.read_text())
+        seed["coverage_plan"]["essential_topics"].append("New topic")
+        path.write_text(json.dumps(seed))
+    subprocess.run(["git", "add", str(path.relative_to(wt))], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-m", "changed input"], cwd=wt, check=True, capture_output=True)
+    monkeypatch.setattr(stages, "merge_ff_only", lambda *_a: pytest.fail("unexpected merge"))
+    stages.merge_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_PENDING" and "changed since review" in st["review_blocked"] and wt.exists()
+
+
+def test_candidate_changed_during_review_is_not_approved(fake_repo, monkeypatch):
+    slug, wt = _pending_review(fake_repo)
+    def dispatch_after_edit(*_args, **_kwargs):
+        path = wt / state.load_state(slug)["module_path"]
+        path.write_text(path.read_text() + "Changed while reviewing.\n")
+        return DispatchResult(ok=True, stdout=_review_approve_output(), stderr="", returncode=0,
+                              duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(stages, "dispatch", dispatch_after_edit)
+    stages.review_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_PENDING" and "changed during review" in st["review_blocked"]
+    assert st["review_failure"]["payload"]["verdict"] == "approve" and wt.exists()
+
+
+def test_complete_approval_without_scalars_is_bound_unchanged(fake_repo, monkeypatch):
+    slug, _ = _pending_review(fake_repo)
+    payload = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+    del payload["rubric_score"], payload["teaching_score"]
+    result = DispatchResult(ok=True, stdout=json.dumps(payload), stderr="", returncode=0,
+                            duration_sec=0.1, agent="claude", model=None)
+    monkeypatch.setattr(stages, "dispatch", lambda *_a, **_k: result)
+    stages.review_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_APPROVED" and st["review"]["payload"] == payload
+    assert st["review"]["candidate_sha256"] and st["review"]["plan_sha256"]
+    assert stages._merge_review_error(st) is None
+
+
+def test_rebase_changed_plan_is_rechecked_before_merge(fake_repo, monkeypatch):
+    slug, wt = _pending_review(fake_repo)
+    st = state.load_state(slug)
+    st["stage"] = "REVIEW_APPROVED"
+    state.save_state(st)
+    def changed_rebase(*_args):
+        path = wt / "docs/citation-seeds/k8s-cka-module-1.1-pods.json"
+        seed = json.loads(path.read_text())
+        seed["coverage_plan"]["essential_topics"].append("New topic")
+        path.write_text(json.dumps(seed))
+        subprocess.run(["git", "add", str(path.relative_to(wt))], cwd=wt, check=True)
+        subprocess.run(["git", "commit", "-m", "changed by rebase"], cwd=wt, check=True, capture_output=True)
+    monkeypatch.setattr(stages, "rebase_onto_main", changed_rebase)
+    monkeypatch.setattr(stages, "merge_ff_only", lambda *_a: pytest.fail("unexpected merge"))
+    stages.merge_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_PENDING" and "changed since review" in st["review_blocked"] and wt.exists()

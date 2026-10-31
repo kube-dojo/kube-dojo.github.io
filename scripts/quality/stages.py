@@ -971,7 +971,7 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             _defer_review_failure(st, "review verdict malformed", {"attempt_id": attempt_id, "stdout": result.stdout})
             return
 
-        raw = extract_last_json(result.stdout, required_keys={"verdict", "rubric_score", "teaching_score", "must_fix"})
+        raw = extract_last_json(result.stdout, required_keys={"verdict", "must_fix"})
         try:
             current_text, current_plan = _review_inputs(wt, module_rel)
             if _review_digests(current_text, current_plan) != (candidate_digest, plan_digest):
@@ -995,7 +995,7 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
                 st, "REVIEW_IN_PROGRESS", "REVIEW_APPROVED",
                 review=review_meta,
                 review_contract_paused=False, review_blocked=None,
-                note=f"{reviewer} APPROVE score={verdict.get('rubric_score')}",
+                note=f"{reviewer} APPROVE with researched coverage",
             )
         else:
             state.transition(
@@ -1005,47 +1005,20 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             )
 
 
-APPROVE_SCORE_GATE = 4.0
-"""Numeric score floor enforced on an ``approve`` verdict (Codex must #7).
-
-v1 and earlier v2 trusted the verdict string alone, so a malformed
-payload with ``verdict="approve"`` but a 2.5 rubric_score (or a missing
-score) would merge a bad module. v2 now demotes any ``approve`` that
-doesn't present numeric scores ≥ 4.0 on both axes to
-``changes_requested``, with an explicit ``must_fix`` note so the writer
-gets the retry signal.
-"""
-
-
 def _parse_review_verdict(result: DispatchResult) -> dict[str, Any] | None:
+    """Parse only; approval requires separate candidate and plan validation."""
     try:
         payload = extract_last_json(
             result.stdout,
-            required_keys={"verdict", "rubric_score", "teaching_score", "must_fix"},
+            required_keys={"verdict", "must_fix"},
         )
     except JsonExtractError:
         return None
-    verdict = str(payload.get("verdict", "")).strip().lower()
-    if verdict not in ("approve", "changes_requested"):
+    if payload.get("verdict") not in ("approve", "changes_requested") or not isinstance(payload.get("must_fix"), list):
         return None
-    payload["verdict"] = verdict
-
-    # Score gate — approve is conditional on numeric ≥ 4.0 on both axes.
-    if verdict == "approve":
-        rubric = payload.get("rubric_score")
-        teaching = payload.get("teaching_score")
-        numeric_rubric = isinstance(rubric, (int, float))
-        numeric_teaching = isinstance(teaching, (int, float))
-        if not (numeric_rubric and numeric_teaching and float(rubric) >= APPROVE_SCORE_GATE and float(teaching) >= APPROVE_SCORE_GATE):
-            # Demote to changes_requested with an explicit diagnostic.
-            payload["verdict"] = "changes_requested"
-            payload.setdefault("must_fix", []).insert(
-                0,
-                f"Review claimed approve but scores don't meet the {APPROVE_SCORE_GATE:.1f} gate "
-                f"(rubric={rubric!r}, teaching={teaching!r}). "
-                "Re-address the audit gaps and resubmit.",
-            )
-            payload["score_gate_demotion"] = True
+    if payload["verdict"] == "changes_requested" and (not payload["must_fix"] or any(
+            not isinstance(item, str) or not item.strip() for item in payload["must_fix"])):
+        return None
     return payload
 
 
