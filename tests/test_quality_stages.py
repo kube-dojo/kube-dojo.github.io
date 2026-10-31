@@ -19,6 +19,7 @@ import argparse
 import json
 import subprocess
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,10 @@ from conftest import _read_frontmatter
 from scripts.quality import dispatchers, pipeline, stages, state, worktree
 from scripts.quality.citations import CitationResult
 from scripts.quality.dispatchers import DispatchResult
+
+_PLAN = {"module_kind": "module", "outcomes": ["Explain pods"], "essential_topics": ["Pods"],
+         "source_basis": [{"uri": "git:pods", "locator": "line 1", "excerpt": "Pods."}]}
+_QUOTE = "Rewritten pedagogically sound content."
 
 # ---- fixtures ---------------------------------------------------------
 
@@ -71,6 +76,9 @@ Original content about pods. The module has some quiz.
 
 Question 1.
 """)
+    seed = repo / "docs/citation-seeds/k8s-cka-module-1.1-pods.json"
+    seed.parent.mkdir(parents=True)
+    seed.write_text(json.dumps({"module_path": module_rel, "module_key": "k8s/cka/module-1.1-pods", "coverage_plan": _PLAN}))
 
     # Seed a teaching audit so route_one has score + gaps immediately.
     audit_dir = repo / ".pipeline" / "teaching-audit"
@@ -163,7 +171,7 @@ def _writer_stub_output(track: str = "rewrite") -> str:
     return f"Here is the {track}-ed module with improvements:\n\n{_REWRITTEN_MODULE}"
 
 
-def _review_approve_output() -> str:
+def _review_approve_output(quote: str = _QUOTE) -> str:
     """Reviewer verdict with reasoning prose FIRST, verdict JSON LAST."""
     payload = {
         "verdict": "approve",
@@ -173,6 +181,11 @@ def _review_approve_output() -> str:
         "nits": [],
         "strengths": ["Good worked example"],
         "reasoning": "Now teaches properly.",
+        "dimensions": {f"D{i}": 5 for i in range(1, 9)},
+        "dimension_evidence": {f"D{i}": quote for i in range(1, 9)},
+        "coverage": {"outcomes": [{"outcome": "Explain pods", "teaching": quote, "practice": quote,
+                                   "assessment": quote}], "topics": [{"topic": "Pods", "teaching": quote}]},
+        "scope_assessment": {"basis_checked": True, "unjustified_omissions": [], "rationale": "Plan covered."},
     }
     return (
         "Let me reason through this module.\n\n"
@@ -192,6 +205,14 @@ def _review_changes_output(must_fix: list[str]) -> str:
         "reasoning": "Quiz still weak.",
     }
     return "Reviewing.\n\n" + json.dumps(payload)
+
+
+def _install_reviewed_candidate(repo: Path, st: dict) -> None:
+    wt = worktree.create_worktree(repo, st["slug"])
+    (wt / st["module_path"]).write_text(_REWRITTEN_MODULE)
+    subprocess.run(["git", "add", st["module_path"]], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-m", "candidate"], cwd=wt, check=True, capture_output=True)
+    st["review"] = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
 
 
 def _stubbed_dispatch(writer_out: str, review_out: str):
@@ -670,6 +691,9 @@ def test_ff_merge_after_main_advances_with_real_pipeline_modules(fake_repo, monk
     mod2_rel = "src/content/docs/k8s/cka/module-1.2-services.md"
     (fake_repo / mod2_rel).parent.mkdir(parents=True, exist_ok=True)
     (fake_repo / mod2_rel).write_text("---\ntitle: Services\nsidebar:\n  order: 2\n---\n\nBody.\n")
+    (fake_repo / "docs/citation-seeds/k8s-cka-module-1.2-services.json").write_text(json.dumps({
+        "module_path": mod2_rel, "module_key": "k8s/cka/module-1.2-services", "coverage_plan": _PLAN,
+    }))
     audit_dir = fake_repo / ".pipeline" / "teaching-audit"
     slug2 = "k8s-cka-module-1.2-services"
     (audit_dir / f"{slug2}.json").write_text(json.dumps({
@@ -1226,7 +1250,7 @@ Better scenario question.
         stages, "dispatch",
         _stubbed_dispatch(
             f"reasoning prose...\n\n{rewritten_no_mermaid}",
-            _review_approve_output(),
+            _review_approve_output("Rewritten content but I forgot the diagram."),
         ),
     )
     monkeypatch.setattr(
@@ -2031,6 +2055,7 @@ def test_density_gate_failure_bounces_to_write_pending(fake_repo, monkeypatch):
         "route": {"track": "rewrite", "score": 2.0, "missing": []},
         "retry_count": 0,
     })
+    _install_reviewed_candidate(fake_repo, st)
     state.save_state(st)
 
     # Stub out the merge mechanics — we only want to test the density-fail
@@ -2069,6 +2094,7 @@ def test_density_gate_failure_after_retry_cap_marks_failed(fake_repo, monkeypatc
         "route": {"track": "rewrite", "score": 2.0, "missing": []},
         "retry_count": stages.RETRY_CAP,  # already at cap
     })
+    _install_reviewed_candidate(fake_repo, st)
     state.save_state(st)
 
     from scripts.quality import gates as _gates
@@ -2084,3 +2110,54 @@ def test_density_gate_failure_after_retry_cap_marks_failed(fake_repo, monkeypatc
     st = state.load_state(slug)
     assert st["stage"] == "FAILED"
     assert "density gate failed after" in (st.get("failure_reason") or "")
+
+
+def test_skip_review_stays_pending_without_dispatch(fake_repo, monkeypatch):
+    slug = _bootstrap(fake_repo)
+    st = state.load_state(slug)
+    st.update({"stage": "REVIEW_PENDING", "reviewer": "claude"})
+    state.save_state(st)
+    monkeypatch.setenv("KUBEDOJO_SKIP_REVIEW", "1")
+    monkeypatch.setattr(stages, "dispatch", lambda *_a, **_k: pytest.fail("unexpected provider call"))
+    stages.review_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_PENDING" and "deferred" in st["review_blocked"] and st["review"] is None
+
+
+@pytest.mark.parametrize("kind", ["auto", "scalar", "weak"])
+def test_untrusted_approval_cannot_merge_or_delete_candidate(fake_repo, monkeypatch, kind):
+    slug = _bootstrap(fake_repo)
+    st = state.load_state(slug)
+    _install_reviewed_candidate(fake_repo, st)
+    st["stage"] = "REVIEW_APPROVED"
+    if kind == "auto":
+        st["review"]["auto_approved"] = True
+    elif kind == "scalar":
+        del st["review"]["dimensions"]
+    else:
+        st["review"]["dimensions"]["D1"] = 3
+    state.save_state(st)
+    monkeypatch.setattr(stages, "merge_ff_only", lambda *_a: pytest.fail("unexpected merge"))
+    stages.merge_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_PENDING" and st["review_blocked"] and st["review_contract_paused"]
+    assert worktree.worktree_dir(fake_repo, slug).exists()
+    monkeypatch.setattr(stages, "dispatch", lambda *_a, **_k: pytest.fail("unexpected reviewer retry"))
+    assert stages.run_module(slug) == "REVIEW_PENDING"
+
+
+def test_post_merge_sampler_exception_is_nonfatal_and_redacted(monkeypatch, caplog):
+    secret = "private-model-payload-should-not-appear"
+    reports = []
+    monkeypatch.setattr(stages.state, "load_state", lambda _slug: {"module_path": "x.md"})
+    monkeypatch.setattr(stages.gates, "should_sample", lambda _slug: True)
+    def fail(_path):
+        raise RuntimeError(secret)
+    monkeypatch.setattr(stages.gates, "run_real_llm_rubric", fail)
+    monkeypatch.setattr(stages, "_merge_lock", lambda: nullcontext())
+    monkeypatch.setattr(stages.gates, "build_ledger_row", lambda **kw: reports.append(kw["real_llm_result"]) or {})
+    monkeypatch.setattr(stages.gates, "append_ledger", lambda _row: None)
+    monkeypatch.setattr(stages, "_commit_ledger_row", lambda _slug: None)
+    stages._post_merge_gates("slug")
+    assert reports == [{"ok": False, "error": "sampler raised: RuntimeError"}]
+    assert "sampler failed" in caplog.text and secret not in caplog.text

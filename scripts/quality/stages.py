@@ -28,12 +28,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import subprocess
 import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+from scripts.pipeline_common.research_plan import load_research_plan
+from scripts.pipeline_common.teaching_contract import validate_teaching_review
 
 from . import density, gates, queue, state
 from .citations import process_module_citations
@@ -68,11 +72,11 @@ from .worktree import (
     worktree_dir,
 )
 
-
 _REPO_ROOT = primary_checkout_root(Path(__file__).resolve().parents[2])
 _AUDIT_DIR = _REPO_ROOT / ".pipeline" / "teaching-audit"
 _AUDIT_SCRIPT = _REPO_ROOT / "scripts" / "audit_teaching_quality.py"
 _VENV_PYTHON = str(_REPO_ROOT / ".venv" / "bin" / "python")
+logger = logging.getLogger(__name__)
 
 RETRY_CAP = 2
 """Codex↔Claude retries before Gemini tiebreaks. Per #375 locked requirements."""
@@ -110,6 +114,23 @@ def _module_path(st: dict[str, Any]) -> Path:
 
 def _module_path_in_worktree(slug: str, module_relpath: str) -> Path:
     return worktree_dir(_primary(), slug) / module_relpath
+
+
+def _merge_review_error(st: dict[str, Any]) -> str | None:
+    """Fail closed on old, synthetic or structurally incomplete approvals."""
+    review = st.get("review")
+    if not isinstance(review, dict) or review.get("auto_approved") or review.get("verdict") != "approve":
+        return "review is missing or automatically approved"
+    wt = worktree_dir(_primary(), st["slug"])
+    plan, errors = load_research_plan(wt, st["module_path"])
+    if errors:
+        return "; ".join(errors)
+    try:
+        text = (wt / st["module_path"]).read_bytes().decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        return f"review candidate unavailable: {type(exc).__name__}"
+    errors = validate_teaching_review(review, text, plan)
+    return "; ".join(errors) if errors else None
 
 
 def _audit_json_for(slug: str) -> Path:
@@ -159,7 +180,7 @@ def audit_one(slug: str, *, timeout: int = 600) -> None:
                 module_rel,
             ]
             proc = subprocess.run(
-                cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=timeout + 30
+                cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=timeout + 30, check=False
             )
             if proc.returncode != 0 or not audit_file.exists():
                 _fail_and_cleanup(st, f"audit failed: {proc.stderr.strip()[:400]}")
@@ -316,7 +337,7 @@ def route_one(slug: str) -> None:
 
 def _needs_writer(
     *,
-    density_verdict: "density.DensityVerdict",
+    density_verdict: density.DensityVerdict,
     score: float,
     missing: list[str],
 ) -> bool:
@@ -330,9 +351,7 @@ def _needs_writer(
         return True
     if score < SCORE_SKIP_THRESHOLD:
         return True
-    if missing:
-        return True
-    return False
+    return bool(missing)
 
 
 def _missing_structural_sections(text: str) -> list[str]:
@@ -640,7 +659,10 @@ def citation_verify_one(slug: str, *, verifier_fn=None, fetcher_fn=None) -> None
     ``verifier_fn`` is injectable for testing; defaults to the live
     Gemini-flash verifier in :mod:`citations`.
     """
-    from .citations import default_verifier, fetch_page  # local import avoids import-time side effects
+    from .citations import (  # local import avoids import-time side effects
+        default_verifier,
+        fetch_page,
+    )
 
     with state.state_lease(slug) as lease:
         st = lease.load()
@@ -863,52 +885,23 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
     was still on ``main``), always approved because the diff was
     invisible. Fix: ``_module_path_in_worktree``.
 
-    Env override:
-        KUBEDOJO_SKIP_REVIEW=1 — auto-approve every module without
-            dispatching the reviewer LLM. Records a synthetic verdict
-            with ``auto_approved=True`` so a future post-review pass
-            can find these modules and re-evaluate semantically.
-            Used during Claude rate-limit windows where bulk writing
-            should continue but review must be deferred. The
-            deterministic gates (density, visual-aid,
-            code-block-balance) still run on the writer's output.
+    KUBEDOJO_SKIP_REVIEW=1 defers review without creating an approval.
     """
     if os.environ.get("KUBEDOJO_SKIP_REVIEW") == "1":
         with state.state_lease(slug, timeout=5.0) as lease:
             st = lease.load()
             if st is None or st["stage"] != "REVIEW_PENDING":
                 return
-            attempt_id = state.start_in_progress(st, "REVIEW_PENDING", "REVIEW_IN_PROGRESS")
-            reviewer = st["reviewer"]
-            review_meta = {
-                "agent": reviewer,
-                "attempt_id": attempt_id,
-                "verdict": "approve",
-                "rubric_score": None,
-                "teaching_score": None,
-                "auto_approved": True,
-                "must_fix": [],
-                "nits": [],
-            }
-            state.transition(
-                st, "REVIEW_IN_PROGRESS", "REVIEW_APPROVED",
-                review=review_meta,
-                note=f"auto-approved (KUBEDOJO_SKIP_REVIEW); {reviewer} review deferred",
-            )
-            # record the slug for the future post-review pass
-            try:
-                queue_path = Path(".pipeline/quality-pipeline/post-review-queue.txt")
-                queue_path.parent.mkdir(parents=True, exist_ok=True)
-                with queue_path.open("a", encoding="utf-8") as f:
-                    f.write(f"{slug}\n")
-            except OSError:
-                pass
+            state.transition(st, "REVIEW_PENDING", "REVIEW_PENDING",
+                             review_blocked="review deferred by KUBEDOJO_SKIP_REVIEW")
         return
 
     with state.state_lease(slug, timeout=5.0) as lease:
         st = lease.load()
         if st is None or st["stage"] != "REVIEW_PENDING":
             return
+        if st.get("review_contract_paused"):
+            return  # Producer upgrade must explicitly clear this failed-gate pause.
         attempt_id = state.start_in_progress(st, "REVIEW_PENDING", "REVIEW_IN_PROGRESS")
 
         reviewer = st["reviewer"]
@@ -1122,7 +1115,8 @@ def _clear_banner_and_complete_queue(
                 # Codex round-3 must #1: a raise here means we don't know
                 # whether the banner is gone, so the queue must NOT be
                 # marked complete — a future sweep needs to retry.
-                print(f"[warn] {slug}: banner clear raised: {exc}")
+                logger.exception("%s: banner clear failed (%s)", slug, type(exc).__name__,
+                                 exc_info=(type(exc), Exception(type(exc).__name__), exc.__traceback__))
                 cleared = False
                 banner_clean_succeeded = False
 
@@ -1179,7 +1173,8 @@ def _clear_banner_and_complete_queue(
     except FileNotFoundError:
         pass  # legacy slug without a queue doc
     except Exception as exc:  # pragma: no cover — advisory cleanup
-        print(f"[warn] {slug}: queue.record_completion raised: {exc}")
+        logger.exception("%s: queue completion failed (%s)", slug, type(exc).__name__,
+                         exc_info=(type(exc), Exception(type(exc).__name__), exc.__traceback__))
 
 
 def _handle_density_failure(st: dict[str, Any], reason: str) -> None:
@@ -1233,10 +1228,9 @@ def _handle_density_failure(st: dict[str, Any], reason: str) -> None:
     try:
         remove_worktree(primary, st["slug"], delete_branch=True)
     except Exception as exc:  # pragma: no cover — cleanup is advisory
-        print(
-            f"[warn] {st['slug']}: density-retry worktree teardown failed: {exc}; "
-            f"create_worktree will retry pruning on the next write attempt"
-        )
+        logger.exception("%s: density retry teardown failed (%s); next write retries pruning",
+                         st["slug"], type(exc).__name__,
+                         exc_info=(type(exc), Exception(type(exc).__name__), exc.__traceback__))
 
 
 # ---- merge stage -------------------------------------------------------
@@ -1305,6 +1299,10 @@ def merge_one(slug: str) -> None:
         st = lease.load()
         if st is None or st["stage"] != "REVIEW_APPROVED":
             return
+        error = _merge_review_error(st)
+        if error:
+            state.transition(st, "REVIEW_APPROVED", "REVIEW_PENDING", review_blocked=error, review_contract_paused=True)
+            return
         primary = _primary()
         if current_branch(primary) != "main":
             _fail_and_cleanup(st, "merge: primary not on main — manual intervention")
@@ -1339,6 +1337,10 @@ def merge_one(slug: str) -> None:
                         dirty_primary = True
                         break
                     rebase_onto_main(primary, slug)
+                    error = _merge_review_error(st)
+                    if error:
+                        state.transition(st, "REVIEW_APPROVED", "REVIEW_PENDING", review_blocked=error, review_contract_paused=True)
+                        return
                     try:
                         gates.assert_visual_aids_preserved(
                             primary, slug, st["module_path"], base_ref="main",
@@ -1439,8 +1441,9 @@ def _post_merge_gates(slug: str) -> None:
                     f"{gates.REAL_LLM_MIN_TEACHING_SCORE} — batch should pause"
                 )
     except Exception as exc:  # never let a sampler bug undo a merge
-        print(f"[gate-warn] {slug}: sampler raised {type(exc).__name__}: {exc}")
-        real_llm = {"ok": False, "error": f"sampler raised: {exc}"}
+        logger.exception("%s: sampler failed (%s)", slug, type(exc).__name__,
+                         exc_info=(type(exc), Exception(type(exc).__name__), exc.__traceback__))
+        real_llm = {"ok": False, "error": f"sampler raised: {type(exc).__name__}"}
 
     try:
         with _merge_lock():
@@ -1448,7 +1451,8 @@ def _post_merge_gates(slug: str) -> None:
             gates.append_ledger(row)
             _commit_ledger_row(slug)
     except Exception as exc:
-        print(f"[gate-warn] {slug}: ledger append raised {type(exc).__name__}: {exc}")
+        logger.exception("%s: ledger append failed (%s)", slug, type(exc).__name__,
+                         exc_info=(type(exc), Exception(type(exc).__name__), exc.__traceback__))
 
 
 def _commit_ledger_row(slug: str) -> None:
@@ -1537,7 +1541,7 @@ def _recover_write_in_progress(st: dict[str, Any]) -> None:
     branch = branch_name(slug)
     branch_exists = subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", branch],
-        cwd=primary, capture_output=True,
+        cwd=primary, capture_output=True, check=False,
     ).returncode == 0
     ahead = 0
     if branch_exists:
