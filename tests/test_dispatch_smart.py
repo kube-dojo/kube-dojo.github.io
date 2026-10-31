@@ -38,24 +38,13 @@ def test_dispatch_smart_danger_allows_dry_run_with_worktree() -> None:
     assert "[dry-run] task_id=" in result.stdout
 
 
-def test_dispatch_smart_agy_danger_no_worktree_passes_guards() -> None:
-    """agy review-class dispatches don't write to disk under danger mode,
-    so neither worktree guard should fire. We don't dry-run (which would
-    bypass both guards trivially) — instead we assert the worktree-required
-    error strings do NOT appear. The dispatch will fail later (no agy
-    binary in CI, or agent_runtime import) but BOTH worktree-guards must
-    be passed before that downstream failure."""
-    result = _run_dispatch_smart(
-        ["review", "--agent", "agy", "--mode", "danger", "x"]
-    )
-    merged_output = (result.stdout or "") + (result.stderr or "")
-    # Neither worktree guard should fire for agy.
-    assert "--mode danger requires --worktree" not in merged_output, (
-        f"agy hit the line-397 guard. stderr={result.stderr!r}"
-    )
-    assert "requires --worktree to avoid trampling" not in merged_output, (
-        f"agy hit the line-411 guard. stderr={result.stderr!r}"
-    )
+def test_agy_review_cannot_override_unverified_read_only_isolation() -> None:
+    for mode in ("read-only", "danger"):
+        result = _run_dispatch_smart(
+            ["review", "--agent", "agy", "--mode", mode, "--dry-run", "x"]
+        )
+        assert result.returncode != 0
+        assert "read-only route disabled" in result.stderr
 
 
 def test_hermes_agent_is_retired_fail_closed() -> None:

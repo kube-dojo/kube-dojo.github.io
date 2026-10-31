@@ -13,12 +13,11 @@ Known behavioral facts as of issue #1350:
   is one of the strings printed by ``agy models`` (e.g. ``Gemini 3.1 Pro
   (High)``). The runtime model slug (``gemini-3.1-pro-high``) and the display
   string normalize to the same key, so callers may pass either form; an
-  unrecognized or empty value falls back to ``default_model``.
+  unrecognized or empty explicit value raises instead of changing models.
 - Resume/new conversation is ``--conversation=<uuid>``.
-- Write-capable modes use ``--dangerously-skip-permissions``. In addition,
-  ``dispatch_smart.py`` forces ``mode="danger"`` for ``--agent agy``
-  unconditionally because read-only would otherwise hang on the CLI's
-  interactive permission prompts (same protection as ``--agent codex``).
+- Write-capable modes use ``--dangerously-skip-permissions``. Read-only mode
+  is unavailable until CLI isolation is behaviorally verified; permission
+  bypass must never masquerade as read-only review (#3746).
 - No known on-disk session or liveness file exists, so stdout is canonical.
 
 MCP / plugin configuration is a Phase-2 follow-up. ``agy plugin`` only
@@ -40,7 +39,6 @@ from pathlib import Path
 
 from ..result import ParseResult
 from .base import InvocationPlan
-
 
 # Defensive defaults borrowed from Gemini CLI. Agy is new enough that these
 # may need adjustment once we see real Antigravity rate-limit errors.
@@ -68,6 +66,7 @@ _PRINT_TIMEOUT_MARGIN_S = 10
 # the display string to the same key so either form maps here.
 # Re-probe with ``agy models`` when Antigravity ships new ids — do not invent.
 _AGY_MODEL_NAMES: tuple[str, ...] = (
+    "Gemini 4 Argon (High)",
     "Gemini 3.8 Flash (High)",
     "Gemini 3.8 Flash (Medium)",
     "Gemini 3.8 Flash (Low)",
@@ -111,7 +110,7 @@ class AgyAdapter:
         os.environ.get("KUBEDOJO_AGY_MODEL") or "gemini-3.8-flash-high"
     )
     supported_modes: frozenset[str] = frozenset(
-        {"read-only", "workspace-write", "danger"}
+        {"workspace-write", "danger"}
     )
     # agy `-p` can exit 0 having called tools but written NO file (the
     # intermittent headless no-write flake, #2099). Without this, an empty
@@ -136,21 +135,17 @@ class AgyAdapter:
         """Build the ``agy`` print-mode invocation.
 
         ``model`` is mapped to the matching ``agy --model "<Display Name>"``
-        flag (see :func:`_normalize_model`). An unrecognized or empty value
-        falls back to ``default_model``; if even that is unmappable the flag
-        is omitted and agy uses its TUI-selected model.
+        flag (see :func:`_normalize_model`). Explicit unsupported models and
+        unverified read-only execution fail before a process can be spawned.
         """
+        if mode == "read-only":
+            raise ValueError("Agy read-only route disabled: CLI isolation is unverified (#3746)")
         if mode not in self.supported_modes:
             raise ValueError(f"AgyAdapter: unsupported mode {mode!r}")
 
         agy_bin = shutil.which("agy") or str(Path.home() / ".local/bin/agy")
-        # `--dangerously-skip-permissions` is unconditional: any tool-using
-        # prompt (file read, shell call) triggers an interactive permission
-        # prompt that would hang a headless dispatch waiting for human input.
-        # The `mode` field is retained for runtime accounting + adapter-API
-        # parity, but agy has no finer-grained permission model than this
-        # single flag. dispatch_smart.py separately forces mode=danger for
-        # --agent agy so callers can't accidentally route around this.
+        # Only explicitly write-capable invocations reach this permission
+        # bypass. The CLI has no proven read-only headless permission mode.
         cmd: list[str] = [agy_bin, "-p", prompt, "--dangerously-skip-permissions"]
 
         # Add the dispatch working dir (worktree / repo) to agy's workspace.
@@ -192,22 +187,18 @@ class AgyAdapter:
             liveness_paths=(),
         )
 
-    def _resolve_model_flag(self, model: str | None) -> str | None:
+    def _resolve_model_flag(self, model: str | None) -> str:
         """Map a runtime model slug (or display string) to the canonical
         ``agy --model`` value.
 
-        Tries the caller's ``model`` first, then ``default_model``, so a stale
-        placeholder (e.g. the legacy ``"tui-controlled"``) or an empty value
-        degrades to the adapter default rather than passing an invalid flag.
-        Returns ``None`` only when neither maps, leaving the model unset so
-        agy uses its TUI-selected one.
+        Only omission selects the configured default. Unsupported explicit
+        values never fall back to another model or the TUI selection.
         """
-        for candidate in (model, self.default_model):
-            if candidate:
-                resolved = _AGY_MODEL_BY_NORMALIZED.get(_normalize_model(candidate))
-                if resolved:
-                    return resolved
-        return None
+        candidate = self.default_model if model is None else model
+        resolved = _AGY_MODEL_BY_NORMALIZED.get(_normalize_model(candidate)) if candidate else None
+        if resolved is None:
+            raise ValueError(f"AgyAdapter: unsupported explicit model {candidate!r}; no substitution")
+        return resolved
 
     def parse_response(
         self,

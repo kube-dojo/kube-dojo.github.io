@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -24,18 +26,11 @@ def _build(mode: str, *, tool_config: dict | None = None) -> list[str]:
     return plan.cmd
 
 
-def test_build_invocation_always_includes_dangerously_skip(monkeypatch) -> None:
-    """--dangerously-skip-permissions is unconditional across all modes.
-
-    Agy has no finer-grained permission model than this single flag, and
-    leaving it off causes interactive permission prompts that hang a
-    headless dispatch. dispatch_smart.py also forces mode=danger as a
-    second line of defense, but the adapter must hold the invariant on
-    its own so direct runner.invoke callers get the right behavior.
-    """
+def test_write_modes_explicitly_include_permission_bypass(monkeypatch) -> None:
+    """The existing write route stays explicit; it is not read-only."""
     monkeypatch.setattr("agent_runtime.adapters.agy.shutil.which", lambda _: "agy")
 
-    for mode in ("read-only", "workspace-write", "danger"):
+    for mode in ("workspace-write", "danger"):
         cmd = _build(mode)
         assert cmd == [
             "agy",
@@ -117,23 +112,23 @@ def test_build_invocation_accepts_display_string(monkeypatch) -> None:
     assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 3.1 Pro (High)"
 
 
-def test_build_invocation_unknown_model_falls_back_to_default(monkeypatch) -> None:
-    """A stale/unknown slug (e.g. legacy 'tui-controlled') degrades to the
-    adapter default rather than passing an invalid --model value."""
-    monkeypatch.setattr("agent_runtime.adapters.agy.shutil.which", lambda _: "agy")
-    adapter = AgyAdapter()
+@pytest.mark.parametrize("model", ["tui-controlled", "gemini-4-nonexistent", ""])
+def test_explicit_unknown_models_never_substitute(model) -> None:
+    with pytest.raises(ValueError, match="no substitution"):
+        AgyAdapter()._resolve_model_flag(model)
 
-    plan = adapter.build_invocation(
-        prompt="p",
-        mode="read-only",
-        cwd=Path("/tmp"),
-        model="tui-controlled",
-        task_id=None,
-        session_id=None,
-        tool_config=None,
-    )
 
-    assert plan.cmd[plan.cmd.index("--model") + 1] == "Gemini 3.8 Flash (High)"
+def test_argon_model_resolves_exactly() -> None:
+    for model in ("gemini-4-argon-high", "Gemini 4 Argon (High)"):
+        assert AgyAdapter()._resolve_model_flag(model) == "Gemini 4 Argon (High)"
+
+
+def test_read_only_route_refuses_before_binary_lookup(monkeypatch) -> None:
+    def unexpected_lookup(_):
+        pytest.fail("read-only route must refuse before binary lookup or spawn")
+    monkeypatch.setattr("agent_runtime.adapters.agy.shutil.which", unexpected_lookup)
+    with pytest.raises(ValueError, match="read-only route disabled"):
+        _build("read-only")
 
 
 def test_build_invocation_with_session_id(monkeypatch) -> None:
@@ -143,7 +138,7 @@ def test_build_invocation_with_session_id(monkeypatch) -> None:
 
     plan = adapter.build_invocation(
         prompt="p",
-        mode="read-only",
+        mode="workspace-write",
         cwd=Path("/tmp"),
         model="gemini-3.8-flash-high",
         task_id=None,
@@ -160,7 +155,7 @@ def test_build_invocation_uses_home_fallback(monkeypatch) -> None:
 
     plan = adapter.build_invocation(
         prompt="p",
-        mode="read-only",
+        mode="workspace-write",
         cwd=Path("/tmp"),
         model=None,
         task_id=None,
