@@ -9,7 +9,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.quality import prompts  # noqa: E402
+from scripts.quality import prompts
+
+_PLAN = {"module_kind": "module", "outcomes": ["Explain X"], "essential_topics": ["X"],
+         "source_basis": [{"uri": "git:x", "locator": "line 1", "excerpt": "X."}]}
 
 
 def test_rewrite_prompt_contains_module_path() -> None:
@@ -82,26 +85,33 @@ def test_review_prompt_names_writer_and_track() -> None:
         writer_agent="codex",
         track="rewrite",
         original_gaps=["Quiz weak"],
+        coverage_plan=_PLAN,
     )
     assert "codex" in out
     assert "rewrite" in out
     assert "Quiz weak" in out
 
 
+def test_review_prompt_requires_research_plan() -> None:
+    with pytest.raises(ValueError, match="research coverage plan required"):
+        prompts.review_prompt(module_path="x.md", module_text="x", writer_agent="codex", track="rewrite", original_gaps=[])
+
+
 def test_review_prompt_specifies_approve_gate() -> None:
     out = prompts.review_prompt(
         module_path="x.md", module_text="x", writer_agent="claude", track="structural",
-        original_gaps=[],
+        original_gaps=[], coverage_plan=_PLAN,
     )
     # 4.0 gate on both axes — regression guard.
     assert "teaching_score >= 4.0" in out
     assert "rubric_score >= 4.0" in out
+    assert all(f'"D{i}"' in out for i in range(1, 9)) and "total >=33" in out and "Explain X" in out
 
 
 def test_review_prompt_ignores_sources_section() -> None:
     out = prompts.review_prompt(
         module_path="x.md", module_text="x", writer_agent="claude", track="rewrite",
-        original_gaps=[],
+        original_gaps=[], coverage_plan=_PLAN,
     )
     # v1 had this leak: rubric text penalized missing Sources while the
     # prompt told the reviewer to ignore them. Regression guard —
@@ -115,7 +125,7 @@ def test_review_prompt_asks_for_json_at_end() -> None:
     put the verdict JSON LAST so ``extract_last_json`` wins."""
     out = prompts.review_prompt(
         module_path="x.md", module_text="x", writer_agent="claude", track="rewrite",
-        original_gaps=[],
+        original_gaps=[], coverage_plan=_PLAN,
     )
     assert "LAST" in out or "END of your response" in out
 
@@ -123,7 +133,7 @@ def test_review_prompt_asks_for_json_at_end() -> None:
 def test_review_prompt_specifies_structural_preservation() -> None:
     out = prompts.review_prompt(
         module_path="x.md", module_text="x", writer_agent="codex", track="structural",
-        original_gaps=[],
+        original_gaps=[], coverage_plan=_PLAN,
     )
     assert "PRESERVED" in out or "preserve" in out.lower()
 

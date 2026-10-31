@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Deferred-review pass for KUBEDOJO_SKIP_REVIEW=1 batches (#388).
 
 The skip-review path keeps a writer batch moving when the reviewer LLM is
@@ -33,16 +32,17 @@ import sys
 from pathlib import Path
 from typing import cast
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from quality import state as qstate  # noqa: E402
-from quality.dispatchers import Agent, DispatcherUnavailable, dispatch  # noqa: E402
-from quality.prompts import build_audit_context, review_prompt  # noqa: E402
-from quality.queue import (  # noqa: E402
+from quality import state as qstate
+from quality.dispatchers import Agent, DispatcherUnavailable, dispatch
+from quality.prompts import build_audit_context, review_prompt
+from quality.queue import (
     clear_qa_pending_frontmatter,
     set_revision_pending_frontmatter,
 )
-from quality.stages import _parse_review_verdict  # noqa: E402
+from quality.stages import _parse_review_verdict
 
 QUEUE_PATH = Path(".pipeline/quality-pipeline/post-review-queue.txt")
 
@@ -92,13 +92,16 @@ def review_slug(slug: str, *, reviewer_override: str | None, timeout: int, dry_r
     if dry_run:
         return "skip", f"DRY-RUN: would dispatch {reviewer} against {module_file}"
 
-    prompt = review_prompt(
-        module_path=st["module_path"],
-        module_text=module_file.read_text(encoding="utf-8"),
-        writer_agent=st["writer"],
-        track=track,
-        original_gaps=build_audit_context(st.get("audit")),
-    )
+    try:
+        prompt = review_prompt(
+            module_path=st["module_path"],
+            module_text=module_file.read_text(encoding="utf-8"),
+            writer_agent=st["writer"],
+            track=track,
+            original_gaps=build_audit_context(st.get("audit")),
+        )
+    except ValueError as exc:
+        return "fail", str(exc)  # Historical post-review stays queued until its producer is upgraded.
     try:
         result = dispatch(cast(Agent, reviewer), prompt, timeout=timeout, tools_disabled=True)
     except DispatcherUnavailable as e:

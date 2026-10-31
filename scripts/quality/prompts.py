@@ -14,6 +14,7 @@ possible to snapshot-test them.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -177,6 +178,7 @@ def review_prompt(
     writer_agent: str,
     track: str,
     original_gaps: list[str],
+    coverage_plan: dict[str, Any] | None = None,
 ) -> str:
     """Cross-family review prompt.
 
@@ -184,6 +186,8 @@ def review_prompt(
     dimensions in context. v1 had the rubric implicit via
     ``.claude/rules/module-quality.md`` and reviewers would drift.
     """
+    if coverage_plan is None:
+        raise ValueError("research coverage plan required before review")
     rubric = _read(_RUBRIC_PATH)
     rules = _read(_RULES_PATH)
     framework = _read(_FRAMEWORK_PATH)
@@ -199,6 +203,11 @@ def review_prompt(
 
 ## Original audit gaps that should now be fixed
 {gaps}
+
+## Author research coverage plan (input, not acceptance or source support)
+```json
+{json.dumps(coverage_plan, ensure_ascii=False, indent=2)}
+```
 
 ## Quality rubric (scoring dimensions)
 {rubric}
@@ -222,6 +231,10 @@ Return ONLY a JSON object with this exact shape. No preamble, no reasoning prose
   "verdict": "approve" | "changes_requested",
   "rubric_score": <float 1.0-5.0>,
   "teaching_score": <float 1.0-5.0>,
+  "dimensions": {{"D1": <integer 1-5>, "D2": <integer 1-5>, "D3": <integer 1-5>, "D4": <integer 1-5>, "D5": <integer 1-5>, "D6": <integer 1-5>, "D7": <integer 1-5>, "D8": <integer 1-5>}},
+  "dimension_evidence": {{"D1": "<exact candidate quote>", "D2": "<quote>", "D3": "<quote>", "D4": "<quote>", "D5": "<quote>", "D6": "<quote>", "D7": "<quote>", "D8": "<quote>"}},
+  "coverage": {{"outcomes": [{{"outcome": "<exact planned outcome>", "teaching": "<candidate quote>", "practice": "<candidate quote>", "assessment": "<candidate quote>"}}], "topics": [{{"topic": "<exact planned topic>", "teaching": "<candidate quote>"}}]}},
+  "scope_assessment": {{"basis_checked": <boolean>, "unjustified_omissions": [<items>], "rationale": "<judgment>"}},
   "must_fix": [<specific, actionable issues — empty list if approve>],
   "nits": [<0-5 minor suggestions — not blocking>],
   "strengths": [<1-4 things done well>],
@@ -229,7 +242,7 @@ Return ONLY a JSON object with this exact shape. No preamble, no reasoning prose
 }}
 
 Rules:
-- Verdict is "approve" ONLY IF teaching_score >= 4.0 AND rubric_score >= 4.0 AND every original gap is genuinely addressed.
+- Verdict is "approve" ONLY IF teaching_score >= 4.0 AND rubric_score >= 4.0, every dimension is >=4, total >=33, every planned outcome and topic is covered with exact candidate quotes, scope has no unjustified omissions, and every original gap is addressed. Shared quotes can support multiple outcomes; never invent evidence.
 - must_fix entries must be specific — "Quiz Q3 tests recall (what is a Pod?); rewrite as scenario" NOT "improve quiz".
 - Ignore the `## Sources` section for scoring — citation insertion runs in a SEPARATE downstream stage (`scripts/citation_backfill.py`), so neither the rubric's "Citation Gate" nor the absence of a Sources section should reduce the score here. The writer was instructed to preserve any pre-existing Sources verbatim and not add a new one; verify that instruction was honored (do not flag absence as a must-fix).
 - For track=structural: verify existing content was PRESERVED verbatim (zero edits to pre-existing lines). If any existing line was modified, verdict must be changes_requested.

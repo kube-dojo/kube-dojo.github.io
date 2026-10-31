@@ -116,20 +116,43 @@ def _module_path_in_worktree(slug: str, module_relpath: str) -> Path:
     return worktree_dir(_primary(), slug) / module_relpath
 
 
+def _review_inputs(wt: Path, module_rel: str) -> tuple[str, dict]:
+    plan, errors = load_research_plan(wt, module_rel)
+    if errors:
+        raise ValueError("; ".join(errors))
+    path = wt / module_rel
+    if path.is_symlink() or not path.resolve().is_relative_to(wt.resolve()):
+        raise ValueError("review candidate escapes worktree")
+    return path.read_bytes().decode("utf-8"), plan
+
+
+def _review_digests(text: str, plan: dict) -> tuple[str, str]:
+    raw = json.dumps(plan, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+    return hashlib.sha256(text.encode()).hexdigest(), hashlib.sha256(raw).hexdigest()
+
+
+def _defer_review_failure(st: dict[str, Any], reason: str, failure: dict) -> None:
+    previous = st.get("review_failures") or ([st["review_failure"]] if st.get("review_failure") else [])
+    state.transition(st, "REVIEW_IN_PROGRESS", "REVIEW_PENDING", review_blocked=reason,
+                     review_failure=failure, review_failures=[*previous, failure], review_contract_paused=True,
+                     review_contract_version=2)
+
+
 def _merge_review_error(st: dict[str, Any]) -> str | None:
     """Fail closed on old, synthetic or structurally incomplete approvals."""
     review = st.get("review")
-    if not isinstance(review, dict) or review.get("auto_approved") or review.get("verdict") != "approve":
+    if (not isinstance(review, dict) or review.get("auto_approved") or review.get("verdict") != "approve"
+            or not isinstance(review.get("payload"), dict) or review["payload"].get("verdict") != "approve"
+            or review["payload"].get("auto_approved")):
         return "review is missing or automatically approved"
     wt = worktree_dir(_primary(), st["slug"])
-    plan, errors = load_research_plan(wt, st["module_path"])
-    if errors:
-        return "; ".join(errors)
     try:
-        text = (wt / st["module_path"]).read_bytes().decode("utf-8")
-    except (OSError, UnicodeError) as exc:
-        return f"review candidate unavailable: {type(exc).__name__}"
-    errors = validate_teaching_review(review, text, plan)
+        text, plan = _review_inputs(wt, st["module_path"])
+        if has_uncommitted(wt) or _review_digests(text, plan) != (review.get("candidate_sha256"), review.get("plan_sha256")):
+            return "candidate or research plan changed since review"
+    except (OSError, UnicodeError, ValueError, WorktreeError) as exc:
+        return f"review input unavailable: {exc}"
+    errors = validate_teaching_review(review["payload"], text, plan)
     return "; ".join(errors) if errors else None
 
 
@@ -900,25 +923,28 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
         st = lease.load()
         if st is None or st["stage"] != "REVIEW_PENDING":
             return
-        if st.get("review_contract_paused"):
-            return  # Producer upgrade must explicitly clear this failed-gate pause.
+        if st.get("review_contract_paused") and st.get("review_contract_version") == 2:
+            return
+        wt, module_rel = worktree_dir(_primary(), slug), st["module_path"]
+        try:
+            if not isinstance(st.get("reviewer"), str) or not st["reviewer"].strip() or has_uncommitted(wt):
+                raise ValueError("reviewer missing or worktree dirty")
+            module_text, plan = _review_inputs(wt, module_rel)
+            candidate_digest, plan_digest = _review_digests(module_text, plan)
+        except (OSError, UnicodeError, ValueError, WorktreeError) as exc:
+            state.transition(st, "REVIEW_PENDING", "REVIEW_PENDING", review_blocked=str(exc))
+            return
         attempt_id = state.start_in_progress(st, "REVIEW_PENDING", "REVIEW_IN_PROGRESS")
 
         reviewer = st["reviewer"]
         track = (st.get("route") or {}).get("track", "rewrite")
-        module_rel = st["module_path"]
-        module_file = _module_path_in_worktree(slug, module_rel)
-        if not module_file.exists():
-            _fail_and_cleanup(st, f"review: module missing at {module_file}")
-            return
-        module_text = module_file.read_text(encoding="utf-8")
-
         prompt = review_prompt(
             module_path=module_rel,
             module_text=module_text,
             writer_agent=st["writer"],
             track=track,
             original_gaps=build_audit_context(st.get("audit")),
+            coverage_plan=plan,
         )
 
         try:
@@ -936,27 +962,39 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             raise
 
         if not result.ok:
-            _fail_and_cleanup(
-                st,
-                f"review: {reviewer} dispatch failed (rc={result.returncode}): "
-                f"{result.stderr.strip()[:400]}",
-            )
+            _defer_review_failure(st, "review dispatch failed",
+                                  {"attempt_id": attempt_id, "stdout": result.stdout, "stderr": result.stderr})
             return
 
         verdict = _parse_review_verdict(result)
         if verdict is None:
-            _fail_and_cleanup(st, "review: could not parse verdict JSON")
+            _defer_review_failure(st, "review verdict malformed", {"attempt_id": attempt_id, "stdout": result.stdout})
             return
 
+        raw = extract_last_json(result.stdout, required_keys={"verdict", "rubric_score", "teaching_score", "must_fix"})
+        try:
+            current_text, current_plan = _review_inputs(wt, module_rel)
+            if _review_digests(current_text, current_plan) != (candidate_digest, plan_digest):
+                raise ValueError("candidate or research plan changed during review")
+            errors = validate_teaching_review(raw, module_text, plan) if verdict["verdict"] == "approve" else []
+            if errors or (verdict["verdict"] == "approve" and raw.get("verdict") != "approve"):
+                raise ValueError("; ".join(errors) or "review verdict mismatch")
+        except (OSError, UnicodeError, ValueError) as exc:
+            _defer_review_failure(st, str(exc), {"attempt_id": attempt_id, "payload": raw})
+            return
         review_meta = {
             "agent": reviewer,
             "attempt_id": attempt_id,
-            **verdict,
+            "verdict": verdict["verdict"], "must_fix": verdict["must_fix"], "payload": raw,
+            "candidate_sha256": candidate_digest, "plan_sha256": plan_digest,
         }
+        if st.get("review"):
+            st["prior_reviews"] = [*(st.get("prior_reviews") or []), st["review"]]
         if verdict["verdict"] == "approve":
             state.transition(
                 st, "REVIEW_IN_PROGRESS", "REVIEW_APPROVED",
                 review=review_meta,
+                review_contract_paused=False, review_blocked=None,
                 note=f"{reviewer} APPROVE score={verdict.get('rubric_score')}",
             )
         else:
@@ -1615,7 +1653,6 @@ def run_module(slug: str, *, max_cycles: int = 20) -> str:
     crashing one module at a time.
     """
     recover_in_progress(slug)
-    last_stage: str | None = None
     for _ in range(max_cycles):
         st = state.load_state(slug)
         if st is None:
@@ -1631,8 +1668,7 @@ def run_module(slug: str, *, max_cycles: int = 20) -> str:
         fn(slug)
         st_after = state.load_state(slug)
         new_stage = st_after["stage"] if st_after else stage
-        if new_stage == last_stage == stage:
+        if new_stage == stage:
             # No progress — give up to avoid an infinite loop.
             return stage
-        last_stage = stage
     return state.load_state(slug)["stage"] if state.load_state(slug) else "FAILED"  # type: ignore[index]

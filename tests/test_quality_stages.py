@@ -212,7 +212,10 @@ def _install_reviewed_candidate(repo: Path, st: dict) -> None:
     (wt / st["module_path"]).write_text(_REWRITTEN_MODULE)
     subprocess.run(["git", "add", st["module_path"]], cwd=wt, check=True)
     subprocess.run(["git", "commit", "-m", "candidate"], cwd=wt, check=True, capture_output=True)
-    st["review"] = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+    payload = json.loads(_review_approve_output().split("My verdict:\n\n")[1])
+    candidate, plan = stages._review_digests(_REWRITTEN_MODULE, _PLAN)
+    st["review"] = {"verdict": "approve", "must_fix": [], "payload": payload,
+                    "candidate_sha256": candidate, "plan_sha256": plan}
 
 
 def _stubbed_dispatch(writer_out: str, review_out: str):
@@ -2133,9 +2136,9 @@ def test_untrusted_approval_cannot_merge_or_delete_candidate(fake_repo, monkeypa
     if kind == "auto":
         st["review"]["auto_approved"] = True
     elif kind == "scalar":
-        del st["review"]["dimensions"]
+        del st["review"]["payload"]["dimensions"]
     else:
-        st["review"]["dimensions"]["D1"] = 3
+        st["review"]["payload"]["dimensions"]["D1"] = 3
     state.save_state(st)
     monkeypatch.setattr(stages, "merge_ff_only", lambda *_a: pytest.fail("unexpected merge"))
     stages.merge_one(slug)
@@ -2161,3 +2164,30 @@ def test_post_merge_sampler_exception_is_nonfatal_and_redacted(monkeypatch, capl
     stages._post_merge_gates("slug")
     assert reports == [{"ok": False, "error": "sampler raised: RuntimeError"}]
     assert "sampler failed" in caplog.text and secret not in caplog.text
+
+
+def _pending_review(fake_repo):
+    slug = _bootstrap(fake_repo)
+    st = state.load_state(slug)
+    st.update({"stage": "REVIEW_PENDING", "writer": "codex", "reviewer": "claude"})
+    _install_reviewed_candidate(fake_repo, st)
+    state.save_state(st)
+    return slug, worktree.worktree_dir(fake_repo, slug)
+
+
+def test_review_missing_plan_never_dispatches(fake_repo, monkeypatch):
+    slug, wt = _pending_review(fake_repo)
+    seed = "docs/citation-seeds/k8s-cka-module-1.1-pods.json"
+    (wt / seed).unlink()
+    subprocess.run(["git", "add", seed], cwd=wt, check=True)
+    subprocess.run(["git", "commit", "-m", "remove plan"], cwd=wt, check=True, capture_output=True)
+    monkeypatch.setattr(stages, "dispatch", lambda *_a, **_k: pytest.fail("unexpected provider call"))
+    stages.review_one(slug)
+    st = state.load_state(slug)
+    assert st["stage"] == "REVIEW_PENDING" and "research input blocked" in st["review_blocked"] and wt.exists()
+
+
+def test_review_digests_bind_candidate_and_plan():
+    candidate, plan = stages._review_digests(_REWRITTEN_MODULE, _PLAN)
+    assert stages._review_digests(_REWRITTEN_MODULE + "changed", _PLAN)[0] != candidate
+    assert stages._review_digests(_REWRITTEN_MODULE, {**_PLAN, "essential_topics": ["Other"]})[1] != plan
