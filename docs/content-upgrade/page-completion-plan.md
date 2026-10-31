@@ -14,7 +14,8 @@ duplicate forms. Unavailable evidence stays unknown.
 - Prior evidence and unresolved material findings, with stable IDs:
 - Strategy: retain / repair / rewrite. Canonical disposition: unreviewed or the
   existing reviewed retain / revise / expand disposition, with its reference.
-- Why this strategy minimizes estimated remaining work, including verification:
+- Reason for this strategy and alternative considered; assumptions and unknowns
+  in the effort comparison (a planning hypothesis, not proof of the cheapest route):
 - Estimated preparation/authoring/review/release effort; rationale and unknowns:
 - Effort budget and reassessment point; observed effort so far:
 - Total expected diff and PR slices under the issue's file/LOC limits. If an
@@ -67,7 +68,8 @@ where current contracts permit it.
 - Newly current accepted pages, acceptances lost/stale, and net change:
 - Accepted lessons and hubs separately; scoped corrections/support PRs separately:
 - Observed preparation / authoring / review / deployment time; unknowns:
-- Actual versus estimated effort; retain/repair/rewrite decision after reassessment:
+- Actual versus estimated effort; recorded reassessment and strategy decision if
+  the estimate is exceeded (no automatic switch or inference that rewriting costs less):
 - Source of any cost figure; say unknown when unavailable, never infer it from PRs:
 - Remaining blocker, responsible owner and next executable action:
 - Next completion target after this page resolves or is explicitly blocked:
