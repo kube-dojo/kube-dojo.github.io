@@ -26,9 +26,9 @@ After this module, you will be able to:
 
 ## Why This Module Matters
 
-In 2012, Knight Capital Group lost about $460 million in roughly 45 minutes after new trading software reached only part of its production fleet. A technician manually deployed the change to 7 of 8 servers, leaving one machine with old behavior that activated in the worst possible way. The company was not destroyed by a new algorithm alone; it was destroyed by a release process that allowed supposedly identical servers to become different while everyone believed they were the same.
+On August 1, 2012, Knight Capital Americas lost more than $460 million after its trading system sent millions of unintended orders over approximately 45 minutes. The [SEC's findings](https://www.sec.gov/litigation/admin/2013/34-70694.pdf) describe a staged deployment that failed to copy new code to one of eight servers. On that server, a repurposed flag triggered obsolete code; a defect in that code led to repeated orders. Knight consented to the SEC order without admitting or denying its findings.
 
-That incident is the harsh version of a problem every operations team eventually meets. A database timeout is changed during an outage, a firewall rule is added from a cloud console, or a package is installed by hand on the one machine that seemed urgent at the time. The change solves the immediate problem, but it also creates a hidden branch of reality that no repository, review, or automated rebuild can explain later.
+The incident illustrates why checking deployment consistency matters: intended changes may not reach every target. The SEC also identified shortcomings in testing, risk controls, and response. IaC can make intended configuration reviewable, but it does not by itself establish that a deployment succeeded or that these other safeguards are effective.
 
 Infrastructure as Code, usually shortened to IaC, exists to close that gap between intention and reality. Instead of treating servers, networks, clusters, and policies as things people remember how to build, IaC treats them as files that can be reviewed, tested, versioned, and replayed. Kubernetes matters in this course because it is built on the same idea: you submit a desired state, and controllers keep working until the actual state matches it.
 
