@@ -1,29 +1,21 @@
 ---
 name: cross-family-reviewer
-description: Cross-family PR review protocol for KubeDojo. Different model family than the author per docs/review-protocol.md. For ANY agent acting as reviewer (codex, composer-2.5, agy, claude). Triggers on "review PR", "R1 review", "R2 review", "cross-family review".
-last_calibrated: 2026-07-07
+description: Independently review a KubeDojo PR against the current review contract and return evidence-backed findings.
 ---
 
 # Cross-family Reviewer Skill
 
-Run a rigorous PR review on KubeDojo code or content. **Different model family than the author** ([`docs/review-protocol.md`](../../../docs/review-protocol.md)) — that's the load-bearing property. Author-family review is allowed for style/lint but never substitutes for cross-family.
-
-> **Routing source-of-truth precedence**: `docs/review-protocol.md` defines the cross-family *principle* but its concrete pairings (Claude → Codex etc.) predate Decision Card C (2026-05-24). The active routing table below + [`STATUS.md`](../../../STATUS.md) "Active policies" supersede the stale defaults in `review-protocol.md` until that doc is refreshed.
+Run a rigorous PR review under [`docs/review-contract.md`](../../../docs/review-contract.md) and [`docs/review-protocol.md`](../../../docs/review-protocol.md). Independent review requires a different actual model family from the author; a fresh same-family red team is useful additional evidence and must be labeled `same_family_red_team`.
 
 This skill describes the **review contract**. For pedagogical content scoring against the 8-dim rubric (D1-D8), layer in [[module-quality-reviewer]].
 
-## Routing table (Decision Card C, 2026-05-24; gemini-cli retired ~2026-06-15 → the Google seat is agy)
+## Reviewer selection
 
-| Author family | Cross-family reviewer (primary) | Fallback |
-|---|---|---|
-| claude (orchestrator inline OR headless) | composer-2.5 (cursor-agent CLI OR cursor IDE) | codex gpt-5.5 |
-| composer-2.5 (cursor-agent CLI OR cursor IDE) | codex gpt-5.5 (danger mode, worktree) | agy (gemini-3.1-pro-high) |
-| codex (gpt-5.5 / spark / mini) | composer-2.5 | agy (gemini-3.1-pro-high or Claude tier) |
-| deepseek-v4-pro | composer-2.5 OR codex | agy (gemini-3.1-pro-high) |
-| agy (gemini models) | composer-2.5 OR codex | — |
-| agy (Claude tier) | codex OR composer-2.5 | — |
+Grok, Gemini and Claude are the primary pool; Muse and DeepSeek are additional options. Codex can independently review non-OpenAI work. Verify the actual family, model, harness, route health and quota live; never infer independence from a product or endpoint name, or silently substitute a model.
 
-**Do NOT use a gemini-flash-class model (via agy) as a code/lab reviewer** — calibrated 0/2 bugs caught on PR #1229 ([[feedback_never_flash_for_code_review]]).
+The lead may make a scoped, prospective exclusion after an independently adjudicated critical miss or integrity failure, or a reproducible pattern of material errors. Record the evidence and reassessment condition; preserve and adjudicate prior adverse findings. Timeouts, unavailable routes and quota/authentication failures are not model-quality verdicts. A negative review alone is not grounds for exclusion.
+
+The contract permits explicitly authorized low-risk delivery with independent review deferred and final acceptance pending. High-risk security, privacy, permission, admission and destructive changes retain the independent gate. Record the scope, revision and authorization; never label a deferred or same-family review independent.
 
 ## How to run a review (R1)
 
