@@ -523,7 +523,7 @@ ls -l ~/.ssh
 
 The first command asks about the `.ssh` directory itself, while the second asks about what is inside it. If you cannot enter a directory, inspecting the directory entry with `ls -ld` is often more useful than trying to list the contents. This pattern carries into system directories as well, although you should be careful and avoid changing files under `/etc` or `/var` unless a lab or administrator explicitly tells you to.
 
-On a kubeadm control-plane node, static Pod manifests live under `/etc/kubernetes/manifests/`. Kubernetes normally places container logs under `/var/log/pods/`; component logs commonly go to journald on systemd hosts. The exact logging setup matters, so recognize the path in the documentation rather than assuming every log is a plain file in the same directory.
+On a kubeadm control-plane node, static Pod manifests live under `/etc/kubernetes/manifests/`. Kubernetes normally places container logs under `/var/log/pods/`. The exact logging setup matters, so recognize the path in the documentation rather than assuming every log is a plain file in the same directory.
 
 Illustrative node-specific commands; these paths need not exist on your machine:
 
