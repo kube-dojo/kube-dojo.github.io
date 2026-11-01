@@ -10,7 +10,7 @@ sidebar:
 
 Explore recent improvements to practice and troubleshooting:
 
-- **Reason about computer resource problems.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) gives tighter explanations of CPU, RAM and storage, clarifies reported versus installed memory, and adds diagnosis hints and a transfer question before you recommend a change.
+- **Check computer resources and terminal commands.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) adds diagnosis hints before you recommend a change. [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) uses concrete interface choices and asks you to check what command output establishes.
 
 - **Handle Git interruptions and recovery.** Revisit [Worktrees and Stashing](/prerequisites/git-deep-dive/module-5-worktrees-stashing/) to compare ways to set work aside and practice returning to it.
 

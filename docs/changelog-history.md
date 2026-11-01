@@ -6,6 +6,8 @@ Add detailed patch notes here, newest first, with absolute `https://kube-dojo.gi
 
 ## November 2026
 
+- **2026-11-01 — Choose an interface and check its feedback.** [What is a Terminal?](https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) replaces repeated encouragement with concrete GUI/terminal comparisons, qualifies command resolution and timestamp interpretation, and retains its shell-specific quoting, cancellation practice and simulated diagnoses.
+
 - **2026-11-01 — Check the evidence before recommending an upgrade.** [What is a Computer?](https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) removes repeated explanations, clarifies how programs use RAM and how storage lifetime differs from capacity, and distinguishes Windows-reported memory from installed RAM. Its exercise adds graduated diagnosis hints and asks what observation would change a hypothesis.
 
 ## October 2026
