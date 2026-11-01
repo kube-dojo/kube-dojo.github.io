@@ -18,7 +18,7 @@ revision_pending: false
 After this module, you will be able to perform these beginner terminal tasks and explain the reasoning behind each one:
 
 - **Compare** graphical interfaces and terminal interfaces, then choose the better tool for a beginner engineering task.
-- **Open** a terminal on macOS, Windows, or Linux and **diagnose** what the visible prompt is telling you.
+- **Open** a terminal on your chosen operating system and **diagnose** the prompt in the shell you use.
 - **Run** simple commands such as `echo`, a shell-appropriate date/time command (`date` or `Get-Date`), `whoami`, and `hostname`, then **interpret** the output without guessing.
 - **Debug** common beginner terminal problems, including copied prompt symbols, command typos, incomplete quotes, and long-running commands.
 
@@ -86,7 +86,7 @@ Opening the terminal is slightly different on each operating system, but the fir
 
 Windows has several valid options, and they serve different purposes. Windows Terminal is Microsoft's modern terminal application and is a good day-to-day container for shells. WSL, the Windows Subsystem for Linux, gives you a Linux-style shell on Windows; use a WSL tab for the Unix command names in this module (`date`, `date -u`, and bash-style examples such as `$(date)`). PowerShell is a separate shell with its own command names and subexpression syntax. Profiles can define aliases or functions, so availability depends on the host; for a predictable PowerShell path in this module, use the native `Get-Date` and `Write-Output` examples below. WSL is recommended for the rest of this curriculum when later modules expect Unix command names.
 
-If you choose WSL later, the official installation path starts from PowerShell and uses Microsoft's installer command. You do not need to run it for this module, but seeing the shape of the command helps you recognize that terminal instructions can install real tools. This curriculum will return to WSL when the operating system details matter more.
+If you choose WSL later, Microsoft's installation guide uses PowerShell opened as administrator, followed by a restart. The command below installs Ubuntu by default when WSL is not already installed; for an existing WSL setup, check the guide's instructions instead. This is an optional preview: do not run the installer for this module.
 
 ```powershell
 wsl --install
@@ -119,7 +119,7 @@ Here is the same prompt broken into parts. Treat it like a map label printed at 
 | `~` | Your home directory |
 | `$` or `%` | The shell is ready for your command |
 
-PowerShell commonly shows a normal prompt such as `PS C:\Users\Learner>`. Its final `>` is part of that prompt, not automatically an unfinished command. Compare it with the different continuation prompt after an incomplete line: often `>` in Bash, `dquote>` in zsh for an open double quote, or `>>` in PowerShell. Prompt text is customizable, so compare the change with your own starting prompt rather than trusting one symbol alone.
+PowerShell can show a normal prompt such as `PS C:\Users\Learner>`. Its final `>` is part of that prompt, not automatically unfinished input. Continuation examples include `>` in Bash and `dquote>` for an open double quote in zsh; PSReadLine's documented default is `>>`. Prompt text is customizable, so compare the change with your own starting prompt rather than trusting one symbol alone.
 
 This curriculum sometimes shows a prompt symbol at the start of an example line to distinguish the prompt from the command:
 
@@ -206,7 +206,7 @@ You might see output like this, although managed laptops, virtual machines, and 
 your-mac.local
 ```
 
-Machine names matter when you have more than one terminal window open. Imagine one tab is connected to a practice machine and another is connected to a production server. A visible hostname gives you a chance to stop before running the right command in the wrong place, which is one reason many engineers customize prompts to make important environments stand out.
+When several terminal windows are open, check which session each uses. Imagine one tab is connected to a practice machine and another to a production server. Prompts can be customized to include environment labels; confirm the session before acting rather than trusting the label alone.
 
 Exercise scenario: you have two terminal windows open during a practice lab. One prompt says `alex@laptop ~ $`, and the other says `alex@training-vm /tmp $`. Which would you use for a command intended only for the training machine, and what part of the prompt supports your decision?
 
@@ -249,7 +249,7 @@ echo "Hello"
 
 The command is `echo`, and the argument is `"Hello"`. The shell removes the quotes as syntax and gives the command the text inside them. That distinction is subtle at first: quotes are not decorations for humans, they are instructions to the shell about how to group words before the command receives them.
 
-Options change behavior. The `date` command normally prints the local time, but the `-u` option asks for UTC. UTC is a standard time reference used heavily in distributed systems because it avoids confusion when people, servers, or logs are spread across time zones. This option is for Unix-style shells (macOS, Linux, WSL); PowerShell uses `Get-Date` with UTC-oriented formatting instead.
+Options change behavior. The macOS and GNU versions of `date` use `-u` to request UTC rather than the configured local time. Keep the timezone with a timestamp when comparing records from different systems. Follow the command branch for your shell; the PowerShell examples use `Get-Date`.
 
 ```bash
 date -u
@@ -400,8 +400,8 @@ The same decision applies inside a single workflow. You might use a GUI dashboar
 | Typing the `$` symbol from an example | In this lesson's prompt-prefixed example, `$` is a cue rather than command text | Type only the command after the prompt; if you copied it, delete the leading `$` and any following space |
 | Forgetting to press Enter | A terminal does not run a command while you are still editing the line | Press Enter once when the command is complete, then wait for output or the prompt to return |
 | Misspelling the command name as `echoo` | The shell treats the first word as an exact program name, so near misses do not count | Check the spelling of the first word and rerun the corrected command |
-| Changing capitalization, such as `Echo` instead of `echo` | Many shells and filesystems treat uppercase and lowercase as different characters | Match the command's capitalization exactly, especially on Linux and WSL |
-| Forgetting a closing quote | The shell waits for more input, often showing `>` in Bash, `dquote>` in zsh, or `>>` in PowerShell | Compare with your normal prompt; finish the quote or cancel with Ctrl+C and no text selected |
+| Changing command capitalization, such as `Echo` instead of `echo` | A shell may resolve that spelling differently; filename case is a separate filesystem behavior | Match the command case shown and check your shell's documentation |
+| Forgetting a closing quote | The shell waits for more input; examples include `>` in Bash, `dquote>` in zsh, and PSReadLine's `>>` | Compare with your normal prompt; finish the quote or cancel with Ctrl+C and no text selected |
 | Panicking when output keeps printing | A running foreground process can temporarily prevent you from typing a new command | Press Ctrl+C once, then wait to see whether the normal prompt returns |
 | Assuming every terminal window is the same machine | Multiple tabs can connect to different local or remote systems | Confirm which session you opened; compare prompt clues with read-only user and hostname checks |
 | Using a short alias in notes meant for someone else | Aliases only exist if that shell session defines them, so examples can fail on another machine | Write full command names in shared instructions and scripts |
@@ -462,7 +462,7 @@ Check whether you copied this lesson's `$` prompt cue along with the command. Re
 <details>
 <summary>Question 8: Your lesson notes use `date`, but your teammate on Windows opened PowerShell. What command should they run instead, and what continuation prompt will PowerShell show if they leave a quote unclosed?</summary>
 
-Use `Get-Date`, the native PowerShell date/time command. With its default PSReadLine configuration, unfinished input produces `>>`; Bash often shows `>`, while zsh can show `dquote>` for an open double quote. These markers are configurable. Finish the quoted text or cancel with Ctrl+C and no text selected, then compare the result with the normal prompt you saw when the shell opened.
+Use `Get-Date`, the native PowerShell date/time command. With its default PSReadLine configuration, unfinished input produces `>>`; Bash can show `>`, while zsh can show `dquote>` for an open double quote. These markers are configurable. Finish the quoted text or cancel with Ctrl+C and no text selected, then compare the result with the normal prompt you saw when the shell opened.
 
 </details>
 
@@ -474,7 +474,7 @@ Open a terminal, run safe information commands, practice one recovery move, and 
 
 ### Setup
 
-Use any terminal you can open today, then follow the branch for that shell. macOS Terminal and Linux terminals commonly use zsh or Bash; **Windows Terminal with a WSL Ubuntu profile** uses the Unix-style `date` and Bash composition shown below. PowerShell has its own branch using native `Get-Date`, `Write-Output`, and the PowerShell subexpression form `$()`; open a WSL tab only if you want to follow the Unix-style branch. If one command prints a slightly different format on your system, treat that as useful evidence rather than a failure.
+Choose one operating system and one shell for this exercise; complete only that branch. You do not need access to every platform. macOS and Linux terminals can use zsh or Bash; **Windows Terminal with a WSL Ubuntu profile** uses the Unix-style `date` and Bash composition below. PowerShell has its own branch using `Get-Date`, `Write-Output`, and the `$()` subexpression form. Compare your output with the explanation rather than requiring an identical format.
 
 ### Tasks
 
@@ -642,7 +642,7 @@ Transcript A shows unfinished quoted input; finish the quote or cancel and compa
 
 You've completed this exercise when you can demonstrate each item below without needing to close and reopen the terminal:
 
-- [ ] Open a terminal window on your operating system.
+- [ ] Open a terminal window on your chosen operating system.
 - [ ] Identify at least one part of your prompt, such as username, hostname, directory, `$`, or `%`.
 - [ ] Run `echo 'Hello, World!'` and see the output.
 - [ ] Run the date/time command for your shell (`date` in Bash/zsh/WSL or `Get-Date` in PowerShell) and explain why your output differs from the example.
@@ -666,7 +666,7 @@ You've completed this exercise when you can demonstrate each item below without 
 - [Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
 - [GNU Coreutils manual: date invocation](https://www.gnu.org/software/coreutils/manual/html_node/date-invocation.html)
 - [GNU Coreutils manual: whoami invocation](https://www.gnu.org/software/coreutils/manual/html_node/whoami-invocation.html)
-- [GNU Coreutils manual: hostname invocation](https://www.gnu.org/software/inetutils/manual/html_node/hostname-invocation.html)
+- [GNU Inetutils manual: hostname invocation](https://www.gnu.org/software/inetutils/manual/html_node/hostname-invocation.html)
 - [Bash Reference Manual: Quoting](https://www.gnu.org/software/bash/manual/html_node/Quoting.html)
 - [Bash Reference Manual: Command Substitution](https://www.gnu.org/software/bash/manual/html_node/Command-Substitution.html)
 - [PowerShell Get-Date cmdlet](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-date?view=powershell-7.5)
@@ -675,7 +675,7 @@ You've completed this exercise when you can demonstrate each item below without 
 - [IBM History: The punched card](https://www.ibm.com/history/punched-card)
 - [Graphical user interface](https://en.wikipedia.org/wiki/Graphical_user_interface)
 - [DEC VT100 User Guide: Operating Information](https://vt100.net/docs/vt100-ug/chapter1.html)
-- [Command line crash course](https://developer.mozilla.org/en-US/docs/Learn/Tools_and_testing/Understanding_client-side_tools/Command_line)
+- [Command line crash course](https://developer.mozilla.org/en-US/docs/Learn_web_development/Getting_started/Environment_setup/Command_line)
 
 ## Next Module
 
