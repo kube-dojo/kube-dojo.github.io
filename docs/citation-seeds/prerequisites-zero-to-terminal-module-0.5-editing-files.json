@@ -1,122 +1,74 @@
 {
   "module_key": "prerequisites/zero-to-terminal/module-0.5-editing-files",
   "module_path": "src/content/docs/prerequisites/zero-to-terminal/module-0.5-editing-files.md",
-  "research_run_id": "2026-04-19T14:19:52+00:00-codex-gpt-5.3-codex-spark",
   "schema_version": 2,
+  "page_digest": "sha256:e939d37e7d7742a2415329cb72bf4c399b495759b1203f353399551d382bc17f",
   "claims": [
-    {
-      "claim_id": "C001",
-      "claim_text": "The module presents a supposedly real outage at a major tech company caused by a stray edit to `nginx.conf`, leading to site downtime and lost revenue.",
-      "claim_class": "war_story",
-      "span_hint": "section: Why This Module Matters",
-      "disposition": "cannot_be_salvaged",
-      "proposed_url": null,
-      "proposed_tier": null,
-      "anchor_text": "Consider a real-world incident at a major tech company: a junior engineer needed to update a simple setting in a load balancer. They opened the `nginx.conf` file in `nano`, accidentally typed a few stray characters while trying to save, and saved the file. Within minutes, the entire site went down, costing thousands of dollars in revenue. Why? Because they were editing directly on the production server without realizing it, and a single typo in a configuration file can break a service.",
-      "suggested_rewrite": "Consider a realistic production mistake: an engineer editing a load balancer configuration directly on a live server could save stray characters into `nginx.conf`, and a single typo in a configuration file can break a service.",
-      "lesson_point_url": null,
-      "rationale": "This is framed as a real incident but provides no company, date, or source, so it cannot be honestly cited as written."
-    },
-    {
-      "claim_id": "C002",
-      "claim_text": "Vim uses modes, and `i` is one of the commands that switches from Normal mode to Insert mode.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Meet nano: Your First Terminal Editor",
-      "disposition": "supported",
-      "proposed_url": "https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt",
-      "proposed_tier": "upstream",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The official Vim docs describe Normal and Insert modes and list `i` among the commands that enter Insert mode."
-    },
-    {
-      "claim_id": "C003",
-      "claim_text": "A shebang like `#!/bin/bash` is used when a script is executed directly, while explicitly running `bash script.sh` does not consult the shebang.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Your First Script",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Shebang_(Unix)",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The referenced article directly explains shebang behavior for direct execution and notes that explicit interpreter invocation bypasses it."
-    },
-    {
-      "claim_id": "C004",
-      "claim_text": "`chmod +x` adds execute permission so a file can be run directly as a program.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Your First Script",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Chmod",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The `chmod` reference directly covers changing execute permissions on Unix-like systems."
-    },
-    {
-      "claim_id": "C005",
-      "claim_text": "The nano history fun fact includes a broken lineage through `pstrict` before correcting itself to `pico`.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Did You Know",
-      "disposition": "cannot_be_salvaged",
-      "proposed_url": null,
-      "proposed_tier": null,
-      "anchor_text": "**nano is a clone of a clone.** It was created as a free replacement for an editor called `pstrict` which was a replacement for `pstrict` ... actually, nano is a free replacement for `pico`, which was the editor built into the Pine email client from 1989. The name `nano` derives from the SI prefix system, reflecting its role as a successor to pico (nano is 1,000 times larger than pico).",
-      "suggested_rewrite": "**nano is closely related to `pico`.** It was created as a free replacement for `pico`, and the name is a playful nod to the SI prefixes `pico` and `nano`.",
-      "lesson_point_url": null,
-      "rationale": "The `pstrict` wording is erroneous as written, so this sentence needs a factual rewrite rather than a citation pasted onto a broken claim."
-    },
-    {
-      "claim_id": "C006",
-      "claim_text": "The module says `ed` is the oldest surviving text editor still in use.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Did You Know",
-      "disposition": "cannot_be_salvaged",
-      "proposed_url": null,
-      "proposed_tier": null,
-      "anchor_text": "**The oldest surviving text editor still in use is `ed`, created in 1969.**",
-      "suggested_rewrite": "**One early Unix text editor still worth knowing about is `ed`.**",
-      "lesson_point_url": null,
-      "rationale": "This is a hard-to-prove superlative and should be rewritten to a defensible historical description."
-    },
-    {
-      "claim_id": "C007",
-      "claim_text": "`ed` is a line editor associated with early Unix development, and Ken Thompson developed it in 1969.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Did You Know",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Ed_(text_editor)",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The cited page directly identifies `ed` as a line editor and places Ken Thompson's work on it in 1969."
-    }
+    {"claim_id": "FC05001", "claim_text": "Nano keeps edits in an in-memory buffer until the user writes the buffer; other commands read the saved file on disk.", "claim_class": null, "disposition": null, "page_instances": [{"line": 37, "quote": "`nano` loads the file contents into a buffer"}, {"line": 37, "quote": "writes the buffer back to disk only when you save"}, {"line": 41, "quote": "another command such as `cat` reads the last saved version from disk"}, {"line": 41, "quote": "After you save, the next reader sees the new version"}], "source_candidates": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Versioned Nano manual plus one Ubuntu practice observation; do not infer an autosave policy for other editors."},
+    {"claim_id": "FC05002", "claim_text": "The Nano example identifies version and filename and shows a modified-buffer marker.", "claim_class": null, "disposition": null, "page_instances": [{"line": 115, "quote": "Confirm the GNU nano banner, the filename at the top"}, {"line": 118, "quote": "GNU nano 7.2                    hello.txt"}, {"line": 156, "quote": "GNU nano 7.2                    hello.txt"}, {"line": 153, "quote": "The tested GNU nano 7.2 screen shows `*`"}], "source_candidates": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "The asterisk appearance is observed for Nano 7.2 and described in the versioned manual; UI configuration can vary."},
+    {"claim_id": "FC05003", "claim_text": "Nano's caret shortcut notation means Control-key sequences; Ctrl and the named key are pressed together.", "claim_class": null, "disposition": null, "page_instances": [{"line": 134, "quote": "The `^` symbol in that menu means"}, {"line": 421, "quote": "hold Ctrl and press O at the same time"}], "source_candidates": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet"], "candidate_scope_note": "Manual explains Ctrl notation; the exact menu is version/configuration-specific."},
+    {"claim_id": "FC05004", "claim_text": "The supplied GNU nano 7.2 menu and shortcut reference list Ctrl+O for writing, Ctrl+X for exit, Ctrl+K/Ctrl+U for cut/paste, and Ctrl+W for search.", "claim_class": null, "disposition": null, "page_instances": [{"line": 118, "quote": "GNU nano 7.2                    hello.txt"}, {"line": 156, "quote": "GNU nano 7.2                    hello.txt"}, {"line": 126, "quote": "^G Help  ^O Write Out  ^W Where Is  ^K Cut"}, {"line": 163, "quote": "^G Help  ^O Write Out  ^W Where Is  ^K Cut"}, {"line": 138, "quote": "| `^O` | Ctrl + O | Save the file"}, {"line": 139, "quote": "| `^X` | Ctrl + X | Exit nano"}, {"line": 140, "quote": "| `^K` | Ctrl + K | Cut the current line"}, {"line": 141, "quote": "| `^U` | Ctrl + U | Paste a cut line"}, {"line": 142, "quote": "| `^W` | Ctrl + W | Search for text"}], "source_candidates": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Do not generalize Nano 7.2 shortcuts to all versions/configurations; the lesson tells learners to read their menu."},
+    {"claim_id": "FC05005", "claim_text": "Writing out the buffer prompts for the destination filename; confirming saves, then the editor can be exited.", "claim_class": null, "disposition": null, "page_instances": [{"line": 167, "quote": "To save, press Ctrl+O"}, {"line": 167, "quote": "`nano` will ask you to confirm the destination filename"}, {"line": 177, "quote": "After you press Enter"}, {"line": 179, "quote": "To leave `nano`, press Ctrl+X"}], "source_candidates": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "The hosted practice observed Ctrl+O filename prompt and F2 exit; it did not verify physical Ctrl+X delivery."},
+    {"claim_id": "FC05006", "claim_text": "If changes are unsaved, the GNU nano exit path can ask whether to save, discard, or cancel.", "claim_class": null, "disposition": null, "page_instances": [{"line": 179, "quote": "If you changed something after the last save"}, {"line": 186, "quote": "Save modified buffer?  Y Yes  N No  ^C Cancel"}, {"line": 189, "quote": "`Y` continues the save path"}, {"line": 189, "quote": "`N` discards unsaved changes"}], "source_candidates": ["gnu-nano-7.2-manual", "OBS-MACOS-NANO-BINARY-PICO-P02C"], "candidate_scope_note": "The captured official manual and old Nano 9 macOS PTY receipt are distinct version/platform evidence; verify prompt wording for v7.2 before treating this exact rendering as universal."},
+    {"claim_id": "FC05007", "claim_text": "Nano accepts the learner's typed text into the open buffer.", "claim_class": null, "disposition": null, "page_instances": [{"line": 71, "quote": "In `nano`, you can open a file and type into its buffer"}, {"line": 145, "quote": "With `nano` open, type the following three lines"}], "source_candidates": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "GNU nano 7.2 manual scope."},
+    {"claim_id": "FC05008", "claim_text": "Opening a non-existing filename in Nano presents a new buffer, and writing the buffer creates the saved file.", "claim_class": null, "disposition": null, "page_instances": [{"line": 109, "quote": "filename that does not exist yet"}, {"line": 109, "quote": "it opens an editor buffer associated with the name `hello.txt`"}, {"line": 109, "quote": "The file becomes real in the useful sense when you write the buffer out"}], "source_candidates": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "The hosted practice observed a new file saved and then read back; source/manual wording and practice are separate evidence."},
+    {"claim_id": "FC05009", "claim_text": "The cat utility writes file contents to standard output, supporting a short read-only verification after saving.", "claim_class": null, "disposition": null, "page_instances": [{"line": 193, "quote": "The simplest verification command is `cat`"}, {"line": 193, "quote": "prints a file's contents to the terminal"}, {"line": 442, "quote": "Use `cat` for a short read-only check"}], "source_candidates": ["posix-cat"], "candidate_scope_note": "Reuse only POSIX cat-to-stdout behavior; read-only risk framing is teaching guidance."},
+    {"claim_id": "FC05010", "claim_text": "GNU nano line cut stores the line in a cutbuffer; consecutive Ctrl+K cuts add lines, while Ctrl+U pastes the buffer at the cursor.", "claim_class": null, "disposition": null, "page_instances": [{"line": 244, "quote": "press Ctrl+K to cut that entire line"}, {"line": 244, "quote": "`nano` stacks the cut lines"}, {"line": 244, "quote": "Ctrl+U to paste"}], "source_candidates": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Cutbuffer contents may be replaced by intervening keys per the manual; page uses consecutive cuts."},
+    {"claim_id": "FC05011", "claim_text": "GNU nano Ctrl+W starts a forward search; Alt+W finds the next forward occurrence in the v7.2 reference.", "claim_class": null, "disposition": null, "page_instances": [{"line": 246, "quote": "Press Ctrl+W, type the text you want to find"}, {"line": 246, "quote": "Alt+W to find the next occurrence"}], "source_candidates": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Versioned v7.2 key bindings; practice used Ctrl+W and also observed F6 on that browser session."},
+    {"claim_id": "FC05012", "claim_text": "Vim separates Normal and Insert modes; Insert mode accepts typed text, unlike Nano's modeless text entry.", "claim_class": null, "disposition": null, "page_instances": [{"line": 71, "quote": "`vim` uses modes"}, {"line": 75, "quote": "Insert mode accepts text"}, {"line": 349, "quote": "`vim` starts in normal mode"}], "source_candidates": ["vim-intro"], "candidate_scope_note": "The table's comparison is narrow: no claim that this lesson teaches Vim operation or that every terminal editor behaves alike."},
+    {"claim_id": "FC05013", "claim_text": "A shell script is a text file containing commands that Bash can read and execute.", "claim_class": null, "disposition": null, "page_instances": [{"line": 273, "quote": "A script is a text file that contains commands"}, {"line": 273, "quote": "run the recipe whenever you need it"}], "source_candidates": ["ubuntu-bash-invocation", "ubuntu-bash-arguments"], "candidate_scope_note": "Use Bash's script-file invocation context; do not infer that any arbitrary text file should be executed directly."},
+    {"claim_id": "FC05014", "claim_text": "A `.sh` suffix labels a file for human readers but does not itself grant execute permission.", "claim_class": null, "disposition": null, "page_instances": [{"line": 275, "quote": "The `.sh` suffix is a convention"}, {"line": 275, "quote": "it is not the part that makes the file executable"}], "source_candidates": ["ubuntu-chmod1", "gnu-coreutils-chmod-invocation-9e804ed", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Mode-based behavior supports the permission distinction; suffix-as-human-convention is an author wording proposal, not a direct chmod rule."},
+    {"claim_id": "FC05015", "claim_text": "On Linux direct execution uses a leading `#!` interpreter line; explicitly invoking `bash file` selects Bash as the interpreter.", "claim_class": null, "disposition": null, "page_instances": [{"line": 281, "quote": "That line is called a shebang"}, {"line": 281, "quote": "when you execute it directly with `./my-first-script.sh`"}, {"line": 281, "quote": "If you instead run `bash my-first-script.sh`, you have already chosen Bash explicitly"}, {"line": 435, "quote": "a shebang states that choice on this Linux training host"}], "source_candidates": ["linux-execve2", "ubuntu-bash-arguments", "ubuntu-bash-command-execution", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "The exact claim is intentionally scoped to the Linux training host; interpreter-script argument semantics can vary across systems."},
+    {"claim_id": "FC05016", "claim_text": "Bash command substitution `$(command)` runs a command in a subshell and substitutes its standard output, stripping trailing newlines.", "claim_class": null, "disposition": null, "page_instances": [{"line": 296, "quote": "`$(date)` runs the `date` command and inserts its output"}, {"line": 296, "quote": "`$(whoami)` inserts your current username"}, {"line": 524, "quote": "command substitution"}], "source_candidates": ["ubuntu-bash-command-substitution", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Only the standard `$(command)` form in the sample; the manual describes other forms and trailing-newline/word-splitting details."},
+    {"claim_id": "FC05017", "claim_text": "The fixed script examples use `echo` for messages, `cat` for memo contents, and `ls` for the current directory listing.", "claim_class": null, "disposition": null, "page_instances": [{"line": 288, "quote": "echo \"Welcome to the kitchen!\""}, {"line": 489, "quote": "cat kitchen-memo.txt"}, {"line": 519, "quote": "cat kitchen-memo.txt"}, {"line": 540, "quote": "cat kitchen-memo.txt"}, {"line": 589, "quote": "cat kitchen-memo.txt"}, {"line": 4, "quote": "ls"}, {"line": 18, "quote": "ls"}, {"line": 29, "quote": "ls"}, {"line": 31, "quote": "ls"}, {"line": 35, "quote": "ls"}, {"line": 37, "quote": "ls"}, {"line": 41, "quote": "ls"}, {"line": 43, "quote": "ls"}, {"line": 45, "quote": "ls"}, {"line": 62, "quote": "ls"}, {"line": 67, "quote": "ls"}, {"line": 84, "quote": "ls"}, {"line": 89, "quote": "ls"}, {"line": 102, "quote": "ls"}, {"line": 105, "quote": "ls"}, {"line": 130, "quote": "ls"}, {"line": 134, "quote": "ls"}, {"line": 179, "quote": "ls"}, {"line": 189, "quote": "ls"}, {"line": 193, "quote": "ls"}, {"line": 207, "quote": "ls"}, {"line": 221, "quote": "ls"}, {"line": 227, "quote": "ls"}, {"line": 231, "quote": "ls"}, {"line": 236, "quote": "ls"}, {"line": 238, "quote": "ls"}, {"line": 242, "quote": "ls"}, {"line": 244, "quote": "ls"}, {"line": 258, "quote": "ls"}, {"line": 262, "quote": "ls"}, {"line": 267, "quote": "ls"}, {"line": 275, "quote": "ls"}, {"line": 281, "quote": "ls"}, {"line": 298, "quote": "ls"}, {"line": 300, "quote": "ls"}, {"line": 310, "quote": "ls"}, {"line": 313, "quote": "ls"}, {"line": 315, "quote": "ls"}, {"line": 320, "quote": "ls"}, {"line": 357, "quote": "ls"}, {"line": 361, "quote": "ls"}, {"line": 366, "quote": "ls"}, {"line": 378, "quote": "ls"}, {"line": 390, "quote": "ls"}, {"line": 393, "quote": "ls"}, {"line": 395, "quote": "ls"}, {"line": 407, "quote": "ls"}, {"line": 411, "quote": "ls"}, {"line": 416, "quote": "ls"}, {"line": 418, "quote": "ls"}, {"line": 423, "quote": "ls"}, {"line": 425, "quote": "ls"}, {"line": 428, "quote": "ls"}, {"line": 430, "quote": "ls"}, {"line": 432, "quote": "ls"}, {"line": 437, "quote": "ls"}, {"line": 439, "quote": "ls"}, {"line": 444, "quote": "ls"}, {"line": 446, "quote": "ls"}, {"line": 451, "quote": "ls"}, {"line": 453, "quote": "ls"}, {"line": 454, "quote": "ls"}, {"line": 458, "quote": "ls"}, {"line": 472, "quote": "ls"}, {"line": 543, "quote": "ls"}, {"line": 552, "quote": "ls"}, {"line": 592, "quote": "ls"}, {"line": 594, "quote": "ls"}, {"line": 597, "quote": "ls"}, {"line": 599, "quote": "ls"}, {"line": 603, "quote": "ls"}, {"line": 607, "quote": "ls"}, {"line": 635, "quote": "ls"}, {"line": 636, "quote": "ls"}, {"line": 296, "quote": "`echo` prints text"}], "source_candidates": ["ubuntu-bash-invocation", "posix-cat", "posix-ls", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Only the supplied sample commands/outputs; do not generalize echo behavior with options or escapes."},
+    {"claim_id": "FC05018", "claim_text": "GNU chmod symbolic `+` adds selected file-mode bits; `x` is execute for files and search for directories, with omitted classes subject to the umask.", "claim_class": null, "disposition": null, "page_instances": [{"line": 317, "quote": "`+x` adds execute permission"}, {"line": 317, "quote": "add execute permission with `chmod +x`"}, {"line": 597, "quote": "If the owner's execute bit is missing"}], "source_candidates": ["ubuntu-chmod1", "gnu-coreutils-chmod-invocation-9e804ed", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "GNU chmod rule; omitted `who` acts as all except bits restricted by umask. Page focuses on owned practice files."},
+    {"claim_id": "FC05019", "claim_text": "A newly saved practice script may lack execute permission; inspect its actual mode before adding the missing bit.", "claim_class": null, "disposition": null, "page_instances": [{"line": 313, "quote": "For a fresh script saved by GNU nano, expect no execute bit"}, {"line": 313, "quote": "inspect `ls -l my-first-script.sh`"}, {"line": 313, "quote": "confirm the owner's permission group lacks `x`"}, {"line": 597, "quote": "If the owner's execute bit is missing"}], "source_candidates": ["EXEC05-UBUNTU-PLAYGROUND", "ubuntu-chmod1"], "candidate_scope_note": "The actual hosted Ubuntu sample was `-rw-rw-r--` for this account/session; defaults may vary."},
+    {"claim_id": "FC05020", "claim_text": "Linux direct-execution EACCES can arise from missing prefix search, missing file/interpreter execute permission, a non-regular file, or a noexec mount.", "claim_class": null, "disposition": null, "page_instances": [{"line": 313, "quote": "The error alone does not prove a missing execute bit"}, {"line": 313, "quote": "other access restrictions can also block execution"}, {"line": 341, "quote": "filesystem mounted with execution disabled (`noexec`)"}, {"line": 341, "quote": "repeating `chmod` does not fix those causes"}], "source_candidates": ["linux-execve2"], "candidate_scope_note": "Linux execve(2) EACCES list; not a universal error map for all OSes or all command errors."},
+    {"claim_id": "FC05021", "claim_text": "A current-directory script is invoked with `./name`; a command name without a slash follows shell command lookup/PATH behavior.", "claim_class": null, "disposition": null, "page_instances": [{"line": 324, "quote": "The `./` prefix matters"}, {"line": 324, "quote": "Without that prefix, the shell searches directories listed in your `PATH`"}, {"line": 324, "quote": "current working directory is usually not searched automatically"}], "source_candidates": ["ubuntu-bash-command-execution", "ubuntu-bash-invocation"], "candidate_scope_note": "Bash command lookup has its own function/builtin/hash/PATH rules; retain 'usually' and the slash distinction."},
+    {"claim_id": "FC05022", "claim_text": "The deliberately missing quote in the broken script is a Bash parsing error reached after execute access is granted.", "claim_class": null, "disposition": null, "page_instances": [{"line": 597, "quote": "the first `echo` line's missing closing quotation mark causes an unterminated-string error"}, {"line": 597, "quote": "Once Bash starts"}], "source_candidates": ["EXEC05-UBUNTU-PLAYGROUND", "ubuntu-bash-arguments"], "candidate_scope_note": "Specific result verified in one hosted Nano 7.2/Bash 5.2.21 session; do not claim universal wording or status code."},
+    {"claim_id": "FC05023", "claim_text": "The file utility classifies a path using filesystem metadata, magic/content tests, and language tests; that classification helps decide whether a text editor is suitable.", "claim_class": null, "disposition": null, "page_instances": [{"line": 353, "quote": "run `file filename` before editing"}, {"line": 406, "quote": "Opening and saving a binary file in `nano`"}, {"line": 353, "quote": "Plain text, shell scripts"}], "source_candidates": ["ubuntu-file1"], "candidate_scope_note": "file(1) describes its own heuristic classification; it does not directly prove that saving any binary with Nano corrupts it."},
+    {"claim_id": "FC05024", "claim_text": "The hostname and pwd checks report the current machine name and working-directory location used before a remote edit.", "claim_class": null, "disposition": null, "page_instances": [{"line": 364, "quote": "run `hostname` and `pwd`"}, {"line": 456, "quote": "Run `hostname` to confirm which machine"}, {"line": 456, "quote": "run `pwd` to confirm the current directory"}], "source_candidates": ["gnu-hostname-invocation", "posix-pwd", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Commands identify current environment values; their outputs vary per session."},
+    {"claim_id": "FC05025", "claim_text": "Explicit `rm` operands remove the named training files; the lesson requires checking the owned workspace and forbids wildcard/recursive cleanup.", "claim_class": null, "disposition": null, "page_instances": [{"line": 603, "quote": "it removes files without sending them to a graphical trash folder"}, {"line": 603, "quote": "never substitute a wildcard or a recursive removal command"}, {"line": 613, "quote": "rm hello.txt kitchen-memo.txt"}], "source_candidates": ["ubuntu-rm", "EXEC05-UBUNTU-PLAYGROUND"], "candidate_scope_note": "Behavior is limited to the exact named-file command in an exclusive workspace; no broad cleanup authority implied."}
   ],
-  "further_reading": [
-    {
-      "url": "https://en.wikipedia.org/wiki/Shebang_(Unix)",
-      "title": "Shebang (Unix)",
-      "tier": "general",
-      "why_relevant": "Useful background for why `#!/bin/bash` matters when scripts are run directly."
-    },
-    {
-      "url": "https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt",
-      "title": "Vim Reference Manual: Introduction",
-      "tier": "upstream",
-      "why_relevant": "Official Vim documentation for modes, insert commands, and the editor model contrasted with nano."
-    },
-    {
-      "url": "https://en.wikipedia.org/wiki/GNU_nano",
-      "title": "GNU nano",
-      "tier": "general",
-      "why_relevant": "Provides concise background on nano's history, relationship to pico, and its control-key interface."
-    }
+  "further_reading": [],
+  "prior_seed": {
+    "module_key": "prerequisites/zero-to-terminal/module-0.5-editing-files",
+    "module_path": "src/content/docs/prerequisites/zero-to-terminal/module-0.5-editing-files.md",
+    "research_run_id": "2026-04-19T14:19:52+00:00-codex-gpt-5.3-codex-spark",
+    "schema_version": 2,
+    "claims": [
+      {"claim_id": "C001", "claim_text": "The module presents a supposedly real outage at a major tech company caused by a stray edit to `nginx.conf`, leading to site downtime and lost revenue.", "claim_class": "war_story", "span_hint": "section: Why This Module Matters", "disposition": "cannot_be_salvaged", "proposed_url": null, "proposed_tier": null, "anchor_text": "Consider a real-world incident at a major tech company: a junior engineer needed to update a simple setting in a load balancer. They opened the `nginx.conf` file in `nano`, accidentally typed a few stray characters while trying to save, and saved the file. Within minutes, the entire site went down, costing thousands of dollars in revenue. Why? Because they were editing directly on the production server without realizing it, and a single typo in a configuration file can break a service.", "suggested_rewrite": "Consider a realistic production mistake: an engineer editing a load balancer configuration directly on a live server could save stray characters into `nginx.conf`, and a single typo in a configuration file can break a service.", "lesson_point_url": null, "rationale": "This is framed as a real incident but provides no company, date, or source, so it cannot be honestly cited as written."},
+      {"claim_id": "C002", "claim_text": "Vim uses modes, and `i` is one of the commands that switches from Normal mode to Insert mode.", "claim_class": "vendor_capability", "span_hint": "section: Meet nano: Your First Terminal Editor", "disposition": "supported", "proposed_url": "https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt", "proposed_tier": "upstream", "anchor_text": null, "suggested_rewrite": null, "lesson_point_url": null, "rationale": "The official Vim docs describe Normal and Insert modes and list `i` among the commands that enter Insert mode."},
+      {"claim_id": "C003", "claim_text": "A shebang like `#!/bin/bash` is used when a script is executed directly, while explicitly running `bash script.sh` does not consult the shebang.", "claim_class": "vendor_capability", "span_hint": "section: Your First Script", "disposition": "supported", "proposed_url": "https://en.wikipedia.org/wiki/Shebang_(Unix)", "proposed_tier": "general", "anchor_text": null, "suggested_rewrite": null, "lesson_point_url": null, "rationale": "The referenced article directly explains shebang behavior for direct execution and notes that explicit interpreter invocation bypasses it."},
+      {"claim_id": "C004", "claim_text": "`chmod +x` adds execute permission so a file can be run directly as a program.", "claim_class": "vendor_capability", "span_hint": "section: Your First Script", "disposition": "supported", "proposed_url": "https://en.wikipedia.org/wiki/Chmod", "proposed_tier": "general", "anchor_text": null, "suggested_rewrite": null, "lesson_point_url": null, "rationale": "The `chmod` reference directly covers changing execute permissions on Unix-like systems."},
+      {"claim_id": "C005", "claim_text": "The nano history fun fact includes a broken lineage through `pstrict` before correcting itself to `pico`.", "claim_class": "vendor_capability", "span_hint": "section: Did You Know", "disposition": "cannot_be_salvaged", "proposed_url": null, "proposed_tier": null, "anchor_text": "**nano is a clone of a clone.** It was created as a free replacement for an editor called `pstrict` which was a replacement for `pstrict` ... actually, nano is a free replacement for `pico`, which was the editor built into the Pine email client from 1989. The name `nano` derives from the SI prefix system, reflecting its role as a successor to pico (nano is 1,000 times larger than pico).", "suggested_rewrite": "**nano is closely related to `pico`.** It was created as a free replacement for `pico`, and the name is a playful nod to the SI prefixes `pico` and `nano`.", "lesson_point_url": null, "rationale": "The `pstrict` wording is erroneous as written, so this sentence needs a factual rewrite rather than a citation pasted onto a broken claim."},
+      {"claim_id": "C006", "claim_text": "The module says `ed` is the oldest surviving text editor still in use.", "claim_class": "vendor_capability", "span_hint": "section: Did You Know", "disposition": "cannot_be_salvaged", "proposed_url": null, "proposed_tier": null, "anchor_text": "**The oldest surviving text editor still in use is `ed`, created in 1969.**", "suggested_rewrite": "**One early Unix text editor still worth knowing about is `ed`.**", "lesson_point_url": null, "rationale": "This is a hard-to-prove superlative and should be rewritten to a defensible historical description."},
+      {"claim_id": "C007", "claim_text": "`ed` is a line editor associated with early Unix development, and Ken Thompson developed it in 1969.", "claim_class": "vendor_capability", "span_hint": "section: Did You Know", "disposition": "supported", "proposed_url": "https://en.wikipedia.org/wiki/Ed_(text_editor)", "proposed_tier": "general", "anchor_text": null, "suggested_rewrite": null, "lesson_point_url": null, "rationale": "The cited page directly identifies `ed` as a line editor and places Ken Thompson's work on it in 1969."}
+    ],
+    "further_reading": [
+      {"url": "https://en.wikipedia.org/wiki/Shebang_(Unix)", "title": "Shebang (Unix)", "tier": "general", "why_relevant": "Useful background for why `#!/bin/bash` matters when scripts are run directly."},
+      {"url": "https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt", "title": "Vim Reference Manual: Introduction", "tier": "upstream", "why_relevant": "Official Vim documentation for modes, insert commands, and the editor model contrasted with nano."},
+      {"url": "https://en.wikipedia.org/wiki/GNU_nano", "title": "GNU nano", "tier": "general", "why_relevant": "Provides concise background on nano's history, relationship to pico, and its control-key interface."}
+    ],
+    "notes": "Most of the module is pedagogical prose and command practice; the main citation-worthy items are the anonymous outage anecdote, specific editor-history claims, and shell execution mechanics.",
+    "_schema_issues": [],
+    "rejected_urls": []
+  },
+  "prior_seed_digest": "sha256:fce5aff87a7cc65d87509cd71d19d57eb67bf35d653f8b894d9009d8960e48f9",
+  "removed_author_claims": [
+    {"claim_id": "C001", "claim_text": "The module presents a supposedly real outage at a major tech company caused by a stray edit to `nginx.conf`, leading to site downtime and lost revenue.", "claim_class": "war_story", "disposition": "cannot_be_salvaged", "historical_span_hint": "section: Why This Module Matters", "relation_to_current_page": "removed_unsupported_real_incident", "current_claim_ids": [], "current_judgment": null},
+    {"claim_id": "C005", "claim_text": "The nano history fun fact includes a broken lineage through `pstrict` before correcting itself to `pico`.", "claim_class": "vendor_capability", "disposition": "cannot_be_salvaged", "historical_span_hint": "section: Did You Know", "relation_to_current_page": "removed_pstrict_pico_history_trivia", "current_claim_ids": [], "current_judgment": null},
+    {"claim_id": "C006", "claim_text": "The module says `ed` is the oldest surviving text editor still in use.", "claim_class": "vendor_capability", "disposition": "cannot_be_salvaged", "historical_span_hint": "section: Did You Know", "relation_to_current_page": "removed_editor_superlative", "current_claim_ids": [], "current_judgment": null},
+    {"claim_id": "C007", "claim_text": "`ed` is a line editor associated with early Unix development, and Ken Thompson developed it in 1969.", "claim_class": "vendor_capability", "disposition": "supported", "historical_span_hint": "section: Did You Know", "relation_to_current_page": "removed_ed_historical_claim", "current_claim_ids": [], "current_judgment": null}
   ],
-  "notes": "Most of the module is pedagogical prose and command practice; the main citation-worthy items are the anonymous outage anecdote, specific editor-history claims, and shell execution mechanics.",
-  "_schema_issues": [],
-  "rejected_urls": []
+  "prior_claim_crosswalk": [
+    {"claim_id": "C001", "proposed_relation": "removed_unsupported_real_incident", "current_claim_ids": [], "current_judgment": null},
+    {"claim_id": "C002", "proposed_relation": "retained_qualified_vim_mode_comparison", "current_claim_ids": ["FC05012"], "current_judgment": null},
+    {"claim_id": "C003", "proposed_relation": "retained_linux_direct_execution_and_explicit_bash", "current_claim_ids": ["FC05015"], "current_judgment": null},
+    {"claim_id": "C004", "proposed_relation": "retained_practice_permission_change", "current_claim_ids": ["FC05018", "FC05019"], "current_judgment": null},
+    {"claim_id": "C005", "proposed_relation": "removed_pstrict_pico_history_trivia", "current_claim_ids": [], "current_judgment": null},
+    {"claim_id": "C006", "proposed_relation": "removed_editor_superlative", "current_claim_ids": [], "current_judgment": null},
+    {"claim_id": "C007", "proposed_relation": "removed_ed_historical_claim", "current_claim_ids": [], "current_judgment": null}
+  ],
+  "notes": ["Unjudged source/claim preparation: all source_candidates are locators, not source support, eligibility, or reviewer verdicts.", "The original April 19 0.5 seed is retained byte-for-byte as prior_seed; its old page text and historic dispositions are not inherited as current review results.", "The current page hash is frozen at the root-declared final e939d37e. Any later prose edit invalidates physical line locators and requires regenerating this seed.", "Ubuntu practice source is one ungraded Ubuntu 24.04.5/Bash 5.2.21/GNU nano 7.2 session; it is practice evidence only.", "One Nano 7.2 menu/source set is version-scoped. The current Nano manual/cheatsheet capture and actual Ubuntu menu output should be compared; do not generalize to all versions or configs.", "The binary-file damage statement exceeds the captured file(1) classification source; source capture distinguishes data types but does not establish Nano corruption behavior.", "GNU Coreutils HTML chmod page timed out once; the captured Ubuntu Noble chmod(1) page and pinned full Coreutils manual source provide candidate mode rules. The Linux execve page is separately captured for EACCES scopes.", "Prior legacy negative review events remain in prior_seed/API evidence; no review budget is reset or judgment fabricated."]
 }
