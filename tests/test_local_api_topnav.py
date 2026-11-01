@@ -27,61 +27,27 @@ def _route(tmp_path: Path, path: str) -> str:
     return body
 
 
-def _has_channels_nav(html: str) -> bool:
-    return bool(re.search(r'<a class="navlink(?: active)?" href="/channels"', html))
+def test_three_primary_areas_and_grouped_tools(tmp_path: Path) -> None:
+    for route, active in (('/', '/'), ('/operations', '/operations'), ('/quality', '/quality')):
+        page = _route(tmp_path, route)
+        nav = page.split('<nav class="topnav"', 1)[1].split('</nav>', 1)[0]
+        primary, tools = nav.split('<details class="nav-tools">', 1)
+        assert len(re.findall(r'class="navlink', primary)) == 3
+        assert f'href="{active}" aria-current="page"' in primary
+        assert 'href="/channels"' in tools and 'href="/decisions"' in tools
+        assert 'href="/health"' not in nav and 'href="/pipeline"' not in nav
 
 
-def _has_decisions_nav(html: str) -> bool:
-    return bool(re.search(r'<a class="navlink(?: active)?" href="/decisions"', html))
+def test_secondary_pages_keep_navigation_and_current_location(tmp_path: Path) -> None:
+    for route in ('/channels', '/channels/thread-123', '/decisions', '/artifacts'):
+        page = _route(tmp_path, route)
+        key = '/' + route.strip('/').split('/')[0]
+        assert f'href="{key}" aria-current="page"' in page
+        assert 'href="/operations"' in page and 'href="/quality"' in page
 
 
-def test_health_route_keeps_topnav(tmp_path: Path) -> None:
-    html = _route(tmp_path, "/health")
-    assert _has_channels_nav(html)
-    assert _has_decisions_nav(html)
-    assert '<a class="navlink active" href="/health"' in html
-
-
-def test_quality_route_returns_real_page(tmp_path: Path) -> None:
-    html = _route(tmp_path, "/quality")
-    assert len(html) > 5000
-    assert '<a class="navlink active" href="/quality"' in html
-    assert 'id="quality-board"' in html
-
-
-def test_operator_route_returns_real_page(tmp_path: Path) -> None:
-    html = _route(tmp_path, "/operator")
-    assert len(html) > 5000
-    assert 'id="op-now"' in html
-    assert '<a class="navlink active" href="/operator"' in html
-
-
-def test_dashboard_drops_op_hero_columns(tmp_path: Path) -> None:
-    html = _route(tmp_path, "/")
-    assert 'id="op-now"' not in html
-
-
-def test_dashboard_summary_links_to_operator(tmp_path: Path) -> None:
-    html = _route(tmp_path, "/")
-    assert 'class="op-summary-card"' in html
-    assert 'class="op-summary-link"' in html
-
-
-def test_home_page_links_to_channels(tmp_path: Path) -> None:
-    html = _route(tmp_path, "/")
-    assert _has_channels_nav(html)
-    assert _has_decisions_nav(html)
-
-
-def test_channels_pages_keep_topnav(tmp_path: Path) -> None:
-    for path in ["/channels", "/channels/thread-123"]:
-        html = _route(tmp_path, path)
-        assert _has_channels_nav(html)
-        assert _has_decisions_nav(html)
-
-
-def test_decisions_page_keeps_topnav(tmp_path: Path) -> None:
-    html = _route(tmp_path, "/decisions")
-    assert _has_channels_nav(html)
-    assert _has_decisions_nav(html)
-    assert '<a class="navlink active" href="/decisions"' in html
+def test_quality_retains_canonical_and_legacy_inspection(tmp_path: Path) -> None:
+    page = _route(tmp_path, '/quality')
+    for key in ('cc-summary', 'cc-work-summary', 'cc-rows', 'quality-board'):
+        assert f'id="{key}"' in page
+    assert 'Legacy pipeline progress (secondary)' in page
