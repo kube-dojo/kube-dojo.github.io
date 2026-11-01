@@ -1,0 +1,579 @@
+{
+  "schema": "kubedojo.reviewed_source_catalog.v1",
+  "page": "prerequisites/zero-to-terminal/module-0.4-files-and-directories.md",
+  "page_digest": "sha256:5fe36be980ce7c1f4d1ea5f1a7984d0233040f267de2cba89798035d10a5dd6d",
+  "seed_digest": "sha256:704d70dd069f8fd32381090b5433ce90bb59c80c55bb09aa37ef55144891093a",
+  "status": "REVIEWED",
+  "provenance": {
+    "review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3773#issuecomment-6558768843",
+    "reviewed_head": "e4ad9f706302210eb73405bc197316d9efa44900",
+    "merged_commit": "1a59c87a9a6369798a624b2a3119fc6f8afdf012",
+    "run_identity": "501cf2b2-59e0-4871-aceb-f9842c0ce5f7",
+    "verdict_digest": "sha256:805221e4a1e1fbf7f17b4e429ab6a5409356f0df9c38396caa06de5d6ae56533",
+    "source_index_digest": "sha256:2364c58032fd8e6989153a8f2789918536059d3d98b488820b560b210a2766c1",
+    "reviewer_supplement_digest": "sha256:9a24985d1ade559ae50034f9c3d40ba58e94a76be578e9ce8363ba3370500248",
+    "native_model": "grok-4.7",
+    "independent_review": "xai"
+  },
+  "closing_review": {
+    "verdict": "APPROVE",
+    "pr_verdict": "APPROVE",
+    "source_editorial_verdict": "APPROVE",
+    "head": "e4ad9f706302210eb73405bc197316d9efa44900",
+    "page_digest": "sha256:5fe36be980ce7c1f4d1ea5f1a7984d0233040f267de2cba89798035d10a5dd6d",
+    "seed_digest": "sha256:704d70dd069f8fd32381090b5433ce90bb59c80c55bb09aa37ef55144891093a",
+    "source_index_digest": "sha256:2364c58032fd8e6989153a8f2789918536059d3d98b488820b560b210a2766c1",
+    "run_identity": "501cf2b2-59e0-4871-aceb-f9842c0ce5f7",
+    "end_marker": "501cf2b2-59e0-4871-aceb-f9842c0ce5f7",
+    "r1_verdict_digest": "sha256:ceeb9f77266924464dad3ef9ab14cb1ef0924eb70653a4ba6597e14d39fee059",
+    "finding_dispositions": [
+      {"id": "F04-JOURNALD-SCOPE", "disposition": "closed", "severity": "major", "path": "src/content/docs/prerequisites/zero-to-terminal/module-0.4-files-and-directories.md", "line": 526, "actualquote": "On a kubeadm control-plane node, static Pod manifests live under `/etc/kubernetes/manifests/`. Kubernetes normally places container logs under `/var/log/pods/`.", "why": "The removed clause, 'component logs commonly go to journald on systemd hosts,' was the unsupported claim. Current Kubernetes logging docs limit the systemd journald default to the kubelet and container runtime, put container logs under /var/log/pods by default, and say pod-hosted control-plane components write files under /var/log and do not write to the journal. Those two path sentences remain, and the following caution still says the logging setup must be read from documentation. Removing the clause closes the finding. Adding the component taxonomy was not required for this beginner path lesson.", "fix": "none"},
+      {"id": "FC04014", "disposition": "preserved_historical_unsupported", "actualquote": "Kubernetes component logs commonly go to journald on systemd hosts.", "why": "The current seed removes FC04014 from the active claims and keeps the original claim text, page instance, UNSUPPORTED judgment, evidence ref kubernetes-logging, and public review URL https://github.com/kube-dojo/kube-dojo.github.io/pull/3773#issuecomment-6558638777. It is not reclassified as supported. The quote is absent from the current page. R1 NEEDS_CHANGES at head 115439c43805fc0f9915c55a8051b10e92584b00 remains the historical verdict.", "fix": "none"}
+    ],
+    "remaining_findings": [],
+    "reaffirms_claim_ids": ["FC04001", "FC04002", "FC04003", "FC04004", "FC04005", "FC04006", "FC04007", "FC04008", "FC04009", "FC04010", "FC04011", "FC04012", "FC04013", "FC04015", "FC04016", "FC04017", "FC04018", "FC04019", "FC04020", "FC04021", "FC04022", "FC04023", "FC04024", "FC04025", "FC04026", "FC04027", "FC04028", "FC04029", "FC04030", "FC04031", "FC04032", "FC04033", "FC04034", "FC04035", "FC04036", "FC04037", "FC04038", "FC04039", "FC04040", "FC04041", "FC04042", "FC04043", "FC04044", "FC04045", "FC04046", "FC04047", "FC04048", "FC04049", "FC04050", "FC04052", "FC04053"],
+    "reaffirms_unchanged_claims": true,
+    "claims_changed_from_R1_only_removed": ["FC04014"],
+    "coverage": {
+      "reviewed_claim_ids": ["FC04001", "FC04002", "FC04003", "FC04004", "FC04005", "FC04006", "FC04007", "FC04008", "FC04009", "FC04010", "FC04011", "FC04012", "FC04013", "FC04015", "FC04016", "FC04017", "FC04018", "FC04019", "FC04020", "FC04021", "FC04022", "FC04023", "FC04024", "FC04025", "FC04026", "FC04027", "FC04028", "FC04029", "FC04030", "FC04031", "FC04032", "FC04033", "FC04034", "FC04035", "FC04036", "FC04037", "FC04038", "FC04039", "FC04040", "FC04041", "FC04042", "FC04043", "FC04044", "FC04045", "FC04046", "FC04047", "FC04048", "FC04049", "FC04050", "FC04052", "FC04053"],
+      "uncovered_ids": [],
+      "additional_material_claims": []
+    },
+    "source_eligibility_unchanged": true,
+    "source_eligibility_note": "Original R1 eligibility stands for the same 30-entry index and bodies. kubernetes-logging stays ELIGIBLE; its R1 contradiction note applied only to the removed component-log sentence. EXEC-UBUNTU04 stays LIMITED, and its frozen retrieval_uri remains null.",
+    "public_copy_mapping_disposition": "Faithful later publication of the identical EXEC-UBUNTU04 body. API comment 6558571851 marks that body after a lead preamble; the marked text matches the retained practice-notes.md opening, graded step-3 false positive, and playground close. Its stated SHA-256 4ac9bd4260c038405f0029b77ba0c8de771df719c98083c52c394b9533ff250f equals the frozen index digest. This call did not recompute the hash. R1 reviewed that body while the index URI was null and did not review this later URL. No new practice run.",
+    "module_scores": {
+      "D1": {
+        "score": 5,
+        "line": 20,
+        "quote": "**Navigate** absolute and relative paths and choose the safer form",
+        "rationale": "Reaffirmed. Four outcomes use apply and analyze verbs, and the page still teaches and tests each one. Raw Markdown kept."
+      },
+      "D2": {
+        "score": 4,
+        "line": 230,
+        "quote": "Once you can point to a file, the next skill is choosing how to read it.",
+        "rationale": "Reaffirmed at the corrected line. The page still moves from tree, navigation and paths to reading, creation, modes and diagnosis. Some checkpoint material repeats."
+      },
+      "D3": {
+        "score": 5,
+        "line": 72,
+        "quote": "Pause and predict: if two users on the same Linux machine both read",
+        "rationale": "Reaffirmed. Prediction checks still precede navigation, paths, reading, dotfiles and redirection, and the lab asks for a prediction before each command."
+      },
+      "D4": {
+        "score": 5,
+        "line": 500,
+        "quote": "Kubernetes client configuration may include certificate data, tokens, context names",
+        "rationale": "Revised from 4. The journald clause was the only stated accuracy gap. Logs, kubeconfig secrecy, path-versus-access errors, and the remaining bounded manifest and /var/log/pods paths are concrete and accurate."
+      },
+      "D5": {
+        "score": 5,
+        "line": 685,
+        "quote": "The group bits grant read but not write.",
+        "rationale": "Reaffirmed at the corrected line. Seven explained quizzes and the exercise still cover path choice, reading, mode-bit diagnosis and dotfile limits."
+      },
+      "D6": {
+        "score": 4,
+        "line": 372,
+        "quote": "-  rw-  r--  r--",
+        "rationale": "Reaffirmed at the corrected raw line. The permission figure stays labeled in place, tables separate file and directory meanings, and worked traces precede the unguided diagnosis."
+      },
+      "D7": {
+        "score": 4,
+        "line": 31,
+        "quote": "The goal is being able to look at a path during a real troubleshooting task",
+        "rationale": "Reaffirmed. Pace and examples stay purposeful. The kitchen comparison remains mapped to name, contents and location and is not used as evidence."
+      },
+      "D8": {
+        "score": 4,
+        "line": 604,
+        "quote": "The anti-pattern is pretending one tool fits every job.",
+        "rationale": "Reaffirmed. For this medium lesson, command-choice tables, mode-bit limits and the path-versus-access split remain a usable decision pattern. Deleting the inaccurate clause does not make it a senior design-review treatment."
+      },
+      "total": 36
+    },
+    "lab_scores": {
+      "L1": {
+        "score": 4,
+        "line": 855,
+        "quote": "Diagnostic Challenge: Three Failures, No Recipe",
+        "rationale": "Reaffirmed. The recipe tree is guided, then three failures require checkpoint commands without a step list."
+      },
+      "L2": {
+        "score": 4,
+        "line": 720,
+        "quote": "Create the project directories.",
+        "rationale": "Reaffirmed. Tasks still move from directories and content to a reading comparison, modes, a hidden name, navigation and an integrated diagnosis."
+      },
+      "L3": {
+        "score": 5,
+        "line": 886,
+        "quote": "Explain why `cat`, `head -n 1`, and `tail -n 1` show different amounts",
+        "rationale": "Reaffirmed at the corrected line. Completion still requires a prediction, an explanation of the different reads, and a written diagnosis of path, type and access failures."
+      },
+      "L4": {
+        "score": 4,
+        "line": 805,
+        "quote": "The first `cat` combines the files in the given order.",
+        "rationale": "Reaffirmed at the corrected line. Solution notes explain the mechanism and the stop conditions. They remain one disclosed explanation."
+      },
+      "L5": {
+        "score": 4,
+        "line": 705,
+        "quote": "The same path and reading decisions apply when you later inspect a manifest or log.",
+        "rationale": "Reaffirmed. The lab states the transfer to manifests and logs and practices three related failures. It does not add a second open problem."
+      },
+      "total": 21
+    },
+    "topic_outcome_coverage": {
+      "Navigate absolute and relative paths": {
+        "teaching": "Tree, pwd, ls, cd, absolute and relative resolution, and checkpoint narrowing.",
+        "practice": "Tasks 1, 2 and 8, plus diagnostic symptoms 1 and 2.",
+        "assessment": "Quizzes 1, 2 and 4."
+      },
+      "Choose a text-reading command": {
+        "teaching": "cat, head and tail purposes, defaults, -n, and output size.",
+        "practice": "Task 5 individual reads and the three-line summary comparison.",
+        "assessment": "Quiz 6."
+      },
+      "Interpret permissions": {
+        "teaching": "ls -l type and mode groups, file versus directory rwx, parent search, and extra rules.",
+        "practice": "Task 6 and symptom 3.",
+        "assessment": "Quizzes 5 and 7."
+      },
+      "Find and interpret hidden names": {
+        "teaching": "Dot-prefix listing behavior and the statement that a dot is not access control.",
+        "practice": "Controlled .practice-hidden example and task 7.",
+        "assessment": "Quiz 3."
+      }
+    },
+    "accepted_scope_limits": ["Removed Did You Know bullets remain accepted. Root and home, dotfiles, /dev/null and /proc, and the bounded Kubernetes paths remain taught where used.", "cp, mv, rm and chmod are not new outcomes. Cleanup stays a link to Module 0.3 Step 8.", "The old graded scenario's default-root stop and step-3 false positive stay negative evidence. This page uses the ungraded Ubuntu playground and does not say that grader was repaired.", "ACLs, capabilities, noclobber and CDPATH remain boundaries. A full journald-versus-file component taxonomy is outside this lesson's outcomes.", "No Windows, macOS or other-shell execution is claimed."],
+    "material_omissions": [],
+    "practice_evidence_disposition": "Reaffirmed supplied evidence only. EXEC-UBUNTU04 still matches the single-quoted recipes, fresh kubedojo-practice workspace, controlled .practice-hidden file, four-command summary, three diagnostics and owned rm cleanup on Ubuntu 24.04.5 and Bash 5.2.21. The legacy grader's root stop and step-3 false positive stay negative, with checker identity unknown. Illustrative kubeconfig, syslog and home listings were not executed. This call did not rerun the lab. The journald sentence was not an executed command.",
+    "companion": {
+      "author": {
+        "family": "OpenAI",
+        "provider": "OpenAI",
+        "model": "Codex",
+        "harness": "Codex",
+        "effective_route": "authoring route named as OpenAI"
+      },
+      "reviewer": {
+        "identity": "regular xAI Grok 4.7",
+        "family": "xAI",
+        "provider": "xAI",
+        "model": "grok-4.7",
+        "harness": "direct read-only Grok review",
+        "effective_route": "no dispatch and no subagent"
+      },
+      "review_kind": "combined closing source, editorial, practice and content-PR R2",
+      "scope": "PR 3773 module 0.4 only",
+      "run": "501cf2b2-59e0-4871-aceb-f9842c0ce5f7",
+      "budgets": {
+        "source_editorial": {
+          "cap": 2,
+          "spent": 2,
+          "remaining": 0
+        },
+        "content_pr": {
+          "cap": 2,
+          "spent": 2,
+          "remaining": 0
+        },
+        "physical_closing_calls": 1
+      }
+    },
+    "performed_checks": ["Read the current page around the edit and all 13 rubric lines, the frozen R1 page line 526, the original R1 verdict, the current and original seeds, the change receipt, the 30-entry source index, and the practice receipt.", "Fetched the current Kubernetes logging page, System component logs and Log locations, and confirmed the journald default is limited to kubelet and the container runtime.", "Fetched public comments 6558638777 and 6558571851. Compared the marked practice body with the retained receipt text.", "Confirmed the diff is one in-place deletion, journald is absent, and FC04011 and FC04013 quotes remain on line 526."],
+    "supplied_checks": ["Pipeline tests, primary build, branch CI, structural URL checks, and the original reference-path execution remain supplied. They were not rerun here.", "No publication, merge, or canonical adoption is inferred."],
+    "limits": ["No shell, edit, subagent, message, hash recomputation, lab rerun, or test execution.", "The 51 unchanged claim rationales and source-eligibility rows are bound by exact-ID reaffirmation, not rewritten.", "Line stability follows the one-line substitution plus spot checks, not a fresh 147-locator audit."]
+  },
+  "closing_integrity": {
+    "head": "e4ad9f706302210eb73405bc197316d9efa44900",
+    "run_identity": "501cf2b2-59e0-4871-aceb-f9842c0ce5f7",
+    "native_model": "grok-4.7",
+    "native_stop": "end_turn",
+    "verdict_sha256": "sha256:805221e4a1e1fbf7f17b4e429ab6a5409356f0df9c38396caa06de5d6ae56533",
+    "verdict": "APPROVE",
+    "canonical_envelope": {
+      "verdict": "APPROVE",
+      "head": "e4ad9f706302210eb73405bc197316d9efa44900",
+      "findings": []
+    },
+    "canonical_field_mapping": "Explicit remaining_findings from genuine closing JSON; not defaulted from missing evidence",
+    "all_13_score_quotes_exact": true,
+    "source_and_pr_state": "APPROVE_STOP2of2",
+    "r1_negative_retained": true
+  },
+  "original_review": {
+    "verdict": "NEEDS_CHANGES",
+    "pr_verdict": "NEEDS_CHANGES",
+    "source_editorial_verdict": "NEEDS_CHANGES",
+    "head": "115439c43805fc0f9915c55a8051b10e92584b00",
+    "page_digest": "sha256:34a13e66d9d7c90b95d2ad4ff49bf72eacb8817e75f8c1deebfaca55143736cf",
+    "seed_digest": "sha256:7fee460322f02055489a8e25e8dc767a159e082907185573f3a5edabe4853a13",
+    "source_index_digest": "sha256:2364c58032fd8e6989153a8f2789918536059d3d98b488820b560b210a2766c1",
+    "run_identity": "f07da2db-7840-41aa-9bde-207105c95da1",
+    "end_marker": "f07da2db-7840-41aa-9bde-207105c95da1",
+    "findings": [
+      {"id": "F04-JOURNALD-SCOPE", "severity": "major", "path": "src/content/docs/prerequisites/zero-to-terminal/module-0.4-files-and-directories.md", "line": 526, "actualquote": "component logs commonly go to journald on systemd hosts.", "why": "The cited Logging Architecture page puts workload container logs under /var/log/pods by default, and on systemd it sends kubelet and container-runtime logs to journald by default. The same page says pod-hosted control-plane components write files under /var/log and do not write to the systemd journal. The sentence treats those classes as one common journald destination, next to the kubeadm static-Pod path.", "fix": "Name kubelet and the container runtime for the systemd journald default, and say pod-hosted control-plane components log to files under /var/log rather than to journald."}
+    ],
+    "optional_nits": [],
+    "claims": [
+      {"claim_id": "FC04001", "verdict": "SUPPORTED", "evidence_refs": ["linux-inode7", "posix-ls"], "support_note": "inode(7) stores owner, group, mode and timestamps; POSIX ls -l prints that metadata. Contents are the file data the inode describes."},
+      {"claim_id": "FC04002", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-file1"], "support_note": "Ubuntu file(1) classifies printable text separately from other data, which it describes as usually binary."},
+      {"claim_id": "FC04003", "verdict": "SUPPORTED", "evidence_refs": ["linux-zero4"], "support_note": "null(4) documents /dev/null as a special file created with mknod as a character device."},
+      {"claim_id": "FC04004", "verdict": "SUPPORTED", "evidence_refs": ["linux-proc5"], "support_note": "proc(5) defines /proc as a pseudo-filesystem of process and system information."},
+      {"claim_id": "FC04005", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "posix-ls"], "support_note": "Path resolution walks directory components, and POSIX ls lists the names contained in a directory."},
+      {"claim_id": "FC04006", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7"], "support_note": "A pathname starting with / is absolute and starts at the process root, usually the filesystem root."},
+      {"claim_id": "FC04007", "verdict": "SUPPORTED", "evidence_refs": ["fhs-3.0-home", "apple-filesystem-overview"], "support_note": "FHS calls /home an optional, commonly default placement. Apple says boot-volume homes live in /Users and network homes also exist, so commonly is the right strength."},
+      {"claim_id": "FC04008", "verdict": "SUPPORTED", "evidence_refs": ["fhs-3.0-etc"], "support_note": "FHS 3.0 defines /etc as host-specific system configuration. Often matches that convention, not every config file."},
+      {"claim_id": "FC04009", "verdict": "SUPPORTED", "evidence_refs": ["fhs-3.0-var-log"], "support_note": "FHS defines /var/log as the directory for miscellaneous log files."},
+      {"claim_id": "FC04010", "verdict": "SUPPORTED", "evidence_refs": ["fhs-3.0-tmp"], "support_note": "FHS says /tmp data may be deleted in a site-specific way and recommends boot cleanup without requiring it."},
+      {"claim_id": "FC04011", "verdict": "SUPPORTED", "evidence_refs": ["kubernetes-kubeadm-implementation"], "support_note": "kubeadm writes control-plane static Pod manifests to /etc/kubernetes/manifests and kubelet watches that directory. Dry-run uses a temporary folder, which the page does not deny."},
+      {"claim_id": "FC04012", "verdict": "SUPPORTED", "evidence_refs": ["kubernetes-kubectl-config"], "support_note": "kubectl uses only --kubeconfig when set, otherwise $KUBECONFIG, and otherwise ${HOME}/.kube/config. By default matches that last case."},
+      {"claim_id": "FC04013", "verdict": "SUPPORTED", "evidence_refs": ["kubernetes-logging"], "support_note": "Kubelet directs the runtime to write container logs under /var/log/pods by default, and podLogsDir can change that path. Normally matches the default."},
+      {"claim_id": "FC04014", "verdict": "UNSUPPORTED", "evidence_refs": ["kubernetes-logging"], "support_note": "Journald-by-default is stated for kubelet and the container runtime on systemd. Pod-hosted control-plane components write files under /var/log and explicitly do not write to the journal."},
+      {"claim_id": "FC04015", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "An unquoted bare tilde-prefix with an empty login name expands to HOME."},
+      {"claim_id": "FC04016", "verdict": "SUPPORTED", "evidence_refs": ["posix-pwd"], "support_note": "POSIX pwd writes an absolute pathname of the current working directory."},
+      {"claim_id": "FC04017", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "With no operand, POSIX ls behaves as if the operand were dot, the current directory."},
+      {"claim_id": "FC04018", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "POSIX ls -l writes entry type, permission classes, link count, owner, group, size, modification time and name."},
+      {"claim_id": "FC04019", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd"], "support_note": "POSIX cd changes the shell working directory. It does not rename or move directory entries."},
+      {"claim_id": "FC04020", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd", "ubuntu-bash-topics"], "support_note": "With HOME set, cd with no operand uses HOME. A bare unquoted ~ expands to HOME. Dot-dot is the parent component."},
+      {"claim_id": "FC04021", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd", "ubuntu-bash-topics"], "support_note": "Bash converts cd - to $OLDPWD before the change. POSIX uses OLDPWD for the operand -. Both also write the new absolute path when it can be determined."},
+      {"claim_id": "FC04022", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "posix-cd"], "support_note": "A pathname without a leading / starts at the current working directory, or at an openat directory fd. cd can also search CDPATH unless the operand starts with /."},
+      {"claim_id": "FC04023", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7"], "support_note": "Path resolution treats . as the directory itself and .. as its parent, and does not walk above /."},
+      {"claim_id": "FC04024", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "ubuntu-bash-command-execution"], "support_note": "./script.sh is a relative pathname looked up in the current directory. A command name with no slash is found through function, builtin, then PATH search."},
+      {"claim_id": "FC04025", "verdict": "SUPPORTED", "evidence_refs": ["posix-cat"], "support_note": "POSIX cat reads the named files in order and writes their bytes to standard output."},
+      {"claim_id": "FC04026", "verdict": "SUPPORTED", "evidence_refs": ["posix-head"], "support_note": "With no options, POSIX head acts as -n 10. -n selects a line count, and a shorter file is copied whole."},
+      {"claim_id": "FC04027", "verdict": "SUPPORTED", "evidence_refs": ["posix-tail", "gnu-tail"], "support_note": "POSIX tail assumes -n 10 when -c, -n and -r are absent. -n 1 is the last line. GNU tail documents the same default and -n."},
+      {"claim_id": "FC04028", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "POSIX ls -l writes the entry's metadata. It does not write the file's contents."},
+      {"claim_id": "FC04029", "verdict": "SUPPORTED", "evidence_refs": ["kubernetes-kubeconfig-v1", "kubernetes-kubectl-config"], "support_note": "The v1 Config type includes context names, usernames, cluster server addresses, client-certificate-data and bearer tokens. The kubectl page supplies the file-selection rule, not those fields."},
+      {"claim_id": "FC04030", "verdict": "SUPPORTED", "evidence_refs": ["posix-mkdir"], "support_note": "Plain POSIX mkdir creates the named directory. Only -p creates missing intermediate components."},
+      {"claim_id": "FC04031", "verdict": "SUPPORTED", "evidence_refs": ["posix-mkdir"], "support_note": "mkdir -p creates missing parents and succeeds when the named directories already exist."},
+      {"claim_id": "FC04032", "verdict": "SUPPORTED", "evidence_refs": ["posix-touch"], "support_note": "POSIX touch creates a missing file and otherwise updates timestamps through utimensat. That update does not replace file data."},
+      {"claim_id": "FC04033", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "POSIX ls omits names beginning with a period unless -a or -A is set. -a writes those names. The rule is listing, not an access check."},
+      {"claim_id": "FC04034", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "The long-format mode is entry type, then three-character owner, group and other fields. d is directory and - is a regular file."},
+      {"claim_id": "FC04035", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "linux-open2"], "support_note": "For ordinary files the three bits are read, write and execute. open(2) returns EACCES when the requested access is not allowed."},
+      {"claim_id": "FC04036", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "posix-opendir-2024"], "support_note": "Path resolution names the first bit read permission. POSIX.1-2024 opendir fails with EACCES when read permission is denied on the directory, and readdir then reads its entries."},
+      {"claim_id": "FC04037", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7"], "support_note": "On a directory the third bit is search permission. Missing search on the current lookup directory returns EACCES."},
+      {"claim_id": "FC04038", "verdict": "SUPPORTED", "evidence_refs": ["linux-open2", "linux-unlink2"], "support_note": "Creating a file needs write on the parent, and unlink needs write on the containing directory. Both also require search on the path. Sticky-bit and other errors remain extra restrictions."},
+      {"claim_id": "FC04039", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "linux-acl5"], "support_note": "Owner mode or ACL_USER_OBJ is used when the effective UID is the owner. Group members who are not the owner are checked against the group class, not the owner bits."},
+      {"claim_id": "FC04040", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "linux-acl5", "linux-capabilities7"], "support_note": "Every non-final component needs search permission. ACLs can further restrict access, and CAP_DAC_OVERRIDE or CAP_DAC_READ_SEARCH can bypass some checks."},
+      {"claim_id": "FC04041", "verdict": "SUPPORTED", "evidence_refs": ["linux-capabilities7"], "support_note": "CAP_DAC_OVERRIDE bypasses file read, write and execute checks, with the execute-bit caveat. CAP_DAC_READ_SEARCH bypasses file read and directory read and search checks."},
+      {"claim_id": "FC04042", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "POSIX ls -d does not treat a directory operand differently from other file types, so it reports the directory entry rather than its children."},
+      {"claim_id": "FC04043", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "Bash > creates a missing target and truncates an existing one. With noclobber, > fails when the target is an existing regular file."},
+      {"claim_id": "FC04044", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "Single quotes preserve the literal value of every enclosed character. The ingredient strings contain no single quote."},
+      {"claim_id": "FC04045", "verdict": "SUPPORTED", "evidence_refs": ["EXEC-UBUNTU04"], "support_note": "The playground receipt recorded initial root and HOME=/root, then su - ubuntu reached the existing ubuntu account and /home/ubuntu. One image only."},
+      {"claim_id": "FC04046", "verdict": "SUPPORTED", "evidence_refs": ["EXEC-UBUNTU04"], "support_note": "As ubuntu, ls /root returned Permission denied status 2, and ls -ld /root showed root-owned drwx------. This is that host, not every system."},
+      {"claim_id": "FC04047", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd", "linux-path_resolution7"], "support_note": "cd changes to a directory. Path resolution returns ENOTDIR, Not a directory, when a component used as a directory is neither a directory nor a symlink to one."},
+      {"claim_id": "FC04048", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7", "linux-open2"], "support_note": "A missing component returns ENOENT, No such file or directory. Denied search or requested access returns EACCES, Permission denied. The page points toward those checks and does not say the message is exhaustive."},
+      {"claim_id": "FC04049", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd"], "support_note": "POSIX writes the new path when CDPATH supplies it or the operand is -. A no-option cd that does not use CDPATH has no required success message."},
+      {"claim_id": "FC04050", "verdict": "SUPPORTED", "evidence_refs": ["linux-path_resolution7"], "support_note": "Components are substrings delimited by /. A leading / also marks an absolute pathname."},
+      {"claim_id": "FC04052", "verdict": "SUPPORTED", "evidence_refs": ["posix-cat", "posix-head", "posix-tail", "EXEC-UBUNTU04"], "support_note": "A one-line file is shorter than the default ten lines, so cat, head and tail each show that line. The receipt saw one ingredient line from each single-file read."},
+      {"claim_id": "FC04053", "verdict": "SUPPORTED", "evidence_refs": ["posix-cat", "posix-head", "posix-tail", "EXEC-UBUNTU04"], "support_note": "cat writes inputs in argument order. head -n 1 is the first line and tail -n 1 is the last. The receipt showed bread, then pasta, then coffee, with head and tail selecting the ends."}
+    ],
+    "coverage": {
+      "reviewed_claim_ids": ["FC04001", "FC04002", "FC04003", "FC04004", "FC04005", "FC04006", "FC04007", "FC04008", "FC04009", "FC04010", "FC04011", "FC04012", "FC04013", "FC04014", "FC04015", "FC04016", "FC04017", "FC04018", "FC04019", "FC04020", "FC04021", "FC04022", "FC04023", "FC04024", "FC04025", "FC04026", "FC04027", "FC04028", "FC04029", "FC04030", "FC04031", "FC04032", "FC04033", "FC04034", "FC04035", "FC04036", "FC04037", "FC04038", "FC04039", "FC04040", "FC04041", "FC04042", "FC04043", "FC04044", "FC04045", "FC04046", "FC04047", "FC04048", "FC04049", "FC04050", "FC04052", "FC04053"],
+      "uncovered_ids": [],
+      "additional_material_claims": []
+    },
+    "source_eligibility": [
+      {"source_id": "apple-filesystem-overview", "verdict": "LIMITED", "reason": "Archived Apple guide is eligible for /Users as a boot-volume home location and for network homes. It is not a census of every deployment."},
+      {"source_id": "fhs-3.0-etc", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /etc section is the primary convention for host-specific configuration."},
+      {"source_id": "fhs-3.0-home", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /home section supports the optional, commonly default user-home placement."},
+      {"source_id": "fhs-3.0-tmp", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /tmp section supports temporary files and site-specific deletion."},
+      {"source_id": "fhs-3.0-var-log", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /var/log section supports log files and directories."},
+      {"source_id": "gnu-tail", "verdict": "ELIGIBLE", "reason": "GNU coreutils tail manual supports the ten-line default and -n. It does not define POSIX tail."},
+      {"source_id": "kubernetes-kubeadm-implementation", "verdict": "ELIGIBLE", "reason": "Current kubeadm implementation page directly states the static Pod manifest directory and kubelet watch."},
+      {"source_id": "kubernetes-kubectl-config", "verdict": "LIMITED", "reason": "Eligible for --kubeconfig, KUBECONFIG and ${HOME}/.kube/config selection. It does not describe certificate or token fields."},
+      {"source_id": "kubernetes-logging", "verdict": "ELIGIBLE", "reason": "Current logging architecture is the right primary page. Its split between journald and /var/log contradicts the page's component-log sentence."},
+      {"source_id": "kubernetes-kubeconfig-v1", "verdict": "ELIGIBLE", "reason": "The v1 API reference supplies AuthInfo and Cluster fields, including certificate data, tokens, usernames and server addresses."},
+      {"source_id": "linux-acl5", "verdict": "ELIGIBLE", "reason": "acl(5) is eligible for the owner-before-group access algorithm and for additional ACL restrictions."},
+      {"source_id": "linux-capabilities7", "verdict": "LIMITED", "reason": "The supplied complete CAP_DAC_OVERRIDE and CAP_DAC_READ_SEARCH entries support some bypasses. The excerpt is not the whole capabilities manual."},
+      {"source_id": "linux-inode7", "verdict": "ELIGIBLE", "reason": "inode(7) is eligible for owner, permissions and timestamp metadata."},
+      {"source_id": "linux-open2", "verdict": "LIMITED", "reason": "The complete EACCES entries support denied access, parent search and parent write on create. They are not all of open(2)."},
+      {"source_id": "linux-path_resolution7", "verdict": "ELIGIBLE", "reason": "The full path_resolution(7) page supports absolute and relative lookup, dot components, mode classes and search permission."},
+      {"source_id": "linux-proc5", "verdict": "ELIGIBLE", "reason": "proc(5) directly defines the proc pseudo-filesystem."},
+      {"source_id": "linux-unlink2", "verdict": "ELIGIBLE", "reason": "unlink(2) supports directory write and search for name removal, plus sticky-bit exceptions."},
+      {"source_id": "linux-zero4", "verdict": "ELIGIBLE", "reason": "null(4) documents /dev/null as a character special file."},
+      {"source_id": "posix-cat", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 cat supports ordered concatenation to standard output."},
+      {"source_id": "posix-cd", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 cd supports HOME, OLDPWD, dot-dot and the CDPATH output exception."},
+      {"source_id": "posix-head", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 head supports the ten-line default and -n."},
+      {"source_id": "posix-ls", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 ls supports default dot, -a, -l fields and -d."},
+      {"source_id": "posix-mkdir", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 mkdir supports plain creation and -p parent creation without an existing-directory error."},
+      {"source_id": "posix-pwd", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 pwd requires an absolute pathname of the working directory."},
+      {"source_id": "posix-tail", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 tail supports the ten-line default and -n."},
+      {"source_id": "posix-touch", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 touch supports creation and timestamp update without a content rewrite."},
+      {"source_id": "ubuntu-bash-command-execution", "verdict": "ELIGIBLE", "reason": "The captured Bash command-execution section supports slash versus PATH lookup."},
+      {"source_id": "ubuntu-bash-topics", "verdict": "ELIGIBLE", "reason": "The captured Bash sections support single quotes, bare tilde, output redirection, noclobber and cd -."},
+      {"source_id": "ubuntu-file1", "verdict": "ELIGIBLE", "reason": "Ubuntu file(1) is eligible for the text-versus-binary classification used here."},
+      {"source_id": "posix-opendir-2024", "verdict": "ELIGIBLE", "reason": "Web-fetched POSIX.1-2024 opendir says read permission denied on the directory is EACCES. Used only for directory listing."},
+      {"source_id": "EXEC-UBUNTU04", "verdict": "LIMITED", "reason": "Eligible only as the supplied native Ubuntu 24.04.5, Bash 5.2.21 playground observation. It is not a source audit or another operating system."}
+    ],
+    "module_scores": {
+      "D1": {
+        "score": 5,
+        "line": 20,
+        "quote": "Navigate absolute and relative paths and choose the safer form",
+        "rationale": "Four outcomes use apply and analyze verbs, and the page teaches and tests each one."
+      },
+      "D2": {
+        "score": 4,
+        "line": 228,
+        "quote": "Once you can point to a file, the next skill is choosing how to read it.",
+        "rationale": "The page moves from tree, navigation and paths to reading, creation, modes and diagnosis, with explicit bridges. Some checkpoint material repeats."
+      },
+      "D3": {
+        "score": 5,
+        "line": 72,
+        "quote": "Pause and predict: if two users on the same Linux machine both read",
+        "rationale": "Prediction checks occur before navigation, paths, reading, dotfiles and redirection, and the lab asks for a prediction before each command."
+      },
+      "D4": {
+        "score": 4,
+        "line": 500,
+        "quote": "Kubernetes client configuration may include certificate data, tokens, context names",
+        "rationale": "Logs, kubeconfig secrecy, path-versus-access errors and qualified Kubernetes locations are concrete. The journald sentence is the bounded factual miss."
+      },
+      "D5": {
+        "score": 5,
+        "line": 683,
+        "quote": "The group bits grant read but not write.",
+        "rationale": "Seven explained quizzes and the exercise cover path choice, reading, mode-bit diagnosis and dotfile limits, including why the answer holds."
+      },
+      "D6": {
+        "score": 4,
+        "line": 371,
+        "quote": "-  rw-  r--  r--",
+        "rationale": "The permission figure is labeled in place, tables separate file and directory meanings, and worked traces precede the unguided diagnosis."
+      },
+      "D7": {
+        "score": 4,
+        "line": 31,
+        "quote": "The goal is being able to look at a path during a real troubleshooting task",
+        "rationale": "The pace and examples stay purposeful. The kitchen comparison is mapped to name, contents and location and is not used as evidence."
+      },
+      "D8": {
+        "score": 4,
+        "line": 604,
+        "quote": "The anti-pattern is pretending one tool fits every job.",
+        "rationale": "For a medium lesson, command-choice tables, mode-bit limits and the path-versus-access split give a usable decision pattern. The journald wording still needs correction."
+      },
+      "total": 35
+    },
+    "lab_scores": {
+      "L1": {
+        "score": 4,
+        "line": 855,
+        "quote": "Diagnostic Challenge: Three Failures, No Recipe",
+        "rationale": "The recipe tree is guided, then three failures require the learner to choose checkpoint commands without a step list."
+      },
+      "L2": {
+        "score": 4,
+        "line": 720,
+        "quote": "Create the project directories.",
+        "rationale": "Tasks move from directories and content to a reading comparison, modes, a hidden name, navigation and an integrated diagnosis."
+      },
+      "L3": {
+        "score": 5,
+        "line": 885,
+        "quote": "Explain why `cat`, `head -n 1`, and `tail -n 1` show different amounts",
+        "rationale": "Completion requires a prediction, an explanation of the different reads, and a written diagnosis of path, type and access failures."
+      },
+      "L4": {
+        "score": 4,
+        "line": 804,
+        "quote": "The first `cat` combines the files in the given order.",
+        "rationale": "Solution notes explain the mechanism and the stop conditions. They are one disclosed explanation rather than adaptive hint tiers."
+      },
+      "L5": {
+        "score": 4,
+        "line": 705,
+        "quote": "The same path and reading decisions apply when you later inspect a manifest or log.",
+        "rationale": "The lab states the transfer to manifests and logs and practices three related failures. It does not add a second open problem."
+      },
+      "total": 21
+    },
+    "topic_outcome_coverage": {
+      "Navigate absolute and relative paths": {
+        "teaching": "Tree, pwd, ls, cd, absolute and relative resolution, and checkpoint narrowing.",
+        "practice": "Tasks 1, 2 and 8, plus diagnostic symptoms 1 and 2.",
+        "assessment": "Quizzes 1, 2 and 4."
+      },
+      "Choose a text-reading command": {
+        "teaching": "cat, head and tail purposes, defaults, -n, and output size.",
+        "practice": "Task 5 individual reads and the three-line summary comparison.",
+        "assessment": "Quiz 6."
+      },
+      "Interpret permissions": {
+        "teaching": "ls -l type and mode groups, file versus directory rwx, parent search, and extra rules.",
+        "practice": "Task 6 and symptom 3.",
+        "assessment": "Quizzes 5 and 7."
+      },
+      "Find and interpret hidden names": {
+        "teaching": "Dot-prefix listing behavior and the statement that a dot is not access control.",
+        "practice": "Controlled .practice-hidden example and task 7.",
+        "assessment": "Quiz 3."
+      }
+    },
+    "accepted_scope_limits": ["Removed Did You Know bullets are accepted. Root and home, dotfiles, /dev/null and /proc, and the bounded Kubernetes paths remain taught where used.", "cp, mv, rm and chmod are not new outcomes. Cleanup stays a link to Module 0.3 Step 8.", "The old graded scenario's default-root stop and step-3 false positive stay negative evidence. This page uses the ungraded Ubuntu playground and does not say that grader was repaired.", "ACLs, capabilities, noclobber and CDPATH are boundaries, not full topics.", "No Windows, macOS or other-shell execution is claimed."],
+    "material_omissions": [],
+    "practice_evidence_disposition": "The supplied EXEC-UBUNTU04 playground follow-up matches this candidate's single-quoted recipes, fresh kubedojo-practice workspace, controlled .practice-hidden file, four-command summary, three diagnostics and owned rm cleanup on Ubuntu 24.04.5 and Bash 5.2.21. The earlier receipt page used double quotes; the current page now uses the executed single quotes. && wrappers and collision checks are harness around the same commands. Illustrative kubeconfig, syslog and home listings were correctly not executed. This invocation did not rerun the lab. The remaining difference is not material. The journald sentence was not an executed command.",
+    "prior_finding_dispositions": [
+      {"id": "2026-05-30-kubeconfig-dump", "disposition": "preserved", "note": "The page uses ls -l ~/.kube/config and warns against printing tokens or certificates. No head or cat of a real kubeconfig is taught."},
+      {"id": "2026-05-30-placeholder-commands", "disposition": "preserved", "note": "Machine-specific and prerequisite paths remain text examples, with an instruction not to inspect real configuration or keys."},
+      {"id": "P02b-workspace-and-nesting", "disposition": "preserved", "note": "A fresh workspace uses plain mkdir, stops on error, and keeps later recipe paths inside that workspace. touch is described as preserving existing content."},
+      {"id": "graded-lab-root-and-step3", "disposition": "retained-negative", "note": "Root stayed on graded step 1 until su - ubuntu, and step 3 advanced while the synthetic file remained mode 000. Checker identity is unknown. The candidate does not claim a repair."}
+    ],
+    "performed_checks": ["Read the full current module, seed claims, source index, review context, scope plan, practice receipt, integration notes, structural record, prior May 30 review, P02b note, changelog entries, and the Module 0.3 Step 8 cleanup target.", "Read the captured primary passages for all 52 current claims, including kubeadm, kubectl config, kubeconfig v1, logging, FHS, POSIX utilities, Bash, path resolution, open, unlink, ACL and capabilities.", "Fetched POSIX.1-2024 opendir and General Concepts 4.7 to resolve directory read permission. Chapter 4.7 was truncated before a separate directory-read definition; the opendir EACCES sentence was complete.", "Compared the current command text with the supplied playground receipt. No shell, browser, lab rerun, test execution, write, or message."],
+    "supplied_checks": ["Pipeline tests exited 0 and the fixture was restored.", "Primary main npm run build at 2c5c90fe3ccf7049abeae573d27733bfc4635787 exited 0 and did not include this candidate. Candidate branch CI is pending.", "Structural T1 reports only removed Did You Know and section-order diagnostics. Eleven source URLs: ten HTTP 200 and one redirect.", "Two tracked files, 194 aggregate lines, and no Ukrainian changes. No publication or canonical acceptance."],
+    "limits": ["No independent execution of the playground or of the page commands.", "The primary build does not validate this head. Branch CI was not observed.", "Allowlist absence was not treated as a factual or eligibility verdict.", "Metadata, schema and word counts were not treated as semantic approval."],
+    "companion": {
+      "author": {
+        "family": "OpenAI",
+        "provider": "OpenAI",
+        "model": "Codex/Terra",
+        "harness": "Codex",
+        "effective_route": "authoring route named by the task as OpenAI Codex/Terra"
+      },
+      "reviewer": {
+        "family": "xAI",
+        "provider": "xAI",
+        "model": "Grok 4.7",
+        "harness": "regular Grok review invocation",
+        "effective_route": "direct read-only review; no subagent and no dispatch route"
+      },
+      "review_kind": "combined source, editorial, practice and content-PR R1",
+      "scope": "PR 3773 module 0.4 only; no PR 3738 and no other held page",
+      "budgets": {
+        "whole_page_audit": {
+          "cap": 2,
+          "spent": 1,
+          "remaining": 1,
+          "historical_reset": false
+        },
+        "content_pr": {
+          "cap": 2,
+          "spent": 1,
+          "remaining": 1,
+          "historical_reset": false
+        },
+        "note": "This call judges both new streams once. NEEDS_CHANGES leaves one fix review in each cap. May 30 and P02b counters were not reset."
+      }
+    }
+  },
+  "original_integrity": {
+    "head": "115439c43805fc0f9915c55a8051b10e92584b00",
+    "run_identity": "f07da2db-7840-41aa-9bde-207105c95da1",
+    "native_model": "grok-4.7",
+    "native_stop": "end_turn",
+    "verdict_sha256": "sha256:ceeb9f77266924464dad3ef9ab14cb1ef0924eb70653a4ba6597e14d39fee059",
+    "verdict": "NEEDS_CHANGES",
+    "stream_digest": "sha256:6c35e95c250e8cf57792672647e809b06fc2a2bc6f8e9eb36f9bac365629a142",
+    "quote_locator_errors_retained": ["D1", "D2", "D5", "D6", "L3", "L4"],
+    "scope": "R1 NEEDS_CHANGES preserved; no acceptance. Scored values are provisional pending factual correction and genuine R2."
+  },
+  "original_verdict_digest": "sha256:ceeb9f77266924464dad3ef9ab14cb1ef0924eb70653a4ba6597e14d39fee059",
+  "original_review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3773#issuecomment-6558638777",
+  "practice_publication_mapping": {
+    "source_id": "EXEC-UBUNTU04",
+    "retrieval_uri": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3773#issuecomment-6558571851",
+    "body_digest": "sha256:4ac9bd4260c038405f0029b77ba0c8de771df719c98083c52c394b9533ff250f",
+    "frozen_source_index_digest": "sha256:2364c58032fd8e6989153a8f2789918536059d3d98b488820b560b210a2766c1",
+    "original_retrieval_uri": null,
+    "exact_body_equal": true,
+    "scope": "Exact retained synthetic practice receipt published after R1 began; unchanged body/page/seed/index. Public-copy metadata only, not a new or restamped source judgment."
+  },
+  "sources": [
+    {"source_id": "EXEC-UBUNTU04", "retrieval_uri": null, "snapshot_digest": "sha256:4ac9bd4260c038405f0029b77ba0c8de771df719c98083c52c394b9533ff250f", "review_text_digest": "sha256:4ac9bd4260c038405f0029b77ba0c8de771df719c98083c52c394b9533ff250f", "capture_scope": "Retained full local human-observed native Chrome practice receipt; not a source audit.", "qualifiers": "One hosted Ubuntu/Bash session; retain old graded-lab negatives, unknown grader identity and ungraded playground observations separately.", "review_eligibility": {"source_id": "EXEC-UBUNTU04", "verdict": "LIMITED", "reason": "Eligible only as the supplied native Ubuntu 24.04.5, Bash 5.2.21 playground observation. It is not a source audit or another operating system."}},
+    {"source_id": "apple-filesystem-overview", "retrieval_uri": "https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html", "snapshot_digest": "sha256:3632c19044906714af5bfbc1029d882f35d1bd70208224b2836acc26d0e29d72", "review_text_digest": "sha256:a7ece2c4af7b9fb2634e9ea4763ba41e4b694dc19b21829c0d3fabdcbda34777", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Archived Apple developer guide; home location conventions do not establish every deployment.", "review_eligibility": {"source_id": "apple-filesystem-overview", "verdict": "LIMITED", "reason": "Archived Apple guide is eligible for /Users as a boot-volume home location and for network homes. It is not a census of every deployment."}},
+    {"source_id": "fhs-3.0-etc", "retrieval_uri": "https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch03s07.html", "snapshot_digest": "sha256:533cbcfc344600afc7aa67949acf1580187c8426d48e54a7b66e312c4ca82fb7", "review_text_digest": "sha256:c69f08c1d97217cddcf9c297e20b8142d70b856a030accc746ab35ca4a50a2eb", "capture_scope": "complete returned FHS section HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Complete captured body; verify applicability and qualifications.", "review_eligibility": {"source_id": "fhs-3.0-etc", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /etc section is the primary convention for host-specific configuration."}},
+    {"source_id": "fhs-3.0-home", "retrieval_uri": "https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch03s08.html", "snapshot_digest": "sha256:0f65013d16938107a0aabf5b16728576649cec925dff43e64f52d251116232f8", "review_text_digest": "sha256:859c12457aba7d7ec16bc3e92c09ca3f26c945b7fb77a1350d5970c952ae31d6", "capture_scope": "complete returned FHS section HTML document; parser-generated full text body, no topical cropping", "qualifiers": "FHS convention; exceptions and optionality remain applicable.", "review_eligibility": {"source_id": "fhs-3.0-home", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /home section supports the optional, commonly default user-home placement."}},
+    {"source_id": "fhs-3.0-tmp", "retrieval_uri": "https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch03s18.html", "snapshot_digest": "sha256:06352d901244d452331758cb1bc88e8d0c8ed0914653cbeb02074cbb54fb559e", "review_text_digest": "sha256:dbd7135306a77f78bc2512080297a2bc4dc16c9a2f5752215bbbd453d02db902", "capture_scope": "complete returned FHS section HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Complete captured body; verify applicability and qualifications.", "review_eligibility": {"source_id": "fhs-3.0-tmp", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /tmp section supports temporary files and site-specific deletion."}},
+    {"source_id": "fhs-3.0-var-log", "retrieval_uri": "https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s10.html", "snapshot_digest": "sha256:9722d01b451ffd0d57094668ac2f95f8f305fba4896441cd503f922671a92b19", "review_text_digest": "sha256:0abe012182b46a7139dbb6041e617d844010dc762d20974f376c8c896f1ba497", "capture_scope": "complete returned FHS section HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Complete captured body; verify applicability and qualifications.", "review_eligibility": {"source_id": "fhs-3.0-var-log", "verdict": "ELIGIBLE", "reason": "FHS 3.0 /var/log section supports log files and directories."}},
+    {"source_id": "gnu-tail", "retrieval_uri": "https://www.gnu.org/s/coreutils/manual/html_node/tail-invocation.html", "snapshot_digest": "sha256:2104774111875039a6de49d7a371f6b778a6d6da4104924af9d554809605fa41", "review_text_digest": "sha256:d34c8e002c23bc11fc18d8657f7f1f6889c86009ae0dd9c296e3fc94e0a39068", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Lines 41-62. GNU-specific; this is a complete manual page capture.", "review_eligibility": {"source_id": "gnu-tail", "verdict": "ELIGIBLE", "reason": "GNU coreutils tail manual supports the ten-line default and -n. It does not define POSIX tail."}},
+    {"source_id": "kubernetes-kubeadm-implementation", "retrieval_uri": "https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/", "snapshot_digest": "sha256:bb547570fe6afe5ee1edaabaf48a316384f4426d620293c661a98df6fb56546d", "review_text_digest": "sha256:ea2e823350780393f3f2630f5187245fc69f277b63e34a0f8a160c43df38c280", "capture_scope": "Complete HTML main article text, excluding navigation, scripts and styles; full parent retained.", "qualifiers": "Complete main article including static Pod manifest generation.", "review_eligibility": {"source_id": "kubernetes-kubeadm-implementation", "verdict": "ELIGIBLE", "reason": "Current kubeadm implementation page directly states the static Pod manifest directory and kubelet watch."}},
+    {"source_id": "kubernetes-kubeconfig-v1", "retrieval_uri": "https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/", "snapshot_digest": "sha256:5feb5b6f005258dc1136156928322e7e97c5a28af7a2afad9f1b1c784a903504", "review_text_digest": "sha256:65d4be8c623be8762c2b6ef6375e955ced82c360d8ef953b4c713d48a9de6bff", "capture_scope": "Complete HTML main article text including AuthInfo and Cluster sections; navigation, scripts and styles excluded; full parent retained.", "qualifiers": "Only the documented kubeconfig v1 API fields and types in the captured AuthInfo and Cluster sections; not a claim that each field must be populated or that any credential is safe to reveal.", "review_eligibility": {"source_id": "kubernetes-kubeconfig-v1", "verdict": "ELIGIBLE", "reason": "The v1 API reference supplies AuthInfo and Cluster fields, including certificate data, tokens, usernames and server addresses."}},
+    {"source_id": "kubernetes-kubectl-config", "retrieval_uri": "https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config/", "snapshot_digest": "sha256:d40b3c3771acb8a7487417c4673142c2e00fb6cc9e97d8de29341b72448caa11", "review_text_digest": "sha256:91131ccafa280381b3dce7cc31fb3b9af6136664d520ddbb77ff237b6c3c2752", "capture_scope": "Complete HTML main article text, excluding navigation, scripts and styles; full parent retained.", "qualifiers": "Complete main article with selection order and options; actual secret-data content may require other Kubernetes evidence.", "review_eligibility": {"source_id": "kubernetes-kubectl-config", "verdict": "LIMITED", "reason": "Eligible for --kubeconfig, KUBECONFIG and ${HOME}/.kube/config selection. It does not describe certificate or token fields."}},
+    {"source_id": "kubernetes-logging", "retrieval_uri": "https://kubernetes.io/docs/concepts/cluster-administration/logging/", "snapshot_digest": "sha256:74d078eaf1cb2af721378b984d1bf6e799182b478362acfa95cacf3804943f31", "review_text_digest": "sha256:d4a97a881c29bc25606ee46d7b0a4d8929a1a2caf24b0ae339fab043417d133b", "capture_scope": "Complete HTML main article text, excluding navigation, scripts and styles; full parent retained.", "qualifiers": "Complete main article including container and system component logging; setup and configuration vary.", "review_eligibility": {"source_id": "kubernetes-logging", "verdict": "ELIGIBLE", "reason": "Current logging architecture is the right primary page. Its split between journald and /var/log contradicts the page's component-log sentence."}},
+    {"source_id": "linux-acl5", "retrieval_uri": "https://man7.org/linux/man-pages/man5/acl.5.html", "snapshot_digest": "sha256:6c004a658fbd601b2820bab886bc86e777a832f36855bc2312a17888e4c62228", "review_text_digest": "sha256:93433ec47c5a06c91bc73c835b47d38e6e1bfec8cd2cbbf3353ca4eb2b980bb5", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "ACL effects depend on actual access entries and masks.", "review_eligibility": {"source_id": "linux-acl5", "verdict": "ELIGIBLE", "reason": "acl(5) is eligible for the owner-before-group access algorithm and for additional ACL restrictions."}},
+    {"source_id": "linux-capabilities7", "retrieval_uri": "https://man7.org/linux/man-pages/man7/capabilities.7.html", "snapshot_digest": "sha256:79ca88f6d8984ca2858860e7267d7c4660f6555151cc1f570305a9c6dfccf714", "review_text_digest": "sha256:362b07c238c2fd57b95dadfd76e48462825a277c3f887b22c7ed841a58ae0cbc", "capture_scope": "Complete DESCRIPTION introduction and complete CAP_DAC_OVERRIDE and CAP_DAC_READ_SEARCH entries; full parent retained.", "qualifiers": "Selected complete CAP_DAC_OVERRIDE and CAP_DAC_READ_SEARCH entries plus introductory context; see retained full parent for all capabilities.", "review_eligibility": {"source_id": "linux-capabilities7", "verdict": "LIMITED", "reason": "The supplied complete CAP_DAC_OVERRIDE and CAP_DAC_READ_SEARCH entries support some bypasses. The excerpt is not the whole capabilities manual."}},
+    {"source_id": "linux-inode7", "retrieval_uri": "https://man7.org/linux/man-pages/man7/inode.7.html", "snapshot_digest": "sha256:e58d9f6663e6e331bee30caa3a15bab782328631093b1c9ad18a556420dcc427", "review_text_digest": "sha256:8e3612c7a6d04e84876e580a80dad60cb0b28a3588fc8d586cbc57b4f82f84e5", "capture_scope": "complete returned manual HTML page; parser-generated full text body, no topical cropping", "qualifiers": "Complete captured body; verify applicability and qualifications.", "review_eligibility": {"source_id": "linux-inode7", "verdict": "ELIGIBLE", "reason": "inode(7) is eligible for owner, permissions and timestamp metadata."}},
+    {"source_id": "linux-open2", "retrieval_uri": "https://man7.org/linux/man-pages/man2/open.2.html", "snapshot_digest": "sha256:d665489cadb85624d98fae03a8d8d06209030f32735cff8aeba949ad8491c789", "review_text_digest": "sha256:606ad2203e913d48c0e087f350577301684d535084d138716a46394a6c7a6bc8", "capture_scope": "Complete ERRORS introduction and both complete EACCES entries, ending before EBADF; full parent retained.", "qualifiers": "Both complete EACCES entries with ERRORS introductory context; see linux-path_resolution7 and full parent for broader conditions.", "review_eligibility": {"source_id": "linux-open2", "verdict": "LIMITED", "reason": "The complete EACCES entries support denied access, parent search and parent write on create. They are not all of open(2)."}},
+    {"source_id": "linux-path_resolution7", "retrieval_uri": "https://man7.org/linux/man-pages/man7/path_resolution.7.html", "snapshot_digest": "sha256:94e3dcca3161a98b0425aba98b32e6bf083a74d10243c548dce18b4a7a2184b4", "review_text_digest": "sha256:c6f41b956c01aeaa6b01a1c0eb8edfa173a3fcac86d4f7f8283f87ea015cb891", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Path access depends on each prefix, credentials, capabilities and other applicable access rules.", "review_eligibility": {"source_id": "linux-path_resolution7", "verdict": "ELIGIBLE", "reason": "The full path_resolution(7) page supports absolute and relative lookup, dot components, mode classes and search permission."}},
+    {"source_id": "linux-proc5", "retrieval_uri": "https://man7.org/linux/man-pages/man5/proc.5.html", "snapshot_digest": "sha256:b197c5fa64577269f992d50f60acfd5e0cc3df756644ddd8bd19a02591272a97", "review_text_digest": "sha256:c3eae6f00adf018ce7aa4b2178173d6569873459eabd8d2b2aec2307f026e844", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Lines 91-271 (DESCRIPTION). Visibility/configuration varies (e.g. hidepid); do not imply ordinary files or universal access.", "review_eligibility": {"source_id": "linux-proc5", "verdict": "ELIGIBLE", "reason": "proc(5) directly defines the proc pseudo-filesystem."}},
+    {"source_id": "linux-unlink2", "retrieval_uri": "https://man7.org/linux/man-pages/man2/unlink.2.html", "snapshot_digest": "sha256:54342d11f277bc670a1896301752b87abbb27261a1e84e8300f2d4c1b0fbde9b", "review_text_digest": "sha256:36300d31be80c84398878c6e901a12ddbac9c79a19bf9158a49190d9e7cf2b03", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Lines 184-237 (ERRORS). Keep scoped to unlink/removal; current lesson does not teach deletion.", "review_eligibility": {"source_id": "linux-unlink2", "verdict": "ELIGIBLE", "reason": "unlink(2) supports directory write and search for name removal, plus sticky-bit exceptions."}},
+    {"source_id": "linux-zero4", "retrieval_uri": "https://man7.org/linux/man-pages/man4/zero.4.html", "snapshot_digest": "sha256:ef30e2c7e50cc587b560adc5da98123deb6926be873a3793fb9b43d61944cf7b", "review_text_digest": "sha256:cae0228d967665748847446428261d9d6b2497b53217058fe9a47899809027b8", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Lines 91-123 (DESCRIPTION/FILES). Examples only; not proof that every /dev entry is a device node.", "review_eligibility": {"source_id": "linux-zero4", "verdict": "ELIGIBLE", "reason": "null(4) documents /dev/null as a character special file."}},
+    {"source_id": "posix-cat", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cat.html", "snapshot_digest": "sha256:c65d7288eec83a6e19ad3c6e5d407eb0c072d856d73674ecf619e52a3c2a1d66", "review_text_digest": "sha256:3553def5de2fd40aec86f97ff2e3ffdb7e48dacf317782ab3c9d19efffe2b170", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "Does not support reading secrets or justify unbounded output; preserve page safety guidance.", "review_eligibility": {"source_id": "posix-cat", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 cat supports ordered concatenation to standard output."}},
+    {"source_id": "posix-cd", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html", "snapshot_digest": "sha256:6c62adc698387aa20c6331a59c069c520cce58868f1f36adb4eb1a26972d41ee", "review_text_digest": "sha256:f286d6c97d4e025ee9455a8c6405e9c7281820ba102bf6f4b5073bf33d61a665", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "POSIX cd includes CDPATH and option/context qualifiers.", "review_eligibility": {"source_id": "posix-cd", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 cd supports HOME, OLDPWD, dot-dot and the CDPATH output exception."}},
+    {"source_id": "posix-head", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/head.html", "snapshot_digest": "sha256:812ce0ca42b45f118d748fc0131a49b3a307bc3042235fd85a9ede87db32cc47", "review_text_digest": "sha256:9927664ec96a1560ce49aebcfc34b278171e4f6c2cc7dc7ffe17a4989f6e43ed", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "POSIX utility behavior, not evidence for every non-POSIX implementation.", "review_eligibility": {"source_id": "posix-head", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 head supports the ten-line default and -n."}},
+    {"source_id": "posix-ls", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html", "snapshot_digest": "sha256:cd4db85f09dbadf3d529b1bf6a8c157806759c5a22d3ca616aad0cc0363f07bc", "review_text_digest": "sha256:489a39dd1d869697469bd2572934d9d98c661a2f417a24a319c4ac522f564ebb", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "Dot-leading name affects default ls visibility only; not secrecy/access control. Use exact source section for -d if retained.", "review_eligibility": {"source_id": "posix-ls", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 ls supports default dot, -a, -l fields and -d."}},
+    {"source_id": "posix-mkdir", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html", "snapshot_digest": "sha256:7d37d11b3829422919fbc928cf3e4e0e2c9ba3d0eaba2e2e36362e80f4086576", "review_text_digest": "sha256:61d4a0c39a193f2f4c36554bd56dfed8221f1d446fa7dd8c1b3ec8971aa5bca2", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "Does not establish P02b safety sequence or collision evidence.", "review_eligibility": {"source_id": "posix-mkdir", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 mkdir supports plain creation and -p parent creation without an existing-directory error."}},
+    {"source_id": "posix-opendir-2024", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/functions/opendir.html", "snapshot_digest": "sha256:d0ca4c31cd85900e9f16716942693a4fb56863a3997ba6af0534d3b381f465d0", "review_text_digest": "sha256:9133d6d2a18c42985d79a0218b9e6e6647d464d8b0ea1efc60a512ebaf35e429", "capture_scope": "Exact complete text returned to the reviewer by native web_fetch, with no author cropping. Snapshot hashes the returned tool payload, not upstream raw HTML.", "qualifiers": "POSIX.1-2024 opendir read-permission EACCES; used only for directory listing, not all access decisions.", "review_eligibility": {"source_id": "posix-opendir-2024", "verdict": "ELIGIBLE", "reason": "Web-fetched POSIX.1-2024 opendir says read permission denied on the directory is EACCES. Used only for directory listing."}, "reviewer_retrieval": {"run_identity": "f07da2db-7840-41aa-9bde-207105c95da1", "tool_use_id": "call-50fa05b8-f279-47f5-a59c-92bb020a712b-73", "native_stream_digest": "sha256:6c35e95c250e8cf57792672647e809b06fc2a2bc6f8e9eb36f9bac365629a142", "tool_result_digest": "sha256:d0ca4c31cd85900e9f16716942693a4fb56863a3997ba6af0534d3b381f465d0", "http_status": 200, "returned_content_fields": ["url", "content", "content_type", "status_code", "bytes"], "retrieval_time": "within actual R1 run; per-tool timestamp not emitted", "source_eligibility_from": "genuine R1 posix-opendir-2024 ELIGIBLE, reaffirmed in R2"}},
+    {"source_id": "posix-pwd", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pwd.html", "snapshot_digest": "sha256:6c0724e219d469ac68640fc07c825a95e090931483b9cee2d089dec136efd7f6", "review_text_digest": "sha256:0fe12cb226e06dbe2146472006839c1514e7c63ee775f3b7b37abaf8b1a672b1", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "No claims about -L/-P, symlinks, or every implementation detail.", "review_eligibility": {"source_id": "posix-pwd", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 pwd requires an absolute pathname of the working directory."}},
+    {"source_id": "posix-tail", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/tail.html", "snapshot_digest": "sha256:792dfe494f50222bf7a71c9550b842dfb51632ca449c1c3af2ddf28b87304ad8", "review_text_digest": "sha256:477b53f3956f6e1b575060918885c46804ffa311c66bf22e941e14f08e8f5f6f", "capture_scope": "complete returned HTML document; parser-generated full text body, no topical cropping", "qualifiers": "Lines 54-74 and tail examples near 380-400. Use for portable claims; follow platform syntax.", "review_eligibility": {"source_id": "posix-tail", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 tail supports the ten-line default and -n."}},
+    {"source_id": "posix-touch", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html", "snapshot_digest": "sha256:ae8c1a8fc027372a6a50561b7c07bea8c30a471458ee72c00d7b35c039d756b7", "review_text_digest": "sha256:f3644425ed227b8c6162f56b9213193eb49ab70795cc5982f9799c432cb52e5c", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "Avoid implying touch only creates files; existing-file timestamp behavior matters.", "review_eligibility": {"source_id": "posix-touch", "verdict": "ELIGIBLE", "reason": "POSIX.1-2024 touch supports creation and timestamp update without a content rewrite."}},
+    {"source_id": "ubuntu-bash-command-execution", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html", "snapshot_digest": "sha256:1615da7cb93dbcbeb944582d74d80ba977dae02870ea9e5b64c2e5967a6b538d", "review_text_digest": "sha256:0717b78421b27540c84e18981b676579f44a14d45316f9f1b7e385a49ffc8156", "capture_scope": "complete Bash manual COMMAND EXECUTION section from retained parent HTML, through immediately before next h2; no network fetch or topic-window cropping", "qualifiers": "Complete COMMAND EXECUTION section; full Bash parent retained.", "review_eligibility": {"source_id": "ubuntu-bash-command-execution", "verdict": "ELIGIBLE", "reason": "The captured Bash command-execution section supports slash versus PATH lookup."}},
+    {"source_id": "ubuntu-bash-topics", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html", "snapshot_digest": "sha256:f4b959a94ee56f204df280261be1ea04716007582c9a65d3b46e74dbe5357f03", "review_text_digest": "sha256:c52cea86ff4931421d4aedd01b7c35f398acdc4a9cf5043ee5441cbdfce714cd", "capture_scope": "Complete named manual sections: definitions, simple commands, pipelines, quoting, tilde expansion, word splitting, output redirection, prompting, commands for moving, history, shell builtins. Full parent HTML retained as ubuntu-bash.html; no character-window cropping.", "qualifiers": "Named complete sections only; redirection depends on noclobber and empty tilde expansion is shell-specific.", "review_eligibility": {"source_id": "ubuntu-bash-topics", "verdict": "ELIGIBLE", "reason": "The captured Bash sections support single quotes, bare tilde, output redirection, noclobber and cd -."}},
+    {"source_id": "ubuntu-file1", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/file.1.html", "snapshot_digest": "sha256:0a654b48d15c6f667e2b71542459b988c100a4c9d9a17ad71244dd2b437c054e", "review_text_digest": "sha256:4d914d21d779afb22f9f7cad8803b2cf543a0b342ccdf6caa4a0be42afcf6adb", "capture_scope": "complete returned manual HTML page; parser-generated full text body, no topical cropping", "qualifiers": "Complete captured body; verify applicability and qualifications.", "review_eligibility": {"source_id": "ubuntu-file1", "verdict": "ELIGIBLE", "reason": "Ubuntu file(1) is eligible for the text-versus-binary classification used here."}}
+  ],
+  "publication": {
+    "http": {
+      "url": "https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.4-files-and-directories/",
+      "status": 200,
+      "deployment": {
+        "conclusion": "success",
+        "databaseId": 41312719391,
+        "headSha": "1a59c87a9a6369798a624b2a3119fc6f8afdf012",
+        "status": "completed",
+        "url": "https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/41312719391"
+      },
+      "observed_at": "2026-11-01T13:56:59.016494+00:00",
+      "checks": {
+        "playground_link": true,
+        "observable_reading_task": true,
+        "summary_commands": true,
+        "controlled_dotfile": true,
+        "ordinary_group_bits": true,
+        "qualified_kubeadm": true,
+        "whats_new_benefits": true
+      },
+      "removed_text_absent": {
+        "overbroad_journald_clause": true,
+        "old_graded_association": true,
+        "redundant_config_catalog": true
+      },
+      "response_sha256": "sha256:d39d54e001fa215e60a2156d5b7fd746649087bd84815a74f8764fcb72009cdd",
+      "changelog_status": 200
+    },
+    "native": {
+      "url": "https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.4-files-and-directories/",
+      "merge": "1a59c87a9a6369798a624b2a3119fc6f8afdf012",
+      "deployment_run": 41312719391,
+      "observed_at": "2026-11-01T13:58:02.760514+00:00",
+      "new_text_observed": true,
+      "interaction_checks": {
+        "current_reading_prediction_and_four_commands_visible": true,
+        "task5_disclosure_opens_and_explains_order_and_head_tail": true,
+        "quiz5_disclosure_opens_with_ordinary_bits_and_parent_rules": true,
+        "controlled_dotfile_and_ubuntu_playground_visible": true,
+        "layout_visually_inspected": true
+      },
+      "evidence": ["publication-native-initial.ax.txt", "publication-native-expanded.ax.txt"],
+      "limits": "Native Chrome actual published URL; screenshot visually inspected, not retained. Not another lab execution or every-platform proof."
+    },
+    "merge": {
+      "pr": 3773,
+      "head": "e4ad9f706302210eb73405bc197316d9efa44900",
+      "merge": "1a59c87a9a6369798a624b2a3119fc6f8afdf012",
+      "review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3773#issuecomment-6558768843",
+      "reviewed_tree": "936e91c1ade0f693bbb0cbd2ee018a39a7d70b98",
+      "merged_tree": "936e91c1ade0f693bbb0cbd2ee018a39a7d70b98",
+      "full_trees_equal": true,
+      "ci_checks": 11,
+      "ci_passed": true,
+      "review_result": "APPROVE STOP2/2 source and content"
+    }
+  }
+}
