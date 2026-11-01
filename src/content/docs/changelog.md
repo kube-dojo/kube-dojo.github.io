@@ -10,6 +10,8 @@ sidebar:
 
 Explore recent improvements to practice and troubleshooting:
 
+- **Edit, verify, and run a small script.** [Editing Files](/prerequisites/zero-to-terminal/module-0.5-editing-files/) uses an Ubuntu playground for Nano practice and separates saved text, execute permissions, and script errors.
+
 - **Choose terminal commands by their effect.** [First Terminal Commands](/prerequisites/zero-to-terminal/module-0.3-first-commands/) practices file operations and pipeline troubleshooting. [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) compares whole-file and partial reads, reveals a controlled dotfile, and distinguishes path failures from access failures in an Ubuntu playground.
 
 - **Check computer resources and terminal commands.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) adds diagnosis hints before you recommend a change. [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) uses concrete interface choices and asks you to check what command output establishes.

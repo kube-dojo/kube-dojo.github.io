@@ -4,16 +4,10 @@ slug: prerequisites/zero-to-terminal/module-0.5-editing-files
 revision_pending: false
 sidebar:
   order: 6
-lab:
-  id: "prereq-0.5-editing-files"
-  url: "https://killercoda.com/kubedojo/scenario/prereq-0.5-editing-files"
-  duration: "20 min"
-  difficulty: "beginner"
-  environment: "ubuntu"
 ---
 > **Complexity**: `[MEDIUM]` - Long-form practice: type what you see, save, verify, and run a tiny script
 >
-> **Time to Complete**: 80–100 minutes (read + editor drills)
+> **Time to Complete**: Estimate 80–100 minutes for reading and practice; individual times vary.
 >
 > **Prerequisites**: [Module 0.4 - Files and Directories](../module-0.4-files-and-directories/), which builds on [Module 0.3 - First Terminal Commands](../module-0.3-first-commands/)
 
@@ -32,9 +26,9 @@ By the end of this module you will have practiced the full editing loop that app
 
 Hypothetical scenario: you are connected to a training Linux host over a terminal, and a practice service refuses to start because its configuration file has one misspelled setting. There is no desktop editor on that host, and copying the file back to your laptop would add several chances to edit the wrong copy. The practical question is not whether you are a "terminal person"; the question is whether you can open the right file, make the smallest safe change, save it, and prove that the file now contains what you intended.
 
-In the previous terminal modules, you created empty files with `touch` and inspected directories with commands such as `ls` and `pwd`. Empty files are like blank order tickets in a restaurant kitchen: they reserve a place, but they do not tell anyone what to cook. Real systems use text files for shell scripts, package lists, service configuration, environment files, documentation notes, and eventually Kubernetes manifests for version 1.35 and later clusters. Once text becomes the instruction layer for a system, editing it safely becomes an operations skill rather than a typing exercise.
+In the previous terminal modules, you created empty files with `touch` and inspected directories with commands such as `ls` and `pwd`. Empty files are like blank order tickets in a restaurant kitchen: they reserve a place, but they do not tell anyone what to cook. Real systems use text files for shell scripts, package lists, service configuration, environment files, documentation notes, and eventually Kubernetes manifests. Once text becomes the instruction layer for a system, editing it safely becomes an operations skill rather than a typing exercise.
 
-This lesson starts with `nano` because it behaves the way most beginners expect: you type letters and they appear in the file. That does not make it a toy. Many experienced engineers still use `nano` for quick edits because it shows its main commands on screen and keeps the cognitive load low when the real problem is the file content. You will also meet `vim`, not as a status symbol, but as a tool with different tradeoffs that becomes valuable after the basic file-editing loop feels routine.
+This lesson starts with `nano`: you can type into a buffer and use the displayed commands to save and exit. You will also compare it with `vim` and file viewers.
 
 ## Why Terminal Editing Exists
 
@@ -74,16 +68,14 @@ The correct answer is the file on disk, because the shell and `cat` know nothing
 
 ## Meet nano Before You Need It
 
-There are many editors that run in a terminal, but the two names beginners hear most often are `nano` and `vim`. We start with `nano` because its interaction model is direct: open a file, type text, save with a visible shortcut, and exit with another visible shortcut. `vim` is extremely powerful, but it uses modes, so pressing a letter may insert text in one mode and run an editor command in another. That mode system is valuable after you learn it, yet it is a poor first obstacle when the real lesson is safe file editing.
+Both `nano` and `vim` run in a terminal. In `nano`, you can open a file and type into its buffer. `vim` uses modes: a key may insert text in one mode and issue a command in another. This lesson uses `nano` for the editing loop.
 
 | nano | vim |
 |------|-----|
-| Works the way you'd expect | Has a steep learning curve |
-| Type and it types | [You need to press `i` before you can type](https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt) |
-| Menu at the bottom shows you how to save and quit | People famously get stuck and can't figure out how to exit |
-| Perfect for beginners | Powerful but overwhelming at first |
+| Typing enters text into the buffer | Insert mode accepts text ([Vim introduction](https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt)) |
+| Menu shows common shortcuts | Modes distinguish editing from commands |
 
-The comparison is not an argument that one editor is morally better than another. It is a decision about the first tool for a specific job. If you need to make a small, confident edit on a remote host today, `nano` is a good default because it keeps the commands visible. If you later spend hours editing code over SSH, `vim` may become attractive because its movement, search, macros, and repeat commands reward practice. A good engineer chooses tools by situation, not by folklore.
+Choose a tool that fits the task and the environment. This module introduces `nano`; it does not require you to learn Vim's commands.
 
 You will see the same idea when choosing between `nano` and `cat`. `nano` is for changing a file, while `cat` is for printing a file to the terminal. Opening an editor just to look at a file creates unnecessary risk because a stray keystroke can modify the buffer. Printing a file with `cat` when you meant to edit it is harmless but ineffective. The workflow is easier when each command has a clear job in your mind.
 
@@ -96,11 +88,9 @@ Most systems will show "No such file or directory," and that is useful feedback 
 
 </details>
 
-There is another subtle editor distinction that will matter later: some editors are optimized for discoverability, and others are optimized for speed after memorization. `nano` makes common commands visible at the bottom of the screen, so it is easy to recover when you forget a shortcut. `vim` hides much of its power behind commands, modes, and combinations that become fast only after practice. This module chooses discoverability because the first milestone is not speed; it is making correct changes without getting trapped inside the tool.
-
 ## Opening, Editing, Saving, and Exiting
 
-Create a fresh disposable workspace before opening any practice filename. Existing files under your home directory are not automatically safe to edit or remove. Keep this workspace under your exclusive control and use it for every example, script, hands-on task, and cleanup command in this lesson.
+You can use the [plain Ubuntu playground](https://killercoda.com/playgrounds/scenario/ubuntu) for this self-checked practice. If it opens as root, `su - ubuntu` switches to its existing unprivileged account. Create a fresh disposable workspace before opening any practice filename. Existing files under your home directory are not automatically safe to edit or remove. Keep this workspace under your exclusive control and use it for every example, script, hands-on task, and cleanup command in this lesson.
 
 Run these commands **one line at a time**. If `mkdir` or `cd` reports any error, stop before the next command. If the workspace name already exists as a file, directory, or symbolic link, leave it untouched and choose an unused name such as `kubedojo-editing-2`; substitute that name in later paths. Use plain `mkdir` for this root, not `mkdir -p`, which would accept an existing directory.
 
@@ -125,7 +115,7 @@ nano hello.txt
 Your screen will change completely because the terminal is now controlled by `nano` instead of your shell prompt. This simplified GNU nano screen is illustrative; versions, terminal width, and configuration can change the menu. Confirm the GNU nano banner, the filename at the top, the editing area, and the shortcuts at the bottom before typing.
 
 ```text
-  GNU nano 9.0                    hello.txt
+  GNU nano 7.2                    hello.txt
 
 
 
@@ -133,13 +123,13 @@ Your screen will change completely because the terminal is now controlled by `na
 
 
 
-^G Help  ^O Write Out  ^F Where Is  ^K Cut    ^T Execute  ^C Location
+^G Help  ^O Write Out  ^W Where Is  ^K Cut    ^T Execute  ^C Location
 ^X Exit  ^R Read File  ^\ Replace   ^U Paste  ^J Justify  ^/ Go To Line
 ```
 
 The bottom menu is the reason `nano` is a friendly first editor. It does not expect you to memorize everything before you can leave. The word "Write Out" means save the buffer to a file, and "Exit" means leave the editor and return to the shell. The old-fashioned wording is common in Unix tools, so it is better to learn the phrase once than to be surprised by it later.
 
-GNU nano 9.0's default menu shows Ctrl+F for search; Ctrl+W also works as a search shortcut and is used in the practice below. Read your actual menu when a key behaves differently, rather than assuming every editor or configuration uses identical bindings.
+The tested Ubuntu playground displayed Ctrl+W for search. Read your actual menu when a key behaves differently; versions and configuration can change the displayed bindings.
 
 The `^` symbol in that menu means "hold the Ctrl key," not "type a caret character." When `nano` shows `^O`, press Ctrl and O at the same time. When it shows `^X`, press Ctrl and X at the same time. This notation appears in many terminal programs, logs, and manuals, so learning it here pays off outside `nano` as well.
 
@@ -149,7 +139,7 @@ The `^` symbol in that menu means "hold the Ctrl key," not "type a caret charact
 | `^X` | Ctrl + X | Exit nano |
 | `^K` | Ctrl + K | Cut the current line |
 | `^U` | Ctrl + U | Paste a cut line |
-| `^F` or `^W` | Ctrl + F or Ctrl + W | Search for text |
+| `^W` | Ctrl + W | Search for text |
 | `^G` | Ctrl + G | Show help |
 
 With `nano` open, type the following three lines. Do not worry if the screen wraps differently on your terminal; the file content is determined by the characters and line breaks you type, not by the exact visual width of the terminal window. Press Enter at the end of each line so the text becomes three separate lines in the file.
@@ -160,17 +150,17 @@ Today's special: Learning to edit files.
 Chef says: You're doing great.
 ```
 
-Your screen should now show the text and a "Modified" indicator near the top. That word means the buffer has changes that are not yet written to disk. It is a useful warning because it tells you that leaving incorrectly could discard work.
+Your screen should now show the text and a modified-buffer indicator near the top. The tested GNU nano 7.2 screen shows `*`; its appearance may differ in another version. It warns that the buffer has changes not yet saved.
 
 ```text
-  GNU nano 9.0                    hello.txt                    Modified
+  GNU nano 7.2                    hello.txt *
 
 Welcome to the Kitchen!
 Today's special: Learning to edit files.
 Chef says: You're doing great.
 
 
-^G Help  ^O Write Out  ^F Where Is  ^K Cut    ^T Execute  ^C Location
+^G Help  ^O Write Out  ^W Where Is  ^K Cut    ^T Execute  ^C Location
 ^X Exit  ^R Read File  ^\ Replace   ^U Paste  ^J Justify  ^/ Go To Line
 ```
 
@@ -181,12 +171,12 @@ Ctrl + O
 ```
 
 ```text
-Write to File: hello.txt
+File Name to Write: hello.txt
 ```
 
-After you press Enter, the "Modified" indicator disappears because the editor buffer and the file on disk now match. You are still inside `nano`, so saving and exiting are two separate steps. This separation is useful because you can save a checkpoint, keep editing, and save again before leaving.
+After you press Enter, the modified indicator disappears. You are still inside `nano`, so saving and exiting are separate steps. Verify the saved file after exiting.
 
-To leave `nano`, press Ctrl+X. If the buffer has no unsaved changes, `nano` exits immediately. If you changed something after the last save, it asks whether to save the modified buffer, and you must choose deliberately.
+To leave `nano`, press Ctrl+X. If the buffer has no unsaved changes, `nano` exits immediately. If you changed something after the last save, it asks whether to save the modified buffer, and you must choose deliberately. On the tested browser terminal, F2 also returned to the shell after saving.
 
 ```text
 Ctrl + X
@@ -196,7 +186,7 @@ Ctrl + X
 Save modified buffer?  Y Yes  N No  ^C Cancel
 ```
 
-This prompt is worth slowing down for because the choices are literal. `Y` saves changes and continues the exit path, `N` discards unsaved changes, and Ctrl+C cancels the exit attempt so you can return to editing. Beginners often press a key quickly because they want the prompt to go away, but this is exactly the moment when a patient habit prevents lost work.
+Read the prompt before answering: `Y` continues the save path, `N` discards unsaved changes, and Ctrl+C cancels the exit attempt so you can return to editing. Confirm the destination if Nano asks for a filename.
 
 ## Verify and Reopen Files Deliberately
 
@@ -245,7 +235,7 @@ The edit might still succeed, yet the file would be in the wrong place for the n
 
 </details>
 
-Verification is also where you catch spelling and punctuation mistakes that the editor cannot understand for you. `nano` does not know whether "pantry" or "panty" is the right kitchen word, and Bash does not know whether a message in an `echo` line is professionally worded. The editor helps you place characters; the verification step helps you read them as the next program or person will read them. That is why experienced terminal users often print or diff a file after editing even when the change seemed simple.
+Verification also helps you catch spelling, punctuation and line-order mistakes before another program reads the file.
 
 ## Move Around, Search, Cut, and Paste
 
@@ -253,7 +243,7 @@ Small files can be edited by simply typing at the end, but real configuration fi
 
 `nano` also has simple line-oriented cut and paste commands. Move the cursor to a line you want to move, press Ctrl+K to cut that entire line, move to the destination, and press Ctrl+U to paste it. If you press Ctrl+K multiple times in a row, `nano` stacks the cut lines and pastes them together when you press Ctrl+U. This is useful when reorganizing a small script or moving related configuration lines together.
 
-Search is the other editing skill that becomes essential sooner than most beginners expect. Press Ctrl+W, type the text you want to find, and press Enter. In your `hello.txt` file, searching for `special` jumps to the line with "Today's special." Pressing Ctrl+W and then Enter again repeats the last search, which is convenient in longer files where the same setting appears more than once.
+Press Ctrl+W, type the text you want to find, and press Enter. In your `hello.txt` file, searching for `special` should move the cursor to the matching word. The GNU nano 7.2 shortcut reference lists Alt+W to find the next occurrence.
 
 ```text
 Ctrl + W
@@ -324,7 +314,7 @@ For a fresh script saved by GNU nano, expect no execute bit. If direct execution
 
 </details>
 
-Now add execute permission with `chmod +x`. `chmod` stands for change mode, and `+x` means "add execute permission." You are telling the operating system that this file is allowed to run as a program, not merely sit on disk as text.
+Inspect the mode of your owned practice script. If the owner execute bit is missing, add execute permission with `chmod +x`. `chmod` stands for change mode, and `+x` adds execute permission; it does not diagnose every possible access failure.
 
 ```bash
 ls -l my-first-script.sh
@@ -362,7 +352,7 @@ The practical question is always "what is the safest tool for the current job?" 
 
 There is one more judgment call: avoid editing binary files with a text editor. Images, compiled programs, archives, and many database files are not plain text. Opening one in `nano` may show strange characters, and saving it can corrupt the file. When you are unsure, run `file filename` before editing. Plain text, shell scripts, Markdown, YAML, JSON, and many configuration files are appropriate targets for a terminal text editor.
 
-Configuration files deserve extra caution because programs read them literally. A stray quote, missing colon, or wrong indentation level can change behavior. Later Kubernetes modules will ask you to edit YAML manifests, and Kubernetes 1.35 will parse those files according to YAML structure rather than your visual intention. The habits from this module transfer directly: open the right file, make a focused edit, save, validate, and then let the system read it.
+Configuration files deserve extra caution because programs read them literally. A stray quote, missing colon, or wrong indentation level can change behavior. Later Kubernetes modules will ask you to edit YAML manifests, where YAML structure determines how the configuration is read. The habits from this module transfer directly: open the right file, make a focused edit, save, validate, and then let the system read it.
 
 This is why "quick edit" should not mean "careless edit." A quick edit is small, focused, and verified; a careless edit is rushed, unverified, and often performed in the wrong place. The terminal rewards precision because it gives you compact tools with very little ceremony. It also exposes mistakes quickly because those tools do exactly what you ask. Your goal is to become calm with that literalness rather than intimidated by it.
 
@@ -377,15 +367,9 @@ The safest next step is not to edit and hope; it is to run `hostname` and `pwd`,
 
 ## Patterns & Anti-Patterns
 
-The reliable pattern for beginner editing is small, verified change sets. Make one meaningful change, save it, exit cleanly, and verify the saved file before moving on. This approach may feel slower than typing a dozen edits at once, but it gives you a clear checkpoint when something goes wrong. It also mirrors professional change control: smaller changes are easier to review, test, explain, and revert.
-
-Another strong pattern is to choose read-only commands before edit-capable commands when you are still investigating. If you only need to inspect a file, use `cat` for short files or a pager in later modules. Opening an editor should be a deliberate decision because editors are designed to modify buffers. The difference is similar to reading a posted kitchen schedule versus taking a pen to it.
-
-A third pattern is to make scripts self-explanatory at the top. A shebang declares the interpreter, and clear `echo` output helps the person running the script understand what is happening. For training scripts, friendly messages are enough. For operational scripts, clear output becomes even more important because the person reading a terminal log may not be the person who wrote the script.
+Make one meaningful change, save it, exit, and verify the saved file before moving on. This gives you a checkpoint when something goes wrong.
 
 The matching anti-pattern is treating successful editing as proof of correct behavior. Saving a file proves only that bytes were written to disk. It does not prove that a service can parse the file, that a script has permission to run, or that the commands inside the script are correct. That is why every edit should be followed by the smallest verification command that checks the next layer of meaning.
-
-These patterns are intentionally modest because beginner reliability comes from repeatable habits, not dramatic tricks. If you always confirm location before sensitive edits, save intentionally, inspect the saved result, and test the next layer, you prevent most early terminal editing failures. Later, when you learn faster editors and richer validation commands, those tools will plug into the same pattern. The tool can change; the workflow should remain recognizable.
 
 | Situation | Use This Pattern | Avoid This Anti-Pattern |
 |-----------|------------------|--------------------------|
@@ -410,21 +394,11 @@ You can also think in terms of reversibility. Viewing is easy to back out of bec
 
 The best choice is often the one that leaves the most evidence. A `cat` command leaves visible output in your terminal scrollback. A saved script leaves a file you can reopen and inspect. A `chmod +x` command changes a permission bit that can be checked later with tools you will learn in the next terminal lessons. When you choose tools this way, you build a trail that helps you and other engineers understand what happened.
 
-## Did You Know?
-
-- **GNU nano 8.0 was released in 2024, and nano 9.x followed later with the same visible-control-key style beginners rely on.** The exact version on your system may differ, but the core save and exit workflow remains recognizable across many Linux distributions.
-
-- **`nano` began as a free replacement for `pico`, the editor used with the Pine email client.** The name plays on SI prefixes: nano is larger than pico, and the joke stuck because the replacement became a widely installed editor in its own right.
-
-- **The Unix line editor `ed` dates to 1969 and was written by Ken Thompson.** It edits one line at a time, so a full-screen editor such as `nano` is a luxury compared with early Unix editing workflows.
-
-- **A shebang line must start with the two characters `#!` at the very beginning of a script.** If you accidentally write `# !/bin/bash` or put a blank line above it, direct execution may not select the interpreter you intended.
-
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
-| Confusing suspension with exit | GNU nano 9.0 defaults show a hint on Ctrl+Z; Ctrl+T then Ctrl+Z suspends instead of exiting | If the shell reports a stopped editor, run `fg` to resume it, then Ctrl+X to exit; if still in the editor, use Ctrl+X |
+| Confusing suspension with exit | A suspended editor has not exited | If the shell reports a stopped editor, run `fg` to resume it, then use the displayed exit command |
 | Forgetting to save before exiting | Beginners expect autosave, but `nano` writes only when told to write out | Press Ctrl+O and Enter before Ctrl+X, or answer `Y` carefully when prompted |
 | Typing `^O` literally into the file | The caret notation looks like two printable characters if you have not seen terminal shortcuts before | Hold Ctrl and press O; do not type the caret character |
 | Using `nano` when you meant to use `cat` | You wanted to inspect a file but opened an editor capable of changing it | Use `cat filename` for short read-only checks and reserve `nano` for edits |
@@ -458,7 +432,7 @@ The message identifies an access failure, but does not establish its exact cause
 <details>
 <summary>A script starts with `echo "Starting backup"` and no shebang. It runs with `bash backup.sh` but behaves unpredictably with `./backup.sh`. What should you change?</summary>
 
-Add a shebang such as `#!/bin/bash` as the first line when the script is intended to run directly. Running `bash backup.sh` chooses Bash explicitly, so the script can work in that form even without a shebang. Direct execution asks the operating system to choose an interpreter, and the shebang is the portable way to state that choice. After editing, save, verify the first line, and make sure execute permission is present.
+Add a shebang such as `#!/bin/bash` as the first line when the script is intended to run directly. Running `bash backup.sh` chooses Bash explicitly, so the script can work in that form even without a shebang. Direct execution asks the operating system to choose an interpreter, and a shebang states that choice on this Linux training host. After editing, save, verify the first line, and make sure execute permission is present.
 
 </details>
 
@@ -652,7 +626,8 @@ Success criteria:
 
 ## Sources
 
-- [GNU nano manual](https://www.nano-editor.org/dist/latest/nano.html)
+- [GNU nano 7.2 manual](https://www.nano-editor.org/dist/v7/nano.html)
+- [GNU nano 7.2 shortcut reference](https://www.nano-editor.org/dist/v7/cheatsheet.html)
 - [GNU nano homepage](https://www.nano-editor.org/)
 - [Vim Reference Manual: Introduction](https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt)
 - [Bash Reference Manual: Shell Scripts](https://www.gnu.org/software/bash/manual/bash.html#Shell-Scripts)
@@ -661,10 +636,6 @@ Success criteria:
 - [GNU Coreutils manual: chmod invocation](https://www.gnu.org/software/coreutils/manual/html_node/chmod-invocation.html)
 - [The Open Group: chmod](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/chmod.html)
 - [Linux man-pages: execve](https://man7.org/linux/man-pages/man2/execve.2.html)
-- [Shebang (Unix)](https://en.wikipedia.org/wiki/Shebang_%28Unix%29)
-- [Chmod](https://en.wikipedia.org/wiki/Chmod)
-- [Ed (text editor)](https://en.wikipedia.org/wiki/Ed_%28text_editor%29)
-- [GNU nano](https://en.wikipedia.org/wiki/GNU_nano)
 
 ## Next Module
 
