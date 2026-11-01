@@ -4,6 +4,10 @@ This archive preserves the historical English What’s New entries; earlier inte
 
 Add detailed patch notes here, newest first, with absolute `https://kube-dojo.github.io/` links. Keep the web What’s New page to 3–5 curated recent highlights, grouping related updates for readers.
 
+## November 2026
+
+- **2026-11-01 — Check the evidence before recommending an upgrade.** [What is a Computer?](https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) removes repeated explanations, clarifies how programs use RAM and how storage lifetime differs from capacity, and distinguishes Windows-reported memory from installed RAM. Its exercise adds graduated diagnosis hints and asks what observation would change a hypothesis.
+
 ## October 2026
 
 - **2026-10-30 — Find related lessons while planning study scope.** [Plan Study Scope by Goal](https://kube-dojo.github.io/prerequisites/philosophy-design/module-1.3-what-we-dont-cover/) replaces misleading site-wide exclusion wording with goal-based planning and links to existing cloud, operations, networking and tooling lessons. The original lesson URL and section bookmark remain available.

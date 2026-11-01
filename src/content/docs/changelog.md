@@ -6,11 +6,11 @@ sidebar:
   label: "What's New"
 ---
 
-## October 2026
+## Recent improvements
 
 Explore recent improvements to practice and troubleshooting:
 
-- **Inspect computer resources before choosing a fix.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) clarifies how to record your system's specs, distinguish RAM from file storage, and check a diagnosis before changing anything.
+- **Reason about computer resource problems.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) gives tighter explanations of CPU, RAM and storage, clarifies reported versus installed memory, and adds diagnosis hints and a transfer question before you recommend a change.
 
 - **Handle Git interruptions and recovery.** Revisit [Worktrees and Stashing](/prerequisites/git-deep-dive/module-5-worktrees-stashing/) to compare ways to set work aside and practice returning to it.
 
