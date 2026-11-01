@@ -1,0 +1,347 @@
+{
+  "schema": "kubedojo.reviewed_source_catalog.v1",
+  "page": "prerequisites/zero-to-terminal/module-0.5-editing-files.md",
+  "page_digest": "sha256:e939d37e7d7742a2415329cb72bf4c399b495759b1203f353399551d382bc17f",
+  "seed_digest": "sha256:167310dc74fedafbf28d0d5321725378fc94d957c1e9b40357d5308efcfadd27",
+  "status": "REVIEWED",
+  "provenance": {
+    "review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3775#issuecomment-6560055391",
+    "reviewed_head": "9468c5c90db42f5a8aa9055bd40c344fc65092c5",
+    "merged_commit": "f74bdc153b1c1db050445462cc5d0f0f1d32c85b",
+    "run_identity": "e21b5a2f-41fc-4985-9ed3-9623177c6695",
+    "verdict_digest": "sha256:e651c044f80fe9d0fe7844830d33f7330b4ffd197cd2b345ccf72a01dcd64d78",
+    "source_index_digest": "sha256:75a25e975ca2313827edba080d6bf283bb18482865967b5d5f75c723ff09880b",
+    "native_model": "grok-4.7"
+  },
+  "review": {
+    "verdict": "APPROVE_WITH_NITS",
+    "pr_verdict": "APPROVE_WITH_NITS",
+    "source_editorial_verdict": "APPROVE_WITH_NITS",
+    "head": "9468c5c90db42f5a8aa9055bd40c344fc65092c5",
+    "page_digest": "sha256:e939d37e7d7742a2415329cb72bf4c399b495759b1203f353399551d382bc17f",
+    "seed_digest": "sha256:167310dc74fedafbf28d0d5321725378fc94d957c1e9b40357d5308efcfadd27",
+    "source_index_digest": "sha256:75a25e975ca2313827edba080d6bf283bb18482865967b5d5f75c723ff09880b",
+    "run_identity": "e21b5a2f-41fc-4985-9ed3-9623177c6695",
+    "end_marker": "e21b5a2f-41fc-4985-9ed3-9623177c6695",
+    "findings": [
+      {"stableID": "NIT-050-MODIFIED-GLYPH", "severity": "nit", "path": "src/content/docs/prerequisites/zero-to-terminal/module-0.5-editing-files.md", "line": 153, "actualquote": "The tested GNU nano 7.2 screen shows `*`", "why": "Optional nit, deferred, not a fix-round blocker. GNU nano 7.2 section 3.1 says the default title bar shows the word Modified on the right. The same manual shows an asterisk after the filename only with --stateflags or the minibar. The Ubuntu receipt records write-out, search, cut/paste, and F2, and does not record which glyph appeared. The same sentence already says the appearance may differ, and the buffer-versus-disk lesson does not depend on the star.", "fix": "No change is required for this revision. On a later edit, show the default word Modified, or attribute the asterisk to stateflags/minibar or to a receipt line that actually recorded it."}
+    ],
+    "claims": [
+      {"claim_id": "FC05001", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "The 7.2 editor screen holds text until Write Out. Practice saved with Ctrl+O and then read the saved lines with cat; an unsaved malformed line was cancelled before that save."},
+      {"claim_id": "FC05002", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "The manual title bar shows the version and filename and a modified indicator. The default word is Modified; an asterisk is the stateflags/minibar form. The receipt does not record the glyph, so the page's tested-star sentence stays the deferred nit above. The claim that a marker exists is supported."},
+      {"claim_id": "FC05003", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet"], "support_note": "Section 3.3 says ^ means hold Ctrl and press the named key. The cheatsheet uses the same Ctrl+key names."},
+      {"claim_id": "FC05004", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Cheatsheet: Ctrl+O offers to write, Ctrl+X exits, Ctrl+K cuts a line, Ctrl+U pastes, Ctrl+W searches forward. Help in the session mapped those functions to F3, F2, F9, F10, and F6. Ctrl+S is an additional direct save and is not required by the taught Ctrl+O path."},
+      {"claim_id": "FC05005", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Practice showed File Name to Write: hello.txt, confirmed it, and left the editor. Exit was F2, which that session's help mapped to ^X. Physical Ctrl+X was not established. The manual's writeout function asks for a filename."},
+      {"claim_id": "FC05006", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Practice discarded an unsaved buffer with F2 then n. The manual has exit, writeout, and a cancel function. The exact rendered line Save modified buffer? Y Yes N No ^C Cancel is not transcribed in the captured 7.2 manual excerpt or the receipt; the behavioral save/discard/cancel choice is what the claim states."},
+      {"claim_id": "FC05007", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Section 3.2 says nano is modeless and ordinary keystrokes enter text. Both scripts and the memo were typed inside nano."},
+      {"claim_id": "FC05008", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Opening a new name presents a buffer; the file was readable with cat only after write-out. The manual center title says New Buffer until the file is named, and writeout writes the buffer."},
+      {"claim_id": "FC05009", "verdict": "SUPPORTED", "evidence_refs": ["posix-cat"], "support_note": "POSIX cat reads named files in order and writes their bytes to standard output. Using it instead of an editor is teaching guidance, not a cat option."},
+      {"claim_id": "FC05010", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Section 3.4: ^K stores the line in the cutbuffer, consecutive ^K strokes add lines, and another key before ^K overwrites the cutbuffer. ^U pastes at the cursor. Practice cut and pasted one line. The page limits stacking to presses in a row."},
+      {"claim_id": "FC05011", "verdict": "SUPPORTED", "evidence_refs": ["gnu-nano-7.2-manual", "gnu-nano-7.2-cheatsheet", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Default search is ^W and forward. The v7.2 cheatsheet lists Alt+W for the next forward match. Practice opened search with Ctrl+W and with F6 and found special. Alt+W was not exercised."},
+      {"claim_id": "FC05012", "verdict": "SUPPORTED", "evidence_refs": ["vim-intro"], "support_note": "Vim's introduction says startup is Normal mode unless insertmode is set, and Insert mode inserts typed text. The page does not teach Vim commands. The capture is an upstream main-branch text, sufficient for this mode distinction."},
+      {"claim_id": "FC05013", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-invocation", "ubuntu-bash-arguments"], "support_note": "Ubuntu Noble Bash: a non-option file argument is read and executed as shell commands. That does not make an arbitrary text file directly executable."},
+      {"claim_id": "FC05014", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-chmod1", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "chmod changes mode bits, not the suffix. Fresh .sh files in this session were -rw-rw-r-- and direct execution returned 126 until chmod +x."},
+      {"claim_id": "FC05015", "verdict": "SUPPORTED", "evidence_refs": ["linux-execve2", "ubuntu-bash-arguments", "ubuntu-bash-command-execution", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Linux execve treats a first line of the form #!interpreter as an interpreter script when the file is executable. Bash file-argument invocation reads the file as Bash. Practice ran the shebang scripts directly after the mode fix. Scoped to this Linux host."},
+      {"claim_id": "FC05016", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-command-substitution", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "The Noble Bash section says $(command) runs in a subshell and replaces the substitution with standard output after trailing newlines are deleted. Practice printed the date, ubuntu, and the workspace path from the typed substitutions."},
+      {"claim_id": "FC05017", "verdict": "SUPPORTED", "evidence_refs": ["posix-cat", "posix-ls", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "The report script uses echo, cat kitchen-memo.txt, and ls. Practice printed the heading, all six memo lines, and the owned filenames. Seed line hits that merely contain the letters ls are extractor noise and were not used."},
+      {"claim_id": "FC05018", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-chmod1", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "GNU chmod: + adds the selected bits; x is execute for files and search for directories; omitted who behaves as a except bits set in the umask. The page then tells the learner to inspect the owner bit on an owned practice file. The Coreutils excerpt shows ug+x examples but not this omitted-who sentence."},
+      {"claim_id": "FC05019", "verdict": "SUPPORTED", "evidence_refs": ["EXEC05-UBUNTU-PLAYGROUND", "ubuntu-chmod1"], "support_note": "This ubuntu account's nano-saved scripts were -rw-rw-r--. The page says to expect no execute bit and to confirm that with ls -l before chmod. That is this session's result, not a promise for every umask or editor."},
+      {"claim_id": "FC05020", "verdict": "SUPPORTED", "evidence_refs": ["linux-execve2"], "support_note": "execve EACCES includes denied search on a path prefix or interpreter, a non-regular file, denied execute permission, and a noexec mount. The page correctly says Permission denied alone does not prove a missing x bit and that repeating chmod does not fix the other causes."},
+      {"claim_id": "FC05021", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-command-execution", "ubuntu-bash-invocation"], "support_note": "A name containing a slash executes that file. A name without a slash is resolved through functions, builtins, the command hash, and PATH. Bash does not add the current directory unless it is already a PATH element; the page's usually is the conservative wording."},
+      {"claim_id": "FC05022", "verdict": "SUPPORTED", "evidence_refs": ["EXEC05-UBUNTU-PLAYGROUND", "ubuntu-bash-arguments"], "support_note": "After chmod, Bash reported unexpected EOF while looking for a matching double quote and status 2. Adding the missing quote produced the heading, date, memo, and status 0. The page's unterminated-string description matches that diagnostic. Wording and status are this Bash 5.2.21 session."},
+      {"claim_id": "FC05023", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-file1", "gnu-nano-7.2-manual"], "support_note": "Ubuntu file(1) classifies by filesystem tests, magic tests, then language tests. Whether to open a text editor is the lesson's use of that classification. Nano's DOS/Unix write conversion can change bytes; file(1) does not itself prove corruption."},
+      {"claim_id": "FC05024", "verdict": "SUPPORTED", "evidence_refs": ["gnu-hostname-invocation", "posix-pwd", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Inetutils hostname with no name operand shows the host name and can set it if given an argument. POSIX pwd writes an absolute current-directory path. Practice confirmed the workspace with pwd. The captured hostname page is Inetutils despite the coreutils-like path."},
+      {"claim_id": "FC05025", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-rm", "EXEC05-UBUNTU-PLAYGROUND"], "support_note": "Ubuntu rm removes named file operands and does not remove directories unless asked. Practice removed exactly the five owned names. The receipt then removed the empty directory; the page says to leave the directory and forbids wildcards and recursive removal."}
+    ],
+    "coverage": {
+      "reviewed_claim_ids": ["FC05001", "FC05002", "FC05003", "FC05004", "FC05005", "FC05006", "FC05007", "FC05008", "FC05009", "FC05010", "FC05011", "FC05012", "FC05013", "FC05014", "FC05015", "FC05016", "FC05017", "FC05018", "FC05019", "FC05020", "FC05021", "FC05022", "FC05023", "FC05024", "FC05025"],
+      "uncovered_ids": [],
+      "additional_material_claims": [
+        {"claim_id": "ND05001", "claim_text": "If the plain Ubuntu playground opens as root, su - ubuntu switches to its existing unprivileged account.", "page_locator": "src/content/docs/prerequisites/zero-to-terminal/module-0.5-editing-files.md:93", "evidence_refs": ["EXEC05-UBUNTU-PLAYGROUND"], "rationale": "The receipt found root, saw an existing ubuntu account, and su - ubuntu landed in /home/ubuntu. Nothing was installed and no account was created."},
+        {"claim_id": "ND05002", "claim_text": "On the tested browser terminal, F2 returned to the shell after a save, and that session's nano help mapped F2 to ^X.", "page_locator": "src/content/docs/prerequisites/zero-to-terminal/module-0.5-editing-files.md:179", "evidence_refs": ["EXEC05-UBUNTU-PLAYGROUND"], "rationale": "Exercise exits used F2. Help listed ^X (F2). This qualifies the Ctrl+X teaching without claiming a physical Ctrl+X keypress."},
+        {"claim_id": "ND05003", "claim_text": "A command named nano can launch a different editor, such as Pico, on some machines.", "page_locator": "src/content/docs/prerequisites/zero-to-terminal/module-0.5-editing-files.md:107", "evidence_refs": ["OBS-MACOS-NANO-BINARY-PICO-P02C"], "rationale": "One macOS host's /usr/bin/nano launched UW Pico 5.09. The page's on some machines matches that single-host limit and tells the learner to stop when the banner is not GNU nano."},
+        {"claim_id": "ND05004", "claim_text": "Saving a non-text file from nano can change its bytes because nano can rewrite a file in DOS or Unix line-ending format.", "page_locator": "src/content/docs/prerequisites/zero-to-terminal/module-0.5-editing-files.md:353", "evidence_refs": ["gnu-nano-7.2-manual"], "rationale": "The 7.2 manual documents DOS-format writing and a Unix-format save that overrides nano's format-preserving default. The page's can corrupt is that capability, not a claim that every byte string is altered."}
+      ]
+    },
+    "source_eligibility": [
+      {"source_id": "gnu-nano-7.2-manual", "verdict": "ELIGIBLE", "reason": "Versioned 7.2 manual. Bindings and the modified marker depend on version and configuration; default title text is Modified, while the asterisk is stateflags or minibar."},
+      {"source_id": "gnu-nano-7.2-cheatsheet", "verdict": "ELIGIBLE", "reason": "Versioned 7.2 shortcut list, including Ctrl+W and Alt+W. The learner's visible menu remains authoritative."},
+      {"source_id": "gnu-nano-7.2-faq", "verdict": "LIMITED", "reason": "Read only to confirm the removed history trivia is not a current outcome. FAQ 1.4 self-identifies 7.2 and is not evidence about later nano releases."},
+      {"source_id": "vim-intro", "verdict": "ELIGIBLE", "reason": "Upstream introduction supports Normal versus Insert only. It is a main-branch snapshot, not a Vim release pin, and it does not support teaching Vim."},
+      {"source_id": "linux-execve2", "verdict": "ELIGIBLE", "reason": "Linux execve(2) interpreter-script and EACCES text. Not an error map for other operating systems."},
+      {"source_id": "ubuntu-chmod1", "verdict": "ELIGIBLE", "reason": "Ubuntu Noble GNU chmod(1): symbolic plus, execute/search, and omitted-who behavior limited by umask."},
+      {"source_id": "gnu-coreutils-chmod-invocation-9e804ed", "verdict": "LIMITED", "reason": "Pinned excerpt shows ug+x examples. It does not itself state the omitted-who umask rule used for FC05018."},
+      {"source_id": "ubuntu-bash-invocation", "verdict": "ELIGIBLE", "reason": "Ubuntu Noble Bash 5.2 invocation section for reading a script file."},
+      {"source_id": "ubuntu-bash-arguments", "verdict": "ELIGIBLE", "reason": "Same manual's ARGUMENTS section: a file argument is read as shell commands."},
+      {"source_id": "ubuntu-bash-command-substitution", "verdict": "ELIGIBLE", "reason": "Same manual's command-substitution section, including trailing-newline deletion. The page demonstrates only $(command)."},
+      {"source_id": "ubuntu-bash-command-execution", "verdict": "ELIGIBLE", "reason": "Same manual's command-execution section for slash versus PATH lookup and the #! interpreter line."},
+      {"source_id": "posix-cat", "verdict": "ELIGIBLE", "reason": "POSIX cat writes file bytes to standard output in order. It does not prescribe the exact missing-file diagnostic string."},
+      {"source_id": "ubuntu-file1", "verdict": "ELIGIBLE", "reason": "Ubuntu file(1) filesystem, magic, and language tests. It does not prove that nano corrupts every binary."},
+      {"source_id": "EXEC05-UBUNTU-PLAYGROUND", "verdict": "ELIGIBLE", "reason": "One ungraded native-Chrome Ubuntu 24.04.5 playground: Bash 5.2.21 and GNU nano 7.2. Observation evidence, not a graded check, score, or acceptance by itself."},
+      {"source_id": "posix-pwd", "verdict": "ELIGIBLE", "reason": "POSIX pwd writes an absolute pathname of the current working directory."},
+      {"source_id": "posix-ls", "verdict": "ELIGIBLE", "reason": "POSIX ls lists directory entries; long format carries mode information. Display details are not universal across operating systems."},
+      {"source_id": "posix-mkdir", "verdict": "ELIGIBLE", "reason": "POSIX mkdir creates the named directories. The plain-mkdir collision stop is lesson procedure; -p is what suppresses the existing-component error."},
+      {"source_id": "ubuntu-rm", "verdict": "ELIGIBLE", "reason": "Ubuntu Noble rm removes named file operands and does not recurse or remove directories by default."},
+      {"source_id": "OBS-MACOS-NANO-BINARY-PICO-P02C", "verdict": "LIMITED", "reason": "One macOS host resolved /usr/bin/nano to UW Pico 5.09, and its separate GNU nano 9.0 PTY evidence stays on that platform."},
+      {"source_id": "gnu-hostname-invocation", "verdict": "ELIGIBLE", "reason": "Inetutils hostname shows the host name with no operand and can set it when a name is supplied. The page uses only the show form as an environment check."}
+    ],
+    "module_scores": {
+      "D1": {
+        "score": 5,
+        "line": 20,
+        "quote": "Create and edit plain text files using `nano`",
+        "rationale": "Four outcomes use observable verbs: create/edit, implement/verify, diagnose/fix, and compare/choose. The worked loop, quizzes, and five-part exercise carry each one."
+      },
+      "D2": {
+        "score": 5,
+        "line": 37,
+        "quote": "`nano` loads the file contents into a buffer",
+        "rationale": "The lesson moves from buffer versus disk, to one editor, to verification, movement, a script, and then judgment. It names modules 0.3 and 0.4 and stops navigation on the first workspace error."
+      },
+      "D3": {
+        "score": 5,
+        "line": 65,
+        "quote": "The correct answer is the file on disk",
+        "rationale": "Prediction prompts precede the editor drill, the missing-file case, search choice, wrong-directory and wrong-host decisions, and the direct-execution result. Part 4 withholds the failing layer until the learner tries it."
+      },
+      "D4": {
+        "score": 4,
+        "line": 27,
+        "quote": "Hypothetical scenario: you are connected to a training Linux host",
+        "rationale": "The labeled scenario, wrong-path stop, and permission-versus-parser split are concrete and bounded. The kitchen framing is illustrative rather than evidence of a production incident."
+      },
+      "D5": {
+        "score": 5,
+        "line": 592,
+        "quote": "decide whether the failure is permission, interpreter parsing, or script logic",
+        "rationale": "Seven quizzes cover unsaved buffers, caret notation, access versus parsing, shebang, viewer choice, cut/paste order, and host/directory checks. Part 4 requires the learner to separate those layers and verify the repaired file."
+      },
+      "D6": {
+        "score": 4,
+        "line": 95,
+        "quote": "Run these commands **one line at a time**.",
+        "rationale": "One editor, one workspace, and a worked save loop come before the unguided script. The loop is repeated often enough for a novice, and the removed editor rhetoric keeps the repetition useful."
+      },
+      "D7": {
+        "score": 4,
+        "line": 27,
+        "quote": "make the smallest safe change, save it, and prove",
+        "rationale": "The pace is direct, the hypothetical is labeled, and the kitchen lines give the commands something to edit. Emphasis stays on verification rather than a story."
+      },
+      "D8": {
+        "score": 4,
+        "line": 372,
+        "quote": "Saving a file proves only that bytes were written to disk.",
+        "rationale": "For a medium novice module, the pattern table, viewer-versus-editor choice, and noexec stop explain why and when. A full permission taxonomy is an accepted omission, so this is not senior design-review depth."
+      }
+    },
+    "lab_scores": {
+      "L1": {
+        "score": 4,
+        "line": 581,
+        "quote": "This part removes the scaffolding and tests whether you can diagnose a failure on your own.",
+        "rationale": "The memo scenario is ordinary by design. Parts 1–3 prescribe commands; Part 4 is the decision point. That is enough scenario judgment for a 4 and short of an open production incident."
+      },
+      "L2": {
+        "score": 5,
+        "line": 579,
+        "quote": "Part 4: Diagnose and fix a broken script (unguided)",
+        "rationale": "The curve runs from a three-line file, to reopen and search, to a shebang script, to a script that reads another file, and then to an unguided two-layer failure."
+      },
+      "L3": {
+        "score": 5,
+        "line": 592,
+        "quote": "read the exact error message, decide whether the failure is permission",
+        "rationale": "Success depends on distinguishing directory, save, access, and script content, then proving the repair with cat and direct execution. The learner cannot pass Part 4 by copying an earlier chmod line alone."
+      },
+      "L4": {
+        "score": 4,
+        "line": 597,
+        "quote": "These are separate access and parsing layers",
+        "rationale": "The hidden diagnosis tells which check to use, when to stop retrying chmod, and that bash file can expose the quote error before execute permission. It teaches the layer model rather than only pasting the repaired file."
+      },
+      "L5": {
+        "score": 4,
+        "line": 355,
+        "quote": "The habits from this module transfer directly",
+        "rationale": "The exercise states that the same open, save, verify, and permit loop applies to helpers, notes, YAML, and service configuration, without promising those tasks are completed here."
+      }
+    },
+    "topic_outcome_coverage": {
+      "create_edit_verify": "Taught in the buffer model and nano loop, practiced on hello.txt and kitchen-memo.txt, checked by the unsaved-buffer and viewer quizzes.",
+      "movement_search_cut_paste": "Arrow movement, Ctrl+W search, and consecutive Ctrl+K/Ctrl+U are taught; practice searched, cut, and pasted; the order quiz checks the content layer.",
+      "typed_bash_script_shebang_substitution": "Both scripts are required to be typed inside nano. Shebang versus bash file, $(date), $(whoami), and $(pwd) are taught and were executed.",
+      "direct_execution_versus_access_versus_parser": "The first script expects a missing execute bit, and Part 4 then exposes the missing quote only after access succeeds. Persistent Permission denied is escalated to path or noexec rather than another chmod.",
+      "viewer_editor_judgment": "cat versus nano versus vim versus a local graphical editor is taught, tabulated, and quizzed without Vim command instruction.",
+      "workspace_safety": "Exclusive directory, plain mkdir, collision rename, Linux paths, owned-name cleanup, and no wildcard or recursive removal are explicit."
+    },
+    "accepted_scope_limits": ["No new sed or heredoc outcome; the old graded scenario is retargeted to the ungraded Ubuntu playground under the stated align-or-retarget option.", "No claim that the old grader is fixed, and no labs#97 body was reopened in this pass.", "No Vim mastery, full permission taxonomy, production configuration editing, other-OS execution promise, or editor-history trivia.", "The 80–100 minute figure is explicitly an estimate and was not measured.", "less, complete job control, and the nano 7.2 ^T^Z suspend sequence are outside the novice edit loop; fg is only recovery if a stopped editor is already reported.", "Removed Kubernetes minor, version, and history claims are appropriate because this page is not exam-pinned Kubernetes content."],
+    "material_omissions": [],
+    "practice_evidence_disposition": {
+      "disposition": "ACCEPTED_WITH_LIMITS",
+      "environment": "Supplied receipt: native Chrome, Killercoda plain Ubuntu playground, Ubuntu 24.04.5 LTS, Bash 5.2.21, GNU nano 7.2. Initial user root; su - ubuntu reached the existing ubuntu account.",
+      "observed": "Create, save, reopen, search, line cut/paste, both scripts typed inside nano, direct execution 126, chmod, repaired run, deliberate missing quote then status 0, and removal of the five owned files.",
+      "limits": "This pass had no shell or browser and did not rerun the lab. Physical Ctrl+X was not established; F2 was the exit used, and Ctrl+W was separately delivered. An automation typeText call dropped newlines; that unsaved line was cancelled and the text was reentered line by line. Status wrappers and rmdir of the empty workspace go beyond the learner blocks. The receipt is not a graded check or publication acceptance. Prior macOS GNU nano 9 and Pico evidence remains limited to that host."
+    },
+    "prior_finding_dispositions": [
+      {"id": "LEGACY-2026-05-30-REJECT", "disposition": "PRESERVED_AND_ADDRESSED", "note": "The stored reject concerned a wrong artifact reference and a macOS path in an Ubuntu lab. The current page removes the old lab frontmatter, uses the Ubuntu playground, and shows a Linux workspace path."},
+      {"id": "LEGACY-2026-05-30-APPROVE", "disposition": "PRESERVED_NOT_REUSED_AS_ACCEPTANCE", "note": "The orchestrator-verified approval checked two mechanical fixes. It is not this whole-page judgment."},
+      {"id": "P02-WORKSPACE-COLLISION-CLEANUP", "disposition": "PRESERVED", "note": "Exclusive workspace, plain mkdir, collision stop, typed-in-editor instruction, and explicit owned-file cleanup remain."},
+      {"id": "P02-PERMISSION-LAYERS", "disposition": "PRESERVED", "note": "A permission error still does not prove a missing execute bit, and persistent access failures are not treated as another chmod."},
+      {"id": "P02-NANO9-SHORTCUTS", "disposition": "RETARGETED", "note": "The nano 9 Ctrl+F menu and Modified illustration are replaced with the 7.2 Ctrl+W menu and a qualified modified marker. The asterisk glyph is the deferred nit."},
+      {"id": "P02-MACOS-PICO", "disposition": "PRESERVED_PLATFORM_LIMIT", "note": "The page now warns that nano can launch Pico and tells the learner to stop when the banner is not GNU nano. That warning rests on one macOS observation."},
+      {"id": "REMOVED-K8S-VERSION-AND-TRIVIA", "disposition": "ACCEPTED_REMOVAL", "note": "The 1.35 wording, Did You Know history, and Wikipedia history sources are gone. No current claim restores them."}
+    ],
+    "performed_checks": ["Read the current module page, changelog diff, scope plan, claim seed, source index, practice receipt, publication mapping, structural JSONL, pipeline JSON, main-build JSON, budget census, and P02c report.", "Read the captured nano 7.2 manual sections and raw manual passages for the title bar, stateflags, minibar, cutbuffer, search, exit/cancel, and DOS/Unix write conversion; read the 7.2 cheatsheet and FAQ excerpt.", "Read Vim introduction modes, Linux execve interpreter scripts and EACCES, Ubuntu chmod(1), the Coreutils chmod excerpt, and the Noble Bash invocation, arguments, command-substitution, and command-execution sections.", "Read POSIX cat, pwd, ls, and mkdir passages, Ubuntu rm and file(1), and the Inetutils hostname entry.", "Web search confirmed the public 7.2 manual's Modified-versus-asterisk distinction. It did not establish whether Ubuntu's packaged nanorc enables stateflags. Secondary save-prompt articles were not treated as eligible sources.", "No shell, browser, subagent, write, or message was used. Digests were not recomputed."],
+    "supplied_checks": {
+      "structural": "Frozen verifier fails body-word floor, Did You Know count, and template order. Anti-leak and anti-fabrication gates pass. Those count failures are diagnostic under the review contract and are not findings.",
+      "pipeline": "Supplied pipeline JSON records exit 0 and fixture_restored true. It does not enumerate 176 passed tests; that count is only in the task statement.",
+      "main_build": "Supplied main build revision 0151908ca2d25b9365c70ef9c10146835717e065 exited 0 with candidate_included false. Branch CI remains required before merge.",
+      "diff": "The supplied diff touches changelog.md and the module: two tracked files, +30/-57.",
+      "reachability": "The task states four earlier live fetch failures were reachability failures, not false claims. This judgment uses the retained captures and the checks above."
+    },
+    "limits": ["Shell was prohibited, so git status, digest recomputation, pipeline, build, and the playground were not rerun.", "The exact missing-search message and the exact exit-prompt pixels were not in the captured manual sections or the receipt. Their behavior is supported; those strings are not separately certified.", "A script without a shebang can still be retried by Bash after ENOEXEC. The quiz's unpredictably is loose, and its required fix, a first-line shebang for direct execution, matches execve.", "labs#97 was not reopened. The page no longer sends learners to the old graded scenario.", "No publication or canonical page-review acceptance is granted. Later seed/catalog/ledger adoption is a separate review inside the standing three-JSON, 1800-line allowance and is not endorsed here."],
+    "companion": {
+      "author": {
+        "identity": "OpenAI Codex/Terra",
+        "family": "OpenAI"
+      },
+      "reviewer": {
+        "identity": "regular xAI Grok 4.7",
+        "family": "xAI",
+        "provider": "xAI",
+        "model": "grok-4.7",
+        "harness": "Grok session",
+        "effective_route": "grok-4.7 direct"
+      },
+      "review_kind": "combined independent source, editorial, practice, and content-PR R1",
+      "scope": "Whole current module 0.5 page and its changelog hunk only. No other audit and no PR 3738 review.",
+      "run_identity": "e21b5a2f-41fc-4985-9ed3-9623177c6695",
+      "budgets": {
+        "whole_page_audit": {
+          "cap": 2,
+          "spent": 1
+        },
+        "content_pr": {
+          "cap": 2,
+          "spent": 1
+        },
+        "same_physical_call": true,
+        "nit_disposition": "deferred; this approval stops both streams",
+        "data_adoption": "separate standing allowance of 3 JSON files and at most 1800 aggregate lines; not prospectively endorsed"
+      }
+    }
+  },
+  "integrity": {
+    "head": "9468c5c90db42f5a8aa9055bd40c344fc65092c5",
+    "run_identity": "e21b5a2f-41fc-4985-9ed3-9623177c6695",
+    "native_stop": "end_turn",
+    "native_model": "grok-4.7",
+    "native_models": ["grok-4.7"],
+    "usage_model_aliases": ["grok-4.7-build"],
+    "verdict_sha256": "sha256:e651c044f80fe9d0fe7844830d33f7330b4ffd197cd2b345ccf72a01dcd64d78",
+    "original_text_digest": "sha256:65c2b766db3213d8aa297e85b6545b00ef2214831b55c85d489c89bcfb9c28c2",
+    "all_input_digests_match": true,
+    "source_claims": 25,
+    "source_supported": 25,
+    "supported_discovery_ids": ["ND05001", "ND05002", "ND05003", "ND05004"],
+    "discovery_field_mapping_basis": "The frozen request defines additional_material_claims as supported new discoveries with claim_id, claim_text, locator, evidence_refs and rationale; it did not request a verdict field there. All four actual original entries affirm support without qualification, name eligible sources, and accompany APPROVE_WITH_NITS, no uncovered IDs and no material omissions. Preserve original entries; a derived receipt SUPPORTED represents those affirmative assertions. Exact-data independent review must adjudicate this mapping; it is not an invented field in the original verdict.",
+    "rendered_quote_mappings": [
+      {"dimension": "D1", "line": 20, "raw_line": "- **Create and edit** plain text files using `nano` from the terminal without depending on a graphical editor.", "quote": "Create and edit plain text files using `nano`", "transform": "remove_markdown_bold_markers"}
+    ],
+    "raw_rubric_quotes_matched": 12,
+    "rendered_markdown_quotes_matched": 1,
+    "actual_tools": ["grep", "read_file", "web_search"],
+    "module_total": 36,
+    "lab_total": 22,
+    "optional_nit_deferred": "NIT-050-MODIFIED-GLYPH; no content change or extra review",
+    "canonical_findings_mapping": {
+      "id": "stableID",
+      "quote": "actualquote",
+      "rule": "Explicit field aliases only; original result unchanged; nonempty finding preserved"
+    },
+    "server_web_search_requests": 4
+  },
+  "discovery_normalization": {
+    "supported_ids": ["ND05001", "ND05002", "ND05003", "ND05004"],
+    "basis": "R1 approval, zero material omissions and integrity-supported IDs; original discovery objects remain unchanged in review. Independent data review must adjudicate this transfer."
+  },
+  "practice_publication_mapping": {
+    "uri": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3775#issuecomment-6559772328",
+    "body_path": "/Users/krisztiankoos/projects/kubedojo/.worktrees/review-assurance/.agent/editing05-next-prep/full-practice.md",
+    "snapshot_digest": "sha256:8f05ad400e61fdd2cfd83f92f3e5caa391c0fa370d598f2a1ded9aa6cad1cc83",
+    "public_body_ends_with_exact_receipt": true
+  },
+  "sources": [
+    {"source_id": "EXEC05-UBUNTU-PLAYGROUND", "retrieval_uri": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3775#issuecomment-6559772328", "snapshot_digest": "sha256:67f52d0a638d03113b3cc9973caac19e24e068583c8d6a1207cb9a04a91a5fff", "review_text_digest": "sha256:8f05ad400e61fdd2cfd83f92f3e5caa391c0fa370d598f2a1ded9aa6cad1cc83", "capture_scope": "Observed practice receipt in public issue comment; local full-practice.md is the retained receipt body, SHA-256 8f05ad400e61fdd2cfd83f92f3e5caa391c0fa370d598f2a1ded9aa6cad1cc83.", "qualifiers": "One ungraded plain Ubuntu 24.04.5 playground, Nano 7.2/Vim 9.1; interactive save/reopen/search/cut-paste plus full exercise and chmod. It is actual practice evidence, not source truth, a graded check, score or page acceptance.", "review_eligibility": {"source_id": "EXEC05-UBUNTU-PLAYGROUND", "verdict": "ELIGIBLE", "reason": "One ungraded native-Chrome Ubuntu 24.04.5 playground: Bash 5.2.21 and GNU nano 7.2. Observation evidence, not a graded check, score, or acceptance by itself."}},
+    {"source_id": "OBS-MACOS-NANO-BINARY-PICO-P02C", "retrieval_uri": "local-report://docs/content-upgrade/reviews/2026-10-26-editing-files-p02c.md", "snapshot_digest": "sha256:96d0c3944198dfe681e951ef907db5efa8b7101bcd4a6303086a37dc5cd8a753", "review_text_digest": "sha256:96d0c3944198dfe681e951ef907db5efa8b7101bcd4a6303086a37dc5cd8a753", "capture_scope": "Complete bounded P02c practice report retained in repository.", "qualifiers": "Observed macOS system /usr/bin/nano launched UW Pico 5.09; proves this one host, not that all systems resolve the nano command to Pico.", "review_eligibility": {"source_id": "OBS-MACOS-NANO-BINARY-PICO-P02C", "verdict": "LIMITED", "reason": "One macOS host resolved /usr/bin/nano to UW Pico 5.09, and its separate GNU nano 9.0 PTY evidence stays on that platform."}},
+    {"source_id": "gnu-hostname-invocation", "retrieval_uri": "https://www.gnu.org/software/inetutils/manual/html_node/hostname-invocation.html", "snapshot_digest": "sha256:936f1066f42f101a0d428f575eacda287ee303260bb5ec763218215b92833f5a", "review_text_digest": "sha256:936f1066f42f101a0d428f575eacda287ee303260bb5ec763218215b92833f5a", "capture_scope": "Complete supplied manual entry.", "qualifiers": "Command identifies the system host name; the current 0.5 lesson uses this only as an environment check.", "review_eligibility": {"source_id": "gnu-hostname-invocation", "verdict": "ELIGIBLE", "reason": "Inetutils hostname shows the host name with no operand and can set it when a name is supplied. The page uses only the show form as an environment check."}},
+    {"source_id": "gnu-nano-7.2-cheatsheet", "retrieval_uri": "https://www.nano-editor.org/dist/v7/cheatsheet.html", "snapshot_digest": "sha256:f4e12897906665482cafa031d82749ebf861e94c07f4d44e4827670b75195b2f", "review_text_digest": "sha256:a3375e30efad6c5d1e7bc9b80e76a8bdbceb87afd38ac43692ef2e84308ab3b3", "capture_scope": "Complete GNU nano 7.2 shortcut reference HTML page.", "qualifiers": "Version-specific shortcut list; actual terminal/menu remains the learner source of truth.", "review_eligibility": {"source_id": "gnu-nano-7.2-cheatsheet", "verdict": "ELIGIBLE", "reason": "Versioned 7.2 shortcut list, including Ctrl+W and Alt+W. The learner's visible menu remains authoritative."}},
+    {"source_id": "gnu-nano-7.2-manual", "retrieval_uri": "https://www.nano-editor.org/dist/v7/nano.html", "snapshot_digest": "sha256:b03b41aafdf95898dd34074db2cb2e4b8d4963bfbb37692c4ede9a2222efb56f", "review_text_digest": "sha256:d03f1f1f136ac2ebe5df5a841ff96041e00b7671bcf68cf6733c2b3fcebb2d39", "capture_scope": "Complete versioned GNU nano 7.2 manual HTML page.", "qualifiers": "Versioned manual; key bindings may differ on other versions/configurations.", "review_eligibility": {"source_id": "gnu-nano-7.2-manual", "verdict": "ELIGIBLE", "reason": "Versioned 7.2 manual. Bindings and the modified marker depend on version and configuration; default title text is Modified, while the asterisk is stateflags or minibar."}},
+    {"source_id": "linux-execve2", "retrieval_uri": "https://man7.org/linux/man-pages/man2/execve.2.html", "snapshot_digest": "sha256:ea744b044227c50f852b8cd6165b5e48ed5c8afecf2258710b5e74b06defd309", "review_text_digest": "sha256:dc44dcda01b70f43285e34a01e042c98979fd8128d699c112b1ca12cd02deb0b", "capture_scope": "Complete Linux execve(2) manual page HTML; full parent retained.", "qualifiers": "Linux-specific direct-execution errors and interpreter scripts.", "review_eligibility": {"source_id": "linux-execve2", "verdict": "ELIGIBLE", "reason": "Linux execve(2) interpreter-script and EACCES text. Not an error map for other operating systems."}},
+    {"source_id": "posix-cat", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cat.html", "snapshot_digest": "sha256:c65d7288eec83a6e19ad3c6e5d407eb0c072d856d73674ecf619e52a3c2a1d66", "review_text_digest": "sha256:3553def5de2fd40aec86f97ff2e3ffdb7e48dacf317782ab3c9d19efffe2b170", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "Reused complete POSIX cat page; prior 0.3 source review supported only named file contents to stdout/in order. No new 0.5 verdict.", "review_eligibility": {"source_id": "posix-cat", "verdict": "ELIGIBLE", "reason": "POSIX cat writes file bytes to standard output in order. It does not prescribe the exact missing-file diagnostic string."}},
+    {"source_id": "posix-ls", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html", "snapshot_digest": "sha256:cd4db85f09dbadf3d529b1bf6a8c157806759c5a22d3ca616aad0cc0363f07bc", "review_text_digest": "sha256:489a39dd1d869697469bd2572934d9d98c661a2f417a24a319c4ac522f564ebb", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "Complete POSIX ls page; supports listed entries and mode/owner fields where applicable; do not generalize all OS formatting.", "review_eligibility": {"source_id": "posix-ls", "verdict": "ELIGIBLE", "reason": "POSIX ls lists directory entries; long format carries mode information. Display details are not universal across operating systems."}},
+    {"source_id": "posix-pwd", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pwd.html", "snapshot_digest": "sha256:6c0724e219d469ac68640fc07c825a95e090931483b9cee2d089dec136efd7f6", "review_text_digest": "sha256:0fe12cb226e06dbe2146472006839c1514e7c63ee775f3b7b37abaf8b1a672b1", "capture_scope": "complete command documentation page; no text cropping", "qualifiers": "Complete POSIX pwd page; supports absolute current working directory output only.", "review_eligibility": {"source_id": "posix-pwd", "verdict": "ELIGIBLE", "reason": "POSIX pwd writes an absolute pathname of the current working directory."}},
+    {"source_id": "ubuntu-bash-arguments", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html", "snapshot_digest": "sha256:f4b959a94ee56f204df280261be1ea04716007582c9a65d3b46e74dbe5357f03", "review_text_digest": "sha256:b3acf1ba2225ee8c64f671a945d7857e3d03800fcdbce2a807ce1c147d931c71", "capture_scope": "Complete named Bash section extracted from the retained complete parent HTML; no topical cropping within section.", "qualifiers": "Ubuntu Noble Bash 5.2 manual. This is derived from an already captured full parent; original parent remains at /Users/krisztiankoos/projects/kubedojo/.worktrees/review-assurance/.agent/commands03-completion/ubuntu-bash.html.", "review_eligibility": {"source_id": "ubuntu-bash-arguments", "verdict": "ELIGIBLE", "reason": "Same manual's ARGUMENTS section: a file argument is read as shell commands."}},
+    {"source_id": "ubuntu-bash-command-execution", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html", "snapshot_digest": "sha256:f4b959a94ee56f204df280261be1ea04716007582c9a65d3b46e74dbe5357f03", "review_text_digest": "sha256:cb61a98788f24bcfdf173000719060d10053cdabeaed91db7c1a6428ce74d4d3", "capture_scope": "Complete named Bash section extracted from the retained complete parent HTML; no topical cropping within section.", "qualifiers": "Ubuntu Noble Bash 5.2 manual. This is derived from an already captured full parent; original parent remains at /Users/krisztiankoos/projects/kubedojo/.worktrees/review-assurance/.agent/commands03-completion/ubuntu-bash.html.", "review_eligibility": {"source_id": "ubuntu-bash-command-execution", "verdict": "ELIGIBLE", "reason": "Same manual's command-execution section for slash versus PATH lookup and the #! interpreter line."}},
+    {"source_id": "ubuntu-bash-command-substitution", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html", "snapshot_digest": "sha256:f4b959a94ee56f204df280261be1ea04716007582c9a65d3b46e74dbe5357f03", "review_text_digest": "sha256:8b5c609b68f4551711f2b74b8d97b4470ab6d93c9d535a7c1a21882ab023774e", "capture_scope": "Complete named Bash section extracted from the retained complete parent HTML; no topical cropping within section.", "qualifiers": "Ubuntu Noble Bash 5.2 manual. This is derived from an already captured full parent; original parent remains at /Users/krisztiankoos/projects/kubedojo/.worktrees/review-assurance/.agent/commands03-completion/ubuntu-bash.html.", "review_eligibility": {"source_id": "ubuntu-bash-command-substitution", "verdict": "ELIGIBLE", "reason": "Same manual's command-substitution section, including trailing-newline deletion. The page demonstrates only $(command)."}},
+    {"source_id": "ubuntu-bash-invocation", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html", "snapshot_digest": "sha256:f4b959a94ee56f204df280261be1ea04716007582c9a65d3b46e74dbe5357f03", "review_text_digest": "sha256:6c02a022f92659b6e772ae9bd3e47f3f3ef224e5201db5700245823e594b56c5", "capture_scope": "Complete named Bash section extracted from the retained complete parent HTML; no topical cropping within section.", "qualifiers": "Ubuntu Noble Bash 5.2 manual. This is derived from an already captured full parent; original parent remains at /Users/krisztiankoos/projects/kubedojo/.worktrees/review-assurance/.agent/commands03-completion/ubuntu-bash.html.", "review_eligibility": {"source_id": "ubuntu-bash-invocation", "verdict": "ELIGIBLE", "reason": "Ubuntu Noble Bash 5.2 invocation section for reading a script file."}},
+    {"source_id": "ubuntu-chmod1", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/chmod.1.html", "snapshot_digest": "sha256:ca81c56c4ed6233e77426b5b1644b322f49c123b133ab1d78427afa7218a658b", "review_text_digest": "sha256:20eb1ddc9f4f19843c207643576d0624cbb37a1fdf61da5860a008e2505e25ab", "capture_scope": "Complete Ubuntu Noble GNU chmod(1) manual page HTML; full parent retained.", "qualifiers": "GNU version; symbolic mode omitted who defaults as all except umask bits; + adds selected bits.", "review_eligibility": {"source_id": "ubuntu-chmod1", "verdict": "ELIGIBLE", "reason": "Ubuntu Noble GNU chmod(1): symbolic plus, execute/search, and omitted-who behavior limited by umask."}},
+    {"source_id": "ubuntu-file1", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/file.1.html", "snapshot_digest": "sha256:0a654b48d15c6f667e2b71542459b988c100a4c9d9a17ad71244dd2b437c054e", "review_text_digest": "sha256:4d914d21d779afb22f9f7cad8803b2cf543a0b342ccdf6caa4a0be42afcf6adb", "capture_scope": "complete returned manual HTML page; parser-generated full text body, no topical cropping", "qualifiers": "Describes file(1) classification via filesystem/stat, magic and language tests; it does not prove nano corrupts arbitrary binary files.", "review_eligibility": {"source_id": "ubuntu-file1", "verdict": "ELIGIBLE", "reason": "Ubuntu file(1) filesystem, magic, and language tests. It does not prove that nano corrupts every binary."}},
+    {"source_id": "ubuntu-rm", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/rm.1.html", "snapshot_digest": "sha256:a36af222ffc6e6623947156d8bc656f56ea35286cc050107a32ce591a0f892c9", "review_text_digest": "sha256:f854ead355f0aaefb328732d07b49775d22c4ed2b0b79158b9220e7192228e76", "capture_scope": "Complete command manual page", "qualifiers": "Complete Ubuntu Noble rm(1) manual page; supports removal behavior and explicit operand handling; does not authorize arbitrary cleanup.", "review_eligibility": {"source_id": "ubuntu-rm", "verdict": "ELIGIBLE", "reason": "Ubuntu Noble rm removes named file operands and does not recurse or remove directories by default."}},
+    {"source_id": "vim-intro", "retrieval_uri": "https://raw.githubusercontent.com/vim/vim/master/runtime/doc/intro.txt", "snapshot_digest": "sha256:841ddb7966a47a9e46b5609f356b7896a045d67370a146f9833b482c16a68627", "review_text_digest": "sha256:fadc818612413792a6c5fd1afbb44ad8dcff5716a44a003b65d69b7c5f616dd5", "capture_scope": "Complete upstream Vim introduction text file.", "qualifiers": "Upstream main-branch snapshot; supports only documented mode distinctions in excerpt.", "review_eligibility": {"source_id": "vim-intro", "verdict": "ELIGIBLE", "reason": "Upstream introduction supports Normal versus Insert only. It is a main-branch snapshot, not a Vim release pin, and it does not support teaching Vim."}}
+  ],
+  "publication": {
+    "http": {
+      "url": "https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.5-editing-files/",
+      "status": 200,
+      "deployment": {
+        "conclusion": "success",
+        "databaseId": 41322009288,
+        "headSha": "f74bdc153b1c1db050445462cc5d0f0f1d32c85b",
+        "status": "completed",
+        "url": "https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/41322009288"
+      },
+      "checks": {
+        "plain_ubuntu_playground": true,
+        "nano72_illustration": true,
+        "read_actual_menu": true,
+        "permission_error_not_diagnosis": true,
+        "unguided_broken_script": true,
+        "changelog_benefit": true
+      },
+      "removed_text_absent": {
+        "old_graded_lab": true,
+        "old_nano9_screen": true,
+        "gratuitous_kubernetes_pin": true
+      },
+      "module_http_digest": "sha256:a727d5653878f1515835c757474ede31e41a311df6ec7f6f0a9c4e1ad76a42b9",
+      "changelog_http_digest": "sha256:385eb2863f4f865a38e334e52717b208b2fef21fa1adf0341668ff9d1f9c43f9",
+      "recorded_at": "2026-11-01T15:45:09.258186+00:00",
+      "scope": "Expected text and actual successful deployment; native interactions recorded separately."
+    },
+    "native": {
+      "url": "https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.5-editing-files/",
+      "merge": "f74bdc153b1c1db050445462cc5d0f0f1d32c85b",
+      "deployment_run": 41322009288,
+      "new_text_observed": true,
+      "interaction_checks": {
+        "ubuntu_playground_and_nano72_visible": true,
+        "permission_quiz_expanded_and_qualified_feedback_visible": true,
+        "broken_script_solution_expanded_and_two_layers_visible": true,
+        "desktop_layout_readable": true
+      },
+      "evidence": ["publication-native-full.ax.txt", "publication-quiz.ax.txt", "publication-diagnosis.ax.txt"],
+      "limits": "Actual published page in native Chrome. Screenshot viewed, not retained. This is publication/interaction verification, not another practice execution or other-platform proof."
+    },
+    "merge": {
+      "pr": 3775,
+      "head": "9468c5c90db42f5a8aa9055bd40c344fc65092c5",
+      "merge": "f74bdc153b1c1db050445462cc5d0f0f1d32c85b",
+      "reviewed_tree": "a0d171e61e03f6969993661babb08e669cb1bbee",
+      "merged_tree": "a0d171e61e03f6969993661babb08e669cb1bbee",
+      "full_trees_equal": true,
+      "review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3775#issuecomment-6560055391"
+    }
+  }
+}
