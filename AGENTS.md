@@ -22,9 +22,8 @@ and its linked plan before dispatching repairs or reviews. Complete pages are
 the delivery target; scoped fixes and support PRs retain their narrower meaning.
 
 Friction reports are observations, not new tasks or acceptance gates. Use a
-workable authorized path. Support fixes need an actual current-page blocker or
-a bounded recurring cost and a clear return to content; do not pursue an ideal
-environment.
+workable authorized path. Support fixes need an actual current-page blocker,
+a bounded fix and a clear return to content; do not pursue an ideal environment.
 
 ## Workspace and evidence
 

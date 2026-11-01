@@ -1,58 +1,54 @@
 # Page completion plan
 
-Keep one short working record in the packet's registered local evidence directory.
-Link existing evidence rather than copying it into more forms. This replaces the
-previous template; it adds no approval, estimate, learner-study or environment gate.
+Keep one short record in the registered local packet; link evidence instead of
+copying forms. This workflow adds no estimate, learner-study or environment gate.
 
 ## Scope note
 
-- Page, owning issue, accountable lead, exact revision/page and seed digests:
-- Audience, prerequisites, essential outcomes and deliberate exclusions:
-- Strategy: retain / repair / rewrite; name the evidenced defects to address:
-- Applicable exercise paths and environment; documented but unexecuted alternatives:
-- Prior unresolved finding IDs and evidence; PR and whole-page calls spent/ceiling:
+- Page/issue/lead, revision/page and seed digests; audience and prerequisites:
+- Essential outcomes, exclusions and evidenced defects or gaps:
+- Strategy: keep, improve, merge, rewrite, retire, add, or a justified combination:
+- Applicable exercise paths/environment; documented but unexecuted alternatives:
+- Prior unresolved finding IDs; PR and whole-page calls spent/ceiling:
 - Authorized independent reviewer; next concrete action or actual missing evidence:
 
-## Prepare and review
+## Finish sequence
 
-1. Read and improve the whole page. Preserve supported outcomes; remove filler,
-   repetition, unsupported specificity and canned transitions. Make mechanisms,
-   practical decisions, worked examples and feedback serve the learner's outcomes.
-2. Keep a concise material-claim ledger: stable ID, exact page quote/location,
-   source URL/locator, dated/version scope where needed, snapshot digest and literal
-   supporting excerpt. Include necessary context and qualifications. Keep complete
-   snapshots available; a URL or matching quotation alone does not prove support.
-   Teaching instructions need no separate factual row unless they assert behavior.
-3. Run applicable exercises and proportionate deterministic checks. Record actual
-   environment, commands, observed output and cleanup. Preserve failures and limits.
-   Check quote/excerpt integrity, page/seed bindings, required local checks and CI;
-   these checks do not establish factual support or teaching quality.
-4. Submit one combined independent review of the stable candidate: complete changed
-   files/page, material claims with source context, applicable execution receipts,
-   prior unresolved findings/dispositions and current rubric. Keep source, teaching,
-   practice and PR judgments distinct in that response; carry both stream counters.
-   Require semantic support, a check for omitted material claims, outcome alignment,
-   all D1–D8 scores and applicable L1–L5 scores, and concrete desloping findings.
-5. Resolve material findings. Carry supported disagreements for independent
-   adjudication; the lead cannot turn a contested negative review into approval.
-   A changed head/page/seed needs exact-revision re-review, including wording edits.
-   Supply the full current page plus the relevant change/finding/source context;
-   reuse reconciled immutable evidence instead of repeating unrelated history.
-   Plan one review plus one fix review; carry actual counters and grants. After
-   two calls, reassess with the workflow collaborator before another allowed call.
-   Stop at valid unchanged-revision approval; leave optional nits deferred.
-6. Merge after required review/checks; verify actual publication and native smoke.
-   Adopt canonical data only with real evidence and its required independent review.
-   Data-only review checks transfer, bindings and changed data, without repeating
-   semantic/editorial review of an unchanged reviewed candidate. Use the standing
-   three-JSON budget in the review contract; no future deployment pass.
+1. Read and improve the whole page: remove filler, repetition, unsupported specificity
+   and canned transitions; teach mechanisms, decisions, examples and useful feedback.
+   Retire/merge only for evidenced learner need, obsolescence or duplication; preserve
+   needed outcomes elsewhere and repair routes/prerequisites/links. Add for named gaps.
+   Record scope decisions; these strategies add no canonical disposition enum or pass.
+2. Keep a material-claim ledger: stable ID, exact page quote/location, source URL and
+   locator, date/version scope, snapshot digest and literal contextual excerpt.
+   Retain complete snapshots; matching text or a URL alone does not prove support.
+   Instructions need no factual row unless they assert behavior. Missing context stays
+   unknown; the reviewer names what is needed, rather than passing to save a call.
+3. Run required exercises on the applicable path; retain environment, commands,
+   observed output, verification/cleanup and failures. Run quote/excerpt integrity,
+   bindings, required local checks and CI; these do not prove truth or teaching quality.
+4. Use one combined independent review: complete changed files/current page, claims
+   and source context, practice receipts, unresolved findings/dispositions and rubric.
+   Keep distinct judgments; a combined call counts once against each stream it judges.
+   Require semantic support, omitted-claim discovery, outcome alignment, D1–D8 and
+   applicable L1–L5 scores, and concrete desloping findings. Preserve current floors.
+5. Resolve material findings; contested negatives require independent resolution.
+   Changed head/page/seed needs exact-revision review, including wording edits:
+   supply the full current page plus relevant changes/findings/source context,
+   reusing reconciled immutable evidence. Plan one review plus one fix review;
+   reassess with the designated collaborator after two. Carry counters/grants,
+   stop at valid unchanged-revision approval and defer optional nits.
+6. Merge after required checks/review; verify real publication and native smoke.
+   Adopt data with genuine evidence, bindings, schema checks and independent exact-data
+   review. Reuse unchanged semantic/editorial judgments; use the review contract's
+   standing adoption budget. Never claim a future deployment passed.
 
-## One finish record
+## Result and timing
 
-Record source support, teaching/rubric, applicable practice, checks, publication
-and canonical adoption as pass/fail/pending/unknown or justified not-applicable,
-each with its revision-bound evidence link. Do not invent passes or requirements.
-Record packet bytes, actual calls/latency, material versus optional findings,
-incorrect blocker demands, time spent where known, and canonical completion.
-Compare the next two or three pages; improvement is unproven until measured.
-Keep one NOW page and the next learner-route page; preserve parked work and budgets.
+Record revision-bound source, rubric, practice, checks, publication and adoption
+states/links; pending/unknown stays visible. Append UTC start/phase/end events to the
+primary checkout's `.agent/module-timing.jsonl`, naming page/revision and full/partial
+scope. Elapsed time includes review/CI waits; active effort stays unknown unless logged.
+Compare accepted lessons (hubs separately), all calls/latency, packet bytes and later
+material rework over consecutive pages. Report additions/retirements separately so
+scope changes cannot disguise progress. Keep one NOW target and the next learner page.

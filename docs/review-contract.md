@@ -127,13 +127,13 @@ Use the [page completion workflow](content-upgrade/page-completion-plan.md) to
 combine source, rubric/desloping, practice and PR judgments in one call.
 Correctness, interest, clear prose and D1–D8/L1–L5 floors remain required.
 
-Plan one initial combined review and at most one fix review. Two invocations per
-stream are the default automatic ceiling for new page audits and their PRs. Keep
-existing spent counters and explicit grants intact. After the second call, reassess
-scope/method with the workflow collaborator before another authorized invocation;
-do not automatically repeat the same loop. Calls above a stream's ceiling need an
-explicit user grant. Failed/incomplete calls count; unresolved material findings
-still block acceptance. Optional nits never justify another round after approval.
+New content-upgrade page-audit and PR streams opened after this policy merges have
+an explicit user-directed two-call automatic cap (initial plus one fix review),
+overriding review-loop's five-call default. Earlier streams keep recorded ceilings
+and spent counters; no reset. After two calls, reassess with the user-designated
+workflow collaborator (currently Claude under #3762); reassessment grants no calls.
+Exceeding a stream ceiling needs an explicit user grant. Failed/incomplete calls
+count; material findings block acceptance. Stop on approval; defer optional nits.
 
 Supply complete changed files/current page, the material-claim ledger, contextual
 primary-source excerpts, execution receipts and unresolved prior findings. Retain
@@ -150,23 +150,23 @@ Preserve invoked/frozen packets and their negative results. A replacement packet
 records its new bindings, scope changes, all unresolved adverse findings and carried
 counters; it never edits an old verdict or rebinds approval to different bytes.
 
-Before creating an extra blocker, identify the applicable requirement and the
-substantiated factual, teaching, execution or release defect. Report uncertain
-findings, but uncertainty or a tool restriction alone is not proof of a defect.
-Document applicability disagreements and obtain independent resolution of material
-disputes; the lead cannot silently dismiss a negative verdict. Any changed revision
-still requires exact-revision review; unchanged evidence may be reused explicitly.
+Reviewers and leads must substantiate new blockers against applicable requirements.
+A lead's disagreement cannot clear a negative verdict or finding. Disputes about
+substantiation, materiality or applicability stay open for reviewer resolution or
+independent adjudication before approval; label demands incorrect only after that
+resolution or explicit user direction. Any changed revision needs exact-revision
+review; reuse unchanged evidence explicitly. A tool restriction alone proves no defect.
 
 Record packet bytes and review latency; no size target may omit required evidence
 or force padding. Automation validates identities, quotes, schema and publication;
 it cannot manufacture source judgments, rubric scores or acceptance.
 
 Routine single-page post-publication adoption has a standing #3762 budget of at most
-1,800 aggregate changed lines in exactly three JSON files: that page's citation seed,
-source catalog, and its row in `docs/content-upgrade/page-reviews.json`. Other rows
-stay unchanged; no executable or learner-content changes. No per-page prospective
-budget endorsement is needed. Exact-data review, required checks, real publication,
-page/seed bindings and genuine source/editorial/practice evidence still apply.
+1,800 aggregate changed lines, limited to its citation-seed JSON, page-specific source
+catalog JSON and its row in `docs/content-upgrade/page-reviews.json`; unchanged files
+need no edit. Other pages and shared source entries must not change. No per-page
+prospective budget endorsement is needed. Exact-data review, required checks, real
+publication, bindings and genuine source/editorial/practice evidence still apply.
 Larger/different changes need their own reviewed plan; schema/consumer checks hold.
 
 ## Prevention and measurement
