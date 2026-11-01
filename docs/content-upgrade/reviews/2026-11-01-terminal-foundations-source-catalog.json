@@ -17,7 +17,7 @@
     "review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3766#issuecomment-6555986369",
     "native_result_digest": "sha256:906c09efb882a08a91896d42bf1e1b9712123f2f425d6bdf510d331c8f12d085",
     "genuine_verdict_digest": "sha256:bc10e0129ba1979ad669531da2e1505699ae0257fa491eb2d3637ee66999b6ed",
-    "source_index_digest": "sha256:77e9751edfc6918ad0f96766e3d8ad55f5d25efbbb6d33586280cb10eaf34294",
+    "source_index_digest": "sha256:245fd6a5853bbc81a670e52a2a3af8b41befcbbb173f1be556d890bb0f95caf0",
     "projection": "Genuine R3 verdicts/evidence_refs/support notes retained. Source refs expand deterministically to the exact supplied URI/digest/scope; no external quotation is regenerated or invented. Only cited source metadata is published; full offered index and original literal snapshots are retained. Private native reasoning excluded. R1/R2 negative history remains preserved; only R3 approval is consumed.",
     "review_budget": "Source and content PR STOP3/5 each; this separate data PR consumes neither source stream nor a new source judgment."
   },
