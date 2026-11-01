@@ -294,9 +294,9 @@ CPU capacity cannot substitute for memory capacity. In Kubernetes, however, the 
 
 ## Reading Symptoms Like an Operator
 
-If a computer is slow, ask when the delay occurs: starting programs, switching apps, saving files, joining video calls, or loading websites. Each symptom suggests different checks.
+If a computer is slow, ask when the delay occurs: starting programs, switching apps, saving files, editing video, or loading websites. Each symptom suggests different checks.
 
-Slow application startup can involve disk and operating-system work because the program must be loaded from storage into RAM. Slow switching between many open applications can involve RAM pressure because the OS may be moving inactive data out of memory and back in again. Slow calculations, video encoding, compression, and game simulation can involve CPU pressure. Slow web pages may involve network latency, browser CPU use, DNS, remote servers, or local memory pressure.
+Slow application startup can involve disk and operating-system work because the program must be loaded from storage into RAM. Slow switching between many open applications can involve RAM pressure because the OS may be moving inactive data out of memory and back in again. Slow video editing and game calculations justify inspecting CPU activity too. Slow web pages may involve network latency, browser CPU use, DNS, remote servers, or local memory pressure.
 
 The goal is not to guess perfectly on the first try. The goal is to form a testable hypothesis. If you suspect RAM pressure, open the system's resource monitor and look for memory usage and swap activity. If you suspect disk fullness, check free storage. If you suspect CPU pressure, look for a process consuming processor time. If you suspect one program is broken, compare it with other programs that are still healthy.
 
@@ -310,7 +310,7 @@ A good hypothesis includes both a resource and a reason. "It is slow because com
 | One app freezes but others work | Application process state | One recipe may be stuck while the OS continues |
 | Website loads slowly on all devices | Network path or remote service | The local computer may not be the bottleneck |
 
-This table is a decision aid, not a law of nature. Real incidents can involve several resources at once. A browser can consume CPU, RAM, disk cache, and network bandwidth in the same session. A full disk can make memory pressure worse by limiting swap. A hot laptop can slow its CPU to protect itself. The operator's job is to keep asking which resource is constrained and what evidence supports that claim.
+This table is a decision aid, not a law of nature. Real incidents can involve several resources at once. A browser can consume CPU, RAM, disk cache, and network bandwidth in the same session. A full disk can make memory pressure worse by limiting swap. Keep asking which resource is constrained and what evidence supports that claim.
 
 Hypothetical scenario: your laptop has 16 GB of RAM and a large SSD, but becomes sluggish during a video export. Across repeated samples, the system-wide CPU summary is almost fully busy and the editor accounts for most CPU time; memory pressure is low. CPU contention is the leading hypothesis. Compare responsiveness when the export is paused before considering an upgrade.
 
@@ -387,9 +387,9 @@ Do not decide from CPU availability alone. Compare the Pod's declared memory req
 </details>
 
 <details>
-<summary>4. Your video call freezes, but other websites load quickly and your speed test is healthy. Which bottleneck would you evaluate next?</summary>
+<summary>4. Your video editor slows while processing a clip. You have plenty of free storage but have not checked CPU or memory activity. Which checks would distinguish CPU pressure from memory pressure?</summary>
 
-Evaluate CPU pressure and local application behavior next because real-time video can require constant encoding and decoding. A healthy network result weakens the case that bandwidth is the only problem. RAM pressure can also contribute if the machine is overloaded, so checking both CPU and memory is reasonable. The key is that "internet slow" is no longer the only explanation.
+Compare repeated system-wide and editor CPU readings with memory pressure or available memory and ongoing paging. Editing software can use multiple cores, but that does not show that CPU is the limiting resource in this case. Free storage does not establish that RAM is sufficient. Use observations that coincide with the delay before choosing a change.
 </details>
 
 <details>
