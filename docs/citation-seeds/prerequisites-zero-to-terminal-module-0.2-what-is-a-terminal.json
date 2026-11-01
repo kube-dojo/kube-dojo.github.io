@@ -1,148 +1,1090 @@
 {
+  "schema_version": 2,
   "module_key": "prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal",
   "module_path": "src/content/docs/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal.md",
-  "research_run_id": "2026-04-19T14:01:39+00:00-codex-gpt-5.3-codex-spark",
-  "schema_version": 2,
+  "page_sha256": "7815fad4828994da3a381b02dcb2c73c0b83f22c376f2bc65cff5a3d3477960a",
+  "further_reading": [],
+  "status": "UNJUDGED author inventory; proposed accounting and history require independent classification",
+  "canonical_seed_sha256": "c48c1f397f1cb6802a64e7f38d0c04ce6b06ef1401e626220616c0e4bf580619",
+  "archived_author_inputs": [
+    {
+      "path": "/Users/krisztiankoos/projects/kubedojo/.agent/session231/terminal02-author-inventory/author-v1-final/candidate-seed.json",
+      "sha256": "80e1256b1445e5b9bb3b33796067f1b38dce3339c1092c79e75c52268c06bd9a",
+      "purpose": "historical author inventory or context; not canonical and not a verdict"
+    },
+    {
+      "path": "/Users/krisztiankoos/projects/kubedojo/.agent/session231/terminal02-author-inventory/author-v1-final/original-id-crosswalk.json",
+      "sha256": "5ed3b3d05d99e0e4e412c55b93d64da83764e5d7fafc3a5cb6685666e06d72af",
+      "purpose": "historical author inventory or context; not canonical and not a verdict"
+    },
+    {
+      "path": "/Users/krisztiankoos/projects/kubedojo/.agent/session231/terminal02-author-inventory/author-v1-final/page.md",
+      "sha256": "2c622ed5d83cb745613e48a629ade060323c66322e6a2ae4101ccd0327d66f47",
+      "purpose": "historical author inventory or context; not canonical and not a verdict"
+    },
+    {
+      "path": "/Users/krisztiankoos/projects/kubedojo/.agent/session231/terminal02-author-inventory/author-v1-final/source-and-practice-map-original.json",
+      "sha256": "00cb789318e85f33b2d2e86105ac022861baab6cf958f1cf1450e63d28b6ee65",
+      "purpose": "historical author inventory or context; not canonical and not a verdict"
+    },
+    {
+      "path": "/Users/krisztiankoos/projects/kubedojo/.agent/session231/terminal02-author-inventory/author-v1-final/research-gaps.json",
+      "sha256": "8c81c2c4dd56f497e07b132d8ae166151d5aa88e3db576d6ff73bc8e12d507e1",
+      "purpose": "historical author inventory or context; not canonical and not a verdict"
+    },
+    {
+      "path": "/Users/krisztiankoos/projects/kubedojo/.worktrees/review-assurance/.agent/terminal02-next-draft/draft-seed.json",
+      "sha256": "65140ca615e2dd7c2b1e52a29ac6974b450192b12e36f43c698a780ebe8788f7",
+      "role": "Pre-lead final bounded editorial seed; author proposals only, no independent judgments"
+    }
+  ],
   "claims": [
     {
-      "claim_id": "C001",
-      "claim_text": "SSH (Secure Shell) is a protocol for secure remote login and other secure network services, and terminal access over SSH is a standard way to manage remote systems.",
-      "claim_class": "standard",
-      "span_hint": "section: Why Do Engineers Use Terminals? / 3. Remote Access",
-      "disposition": "supported",
-      "proposed_url": "https://www.rfc-editor.org/info/rfc4251",
-      "proposed_tier": "standards",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "RFC 4251 is the authoritative standards-track source for SSH as secure remote login."
+      "claim_id": "T02N0031",
+      "claim_text": "Tools you will meet later, such as Git and `kubectl`, can be used through commands. This module introduces how to read a prompt, enter a command, and connect its output to the machine you are using.",
+      "line_start": 31,
+      "line_end": 31,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
     },
     {
-      "claim_id": "C002",
-      "claim_text": "In the February 28, 2017 Amazon S3 disruption in us-east-1, an authorized operator entered one input incorrectly, removing more servers than intended; AWS later added safeguards to reduce the chance of a repeat.",
-      "claim_class": "incident",
-      "span_hint": "section: Why Do Engineers Use Terminals? / A Documented Operational Mistake",
-      "disposition": "supported",
-      "proposed_url": "https://aws.amazon.com/message/41926/",
-      "proposed_tier": "vendor",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "AWS's own postmortem directly documents the incorrect command input, the broader impact, and the follow-up safeguards."
+      "claim_id": "T02N0037",
+      "claim_text": "A GUI, or Graphical User Interface, gives you icons, windows, buttons, menus, file pickers, and visual feedback. Clicking a browser icon or moving a photo into a folder uses these visible controls to communicate with the computer.",
+      "line_start": 37,
+      "line_end": 37,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
     },
     {
-      "claim_id": "C003",
-      "claim_text": "The first computers had no screens at all.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? / item 1",
-      "disposition": "cannot_be_salvaged",
-      "proposed_url": null,
-      "proposed_tier": null,
-      "anchor_text": "The first computers had no screens at all.",
-      "suggested_rewrite": "Many early computers had no interactive screens at all.",
-      "lesson_point_url": null,
-      "rationale": "The absolute phrasing is broader than the supporting history and should be narrowed to a more defensible historical statement."
+      "claim_id": "T02N0039",
+      "claim_text": "A GUI can show a chart, colors, photos, or a diagram directly. Menus, toolbars, and dialogs can also show available choices without requiring you to remember command names. These features can be useful for visual work and exploring an unfamiliar application.",
+      "line_start": 39,
+      "line_end": 39,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0041",
+      "claim_text": "A terminal is also an interface, but it is text based. Instead of clicking visible controls, you type an instruction and press Enter. The computer prints a response, changes something, or starts a program. It may look plain because the terminal is not trying to show every possible action at once; it is waiting for you to describe exactly what you want in a small command language.",
+      "line_start": 41,
+      "line_end": 41,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0049",
+      "claim_text": "That single symbol is easy to underestimate. It means the shell is ready for a command, much like a blank search box means a browser is ready for a query. The terminal does not remove the computer's graphical abilities; it gives you another way to operate the same machine, one that is especially good for precise, repeated, text-heavy work.",
+      "line_start": 49,
+      "line_end": 49,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0053",
+      "claim_text": "A command is text that can be saved in a note or script, reviewed, and run again. Before repeating it, check that its effects and target are still appropriate.",
+      "line_start": 53,
+      "line_end": 53,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0059",
+      "claim_text": "| GUI | Visual inspection, discovery, drag-and-drop work, dashboards | Repeating many exact steps, documenting every click, remote text-only servers | You mostly click visible controls |",
+      "line_start": 59,
+      "line_end": 59,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0060",
+      "claim_text": "| Terminal | Precise commands, automation, remote access, repeatable troubleshooting | Visual editing, first-time exploration, tasks where pictures carry the meaning | You type a command and read text output |",
+      "line_start": 60,
+      "line_end": 60,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0067",
+      "claim_text": "A typed instruction can be tested, reviewed, saved, and rerun for a uniform change. A GUI may be useful when the pattern is irregular or needs visual inspection. Either approach needs a check of the intended changes before altering files.",
+      "line_start": 67,
+      "line_end": 67,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0071",
+      "claim_text": "For example, renaming files one at a time in a GUI involves repeating the rename steps for each file. A shell loop can express a uniform pattern once and apply it repeatedly. Either way, check the intended names and any existing files before changing them.",
+      "line_start": 71,
+      "line_end": 71,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0075",
+      "claim_text": "> Here is what a file-renaming loop *looks like* in a shell. You have not learned file operations or loops yet; running it would rename real `.txt` files on your machine and can overwrite existing `backup_*.txt` names. Read it for the idea; you will run commands like this in a later module.",
+      "line_start": 75,
+      "line_end": 75,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0085",
+      "claim_text": "Opening the terminal is slightly different on each operating system, but the first goal is the same everywhere: get to a window that shows a prompt and a blinking cursor. On macOS, press Cmd + Space, type Terminal, and press Enter. On many Linux desktops, Ctrl + Alt + T opens a terminal, and the applications menu usually has a Terminal entry if the shortcut is disabled.",
+      "line_start": 85,
+      "line_end": 85,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0087",
+      "claim_text": "Windows has several valid options, and they serve different purposes. Windows Terminal is Microsoft's modern terminal application and is a good day-to-day container for shells. WSL, the Windows Subsystem for Linux, gives you a Linux-style shell on Windows; use a WSL tab for the Unix command names in this module (`date`, `date -u`, and bash-style examples such as `$(date)`). PowerShell is a separate shell with its own command names and subexpression syntax. Profiles can define aliases or functions, so availability depends on the host; for a predictable PowerShell path in this module, use the native `Get-Date` and `Write-Output` examples below. WSL is recommended for the rest of this curriculum when later modules expect Unix command names.",
+      "line_start": 87,
+      "line_end": 87,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0089",
+      "claim_text": "If you choose WSL later, Microsoft's installation guide uses PowerShell opened as administrator, followed by a restart. The command below installs Ubuntu by default when WSL is not already installed; for an existing WSL setup, check the guide's instructions instead. This is an optional preview: do not run the installer for this module.",
+      "line_start": 89,
+      "line_end": 89,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0102",
+      "claim_text": "In this example, \"Last login\" is informational and the line ending with `%` is the prompt. A Linux or WSL prompt may end with `$` instead. Prompt content is customizable: it may show a user, machine, or directory, but these details are not guaranteed.",
+      "line_start": 102,
+      "line_end": 102,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0104",
+      "claim_text": "It helps to separate three words that people often mix together. The terminal application is the window that displays text and accepts keyboard input. The shell is the program inside that window that reads your command line and starts commands. The prompt is the small piece of text printed by the shell to show that it is ready for another instruction.",
+      "line_start": 104,
+      "line_end": 104,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0106",
+      "claim_text": "Different systems may use different shells. macOS Terminal defaults to zsh unless configured otherwise; Linux systems can use Bash, and Windows PowerShell has its own language and conventions. Follow the branch for your shell while comparing the shared pattern of commands, output, and prompts.",
+      "line_start": 106,
+      "line_end": 106,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0122",
+      "claim_text": "PowerShell can show a normal prompt such as `PS C:\\Users\\Learner>`. Its final `>` is part of that prompt, not automatically unfinished input. Continuation examples include `>` in Bash and `dquote>` for an open double quote in zsh; PSReadLine's documented default is `>>`. Prompt text is customizable, so compare the change with your own starting prompt rather than trusting one symbol alone.",
+      "line_start": 122,
+      "line_end": 122,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0130",
+      "claim_text": "In that example, `$` is a prompt cue, not part of the command. Type only `echo \"Hello\"`; copying the prompt symbol can produce an error.",
+      "line_start": 130,
+      "line_end": 130,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0132",
+      "claim_text": "Watch for your usual command prompt to return before typing the next command. If it has not returned, a program may still be running or waiting, or the shell may need more input to finish your line. A continuation prompt is different from the usual prompt: read the preceding command and compare the display before deciding what to do next.",
+      "line_start": 132,
+      "line_end": 132,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0134",
+      "claim_text": "Some commands print a result, some print errors, and some successful commands print nothing. Watch for the normal prompt to return, then use the command's documentation and output to decide what happened.",
+      "line_start": 134,
+      "line_end": 134,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0138",
+      "claim_text": "The examples in this section ask standard commands to print information without changing files: `echo` prints text, `date` or `Get-Date` reports date and time, `whoami` reports the account, and `hostname` reports the machine name. Shell functions, aliases, or local configuration can change which command runs, so use the expected shell and check unfamiliar environments. Type an instruction, press Enter, read the output, and wait for the prompt.",
+      "line_start": 138,
+      "line_end": 138,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0157",
+      "claim_text": "The command name is `echo`, and its text argument is `Hello, World!`; the single quotes group that text without becoming part of the output. An argument is information you give to a command. Here we use single quotes for literal text because interactive zsh can treat `!` specially inside double quotes. Later, double quotes let us insert command output into a sentence.",
+      "line_start": 157,
+      "line_end": 157,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0195",
+      "claim_text": "On a shared or remote system, checking the account helps you determine whether you are working as the intended user. The account can affect permissions and file ownership.",
+      "line_start": 195,
+      "line_end": 195,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02A0209",
+      "claim_text": "When several terminal windows are open, check which session each uses. Imagine one tab is connected to a practice machine and another to a production server. Prompts can be customized to include environment labels; confirm the session before acting rather than trusting the label alone.",
+      "line_start": 209,
+      "line_end": 209,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null,
+      "proposal_reason": "Promoted after genuineR1 additional-material discovery; all judgments remain null."
+    },
+    {
+      "claim_id": "T02N0216",
+      "claim_text": "In this exercise, choose the window labeled `alex@training-vm /tmp $`; the hostname label distinguishes it from the laptop window. In a real session, prompts can be customized or outdated. Use them as orientation clues, confirm which local or remote session you opened, and compare the read-only `whoami` and `hostname` output before changing anything. A prompt label alone does not establish machine identity or permissions.",
+      "line_start": 216,
+      "line_end": 216,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0228",
+      "claim_text": "For the simple commands in this lesson, read the command name first. Options modify its behavior, and arguments supply text or other data, such as a file, directory, server name, or URL.",
+      "line_start": 228,
+      "line_end": 228,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0234",
+      "claim_text": "Square brackets in a teaching diagram mean \"optional,\" not something you literally type. A command may have no options, one option, many options, no arguments, or several arguments. The shell splits the line into pieces, identifies the command name, and passes the remaining pieces to that command according to the program's own rules.",
+      "line_start": 234,
+      "line_end": 234,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0236",
+      "claim_text": "Whitespace is part of that structure. The shell normally uses spaces to separate the command name, options, and arguments, which is why quotes matter when one argument contains spaces.",
+      "line_start": 236,
+      "line_end": 236,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0250",
+      "claim_text": "The command is `echo`, and the argument is `\"Hello\"`. The shell removes the quotes as syntax and gives the command the text inside them. That distinction is subtle at first: quotes are not decorations for humans, they are instructions to the shell about how to group words before the command receives them.",
+      "line_start": 250,
+      "line_end": 250,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0252",
+      "claim_text": "Options change behavior. The macOS and GNU versions of `date` use `-u` to request UTC rather than the configured local time. Keep the timezone with a timestamp when comparing records from different systems. Follow the command branch for your shell; the PowerShell examples use `Get-Date`.",
+      "line_start": 252,
+      "line_end": 252,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0258",
+      "claim_text": "This command has a command name, `date`, and an option, `-u`. There is no extra argument because the command already knows the thing it is supposed to print. Other commands will need arguments, such as a filename, a directory path, or a Kubernetes resource name, but the structure stays familiar.",
+      "line_start": 258,
+      "line_end": 258,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0260",
+      "claim_text": "Options often have short and long forms, although the exact names depend on each command. A short option may look like `-u`, while a long option may look like `--help` or `--version`. Check the command's help or manual for the options it accepts.",
+      "line_start": 260,
+      "line_end": 260,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0274",
+      "claim_text": "An opening quote without its closing partner leaves this command unfinished. Instead of running it, the shell may show a continuation prompt such as `>` and wait for the rest of the text.",
+      "line_start": 274,
+      "line_end": 274,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0276",
+      "claim_text": "Compare `Hello World` with `\"Hello World\"`: the first contains two unquoted words; the second groups the text as one argument. A command can interpret those argument lists differently.",
+      "line_start": 276,
+      "line_end": 276,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0282",
+      "claim_text": "You can type the missing quote and press Enter, or cancel the unfinished input with Ctrl+C and return to a fresh prompt. In Unix terminals, Ctrl+C normally generates an interrupt signal, SIGINT. PowerShell and terminal hosts also have cancellation behavior, but keyboard bindings and text selection can change what the key does; check that your normal prompt returned.",
+      "line_start": 282,
+      "line_end": 282,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0288",
+      "claim_text": "Here the prompt changed after an unfinished quote, so the shell is asking for more input. Your shell might show `>`, `dquote>`, or `>>`, depending on its language and configuration. The important evidence is the incomplete command and the change from your normal prompt, rather than the presence of a particular angle bracket.",
+      "line_start": 288,
+      "line_end": 288,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0304",
+      "claim_text": "PowerShell uses the [`$()` subexpression operator](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.5#subexpression-operator--) inside the native `Write-Output` command. In either branch, `whoami` reports the account running that shell; read the output as evidence about the current session.",
+      "line_start": 304,
+      "line_end": 304,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0308",
+      "claim_text": "There is a safety lesson inside composition too. When a command contains smaller commands, the shell has to evaluate some parts before the final command runs. That is powerful, but it also means you should read composed commands more carefully than single-word commands. In this module the composed command only prints text, so it is a good place to see the mechanism without risking files or system settings.",
+      "line_start": 308,
+      "line_end": 308,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0316",
+      "claim_text": "The first recovery habit is to compare the display with the normal prompt you saw when you opened this shell. If that prompt has returned, you can enter another command. If output keeps arriving without it, a command may still be running. If an unfinished quote changes the prompt, the shell is waiting for more input. PowerShell's normal prompt can already end in `>`, so that character alone is not a diagnosis.",
+      "line_start": 316,
+      "line_end": 316,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0318",
+      "claim_text": "Ctrl+C is a useful first cancellation attempt when a command runs too long or waits unexpectedly. In Unix terminals it normally sends SIGINT to the foreground process group. In PowerShell with common PSReadLine bindings, Ctrl+C can copy selected text instead of canceling input; deselect the text before trying to cancel. Host applications and key bindings vary, so watch for the normal prompt rather than assuming the key always stopped the command.",
+      "line_start": 318,
+      "line_end": 318,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0324",
+      "claim_text": "Ctrl+C is not universal, so keep the boundary clear. If the terminal application itself is frozen, closing and reopening the window may be more practical. If you are inside a full-screen program such as `less`, `top`, or `vim`, that program may have its own quit key. If a program deliberately ignores SIGINT, you may need a stronger tool later, but that is beyond today's beginner scope.",
+      "line_start": 324,
+      "line_end": 324,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0326",
+      "claim_text": "Another common recovery move is reading errors literally. If the shell says `command not found`, it usually means the first word did not match an installed command or program. That can happen because of a typo, wrong capitalization, copying the prompt symbol, or trying to run a tool before installing it. The error sounds severe, but it is often just the shell saying it cannot find a program by that name.",
+      "line_start": 326,
+      "line_end": 326,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0334",
+      "claim_text": "Later Kubernetes examples use full commands such as `kubectl get pods`; aliases do not reliably expand in non-interactive scripts. Check the current context, namespace, and output when working with a cluster.",
+      "line_start": 334,
+      "line_end": 334,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0357",
+      "claim_text": "| Copying the `$` prompt symbol | The shell may treat `$` as unexpected input or produce confusing errors | Copy only the command text after the prompt |",
+      "line_start": 357,
+      "line_end": 357,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0359",
+      "claim_text": "| Using aliases in shared scripts | The script fails where the alias is not defined | Write full command names in examples and scripts |",
+      "line_start": 359,
+      "line_end": 359,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0360",
+      "claim_text": "| Closing the terminal for every mistake | You can discard error messages before inspecting them | Use Ctrl+C or complete the unfinished input when appropriate |",
+      "line_start": 360,
+      "line_end": 360,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
     },
     {
       "claim_id": "C004",
-      "claim_text": "Early programmers used punched cards, literal cardboard cards with holes, to provide programs and data to computers.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? / item 1",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Punched_card",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The punched-card history page directly supports the description of cards with holes being used for computing input."
-    },
-    {
-      "claim_id": "C005",
-      "claim_text": "Graphical user interfaces emerged in 1970s systems and became mainstream in the 1980s with personal computers such as the Apple Macintosh.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? / item 1",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Graphical_user_interface",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The GUI history page covers 1970s Xerox-era development and the Macintosh-era popularization in the 1980s."
+      "claim_text": "1. **Input could be recorded before the computer read it.** IBM's [punched-card history](https://www.ibm.com/history/punched-card) describes characters encoded as holes in cards and a separate reader that loads their data. A prepared card could hold input until it was read. In the interactive session practiced here, you type a command and read its output in the terminal.",
+      "line_start": 388,
+      "line_end": 388,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
     },
     {
       "claim_id": "C006",
-      "claim_text": "In the 1960s-70s, a terminal was a separate hardware device connected to a larger computer, and today's terminal applications are called terminal emulators because they emulate those earlier terminals.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? / item 2",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Computer_terminal",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The computer terminal history page describes hardware terminals and the later role of terminal emulators."
+      "claim_text": "2. **A terminal could be a physical keyboard and screen.** The [DEC VT100 User Guide](https://vt100.net/docs/vt100-ug/chapter1.html) describes a keyboard that sends information to a computer and a video screen that displays data sent back by that computer. This division helps explain a modern terminal emulator: it provides the input/output interface, while the shell is the program that interprets your commands.",
+      "line_start": 390,
+      "line_end": 390,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "C001",
+      "claim_text": "3. **SSH has been standardized for decades as a secure remote-login protocol family.** RFC 4251 describes the Secure Shell architecture. OpenSSH provides SSH tools, including a client and a server.",
+      "line_start": 392,
+      "line_end": 392,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
     },
     {
       "claim_id": "C007",
-      "claim_text": "Windows Terminal is Microsoft's terminal application for shells such as PowerShell, Command Prompt, and bash via WSL.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Opening Your Terminal / Windows / Option B",
-      "disposition": "supported",
-      "proposed_url": "https://learn.microsoft.com/en-us/windows/terminal/",
-      "proposed_tier": "vendor",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "Microsoft's Windows Terminal overview directly describes the product and the shells it hosts."
+      "claim_text": "4. **Windows Terminal was announced in 2019; version 1.0 was released in May 2020.** Microsoft's [announcement](https://devblogs.microsoft.com/commandline/introducing-windows-terminal/) and [1.0 release post](https://devblogs.microsoft.com/commandline/windows-terminal-1-0/) distinguish preview history from the stable release. It can host PowerShell, Command Prompt and WSL profiles; the terminal application and the shell are separate programs.",
+      "line_start": 394,
+      "line_end": 394,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0400",
+      "claim_text": "| Typing the `$` symbol from an example | In this lesson's prompt-prefixed example, `$` is a cue rather than command text | Type only the command after the prompt; if you copied it, delete the leading `$` and any following space |",
+      "line_start": 400,
+      "line_end": 400,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0401",
+      "claim_text": "| Forgetting to press Enter | A terminal does not run a command while you are still editing the line | Press Enter once when the command is complete, then wait for output or the prompt to return |",
+      "line_start": 401,
+      "line_end": 401,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0402",
+      "claim_text": "| Misspelling the command name as `echoo` | The shell treats the first word as an exact program name, so near misses do not count | Check the spelling of the first word and rerun the corrected command |",
+      "line_start": 402,
+      "line_end": 402,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0403",
+      "claim_text": "| Changing command capitalization, such as `Echo` instead of `echo` | A shell may resolve that spelling differently; filename case is a separate filesystem behavior | Match the command case shown and check your shell's documentation |",
+      "line_start": 403,
+      "line_end": 403,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0404",
+      "claim_text": "| Forgetting a closing quote | The shell waits for more input; examples include `>` in Bash, `dquote>` in zsh, and PSReadLine's `>>` | Compare with your normal prompt; finish the quote or cancel with Ctrl+C and no text selected |",
+      "line_start": 404,
+      "line_end": 404,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0405",
+      "claim_text": "| Panicking when output keeps printing | A running foreground process can temporarily prevent you from typing a new command | Press Ctrl+C once, then wait to see whether the normal prompt returns |",
+      "line_start": 405,
+      "line_end": 405,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0406",
+      "claim_text": "| Assuming every terminal window is the same machine | Multiple tabs can connect to different local or remote systems | Confirm which session you opened; compare prompt clues with read-only user and hostname checks |",
+      "line_start": 406,
+      "line_end": 406,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0407",
+      "claim_text": "| Using a short alias in notes meant for someone else | Aliases only exist if that shell session defines them, so examples can fail on another machine | Write full command names in shared instructions and scripts |",
+      "line_start": 407,
+      "line_end": 407,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0416",
+      "claim_text": "Press Ctrl+C once, with no text selected, and watch for the normal prompt to return. In Unix terminals this normally sends SIGINT to the foreground process group; other hosts may handle cancellation differently. The command may still control the foreground until it responds. Full-screen programs can have their own quit keys, so consult the program's help if the normal prompt does not return.",
+      "line_start": 416,
+      "line_end": 416,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0423",
+      "claim_text": "Because the prompt changed immediately after your echo command, check for an opening quote without a closing partner. The shell may be waiting for the rest of the text. Finish the quote and press Enter, or press Ctrl+C with no text selected to cancel. Compare the result with your normal prompt; PowerShell's normal prompt can itself end in `>`.",
+      "line_start": 423,
+      "line_end": 423,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0430",
+      "claim_text": "In this illustration, the labels suggest user `alice`, host `db-primary-main` and directory `/etc/config`. They are reasons to pause before changing anything, not independent proof of location or privilege: the prompt, including `$`, can be customized. Confirm which session you opened and compare its user and hostname checks with your intended training environment before proceeding.",
+      "line_start": 430,
+      "line_end": 430,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0437",
+      "claim_text": "Use `date` in Bash or zsh, or `Get-Date` in PowerShell, to record what that machine's clock reports. Include the timezone and when the command was run relative to the update. Check clock accuracy and the timezone used by the logs before comparing them; a printed timestamp alone does not guarantee either an exact update time or aligned clocks.",
+      "line_start": 437,
+      "line_end": 437,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0444",
+      "claim_text": "A command or script can be saved, reviewed, and repeated. First check its effects and targets, test it in an appropriate training environment, and verify the result on each server. A repeated command can also repeat a mistake; a GUI may help inspect the resulting state.",
+      "line_start": 444,
+      "line_end": 444,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0451",
+      "claim_text": "A GUI can make visual controls, diagrams, or charts useful to inspect. A terminal can provide commands to save, repeat, or use on a text-only remote session. Choose based on the task, available tools, and feedback you need; a workflow can use both.",
+      "line_start": 451,
+      "line_end": 451,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0458",
+      "claim_text": "Check whether you copied this lesson's `$` prompt cue along with the command. Remove that cue and its prompt-only spacing, then check the command's quotes and spelling before trying again.",
+      "line_start": 458,
+      "line_end": 458,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0465",
+      "claim_text": "Use `Get-Date`, the native PowerShell date/time command. With its default PSReadLine configuration, unfinished input produces `>>`; Bash can show `>`, while zsh can show `dquote>` for an open double quote. These markers are configurable. Finish the quoted text or cancel with Ctrl+C and no text selected, then compare the result with the normal prompt you saw when the shell opened.",
+      "line_start": 465,
+      "line_end": 465,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0477",
+      "claim_text": "Choose one operating system and one shell for this exercise; complete only that branch. You do not need access to every platform. macOS and Linux terminals can use zsh or Bash; **Windows Terminal with a WSL Ubuntu profile** uses the Unix-style `date` and Bash composition below. PowerShell has its own branch using `Get-Date`, `Write-Output`, and the `$()` subexpression form. Compare your output with the explanation rather than requiring an identical format.",
+      "line_start": 477,
+      "line_end": 477,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0486",
+      "claim_text": "On macOS, the prompt may end with `%`; on Linux and WSL, it often ends with `$`. Your prompt may include your username, machine name, current directory, Git branch, or other decorations depending on configuration. The success criterion is not matching the examples exactly. The success criterion is being able to explain what your own prompt is showing.",
+      "line_start": 486,
+      "line_end": 486,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0505",
+      "claim_text": "If you typed only `echo 'Hello, World!'`, the terminal should print `Hello, World!` and return to the prompt. If you copied `$ echo 'Hello, World!'` and received an error, remove the leading prompt symbol and run the command again. That correction is part of the learning objective, not a sign that you failed.",
+      "line_start": 505,
+      "line_end": 505,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0532",
+      "claim_text": "Your exact timestamp will differ from the example because your machine has its own current time, timezone, and formatting rules. The important result is that the shell-appropriate command prints a timestamp and then the prompt returns. In Bash, zsh, or WSL, that command is `date`; in PowerShell, use the native `Get-Date` cmdlet shown above. The [`Get-Date` documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-date?view=powershell-7.5) describes the PowerShell form.",
+      "line_start": 532,
+      "line_end": 532,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0556",
+      "claim_text": "`whoami` should print the account running the shell, and `hostname` should print the machine name. These values may be plain, corporate-managed, or automatically generated by your operating system. The point is to connect the output back to the prompt and to notice that commands can answer practical questions about the current session.",
+      "line_start": 556,
+      "line_end": 556,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0579",
+      "claim_text": "The first command prints the literal message without needing any replacement text. In the Bash/zsh/WSL branch, the composed command runs `date` and `whoami` first; in PowerShell, it evaluates `Get-Date` and `whoami` inside `Write-Output`. Both branches show composition while only printing information. See Microsoft's [subexpression operator documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_operators?view=powershell-7.5#subexpression-operator--) for the PowerShell form.",
+      "line_start": 579,
+      "line_end": 579,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0594",
+      "claim_text": "The shell should show a continuation prompt because the quote was not closed. Pressing Ctrl+C should cancel the unfinished command and return you to the normal prompt. This is a valuable practice repetition because it makes the recovery move familiar before you need it during a more stressful command.",
+      "line_start": 594,
+      "line_end": 594,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02N0637",
+      "claim_text": "Transcript A shows unfinished quoted input; finish the quote or cancel and compare with the normal prompt. Transcript B shows continuing output without a returned prompt; try Ctrl+C once and check the result. Transcript C shows a copied `$` prompt symbol being treated as a command; retype `echo 'Hello, World!'` without it. In the synthetic Transcript D, choose the window labeled `alex@training-vm /tmp $`. In real sessions, confirm the connection you opened and read the user/hostname checks before changing anything; customized labels alone are not proof.",
+      "line_start": 637,
+      "line_end": 637,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "T02A0669",
+      "claim_text": "- [GNU Inetutils manual: hostname invocation](https://www.gnu.org/software/inetutils/manual/html_node/hostname-invocation.html)",
+      "line_start": 669,
+      "line_end": 669,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null,
+      "proposal_reason": "Promoted after genuineR1 additional-material discovery; all judgments remain null."
+    },
+    {
+      "claim_id": "T02A0678",
+      "claim_text": "- [Command line crash course](https://developer.mozilla.org/en-US/docs/Learn_web_development/Getting_started/Environment_setup/Command_line)",
+      "line_start": 678,
+      "line_end": 678,
+      "claim_class": null,
+      "disposition": null,
+      "judgment": null,
+      "eligibility": null,
+      "proposal_reason": "Promoted after genuineR1 additional-material discovery; all judgments remain null."
+    }
+  ],
+  "editorial_accounting": [
+    {
+      "accounting_id": "T02A0091",
+      "literal_span": "```powershell\nwsl --install\n```",
+      "line_start": 91,
+      "line_end": 93,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0089"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0645",
+      "literal_span": "- [ ] Open a terminal window on your chosen operating system.",
+      "line_start": 645,
+      "line_end": 645,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0085",
+        "T02N0477"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0646",
+      "literal_span": "- [ ] Identify at least one part of your prompt, such as username, hostname, directory, `$`, or `%`.",
+      "line_start": 646,
+      "line_end": 646,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0122",
+        "T02N0486"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0647",
+      "literal_span": "- [ ] Run `echo 'Hello, World!'` and see the output.",
+      "line_start": 647,
+      "line_end": 647,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0138",
+        "T02N0157",
+        "T02N0505"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0648",
+      "literal_span": "- [ ] Run the date/time command for your shell (`date` in Bash/zsh/WSL or `Get-Date` in PowerShell) and explain why your output differs from the example.",
+      "line_start": 648,
+      "line_end": 648,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0138",
+        "T02N0532"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0649",
+      "literal_span": "- [ ] Run `whoami` and `hostname` and connect the output to your current session.",
+      "line_start": 649,
+      "line_end": 649,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0195",
+        "T02N0556"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0650",
+      "literal_span": "- [ ] Run the combined shell-appropriate example: `echo \"Today is $(date) and I am $(whoami)\"` in Bash/zsh/WSL, or `Write-Output \"Today is $(Get-Date) and I am $(whoami)\"` in PowerShell.",
+      "line_start": 650,
+      "line_end": 650,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0579"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0651",
+      "literal_span": "- [ ] Cancel an unfinished quoted command with Ctrl+C and return to a normal prompt.",
+      "line_start": 651,
+      "line_end": 651,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0282",
+        "T02N0318",
+        "T02N0594"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    },
+    {
+      "accounting_id": "T02A0652",
+      "literal_span": "- [ ] Diagnose the shell state and next move in each frozen transcript without running any new commands.",
+      "line_start": 652,
+      "line_end": 652,
+      "reason": "Proposed instruction or illustration whose embedded software behavior is explicitly represented by the related current material claim IDs; R1 flagged scope/materiality and R2 must adjudicate independently. This is not runtime evidence or an author override.",
+      "related_claim_ids": [
+        "T02N0637"
+      ],
+      "prior_review_flag": "R1 additional_material_ids"
+    }
+  ],
+  "canonical_history": [
+    {
+      "claim_id": "C001",
+      "current_claim_text": "3. **SSH has been standardized for decades as a secure remote-login protocol family.** RFC 4251 describes the Secure Shell architecture. OpenSSH provides SSH tools, including a client and a server.",
+      "historical_text": "SSH (Secure Shell) is a protocol for secure remote login and other secure network services, and terminal access over SSH is a standard way to manage remote systems.",
+      "historical_span_hint": "section: Why Do Engineers Use Terminals? / 3. Remote Access",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/0",
+      "proposed_relation": "refreshed qualified current text; historical proposition may be broader",
+      "current_targets": [
+        "C001"
+      ],
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "C002",
+      "current_claim_text": null,
+      "historical_text": "In the February 28, 2017 Amazon S3 disruption in us-east-1, an authorized operator entered one input incorrectly, removing more servers than intended; AWS later added safeguards to reduce the chance of a repeat.",
+      "historical_span_hint": "section: Why Do Engineers Use Terminals? / A Documented Operational Mistake",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/1",
+      "proposed_relation": "original proposition not identified in the current draft; proposed absence",
+      "current_targets": [],
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "C003",
+      "current_claim_text": null,
+      "historical_text": "The first computers had no screens at all.",
+      "historical_span_hint": "section: Did You Know? / item 1",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/2",
+      "proposed_relation": "original proposition not identified in the current draft; proposed absence",
+      "current_targets": [],
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "C004",
+      "current_claim_text": "1. **Input could be recorded before the computer read it.** IBM's [punched-card history](https://www.ibm.com/history/punched-card) describes characters encoded as holes in cards and a separate reader that loads their data. A prepared card could hold input until it was read. In the interactive session practiced here, you type a command and read its output in the terminal.",
+      "historical_text": "Early programmers used punched cards, literal cardboard cards with holes, to provide programs and data to computers.",
+      "historical_span_hint": "section: Did You Know? / item 1",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/3",
+      "proposed_relation": "refreshed qualified current text; historical proposition may be broader",
+      "current_targets": [
+        "C004"
+      ],
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "C005",
+      "current_claim_text": null,
+      "historical_text": "Graphical user interfaces emerged in 1970s systems and became mainstream in the 1980s with personal computers such as the Apple Macintosh.",
+      "historical_span_hint": "section: Did You Know? / item 1",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/4",
+      "proposed_relation": "original proposition not identified in the current draft; proposed absence",
+      "current_targets": [],
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "C006",
+      "current_claim_text": "2. **A terminal could be a physical keyboard and screen.** The [DEC VT100 User Guide](https://vt100.net/docs/vt100-ug/chapter1.html) describes a keyboard that sends information to a computer and a video screen that displays data sent back by that computer. This division helps explain a modern terminal emulator: it provides the input/output interface, while the shell is the program that interprets your commands.",
+      "historical_text": "In the 1960s-70s, a terminal was a separate hardware device connected to a larger computer, and today's terminal applications are called terminal emulators because they emulate those earlier terminals.",
+      "historical_span_hint": "section: Did You Know? / item 2",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/5",
+      "proposed_relation": "refreshed qualified current text; historical proposition may be broader",
+      "current_targets": [
+        "C006"
+      ],
+      "judgment": null,
+      "eligibility": null
+    },
+    {
+      "claim_id": "C007",
+      "current_claim_text": "4. **Windows Terminal was announced in 2019; version 1.0 was released in May 2020.** Microsoft's [announcement](https://devblogs.microsoft.com/commandline/introducing-windows-terminal/) and [1.0 release post](https://devblogs.microsoft.com/commandline/windows-terminal-1-0/) distinguish preview history from the stable release. It can host PowerShell, Command Prompt and WSL profiles; the terminal application and the shell are separate programs.",
+      "historical_text": "Windows Terminal is Microsoft's terminal application for shells such as PowerShell, Command Prompt, and bash via WSL.",
+      "historical_span_hint": "section: Opening Your Terminal / Windows / Option B",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/6",
+      "proposed_relation": "refreshed qualified current text; historical proposition may be broader",
+      "current_targets": [
+        "T02N0087",
+        "C007"
+      ],
+      "judgment": null,
+      "eligibility": null
     },
     {
       "claim_id": "C008",
-      "claim_text": "Microsoft documents `wsl --install` as the one-command way to install WSL, with Ubuntu installed by default and a restart required.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Opening Your Terminal / Windows / Option C",
-      "disposition": "supported",
-      "proposed_url": "https://learn.microsoft.com/en-us/windows/wsl/install",
-      "proposed_tier": "vendor",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The official WSL install guide matches the exact command and restart flow shown in the module."
+      "current_claim_text": null,
+      "historical_text": "Microsoft documents `wsl --install` as the one-command way to install WSL, with Ubuntu installed by default and a restart required.",
+      "historical_span_hint": "section: Opening Your Terminal / Windows / Option C",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/7",
+      "proposed_relation": "related narrower treatment, original proposition not fully retained",
+      "current_targets": [
+        "T02N0089"
+      ],
+      "judgment": null,
+      "eligibility": null
     },
     {
       "claim_id": "C009",
-      "claim_text": "GitLab's January 31, 2017 outage involved accidental removal of data from the primary database, causing a major outage and some unrecoverable production data loss.",
-      "claim_class": "incident",
-      "span_hint": "section: Common Mistakes in Production / first table row",
-      "disposition": "supported",
-      "proposed_url": "https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/",
-      "proposed_tier": "incidents",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "GitLab's published postmortem directly states the accidental data removal, outage, and unrecoverable data loss."
+      "current_claim_text": null,
+      "historical_text": "GitLab's January 31, 2017 outage involved accidental removal of data from the primary database, causing a major outage and some unrecoverable production data loss.",
+      "historical_span_hint": "section: Common Mistakes in Production / first table row",
+      "historical_source_pointer": "docs/citation-seeds/prerequisites-zero-to-terminal-module-0.2-what-is-a-terminal.json#/claims/8",
+      "proposed_relation": "original proposition not identified in the current draft; proposed absence",
+      "current_targets": [],
+      "judgment": null,
+      "eligibility": null
     }
   ],
-  "further_reading": [
-    {
-      "url": "https://developer.mozilla.org/en-US/docs/Learn/Tools_and_testing/Understanding_client-side_tools/Command_line",
-      "title": "Command line crash course",
-      "tier": "general",
-      "why_relevant": "It is a beginner-friendly follow-up that explains what the terminal is and how to use a few basic commands."
+  "prior_upgrade_seed_sha256": "55bc17a22c6f529b1ac5fdd662598211fb849dfae5e322645fe4ca93bfa11378",
+  "prior_review_run": "fe54b488-55a9-4bed-b833-87045aa50d0a",
+  "r1_discovery_proposals": {
+    "promoted": [
+      "T02A0209",
+      "T02A0669",
+      "T02A0678"
+    ],
+    "instruction_or_illustration_linked": {
+      "T02A0091": [
+        "T02N0089"
+      ],
+      "T02A0645": [
+        "T02N0085",
+        "T02N0477"
+      ],
+      "T02A0646": [
+        "T02N0122",
+        "T02N0486"
+      ],
+      "T02A0647": [
+        "T02N0138",
+        "T02N0157",
+        "T02N0505"
+      ],
+      "T02A0648": [
+        "T02N0138",
+        "T02N0532"
+      ],
+      "T02A0649": [
+        "T02N0195",
+        "T02N0556"
+      ],
+      "T02A0650": [
+        "T02N0579"
+      ],
+      "T02A0651": [
+        "T02N0282",
+        "T02N0318",
+        "T02N0594"
+      ],
+      "T02A0652": [
+        "T02N0637"
+      ]
     },
-    {
-      "url": "https://www.rfc-editor.org/info/rfc4251",
-      "title": "RFC 4251: The Secure Shell (SSH) Protocol Architecture",
-      "tier": "standards",
-      "why_relevant": "It gives the authoritative definition of SSH, which is the standard remote-access protocol mentioned in the module."
-    },
-    {
-      "url": "https://learn.microsoft.com/en-us/windows/wsl/install",
-      "title": "Install WSL",
-      "tier": "vendor",
-      "why_relevant": "It is the official next-step guide for Windows learners who want a Linux-compatible terminal environment."
-    }
-  ],
-  "notes": "The module already contains inline links for OpenSSH, AWS, and GitLab; RFC 4251 can cover the SSH standards claim on an allowlisted host, while the main remaining citation work is the historical material in the Did You Know section and the Windows-specific setup claims.",
-  "_schema_issues": [],
-  "rejected_urls": []
+    "own_instruction_accounting": "T02N0314",
+    "status": "Author proposals requiring independentR2; do not relabel genuine R1 verdict or claim closure."
+  },
+  "accounting_scope": {
+    "note": "Only the nine disputed R1 discovery rows are carried for independent adjudication; exhaustive nonmaterial line accounting is no longer required under merged3767. Full current page must be searched for missed material claims. No R1 finding is cleared by this author proposal.",
+    "complete_prior_seed": "/Users/krisztiankoos/projects/kubedojo/.worktrees/review-assurance/.agent/terminal-completion/prospective-canonical-seed-r2.json",
+    "complete_prior_seed_digest": "sha256:f7ce5f208aa7e1e388511413e6e50c1b87a4a8856b4db43955bfd3aee037f91e"
+  }
 }
