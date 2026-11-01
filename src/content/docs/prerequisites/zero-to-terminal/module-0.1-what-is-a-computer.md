@@ -108,7 +108,7 @@ When RAM fills up, the operating system has several unpleasant choices. It can c
 The result depends on how much memory those programs actually need; tab count alone does not establish a bottleneck. If their active data exceeds the available workspace, the OS may reclaim caches, compress memory, or move data to disk, and switching applications may slow down. Check memory pressure and ongoing swap activity before concluding that RAM is the cause.
 </details>
 
-This is why "my computer is slow" is not enough information for a good diagnosis. A slow video call with a fast network may point toward CPU pressure if the machine cannot encode or decode video smoothly. A slow laptop after opening many applications may point toward RAM pressure if the system is swapping. A slow file search may point toward disk performance or indexing. The symptom matters, but the resource under pressure matters more.
+A slow video edit can justify checking CPU activity alongside other resources; editing software may use several cores. If a laptop slows after opening many applications, check memory pressure or available memory and ongoing paging. If opening files is slow, check storage activity. These checks help distinguish hypotheses; a symptom alone does not establish the cause.
 
 Before running this, what output do you expect from your own machine: a CPU model name, a large byte count for memory, or a percentage of current usage? These commands report processor and memory information and filesystem space, not a complete live performance diagnosis. Task 3 introduces observations of current activity.
 
@@ -242,7 +242,7 @@ Some "recipes" you use every day:
   Terminal                       -> Text interface that hosts a command shell
 ```
 
-The terminal deserves special attention because it is the next door in this curriculum. A graphical interface lets you ask for work through windows, menus, icons, and buttons. A terminal hosts a shell that interprets text commands; programs launched through it can request operating-system services. Text commands are useful for automation and precise documentation, and terminals are common on remote servers without a graphical desktop.
+The next module introduces the terminal. A graphical interface lets you ask for work through windows, menus, icons, and buttons. A terminal hosts a shell that interprets text commands; programs launched through it can request operating-system services. Text commands are useful for automation, precise documentation, and work without a graphical desktop.
 
 Linux matters in this curriculum because Kubernetes control-plane components run on Linux and many of the later exercises use Linux tools. Kubernetes also supports Windows worker nodes for Windows workloads. The operating system on your learning laptop and the operating system running a cluster workload are separate choices.
 
@@ -296,7 +296,7 @@ CPU capacity cannot substitute for memory capacity. In Kubernetes, however, the 
 
 If a computer is slow, ask when the delay occurs: starting programs, switching apps, saving files, joining video calls, or loading websites. Each symptom suggests different checks.
 
-Slow application startup often involves disk and operating-system work because the program must be loaded from storage into RAM. Slow switching between many open applications often involves RAM pressure because the OS may be moving inactive data out of memory and back in again. Slow calculations, video encoding, compression, and game simulation often involve CPU pressure. Slow web pages may involve network latency, browser CPU use, DNS, remote servers, or local memory pressure.
+Slow application startup can involve disk and operating-system work because the program must be loaded from storage into RAM. Slow switching between many open applications can involve RAM pressure because the OS may be moving inactive data out of memory and back in again. Slow calculations, video encoding, compression, and game simulation can involve CPU pressure. Slow web pages may involve network latency, browser CPU use, DNS, remote servers, or local memory pressure.
 
 The goal is not to guess perfectly on the first try. The goal is to form a testable hypothesis. If you suspect RAM pressure, open the system's resource monitor and look for memory usage and swap activity. If you suspect disk fullness, check free storage. If you suspect CPU pressure, look for a process consuming processor time. If you suspect one program is broken, compare it with other programs that are still healthy.
 
@@ -306,7 +306,7 @@ A good hypothesis includes both a resource and a reason. "It is slow because com
 |---|---|---|
 | Many apps open and everything pauses | RAM and swap usage | The counter may be full, causing disk shuffling |
 | File saves fail or updates will not install | Free disk space | The pantry may have no shelf space left |
-| Video call freezes while network speed is fine | CPU usage by call app | Real-time video can be processor-heavy |
+| Video editing is slow | System-wide and editor CPU activity, plus memory pressure | Editing can use multiple cores; check whether CPU saturation matches the delay |
 | One app freezes but others work | Application process state | One recipe may be stuck while the OS continues |
 | Website loads slowly on all devices | Network path or remote service | The local computer may not be the bottleneck |
 
@@ -330,7 +330,7 @@ Keep the resources distinct and map symptoms to possible causes before choosing 
 |---|---|---|
 | "Just restart it" as the only strategy | Temporary relief hides recurring CPU, RAM, disk, or program problems | Restart when useful, then inspect what pressure returns |
 | "Buy a bigger hard drive" for every slow machine | Storage capacity may not affect CPU or RAM bottlenecks | Check CPU, memory, disk fullness, and disk type separately |
-| "Linux is only for experts" | Learners avoid the environment used by many servers and Kubernetes labs | Treat Linux commands as normal operating-system conversations |
+| "Linux is only for experts" | Kubernetes control-plane components run on Linux | Learn basic Linux commands through the guided exercises |
 
 ## When You'd Use This vs Alternatives
 
@@ -343,7 +343,7 @@ Use more detailed models when an initial resource check cannot answer your quest
 | "Why is my laptop slow?" | CPU, RAM, disk, OS, program | You need precise profiling or hardware-level tuning |
 | "Why did my unsaved work disappear?" | RAM is temporary, disk is durable | You need filesystem recovery or backup design |
 | "Why does Kubernetes care about memory?" | Nodes have finite counter space | You need cgroups, limits, eviction, and QoS classes |
-| "Why learn Linux?" | Many servers and Kubernetes tools expect it | You need kernel, networking, or security internals |
+| "Why learn Linux?" | The Kubernetes control plane runs on Linux | You need kernel, networking, or security internals |
 
 ## Did You Know?
 
@@ -359,13 +359,12 @@ Use more detailed models when an initial resource check cannot answer your quest
 
 | Mistake | Why It Happens | How to Fix It |
 |---|---|---|
-| Confusing RAM and storage | Product pages and casual speech both use the word "memory" loosely | Say RAM for temporary counter space and storage or disk for durable pantry space |
+| Confusing RAM and storage | Using "memory" without distinguishing working space from file storage | Say RAM for temporary counter space and storage or disk for durable pantry space |
 | Buying more storage to fix every slow computer | A bigger pantry does not make the chef cook faster | Check CPU use, RAM pressure, disk fullness, and disk type before upgrading |
-| Ignoring RAM when many apps are open | The machine still has free disk space, so the real bottleneck is easy to miss | Check memory and swap usage, then close or reduce memory-heavy programs |
+| Ignoring RAM when many apps are open | Free disk space does not establish that working memory is sufficient | Check available memory or pressure and ongoing paging, then compare responsiveness after reducing work |
 | Blaming CPU speed for internet lag | Slow pages feel local even when the delay is network or remote-service related | Compare other devices, check network quality, and inspect CPU only if local work is heavy |
-| Never restarting the operating system | Sleep and wake feel like shutdown, but temporary state can accumulate | Restart as a recovery step, then investigate if the same pressure returns |
-| Judging a CPU only by clock speed | Simple numbers are easier to compare than cores, architecture, and workload | Consider cores, generation, cooling, power limits, and the kind of work being done |
-| Treating Linux as optional trivia | Desktop habits hide how common Linux is on servers and in Kubernetes examples | Learn basic Linux commands as part of learning how cloud systems are operated |
+| Judging a CPU only by clock speed | Clock speed is only one factor in performance | Consider cores, generation, cooling, power limits, and the kind of work being done |
+| Treating Linux as optional trivia | Kubernetes control-plane components run on Linux | Distinguish your laptop OS from the cluster-node OS and learn the commands each exercise uses |
 
 ## Quiz
 
@@ -402,7 +401,7 @@ Under those assumptions, the 16 GB machine has more room for the memory-demandin
 <details>
 <summary>6. A learner says Linux is unrelated to Kubernetes because they use Windows on their laptop. How would you evaluate that claim?</summary>
 
-The claim is too narrow because Kubernetes and container tooling commonly assume Linux behavior, even if a learner's desktop is Windows. Windows worker nodes are supported for Windows workloads, but the Kubernetes control plane runs on Linux and many examples use Linux commands. A Windows laptop can still be a fine learning machine through terminals, remote systems, WSL, containers, or cloud labs. The practical conclusion is to learn Linux basics, not to abandon Windows.
+The Kubernetes control plane runs on Linux, and Windows worker nodes support Windows workloads. A Windows laptop can still be a learning machine through terminals, remote systems, WSL, containers, or cloud labs. Learn the Linux commands required by an exercise while keeping your local OS choice separate from the cluster's.
 </details>
 
 ## Hands-On Exercise: Check Your Computer's Specs

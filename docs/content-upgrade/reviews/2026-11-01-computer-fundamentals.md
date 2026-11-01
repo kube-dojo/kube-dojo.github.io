@@ -1,58 +1,42 @@
 # T01-P01: clearer computer fundamentals and diagnosis practice
 
-Owner #2278. This records a consolidated author correction to module0.1,
-not a whole-page source/editorial verdict, numeric score or lead acceptance.
-Earlier [P01](2026-10-26-zero-to-terminal-p01.md),
-[P01c](2026-10-26-zero-to-terminal-p01c.md) and
-[P01d](2026-10-30-zero-to-terminal-p01d.md) findings and evidence remain preserved.
+Owner #2278. Consolidated author correction, not whole-page acceptance.
+Earlier [P01](2026-10-26-zero-to-terminal-p01.md), [P01c](2026-10-26-zero-to-terminal-p01c.md) and [P01d](2026-10-30-zero-to-terminal-p01d.md) evidence remains preserved.
 
 Page: `prerequisites/zero-to-terminal/module-0.1-what-is-a-computer.md`.
-Candidate SHA-256: `1808bc2e682e20acf0d8a0489319ad9505f5465e675983c58fcffd13f2358b5f`.
-Prior published SHA-256: `324d301d718fc51ed3fd63e8dcd72188701de6617dc417174da88bb3aad2115f`.
+Candidate SHA256: `de2071eb760c01e1e49a3a8e2fc97d5a776e4c07b7d5efdc3837d94c818c867b`.
+Prior published SHA256: `324d301d718fc51ed3fd63e8dcd72188701de6617dc417174da88bb3aad2115f`.
 
 ## Teaching and factual changes
 
-- Remove repeated kitchen explanations and generic engineer/operator rhetoric.
-  Drop the unmeasured RAM-to-kitchen capacity tiers and invented photo dialogue.
-  Preserve the diagram, worked diagnoses, four historical facts, six quizzes,
-  six practice tasks and the optional Kubernetes boundary.
+- Remove repeated kitchen restatements, canned operator rhetoric, unmeasured
+  RAM tiers and invented photo dialogue. Preserve the diagram, worked diagnoses,
+  four historical facts, six quizzes and six practice tasks.
 - Explain demand-paged loading and conditional CPU performance; require
   confirming observations before recommending hardware or file deletion.
-- Separate process memory, including sharing, from file permissions;
+- Distinguish process memory, including sharing, from file permissions;
   qualify Windows-reported RAM and ephemeral/persistent volume lifetimes.
-- Narrow the Linux/Windows outcome to the local-versus-cluster setup decision
-  actually taught and assessed, rather than an unsupported adoption explanation.
-- Add graduated diagnosis hints, a decision context and a transfer question.
-  Retain read-only practice, uncertainty and the instruction not to induce a fault.
-- Replace duplicate/unversioned and unrelated source entries with primary
-  support for the explanations above; retain the history citations.
+- Teach local-OS versus cluster-OS decisions using the Kubernetes control-plane
+  requirement. Remove server-prevalence claims throughout prose and tables.
+  Distinguish requests from limits and keep the Kubernetes preview optional.
+- Add graduated diagnosis hints and transfer practice. Executable commands stay
+  unchanged. Remove the unsourced sleep/wake explanation; six mistake rows remain.
+- Add primary inventory-tool documentation and prune unrelated source entries.
 
-[Independent Grok 4.7 R1](https://github.com/kube-dojo/kube-dojo.github.io/pull/3764#issuecomment-6551102326)
-requested missing Mac/Linux command evidence, Task Manager documentation and
-removal of prevalence wording. This revision addresses those requests and the
-three terminology/navigation nits; exact-revision re-review remains required.
-R1 scores were withheld because the citation gate failed.
+## Review and execution limits
 
-## Execution and review limits
+[Grok R1](https://github.com/kube-dojo/kube-dojo.github.io/pull/3764#issuecomment-6551102326) requested missing command evidence and narrower terminology.
+[Grok R2](https://github.com/kube-dojo/kube-dojo.github.io/pull/3764#issuecomment-6551387288) cleared those gaps but found repeated prevalence and sleep claims.
+This revision addresses them; exact-revision re-review is required.
+Both reviews withheld scores and rejected current canonical adoption.
 
-Native Mac About/Storage and Activity Monitor CPU/Memory were inspected;
-inventory and nonzero process readings were observable. The earlier zero-memory
-UI reading remains preserved without an asserted cause. Original panes restored;
-no process stopped, settings changed or slowdown induced.
+Native Mac About/Storage and Activity Monitor were observed; earlier Mac/Linux
+stdout and receipts are retained. No fault was induced, process stopped or
+setting changed. The earlier zero-memory UI reading remains unexplained.
+R2 found the Mac choose-your-OS path adequate; Windows remains unexecuted.
+The new Docker attempt stopped before creation because its socket was unavailable.
 
-Earlier unchanged Mac/Linux stdout and receipts remain reusable execution evidence.
-A new Linux observation stopped before container creation because the Docker
-socket was unavailable. Windows commands and GUI paths remain unexecuted;
-documentation and a Mac walkthrough do not establish their runtime behavior.
-Synthetic profiles remain reasoning exercises, not reproduced incidents.
-
-The old verifier's 5,000-word check disagrees with the current rubric's natural
-coverage policy; report that diagnostic without padding. Its heuristic alignment
-map is not semantic assessment. Source-fetch errors remain separate from factual
-truth: blocked direct requests and available primary web representations are
-recorded with their different scopes.
-
-Independent exact-revision review, candidate CI, publication and canonical
-adoption require their actual evidence. This author note grants none of them.
-Do not carry an old approval onto the new page digest or close T01-P01 from this
-correction; the remaining page-level gates and module0.2 still belong to the batch.
+The legacy word-floor diagnostic conflicts with the natural-coverage rubric;
+do not pad. Synthetic profiles are reasoning exercises, not reproduced incidents.
+Actual CI, publication and canonical adoption remain separate gates.
+This note does not close T01-P01 or the remaining module0.2.
