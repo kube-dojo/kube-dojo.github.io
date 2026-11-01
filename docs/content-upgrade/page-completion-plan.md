@@ -1,79 +1,54 @@
 # Page completion plan
 
-Copy this template into the packet's registered local evidence directory. Keep
-one NOW page and link the existing owning issue/batch; do not create a parallel
-inventory. This is a working plan, not a verdict or canonical acceptance receipt.
-Its fields replace scattered preparation notes where practical; do not maintain
-duplicate forms. Unavailable evidence stays unknown.
+Keep one short record in the registered local packet; link evidence instead of
+copying forms. This workflow adds no estimate, learner-study or environment gate.
 
-## Target and decision
+## Scope note
 
-- Page path, current commit and page digest:
-- Owning issue/batch, accountable lead and evidence directory:
-- Audience, prerequisites, essential outcomes and deliberate scope limits:
-- Prior evidence and unresolved material findings, with stable IDs:
-- Strategy: retain / repair / rewrite. Canonical disposition: unreviewed or the
-  existing reviewed retain / revise / expand disposition, with its reference.
-- Reason for this strategy and alternative considered; assumptions and unknowns
-  in the effort comparison (a planning hypothesis, not proof of the cheapest route):
-- Estimated preparation/authoring/review/release effort; rationale and unknowns:
-- Effort budget and reassessment point; observed effort so far:
-- Total expected diff and PR slices under the issue's file/LOC limits. If an
-  exception is needed, link its explicit reviewed authorization before using it:
+- Page/issue/lead, revision/page and seed digests; audience and prerequisites:
+- Essential outcomes, exclusions and evidenced defects or gaps:
+- Strategy: keep, improve, merge, rewrite, retire, add, or a justified combination:
+- Applicable exercise paths/environment; documented but unexecuted alternatives:
+- Prior unresolved finding IDs; PR and whole-page calls spent/ceiling:
+- Authorized independent reviewer; next concrete action or actual missing evidence:
 
-## Feasibility before dispatch
+## Finish sequence
 
-| Requirement | Actual state and evidence | Owner and next action if missing |
-| --- | --- | --- |
-| Live leases, module state and previous reviews inspected | | |
-| PR invocation history: spent / ceiling / remaining | | |
-| Whole-page invocation history: spent / ceiling / remaining | | |
-| Authorized reviewer family/route, health and quota | | |
-| Primary source access and complete material-claim inventory | | |
-| Applicable practice environment, permissions and cleanup | | |
-| All known author changes and prior material findings accounted for | | |
+1. Read and improve the whole page: remove filler, repetition, unsupported specificity
+   and canned transitions; teach mechanisms, decisions, examples and useful feedback.
+   Retire/merge only for evidenced learner need, obsolescence or duplication; preserve
+   needed outcomes elsewhere and repair routes/prerequisites/links. Add for named gaps.
+   Record scope decisions; these strategies add no canonical disposition enum or pass.
+2. Keep a material-claim ledger: stable ID, exact page quote/location, source URL and
+   locator, date/version scope, snapshot digest and literal contextual excerpt.
+   Retain complete snapshots; matching text or a URL alone does not prove support.
+   Instructions need no factual row unless they assert behavior. Missing context stays
+   unknown; the reviewer names what is needed, rather than passing to save a call.
+3. Run required exercises on the applicable path; retain environment, commands,
+   observed output, verification/cleanup and failures. Run quote/excerpt integrity,
+   bindings, required local checks and CI; these do not prove truth or teaching quality.
+4. Use one combined independent review: complete changed files/current page, claims
+   and source context, practice receipts, unresolved findings/dispositions and rubric.
+   Keep distinct judgments; a combined call counts once against each stream it judges.
+   Require semantic support, omitted-claim discovery, outcome alignment, D1–D8 and
+   applicable L1–L5 scores, and concrete desloping findings. Preserve current floors.
+5. Resolve material findings; contested negatives require independent resolution.
+   Changed head/page/seed needs exact-revision review, including wording edits:
+   supply the full current page plus relevant changes/findings/source context,
+   reusing reconciled immutable evidence. Plan one review plus one fix review;
+   reassess with the designated collaborator after two. Carry counters/grants,
+   stop at valid unchanged-revision approval and defer optional nits.
+6. Merge after required checks/review; verify real publication and native smoke.
+   Adopt data with genuine evidence, bindings, schema checks and independent exact-data
+   review. Reuse unchanged semantic/editorial judgments; use the review contract's
+   standing adoption budget. Never claim a future deployment passed.
 
-Unknown counters permit investigation, not invocation. Failed calls count;
-strategy/provider/head changes do not reset a stream. A time/effort estimate is
-not permission to exceed an invocation cap or lower an acceptance requirement.
+## Result and timing
 
-## Finish map
-
-Record pending / pass / fail / unknown / justified not-applicable with actual
-revision-bound references. All existing applicability and acceptance rules hold;
-never use this table to manufacture a source judgment or future deployment pass.
-
-| Layer | Evidence/revision or exact missing work | Owner / next check |
-| --- | --- | --- |
-| Presence, structure and route | | |
-| Material claims and primary sources | | |
-| Editorial rubric and outcome/assessment alignment | | |
-| Applicable practice execution, verification and cleanup | | |
-| Independent exact-revision review and carried finding dispositions | | |
-| Required local checks and candidate CI | | |
-| Merged publication, HTTP and native smoke | | |
-| Translation boundary or parked-locale treatment under current policy | | |
-| Lead disposition and canonical adoption | | |
-
-Prepare factual/source, teaching and practice inputs together. Submit the final
-whole-page review after known author changes and required inputs are ready.
-Retain distinct judgments and counters; book-specific blinded reviews and human
-gates remain separate. Record every required PR slice without substituting its
-approval for whole-page acceptance. Group compatible release/adoption work only
-where current contracts permit it.
-
-## Reassessment and observed results
-
-- Baseline timestamp and current accepted count/denominator; page kind:
-- Newly current accepted pages, acceptances lost/stale, and net change:
-- Accepted lessons and hubs separately; scoped corrections/support PRs separately:
-- Observed preparation / authoring / review / deployment time; unknowns:
-- Actual versus estimated effort; recorded reassessment and strategy decision if
-  the estimate is exceeded (no automatic switch or inference that rewriting costs less):
-- Source of any cost figure; say unknown when unavailable, never infer it from PRs:
-- Remaining blocker, responsible owner and next executable action:
-- Next completion target after this page resolves or is explicitly blocked:
-
-No accepted-page increase means no completion throughput for that interval,
-even when useful preparation or corrections shipped. It does not prove those
-changes were worthless or that rewriting would have been cheaper.
+Record revision-bound source, rubric, practice, checks, publication and adoption
+states/links; pending/unknown stays visible. Append UTC start/phase/end events to the
+primary checkout's `.agent/module-timing.jsonl`, naming page/revision and full/partial
+scope. Elapsed time includes review/CI waits; active effort stays unknown unless logged.
+Compare accepted lessons (hubs separately), all calls/latency, packet bytes and later
+material rework over consecutive pages. Report additions/retirements separately so
+scope changes cannot disguise progress. Keep one NOW target and the next learner page.
