@@ -125,7 +125,7 @@ df -h /
 
 The first command asks macOS for the CPU brand string, which is a human-readable description of the processor. The second prints memory size in bytes, so a large number is expected. The third command shows filesystem usage in a readable format, including the root filesystem mounted at `/`. You do not need to memorize these commands today; you need to notice that CPU, RAM, and disk can be inspected separately.
 
-On Linux, the commands look different because the operating system exposes information through different tools, but the same questions are being asked. `lscpu` summarizes the processor, `free -h` summarizes memory, and `df -h` summarizes filesystem space. These commands are common on servers, which is one reason learning Linux basics matters for Kubernetes work.
+On Linux, `lscpu` summarizes the processor, `free -h` summarizes memory, and `df -h` summarizes filesystem space. They answer the same three inventory questions using Linux tools.
 
 ```bash
 # See your CPU info on Linux
@@ -225,10 +225,10 @@ Examples of desktop and server operating systems:
 
   Windows  -> Microsoft's operating system family
   macOS    -> Apple's system, used on Macs
-  Linux    -> The open-source family used heavily in servers and cloud infrastructure
+  Linux    -> The operating-system family required for Kubernetes control planes
 ```
 
-The operating system helps programs share the machine through process memory boundaries, scheduling, file permissions, and common services. These mechanisms have different jobs: a memory boundary separates processes, while file permissions govern access to files. A program's access also depends on the identity and privileges it runs with.
+The operating system helps programs share the machine through process memory boundaries, scheduling, file permissions, and common services. These mechanisms have different jobs: a memory boundary separates processes unless they share memory, while file permissions govern access to files. A program's access also depends on the identity and privileges it runs with.
 
 That coordination is why a restart can fix some temporary problems. Restarting clears RAM, stops processes, reloads the operating system, and gives background services a clean starting point. It does not make a weak CPU stronger or a small disk larger, but it can remove accumulated temporary state. The important point is to treat restart as a diagnostic and recovery tool, not as a substitute for understanding the underlying resource pressure.
 
@@ -270,7 +270,7 @@ Cloud virtual machines also offer combinations of resources: a type might advert
 
 Containers also do not remove these limits. A container packages a program and its dependencies so it can run predictably, but it still consumes CPU time, memory, disk, and network resources from the host computer. If ten containers share one node, they share one kitchen. Kubernetes can set rules about how much each container may request or consume, but the total still has to fit within the node's physical and virtual capacity.
 
-When you later read about Kubernetes requests and limits, you will see CPU and memory again. A workload may request enough CPU and memory to run properly, and Kubernetes uses those requests when choosing a node. If a workload exceeds a memory limit, it may be terminated because it has used more temporary working space than promised. That is not arbitrary punishment; it is resource protection for the rest of the kitchen.
+When you later read about Kubernetes requests and limits, you will see CPU and memory again. A workload may request enough CPU and memory to run properly, and Kubernetes uses those requests when choosing a node. If a workload exceeds its memory limit, it may be terminated. Requests guide placement; limits constrain consumption.
 
 Storage also reappears in Kubernetes: images, logs, and application files consume capacity even when CPU and RAM are available. Storage lifetime is a separate question. Ephemeral volumes have lifetimes tied to a Pod, while persistent volumes can outlive an individual Pod. The word "storage" alone does not promise that Kubernetes will retain the data.
 
@@ -421,7 +421,7 @@ Use the instructions for your operating system. If you are on a managed school o
 <details>
 <summary>Solution guidance for Task 1</summary>
 
-On macOS, open **Apple menu > About This Mac** for the computer and OS details. For storage, use **System Settings > General > Storage** on macOS Ventura 13 or later; on earlier versions, use **About This Mac > Storage**. On Windows, use **Settings > System > About** for device and Windows details and **Settings > System > Storage** for storage. Screens can differ by version or access permissions.
+On current macOS, open **System Settings > General > About** for computer and OS details. For storage, use **System Settings > General > Storage** on macOS Ventura 13 or later; on earlier versions, use **About This Mac > Storage**. On Windows, use **Settings > System > About** for device and Windows details and **Settings > System > Storage** for storage. Screens can differ by version or access permissions.
 
 On Linux, use your system settings panel or run `lscpu`, `free -h`, `df -h /`, and `cat /etc/os-release` in a terminal. In the last output, look for `PRETTY_NAME` and `VERSION` or `VERSION_ID`; version fields may be absent, and `PRETTY_NAME` may omit the version. Record an unavailable field as unknown. If a command or screen is unavailable, record that rather than guessing.
 
@@ -547,6 +547,9 @@ Filesystem space pressure is a leading hypothesis: root is 99% used and writes a
 - [Microsoft: The difference between a shell and a terminal](https://learn.microsoft.com/en-us/windows/terminal/faq#what-is-the-difference-between-a-shell-and-a-terminal)
 - [Linux write(2): Limits of a successful write](https://man7.org/linux/man-pages/man2/write.2.html)
 - [Microsoft: Working sets and bringing memory pages into RAM](https://learn.microsoft.com/en-us/windows/win32/memory/working-set)
+- [Apple: System capabilities and RAM size in bytes](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_system_capabilities)
+- [util-linux: lscpu processor information](https://man7.org/linux/man-pages/man1/lscpu.1.html)
+- [Microsoft: Task Manager Processes and Performance views](https://support.microsoft.com/en-au/accessibility/windows/use-a-screen-reader-to-navigate-windows-support-tools)
 - [Microsoft: Private process address spaces](https://learn.microsoft.com/en-us/windows/win32/memory/virtual-address-space)
 - [Microsoft: File permissions and process access](https://learn.microsoft.com/en-us/windows/win32/fileio/file-security-and-access-rights)
 - [Intel: Clock speed, processor design, and workload](https://www.intel.com/content/www/us/en/gaming/resources/cpu-clock-speed.html)
