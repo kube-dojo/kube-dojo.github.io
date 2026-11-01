@@ -30,35 +30,44 @@ After this module, you will be able to practice the following skills in a real t
 
 ## Why This Module Matters
 
-Hypothetical scenario: you are following a setup guide for a Kubernetes practice lab, and the guide tells you to create a configuration folder, copy a sample file, rename it, and remove the old version. The instructions look simple until you realize that every command acts on your current location. If you are in the wrong directory, the command may still succeed, but the file lands somewhere surprising, the copy is not where the next step expects it, or the cleanup command removes a path you meant to keep.
+Hypothetical scenario: you are following a setup guide for a Kubernetes practice lab, and the guide tells you to create a configuration folder, copy a sample file, rename it, and remove the old version. Those relative paths depend on your current location. If you are in the wrong directory, a command may still succeed, but the file lands somewhere surprising, the copy is not where the next step expects it, or the cleanup command removes a path you meant to keep.
 
-That is why first terminal commands are not trivia. They are the control surface for almost every later task in this curriculum: editing manifests, collecting logs, moving through project folders, running `kubectl`, and checking what changed after a command. The terminal is not harder than a graphical interface in principle; it is simply less visual and more literal. It does exactly what you ask in the place where you are standing, so your first job is to learn how to stay oriented.
+These commands help you navigate project folders and prepare files for later work. A relative path depends on the current directory, so check your location and the target before changing anything.
 
-By the end of this module, you will have practiced nine commands that cover a large share of everyday terminal work: `pwd`, `ls`, `cd`, `mkdir`, `touch`, `cp`, `mv`, `rm`, and `clear`. You will also see why pipes are the bridge from "I can run one command" to "I can inspect a system quickly." This is still a beginner module, but the habits are professional habits: check location before action, prefer reversible steps when possible, and treat deletion as a decision rather than a reflex.
+You will practice `pwd`, `ls`, `cd`, `mkdir`, `touch`, `cp`, `mv`, `rm`, and `clear`, then use pipes to connect commands. Check your location before acting, and inspect deletion targets before removing them.
 
-There is another reason this module matters early: terminal mistakes often look like tool mistakes. A learner runs a command, sees output that does not match the guide, and assumes the operating system, course, or shell is broken. Very often the command was correct, but it ran from the wrong directory or acted on a different file than the learner imagined. The fastest way to debug those moments is not a complicated trick; it is the discipline of asking where you are, what is here, and what changed.
-
-You should also expect the terminal to feel slightly uncomfortable at first because it gives less visual feedback than clicking through folders. That discomfort is normal, and it fades as your mental model improves. The goal of this module is not to make you type fast. The goal is to make each command feel explainable: you should know what location it uses, what target it changes, what output proves it worked, and what risk would make you slow down.
+If a result differs from the guide, check where you are, what is there, and what changed. The exercises ask you to explain a command's target and verify its result.
 
 ## Opening Your Terminal and Reading the Prompt
 
-Before we run commands, open a terminal in the environment you are using for this course. On macOS, press `Cmd + Space`, type "Terminal", and press Enter, or open Terminal from Applications > Utilities. On Linux, `Ctrl + Alt + T` opens a terminal on many desktop environments, and the application menu usually has a Terminal entry as well. On Windows, this module is written for a Unix-style shell such as Windows Subsystem for Linux, because native PowerShell has different names and defaults for several commands.
+Before we run commands, open a terminal in the environment you are using for this course. On macOS, press `Cmd + Space`, type "Terminal", and press Enter, or open Terminal from Applications > Utilities. On Ubuntu Desktop, `Ctrl + Alt + T` opens a terminal. Other Linux desktops may use different shortcuts. On Windows, use the linked Ubuntu lab or a Linux shell such as Windows Subsystem for Linux for this lesson.
 
-If you are on Windows, ensure that you run all commands inside Windows Subsystem for Linux (WSL) rather than native PowerShell. While PowerShell defines built-in aliases such as `ls` for `Get-ChildItem`, `cp` for `Copy-Item`, and `rm` for `Remove-Item`, these aliases are not POSIX-compatible. They accept different flag conventions, handle wildcards differently, and fail when passed standard Unix flags such as `-la` or `-r`. This entire curriculum targets standard Unix shell environments, making WSL or an Ubuntu container essential on Windows.
+The commands and options in this lesson use a Unix-style shell and utilities, as in the Ubuntu lab. On Windows, use an appropriate Linux environment such as WSL for these examples; native PowerShell has different commands and option conventions. Do not assume that a similar-looking command has the same behavior in another shell.
 
-When the terminal opens, you should see a short line of text ending in a symbol such as `$` or `%`. That line is called the prompt because it is prompting you to type the next command. The exact text varies by machine, shell, and theme, so do not worry if yours does not match the example exactly. What matters is that the terminal is waiting for one complete instruction, and it will not guess beyond what you typed.
+**In the linked Ubuntu lab:** its task checks look for files in the `ubuntu` account's home when that account exists. If the terminal prompt starts with `root@`, run the following command before starting the lab tasks. It switches to the existing Ubuntu account; your prompt should then start with `ubuntu@`, and `pwd` should show `/home/ubuntu`. This setup step is specific to the linked lab; do not run it in your own local terminal.
+
+```bash
+su - ubuntu
+pwd
+```
+
+The [lab's verifier](https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/step1/verify.sh) checks the account's home directory. A file created under `/root` will not satisfy that check when it expects `/home/ubuntu`, even if the file contains the right answer. Stay in the Ubuntu account for all three lab tasks.
+
+When the shell is ready, it displays a prompt, often ending in `$` or `%`; the root account in the linked lab may use `#`. The prompt's contents depend on the shell and its configuration. Read it as an invitation to enter a command, rather than text that must exactly match the example below.
 
 ```
 username@computername ~ $
 ```
 
-The prompt usually includes some combination of your user name, computer name, and current directory. The `~` symbol is especially important because Unix-style shells commonly use it as shorthand for your home directory, which is the personal area where your user files live. Think of the prompt as a small location badge on your screen: it tells you who is acting, where the action will happen, and when the shell is ready for another command.
+A prompt may include a user name, computer name, or current directory, but its contents are configurable. In many Unix-style shells, `~` is shorthand for your home directory. Use the prompt as a clue and `pwd` to check the working directory before acting.
 
 Notice that a terminal command is just text followed by Enter. Some commands have flags, which are small options such as `-l` or `-a` that change behavior, and some commands have arguments, which are the files or directories the command should act on. The pattern is not universal, but a useful beginner model is "command, options, target." When a command surprises you later, ask which part of that pattern you may have misread.
 
 ## Navigate Directory Paths with `pwd`, `ls`, and `cd`
 
 Your computer organizes files in a tree structure, which means every file and folder has a location relative to a top-level root. A graphical file manager hides much of that structure behind windows and icons, but the terminal asks you to name locations directly. That may feel strict at first, yet the strictness is useful: once you can describe a location as a path, you can automate it, copy it into documentation, and run the same operation on a remote server where no graphical desktop exists.
+
+This macOS-style example shows the relationship between root, home and a user's folders. Linux uses different top-level directory names; the path relationships are the part to follow here.
 
 ```
 / (the root -- the building itself)
@@ -74,7 +83,7 @@ Your computer organizes files in a tree structure, which means every file and fo
 
 In this restaurant-floor-plan analogy, the root directory is the building, your home directory is your private office, and folders such as Desktop or Documents are rooms inside that office. The terminal always has a current working directory, which is the room where relative paths begin. If you say `Documents`, the shell interprets that relative to where you are now; if you say `/Users/yourname/Documents`, you are giving a full path from the building entrance.
 
-The first command is `pwd`, which stands for print working directory. It answers the question "Where am I right now?" before you create, copy, move, or delete anything. Professionals use it constantly because being wrong about location is one of the simplest ways to create confusing results. In a Kubernetes project, for example, running a command from the wrong checkout can make you edit an old manifest while your active cluster still uses a different file.
+The first command is `pwd`, which stands for print working directory. It answers "Where am I?" before you create, copy, move, or delete anything. For example, a wrong checkout can lead you to edit a different manifest from the one you intended.
 
 ```bash
 pwd
@@ -126,7 +135,7 @@ ls -la
 The `-a` flag stands for "all", including hidden files and directories whose names begin with a dot (`.`). Hidden does not mean secret or malicious; it usually means a configuration file or directory that would clutter normal directory browsing. Shell startup files (`.bashrc`, `.zshrc`), editor settings, and tool caches often live this way. Beginners sometimes delete dotfiles because they look unfamiliar, but many of them control how your shell and developer tools behave.
 </details>
 
-The third command is `cd`, which stands for change directory. It changes your current working directory, so every relative path after that begins from the new place. This is like walking from your office into the Documents room before picking up a folder. Nothing has been created or deleted by `cd`; only your point of view has changed.
+The third command is `cd`, which stands for change directory. It changes your current working directory, so every relative path after that begins from the new place. Nothing has been created or deleted by `cd`; only your location has changed. The example below uses a macOS-style `Documents` directory. In the Ubuntu lab, use the existing lowercase `documents` directory instead: names are case-sensitive there. If neither name appears in `ls`, choose an existing directory from that listing and substitute its name in this navigation example.
 
 ```bash
 cd Documents
@@ -144,7 +153,7 @@ The output should now include the Documents directory at the end of the path, sh
 /Users/yourname/Documents
 ```
 
-That pair of commands shows the core navigation loop: move with `cd`, verify with `pwd`, and inspect with `ls`. The loop is intentionally simple because it needs to become automatic. If you later run `kubectl apply -f deployment.yaml`, the shell has to find `deployment.yaml` from your current directory unless you provided a longer path. Knowing where you stand is part of knowing what command you actually ran.
+Use `cd` to move, `pwd` to verify, and `ls` to inspect. A relative file argument such as `deployment.yaml` is resolved from the current directory; check the path before using it in a later command.
 
 ### Going back up: `cd ..`
 
@@ -174,7 +183,7 @@ cd ~
 
 ### Going to a specific place: `cd /path/to/place`
 
-Sometimes you do not want to walk one room at a time. A full path lets you jump directly to a location from the root of the file system. The `/tmp` directory is commonly available on Unix-like systems for temporary files, so it makes a useful example. Do not store important work there unless you know your system's cleanup policy, because temporary directories are designed for disposable data.
+An absolute path lets you navigate from the root of the file system without starting from your current directory. In the Ubuntu lab, `/tmp` provides an existing absolute path to try. On another system, choose an existing directory instead if this path is unavailable. Do not store important work in this practice location; follow your system's storage policy.
 
 ```bash
 cd /tmp
@@ -196,7 +205,7 @@ Now return home so the next practice commands start from a familiar and relative
 cd ~
 ```
 
-Before running this in your own terminal, pause and predict: what output do you expect from `pwd` after running `cd ~`? Formulate your prediction first, then run `pwd` in your shell and compare. This small habit matters because prediction turns terminal practice from copying into reasoning; you are building a mental model, not memorizing a list.
+Before running this, predict what `pwd` will show after `cd ~`, then compare your prediction with the output.
 
 ```bash
 pwd
@@ -226,7 +235,9 @@ cd ~
 mkdir kubedojo-first-commands
 ```
 
-**Continue only if `mkdir` succeeds.** If it reports that the name already exists, or any other error, stop here. Do not reuse or delete that existing path, and do not add `-p` to bypass the error. Choose a different unused workspace name and substitute it consistently below. [The `mkdir` manual](https://www.gnu.org/s/coreutils/manual/html_node/mkdir-invocation.html) explains why ordinary creation reports a collision while `-p` accepts existing directories.
+**Continue only if `mkdir` succeeds.** If it reports that the name already exists, or any other error, stop here. Do not reuse or delete that existing path, and do not add `-p` to bypass the error. Choose a different unused workspace name and substitute it consistently below. [The `mkdir` manual](https://manpages.ubuntu.com/manpages/noble/man1/mkdir.1.html) explains why ordinary creation reports a collision while `-p` accepts existing directories.
+
+Run this walkthrough only in the fresh workspace created in this session. Run commands one at a time, including those shown in the same block. Before each file-changing command, confirm the current directory, source and destination; if a destination already exists unexpectedly, a path is a symbolic link, or a command reports an error, stop and investigate. The diagnostic exercise below deliberately produces one specified error; continue there only if that is the error you observe. Do not overwrite an existing item or clean up a path you cannot identify as your own disposable practice data. These examples are not for personal or shared project files.
 
 After successful creation, enter that new directory and verify the location:
 
@@ -249,7 +260,7 @@ Check that the directory was created by listing the current directory and lookin
 ls
 ```
 
-You should see `my-first-folder` in the list. If you do not, run `pwd` and ask whether you created it somewhere else. If `mkdir` reports that the directory already exists, that is not mysterious; it means the name is already taken in the current directory. You can choose another name, remove the old practice folder after checking it, or reuse the existing folder if that is what you intended.
+You should see `my-first-folder` in the list. If you do not, check `pwd` and investigate. If `mkdir` reports that the name already exists, stop; do not reuse or remove the existing item. Choose a different unused name and substitute it consistently for this practice.
 
 The `-p` flag makes `mkdir` create missing parent directories along a path. Without `-p`, `mkdir restaurant/kitchen/prep-area` fails if `restaurant` or `restaurant/kitchen` does not already exist. With `-p`, the command creates the whole chain as needed. The flag is popular in scripts because it makes setup commands repeatable: running the same command again does not fail simply because the directory already exists.
 
@@ -259,7 +270,7 @@ mkdir -p restaurant/kitchen/prep-area
 
 This creates three folders nested inside each other, even though `restaurant` and `kitchen` did not exist yet. The word "parents" is a helpful memory aid: a child directory cannot exist unless its parent directories exist first. In project work, this pattern appears when you create paths such as `app/frontend/components` or `manifests/base/deployments` before adding files inside them.
 
-`touch` creates an empty file if the named file does not exist. The command originally exists to update timestamps, so if the file already exists, `touch` changes its modification time rather than replacing its contents. For a beginner, the practical use is simple: create a blank file so you have something concrete to copy, move, or delete. Empty files are also common placeholders in labs because they let you practice path operations without needing a text editor yet.
+`touch` creates an empty file if the named file does not exist. It also updates timestamps: if the file already exists, ordinary `touch` updates its access and modification times without replacing its contents. Here, use a new name so you have an empty file to copy, move, or delete without needing a text editor yet.
 
 ```bash
 touch menu.txt
@@ -271,9 +282,9 @@ Check the current directory so you can see the empty file name appear beside the
 ls
 ```
 
-You will see `menu.txt` in your list. It is empty, like a blank sheet of paper waiting to be written on. If you accidentally run `touch` in the wrong directory, the file will still be empty and harmless, but its location will confuse later steps. That is why the `pwd`, `ls`, action loop matters even for simple commands.
+If `touch` succeeded on a new name, `menu.txt` appears in the listing as an empty file. If the name already existed, `touch` can update its timestamp; check your location and target before running it.
 
-`cp` stands for copy, and it creates a duplicate while leaving the original in place. This distinction is critical when you are preserving a known-good version before experimenting. A copy gives you a fallback; a move does not. When you later edit configuration files, copying a file before changing it can be a simple safety measure, although professional version control is the stronger long-term habit.
+`cp` stands for copy, and it creates a duplicate while leaving the original in place. Before copying, check the destination: an existing file may be overwritten. A copy can provide a fallback, but only if you choose and verify a separate destination.
 
 ```bash
 cp menu.txt menu-backup.txt
@@ -297,7 +308,7 @@ To copy a file into a folder, provide the source file and the destination direct
 cp menu.txt restaurant/
 ```
 
-To copy an entire folder and everything inside it, use `-r`, which means recursive. Recursive operations walk through a directory tree, acting on the directory and its children. This is convenient, but it also deserves respect because one command may touch many files. For copying, the risk is usually clutter or confusion; for deletion, recursive behavior can be destructive.
+To copy an entire folder and its contents, use `-r`, which means recursive. Recursive operations can affect many entries. Before this example, verify that `restaurant-copy` does not already exist; stop on a collision or unexpected contents.
 
 ```bash
 cp -r restaurant restaurant-copy
@@ -305,7 +316,7 @@ cp -r restaurant restaurant-copy
 
 `mv` stands for move, but it also renames. This seems odd until you realize that a file's name is part of its path. Moving `menu-backup.txt` into `restaurant/` changes its path from `./menu-backup.txt` to `./restaurant/menu-backup.txt`. Renaming `menu.txt` to `daily-specials.txt` changes only the final path component, but the underlying operation is still "change where this file is known."
 
-When moving a file to another folder, read the command as source first and destination second before pressing Enter:
+When moving a file to another folder, read the source and destination before pressing Enter. Check that the destination directory contains no `menu-backup.txt`; an existing destination can be overwritten. Stop if it is present.
 
 ```bash
 mv menu-backup.txt restaurant/
@@ -313,7 +324,7 @@ mv menu-backup.txt restaurant/
 
 The file is no longer in the current directory because it has been moved into the `restaurant` folder. Unlike `cp`, the original does not stay behind. This is exactly what you want when reorganizing a project, but it is wrong when another tool still expects the original location to exist. When in doubt, copy first, inspect the result, and move only when you are sure there should be one file rather than two.
 
-When renaming a file, the same source-then-destination pattern applies even though the destination is a new name in the same directory:
+When renaming a file, the same source-then-destination pattern applies. First confirm that `daily-specials.txt` is absent; stop if that name already exists.
 
 ```bash
 mv menu.txt daily-specials.txt
@@ -324,7 +335,7 @@ The file `menu.txt` is gone under that name, and `daily-specials.txt` appears in
 <details>
 <summary>Check your prediction</summary>
 
-A cautious and professional answer is to copy (`cp`) when you are exploring or editing a sample configuration, because `cp` leaves the known-good original intact as an immediate fallback if your experimental changes fail. You should move (`mv`) only when you are completing a deliberate, permanent reorganization where keeping an outdated duplicate file would confuse other tools, automated scripts, or teammates.
+Copying a sample leaves the original in place, provided you choose a separate destination and check it first. Moving changes the location instead. Choose based on whether the original should remain, and inspect the destination before either action.
 </details>
 
 ## Delete and Clean Up Safely with `rm` and `clear`
@@ -336,7 +347,7 @@ Consider how everyday graphical file deletion contrasts with an automated termin
 <details>
 <summary>Check your prediction</summary>
 
-A graphical desktop does not destroy the file immediately; it moves the file into a dedicated holding directory (the Trash or Recycle Bin), keeping the data recoverable until you explicitly empty it. In contrast, the terminal's `rm` command is designed for scripts, remote servers, and automated pipelines where no human is present to click confirmation dialogs. `rm` unlinks the file from the filesystem immediately, which means there is no holding area, no desktop undo button, and no safety prompt by default.
+A desktop's Trash or Recycle Bin may provide a holding place for deleted files, but behavior depends on the application and location. Ordinary `rm` removes the named file without sending it to the desktop Trash; do not rely on an Undo button or confirmation prompt. Check the target before running it.
 </details>
 
 `rm` stands for remove. It deletes a file at the path you provide, or in the current directory if you provide only a file name. Before you run it, use `pwd` to confirm where you are and `ls` to confirm the target name. If there is any doubt, stop. A few seconds of checking is cheaper than rebuilding work you removed from the wrong directory.
@@ -345,11 +356,9 @@ A graphical desktop does not destroy the file immediately; it moves the file int
 rm daily-specials.txt
 ```
 
-The file is gone. More precisely, the directory entry is removed immediately, and normal shell usage does not provide an Undo button. Specialized recovery may sometimes be possible before data is overwritten, depending on file system and storage details, but that is not a workflow you should rely on. Treat `rm` as a final action unless you have a backup, a copy, or a version-control history.
+After successful removal, that directory entry is gone. Ordinary `rm` provides no desktop Trash recovery workflow; check that you have a usable backup, copy or version-control record before removing something you may need again. A failed removal is different: read any error and verify the target rather than assuming it disappeared.
 
-For a real example of why backups matter, Pixar's *Toy Story 2* nearly lost roughly 90% of the film's production files in 1998 when a command removed them from production storage; [backups had also been failing, and the work was recovered only because supervising technical director Galyn Susman had a full copy on her home workstation](https://thenextweb.com/news/how-pixars-toy-story-2-was-deleted-twice-once-by-technology-and-again-for-its-own-good) (see also Pixar's "Studio Stories: The Movie Vanishes" featurette on the *Toy Story 2* special features). The team still required reconstruction. This example is not here to dramatize the terminal; it is here to show the practical relationship between destructive commands and recovery planning.
-
-That relationship becomes more important as you move from practice files to real project work. A disposable folder named `restaurant` can be rebuilt in seconds, but a generated report, a downloaded certificate, or a hand-edited configuration file may represent work you cannot easily recreate. The terminal cannot know which file matters to you. It sees paths and permissions, not intent, so you have to supply the intent by choosing narrow targets and verifying them before destructive operations.
+A practice file may be replaceable, while a report, certificate, or hand-edited configuration may not be. Choose a narrow target and verify it before a destructive operation.
 
 One practical safety technique is to separate cleanup into two phases. First, inspect or move the target into a clearly named holding place, such as a temporary cleanup folder. Second, delete only after you are sure the contents are disposable. You will not always need that extra step, especially in small practice labs, but the pattern teaches a useful instinct: when the cost of being wrong is high, make the operation more reversible before you make it final.
 
@@ -361,35 +370,35 @@ rm -r restaurant-copy
 
 The `-r` flag means "recursive", which is the same idea you saw with `cp -r`, but now the action is removal rather than copying. Be especially careful with commands copied from the internet that include `rm -rf`, where `-f` asks for forceful removal and suppresses many prompts. You do not need `-f` for this module. The safer beginner habit is to remove known practice directories by explicit name after listing their contents.
 
-A classic dangerous example is shown below only so you recognize why engineers warn about it. Do not run it. On modern GNU/Linux systems, `rm` normally refuses to operate on `/` because of the default `--preserve-root` safety guard, and disabling that guard requires an explicit unsafe option. The presence of a guard does not make careless deletion safe; it only blocks one especially catastrophic form.
+A dangerous example is shown below only so you recognize it. Do not run it. GNU `rm`, as used in the Ubuntu lab, normally refuses recursive removal of `/` because `--preserve-root` is the default. [Its manual](https://manpages.ubuntu.com/manpages/noble/man1/rm.1.html) documents this protection. It does not protect every other directory you might accidentally name, so it does not make careless deletion safe.
 
 ```text
 rm -rf /
 ```
 
-`clear` is different from `rm` because it affects only the display, not your files. It scrolls old output out of view so you can start with a clean screen. This is useful during practice because a cluttered terminal makes it harder to tell which output belongs to which command. If you clear the screen accidentally, nothing has been deleted, and you can usually scroll back in the terminal window.
+`clear` changes the terminal display rather than removing your files. Save any output you need before running it: the ncurses implementation can clear the scrollback buffer as well as the visible screen, depending on terminal capabilities. [Its manual](https://invisible-island.net/ncurses/man/clear.1.html) explains this behavior; scrolling back is not a reliable way to recover cleared output.
 
 ```bash
 clear
 ```
 
-Your screen is now clean. Nothing was removed from disk, and command history still exists in the shell. On most terminals, `Ctrl + L` performs a similar screen-clear action. Use `clear` when you want visual focus, not as a substitute for cleaning files. For files and directories, you still need `rm`, and you still need the caution that comes with it.
+After a successful `clear`, the screen is cleared and your practice files remain on disk. Screen output and shell command history are different things: history can recall commands, but it does not preserve all their output. In Bash's default Readline key bindings, `Ctrl + L` also clears the screen. Use display clearing for visual focus and file removal only for deliberate cleanup.
 
 ## Combine Commands with Pipes and Filters
 
 Once single commands feel comfortable, pipes introduce the main reason terminal work scales so well. A pipe, written as `|`, sends the output of the command on the left into the command on the right. Instead of making one command do everything, Unix-style tools encourage small commands that do one job and pass text along. This is the assembly-line model: one station lists files, the next station trims the list, and another station searches for a pattern.
 
-This section is still introductory, so you do not need to master every filtering tool today. The important idea is that terminal output can become input. That idea appears constantly in professional work: searching logs, narrowing process lists, finding changed files, and scanning command history. Later Kubernetes commands also produce text or structured output that you will filter when a cluster has too much information to read manually.
+This section introduces output becoming input. You can use filters with listings, logs, or command history; the examples below show the connection before you work with more complex output.
 
-The first pipeline shows only the first 5 files, which is useful when a directory listing would otherwise push useful output off the screen:
+The first pipeline shows the first five lines of a directory listing:
 
 ```bash
-ls | head -5
+ls | head -n 5
 ```
 
-`ls` lists entries, but `head -5` keeps only the first 5 lines. This is useful when a directory has hundreds of files and you want a quick sample without flooding the screen. The left command does not need to know that `head` exists, and `head` does not need to know how `ls` found the names. The pipe connects them by text.
+`ls` lists entries, but `head -n 5` keeps only the first five lines. This is useful when a directory has hundreds of files and you want a quick sample without flooding the screen. The left command does not need to know that `head` exists, and `head` does not need to know how `ls` found the names. The pipe connects them by text.
 
-The second pipeline searches for a word inside a file, turning a full file display into a focused question about matching lines. Earlier in this module you removed `daily-specials.txt` during the deletion practice, so recreate a small sample file before filtering:
+The second pipeline searches for a word inside a file. Earlier you removed `daily-specials.txt`; first list the workspace and confirm that this name is absent. Stop if it exists or if the earlier removal failed: the redirection below can overwrite an existing file. Only then create the sample:
 
 ```bash
 echo "Wednesday: pasta with marinara" > daily-specials.txt
@@ -399,7 +408,7 @@ echo "Wednesday: pasta with marinara" > daily-specials.txt
 cat daily-specials.txt | grep "pasta"
 ```
 
-`cat` displays file contents, and `grep "pasta"` filters to lines containing the word pasta. You will use `grep` often because systems produce more text than humans can read line by line. There are more efficient ways to use `grep` directly on files, but this pipeline is a clear first example: produce text, then filter text. The habit matters more than the specific food word.
+`cat` displays file contents, and `grep "pasta"` selects lines containing `pasta`. You can also use `grep` directly on a file; this example shows how one command's output becomes another's input.
 
 The third pipeline finds a past command you typed, which is a practical way to recover a path or option from recent shell history:
 
@@ -407,19 +416,19 @@ The third pipeline finds a past command you typed, which is a practical way to r
 history | grep "mkdir"
 ```
 
-`history` shows commands you have typed in the shell, and `grep "mkdir"` narrows the output to commands that included `mkdir`. This is handy when you remember part of a command but not the exact path. It also teaches a gentle diagnostic pattern: when the screen has too much information, do not read harder; filter better. The terminal rewards precise questions.
+`history` shows shell history, and `grep "mkdir"` selects lines containing `mkdir`. This can help locate a command when you remember part of it; the entries available depend on the shell and its history settings.
 
-Before running your own pipeline, pause and predict: which side of the pipe runs first, and what exact text moves across the pipe between the two commands? Then try changing the search word in the `history | grep "mkdir"` example to `cd` or `rm`. If a command returns no output, that does not always mean failure; it may mean the filter found no matching lines. Empty output is still information when you know what question you asked.
+Before running your own pipeline, pause and predict: must the left command finish before the right command starts, and what text moves between them? Then change the search word in `history | grep "mkdir"` to `cd` or `rm`. If a filter prints nothing, inspect the unfiltered input before drawing a conclusion; it may simply have found no matching lines.
 
 <details>
 <summary>Check your prediction</summary>
 
-In a Unix pipeline, the operating system starts both commands concurrently (at the same time) and connects the standard output stream of the left command directly to the standard input stream of the right command. In `history | grep "mkdir"`, the text flowing across the pipe is the complete chronological list of previously typed commands. `grep` reads that text stream line by line as it arrives and prints only the lines containing the text string `mkdir`.
+The commands can run concurrently: the left command does not have to finish before the right starts reading. The pipe connects the left command's standard output to the right command's standard input. Here, `history` supplies the entries available to that shell; `grep` selects matching lines as it reads them.
 </details>
 
 ## Quick Reference Card
 
-The table below keeps the original command set close at hand while you practice. Do not try to memorize it by staring at it. Use it as a map while you run small tasks, because memory forms faster when each command solves a concrete problem. The kitchen analogy is intentionally simple: it links an unfamiliar terminal verb to an everyday action, then the later sections add precision.
+Use this table as a reference while you practice. The kitchen analogy connects each command to an everyday action; the examples above explain the actual behavior and its limits.
 
 | Command | What It Does | Kitchen Analogy |
 |---------|-------------|-----------------|
@@ -430,20 +439,14 @@ The table below keeps the original command set close at hand while you practice.
 | `touch` | Creates an empty file | "Put a blank paper on the counter" |
 | `cp` | Copies a file | "Photocopy this recipe" |
 | `mv` | Moves or renames | "Move this to another shelf" or "relabel it" |
-| `rm` | Deletes immediately | "Shred this paper" (no recycle bin by default) |
+| `rm` | Removes the named file entry | "Remove this paper" (no desktop Trash) |
 | `clear` | Cleans the screen | "Wipe the whiteboard" |
-
-The reference card also shows an important design principle: the command names are short because they come from environments where typing mattered and screens were limited. Short names are not meant to be cryptic forever. After a little practice, `pwd` becomes "where am I", `ls` becomes "what is here", and `cd` becomes "go there." The goal is fluency, not reciting expansions.
 
 ## When This Doesn't Apply
 
-The terminal is not the best tool for every file task, and professional engineers use graphical tools when those tools fit the job. If you are visually sorting a large photo library, previewing design assets, or dragging a file into another desktop application, a graphical file manager may be faster and less error-prone. Choosing the terminal should be a decision based on precision, repeatability, remote access, or automation, not a badge of seriousness.
+A graphical file manager can help when you need thumbnails, previews, or drag-and-drop interaction. Terminal commands can be useful when you can name paths, document a sequence, or work through a remote shell. Choose according to the task and inspect the result in either interface.
 
-The terminal becomes the better choice when the action has to be exact, repeated, documented, or performed on a machine you can reach only through a shell. Creating the same directory structure across environments, copying a known file into a known place, filtering a long command history, or cleaning a disposable practice folder are all strong terminal use cases. The same logic later applies to Kubernetes: graphical dashboards can help you inspect, but command-line workflows are easier to repeat and share.
-
-A practical rule is to use the graphical interface when your eyes are making the decision and the terminal when the path or pattern is making the decision. Visual browsing is excellent when you do not know what you want yet. Terminal commands are excellent when you can name exactly what you want. As you gain experience, the two approaches stop competing and start complementing each other.
-
-There is also a middle ground worth noticing. Many editors and development environments include an embedded terminal beside a file tree. That layout is popular because it lets your eyes and commands support each other: you can inspect the project visually, run precise commands from the same root, and notice immediately when files appear or move. If you use an embedded terminal, remember that it still has a current working directory. The surrounding editor does not remove the need for `pwd`.
+For example, a command can describe a directory structure or filter a listing; a graphical dashboard can help display a system's state. You can use both within a workflow.
 
 ## When You'd Use This vs Alternatives
 
@@ -457,10 +460,10 @@ Use pipes when your problem is too much output rather than too little output. A 
 
 ## Did You Know?
 
-- **Command-line interfaces became common long before graphical mouse-and-windows interfaces became mainstream.** [Computers used text-only interfaces from the 1960s until the mid-1980s.](https://en.wikipedia.org/wiki/Command-line_interface) The graphical mouse-and-windows interface you're used to was [popularized by the Apple Macintosh in 1984](https://en.wikipedia.org/wiki/Classic_Mac_OS). When you use a terminal, you're using the original way humans talked to computers.
-- **`ls` is among the oldest commands still widely used today.** It traces back to the [Compatible Time-Sharing System (CTSS) at MIT in the early 1960s](https://en.wikipedia.org/wiki/Compatible_Time-Sharing_System), where a similar command was named `LISTF`. The modern `ls` appeared in the [first version of Unix around 1971](https://en.wikipedia.org/wiki/Ls). You're using a command with more than 50 years of lineage.
-- **The `~` (tilde) for home directory comes from a keyboard accident.** On early terminals, [the Home key and the `~` key were on the same physical key](https://en.wikipedia.org/wiki/Tilde). The convention stuck, and many Unix-like shells now use `~` to mean "home."
-- **The pipe operator made text tools composable instead of monolithic.** [Unix pipelines](https://en.wikipedia.org/wiki/Pipeline_%28Unix%29) let one program's output become another program's input, which is why small tools such as `ls`, `head`, `cat`, `grep`, and `history` can solve larger inspection tasks without each tool knowing about the others.
+- **An empty-looking directory may contain dotfiles.** Plain `ls` normally omits names starting with `.`, while `ls -a` includes them. Use the latter before assuming that a practice directory has no contents; [the `ls` standard](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html) defines the difference.
+- **`touch` can change an existing file without changing its contents.** Its normal job is updating access and modification timestamps. Creating an empty file happens when the target does not exist, as explained in [the `touch` standard](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html).
+- **`mkdir -p` can succeed without creating anything.** If the directory path already exists, it accepts that state; ordinary `mkdir` reports an existing-path error. [The manual](https://manpages.ubuntu.com/manpages/noble/man1/mkdir.1.html) describes behavior useful for repeatable setup, but unsuitable for proving that your practice workspace is new.
+- **A pipe does not wait for a complete output file.** Commands can process a stream while an upstream command is still producing it. [Bash's pipeline documentation](https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html#Pipelines) describes how standard output becomes standard input, allowing small tools to work together.
 
 ## Common Mistakes
 
@@ -521,7 +524,7 @@ Run `ls` to confirm that both `restaurant` and `restaurant-copy` exist, and use 
 
 ## Hands-On Exercise: Build a Restaurant File Structure
 
-Exercise scenario: you are preparing a small file layout for an imaginary restaurant, and your job is to create the structure, inspect it, move one item, copy a menu, and clean up the practice workspace. The exercise intentionally uses harmless empty files so you can focus on command behavior rather than file contents. Work slowly, read each path before pressing Enter, and keep the `pwd`, `ls`, action loop in mind whenever something does not look right.
+Exercise scenario: you are preparing a small file layout for an imaginary restaurant. Use only the fresh workspace created above. Before each mutation, check the relevant source and destination; stop on an error, an unexpected existing name or a symbolic link. Inspect paths with `pwd` and `ls` rather than changing or deleting unfamiliar data.
 
 ### Step 1: Return to your disposable workspace
 
@@ -597,7 +600,7 @@ The three `ls` commands inspect the layout at increasing depth. If the final out
 
 ### Step 5: Move some things around
 
-The ice cream is melting in this exercise scenario, so move it from the freezer path to the prep-area path while reading the source and destination carefully:
+In this exercise scenario, move the ice cream file from the freezer path to the prep-area path. First confirm the source exists and that the destination has no `ice-cream.txt`; stop if it does.
 
 ```bash
 mv restaurant/storage/freezer/ice-cream.txt restaurant/kitchen/prep-area/
@@ -623,28 +626,30 @@ The `mv` command changes the file's location, so `ice-cream.txt` should no longe
 
 ### Step 6: Make a backup of the menu
 
+First check that neither `restaurant/practice-menu.txt` nor `restaurant/practice-menu-backup.txt` exists. Stop if either name is present; do not overwrite or update an unexpected file. These names are distinct from the menu used in the walkthrough.
+
 ```bash
-touch restaurant/menu.txt
-cp restaurant/menu.txt restaurant/menu-backup.txt
+touch restaurant/practice-menu.txt
+cp restaurant/practice-menu.txt restaurant/practice-menu-backup.txt
 ls restaurant/
 ```
 
 <details>
 <summary>Solution notes</summary>
 
-This step uses `cp` because a backup should leave the original in place. The final `ls` should show both `menu.txt` and `menu-backup.txt` in the restaurant directory.
+This step uses `cp` because a backup should leave the original in place. The final `ls` should show both `practice-menu.txt` and `practice-menu-backup.txt` in the restaurant directory.
 </details>
 
 ### Step 7: Diagnostic challenge: locate and relocate a misplaced file
 
-In real systems administration and cloud operations, commands often fail or create files in unintended directories because the operator loses track of their current working location. Imagine a teammate was tasked with adding an inventory file named `olive-oil.txt` into the pantry directory at `restaurant/storage/pantry/`. They navigated into `restaurant/kitchen/` to inspect kitchen equipment, forgot their active shell context, and attempted to run the following command using an invalid relative path:
+Hypothetical scenario: a teammate needs to add `olive-oil.txt` to `restaurant/storage/pantry/`. Confirm that this name is absent from both `restaurant/kitchen/` and `restaurant/storage/pantry/` before recreating the scenario. Stop on a collision. From `restaurant/kitchen/`, they try the following invalid relative path:
 
 ```bash
 cd ~/kubedojo-first-commands/restaurant/kitchen
 touch storage/pantry/olive-oil.txt
 ```
 
-The shell printed `touch: storage/pantry/olive-oil.txt: No such file or directory` because the relative path looked for a `storage` directory inside `kitchen`, where none exists. Confused by the error message, the teammate removed the path prefix and simply ran `touch olive-oil.txt`. The command succeeded silently with exit status zero, but when the team later inspected `restaurant/storage/pantry/`, the required inventory file was nowhere to be found.
+Expect an error saying the path does not exist, such as `No such file or directory`; the full wording varies by utility and locale. The relative path looks for `storage` inside `kitchen`. If the command succeeds or reports a different problem, stop and inspect the workspace. After the expected missing-path error, confirm that `olive-oil.txt` is absent in the current directory before creating it:
 
 ```bash
 touch olive-oil.txt
@@ -696,12 +701,12 @@ The output for `storage/pantry/` now displays `flour.txt`, `olive-oil.txt`, and 
 
 ### Step 8: Clean up
 
-When you are done experimenting, return to your workspace and inspect its practice tree before removing it. Stop if the directory change fails or the displayed location is wrong. Remove only the `restaurant` inside this workspace:
+When you are done, return to your workspace and inspect its practice tree before removing it. Stop if the directory change fails, the location is wrong, a path is a symbolic link, or the tree contains anything you cannot identify as disposable practice data. Remove only the `restaurant` inside the fresh workspace:
 
 ```bash
 cd ~/kubedojo-first-commands
 pwd
-ls restaurant
+ls -laR restaurant
 ```
 
 ```bash
@@ -729,7 +734,7 @@ Use this success criteria checklist to confirm that you practiced every aligned 
 - [ ] You created empty practice files with `touch` in the correct subdirectories.
 - [ ] You inspected the structure with `ls` at multiple levels.
 - [ ] You moved `ice-cream.txt` with `mv` and verified the new location.
-- [ ] You copied `menu.txt` with `cp` so the original and backup both existed.
+- [ ] You copied `practice-menu.txt` with `cp` so the original and backup both existed.
 - [ ] You used `pwd` and `ls` to diagnose a command that ran in the wrong directory, then navigated with `cd` and moved the file with `mv` to restore the correct structure.
 - [ ] You removed only the disposable `restaurant` practice directory with `rm -r`.
 - [ ] You used a pipe with `grep` to verify that cleanup produced no remaining restaurant entry.
@@ -738,7 +743,7 @@ The walkthrough's other files still live inside `kubedojo-first-commands`. Keep 
 
 ```bash
 cd ~
-ls kubedojo-first-commands
+ls -laR kubedojo-first-commands
 ```
 
 ```bash
@@ -747,21 +752,18 @@ rm -r kubedojo-first-commands
 
 ## Sources
 
-- [Command-line interface](https://en.wikipedia.org/wiki/Command-line_interface) — Background on text-based computer interfaces and their long use before mainstream graphical systems.
-- [Classic Mac OS](https://en.wikipedia.org/wiki/Classic_Mac_OS) — Overview of the original Macintosh software platform associated with the popularization of GUI computing in 1984.
-- [Tilde](https://en.wikipedia.org/wiki/Tilde) — Explains the historical terminal-keyboard convention behind `~` as a home-directory shorthand.
-- [Unix shell](https://en.wikipedia.org/wiki/Unix_shell) — Further reading on shells, prompts, commands, and the environment this module introduces.
-- [ls](https://en.wikipedia.org/wiki/Ls) — Further reading on the `ls` command, including history and common options.
-- [Pipeline (Unix)](https://en.wikipedia.org/wiki/Pipeline_%28Unix%29) — Further reading on how the pipe operator connects one command's output to another.
-- [POSIX `pwd`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/pwd.html) — Standard behavior for printing the working directory.
-- [POSIX `ls`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/ls.html) — Standard listing utility behavior and options.
-- [POSIX `mkdir`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/mkdir.html) — Standard directory creation utility behavior.
-- [GNU `mkdir`](https://www.gnu.org/s/coreutils/manual/html_node/mkdir-invocation.html) — Existing-path errors and the different behavior of `-p`.
-- [POSIX `touch`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/touch.html) — Standard timestamp update and file creation utility behavior.
-- [POSIX `cp`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/cp.html) — Standard copy utility behavior, including recursive copying.
-- [POSIX `mv`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/mv.html) — Standard move and rename utility behavior.
-- [POSIX `rm`](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/rm.html) — Standard removal utility behavior and recursive deletion options.
-- [How Pixar's Toy Story 2 Was Deleted Twice](https://thenextweb.com/news/how-pixars-toy-story-2-was-deleted-twice-once-by-technology-and-again-for-its-own-good) — Account of the 1998 production incident and file recovery.
+- [Ubuntu Bash manual](https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html) — Shell paths, expansion, prompts, pipelines, history and Readline bindings.
+- [ncurses `clear`](https://invisible-island.net/ncurses/man/clear.1.html) — Screen clearing and terminal-dependent scrollback behavior.
+- [KubeDojo lab verifier](https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/step1/verify.sh) — Account home selection for the linked lab's task checks.
+- [POSIX `pwd`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pwd.html) — Standard behavior for printing the working directory.
+- [POSIX `ls`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html) — Standard listing utility behavior and options.
+- [POSIX `mkdir`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html) — Standard directory creation utility behavior.
+- [Ubuntu `mkdir`](https://manpages.ubuntu.com/manpages/noble/man1/mkdir.1.html) — Existing-path errors and the different behavior of `-p`.
+- [Ubuntu `rm`](https://manpages.ubuntu.com/manpages/noble/man1/rm.1.html) — GNU recursive-removal options and the root guard.
+- [POSIX `touch`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html) — Standard timestamp update and file creation utility behavior.
+- [POSIX `cp`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cp.html) — Standard copy utility behavior, including recursive copying.
+- [POSIX `mv`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html) — Standard move and rename utility behavior.
+- [POSIX `rm`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html) — Standard removal utility behavior and recursive deletion options.
 
 ## Next Module
 

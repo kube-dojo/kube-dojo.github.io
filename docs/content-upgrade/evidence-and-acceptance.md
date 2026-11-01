@@ -35,6 +35,14 @@ There is no quota of rewrites or expansions, and no page must add a mystery or g
 
 ## Closure sequence
 
+For a choose-one-path exercise, execute the declared applicable learner path,
+including its required verification and cleanup. Other supported OS/shell branches
+may remain source-checked and explicitly unexecuted; do not claim observed behavior
+there. A branch essential to the stated outcome still needs applicable execution.
+A desktop-inspection tool restriction does not itself create a requirement for a
+separate GUI demonstration. Missing evidence of an actual required action remains
+unknown. Do not replace required exercise execution with source links alone.
+
 For each wave, freeze the inventory and dispositions, run structural checks, verify technical/source claims, obtain independent editorial review, execute applicable labs, review translations, and then perform deployed smoke. Attach the evidence packet: inventory, command/checker logs, claim matrix, review verdicts, lab receipts, translation report, and deployment record. Add learner evidence when claiming an improvement in completion, understanding, transfer, or retention. Close only when every applicable layer is `pass` and no material finding is unresolved; otherwise retain the explicit status and blocker. A page’s content acceptance must not be represented as deployment or learner success.
 
 ## Word-floor harmonization

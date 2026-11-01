@@ -113,7 +113,7 @@ Passive reading creates an illusion of understanding. Active learning techniques
 
 ### The Rule
 
-Every module must have at least TWO active learning touchpoints beyond the final exercise:
+Integrate active learning where it supports the outcomes rather than reserving it for a final exercise. Shared activities may cover several outcomes; justify scope and omissions through `docs/review-contract.md`. Useful forms include:
 1. A prediction or reasoning question embedded in the content (not just at the end)
 2. A "what would happen if..." scenario that tests understanding, not recall
 
@@ -176,21 +176,21 @@ A module has this problem if:
 
 | Severity | Description | Action |
 |----------|------------|--------|
-| **Critical** | Module is a stub (<100 lines) or pure outline | Full rewrite required |
-| **High** | Module lists facts without explanation (300+ lines of bullets) | Major restructure — add narrative, scenarios, exercises |
+| **Critical** | Material outcomes are untaught or the lesson is an unsupported outline | Rework the missing teaching against researched scope |
+| **High** | Facts are listed without mechanisms or explanation | Add supported reasoning, appropriate examples and practice |
 | **Medium** | Module teaches but lacks active learning (no exercises, no scenarios) | Add exercises, prediction prompts, worked examples |
-| **Low** | Module teaches well but missing polish (no "Did You Know?", thin quiz) | Add missing sections per template |
+| **Low** | A useful learning element is missing for the planned outcomes | Add supported teaching or record an independently accepted scope justification |
 
 ---
 
 ## 7. Summary: The 7 Non-Negotiable Quality Signals
 
-When reviewing any module, check for these. If more than 2 are missing, the module needs work:
+Check these practices against the researched outcomes and audience. Material omissions require correction or an independently accepted scope justification; counting checklist items cannot establish acceptance:
 
 1. **Clear learning outcomes** stated at the top (what will you be able to DO after this?)
 2. **Narrative flow** — sections build on each other, not random order
 3. **"Why" before "What"** — motivation precedes instruction
-4. **Worked examples** — at least one fully worked problem before asking the learner to solve one
-5. **Active learning** — at least 2 points where the learner must think/predict/decide (beyond the final quiz)
+4. **Worked examples** — appropriate worked explanation before comparable independent practice
+5. **Active learning** — opportunities to think, predict, decide or retrieve that serve the taught outcomes, with feedback
 6. **Visual aids** — diagrams, tables, or ASCII art that explain architecture/flow (not decoration)
 7. **Aligned assessment** — quiz and exercise test what was actually taught, at Level 3+ on Bloom's

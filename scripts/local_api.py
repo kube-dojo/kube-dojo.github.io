@@ -135,7 +135,8 @@ def _content_coverage_report(repo_root: Path, *, compact: bool = False) -> dict:
         if compact:
             keys = ("status", "coverage_health", "locales", "milestones", "caveat", "parked_locales")
             return {"endpoint": "/api/content/coverage", **{key: report[key] for key in keys}, "errors": report["errors"][:5], "receipt_error_count": len(report["receipt_errors"]), "receipt_errors": [item[:200] for item in report["receipt_errors"][:5]]}
-        return report
+        from quality.process_timing import add_process_times
+        return add_process_times(report, repo_root, dependencies[0], version[1][0][1:])
     except (OSError, UnicodeError, TypeError, ValueError, AttributeError, LookupError, ImportError, RuntimeError, ArithmeticError) as exc:
         return {"status": "unavailable", "coverage_health": "unknown", "errors": [f"coverage unavailable: {type(exc).__name__}"], "endpoint": "/api/content/coverage"}
 

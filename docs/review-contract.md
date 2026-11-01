@@ -121,6 +121,54 @@ Keep source, editorial, practice, deployment and lead acceptance separate and
 revision-bound. Record published corrections as work without restamping old
 acceptance. Book-specific source/editor/cap rules retain their separate scope.
 
+## Proportionate curriculum review inputs
+
+Use the [page completion workflow](content-upgrade/page-completion-plan.md) to
+combine source, rubric/desloping, practice and PR judgments in one call.
+Correctness, interest, clear prose and D1–D8/L1–L5 floors remain required.
+
+New content-upgrade page-audit and PR streams opened after this policy merges have
+an explicit user-directed two-call automatic cap (initial plus one fix review),
+overriding review-loop's five-call default. Earlier streams keep recorded ceilings
+and spent counters; no reset. After two calls, reassess with the user-designated
+workflow collaborator (currently Claude under #3762); reassessment grants no calls.
+Exceeding a stream ceiling needs an explicit user grant. Failed/incomplete calls
+count; material findings block acceptance. Stop on approval; defer optional nits.
+
+Supply complete changed files/current page, the material-claim ledger, contextual
+primary-source excerpts, execution receipts and unresolved prior findings. Retain
+snapshots/digests/locators, identify excerpt scope and expand ambiguous context.
+Do not automatically append whole manuals, unrelated history or duplicate bodies.
+Source matching checks integrity only; the independent reviewer still judges full
+semantic support and searches the whole page for omitted material claims.
+
+Per-line nonmaterial accounting and per-input last-line quotation are not universal
+acceptance requirements. Do not require model-generated bookkeeping for every
+heading, instruction or line. Existing seed schemas and consumers still apply;
+required claim IDs, actual source verdicts and provenance must remain complete.
+Preserve invoked/frozen packets and their negative results. A replacement packet
+records its new bindings, scope changes, all unresolved adverse findings and carried
+counters; it never edits an old verdict or rebinds approval to different bytes.
+
+Reviewers and leads must substantiate new blockers against applicable requirements.
+A lead's disagreement cannot clear a negative verdict or finding. Disputes about
+substantiation, materiality or applicability stay open for reviewer resolution or
+independent adjudication before approval; label demands incorrect only after that
+resolution or explicit user direction. Any changed revision needs exact-revision
+review; reuse unchanged evidence explicitly. A tool restriction alone proves no defect.
+
+Record packet bytes and review latency; no size target may omit required evidence
+or force padding. Automation validates identities, quotes, schema and publication;
+it cannot manufacture source judgments, rubric scores or acceptance.
+
+Routine single-page post-publication adoption has a standing #3762 budget of at most
+1,800 aggregate changed lines, limited to its citation-seed JSON, page-specific source
+catalog JSON and its row in `docs/content-upgrade/page-reviews.json`; unchanged files
+need no edit. Other pages and shared source entries must not change. No per-page
+prospective budget endorsement is needed. Exact-data review, required checks, real
+publication, bindings and genuine source/editorial/practice evidence still apply.
+Larger/different changes need their own reviewed plan; schema/consumer checks hold.
+
 ## Prevention and measurement
 
 Keep offline regression cases for incomplete rubric/coverage, padded but

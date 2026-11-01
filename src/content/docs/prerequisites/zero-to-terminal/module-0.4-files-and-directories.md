@@ -4,12 +4,6 @@ slug: prerequisites/zero-to-terminal/module-0.4-files-and-directories
 revision_pending: false
 sidebar:
   order: 5
-lab:
-  id: "prereq-0.4-files-directories"
-  url: "https://killercoda.com/kubedojo/scenario/prereq-0.4-files-directories"
-  duration: "20 min"
-  difficulty: "beginner"
-  environment: "ubuntu"
 ---
 > **Complexity**: `[MEDIUM]` - Long-form foundational read for absolute beginners
 >
@@ -26,13 +20,13 @@ After this module, you will be able to:
 - **Navigate** absolute and relative paths and choose the safer form for a command, script, or troubleshooting session.
 - **Read** files with `cat`, `head`, and `tail`, then select the command that fits the size and purpose of the file.
 - **Interpret** file permissions from `ls -l` output and diagnose who can read, write, or enter a file or directory.
-- **Find** hidden dotfiles and evaluate why configuration files are hidden by default.
+- **Find** hidden dotfiles and explain what a leading dot does and does not protect.
 
 ## Why This Module Matters
 
-Hypothetical scenario: you are helping diagnose a Kubernetes node where a Pod keeps restarting, and a teammate tells you, "Check the kubelet logs, then compare the manifest under `/etc/kubernetes/manifests/` with the kubeconfig under `~/.kube/config`." Nothing in that sentence is advanced Kubernetes yet. The hard part, for a beginner, is that every useful clue is described as a path, and every path assumes you can move through the filesystem without a graphical file browser.
+When a command reports a file path, you need to know where it starts, how to inspect the file, and whether your account can reach it. These skills apply to notes and project files as well as system logs.
 
-The terminal treats the filesystem as the map of the machine. Configuration lives in files, logs are written as files, scripts are stored as files, and directories organize all of it into predictable places. When you can read paths confidently, a command like `tail -n 20 /var/log/syslog` stops looking like punctuation and starts reading like plain instructions: show me the newest twenty lines from this log file.
+Paths identify files and directories. For example, `tail -n 20 /var/log/syslog` asks for the last twenty lines of a file at an absolute path, if that file exists and you can read it.
 
 This module gives you that map-reading skill. You will learn what files and directories are, how Linux arranges them in a tree, how to move with `pwd`, `ls`, and `cd`, how to decide between absolute and relative paths, how to inspect file contents, how to spot hidden dotfiles, and how to read the first permission characters that appear in `ls -l`. The goal is not memorizing commands in isolation. The goal is being able to look at a path during a real troubleshooting task and know what to try next.
 
@@ -42,9 +36,9 @@ A **file** is a named container for information stored on your computer. It can 
 
 Think of a file like a recipe card in a working kitchen. The card has a name, such as `grocery-list.txt`; it has contents, such as "eggs, milk, bread"; and it sits in a location, such as a drawer or recipe box. If two drawers both contain a card named `sauce.txt`, the name alone is not enough. You need the location as well, which is why paths matter so much in terminal work.
 
-Files can contain many kinds of data, and the terminal does not judge a file by its icon the way a desktop environment often does. A text file might contain notes, source code, a YAML manifest, or shell commands. A binary file might contain an image, a compiled program, compressed data, or a database. The filename extension is a useful convention, but the filesystem itself mostly cares about bytes, metadata, and permissions.
+Files can contain many kinds of data. A text file might contain notes, source code, a YAML manifest, or shell commands. A binary file might contain an image, a compiled program, compressed data, or a database. The commands below use small text files that you create for practice.
 
-In Linux, the file idea goes deeper than documents. Your actual notes are files, but the operating system also exposes devices, kernel information, and running process details through file-like interfaces. For example, Red Hat documentation describes how device entries appear under paths such as `/dev`, and process or kernel state is exposed through `/proc`. You do not need to manage device files today, but you should remember the pattern: Linux tools are powerful because many different things can be read, listed, redirected, or inspected through a file-shaped interface.
+Linux also exposes some system interfaces through paths. Entries such as `/dev/null` are device special files; `/proc` is a pseudo-filesystem exposing process and system information. They are not ordinary stored documents. You do not need to manage them here, but recognizing those paths will help you read later troubleshooting examples.
 
 ```text
 /                          <-- The "root" — the very top, the ground floor
@@ -60,9 +54,9 @@ In Linux, the file idea goes deeper than documents. Your actual notes are files,
 └── usr/                   <-- User programs and utilities
 ```
 
-A **directory** is a container for files and other directories. Desktop users usually say "folder" because the visual metaphor is a paper folder; terminal users usually say "directory" because that is the technical term. The concepts are the same, but the terminal version is more precise because it makes parent and child relationships visible in every path.
+A **directory** contains entries for files and other directories. A graphical interface often calls it a folder; paths express the relationships between those entries.
 
-The tree starts at `/`, called the root directory. Every absolute path begins there, even if the directory you use every day is much lower in the tree. Your personal work usually lives under `/home/yourname/` on Linux and under `/Users/yourname/` on macOS, while system configuration often lives under `/etc/`, logs often live under `/var/log/`, and temporary files often live under `/tmp/`. Kubernetes follows these conventions: kubeadm writes static Pod manifests under `/etc/kubernetes/manifests/`, kubelet and container logs are commonly found below `/var/log/`, and `kubectl` configuration is commonly read from `~/.kube/config`.
+The tree starts at `/`, called the root directory. Every absolute path begins there, even if the directory you use every day is much lower in the tree. Home directories commonly live under `/home/` on Linux and `/Users/` on macOS. System configuration often lives under `/etc/`, logs under `/var/log/`, and temporary files under `/tmp/`. For a Kubernetes example, kubeadm writes static Pod manifests under `/etc/kubernetes/manifests/`; `kubectl` uses `~/.kube/config` by default. These are illustrative locations, not directories you need to create for this lesson.
 
 | Path | What It Is | Kitchen Analogy |
 |------|-----------|-----------------|
@@ -75,7 +69,7 @@ The tree starts at `/`, called the root directory. Every absolute path begins th
 
 The `~` character is a shell shortcut for your home directory, not a directory named tilde that you normally see in `ls`. That distinction matters when you read documentation. A command that points to `~/.kube/config` means "inside the current user's home directory, find a hidden `.kube` directory, then read the `config` file." It does not matter whether the user's actual home path is `/home/amina`, `/home/yourname`, or `/Users/amina` on macOS.
 
-Pause and predict: if two users on the same Linux machine both run a command that reads `~/.kube/config`, do they read the same file or different files? Commit to your answer out loud or on paper before opening the reveal, because the prediction is what trains the mental model.
+Pause and predict: if two users on the same Linux machine both read `~/.kube/config`, do they read the same file or different files?
 
 <details>
 <summary>Check your prediction</summary>
@@ -94,7 +88,7 @@ They usually read different files, because `~` expands separately for each user'
 
 ## Navigating Without Getting Lost
 
-When you open a terminal, you are always "standing" in one directory, called your **working directory**. The terminal does not show a full map by default because a full map would be noisy on every command. Instead, you ask specific questions: where am I, what is here, and where do I want to go next?
+Your shell has a **working directory**. To navigate, ask where you are, what is there, and where you want to go.
 
 The first question is answered by `pwd`, which stands for **print working directory**. It gives you the full absolute path to your current location. In the kitchen analogy, `pwd` is the answer to "which room am I standing in right now?", and that answer determines whether relative directions such as `Documents/report.txt` make sense.
 
@@ -106,7 +100,7 @@ pwd
 /home/yourname
 ```
 
-The second question is answered by `ls`, which lists the contents of a directory. With no path, it lists the current directory. With a path, it lists that location instead. Beginners often treat `ls` as a command to run after getting confused, but it is better to treat it as a normal navigation habit: look before moving, especially when you are near system directories or production logs.
+The second question is answered by `ls`, which lists directory contents. With no path, it lists the current directory; with a path, it lists that location instead.
 
 ```bash
 ls
@@ -148,41 +142,19 @@ pwd
 | `cd -` | The last directory you were in | "Go back to where I just was" |
 | `cd /` | The root directory | "Go to the ground floor" |
 
-These shortcuts are small, but they remove a lot of friction. `cd ..` is especially useful because it moves to the parent directory without requiring you to type the whole parent path. `cd -` is useful during troubleshooting because you often jump between a project directory and a log directory; it lets you bounce back to the previous location without remembering the exact spelling.
-
-```bash
-cd ~
-pwd
-```
-
-```bash
-cd ..
-pwd
-```
-
-```bash
-cd -
-pwd
-```
+Use `cd -` to return to the previous directory. The next example ends at `/`; the workspace setup will return you home before creating files.
 
 ```bash
 cd /
 pwd
 ```
 
-Before running this, what output do you expect from the last `pwd` if the previous command was `cd /`? Make the prediction first, then run it. This habit matters because terminal work is mostly hypothesis testing: you form a mental model of where you are, run a command, and compare the output with what you expected.
+Before running this, predict what the last `pwd` will print after `cd /`, then compare it with the output.
 
 <details>
 <summary>Check your prediction</summary>
 
 The last `pwd` prints `/`, the root directory, because `cd /` moves you to the very top of the filesystem tree. An absolute destination like `/` always lands in the same place, no matter where your session was standing before the command. If your run printed something else, re-check the order of the commands rather than blaming the shell.
-
-</details>
-
-<details>
-<summary>Reveal the expected output</summary>
-
-The output should be a single line containing `/`, because `cd /` moves the session to the root directory and `pwd` then prints that absolute path. If your prediction was anything else, trace the sequence again: the earlier `cd ~`, `cd ..`, and `cd -` movements do not matter once `cd /` runs, because every `cd` replaces the working directory completely rather than adding to it.
 
 </details>
 
@@ -226,7 +198,7 @@ cd Documents
 | `.` | Current directory, or "here" | `./script.sh` means `script.sh` in this directory |
 | `..` | Parent directory, or "up one level" | `../Downloads` means go up, then into `Downloads` |
 
-The `.` symbol often appears when running scripts from the current directory, as in `./script.sh`. The shell uses it because many systems do not automatically search the current directory for commands. That behavior prevents accidental execution of a program just because it happens to have the same name as a common tool and lives in the folder where you are standing.
+The `.` symbol identifies the current directory. `./script.sh` names a script there explicitly. A command name without a slash instead goes through the shell's command-search rules; being in the directory alone does not ensure that the shell will find the program.
 
 The `..` symbol is the cleanest way to move to a sibling location. If you are in `/home/user/projects/app/src` and need `/home/user/projects/app/README.md`, the relative path `../README.md` says "go to the parent directory, then read README." That is shorter than the absolute path and still precise because you know your current location.
 
@@ -301,7 +273,7 @@ Think about it: you need to check the last few lines of a log file that is 10,00
 | `head` | File headers, first records, initial comments | Recent log errors near the bottom | Check the first lines of a CSV or report |
 | `tail` | Recent log events and appended files | Understanding the full structure of a file | Inspect the newest system log lines |
 
-The same choice appears in Kubernetes work. When checking cluster access, reading a short kubeconfig snippet might be reasonable with `cat`, although you should be careful not to expose secrets on a shared screen. When reading node or container logs under `/var/log/`, `tail` is usually safer because the newest entries carry the strongest troubleshooting signal. The command is simple, but the decision behind it is operational judgment.
+For logs, `tail` can limit output to the latest lines. Configuration and logs may contain sensitive data: use sanitized examples for practice and inspect only what you need, without sharing private output. The kubeconfig metadata example below is illustrative; it is not required for this lesson.
 
 Illustrative log path — use this only on a machine where that log exists and you may read it:
 
@@ -309,7 +281,7 @@ Illustrative log path — use this only on a machine where that log exists and y
 tail -n 20 /var/log/syslog
 ```
 
-```bash
+```text
 ls -l ~/.kube/config
 ```
 
@@ -321,7 +293,7 @@ Navigation becomes more useful when you can create a small structure of your own
 
 ### Create Your Disposable Workspace First
 
-The earlier navigation ended at `/`; do not create practice files there. For every file-changing example below, use a new directory that you create solely for this lesson and keep under your exclusive control. Being inside your home directory alone does not make existing files disposable.
+The earlier navigation ended at `/`; do not create practice files there. You can use the [Ubuntu playground](https://killercoda.com/playgrounds/scenario/ubuntu) for the self-checked exercises. If its terminal starts as root, run `su - ubuntu` to use the existing unprivileged account. For every file-changing example below, use a new directory that you create solely for this lesson and keep under your exclusive control. Being inside your home directory alone does not make existing files disposable.
 
 Run these commands **one line at a time**. After any `mkdir` or `cd` error, stop: do not run the next line or any file-writing command. If `mkdir` reports that the name exists (including a file or symbolic link), leave it untouched, choose an unused name such as `kubedojo-practice-2`, and substitute that name in every later project path. Do not use `mkdir -p` for this workspace root: it would accept an existing directory instead of establishing a fresh one.
 
@@ -353,49 +325,35 @@ touch shopping-list.txt
 
 `touch` creates a new empty file, but it also updates the timestamp when the file already exists. That dual behavior is useful, but it can surprise beginners. If you expected `touch` to add content, nothing will appear inside the file; it is more like placing a blank recipe card on the counter than writing the recipe.
 
-Hidden files are files or directories whose names start with a dot, such as `.bashrc`, `.zshrc`, `.config/`, `.ssh/`, `.gitconfig`, and `.kube/`. They are hidden from plain `ls` output because configuration files are important but usually not part of everyday browsing. Hiding them reduces clutter and lowers the chance that a beginner deletes a shell or SSH configuration while cleaning up normal documents. The next two commands inspect home explicitly with `~` while your shell stays inside the practice workspace.
+Names beginning with a dot do not appear in a plain `ls` listing. In your owned workspace, create a disposable example, then compare the listings:
 
 ```bash
-ls ~
+touch .practice-hidden
+ls
 ```
 
 ```text
-Documents    Downloads    Music
+recipes    shopping-list.txt
 ```
 
 ```bash
-ls -a ~
+ls -a
 ```
 
 ```text
-.   ..   .bashrc   .config   Documents   Downloads   Music
+.   ..   .practice-hidden   recipes   shopping-list.txt
 ```
 
-| File | What It Does |
-|------|-------------|
-| `.bashrc` | Settings for your bash terminal |
-| `.zshrc` | Settings for your zsh terminal, often the default shell on macOS |
-| `.config/` | Directory containing application configurations |
-| `.ssh/` | SSH keys and secure connection configuration |
-| `.gitconfig` | Git identity and behavior settings |
-| `.kube/` | Common directory for Kubernetes client configuration |
+Some tools use dot-prefixed names for configuration; `kubectl`'s default `~/.kube/config` is one example. You can recognize such paths without opening real credentials for this exercise.
 
 Hidden does not mean secret. A dotfile is hidden from default directory listings, but any user with enough filesystem permission can still read it. This distinction matters for files such as `.env`, `.ssh/config`, or `~/.kube/config`, because naming a file with a leading dot does not protect credentials. Protection comes from permissions, careful sharing, and not printing sensitive content where it does not belong.
 
-```bash
-ls -a ~
-```
-
-```bash
-ls -l ~/.kube
-```
-
-Pause and predict: if plain `ls ~` does not show `.bashrc`, will `cat ~/.bashrc` still work when the file exists and you have permission? Commit to yes or no, and one sentence of reasoning, before opening the reveal.
+Pause and predict: if plain `ls` does not show `.practice-hidden`, can you address it directly when you have permission?
 
 <details>
 <summary>Check your prediction</summary>
 
-Yes, the command still works, because hidden status affects listing behavior, not path resolution. A leading dot only tells `ls` to skip the name in a default listing; the filesystem itself stores and finds `.bashrc` like any other name. A hidden file can always be addressed directly by its full or relative path, which is why commands such as `cat ~/.bashrc` succeed even when plain `ls` never showed the file.
+Yes, if the file exists and you have access: the leading dot affects the default listing, not the name used in the path. Addressing the file directly does not depend on whether plain `ls` displayed it.
 
 </details>
 
@@ -415,7 +373,7 @@ The first character tells you the type of entry. A `d` means directory, while `-
 |  |    |    |
 |  |    |    └── Others (everyone else) permissions
 |  |    └── Group permissions
-|  └── Owner (you) permissions
+|  └── Owner account permissions
 └── File type (- = file, d = directory)
 ```
 
@@ -466,7 +424,7 @@ The `-d` option in the second command is worth noticing. Without it, `ls -l reci
 
 ## Worked Example: Trace the Path Before You Touch the File
 
-The safest way to use filesystem commands is to slow down for a moment and translate the command into plain language before pressing Enter. This is especially useful when a command creates, overwrites, or depends on a path. Beginners often ask whether memorizing more commands is the fastest way to improve, but the better early skill is learning to narrate what a command will do to the tree.
+Before running a command, identify its starting directory, target, and effect. This matters particularly when it creates or replaces a file.
 
 Exercise scenario: you are inside `~/kubedojo-practice`, and someone asks you to inspect `recipes/appetizers/bruschetta.txt`. The path does not start with `/`, so it is relative to your current working directory. The shell will start where you are standing, look for a directory named `recipes`, then a directory named `appetizers`, then a file named `bruschetta.txt`. If any one of those names is missing or misspelled, the command fails at that step.
 
@@ -484,7 +442,7 @@ Example relative path (run after creating the practice tree in the hands-on exer
 cat recipes/appetizers/bruschetta.txt
 ```
 
-That command reads cleanly once you translate it: from the current project directory, open the appetizer recipe file and print its contents. If you instead ran the same command from your home directory, the shell would look for `/home/yourname/recipes/appetizers/bruschetta.txt`, because the relative path would start from a different place. The command did not change, but the starting point changed, which is why `pwd` is not a beginner crutch; it is part of the reasoning process.
+From the workspace, the command reads the appetizer file. From your home directory, the same relative path instead starts at home and points to a different location. Use `pwd` to check the starting point.
 
 Now compare that with the absolute version. An absolute path is longer, but the shell does not need your current working directory to interpret it. The command below points to one concrete location from the root of the filesystem tree, so it can work from your home directory, the project directory, or a log directory, provided the file exists and permissions allow access.
 
@@ -494,7 +452,7 @@ Example absolute path — adjust `yourname` to match your account:
 cat /home/yourname/kubedojo-practice/recipes/appetizers/bruschetta.txt
 ```
 
-Neither style is universally better. The relative path is easier to type and clearer when everyone is already working inside the same project. The absolute path is safer in documentation, troubleshooting notes, and scripts where the starting location may be unclear. That tradeoff shows up constantly in cloud engineering because a command copied into a runbook should behave the same way for the next engineer who uses it during an incident.
+Choose a relative path when its starting directory is known. An absolute path does not depend on the current directory, but still needs to exist and identify the intended file on the machine where it runs.
 
 The same trace method works for `mkdir -p`. Still inside your newly created workspace, run `pwd` and confirm its path before continuing. When you run `mkdir -p recipes/desserts`, the shell starts there and ensures that each named directory exists in order. If `recipes` exists, it keeps going; if `desserts` is missing, it creates it. Adding `kubedojo-practice/` here would incorrectly create a second project inside the first. Stop on any error before continuing to `touch` or `>`.
 
@@ -511,10 +469,10 @@ This is why `mkdir -p` is common in setup instructions. It avoids forcing learne
 touch recipes/desserts/tiramisu.txt
 ```
 
-When you redirect output with `>`, the stakes change. The command `echo "Ingredients: coffee, mascarpone, ladyfingers, cocoa" > recipes/desserts/tiramisu.txt` sends the text into the file, replacing the previous contents. That is perfect in a fresh lab file because you control the content. In a real configuration file, the same redirect can destroy existing settings, so you should pause before using it on anything important.
+With Bash's default redirection settings, `>` creates the target or replaces its contents; a customized shell may instead refuse an overwrite. Here, `echo 'Ingredients: coffee, mascarpone, ladyfingers, cocoa' > recipes/desserts/tiramisu.txt` replaces only your disposable recipe. On a real configuration file, the same redirect can destroy settings, so check the destination before running it.
 
 ```bash
-echo "Ingredients: coffee, mascarpone, ladyfingers, cocoa" > recipes/desserts/tiramisu.txt
+echo 'Ingredients: coffee, mascarpone, ladyfingers, cocoa' > recipes/desserts/tiramisu.txt
 ```
 
 Pause and predict: if `tiramisu.txt` already contains three lines and you run the redirect command above, how many ingredient lines will remain afterward? Commit to a number before opening the reveal.
@@ -543,27 +501,29 @@ The secret caution in the table is not theoretical. Kubernetes client configurat
 
 When paths include hidden directories, trace them exactly the same way. The path `~/.kube/config` starts by expanding `~` to the user's home directory, then enters the hidden `.kube` directory, then names the `config` file. The dot does not make `.kube` harder for the shell to find. It only hides the directory from a default listing, which is why direct commands can work even when plain `ls` did not show the name.
 
-```bash
+The following Kubernetes and SSH paths are illustrative, not prerequisites; do not inspect real configuration or keys for this exercise.
+
+```text
 ls -a ~
 ```
 
-```bash
+```text
 ls -l ~/.kube
 ```
 
 There is another subtle lesson here: a path can be correct while access still fails. If the path exists but permissions do not allow you to read the file or enter the directory, the shell reports a permission error instead of a missing-file error. That difference matters during diagnosis. "No such file or directory" points toward spelling, starting location, or missing parents. "Permission denied" points toward ownership, permission bits, or a directory on the path that cannot be traversed.
 
-```bash
+```text
 ls -ld ~/.ssh
 ```
 
-```bash
+```text
 ls -l ~/.ssh
 ```
 
 The first command asks about the `.ssh` directory itself, while the second asks about what is inside it. If you cannot enter a directory, inspecting the directory entry with `ls -ld` is often more useful than trying to list the contents. This pattern carries into system directories as well, although you should be careful and avoid changing files under `/etc` or `/var` unless a lab or administrator explicitly tells you to.
 
-In Kubernetes work, the filesystem often appears during debugging before the Kubernetes-specific command does. A control-plane node may have static Pod manifests under `/etc/kubernetes/manifests/`, and kubelet-managed logs may appear under `/var/log/pods/` or `/var/log/containers/` depending on the environment. Even when you later use `kubectl logs`, the mental model is the same: logs are records written somewhere, and paths are how the machine names those places.
+On a kubeadm control-plane node, static Pod manifests live under `/etc/kubernetes/manifests/`. Kubernetes normally places container logs under `/var/log/pods/`. The exact logging setup matters, so recognize the path in the documentation rather than assuming every log is a plain file in the same directory.
 
 Illustrative node-specific commands; these paths need not exist on your machine:
 
@@ -602,11 +562,7 @@ ls -ld recipes/appetizers
 ls -l recipes/appetizers/bruschetta.txt
 ```
 
-Notice that this checkpoint method does not require advanced tools. It uses only the commands you have already learned, but it uses them in a diagnostic order. That is the difference between command memorization and operational skill. A memorized command gives you one attempt; a mental model gives you the next question when the first attempt fails.
-
 You can also use checkpoints to avoid accidental writes. Before creating a file with `touch` or replacing content with `>`, run `pwd` and `ls` to confirm the destination. In a beginner lab, the worst mistake is usually a messy practice directory. In professional work, writing to the wrong path can overwrite a configuration file, create a directory structure in the wrong place, or leave a script writing logs where nobody expects to find them.
-
-This carefulness is not meant to make the terminal feel dangerous. It is meant to make it feel inspectable. A graphical file browser protects you by showing context visually; the terminal protects you by making every command explicit. Once you learn to read those commands as path operations, you gain a form of control that transfers directly to remote servers, build systems, CI logs, and Kubernetes nodes where no graphical interface is available.
 
 ### Diagnose It Yourself: Two Broken Reads
 
@@ -617,7 +573,7 @@ Everything above gave you the checkpoint method in a guided order. This challeng
 <details>
 <summary>Reveal a worked diagnosis for symptom one</summary>
 
-The error message is the first clue: "No such file or directory" means the path itself failed to resolve, so this is a path problem rather than a permission problem. The two likely explanations to check are a different starting point and a name mismatch somewhere along the route. `pwd` settles the starting-point question in one step. If it confirms your chosen workspace, walk the checkpoints with `ls recipes` and then `ls recipes/appetizers`. For example, if that listing shows `brushetta.txt`, the name is missing the `c` from `bruschetta.txt`; that is a hypothetical typing mistake, not the output of the correctly followed exercise. Use the name the filesystem actually has, and let each listing supply evidence before choosing a diagnosis.
+The error is a clue to check the starting directory and each name in the path. Run `pwd`; if it confirms your workspace, inspect `ls recipes` and then `ls recipes/appetizers`. For example, a hypothetical `brushetta.txt` would differ from `bruschetta.txt` by a missing `c`. Check the actual listing before choosing a diagnosis.
 
 </details>
 
@@ -630,7 +586,7 @@ The error message is the first clue: "No such file or directory" means the path 
 
 </details>
 
-Notice how the two symptoms triaged differently even though both were "the file would not open." The error message chose the branch: missing-file wording sent you to `pwd` and per-level `ls` checks, while permission wording sent you to `ls -l` and `ls -ld` checks. That branching habit is the unguided version of the cookbook, and it is the version you will actually use on unfamiliar machines.
+The two messages suggest different first checks: path checkpoints for the missing-file example, and file and directory permissions for the access example. Neither message alone describes every possible cause.
 
 ## When This Doesn't Apply
 
@@ -642,7 +598,7 @@ The pattern is to use the terminal when precision, repeatability, remote access,
 |----------|------|--------------|
 | Terminal navigation | You need exact paths or remote access | Commands work over SSH and can be repeated |
 | GUI file browser | You need visual previews or drag-and-drop | The interface is optimized for browsing human media |
-| `cat`, `head`, `tail` | You need quick text inspection | They are lightweight and available on most Unix-like systems |
+| `cat`, `head`, `tail` | You need quick text inspection | Read all, first, or last lines according to the question |
 | Specialized search tools | You need to find content across many files | Listing one directory at a time becomes too slow |
 
 The anti-pattern is pretending one tool fits every job. Printing a massive log with `cat`, manually clicking through a server over a remote desktop, or using relative paths in a script with no control over the starting directory all come from ignoring the task shape. The better habit is to ask: am I locating something, inspecting something, creating structure, or diagnosing access?
@@ -680,13 +636,6 @@ Need to answer a filesystem question?
 | Inspect recent log lines | `tail -n 20 file` | Increase the line count only if needed |
 | Diagnose access | `ls -l file` | Use `ls -ld directory` for the directory itself |
 
-## Did You Know?
-
-- **The `/` root directory is called "root" because the directory tree grows from one starting point.** Unlike a real tree, diagrams often draw the root at the top and branches below it, which is why paths appear to grow downward from `/`.
-- **The `~` shortcut expands in shell contexts to a user's home directory.** That is why `~/.kube/config` can describe a different concrete file for each user while still being correct documentation.
-- **Linux exposes many non-document things through file-like paths.** Device entries under `/dev` and process information under `/proc` are part of the reason ordinary file tools can inspect so much system state.
-- **Kubernetes troubleshooting still depends on ordinary filesystem habits.** Static Pod manifests under `/etc/kubernetes/manifests/`, kubeconfig files under `~/.kube/`, and node logs under `/var/log/` are all easier to investigate once paths feel normal.
-
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
@@ -719,7 +668,7 @@ The script relies on a relative path, so `config/` is resolved from whatever dir
 <details>
 <summary>Question 3: You downloaded a project that includes `.env`, but plain `ls` does not show it. What should you run, and what security assumption should you avoid?</summary>
 
-Run `ls -a` to include hidden names that start with a dot. The file is hidden from default listings because dotfiles are usually configuration, not because they are protected. You should avoid assuming `.env` is secret merely because it is hidden. If it contains credentials, permissions and careful handling matter more than the leading dot.
+Run `ls -a` to include names that start with a dot. The leading dot hides the name from default listings; it does not protect the contents. If `.env` contains credentials, permissions and careful handling matter more than the leading dot.
 
 </details>
 
@@ -731,9 +680,9 @@ Run `ls -a` to include hidden names that start with a dot. The file is hidden fr
 </details>
 
 <details>
-<summary>Question 5: A sensitive file has permissions `-rw-r-----`, is owned by `admin`, and belongs to group `support`. What can a user in `support` do, and what blocks modification?</summary>
+<summary>Question 5: A sensitive file has permissions `-rw-r-----`, is owned by `admin`, and belongs to group `support`. What do the ordinary mode bits grant a non-owner user in `support`?</summary>
 
-A user in the `support` group can read the file because the group permission segment is `r--`. They cannot write to it because the group segment does not include `w`. The owner segment `rw-` allows `admin` to read and modify the file, but those owner permissions do not automatically apply to group members. This is a useful least-privilege shape when support staff need to inspect information without changing it.
+The group bits grant read but not write. The owner bits grant `admin` read and write; they do not automatically apply to other group members. Actual access also depends on search permission on parent directories and any additional access rules or privileges.
 
 </details>
 
@@ -753,7 +702,7 @@ Use `ls -ld recipes`. The `-l` option asks for long format, while `-d` tells `ls
 
 ## Hands-On Exercise: Building Your First Directory Structure
 
-In this exercise, you will create a small recipe project, navigate through it, read files, inspect permissions, and reveal hidden configuration files. The scenario is intentionally ordinary because the mechanics are the same when the file is a recipe, a Kubernetes manifest, or a node log. Work slowly enough to predict each command's output before you run it, then compare the terminal response with your prediction.
+In this exercise, you will create a small recipe project, navigate through it, compare file-reading commands, inspect permissions, and reveal a controlled dotfile. Predict each command's output before running it, then compare the terminal response with your prediction. The same path and reading decisions apply when you later inspect a manifest or log.
 
 ### Setup
 
@@ -764,7 +713,7 @@ pwd
 ls -a
 ```
 
-Confirm that `pwd` identifies your owned workspace. Following the earlier examples, its top level contains `recipes` and `shopping-list.txt`; a newly created workspace is empty apart from `.` and `..`. Unexpected entries mean stop and establish a fresh workspace. The tasks deliberately reuse only the disposable recipe files you create in this lesson.
+Confirm that `pwd` identifies your owned workspace. Following the earlier examples, its top level contains `recipes`, `shopping-list.txt`, and `.practice-hidden`; a newly created workspace is empty apart from `.` and `..`. Unexpected entries mean stop and establish a fresh workspace. The tasks deliberately reuse only the disposable recipe files you create in this lesson.
 
 ### Tasks
 
@@ -821,9 +770,9 @@ Each path is relative to your chosen workspace, which is why it starts with `rec
 4. **Write simple content into the files.** The `>` character redirects the output of `echo` into the target file.
 
 ```bash
-echo "Ingredients: bread, tomatoes, basil, olive oil" > recipes/appetizers/bruschetta.txt
-echo "Ingredients: pasta, eggs, pancetta, parmesan" > recipes/main-courses/pasta-carbonara.txt
-echo "Ingredients: coffee, mascarpone, ladyfingers, cocoa" > recipes/desserts/tiramisu.txt
+echo 'Ingredients: bread, tomatoes, basil, olive oil' > recipes/appetizers/bruschetta.txt
+echo 'Ingredients: pasta, eggs, pancetta, parmesan' > recipes/main-courses/pasta-carbonara.txt
+echo 'Ingredients: coffee, mascarpone, ladyfingers, cocoa' > recipes/desserts/tiramisu.txt
 ```
 
 <details>
@@ -833,7 +782,7 @@ The `>` redirect replaces the file's contents with the text produced by `echo`. 
 
 </details>
 
-5. **Read each file with a different tool.** The files are tiny, but the point is to practice choosing the tool intentionally.
+5. **Compare how much each tool displays.** First read the individual files:
 
 ```bash
 cat recipes/appetizers/bruschetta.txt
@@ -841,10 +790,19 @@ head recipes/main-courses/pasta-carbonara.txt
 tail recipes/desserts/tiramisu.txt
 ```
 
+All three files have one line, so the outputs alone do not show the difference. From your owned workspace, run `ls -a` and confirm `recipe-summary.txt` is absent before creating it. Stop if that name already exists. Predict which ingredient lines the final three commands will display:
+
+```bash
+cat recipes/appetizers/bruschetta.txt recipes/main-courses/pasta-carbonara.txt recipes/desserts/tiramisu.txt > recipe-summary.txt
+cat recipe-summary.txt
+head -n 1 recipe-summary.txt
+tail -n 1 recipe-summary.txt
+```
+
 <details>
 <summary>Solution notes for task 5</summary>
 
-All three commands should print one ingredient line because each file has only one line. In larger files, the commands would behave differently: `cat` would print everything, `head` would print the beginning, and `tail` would print the end. This lab keeps the files small so you can focus on paths.
+The first `cat` combines the files in the given order. The second displays all three lines; `head` displays the bread line and `tail` the coffee line. Choose the command by how much of the file you need to inspect.
 
 </details>
 
@@ -862,17 +820,17 @@ The file entry for `bruschetta.txt` should begin with `-` because it is a regula
 
 </details>
 
-7. **Reveal hidden files in your home directory.** Compare the output with and without `-a`.
+7. **Reveal a controlled hidden file in your workspace.** The earlier example created `.practice-hidden`. If you skipped it, first confirm that name is absent, including as a symbolic link, then run `touch .practice-hidden`. Compare the listings:
 
 ```bash
-ls ~
-ls -a ~
+ls
+ls -a
 ```
 
 <details>
 <summary>Solution notes for task 7</summary>
 
-The second command should show names beginning with dots if your home directory contains shell or application configuration. You may see `.bashrc`, `.zshrc`, `.config`, `.ssh`, `.gitconfig`, or different dotfiles depending on your machine. The important lesson is that hidden files are still reachable by path.
+The second command shows `.practice-hidden`; the first omits it. A leading dot affects the default listing, not whether a path can be addressed.
 
 </details>
 
@@ -902,7 +860,7 @@ The tasks above told you which command to run at each step. This challenge gives
 
 **Symptom 2: file treated as a directory.** From inside the project, you run `cd recipes/desserts/tiramisu.txt` and the shell refuses with `Not a directory`. What kind of entry does the path end in, and which character of an `ls -l` permission string would have told you that in advance?
 
-**Symptom 3: access, not spelling.** On a Linux machine, you run `ls /root` as your normal user and get `Permission denied`, even though the path is spelled correctly and definitely exists. Which command shows the permissions on the `/root` directory entry itself, and what does that string tell you about who may enter?
+**Symptom 3: access, not spelling.** On the Ubuntu playground as the unprivileged `ubuntu` user, `ls /root` reports `Permission denied`. Which command shows the permissions on the `/root` directory entry itself, and what do the mode bits grant?
 
 <details>
 <summary>One possible diagnosis for each symptom</summary>
@@ -911,7 +869,7 @@ Symptom 1 is a relative-path failure. Running `pwd` shows you are in `.../recipe
 
 Symptom 2 is a type mismatch. `tiramisu.txt` is a regular file, and `cd` can only enter directories. Running `ls -l recipes/desserts/` shows the entry's permission string beginning with `-` instead of `d`, which is the advance clue that the target can be read with `cat` but never entered.
 
-Symptom 3 is a permission failure. Running `ls -ld /root` shows the directory entry itself, typically `drwx------` owned by the `root` user, meaning only the owner may list or enter it. The path is correct, but traversal is blocked — which is exactly why the error says "Permission denied" instead of "No such file or directory."
+Symptom 3 is a permission failure. On the tested playground, `ls -ld /root` showed `drwx------` owned by `root`: the ordinary bits grant the owner read and search, but grant neither to group or others. Other rules and privileges can also affect access.
 
 </details>
 
@@ -925,28 +883,30 @@ You've completed this exercise when you can:
 - [ ] Create nested directories with `mkdir -p`.
 - [ ] Create files with `touch`.
 - [ ] Write content to files with `echo "text" > file`.
-- [ ] Read files with `cat`, `head`, and `tail`.
+- [ ] Explain why `cat`, `head -n 1`, and `tail -n 1` show different amounts of the summary file.
 - [ ] Check file permissions with `ls -l`.
 - [ ] Check directory permissions with `ls -ld`.
 - [ ] View hidden files with `ls -a`.
 - [ ] Navigate with `cd`, `cd ..`, and `cd ~`.
 - [ ] Diagnose a wrong-path, file-vs-directory, or permission failure using `pwd`, `ls`, `ls -l`, and `ls -ld`.
 
+### Finish Your Practice
+
+You may keep your recipe files. To remove them, follow the [owned-workspace cleanup in Module 0.3](../module-0.3-first-commands/#step-8-clean-up), using only the disposable workspace you created here. Inspect it first and stop if its contents or ownership are unfamiliar.
+
 ## Sources
 
 - [Linux open(2): access and file-creation errors](https://man7.org/linux/man-pages/man2/open.2.html)
 - [Linux unlink(2): directory access and removal restrictions](https://man7.org/linux/man-pages/man2/unlink.2.html)
 - [Linux capabilities(7): privileged access checks](https://man7.org/linux/man-pages/man7/capabilities.7.html)
-- [RHEL Storage Administration Guide: File systems](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/storage_administration_guide/ch-filesystem)
-- [The /proc Virtual Filesystem](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/4/html/reference_guide/ch-proc)
-- [A beginner's guide to navigating the Linux filesystem](https://www.redhat.com/en/blog/navigating-linux-filesystem)
+- [Linux proc(5): process and system information](https://man7.org/linux/man-pages/man5/proc.5.html)
+- [POSIX ls: listings, hidden names and permission output](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html)
+- [POSIX tail: reading the end of a file](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/tail.html)
 - [kubectl config reference](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config)
 - [kubeadm implementation details](https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/)
-- [Running Kubernetes node components standalone](https://kubernetes.io/docs/tutorials/cluster-management/kubelet-standalone/)
-- [Home directory](https://en.wikipedia.org/wiki/Home_directory)
-- [Managing file system permissions](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_basic_system_settings/managing-file-system-permissions_configuring-basic-system-settings)
+- [Apple: filesystem and home-directory locations](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html)
+- [Linux path resolution: parent search and permission checks](https://man7.org/linux/man-pages/man7/path_resolution.7.html)
 - [Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
-- [Least Privilege Principle](https://owasp.org/www-community/controls/Least_Privilege_Principle)
 
 ## Next Module
 

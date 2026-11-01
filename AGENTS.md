@@ -17,6 +17,14 @@ itself authorize publishing, deployment, merging, or unrelated cleanup. Carry
 out external actions when the user's request authorizes them, subject to the
 review gates below. Preserve the requested scope and any explicit LOC budget.
 
+For content-upgrade work, use the [page completion workflow](docs/content-upgrade/execution-plan.md#bounded-execution-and-acceptance-loop)
+and its linked plan before dispatching repairs or reviews. Complete pages are
+the delivery target; scoped fixes and support PRs retain their narrower meaning.
+
+Friction reports are observations, not new tasks or acceptance gates. Use a
+workable authorized path. Support fixes need an actual current-page blocker,
+a bounded fix and a clear return to content; do not pursue an ideal environment.
+
 ## Workspace and evidence
 
 - Start at the repository root with `git status --short --branch`.

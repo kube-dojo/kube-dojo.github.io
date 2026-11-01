@@ -40,7 +40,7 @@ Record author and reviewer identity and actual family, model/provider/harness an
 
 ## Evidence limits
 
-Check actual tool capabilities for this run rather than assuming web, shell, filesystem or MCP access. Verify version-specific claims and schema details from appropriate sources when available; otherwise mark them unverified for the lead. A verifier pass does not prove source truth, example execution or learner outcomes.
+Use repository reads and web search or fetch to inspect the changed context and verify current or version-specific claims against appropriate sources. Check actual capabilities and report unavailable tools or sources and the verification they affect; do not pass those claims from memory alone. A verifier pass does not prove source truth, example execution or learner outcomes.
 
 ## Anti-patterns to flag (codebase-wide)
 

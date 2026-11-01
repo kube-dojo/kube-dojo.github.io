@@ -1,0 +1,346 @@
+{
+  "schema": "kubedojo.reviewed_source_catalog.v1",
+  "page": "prerequisites/zero-to-terminal/module-0.3-first-commands.md",
+  "page_digest": "sha256:345b6732b9d9da084981824582222c44ee1f737fdf29560d55c28bdcc9be57f5",
+  "seed_digest": "sha256:59ba6c3ef0fda4fe2e2b58f8fbe2d7d787eb2ed42b9e21f57b90ea00c05d0294",
+  "status": "SOURCE_REBOUND",
+  "provenance": {
+    "review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3769#issuecomment-6557038647",
+    "reviewed_head": "1b28defbc832a970b7cbac4f0ac7415ec5957eda",
+    "merged_commit": "37cd7704406a58c99a7c28bfef3e770e90ee3822",
+    "author_family": "openai",
+    "reviewer_family": "xai",
+    "effective_model": "grok-4.7-build",
+    "run_identity": "525e1a4f-aa55-4957-afa6-02961b7b8c63",
+    "verdict_digest": "sha256:8ce2f2a066ff2a6012960c7b06eff1307f0caa89c3fdf4cb75b23b03a556244a",
+    "original_seed_digest": "sha256:f4d5a36470e27a68a04e03ffcec8ed946bee4228dae9bb99073ac2fbfea47d42",
+    "source_index_digest": "sha256:6905b6fcfd306deb669b69fb5f4f9b7327b3206de57d6ab210841ad6d29673f3",
+    "note": "R1 judgments are for the original seed; the retained R2 response reaffirms their binding to the schema-only normalized seed. Optional nits remain deferred; data PR review is separate."
+  },
+  "source_rebind": {
+    "verdict": {
+      "verdict": "APPROVE_WITH_NITS",
+      "run_identity": "e594b50e-783c-4793-aa95-689da9be4fab",
+      "page_digest": "sha256:345b6732b9d9da084981824582222c44ee1f737fdf29560d55c28bdcc9be57f5",
+      "original_seed_digest": "sha256:f4d5a36470e27a68a04e03ffcec8ed946bee4228dae9bb99073ac2fbfea47d42",
+      "seed_digest": "sha256:59ba6c3ef0fda4fe2e2b58f8fbe2d7d787eb2ed42b9e21f57b90ea00c05d0294",
+      "r1_verdict_digest": "sha256:8ce2f2a066ff2a6012960c7b06eff1307f0caa89c3fdf4cb75b23b03a556244a",
+      "source_index_digest": "sha256:6905b6fcfd306deb669b69fb5f4f9b7327b3206de57d6ab210841ad6d29673f3",
+      "metadata_projection_valid": true,
+      "claims_unchanged": true,
+      "reaffirms_all_r1_claims": true,
+      "source_eligibility_unchanged": true,
+      "rubric_approval_unchanged": true,
+      "coverage": {
+        "reviewed_claim_ids": ["FC03001", "FC03002", "FC03003", "FC03004", "FC03005", "FC03006", "FC03007", "FC03008", "FC03009", "FC03010", "FC03011", "FC03012", "FC03013", "FC03014", "FC03015", "FC03016", "FC03017", "FC03018", "FC03019", "FC03020", "FC03021", "FC03022", "FC03023", "FC03024", "C004", "FC03025", "FC03026", "FC03027", "FC03028", "FC03029", "FC03030", "FC03031", "FC03032", "FC03033", "FC03034", "FC03035", "FC03036", "FC03037", "FC03038"],
+        "uncovered_ids": [],
+        "seed_claim_count": 39,
+        "page_instance_count": 72,
+        "additional_receipt_claim_ids": ["FC03-DISCOVERY-ECHO"]
+      },
+      "discovery_claims": [
+        {"claim_id": "FC03-DISCOVERY-ECHO", "claim_text": "echo writes its arguments and a newline into the redirected file.", "verdict": "SUPPORTED_UNSEEDED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "The sample redirection uses the Bash echo builtin, which the supplied Bash sections document as writing arguments separated by spaces and followed by a newline. Combined with > truncation, this is supported and was not a separate seeded claim.", "shown_scope": "Only echo \"Wednesday: pasta with marinara\" > daily-specials.txt. No -n, -e, -E, or --. The argument has no listed escape sequence, so xpg_echo or -e/-E does not change this sample. The builtin writes that one argument and a newline; the same manual's > behavior, already FC03033, places it in the file. Not a verdict for other echo invocations, exit status, or escape-bearing arguments."},
+        {"claim_id": null, "claim_text": "A Windows PowerShell prompt may show a path like C:\\Users\\yourname.", "verdict": "NONMATERIAL_ILLUSTRATION", "evidence_refs": [], "support_note": "Line 98. The PowerShell prompt excerpt shows current location in forms such as PS C:\\> and PS C:\\ps-test>, not that specific profile folder. The page says 'may' and 'like' and immediately says exact spelling matters less than reading the location. Not a product-capability claim and not a seed gap.", "unchanged_from_r1": true},
+        {"claim_id": null, "claim_text": "A desktop Trash or Recycle Bin may hold deleted files, depending on application and location.", "verdict": "NONMATERIAL_HEDGED", "evidence_refs": [], "support_note": "Line 350. No trash manual was supplied. The sentence is explicitly conditional and is not the safety claim. The safety claim is that ordinary rm has no desktop Trash workflow, which POSIX and GNU rm support.", "unchanged_from_r1": true}
+      ],
+      "findings": [
+        {"id": "FC03-N1", "severity": "low", "status": "deferred_open", "r1_reference": "sha256:8ce2f2a066ff2a6012960c7b06eff1307f0caa89c3fdf4cb75b23b03a556244a", "why": "Page bytes unchanged, so the optional no-slash cp precision nit remains open and is not an acceptance blocker."},
+        {"id": "FC03-N2", "severity": "low", "status": "deferred_open", "r1_reference": "sha256:8ce2f2a066ff2a6012960c7b06eff1307f0caa89c3fdf4cb75b23b03a556244a", "why": "Page Sources list unchanged. Missing cat, head, grep, and su bibliography entries remain a reader-facing nit, not an unresolved support gap."}
+      ],
+      "performed_checks": ["No tools, web, subagents, or writes. Source stream 2/2 only. Content PR 3769 was not re-reviewed and no data-PR verdict was made.", "Bound the supplied NEW seed document to sha256:59ba6c3ef0fda4fe2e2b58f8fbe2d7d787eb2ed42b9e21f57b90ea00c05d0294. It is a different byte string from the original seed sha256:f4d5a36470e27a68a04e03ffcec8ed946bee4228dae9bb99073ac2fbfea47d42.", "Compared all 39 current claims. claim_id, claim_text, 72 page_instances, and source_candidates match. prior_seed history, research_run_id, module identity, and page_digest match. The only current-claim edits are claim_class and disposition set to null on claims 0-38.", "Confirmed the supplied reversible delta: 78 null projections, added top-level further_reading [], and one appended note sentence. Nested prior_seed.record.further_reading and historical claim classes were not nulled. No other field difference was found.", "Treated null claim_class, null disposition, and further_reading [] as schema metadata. They do not replace R1 SUPPORTED judgments, source eligibility, or the two open nits. The retained author note still says support was pending; the appended sentence correctly leaves judgments in the R1 catalog.", "Reaffirmed all 39 R1 semantic verdicts, eligibility, module 35, lab 21, and floors by immutable R1 reference sha256:8ce2f2a066ff2a6012960c7b06eff1307f0caa89c3fdf4cb75b23b03a556244a and quote integrity sha256:0de73cc0468a5447b065bd3a1668b2d778b07f5fcae7c8301d0d82d7a67dbbcf. No new rubric scores.", "Read the supplied echo builtin entry sha256:4274be1b38e51a0429e562b12754aa54ac9df0238e30c5511e0d250a468bbb17 from ubuntu-bash-topics and reaffirmed only the shown no-option sample. The other two R1 discovery rows are unchanged and remain nonmaterial."],
+      "supplied_checks": ["Validator result [] was supplied for the projected seed. It was not re-run and was not treated as proof of equivalence.", "Page digest, both seed digests, R1 response digest, source-index digest, delta digest sha256:2a7e292a9c213738a7ae6dc81b2020e170176c594df18ca6b83ef63e65658f54, and echo-entry digest were supplied identities.", "R1 integrity reports 13/13 score quotes exact. Those quotes were not line-numbered again."],
+      "limits": ["SHA-256 values were not recomputed in this no-tools call. Equivalence is the field comparison of the two supplied seed documents under the stated digests.", "Null schema fields are not source judgments and are not publication, canonical-adoption, data-PR, or future-reviewer acceptance.", "FC03-N1 and FC03-N2 stay deferred because the page is unchanged.", "FC03-DISCOVERY-ECHO does not cover echo -n, echo -e, echo -E, echo --, xpg_echo on escape-bearing arguments, or echo's exit status.", "R1 practice, eligibility, and rubric limits remain in force, including no lab re-execution and no learner-efficacy claim.", "Content PR 3769 stream 1/2 remains unchanged and unreviewed here."],
+      "end_marker": "e594b50e-783c-4793-aa95-689da9be4fab"
+    },
+    "verdict_digest": "sha256:69e0e1afc1a26287c037159a656489a0ff2dcaceee2cc1d5d607c9c7ef34d8b5",
+    "integrity": {
+      "run_identity": "e594b50e-783c-4793-aa95-689da9be4fab",
+      "native_model": "grok-4.7-build",
+      "native_stop": "end_turn",
+      "verdict_sha256": "69e0e1afc1a26287c037159a656489a0ff2dcaceee2cc1d5d607c9c7ef34d8b5",
+      "elapsed_seconds": 145.34,
+      "native_result_sha256": "70077a85229dd96d55e8344cdaa471b2d8e86e8fa5c3c5662189d4257088ba36"
+    },
+    "review_url": "https://github.com/kube-dojo/kube-dojo.github.io/pull/3769#issuecomment-6557201738"
+  },
+  "sources": [
+    {"source_id": "05-zsh-prompt-expansion-and-parser-state-markers-R2-CONTEXT", "retrieval_uri": "https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html", "snapshot_digest": "sha256:06a78500ed0e0571f7b73b43324a55b5a0b9d5b901d5fcd162a469b3cbb2ac83", "capture_scope": "Explicitly scoped literal contextual excerpts, not entire parent read. Mechanical locator selection (including approximate matching) is NOT a support judgment. All original parents retained; reviewer must reject insufficient context and request exact missing support.", "review_eligibility": {"source_id": "05-zsh-prompt-expansion-and-parser-state-markers-R2-CONTEXT", "verdict": "LIMITED", "scope_note": "Zsh prompt-expansion excerpt. Supports configurable prompt text, hostname, user, directory, and # versus %. Not general zsh word tilde expansion."}},
+    {"source_id": "11-install-wsl-R2-CONTEXT", "retrieval_uri": "https://learn.microsoft.com/en-us/windows/wsl/install", "snapshot_digest": "sha256:6312ee1da1cbaf21538f263146250398321beb5bad50b6a2633fdccd08fb572a", "capture_scope": "Explicitly scoped literal contextual excerpts, not entire parent read. Mechanical locator selection (including approximate matching) is NOT a support judgment. All original parents retained; reviewer must reject insufficient context and request exact missing support.", "review_eligibility": {"source_id": "11-install-wsl-R2-CONTEXT", "verdict": "LIMITED", "scope_note": "Excerpt of Microsoft's WSL install page. Supports that WSL provides a Linux userland and Bash. Not every install edge case."}},
+    {"source_id": "APPLE-SPOTLIGHT-KEYS-R2-CONTEXT", "retrieval_uri": "https://support.apple.com/guide/mac-help/spotlight-keyboard-shortcuts-mh26783/27/mac/27", "snapshot_digest": "sha256:5d1b1d6c26cc9f79b1afcaf03b872e783731819b202e243a1564737df6367bfc", "capture_scope": "Explicitly scoped literal contextual excerpts, not entire parent read. Mechanical locator selection (including approximate matching) is NOT a support judgment. All original parents retained; reviewer must reject insufficient context and request exact missing support.", "review_eligibility": {"source_id": "APPLE-SPOTLIGHT-KEYS-R2-CONTEXT", "verdict": "LIMITED", "scope_note": "Excerpt of Apple's Spotlight shortcut page. Command-Space opens Spotlight and Return opens the result. Not the whole Mac keyboard guide."}},
+    {"source_id": "EXEC-UBUNTU03", "retrieval_uri": "observation://commands03/hosted-ubuntu-2026-11-01", "snapshot_digest": "sha256:aae75d5afa4a876cf4760d17c72a61841a4c49ac46c128f3326a2ae7b4124cdf", "capture_scope": "Lead's actual native-browser execution observations; screenshots retained and hashed. Scope/negative account check and harness versus page distinctions explicit.", "review_eligibility": {"source_id": "EXEC-UBUNTU03", "verdict": "ELIGIBLE", "scope_note": "Lead's hosted Killercoda observation for this page on Ubuntu 24.04.5 and Bash 5.2.21. Eligible for what that run actually did. Not a vendor manual, not learner-efficacy data, and not Windows, WSL, or macOS execution."}},
+    {"source_id": "apple-open-terminal", "retrieval_uri": "https://support.apple.com/en-tm/guide/terminal/apd5265185d-f365-44cb-8b09-71a064a42125/mac", "snapshot_digest": "sha256:8ad9176e4a32dac918d75e4d2e621031721a9575ffbb55bba49f48a49601550b", "capture_scope": "Complete supplied body", "review_eligibility": {"source_id": "apple-open-terminal", "verdict": "ELIGIBLE", "scope_note": "Complete supplied Apple Terminal guide body for opening Terminal through Spotlight or Applications/Utilities."}},
+    {"source_id": "lab-setup-sh", "retrieval_uri": "https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/setup.sh", "snapshot_digest": "sha256:81398bd2ef1e0691498a1efa847094fe91d76002ffc9f93947b8fc717f8e0888", "review_text_digest": "sha256:81398bd2ef1e0691498a1efa847094fe91d76002ffc9f93947b8fc717f8e0888", "capture_scope": "Complete file in inspected labs main at fe6f47c3888ec1b7bc079781242d44e7f99e25ce", "review_eligibility": {"source_id": "lab-setup-sh", "verdict": "ELIGIBLE", "scope_note": "Complete setup.sh at the pinned labs commit. Creates lowercase documents for /root and /home/ubuntu. Does not create /tmp."}},
+    {"source_id": "lab-step1-verify-sh", "retrieval_uri": "https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/step1/verify.sh", "snapshot_digest": "sha256:cbfb8ef27deeb79fceabaa9d43f5117f9f4548ace86f0253d850594d31ece9de", "review_text_digest": "sha256:cbfb8ef27deeb79fceabaa9d43f5117f9f4548ace86f0253d850594d31ece9de", "capture_scope": "Complete file in inspected labs main at fe6f47c3888ec1b7bc079781242d44e7f99e25ce", "review_eligibility": {"source_id": "lab-step1-verify-sh", "verdict": "ELIGIBLE", "scope_note": "Complete step-1 verifier at the pinned commit. Chooses /home/ubuntu when the ubuntu account exists."}},
+    {"source_id": "lab-step2-verify-sh", "retrieval_uri": "https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/step2/verify.sh", "snapshot_digest": "sha256:58d00247dd54c8ea344a3299037e2b4e89a4aa49f982cd3e9d0d7649e49d3f72", "review_text_digest": "sha256:58d00247dd54c8ea344a3299037e2b4e89a4aa49f982cd3e9d0d7649e49d3f72", "capture_scope": "Complete file in inspected labs main at fe6f47c3888ec1b7bc079781242d44e7f99e25ce", "review_eligibility": {"source_id": "lab-step2-verify-sh", "verdict": "ELIGIBLE", "scope_note": "Complete step-2 verifier at the pinned commit. Same home selection as step 1."}},
+    {"source_id": "lab-step3-verify-sh", "retrieval_uri": "https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/step3/verify.sh", "snapshot_digest": "sha256:7145673d8345d20be86ab81c7446df24b066dcf3e4d218ee4ae1cce41cb1e7db", "review_text_digest": "sha256:7145673d8345d20be86ab81c7446df24b066dcf3e4d218ee4ae1cce41cb1e7db", "capture_scope": "Complete file in inspected labs main at fe6f47c3888ec1b7bc079781242d44e7f99e25ce", "review_eligibility": {"source_id": "lab-step3-verify-sh", "verdict": "ELIGIBLE", "scope_note": "Complete step-3 verifier at the pinned commit. Same home selection as step 1."}},
+    {"source_id": "ncurses-clear", "retrieval_uri": "https://invisible-island.net/ncurses/man/clear.1.html", "snapshot_digest": "sha256:8b7cf93b98e16c8939eca8f73529b7e37a5d8f11ed2ba2ddd55cfa829d724877", "review_text_digest": "sha256:cfaa6cf36f15765ac34f9e0831b0799b7cd68b1359d84cbb3716544178cd928a", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "ncurses-clear", "verdict": "ELIGIBLE", "scope_note": "Complete ncurses clear manual. Screen clear plus capability-dependent scrollback; -x disables the scrollback attempt."}},
+    {"source_id": "posix-cat", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cat.html", "snapshot_digest": "sha256:c65d7288eec83a6e19ad3c6e5d407eb0c072d856d73674ecf619e52a3c2a1d66", "review_text_digest": "sha256:3553def5de2fd40aec86f97ff2e3ffdb7e48dacf317782ab3c9d19efffe2b170", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-cat", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX cat page. Covers writing file contents to standard output."}},
+    {"source_id": "posix-cd", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cd.html", "snapshot_digest": "sha256:6c62adc698387aa20c6331a59c069c520cce58868f1f36adb4eb1a26972d41ee", "review_text_digest": "sha256:f286d6c97d4e025ee9455a8c6405e9c7281820ba102bf6f4b5073bf33d61a665", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-cd", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX cd page. Covers working-directory change, absolute versus relative operands, and dot-dot. CDPATH is in scope and unused by the page."}},
+    {"source_id": "posix-cp", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/cp.html", "snapshot_digest": "sha256:777d1c06255117e8ea9d8c5ede3996ef77b7c5ddecd1cbf9e584deef239a5836", "review_text_digest": "sha256:b0ea94cda9b0836e8367d050a8940fc98dd9971068d0d3101e6994b26d54deb1", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-cp", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX cp page. Covers copy, directory targets, truncation of an existing file, and -R. Historical -r is noted as no longer specified."}},
+    {"source_id": "posix-grep", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/grep.html", "snapshot_digest": "sha256:9473205c9203676853dd5dfb486f2d7a7e223aa7336a59a3481b05be90dcd531", "review_text_digest": "sha256:651cf533bb26faf3a626f1117593752bc0d7017413510c6dbf0a38987b570666", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-grep", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX grep page. Covers default BRE substring selection, empty stdout when nothing matches, and exit status 1."}},
+    {"source_id": "posix-head", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/head.html", "snapshot_digest": "sha256:812ce0ca42b45f118d748fc0131a49b3a307bc3042235fd85a9ede87db32cc47", "review_text_digest": "sha256:9927664ec96a1560ce49aebcfc34b278171e4f6c2cc7dc7ffe17a4989f6e43ed", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-head", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX head page. Covers -n line counts and short-file behavior."}},
+    {"source_id": "posix-ls", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html", "snapshot_digest": "sha256:cd4db85f09dbadf3d529b1bf6a8c157806759c5a22d3ca616aad0cc0363f07bc", "review_text_digest": "sha256:489a39dd1d869697469bd2572934d9d98c661a2f417a24a319c4ac522f564ebb", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-ls", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX ls page. Covers default operand dot, dotfile omission, -a, and -l fields."}},
+    {"source_id": "posix-mkdir", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mkdir.html", "snapshot_digest": "sha256:7d37d11b3829422919fbc928cf3e4e0e2c9ba3d0eaba2e2e36362e80f4086576", "review_text_digest": "sha256:61d4a0c39a193f2f4c36554bd56dfed8221f1d446fa7dd8c1b3ec8971aa5bca2", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-mkdir", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX mkdir page. Covers creation, existing-directory failure, and -p parent creation without error."}},
+    {"source_id": "posix-mv", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/mv.html", "snapshot_digest": "sha256:c17c6279d2fdf408e2aa82bd674d5eff5130f391361b2e175e4862d6c4a89662", "review_text_digest": "sha256:726d4f4957204be4823bfecdd6389577f21f16bb43ddfe7eac9e2ed193b7cbc1", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-mv", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX mv page. Covers move/rename and removal of an existing destination."}},
+    {"source_id": "posix-pwd", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pwd.html", "snapshot_digest": "sha256:6c0724e219d469ac68640fc07c825a95e090931483b9cee2d089dec136efd7f6", "review_text_digest": "sha256:0fe12cb226e06dbe2146472006839c1514e7c63ee775f3b7b37abaf8b1a672b1", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-pwd", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX pwd page. Covers writing the working directory, including -L/-P, which the page does not need."}},
+    {"source_id": "posix-rm", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/rm.html", "snapshot_digest": "sha256:7ea788ea4ed4cc0f309bfc9681b650da0cbcec9d535604cb12bfd57fbddb9839", "review_text_digest": "sha256:a1c7d5acf53893eba9a48f8fc6a4550fe477931c4f7ab5b7494ef092f3c3c709", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-rm", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX rm page. Covers directory-entry removal, -r/-R hierarchy removal, -f prompt suppression, and refusal of a root operand. It is not the GNU preserve-root manual."}},
+    {"source_id": "posix-touch", "retrieval_uri": "https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html", "snapshot_digest": "sha256:ae8c1a8fc027372a6a50561b7c07bea8c30a471458ee72c00d7b35c039d756b7", "review_text_digest": "sha256:f3644425ed227b8c6162f56b9213193eb49ab70795cc5982f9799c432cb52e5c", "capture_scope": "complete command documentation page; no text cropping", "review_eligibility": {"source_id": "posix-touch", "verdict": "ELIGIBLE", "scope_note": "Complete POSIX touch page. Covers creat() when absent and utimensat() timestamp updates when present."}},
+    {"source_id": "powershell-command-precedence-R2-CONTEXT", "retrieval_uri": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence?view=powershell-7.5", "snapshot_digest": "sha256:a92428d51a8556c911659e4650d19fe1214d328341e17ff20c89da45ef52b10c", "capture_scope": "Explicitly scoped literal contextual excerpts, not entire parent read. Mechanical locator selection (including approximate matching) is NOT a support judgment. All original parents retained; reviewer must reject insufficient context and request exact missing support.", "review_eligibility": {"source_id": "powershell-command-precedence-R2-CONTEXT", "verdict": "LIMITED", "scope_note": "Excerpt of PowerShell command precedence. Establishes a distinct alias/function/cmdlet/executable model. Does not list Unix flag mismatches."}},
+    {"source_id": "ubuntu-bash-topics", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html", "snapshot_digest": "sha256:f4b959a94ee56f204df280261be1ea04716007582c9a65d3b46e74dbe5357f03", "review_text_digest": "sha256:c52cea86ff4931421d4aedd01b7c35f398acdc4a9cf5043ee5441cbdfce714cd", "capture_scope": "Complete named manual sections: definitions, simple commands, pipelines, quoting, tilde expansion, word splitting, output redirection, prompting, commands for moving, history, shell builtins. Full parent HTML retained as ubuntu-bash.html; no character-window cropping.", "review_eligibility": {"source_id": "ubuntu-bash-topics", "verdict": "ELIGIBLE", "scope_note": "Named Bash sections are complete enough for pipelines, quoting, word splitting, tilde expansion, redirection, prompts, history, readline clear-screen, and the cd, pwd, and echo builtins. Not a manual for external ls, cp, head, grep, or cat."}},
+    {"source_id": "ubuntu-command-line-current-R2-CONTEXT", "retrieval_uri": "https://ubuntu.com/desktop/docs/en/latest/tutorial/the-linux-command-line-for-beginners/", "snapshot_digest": "sha256:c145b3439d1592d87ba8e349aff8a1f3135b9a080b18f93ec7b493cbe421f7fe", "capture_scope": "Explicitly scoped literal contextual excerpts, not entire parent read. Mechanical locator selection (including approximate matching) is NOT a support judgment. All original parents retained; reviewer must reject insufficient context and request exact missing support.", "review_eligibility": {"source_id": "ubuntu-command-line-current-R2-CONTEXT", "verdict": "LIMITED", "scope_note": "Contextual excerpts, not the whole parent. The included text does support Ctrl+Alt+T, case sensitivity, absolute and relative paths, tilde home, working directory, and Up-arrow recall."}},
+    {"source_id": "ubuntu-mkdir", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/mkdir.1.html", "snapshot_digest": "sha256:1d599bddf62545bce7630333ebae601ceb69d89a0a9299ec9def2530dbc5ccda", "review_text_digest": "sha256:2fbd42ec59f182161c1ba9aa720ce2cce86c30405db665098b0ba7f2db8811f0", "capture_scope": "Complete command manual page", "review_eligibility": {"source_id": "ubuntu-mkdir", "verdict": "ELIGIBLE", "scope_note": "Complete Ubuntu noble GNU mkdir manual. Covers ordinary creation and -p no-error-if-existing parent creation."}},
+    {"source_id": "ubuntu-rm", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/rm.1.html", "snapshot_digest": "sha256:a36af222ffc6e6623947156d8bc656f56ea35286cc050107a32ce591a0f892c9", "review_text_digest": "sha256:f854ead355f0aaefb328732d07b49775d22c4ed2b0b79158b9220e7192228e76", "capture_scope": "Complete command manual page", "review_eligibility": {"source_id": "ubuntu-rm", "verdict": "ELIGIBLE", "scope_note": "Complete Ubuntu noble GNU rm manual. Covers -r, -f, and default --preserve-root for '/'."}},
+    {"source_id": "ubuntu-su", "retrieval_uri": "https://manpages.ubuntu.com/manpages/noble/man1/su.1.html", "snapshot_digest": "sha256:0e56684abf31a0817c143b2b0ecffa242771f08435a45a64b7c1824244f0764b", "review_text_digest": "sha256:132d74d90502145841f8685e2dab0d8519a9e0af696a1c8743ce917c3d271421", "capture_scope": "Complete command manual page", "review_eligibility": {"source_id": "ubuntu-su", "verdict": "ELIGIBLE", "scope_note": "Complete Ubuntu noble su manual. Login form changes to the target user's home. It does not by itself prove the lab account exists."}}
+  ],
+  "claims": [
+    {"claim_id": "FC03001", "verdict": "SUPPORTED", "evidence_refs": ["apple-open-terminal", "APPLE-SPOTLIGHT-KEYS-R2-CONTEXT"], "support_note": "Apple's Terminal guide says to open Terminal from Spotlight or from /Applications/Utilities by double-click. Spotlight shortcuts bind Command-Space to open Spotlight and Return to open the selected result, which is the page's Cmd+Space, type Terminal, press Enter path.", "self_only_nontechnical": false},
+    {"claim_id": "FC03002", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-command-line-current-R2-CONTEXT"], "support_note": "The current Ubuntu Desktop command-line tutorial gives Ctrl+Alt+T as the usual fast shortcut after describing Ubuntu Desktop launch, and says other Linux versions or Ubuntu flavors locate the launcher differently. The page's 'may use different shortcuts' matches 'most' rather than 'every' desktop.", "self_only_nontechnical": false},
+    {"claim_id": "FC03003", "verdict": "SUPPORTED", "evidence_refs": ["11-install-wsl-R2-CONTEXT", "powershell-command-precedence-R2-CONTEXT"], "support_note": "Microsoft's WSL install page says WSL runs a Linux distribution and unmodified Linux utilities and Bash on Windows. The PowerShell precedence excerpt shows a separate lookup order of aliases, functions, cmdlets, and external programs, so a similar-looking name is not the Unix utility by default. The page no longer asserts the removed alias-to-flag catalog. 'Option conventions' is the consequence of that different command model, not a flag matrix quoted in the excerpt. The 'do not assume' sentence stays inside that evidence.", "self_only_nontechnical": false},
+    {"claim_id": "FC03004", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics", "05-zsh-prompt-expansion-and-parser-state-markers-R2-CONTEXT"], "support_note": "Bash PS1 is configurable and decodes \\u, \\h, \\w, and \\$ (# when euid is 0, otherwise $). Zsh prompt escapes include username, hostname, directory, and %# (# when privileged, otherwise %). The page's 'often', 'may', and 'configurable' match both, including the lab root prompt using #.", "self_only_nontechnical": false},
+    {"claim_id": "FC03005", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics", "ubuntu-command-line-current-R2-CONTEXT"], "support_note": "Bash replaces an unquoted empty tilde-prefix with HOME, or with the executing user's home directory if HOME is unset. The Ubuntu tutorial shows cd ~ landing on the home directory. The page says 'many' shells and teaches the empty ~/cd ~ case, not ~user, ~+, or a failed expansion. The zsh excerpt only covers prompt %~ and is not used here.", "self_only_nontechnical": false},
+    {"claim_id": "FC03006", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd", "ubuntu-command-line-current-R2-CONTEXT"], "support_note": "POSIX cd treats a leading slash as the absolute operand and otherwise resolves a relative operand from the working directory. The Ubuntu tutorial states the same absolute-versus-relative rule for paths. Default CDPATH empty is the case taught; the page does not deny CDPATH.", "self_only_nontechnical": false},
+    {"claim_id": "FC03007", "verdict": "SUPPORTED", "evidence_refs": ["posix-pwd"], "support_note": "POSIX pwd writes an absolute pathname of the current working directory. The page's 'where am I' use matches that. -L versus -P symlink spelling is unspecified by the page and not required by the claim.", "self_only_nontechnical": false},
+    {"claim_id": "FC03008", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "With no operand, ls lists dot. Names beginning with a period are omitted unless named, -a/-A is set, or an implementation-defined condition applies. -a writes all entries, including dot names. The page's 'normally' and 'all, including hidden' match that rule.", "self_only_nontechnical": false},
+    {"claim_id": "FC03009", "verdict": "SUPPORTED", "evidence_refs": ["posix-ls"], "support_note": "POSIX -l long format includes file mode, link count, owner, group, size, modification date and time, and pathname. The page names permissions, ownership, size, and modification time, says not every column is needed yet, and labels the sample as a sample.", "self_only_nontechnical": false},
+    {"claim_id": "FC03010", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd", "ubuntu-bash-topics"], "support_note": "POSIX cd changes the current shell execution environment's working directory. Default -L handles dot-dot by removing the preceding pathname component, which is the parent. Bash's cd builtin describes the same dot-dot removal. The page does not claim cd creates or deletes files.", "self_only_nontechnical": false},
+    {"claim_id": "FC03011", "verdict": "SUPPORTED", "evidence_refs": ["lab-setup-sh", "EXEC-UBUNTU03", "ubuntu-command-line-current-R2-CONTEXT"], "support_note": "The pinned lab setup creates lowercase documents under the lab homes. The hosted run used documents and observed /tmp. The Ubuntu tutorial documents Unix case sensitivity, so Documents and documents differ there. The page tells the learner to substitute an existing name if neither appears.", "self_only_nontechnical": false},
+    {"claim_id": "FC03012", "verdict": "SUPPORTED", "evidence_refs": ["posix-mkdir", "ubuntu-mkdir"], "support_note": "mkdir creates the named directory and is not cd. Without -p, an existing directory is an error: POSIX success with -p includes already-existing directories, and GNU mkdir says -p means no error if existing while ordinary creation is only 'if they do not already exist.' Nothing in either manual changes the shell's working directory.", "self_only_nontechnical": false},
+    {"claim_id": "FC03013", "verdict": "SUPPORTED", "evidence_refs": ["posix-mkdir", "ubuntu-mkdir"], "support_note": "POSIX -p creates missing intermediate components and ignores an operand that already names a directory. GNU mkdir -p says no error if existing and make parent directories as needed. The page limits the no-op success to an existing directory path, which is the case the manuals describe.", "self_only_nontechnical": false},
+    {"claim_id": "FC03014", "verdict": "SUPPORTED", "evidence_refs": ["posix-touch"], "support_note": "When the file does not exist, POSIX touch calls creat() and then sets timestamps. creat() produces the empty file the page describes. The page pairs this with the existing-file timestamp case rather than calling creation the only job.", "self_only_nontechnical": false},
+    {"claim_id": "FC03015", "verdict": "SUPPORTED", "evidence_refs": ["posix-touch"], "support_note": "For an existing file, touch calls utimensat() to set access and modification times. With neither -a nor -m, it updates both. That operation does not replace file contents. The hosted timestamp fixture is consistent but the standard is sufficient.", "self_only_nontechnical": false},
+    {"claim_id": "FC03016", "verdict": "SUPPORTED", "evidence_refs": ["posix-cp", "posix-mv"], "support_note": "POSIX cp copies source contents to a destination and does not remove the source. POSIX mv moves the source to the destination. The page's copy-versus-move contrast follows that split.", "self_only_nontechnical": false},
+    {"claim_id": "FC03017", "verdict": "SUPPORTED", "evidence_refs": ["posix-cp"], "support_note": "When the destination regular file exists and -i is not in effect, cp opens it with truncation and writes the source contents. 'May' covers prompt, permission, and same-file outcomes. The page says an existing file, not an existing directory.", "self_only_nontechnical": false},
+    {"claim_id": "FC03018", "verdict": "SUPPORTED", "evidence_refs": ["posix-cp"], "support_note": "The directory-target form copies the source into an existing directory and errors if that target is missing or not a directory. A trailing slash selects that directory interpretation. The page is right that cp does not create the destination directory. See FC03-N1 for the no-slash missing name, which creates a file instead of failing; that narrower snag does not overturn the seeded claim.", "self_only_nontechnical": false},
+    {"claim_id": "FC03019", "verdict": "SUPPORTED", "evidence_refs": ["EXEC-UBUNTU03", "posix-cp"], "support_note": "The hosted Ubuntu cp -r restaurant restaurant-copy run completed and the copy assertions passed. POSIX specifies -R and says historical -r may still exist but is no longer specified, so POSIX alone does not prove Ubuntu acceptance. The claim is about Ubuntu's cp, which the run shows.", "self_only_nontechnical": false},
+    {"claim_id": "FC03020", "verdict": "SUPPORTED", "evidence_refs": ["posix-mv"], "support_note": "POSIX mv moves the source to the destination path via rename, or copies then removes it across file systems. A distinct successful move does not leave the old source name in place. The page's menu-backup and rename examples are that case.", "self_only_nontechnical": false},
+    {"claim_id": "FC03021", "verdict": "SUPPORTED", "evidence_refs": ["posix-mv"], "support_note": "If the destination path exists, mv removes it and continues, unless a confirmation prompt is declined or removal fails. 'May' is the right strength. The page applies this to an existing menu-backup.txt inside the destination directory.", "self_only_nontechnical": false},
+    {"claim_id": "FC03022", "verdict": "SUPPORTED", "evidence_refs": ["posix-rm", "ubuntu-rm"], "support_note": "POSIX rm removes the named directory entry through remove/unlink and describes no trash or undo. GNU rm likewise unlinks and says content recovery might still be possible with expertise, which is why the page says ordinary users should not rely on a desktop Trash or Undo path and should assume recovery is unreliable. It does not claim forensic recovery is impossible.", "self_only_nontechnical": false},
+    {"claim_id": "FC03023", "verdict": "SUPPORTED", "evidence_refs": ["posix-rm", "ubuntu-rm"], "support_note": "POSIX -r is equivalent to -R and removes the file hierarchy. GNU rm documents -r/-R as recursive removal of directories and their contents. The page also tells the learner to stop on a symbolic link; POSIX does not follow directory symlinks during -r.", "self_only_nontechnical": false},
+    {"claim_id": "FC03024", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-rm", "posix-rm"], "support_note": "GNU -f is 'never prompt' and ignores nonexistent arguments. POSIX -f does not prompt and does not suppress unlink-failure diagnostics. The page's 'suppresses many prompts' matches that, and it does not say -f hides every error.", "self_only_nontechnical": false},
+    {"claim_id": "C004", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-rm"], "support_note": "Ubuntu noble GNU rm documents --preserve-root as the default that does not remove '/', and --no-preserve-root as the switch that stops treating '/' specially. The page shows rm -rf / only as a text example and says the guard does not cover every other named directory. The manual's default is exactly that one special case. POSIX also rejects a root operand, but the page attributes the lab behavior to this GNU default, which is what the Ubuntu manual says.", "self_only_nontechnical": false},
+    {"claim_id": "FC03025", "verdict": "SUPPORTED", "evidence_refs": ["ncurses-clear", "EXEC-UBUNTU03"], "support_note": "ncurses clear clears the screen and the scrollback buffer if the terminal has the E3 capability; -x skips the scrollback attempt. The hosted run cleared the screen and the guarded file's contents remained. The page says 'can' and 'depending on terminal capabilities,' and it does not claim every terminal's scrollback was measured.", "self_only_nontechnical": false},
+    {"claim_id": "FC03026", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics", "ncurses-clear"], "support_note": "Bash's default clear-screen binding is C-l: clear the screen and redraw the current line. That is screen clearing, not the separate clear-display binding that also tries scrollback. Bash history stores commands typed, not their output, which is the page's history-versus-output distinction.", "self_only_nontechnical": false},
+    {"claim_id": "FC03027", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "The Bash pipelines section says command1's standard output is connected by a pipe to command2's standard input before command1's own redirections. The page discusses |, not |&.", "self_only_nontechnical": false},
+    {"claim_id": "FC03028", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "Each command in a multi-command pipeline runs in its own subshell, with the pipe connected before execution. That is concurrent stream processing: the consumer can read while the producer is still writing. The shell waits for every pipeline command before returning the pipeline status; the page does not deny that wait. It denies only that the left command must finish before the right starts reading.", "self_only_nontechnical": false},
+    {"claim_id": "FC03029", "verdict": "SUPPORTED", "evidence_refs": ["posix-head", "EXEC-UBUNTU03"], "support_note": "POSIX head -n counts lines from 1 and copies that many lines, or the whole file if it is shorter. The hosted six-line printf piped to head -n 5 showed lines 1 through 5. 'Keeps only the first five lines' is that rule for input that has at least five lines.", "self_only_nontechnical": false},
+    {"claim_id": "FC03030", "verdict": "SUPPORTED", "evidence_refs": ["posix-cat"], "support_note": "POSIX cat reads the named files and writes their contents to standard output. The page's 'displays file contents' is that stdout behavior.", "self_only_nontechnical": false},
+    {"claim_id": "FC03031", "verdict": "SUPPORTED", "evidence_refs": ["posix-grep"], "support_note": "Default grep selects a line when the pattern, as a BRE, matches any part of the line, and writes selected lines to stdout. pasta, mkdir, and mk contain no BRE metacharacters, so they match those character sequences. If no line is selected, stdout is empty and the exit status is 1; the page says no error was shown and empty output often means no match, which is the absent diagnostic, not a claim that the status is 0.", "self_only_nontechnical": false},
+    {"claim_id": "FC03032", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "Bash history is the list of commands previously typed, bounded by HISTSIZE, HISTFILE, and the history options. The history builtin displays that list. It is not a transcript of command output and is not a guarantee of every command ever typed. The page says 'entries available' and 'depend on the shell and its history settings.'", "self_only_nontechnical": false},
+    {"claim_id": "FC03033", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics"], "support_note": "Bash output redirection with > creates the file or truncates an existing file to zero. noclobber can make that fail, so the page's 'can overwrite' is the accurate strength.", "self_only_nontechnical": false},
+    {"claim_id": "FC03034", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-bash-topics", "EXEC-UBUNTU03"], "support_note": "Bash treats an unquoted space as a metacharacter that separates words, and single or double quotes preserve the space inside a word. The hosted mkdir \"my folder\" created one directory. The page's quoted mkdir example and dashed-name advice match that.", "self_only_nontechnical": false},
+    {"claim_id": "FC03035", "verdict": "SUPPORTED", "evidence_refs": ["lab-step1-verify-sh", "lab-step2-verify-sh", "lab-step3-verify-sh", "EXEC-UBUNTU03"], "support_note": "Each pinned verifier sets USER_HOME to /home/ubuntu when id ubuntu succeeds, otherwise /root, and checks files only under that home. The hosted root-created /root/code.txt did not advance the check; the same file under /home/ubuntu did. The page's 'when that account exists' and 'when it expects /home/ubuntu' match the scripts.", "self_only_nontechnical": false},
+    {"claim_id": "FC03036", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-su", "EXEC-UBUNTU03"], "support_note": "Ubuntu su - is the login form: it substitutes the named user and changes to that user's home directory. The lab account exists in the verifiers and setup, and the hosted su - ubuntu run then showed pwd as /home/ubuntu and passed the three checks. The page limits this step to the linked lab.", "self_only_nontechnical": false},
+    {"claim_id": "FC03037", "verdict": "SUPPORTED", "evidence_refs": ["posix-cd", "posix-mv", "EXEC-UBUNTU03"], "support_note": "A relative path is resolved from the current directory, so storage/pantry from kitchen looks below kitchen. The hosted touch failed with 'No such file or directory,' which the page cites only as an example wording. The subsequent mv from the restaurant directory placed the existing file in the pantry and removed it from the kitchen. The parent-relative form is the same mv operation from the other directory.", "self_only_nontechnical": false},
+    {"claim_id": "FC03038", "verdict": "SUPPORTED", "evidence_refs": ["ubuntu-command-line-current-R2-CONTEXT"], "support_note": "The current Ubuntu beginner tutorial tells the reader to repeat a command using the Up arrow. That is the interactive recall the mistakes table teaches. The supplied Bash sections document history and line motion, but the Up binding itself is carried by this Ubuntu tutorial excerpt.", "self_only_nontechnical": false}
+  ],
+  "coverage": {
+    "reviewed_claim_ids": ["FC03001", "FC03002", "FC03003", "FC03004", "FC03005", "FC03006", "FC03007", "FC03008", "FC03009", "FC03010", "FC03011", "FC03012", "FC03013", "FC03014", "FC03015", "FC03016", "FC03017", "FC03018", "FC03019", "FC03020", "FC03021", "FC03022", "FC03023", "FC03024", "C004", "FC03025", "FC03026", "FC03027", "FC03028", "FC03029", "FC03030", "FC03031", "FC03032", "FC03033", "FC03034", "FC03035", "FC03036", "FC03037", "FC03038"],
+    "uncovered_ids": [],
+    "additional_material_claims": [
+      {"claim_text": "A Windows PowerShell prompt may show a path like C:\\Users\\yourname.", "verdict": "NONMATERIAL_ILLUSTRATION", "note": "Line 98. The PowerShell prompt excerpt shows current location in forms such as PS C:\\> and PS C:\\ps-test>, not that specific profile folder. The page says 'may' and 'like' and immediately says exact spelling matters less than reading the location. Not a product-capability claim and not a seed gap."},
+      {"claim_text": "A desktop Trash or Recycle Bin may hold deleted files, depending on application and location.", "verdict": "NONMATERIAL_HEDGED", "note": "Line 350. No trash manual was supplied. The sentence is explicitly conditional and is not the safety claim. The safety claim is that ordinary rm has no desktop Trash workflow, which POSIX and GNU rm support."},
+      {"claim_text": "echo writes its arguments and a newline into the redirected file.", "verdict": "SUPPORTED_UNSEEDED", "note": "The sample redirection uses the Bash echo builtin, which the supplied Bash sections document as writing arguments separated by spaces and followed by a newline. Combined with > truncation, this is supported and was not a separate seeded claim."}
+    ],
+    "exhaustiveness_rationale": "All 39 seeded current claims were judged once, including every listed page instance in the seed. Deleted historical text was not given a new truth verdict. Commands, outcomes, quizzes, exercise steps, Did You Know, mistakes, and the lab account paragraph were searched for further technical claims. Remaining sentences are hedged illustrations, kitchen-analogy labels the page itself marks as analogies, or instructions. No additional material unsupported claim was found."
+  },
+  "unseeded_discovery": {
+    "claim_id": "FC03-DISCOVERY-ECHO",
+    "original_discovery": {
+      "claim_text": "echo writes its arguments and a newline into the redirected file.",
+      "verdict": "SUPPORTED_UNSEEDED",
+      "note": "The sample redirection uses the Bash echo builtin, which the supplied Bash sections document as writing arguments separated by spaces and followed by a newline. Combined with > truncation, this is supported and was not a separate seeded claim."
+    },
+    "r2_discovery": {
+      "claim_id": "FC03-DISCOVERY-ECHO",
+      "claim_text": "echo writes its arguments and a newline into the redirected file.",
+      "verdict": "SUPPORTED_UNSEEDED",
+      "evidence_refs": ["ubuntu-bash-topics"],
+      "support_note": "The sample redirection uses the Bash echo builtin, which the supplied Bash sections document as writing arguments separated by spaces and followed by a newline. Combined with > truncation, this is supported and was not a separate seeded claim.",
+      "shown_scope": "Only echo \"Wednesday: pasta with marinara\" > daily-specials.txt. No -n, -e, -E, or --. The argument has no listed escape sequence, so xpg_echo or -e/-E does not change this sample. The builtin writes that one argument and a newline; the same manual's > behavior, already FC03033, places it in the file. Not a verdict for other echo invocations, exit status, or escape-bearing arguments."
+    },
+    "evidence_refs": ["ubuntu-bash-topics"],
+    "mapping_note": "Original R1 note preserved and exact R2 discovery retained; no quote generated."
+  },
+  "module_scores": {
+    "D1": {
+      "score": 5,
+      "line": 26,
+      "quote": "- **Navigate** directory paths with `pwd`, `ls`, and `cd`, then diagnose when a command ran in the wrong place",
+      "rationale": "The four outcomes use observable verbs: navigate and diagnose, create and compare copy with move, delete after judging risk, and combine output with filters. Each is taught, practiced, and checked. Diagnosis and copy-versus-move comparison are analysis, not recall."
+    },
+    "D2": {
+      "score": 4,
+      "line": 156,
+      "quote": "Use `cd` to move, `pwd` to verify, and `ls` to inspect.",
+      "rationale": "The page moves from prompt and location, to creation, to deletion, to pipes, then to a walkthrough before the unguided repair. Each file-changing step points back to the location loop. Score 4 rather than 5 because a second audience depth is not developed."
+    },
+    "D3": {
+      "score": 5,
+      "line": 208,
+      "quote": "Before running this, predict what `pwd` will show after `cd ~`, then compare your prediction with the output.",
+      "rationale": "Prediction prompts occur for hidden names, home after cd ~, copy versus move, Trash versus rm, and pipeline timing, with answers withheld in details. Step 7 must be attempted before its walkthrough. The quizzes ask for a decision and a reason."
+    },
+    "D4": {
+      "score": 4,
+      "line": 457,
+      "quote": "Use `rm` only when your problem is deliberate cleanup and you have confirmed the target.",
+      "rationale": "The opening scenario is labeled hypothetical. Practical consequences are specific: wrong-directory success, overwrite, rm without Trash, preserve-root covering only /, and clear versus file removal. Tradeoffs are bounded. Score 4 because there is no verified production incident woven through the lesson."
+    },
+    "D5": {
+      "score": 5,
+      "line": 492,
+      "quote": "Use `cp` for the logo because the requirement explicitly needs two files: the original in `assets/` and a duplicate in `public/`.",
+      "rationale": "Quiz 1 and 5 test wrong-place navigation, quiz 2 and 4 test creation and copy versus move, quiz 3 and 7 test narrow removal, and quiz 6 tests an empty filter. The exercise checklist maps the same four outcomes, and the answers explain why. The supplied verifier's quiz-number mapping is not this map."
+    },
+    "D6": {
+      "score": 4,
+      "line": 112,
+      "quote": "You do not need to understand every column yet, but you should notice that flags change the amount of information a command returns.",
+      "rationale": "One command family is introduced at a time, samples are labeled as samples, and the macOS tree is explicitly not the Linux layout. The lab substitution and stop rules keep the practice path from depending on memorized names. The module is long, but the length is sequential practice rather than an unstructured dump."
+    },
+    "D7": {
+      "score": 4,
+      "line": 431,
+      "quote": "The kitchen analogy connects each command to an everyday action; the examples above explain the actual behavior and its limits.",
+      "rationale": "The pace is direct, the removed history is not replaced with a new anecdote, and the analogy is labeled and limited by the worked commands. Score 4 because the restaurant frame still carries the exercise, so the top band for clarity without analogy is not claimed."
+    },
+    "D8": {
+      "score": 4,
+      "line": 457,
+      "quote": "If you are unsure whether a file matters, prefer moving it into a temporary holding directory, making a copy, or leaving it alone until you can inspect it.",
+      "rationale": "For a [MEDIUM] module, why comes before the command, Common Mistakes states the failure and the fix, and When You'd Use This vs Alternatives is the decision guide. Copy versus move and rm versus clear have consequences. Score 4 rather than 5 because the decisions are beginner-scale, not a design-review defense of a larger system."
+    }
+  },
+  "lab_scores": {
+    "L1": {
+      "score": 4,
+      "line": 645,
+      "quote": "Hypothetical scenario: a teammate needs to add `olive-oil.txt` to `restaurant/storage/pantry/`.",
+      "rationale": "The exercise has a concrete layout and a misplaced file to repair. Early steps are prescribed. Step 7 is the problem the learner has to diagnose, and the solution notes a second relative mv. That is scenario plus guidance, not an open production incident."
+    },
+    "L2": {
+      "score": 5,
+      "line": 660,
+      "quote": "Work through this unguided diagnostic sequence in your terminal before inspecting the solution details below.",
+      "rationale": "Step 1 confirms location, steps 2-4 build the tree, steps 5-6 add predicted move and copy, step 7 combines pwd, ls, cd, and mv without the answer first, and step 8 makes empty filter output a judgment rather than automatic success. That matches this module's apply-and-analyze target."
+    },
+    "L3": {
+      "score": 4,
+      "line": 658,
+      "quote": "Your troubleshooting challenge is to diagnose and repair this misplaced file using only the commands taught in this module: `pwd`, `ls`, `cd`, and `mv`.",
+      "rationale": "The learner must not delete and recreate the file, must explain the sibling-path failure, and must verify both directories. Steps 1-6 can still be followed from the page, so the whole lab is not solely a reasoning exercise."
+    },
+    "L4": {
+      "score": 4,
+      "line": 674,
+      "quote": "Inside the workspace's `restaurant/kitchen/`, the relative path `storage/pantry/` fails because `kitchen` and `storage` are sibling folders inside `restaurant`.",
+      "rationale": "The hidden solution explains the cause, then shows two relative moves and the checks that prove them. It teaches the idea before the command. It is one walkthrough, not a set of adaptive hint tiers."
+    },
+    "L5": {
+      "score": 4,
+      "line": 699,
+      "quote": "You successfully diagnosed a location-dependent error and corrected the file placement without destroying data.",
+      "rationale": "The exercise names the transferable lesson: relative paths depend on the working directory, and the repair keeps the existing file. The same loop is pointed at later files such as deployment.yaml. There is no second unguided scenario, so this is 4 rather than 5."
+    }
+  },
+  "topic_outcome_coverage": {
+    "audience": "Terminal beginners who can already open a terminal after module 0.2.",
+    "essential_topics": {
+      "navigation_and_wrong_path_diagnosis": {
+        "teaching": "Navigate section, lines 66-217, including pwd, ls, cd, .., ~, absolute /tmp, and the Ubuntu documents case note.",
+        "practice": "Walkthrough location checks and exercise steps 1 and 7.",
+        "assessment": "Quiz 1, quiz 5, and the step-7 diagnosis."
+      },
+      "creation_and_copy_versus_move": {
+        "teaching": "Create section, lines 220-338, including mkdir, mkdir -p, touch, cp, cp -r, and mv rename.",
+        "practice": "Exercise steps 2-6 with distinct practice-menu names and destination checks.",
+        "assessment": "Quiz 2 and quiz 4."
+      },
+      "safe_targeted_removal": {
+        "teaching": "Delete section, lines 341-385: confirm with pwd and ls, no Trash workflow, rm -r, no -f required, preserve-root does not protect other paths, clear is display-only.",
+        "practice": "Exercise step 8 inspects with ls -laR, stops on a symlink or unfamiliar data, and removes only the workspace restaurant tree.",
+        "assessment": "Quiz 3 and quiz 7."
+      },
+      "pipes_and_filters": {
+        "teaching": "Pipes section, lines 387-427: |, head -n 5, cat, grep, history, concurrent stream, empty-match output.",
+        "practice": "Walkthrough filters and exercise cleanup ls | grep restaurant.",
+        "assessment": "Quiz 6."
+      }
+    },
+    "material_omissions": [],
+    "accepted_scope_limits": ["Historical command anecdotes and the Toy Story story stay removed, with no replacement story.", "No native GUI-opening exercise is required.", "Windows, WSL, and macOS are source-checked where named and are not claimed as current execution paths.", "Inspection, including symlink refusal, is a learner stop rule and is not described as race or symlink-swap protection."]
+  },
+  "practice_evidence_disposition": {
+    "disposition": "ACCEPT_SUPPLIED_REFERENCE_PATH",
+    "reference_path": "Hosted Killercoda Ubuntu lab, Ubuntu 24.04.5 LTS, GNU Bash 5.2.21, as recorded in EXEC-UBUNTU03.",
+    "what_was_shown": "The default root session created /root/code.txt and the step-1 check did not advance. su - ubuntu then showed /home/ubuntu, and all three task checks reached Lab Complete. A guarded walkthrough and exercise covered navigation with lowercase documents, fresh mkdir, copy and move assertions, the intended missing storage path, relocation without recreating the file, head -n 5, quoted mkdir, clear leaving a file in place, and removal only of the owned practice tree.",
+    "limits": "This reviewer did not re-execute the lab or view screenshot pixels. Screenshot hashes were supplied as identities only. The receipt excludes current Windows, WSL, macOS, and native PowerShell execution, excludes a claim about every terminal's scrollback, and excludes race, symlink-swap, and automatic-stop claims. The 2026-10-26 Mac harness remains evidence for that older revision only.",
+    "learner_efficacy": "No learner-efficacy measurement was supplied or inferred."
+  },
+  "prior_finding_dispositions": [
+    {"id": "2026-10-26-P02A-workspace-ownership", "disposition": "ADDRESSED_ON_CURRENT_PAGE", "note": "Plain mkdir of kubedojo-first-commands, stop on any existing path, no -p bypass, all later mutations inside that new workspace, ls -laR before removal, stop on a symlink or unidentifiable data, and final workspace removal only for the directory created in this session. The page does not say those checks prevent races or symlink swaps."},
+    {"id": "2026-05-30-historical-review", "disposition": "PRESERVED_NOT_RESTAMPED", "note": "Kept as revision-bound history. Its Toy Story citation repair is superseded because that story is gone, not because a new incident verdict was made."},
+    {"id": "C001", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "The everyday-percentage statistic is not on the page. No new truth verdict."},
+    {"id": "C002", "disposition": "SUPERSEDED_BY_NARROWER_REMOVAL_CLAIMS", "note": "Shred and the stronger recovery wording are gone. Current FC03022 is the narrower no-Trash claim and is supported."},
+    {"id": "C003", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "The Toy Story incident is not on the page. No replacement story was added."},
+    {"id": "C004", "disposition": "RETAINED_NARROWED_AND_SUPPORTED", "note": "The current sentence is the Ubuntu GNU default preserve-root guard for / and an explicit statement that other directories are not protected."},
+    {"id": "C005", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "Terminal-versus-mouse history is not on the page."},
+    {"id": "C006", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "The 1960s-to-1980s interface history is not on the page."},
+    {"id": "C007", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "The 1984 Macintosh GUI claim is not on the page."},
+    {"id": "C008", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "The ls lineage claim is not on the page."},
+    {"id": "C009", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "The ADM-3A tilde origin is not on the page."},
+    {"id": "C010", "disposition": "REMOVED_FROM_CURRENT_PAGE", "note": "The universal-tilde claim is not on the page. The current tilde wording says many Unix-style shells."}
+  ],
+  "findings": [
+    {"id": "FC03-N1", "severity": "low", "confidence": 0.72, "path": "src/content/docs/prerequisites/zero-to-terminal/module-0.3-first-commands.md", "line": 305, "quote": "If the directory does not exist, the command will fail rather than create the directory for you.", "why": "Optional precision nit, not an acceptance blocker. The seeded claim is supported for a directory destination and for a trailing slash: POSIX cp copies into an existing directory, and a trailing slash requires that directory to exist. The same paragraph also says the slash is not always required. Without the slash, cp menu.txt restaurant when restaurant is absent uses the two-operand file form and creates a file named restaurant rather than failing. The failure sentence is right for the slash form and right that cp does not create the destination directory.", "fix": "Say that restaurant/ fails when that directory is absent, and that omitting the slash can create a file with that name instead. Leave the example command as written.", "status": "open"},
+    {"id": "FC03-N2", "severity": "low", "confidence": 0.86, "path": "src/content/docs/prerequisites/zero-to-terminal/module-0.3-first-commands.md", "line": 411, "quote": "`cat` displays file contents, and `grep \"pasta\"` selects lines containing `pasta`.", "why": "Optional reader-facing citation nit. Support for these sentences is resolved from the supplied POSIX cat, grep, and head pages, and su - is resolved from the Ubuntu su manual plus the lab run. The page Sources list cites Bash, clear, the step-1 verifier, and the file utilities actually linked, but it does not list cat, head, grep, or su. That does not make the claims false and does not withhold scores. Bash does not specify those external utilities.", "fix": "Add the already-snapshotted POSIX cat, head, and grep pages and the Ubuntu su manual to Sources. Opening-shortcut pages for Spotlight and Ctrl+Alt+T are optional additions.", "status": "open"}
+  ],
+  "performed_checks": ["Read the complete current page, the complete review note, and the complete candidate diff. No tools, web fetches, writes, or subagents were used.", "Judged all 39 seeded claims against the supplied manuals, lab files, and hosted-run receipt, including repeated page instances.", "Searched the current page for omitted technical claims beyond the seed.", "Applied the current review contract and quality rubric independently of the structural verifier's quiz mapping and of its failing gates.", "Confirmed the four outcomes are taught, practiced, and assessed, and scored D1-D8 and L1-L5 from current-page quotes.", "Separated this invocation as 1/2 for the post-3767 whole-page audit and 1/2 for the prospective PR stream. Author is OpenAI Codex. Reviewer is xAI Grok 4.7. Historical 2026-05-30 and 2026-10-26 streams were not reset.", "Did not re-run the lab, recompute density, recount pipeline tests, or inspect screenshot pixels."],
+  "supplied_checks": ["Structural verifier at the current page digest: density mean 46.2, median 44.5, short-paragraph rate 3.8 percent, all reported density gates true. body_words_floor_met is false and is diagnostic under the #3744 migration, so it is not a pad-or-fail gate. anti_leak is false because has_47 is true. The pinned lab commit fe6f47c contains 47 between the non-digits f and c, which is what the raw (?<!digit)47(?!digit) pattern matches. forbidden_tokens is empty and has_emoji is false. This is not a clean anti-leak pass and it is not a content defect.", "Page source URLs were supplied as 12/12 HTTP 200. This reviewer did not repeat those requests. A failed GNU fetch remains unknown and is not treated as false; the live page links the supplied Ubuntu manuals instead.", "Pipeline receipt: exit_code 0, fixture_restored true, same page digest. The brief states 176 tests passed; the receipt does not reprint that count, so the integer 176 is not independently attested.", "Primary main build at 835 was supplied as not containing this candidate. Candidate CI is pending and is not treated as run or passed.", "Practice receipt and screenshot identities were supplied and used only as described above."],
+  "limits": ["Scores are accepted because the supplied manuals and lab run resolve the technical claims. FC03-N2 is a reader-facing bibliography omission, not an unresolved support gap.", "No publication, canonical adoption, or per-page budget endorsement is claimed. The standing routine adoption budget remains a later step.", "Invocation budget after this call: one remaining call on the whole-page audit stream and one remaining call on the prospective PR stream. Optional nits do not require that second call.", "This review does not cover issue 3738 or any other held stream."],
+  "publication": {
+    "http": {
+      "observed_at": "2026-11-01T11:13:46.228832+00:00",
+      "url": "https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.3-first-commands/",
+      "status": 200,
+      "html_digest": "sha256:02cd0465d4f79ff54fc3297aa1bcb27730f38b9511a1028dc4fa9efad934c065",
+      "deployment": {
+        "conclusion": "success",
+        "databaseId": 41299991011,
+        "headSha": "37cd7704406a58c99a7c28bfef3e770e90ee3822",
+        "status": "completed",
+        "url": "https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/41299991011"
+      },
+      "checks": {
+        "su - ubuntu": true,
+        "In the linked Ubuntu lab": true,
+        "Ubuntu Desktop": true,
+        "practice-menu-backup.txt": true,
+        "scrollback buffer": true,
+        "head -n 5": true,
+        "A pipe does not wait for a complete output file": true
+      },
+      "removed_text_absent": {
+        "Computers used text-only interfaces from the 1960s": true,
+        "keyboard accident": true,
+        "Toy Story 2": true,
+        "This entire curriculum targets standard Unix": true,
+        "you can usually scroll back in the terminal window": true
+      }
+    },
+    "native": {
+      "observed_at": "2026-11-01T11:13:36.736Z",
+      "url": "https://kube-dojo.github.io/prerequisites/zero-to-terminal/module-0.3-first-commands/",
+      "merge": "37cd7704406a58c99a7c28bfef3e770e90ee3822",
+      "deployment_run": 41299991011,
+      "browser": "Native Chrome",
+      "new_text_observed": true,
+      "interaction_checks": {
+        "quiz1_expanded": true,
+        "quiz7_expanded": true,
+        "diagnostic_expanded": true
+      },
+      "scope": "Actual published text and three disclosures checked; no assertion that every widget was tested; no completion checkbox changed."
+    }
+  }
+}

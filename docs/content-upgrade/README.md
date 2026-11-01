@@ -71,6 +71,31 @@ Every PR states the reviewed base/head, why the changes improve the stated outco
 
 ## Definition of complete
 
+### Scoped publication closeout
+
+After a scoped correction is published, update its entry in the `work` array of
+[`page-reviews.json`](page-reviews.json) in a bounded, reviewed data change. Compute
+`page_digest` as `sha256:` plus the SHA-256 of the exact current lesson bytes;
+confirm those bytes match the deployed content revision. Replace the existing
+work row for that path: duplicate paths and stale digests become `unknown`.
+
+Record a timezone-aware `updated_at`, a summary naming the correction and pending
+whole-page review, and the concrete next action. Link the scoped review or its
+explicit deferral, completed deployment, and published/native-browser evidence.
+Use `awaiting_review` when the published correction awaits final review; this
+work state alone does not assert that a final-review packet is ready to invoke.
+Carry forward the whole-page `review.spent` and `review.ceiling`; preserve unknown
+allowances as `null`, and keep scoped PR review counters separate. A work record
+does not authorize another review invocation.
+
+Preserve canonical `pages` receipts and earlier negative evidence. Compare every
+canonical page result and locale/track counter before and after the work update,
+then verify both deliveries in the actual `http://127.0.0.1:8768/` API and native
+UI. Published corrections, review readiness, and accepted pages remain separate
+delivery claims; a scoped publication must not restamp whole-page acceptance.
+
+### Program completion
+
 - Every current page has a reviewed disposition and traceable evidence; no page is skipped because its heuristic score was high.
 - Every required factual claim has suitable support or is explicitly qualified/removed through review; disputed historical claims remain qualified.
 - Every promised practical outcome has aligned practice and verification; runnable examples have execution receipts for their documented environment or remain visibly incomplete.

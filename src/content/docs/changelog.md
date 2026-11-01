@@ -6,11 +6,13 @@ sidebar:
   label: "What's New"
 ---
 
-## October 2026
+## Recent improvements
 
 Explore recent improvements to practice and troubleshooting:
 
-- **Inspect computer resources before choosing a fix.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) clarifies how to record your system's specs, distinguish RAM from file storage, and check a diagnosis before changing anything.
+- **Choose terminal commands by their effect.** [First Terminal Commands](/prerequisites/zero-to-terminal/module-0.3-first-commands/) practices file operations and pipeline troubleshooting. [Files and Directories](/prerequisites/zero-to-terminal/module-0.4-files-and-directories/) compares whole-file and partial reads, reveals a controlled dotfile, and distinguishes path failures from access failures in an Ubuntu playground.
+
+- **Check computer resources and terminal commands.** [What is a Computer?](/prerequisites/zero-to-terminal/module-0.1-what-is-a-computer/) adds diagnosis hints before you recommend a change. [What is a Terminal?](/prerequisites/zero-to-terminal/module-0.2-what-is-a-terminal/) uses concrete interface choices and asks you to check what command output establishes.
 
 - **Handle Git interruptions and recovery.** Revisit [Worktrees and Stashing](/prerequisites/git-deep-dive/module-5-worktrees-stashing/) to compare ways to set work aside and practice returning to it.
 

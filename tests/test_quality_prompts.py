@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.quality import prompts  # noqa: E402
+from scripts.quality import prompts
 
 
 def test_rewrite_prompt_contains_module_path() -> None:
@@ -59,10 +59,40 @@ def test_structural_prompt_preserves_existing_sources_and_forbids_new() -> None:
     assert "NEW" in out
 
 
-def test_rewrite_prompt_forbids_47_and_emojis() -> None:
+def test_rewrite_prompt_preserves_style_without_banning_arbitrary_numbers() -> None:
     out = prompts.rewrite_prompt(module_path="x.md", module_text="x", teaching_gaps=[])
-    assert "47" in out  # called out as forbidden
+    assert "Do NOT use the number 47" not in out
     assert "emoji" in out.lower()
+
+
+def test_actual_authoring_inputs_share_coverage_and_shortfall_contract(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[1]
+    monkeypatch.setattr(prompts, "_RULES_PATH", root / ".claude/rules/module-quality.md")
+    monkeypatch.setattr(prompts, "_FRAMEWORK_PATH", root / "docs/pedagogical-framework.md")
+    monkeypatch.setattr(prompts, "_RUBRIC_PATH", root / "docs/quality-rubric.md")
+    outputs = [prompts.rewrite_prompt(module_path="x.md", module_text="47 objects", teaching_gaps=[]),
+               prompts.structural_prompt(module_path="x.md", module_text="47 objects", missing_sections=["quiz"]),
+               (root / "scripts/prompts/module-writer.md").read_text()]
+    contradictions = ("exactly 4 facts", "6-8 rows", "6-8 quiz questions", "NO recall questions",
+                      "No recall questions", "Do NOT repeat the number 47", "Do NOT use the number 47",
+                      "Do NOT write quiz questions that test recall")
+    for text in outputs:
+        assert not any(phrase in text for phrase in contradictions)
+        assert "coverage_plan" in text and "shortfall" in text and "docs/citation-seeds" in text
+        assert "#3744" in text and "padding" in text
+    review = prompts.review_prompt(module_path="x.md", module_text="47 objects", writer_agent="codex",
+                                   track="rewrite", original_gaps=[])
+    for text in [*outputs, review]:
+        assert "content line minimums" not in text and "<100 lines" not in text
+        assert "Add missing sections per template" not in text
+
+
+def test_defined_evidence_shortfall_cannot_be_extracted_as_a_publishable_module() -> None:
+    from scripts.quality.extractors import ModuleExtractError, extract_module_markdown
+
+    report = "EVIDENCE_SHORTFALL: Research unavailable\nMissing inputs: source_basis\nNext action: lead supplies plan"
+    with pytest.raises(ModuleExtractError):
+        extract_module_markdown(report)
 
 
 def test_structural_prompt_lists_missing_sections() -> None:
