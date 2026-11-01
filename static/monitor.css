@@ -1,0 +1,52 @@
+:root { color-scheme: dark; }
+body { margin: 0; background: var(--bg, #0a0f1a); color: var(--text, #e5e7eb); font-family: system-ui, sans-serif; }
+.monitor-shell { max-width: 1160px; margin: 0 auto; padding: 38px 24px 72px; }
+.monitor-heading, .section-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.monitor-heading { margin-bottom: 36px; }
+.monitor-heading h1 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1; letter-spacing: -.035em; margin: 0 0 10px; }
+.monitor-heading p, .section-title p, .monitor-note { color: var(--text-secondary, #9ca3af); margin: 6px 0 0; line-height: 1.5; }
+.monitor-heading button { background: var(--surface-1, #1a2332); border: 1px solid #425067; border-radius: 7px; color: inherit; padding: 9px 15px; font: inherit; cursor: pointer; }
+.monitor-shell a { color: var(--accent, #38bdf8); overflow-wrap: anywhere; }
+.monitor-shell :focus-visible { outline: 3px solid var(--accent, #38bdf8); outline-offset: 3px; }
+.monitor-shell h2 { font-size: 1.2rem; margin: 0; letter-spacing: -.01em; }
+.monitor-shell h3 { font-size: 1rem; margin: 25px 0 8px; }
+.monitor-overview { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.monitor-coverage summary { cursor: pointer; font-weight: 650; margin: 24px 0 8px; }
+.section-title { margin-bottom: 16px; }
+.section-title > span { color: var(--text-secondary, #9ca3af); font-size: .85rem; white-space: nowrap; }
+.monitor-coverage, .monitor-work, .monitor-ops section { border-top: 1px solid #374151; padding-top: 22px; margin-top: 30px; }
+.monitor-total { font-size: 1.15rem; font-weight: 650; margin: 4px 0 8px; }
+.track-row { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(150px, 2fr) minmax(155px, auto); align-items: center; gap: 16px; padding: 11px 0; border-bottom: 1px solid #263245; }
+.track-row strong { font-size: .96rem; }
+.track-count { text-align: right; color: var(--text-secondary, #9ca3af); font-size: .9rem; }
+.track-bar { height: 8px; display: flex; overflow: hidden; border-radius: 20px; background: #374151; }
+.track-bar span { height: 100%; }
+.track-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--text-secondary, #9ca3af); font-size: .78rem; margin: 10px 0 5px; }
+.track-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.legend-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+.bar-accepted { background: #4ade80; } .bar-current { background: #38bdf8; } .bar-revision { background: #fbbf24; }
+.bar-stale, .bar-invalid { background: #f87171; } .bar-unreviewed { background: #374151; }
+.work-row, .ops-row { padding: 14px 0; border-bottom: 1px solid #263245; overflow-wrap: anywhere; }
+.work-row p, .ops-row p { margin: 6px 0 0; line-height: 1.45; color: var(--text-secondary, #9ca3af); }
+.work-row .work-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.work-state { border: 1px solid #56667c; border-radius: 5px; padding: 2px 7px; color: #cbd5e1; font-size: .78rem; }
+.work-state.blocked, .work-state.review_failed { color: #fca5a5; border-color: #a45252; }
+.work-state.prepared, .work-state.awaiting_review { color: #fde68a; border-color: #987a35; }
+.work-state.reviewing, .work-state.preparing { color: #a5e4fc; border-color: #4183a5; }
+.work-date, .ops-meta { font-size: .83rem; color: var(--text-secondary, #9ca3af); }
+.monitor-error { color: #fca5a5; padding: 12px 0; }
+.monitor-ops section { margin-top: 26px; }
+.monitor-diagnostics { margin-top: 32px; color: var(--text-secondary, #9ca3af); }
+.monitor-diagnostics summary { cursor: pointer; color: var(--text, #e5e7eb); }
+@media (max-width: 850px) {
+  .monitor-overview { display: flex; flex-direction: column; gap: 0; }
+  .monitor-overview > section { width: 100%; }
+  .monitor-work { order: -1; }
+}
+@media (max-width: 650px) {
+  .monitor-shell { padding: 25px 16px 48px; }
+  .monitor-heading, .section-title { flex-wrap: wrap; }
+  .track-row { grid-template-columns: 1fr auto; gap: 7px 12px; }
+  .track-bar { grid-column: 1 / -1; grid-row: 2; }
+  .track-count { grid-column: 2; grid-row: 1; }
+}

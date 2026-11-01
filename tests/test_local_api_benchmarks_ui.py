@@ -121,7 +121,7 @@ def test_benchmarks_page_disables_missing_stability_report(tmp_path: Path) -> No
 
 
 def test_benchmarks_top_nav_link_appears_on_existing_ui_routes(tmp_path: Path) -> None:
-    for route in ("/operator", "/quality"):
+    for route in ("/operations", "/quality"):
         status, body, content_type = local_api.route_request(tmp_path, route)
 
         assert status == 200
@@ -129,7 +129,7 @@ def test_benchmarks_top_nav_link_appears_on_existing_ui_routes(tmp_path: Path) -
         assert 'href="/benchmarks">Benchmarks</a>' in body
 
 
-def test_homepage_includes_benchmarks_summary_card(tmp_path: Path) -> None:
+def test_homepage_keeps_benchmarks_in_secondary_tools(tmp_path: Path) -> None:
     _seed_benchmark_reports(tmp_path)
 
     status, body, content_type = local_api.route_request(tmp_path, "/")
@@ -138,4 +138,6 @@ def test_homepage_includes_benchmarks_summary_card(tmp_path: Path) -> None:
     assert content_type == "text/html; charset=utf-8"
     assert "Benchmarks" in body
     assert 'href="/benchmarks"' in body
-    assert "View benchmarks &rarr;" in body
+    menu = body.split('<div class="nav-menu">', 1)[1].split('</details>', 1)[0]
+    assert 'href="/benchmarks"' in menu
+    assert 'benchmarks-summary-card' not in body

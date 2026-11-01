@@ -64,12 +64,13 @@ def test_api_artifacts_returns_json_shape(tmp_path: Path) -> None:
 
     assert status == 200
     assert content_type == "application/json; charset=utf-8"
-    assert body["Handoffs"][0]["title"] == "Handoff"
-    assert body["Handoffs"][0]["path"] == "docs/session-state/handoff.md"
-    assert body["Handoffs"][0]["url"] == "/artifacts/docs/session-state/handoff.md"
-    assert body["Handoffs"][0]["format"] == "md"
-    assert isinstance(body["Handoffs"][0]["mtime"], float)
-    assert isinstance(body["Handoffs"][0]["size_bytes"], int)
+    artifact = body["Handoffs (pre-s196 history)"][0]
+    assert artifact["title"] == "Handoff"
+    assert artifact["path"] == "docs/session-state/handoff.md"
+    assert artifact["url"] == "/artifacts/docs/session-state/handoff.md"
+    assert artifact["format"] == "md"
+    assert isinstance(artifact["mtime"], float)
+    assert isinstance(artifact["size_bytes"], int)
 
 
 def test_artifact_html_uses_shell_by_default(tmp_path: Path) -> None:
@@ -165,16 +166,15 @@ def test_artifact_nonexistent_returns_404(tmp_path: Path) -> None:
     assert status == 404
 
 
-def test_home_has_artifacts_and_decisions_cards(tmp_path: Path) -> None:
+def test_home_groups_artifacts_and_decisions_in_tools(tmp_path: Path) -> None:
     status, body, content_type = local_api.route_request(tmp_path, "/")
 
     assert status == 200
     assert "text/html" in content_type
     assert '<a class="navlink" href="/artifacts">Artifacts</a>' in body
-    assert 'class="artifacts-summary-card" href="/artifacts"' in body
-    assert "View artifacts" in body
-    assert 'class="decisions-summary-card" href="/decisions"' in body
-    assert "View decisions" in body
+    menu = body.split('<div class="nav-menu">', 1)[1].split('</details>', 1)[0]
+    assert 'href="/decisions"' in menu and 'href="/artifacts"' in menu
+    assert 'summary-card' not in body
 
 
 def test_schema_documents_research_artifact_deferral() -> None:
