@@ -1,163 +1,970 @@
 {
   "module_key": "prerequisites/zero-to-terminal/module-0.3-first-commands",
   "module_path": "src/content/docs/prerequisites/zero-to-terminal/module-0.3-first-commands.md",
-  "research_run_id": "2026-04-19T14:08:38+00:00-codex-gpt-5.3-codex-spark",
   "schema_version": 2,
+  "research_run_id": "2026-11-01-first-commands-upgrade",
+  "page_digest": "sha256:345b6732b9d9da084981824582222c44ee1f737fdf29560d55c28bdcc9be57f5",
   "claims": [
     {
-      "claim_id": "C001",
-      "claim_text": "The module's 9 commands cover about 80% of everyday terminal work.",
-      "claim_class": "statistic",
-      "span_hint": "section: Why This Module Matters",
-      "disposition": "soften_to_illustration",
-      "proposed_url": null,
-      "proposed_tier": null,
-      "anchor_text": "By the end of this module, you'll know the 9 commands that cover about 80% of everyday terminal work.",
-      "suggested_rewrite": "By the end of this module, you'll know 9 commands that cover a large share of everyday terminal work.",
-      "lesson_point_url": "https://en.wikipedia.org/wiki/Unix_shell",
-      "rationale": "The percentage is a teaching shorthand rather than a stable measurable statistic."
+      "claim_id": "FC03001",
+      "claim_text": "macOS Terminal can be opened using Spotlight or Applications/Utilities.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 43,
+          "quote": "On macOS, press"
+        }
+      ],
+      "source_candidates": [
+        "apple-open-terminal",
+        "APPLE-SPOTLIGHT-KEYS-R2-CONTEXT"
+      ]
     },
     {
-      "claim_id": "C002",
-      "claim_text": "`rm` removes files immediately rather than sending them to a trash can, recovery may still be possible until data is overwritten, and `shred` is used when stronger recovery resistance is needed.",
-      "claim_class": "security_claim",
-      "span_hint": "section: Command 8: `rm` -- \"Throw Away\"",
-      "disposition": "needs_allowlist_expansion",
-      "proposed_url": "https://www.gnu.org/s/coreutils/manual/html_node/rm-invocation.html",
-      "proposed_tier": null,
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "This is a concrete filesystem-recovery claim best backed by the GNU `rm`/`shred` manual, which is off the current allowlist."
+      "claim_id": "FC03002",
+      "claim_text": "Ubuntu Desktop uses Ctrl+Alt+T to open a terminal; other desktops can differ.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 43,
+          "quote": "On Ubuntu Desktop, `Ctrl + Alt + T`"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-command-line-current-R2-CONTEXT"
+      ]
     },
     {
-      "claim_id": "C003",
-      "claim_text": "Pixar nearly lost Toy Story 2 in 1998 after an accidental `rm -r -f *`, lost about 90% of the film files, and recovered because Galyn Susman had a home backup.",
-      "claim_class": "incident",
-      "span_hint": "section: Command 8: `rm` -- \"Throw Away\" (Real-World War Story)",
-      "disposition": "needs_allowlist_expansion",
-      "proposed_url": "https://thenextweb.com/media/2012/05/21/how-pixars-toy-story-2-was-deleted-twice-once-by-technology-and-again-for-its-own-good/",
-      "proposed_tier": null,
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "This is a named production incident and should be cited to the detailed off-list source that recounts the event from Pixar staff."
+      "claim_id": "FC03003",
+      "claim_text": "WSL supplies a Linux environment; native PowerShell command conventions differ.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 45,
+          "quote": "The commands and options in this lesson"
+        }
+      ],
+      "source_candidates": [
+        "11-install-wsl-R2-CONTEXT",
+        "powershell-command-precedence-R2-CONTEXT"
+      ]
+    },
+    {
+      "claim_id": "FC03004",
+      "claim_text": "Interactive prompt contents are configurable; user, host, location and ending symbols can vary.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 56,
+          "quote": "When the shell is ready"
+        },
+        {
+          "line": 62,
+          "quote": "A prompt may include"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics",
+        "05-zsh-prompt-expansion-and-parser-state-markers-R2-CONTEXT"
+      ]
+    },
+    {
+      "claim_id": "FC03005",
+      "claim_text": "Unquoted tilde at the beginning of a shell word expands to the user's home directory in the taught shells.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 178,
+          "quote": "The `~` symbol is a shortcut"
+        },
+        {
+          "line": 217,
+          "quote": "Running `pwd` outputs your home"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics"
+      ]
+    },
+    {
+      "claim_id": "FC03006",
+      "claim_text": "Relative paths are resolved from the current directory, while an absolute path begins at root.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 84,
+          "quote": "The terminal always has a current"
+        },
+        {
+          "line": 156,
+          "quote": "A relative file argument"
+        },
+        {
+          "line": 186,
+          "quote": "An absolute path lets"
+        }
+      ],
+      "source_candidates": [
+        "posix-cd",
+        "ubuntu-command-line-current-R2-CONTEXT"
+      ]
+    },
+    {
+      "claim_id": "FC03007",
+      "claim_text": "pwd prints the current working directory.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 86,
+          "quote": "The first command is `pwd`"
+        },
+        {
+          "line": 510,
+          "quote": "First run `pwd` to print"
+        }
+      ],
+      "source_candidates": [
+        "posix-pwd"
+      ]
+    },
+    {
+      "claim_id": "FC03008",
+      "claim_text": "Plain ls lists non-dot entries in the current directory by default; -a includes dot entries.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 100,
+          "quote": "The second command is `ls`"
+        },
+        {
+          "line": 135,
+          "quote": "The `-a` flag"
+        },
+        {
+          "line": 463,
+          "quote": "An empty-looking directory may contain dotfiles"
+        }
+      ],
+      "source_candidates": [
+        "posix-ls"
+      ]
+    },
+    {
+      "claim_id": "FC03009",
+      "claim_text": "ls -l gives a long listing including permissions, ownership, size and modification time.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 112,
+          "quote": "The long form, `ls -l`"
+        }
+      ],
+      "source_candidates": [
+        "posix-ls"
+      ]
+    },
+    {
+      "claim_id": "FC03010",
+      "claim_text": "cd changes the shell's working directory; .. refers to the parent directory.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 138,
+          "quote": "The third command is `cd`"
+        },
+        {
+          "line": 160,
+          "quote": "The special path `..`"
+        }
+      ],
+      "source_candidates": [
+        "posix-cd",
+        "ubuntu-bash-topics"
+      ]
+    },
+    {
+      "claim_id": "FC03011",
+      "claim_text": "The linked Ubuntu lab has lowercase documents and /tmp directories; its Linux names distinguish case.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 138,
+          "quote": "In the Ubuntu lab, use the existing lowercase"
+        },
+        {
+          "line": 186,
+          "quote": "In the Ubuntu lab, `/tmp`"
+        }
+      ],
+      "source_candidates": [
+        "lab-setup-sh",
+        "EXEC-UBUNTU03",
+        "ubuntu-command-line-current-R2-CONTEXT"
+      ]
+    },
+    {
+      "claim_id": "FC03012",
+      "claim_text": "Ordinary mkdir creates a directory, reports an existing-path error, and does not change the shell's directory.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 238,
+          "quote": "**Continue only if `mkdir` succeeds"
+        },
+        {
+          "line": 251,
+          "quote": "`mkdir` stands for make directory"
+        }
+      ],
+      "source_candidates": [
+        "posix-mkdir",
+        "ubuntu-mkdir"
+      ]
+    },
+    {
+      "claim_id": "FC03013",
+      "claim_text": "mkdir -p creates missing parent directories and accepts an already existing directory path.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 265,
+          "quote": "The `-p` flag makes `mkdir`"
+        },
+        {
+          "line": 465,
+          "quote": "**`mkdir -p` can succeed"
+        },
+        {
+          "line": 504,
+          "quote": "Use `mkdir -p app/frontend"
+        }
+      ],
+      "source_candidates": [
+        "posix-mkdir",
+        "ubuntu-mkdir"
+      ]
+    },
+    {
+      "claim_id": "FC03014",
+      "claim_text": "touch creates an empty file when its target does not exist.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 222,
+          "quote": "`touch` creates an empty file"
+        },
+        {
+          "line": 273,
+          "quote": "`touch` creates an empty file"
+        },
+        {
+          "line": 285,
+          "quote": "If `touch` succeeded on a new name"
+        }
+      ],
+      "source_candidates": [
+        "posix-touch"
+      ]
+    },
+    {
+      "claim_id": "FC03015",
+      "claim_text": "Ordinary touch updates existing target access/modification timestamps without replacing file contents.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 273,
+          "quote": "It also updates timestamps"
+        },
+        {
+          "line": 464,
+          "quote": "**`touch` can change an existing file"
+        }
+      ],
+      "source_candidates": [
+        "posix-touch"
+      ]
+    },
+    {
+      "claim_id": "FC03016",
+      "claim_text": "cp makes another copy while preserving the source; it differs from moving the source.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 287,
+          "quote": "`cp` stands for copy"
+        },
+        {
+          "line": 338,
+          "quote": "Copying a sample leaves"
+        },
+        {
+          "line": 492,
+          "quote": "Use `cp` for the logo"
+        },
+        {
+          "line": 640,
+          "quote": "This step uses `cp`"
+        }
+      ],
+      "source_candidates": [
+        "posix-cp"
+      ]
+    },
+    {
+      "claim_id": "FC03017",
+      "claim_text": "Copying to an existing destination file may overwrite its contents.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 287,
+          "quote": "an existing file may be overwritten"
+        }
+      ],
+      "source_candidates": [
+        "posix-cp"
+      ]
+    },
+    {
+      "claim_id": "FC03018",
+      "claim_text": "A directory destination receives a copied file; a trailing slash requires the destination directory to exist.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 305,
+          "quote": "To copy a file into a folder"
+        }
+      ],
+      "source_candidates": [
+        "posix-cp"
+      ]
+    },
+    {
+      "claim_id": "FC03019",
+      "claim_text": "The Ubuntu copy command accepts -r for copying a directory and its contents recursively.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 311,
+          "quote": "To copy an entire folder"
+        }
+      ],
+      "source_candidates": [
+        "EXEC-UBUNTU03",
+        "ubuntu-command-line-current-R2-CONTEXT",
+        "posix-cp"
+      ]
+    },
+    {
+      "claim_id": "FC03020",
+      "claim_text": "mv moves or renames a path, leaving the file at the new location rather than retaining the old source name.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 317,
+          "quote": "`mv` stands for move"
+        },
+        {
+          "line": 325,
+          "quote": "The file is no longer in the current directory"
+        },
+        {
+          "line": 624,
+          "quote": "The `mv` command changes the file's location"
+        }
+      ],
+      "source_candidates": [
+        "posix-mv"
+      ]
+    },
+    {
+      "claim_id": "FC03021",
+      "claim_text": "mv may overwrite an existing destination.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 319,
+          "quote": "an existing destination can be overwritten"
+        }
+      ],
+      "source_candidates": [
+        "posix-mv"
+      ]
+    },
+    {
+      "claim_id": "FC03022",
+      "claim_text": "Successful ordinary rm removes the named directory entry without a desktop Trash/Undo workflow.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 350,
+          "quote": "Ordinary `rm` removes the named file"
+        },
+        {
+          "line": 359,
+          "quote": "After successful removal"
+        },
+        {
+          "line": 498,
+          "quote": "The terminal does not give you a normal desktop Undo"
+        }
+      ],
+      "source_candidates": [
+        "posix-rm",
+        "ubuntu-rm"
+      ]
+    },
+    {
+      "claim_id": "FC03023",
+      "claim_text": "rm -r recursively removes a directory tree.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 365,
+          "quote": "To delete a folder and everything inside it"
+        },
+        {
+          "line": 522,
+          "quote": "The correct cleanup command is `rm -r"
+        }
+      ],
+      "source_candidates": [
+        "posix-rm",
+        "ubuntu-rm"
+      ]
+    },
+    {
+      "claim_id": "FC03024",
+      "claim_text": "rm -f requests force behavior and suppresses prompts.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 371,
+          "quote": "where `-f` asks for forceful removal"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-rm",
+        "posix-rm"
+      ]
     },
     {
       "claim_id": "C004",
-      "claim_text": "Modern GNU/Linux `rm` normally refuses to operate recursively on `/` because `--preserve-root` is the default, and deleting `/` requires disabling that protection with `--no-preserve-root`.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Command 8: `rm` -- \"Throw Away\" (classic dangerous example)",
-      "disposition": "needs_allowlist_expansion",
-      "proposed_url": "https://www.gnu.org/software/coreutils/manual/coreutils.html",
-      "proposed_tier": null,
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "This is versioned GNU Coreutils behavior and the authoritative source is the GNU manual, which is off-list."
+      "claim_text": "GNU rm in Ubuntu normally refuses recursive root removal because preserve-root is the default; this does not protect every other target.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 373,
+          "quote": "GNU `rm`, as used in the Ubuntu lab"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-rm"
+      ]
     },
     {
-      "claim_id": "C005",
-      "claim_text": "The terminal predates the mouse by decades.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? (bullet 1)",
-      "disposition": "cannot_be_salvaged",
-      "proposed_url": null,
-      "proposed_tier": null,
-      "anchor_text": "**The terminal predates the mouse by decades.**",
-      "suggested_rewrite": "**Command-line interfaces became common long before graphical mouse-and-windows interfaces became mainstream.**",
-      "lesson_point_url": null,
-      "rationale": "As written, the comparison is historically misleading because mice were demonstrated in the 1960s even though GUI use became mainstream later."
+      "claim_id": "FC03025",
+      "claim_text": "clear clears the terminal display, may clear scrollback depending on capabilities, and does not remove practice files.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 379,
+          "quote": "`clear` changes the terminal display"
+        },
+        {
+          "line": 385,
+          "quote": "After a successful `clear`"
+        }
+      ],
+      "source_candidates": [
+        "ncurses-clear",
+        "EXEC-UBUNTU03"
+      ]
     },
     {
-      "claim_id": "C006",
-      "claim_text": "Computers used text-only interfaces from the 1960s until the mid-1980s.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? (bullet 1)",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Command-line_interface",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The cited page directly discusses command-line interfaces emerging in the 1960s and remaining the dominant interface for nearly three decades."
+      "claim_id": "FC03026",
+      "claim_text": "Bash's default Readline Ctrl+L binding clears the screen; command history and output are different.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 385,
+          "quote": "In Bash's default Readline key bindings"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics",
+        "ncurses-clear"
+      ]
     },
     {
-      "claim_id": "C007",
-      "claim_text": "The Apple Macintosh in 1984 popularized the graphical user interface.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? (bullet 1)",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Classic_Mac_OS",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The cited page directly states that the Macintosh operating system is credited with popularizing the GUI and gives the 1984 release date."
+      "claim_id": "FC03027",
+      "claim_text": "A pipe connects the left command's standard output to the right command's standard input.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 389,
+          "quote": "A pipe, written as `|`"
+        },
+        {
+          "line": 426,
+          "quote": "The pipe connects the left command"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics"
+      ]
     },
     {
-      "claim_id": "C008",
-      "claim_text": "`ls` traces back to CTSS as `LISTF` in 1961, the modern `ls` appeared in early Unix in 1971, and the command is now more than 50 years old.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? (bullet 2)",
-      "disposition": "needs_allowlist_expansion",
-      "proposed_url": "https://tldp.org/LDP/LG/issue48/fischer.html",
-      "proposed_tier": null,
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The precise CTSS/LISTF lineage is verifiable, but the detailed historical source is off the current allowlist."
+      "claim_id": "FC03028",
+      "claim_text": "Pipeline commands can run concurrently without waiting for the producer to finish all output.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 426,
+          "quote": "The commands can run concurrently"
+        },
+        {
+          "line": 466,
+          "quote": "**A pipe does not wait for a complete output file"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics"
+      ]
     },
     {
-      "claim_id": "C009",
-      "claim_text": "The use of `~` for the home directory derives from the Lear-Siegler ADM-3A terminal, where the tilde symbol and Home label were on the same key.",
-      "claim_class": "war_story",
-      "span_hint": "section: Did You Know? (bullet 3)",
-      "disposition": "supported",
-      "proposed_url": "https://en.wikipedia.org/wiki/Tilde",
-      "proposed_tier": "general",
-      "anchor_text": null,
-      "suggested_rewrite": null,
-      "lesson_point_url": null,
-      "rationale": "The cited page directly discusses the Unix home-directory shorthand and its ADM-3A origin."
+      "claim_id": "FC03029",
+      "claim_text": "head -n 5 keeps the first five input lines.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 399,
+          "quote": "`head -n 5` keeps only"
+        }
+      ],
+      "source_candidates": [
+        "posix-head",
+        "EXEC-UBUNTU03"
+      ]
     },
     {
-      "claim_id": "C010",
-      "claim_text": "Every terminal in the world uses `~` to mean home.",
-      "claim_class": "vendor_capability",
-      "span_hint": "section: Did You Know? (bullet 3)",
-      "disposition": "cannot_be_salvaged",
-      "proposed_url": null,
-      "proposed_tier": null,
-      "anchor_text": "The convention stuck, and now every terminal in the world uses `~` to mean \"home.\"",
-      "suggested_rewrite": "The convention stuck, and many Unix-like shells now use `~` to mean \"home.\"",
-      "lesson_point_url": null,
-      "rationale": "The universal claim is too broad; the convention applies widely in Unix-like shells, not literally everywhere."
+      "claim_id": "FC03030",
+      "claim_text": "cat sends file contents to standard output.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 411,
+          "quote": "`cat` displays file contents"
+        }
+      ],
+      "source_candidates": [
+        "posix-cat"
+      ]
+    },
+    {
+      "claim_id": "FC03031",
+      "claim_text": "grep with these plain patterns selects matching input lines; no matching lines can produce empty output.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 411,
+          "quote": "`grep \"pasta\"` selects lines"
+        },
+        {
+          "line": 419,
+          "quote": "`grep \"mkdir\"` selects lines"
+        },
+        {
+          "line": 516,
+          "quote": "Empty output from a pipeline often means"
+        }
+      ],
+      "source_candidates": [
+        "posix-grep"
+      ]
+    },
+    {
+      "claim_id": "FC03032",
+      "claim_text": "history displays entries available to the current shell and its history settings, not guaranteed complete output records.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 419,
+          "quote": "`history` shows shell history"
+        },
+        {
+          "line": 426,
+          "quote": "Here, `history` supplies"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics"
+      ]
+    },
+    {
+      "claim_id": "FC03033",
+      "claim_text": "Output redirection with > can overwrite an existing target file.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 401,
+          "quote": "the redirection below can overwrite"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics"
+      ]
+    },
+    {
+      "claim_id": "FC03034",
+      "claim_text": "Unquoted spaces separate shell words; quoting a spaced filename keeps it together.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 224,
+          "quote": "Spaces are allowed in file names"
+        },
+        {
+          "line": 474,
+          "quote": "The shell treats spaces as separators"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-bash-topics",
+        "EXEC-UBUNTU03"
+      ]
+    },
+    {
+      "claim_id": "FC03035",
+      "claim_text": "The linked lab's checks choose Ubuntu home whenever that account exists; root-home answers then do not satisfy them.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 47,
+          "quote": "its task checks look for files"
+        },
+        {
+          "line": 54,
+          "quote": "A file created under `/root`"
+        }
+      ],
+      "source_candidates": [
+        "lab-step1-verify-sh",
+        "lab-step2-verify-sh",
+        "lab-step3-verify-sh",
+        "EXEC-UBUNTU03"
+      ]
+    },
+    {
+      "claim_id": "FC03036",
+      "claim_text": "In the linked lab, su - ubuntu switches to its existing Ubuntu account and home directory.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 47,
+          "quote": "It switches to the existing Ubuntu account"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-su",
+        "EXEC-UBUNTU03"
+      ]
+    },
+    {
+      "claim_id": "FC03037",
+      "claim_text": "The diagnostic relative path fails because kitchen and storage are siblings; moving the existing file repairs its location.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 652,
+          "quote": "The relative path looks for `storage`"
+        },
+        {
+          "line": 674,
+          "quote": "`kitchen` and `storage` are sibling folders"
+        },
+        {
+          "line": 690,
+          "quote": "Both commands achieve the exact same relocation"
+        }
+      ],
+      "source_candidates": [
+        "posix-cd",
+        "posix-mv",
+        "EXEC-UBUNTU03"
+      ]
+    },
+    {
+      "claim_id": "FC03038",
+      "claim_text": "The shell can recall a previous command using the up arrow under the taught interactive defaults.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [
+        {
+          "line": 479,
+          "quote": "Use the up arrow to recall"
+        }
+      ],
+      "source_candidates": [
+        "ubuntu-command-line-current-R2-CONTEXT"
+      ]
     }
   ],
-  "further_reading": [
-    {
-      "url": "https://en.wikipedia.org/wiki/Unix_shell",
-      "title": "Unix shell",
-      "tier": "general",
-      "why_relevant": "Good next-step overview of what a shell is and why commands, prompts, and working directories behave the way they do."
+  "prior_seed": {
+    "sha256": "694e212f66fe8d49264f4b2aa2ffcef34a8f6f8f9330e07931f9a7284796a591",
+    "record": {
+      "module_key": "prerequisites/zero-to-terminal/module-0.3-first-commands",
+      "module_path": "src/content/docs/prerequisites/zero-to-terminal/module-0.3-first-commands.md",
+      "research_run_id": "2026-04-19T14:08:38+00:00-codex-gpt-5.3-codex-spark",
+      "schema_version": 2,
+      "claims": [
+        {
+          "claim_id": "C001",
+          "claim_text": "The module's 9 commands cover about 80% of everyday terminal work.",
+          "claim_class": "statistic",
+          "span_hint": "section: Why This Module Matters",
+          "disposition": "soften_to_illustration",
+          "proposed_url": null,
+          "proposed_tier": null,
+          "anchor_text": "By the end of this module, you'll know the 9 commands that cover about 80% of everyday terminal work.",
+          "suggested_rewrite": "By the end of this module, you'll know 9 commands that cover a large share of everyday terminal work.",
+          "lesson_point_url": "https://en.wikipedia.org/wiki/Unix_shell",
+          "rationale": "The percentage is a teaching shorthand rather than a stable measurable statistic."
+        },
+        {
+          "claim_id": "C002",
+          "claim_text": "`rm` removes files immediately rather than sending them to a trash can, recovery may still be possible until data is overwritten, and `shred` is used when stronger recovery resistance is needed.",
+          "claim_class": "security_claim",
+          "span_hint": "section: Command 8: `rm` -- \"Throw Away\"",
+          "disposition": "needs_allowlist_expansion",
+          "proposed_url": "https://www.gnu.org/s/coreutils/manual/html_node/rm-invocation.html",
+          "proposed_tier": null,
+          "anchor_text": null,
+          "suggested_rewrite": null,
+          "lesson_point_url": null,
+          "rationale": "This is a concrete filesystem-recovery claim best backed by the GNU `rm`/`shred` manual, which is off the current allowlist."
+        },
+        {
+          "claim_id": "C003",
+          "claim_text": "Pixar nearly lost Toy Story 2 in 1998 after an accidental `rm -r -f *`, lost about 90% of the film files, and recovered because Galyn Susman had a home backup.",
+          "claim_class": "incident",
+          "span_hint": "section: Command 8: `rm` -- \"Throw Away\" (Real-World War Story)",
+          "disposition": "needs_allowlist_expansion",
+          "proposed_url": "https://thenextweb.com/media/2012/05/21/how-pixars-toy-story-2-was-deleted-twice-once-by-technology-and-again-for-its-own-good/",
+          "proposed_tier": null,
+          "anchor_text": null,
+          "suggested_rewrite": null,
+          "lesson_point_url": null,
+          "rationale": "This is a named production incident and should be cited to the detailed off-list source that recounts the event from Pixar staff."
+        },
+        {
+          "claim_id": "C004",
+          "claim_text": "Modern GNU/Linux `rm` normally refuses to operate recursively on `/` because `--preserve-root` is the default, and deleting `/` requires disabling that protection with `--no-preserve-root`.",
+          "claim_class": "vendor_capability",
+          "span_hint": "section: Command 8: `rm` -- \"Throw Away\" (classic dangerous example)",
+          "disposition": "needs_allowlist_expansion",
+          "proposed_url": "https://www.gnu.org/software/coreutils/manual/coreutils.html",
+          "proposed_tier": null,
+          "anchor_text": null,
+          "suggested_rewrite": null,
+          "lesson_point_url": null,
+          "rationale": "This is versioned GNU Coreutils behavior and the authoritative source is the GNU manual, which is off-list."
+        },
+        {
+          "claim_id": "C005",
+          "claim_text": "The terminal predates the mouse by decades.",
+          "claim_class": "war_story",
+          "span_hint": "section: Did You Know? (bullet 1)",
+          "disposition": "cannot_be_salvaged",
+          "proposed_url": null,
+          "proposed_tier": null,
+          "anchor_text": "**The terminal predates the mouse by decades.**",
+          "suggested_rewrite": "**Command-line interfaces became common long before graphical mouse-and-windows interfaces became mainstream.**",
+          "lesson_point_url": null,
+          "rationale": "As written, the comparison is historically misleading because mice were demonstrated in the 1960s even though GUI use became mainstream later."
+        },
+        {
+          "claim_id": "C006",
+          "claim_text": "Computers used text-only interfaces from the 1960s until the mid-1980s.",
+          "claim_class": "war_story",
+          "span_hint": "section: Did You Know? (bullet 1)",
+          "disposition": "supported",
+          "proposed_url": "https://en.wikipedia.org/wiki/Command-line_interface",
+          "proposed_tier": "general",
+          "anchor_text": null,
+          "suggested_rewrite": null,
+          "lesson_point_url": null,
+          "rationale": "The cited page directly discusses command-line interfaces emerging in the 1960s and remaining the dominant interface for nearly three decades."
+        },
+        {
+          "claim_id": "C007",
+          "claim_text": "The Apple Macintosh in 1984 popularized the graphical user interface.",
+          "claim_class": "war_story",
+          "span_hint": "section: Did You Know? (bullet 1)",
+          "disposition": "supported",
+          "proposed_url": "https://en.wikipedia.org/wiki/Classic_Mac_OS",
+          "proposed_tier": "general",
+          "anchor_text": null,
+          "suggested_rewrite": null,
+          "lesson_point_url": null,
+          "rationale": "The cited page directly states that the Macintosh operating system is credited with popularizing the GUI and gives the 1984 release date."
+        },
+        {
+          "claim_id": "C008",
+          "claim_text": "`ls` traces back to CTSS as `LISTF` in 1961, the modern `ls` appeared in early Unix in 1971, and the command is now more than 50 years old.",
+          "claim_class": "war_story",
+          "span_hint": "section: Did You Know? (bullet 2)",
+          "disposition": "needs_allowlist_expansion",
+          "proposed_url": "https://tldp.org/LDP/LG/issue48/fischer.html",
+          "proposed_tier": null,
+          "anchor_text": null,
+          "suggested_rewrite": null,
+          "lesson_point_url": null,
+          "rationale": "The precise CTSS/LISTF lineage is verifiable, but the detailed historical source is off the current allowlist."
+        },
+        {
+          "claim_id": "C009",
+          "claim_text": "The use of `~` for the home directory derives from the Lear-Siegler ADM-3A terminal, where the tilde symbol and Home label were on the same key.",
+          "claim_class": "war_story",
+          "span_hint": "section: Did You Know? (bullet 3)",
+          "disposition": "supported",
+          "proposed_url": "https://en.wikipedia.org/wiki/Tilde",
+          "proposed_tier": "general",
+          "anchor_text": null,
+          "suggested_rewrite": null,
+          "lesson_point_url": null,
+          "rationale": "The cited page directly discusses the Unix home-directory shorthand and its ADM-3A origin."
+        },
+        {
+          "claim_id": "C010",
+          "claim_text": "Every terminal in the world uses `~` to mean home.",
+          "claim_class": "vendor_capability",
+          "span_hint": "section: Did You Know? (bullet 3)",
+          "disposition": "cannot_be_salvaged",
+          "proposed_url": null,
+          "proposed_tier": null,
+          "anchor_text": "The convention stuck, and now every terminal in the world uses `~` to mean \"home.\"",
+          "suggested_rewrite": "The convention stuck, and many Unix-like shells now use `~` to mean \"home.\"",
+          "lesson_point_url": null,
+          "rationale": "The universal claim is too broad; the convention applies widely in Unix-like shells, not literally everywhere."
+        }
+      ],
+      "further_reading": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Unix_shell",
+          "title": "Unix shell",
+          "tier": "general",
+          "why_relevant": "Good next-step overview of what a shell is and why commands, prompts, and working directories behave the way they do."
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Ls",
+          "title": "ls",
+          "tier": "general",
+          "why_relevant": "Expands the beginner `ls` examples into the command's history, common flags, and long-format output."
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Pipeline_(Unix)",
+          "title": "Pipeline (Unix)",
+          "tier": "general",
+          "why_relevant": "Covers the pipe operator used in the module's bonus section and explains how commands pass output to one another."
+        }
+      ],
+      "notes": "Quiz items, exercise steps, code blocks, and tables were intentionally excluded per seed rules. The role-based examples in \"When Pros Use These Commands\" were treated as pedagogical illustration rather than citation-requiring factual claims.",
+      "_schema_issues": [
+        "claim[0]:hard_cite_class_cannot_soften:statistic/soften_to_illustration — must be supported, weak_anchor, or needs_allowlist_expansion"
+      ],
+      "rejected_urls": []
     },
-    {
-      "url": "https://en.wikipedia.org/wiki/Ls",
-      "title": "ls",
-      "tier": "general",
-      "why_relevant": "Expands the beginner `ls` examples into the command's history, common flags, and long-format output."
-    },
-    {
-      "url": "https://en.wikipedia.org/wiki/Pipeline_(Unix)",
-      "title": "Pipeline (Unix)",
-      "tier": "general",
-      "why_relevant": "Covers the pipe operator used in the module's bonus section and explains how commands pass output to one another."
-    }
-  ],
-  "notes": "Quiz items, exercise steps, code blocks, and tables were intentionally excluded per seed rules. The role-based examples in \"When Pros Use These Commands\" were treated as pedagogical illustration rather than citation-requiring factual claims.",
-  "_schema_issues": [
-    "claim[0]:hard_cite_class_cannot_soften:statistic/soften_to_illustration — must be supported, weak_anchor, or needs_allowlist_expansion"
-  ],
-  "rejected_urls": []
+    "claim_dispositions": [
+      {
+        "claim_id": "C001",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C002",
+        "disposition": "superseded_by_atomic_current_removal_claims",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C003",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C004",
+        "disposition": "retained_narrowed_as_current_C004",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C005",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C006",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C007",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C008",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C009",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      },
+      {
+        "claim_id": "C010",
+        "disposition": "removed_from_current_page",
+        "reason": "Preserve predecessor evidence; removing an unnecessary claim is not a new source verdict."
+      }
+    ]
+  },
+  "note": "Author proposals only. Independent semantic support, omitted-claim discovery and source eligibility pending; instructions are not universal per-line claims. Schema metadata is neutral; independent support judgments remain in the reviewed catalog.",
+  "further_reading": []
 }
