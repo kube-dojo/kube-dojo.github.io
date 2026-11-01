@@ -258,6 +258,45 @@ def test_grok_search_argv_sets_low_effort() -> None:
     assert cmd[cmd.index("--reasoning-effort") + 1] == "low"
 
 
+def test_grok_review_has_scoped_read_and_web_tools_without_changing_author_route(tmp_path, monkeypatch) -> None:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    import dispatch_smart
+
+    calls = []
+    def run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 0, stdout="review result\n", stderr="")
+
+    monkeypatch.setattr(dispatch_smart.subprocess, "run", run)
+    for task_class in ("review", "draft"):
+        assert dispatch_smart._run_router_agent(agent="grok", prompt="hello", model="grok-4.7",
+                                               cwd=tmp_path, timeout_s=5, task_class=task_class) == (True, "review result", "")
+    review, author = (call[0] for call in calls)
+    assert review[review.index("--sandbox") + 1] == "read-only"
+    assert review[review.index("--permission-mode") + 1] == "dontAsk" and "--no-subagents" in review
+    assert review[review.index("--tools") + 1].split(",") == ["read_file", "grep", "list_dir", "web_search", "web_fetch"]
+    rules = [review[i + 1] for i, value in enumerate(review) if value == "--allow"]
+    assert set(rules) == {f"Read({tmp_path.resolve()})", f"Read({tmp_path.resolve()}/**)",
+                          f"Grep({tmp_path.resolve()})", f"Grep({tmp_path.resolve()}/**)", "WebSearch", "WebFetch"}
+    assert review[review.index("--output-format") + 1] == "plain"
+    assert all(flag not in author for flag in ("--sandbox", "--tools", "--permission-mode", "--allow"))
+    assert calls[0][1]["cwd"] == tmp_path
+
+
+def test_grok_review_dispatch_passes_class_and_reports_effective_mode(tmp_path, monkeypatch):
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    import dispatch_smart
+
+    captured = {}
+    monkeypatch.setattr(dispatch_smart, "_run_router_agent", lambda **kw: (captured.update(kw) or (True, "ok", "")))
+    monkeypatch.setattr(dispatch_smart, "persist_response", lambda *_: dispatch_smart.PRIMARY_REPO / "result")
+    monkeypatch.setattr(dispatch_smart, "append_log", lambda entry: captured.update(log=entry))
+    assert dispatch_smart.fire(agent="grok", task_class="review", prompt="x", mode="danger", model="grok-4.7",
+                               worktree=tmp_path, task_id="test", timeout_s=5) == 0
+    assert captured["task_class"] == "review" and captured["cwd"] == tmp_path
+    assert captured["log"]["mode"] == "read-only"
+
+
 def test_claude_opus_default_fable_advisor_sonnet_routine() -> None:
     sys.path.insert(0, str(SCRIPTS_DIR))
     from dispatch_smart import TASK_CLASSES

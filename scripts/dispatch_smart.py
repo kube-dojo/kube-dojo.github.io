@@ -727,6 +727,8 @@ def _router_command(
     prompt: str,
     *,
     grok_effort: str | None = None,
+    task_class: str | None = None,
+    cwd: Path | None = None,
 ) -> list[str]:
     """Build the subprocess command for direct router CLIs."""
     if agent == "opencode":
@@ -754,6 +756,12 @@ def _router_command(
         ]
     if agent == "grok":
         cmd = [_grok_binary(), "-p", prompt, "-m", model, "--output-format", "plain"]
+        if task_class == "review":
+            root = (cwd or Path.cwd()).resolve()
+            cmd.extend(["--sandbox", "read-only", "--permission-mode", "dontAsk", "--no-subagents",
+                        "--tools", "read_file,grep,list_dir,web_search,web_fetch"])
+            for rule in (f"Read({root})", f"Read({root}/**)", f"Grep({root})", f"Grep({root}/**)", "WebSearch", "WebFetch"):
+                cmd.extend(["--allow", rule])
         if grok_effort:
             cmd.extend(["--reasoning-effort", grok_effort])
         return cmd
@@ -780,9 +788,10 @@ def _run_router_agent(
     cwd: Path,
     timeout_s: int,
     grok_effort: str | None = None,
+    task_class: str | None = None,
 ) -> tuple[bool, str, str]:
     """Invoke a session-less router CLI and return (ok, stdout, stderr)."""
-    cmd = _router_command(agent, model, prompt, grok_effort=grok_effort)
+    cmd = _router_command(agent, model, prompt, grok_effort=grok_effort, task_class=task_class, cwd=cwd)
     stdin_payload = prompt if agent == "opencode" else ""
     if agent == "cursor":
         stdin_payload = ""
@@ -830,6 +839,8 @@ def fire(
 ) -> int:
     if agent == "agy" and task_class in ("review", "search"):
         raise ValueError("Agy read-only route disabled: CLI isolation is unverified (#3746)")
+    if agent == "grok" and task_class == "review":
+        mode = "read-only"
     print(
         f"[smart] agent={agent} task_class={task_class} model={model} "
         f"mode={mode} timeout={timeout_s}s"
@@ -837,7 +848,7 @@ def fire(
     if worktree:
         print(f"[smart] cwd={worktree}")
     print(f"[smart] task_id={task_id}")
-    if agent in {"cursor", "opencode", "grok"}:
+    if agent in {"cursor", "opencode", "grok"} and not (agent == "grok" and task_class == "review"):
         print("[smart] mode is advisory for this router CLI")
 
     started = time.time()
@@ -863,6 +874,7 @@ def fire(
                 cwd=worktree or Path.cwd(),
                 timeout_s=timeout_s,
                 grok_effort=TASK_CLASSES[task_class].grok_reasoning_effort,
+                task_class=task_class,
             )
             session_id = None
         else:
@@ -1005,8 +1017,8 @@ def main() -> int:
         "--mode",
         choices=["read-only", "workspace-write", "danger"],
         help="Override task-class default mode. For opencode, "
-        "grok, and cursor this is advisory; their CLIs "
-        "enforce their own sandbox behavior.",
+        "grok (except review), and cursor this is advisory; their CLIs "
+        "enforce their own sandbox behavior. Grok review uses read-only.",
     )
     p.add_argument(
         "--model",
