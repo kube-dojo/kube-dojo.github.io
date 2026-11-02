@@ -28,9 +28,9 @@ After this module, you will be able to:
 
 Hypothetical scenario: you have just started helping with a small internal app, and someone says, "The site is down." One teammate can open it from their laptop, another sees a browser error, and a third person pastes a screenshot that only says the page was not found. If every one of those reports goes into the same mental bucket, troubleshooting becomes guessing; if you can separate name lookup, network reachability, service ports, and application responses, the same messy report becomes a sequence of checks.
 
-Kubernetes makes this skill more important because it runs many pieces of software across many machines, then asks those pieces to find each other by name. A Pod receives an IP address, a Service gives a stable address and port, DNS maps names to Services, and `kubectl` talks to the API server over a secure port. You do not need to master cluster networking today, but you do need a reliable first model for what it means when one computer talks to another.
+Kubernetes makes this skill useful because workloads need to find each other across machines. Pods have IP addresses, and a normal Service provides a stable cluster IP and port. Cluster DNS can resolve Service names, and `kubectl` contacts the API server over HTTPS. Headless Services use a different DNS pattern. You will learn those details later.
 
-This module gives you that model from the terminal upward. You will learn what a network is, why IP addresses are not the same as ports, why DNS is useful but also a frequent failure point, and how HTTP status codes prove that a request reached an application. Then you will practice with `ping`, `curl`, and `nslookup`, which are ordinary tools that working engineers use when a dashboard is noisy and the fastest path forward is a small, careful test.
+This module builds that model from the terminal upward. You will distinguish IP addresses from ports and use DNS and HTTP responses as evidence. Then you will practice with `ping`, `curl`, and `nslookup`. An HTTP response proves that a responder answered the request, not that the intended application received it.
 
 ---
 
@@ -38,18 +38,20 @@ This module gives you that model from the terminal upward. You will learn what a
 
 A **network** is two or more computers connected so they can exchange information. That definition is deliberately plain because the essential idea is not a special cloud term; it is the same idea whether the computers are your laptop and printer on home Wi-Fi, two servers in a data center rack, or thousands of containers spread across a Kubernetes cluster. The difference is scale, reliability, and the number of systems helping messages move, not the basic goal.
 
-Your home Wi-Fi is a local network, often called a LAN, where nearby devices share a router and can usually talk to one another directly. The internet is a much larger network of networks, where your router, your internet service provider, backbone networks, domain name systems, and destination servers all participate. When you visit `google.com`, your computer is not magically touching a website; it is sending packets through a chain of networking equipment until a server receives the request and sends a response.
+Home Wi-Fi is a local network, often called a LAN. Devices on it may be able to talk to one another, depending on the network's configuration. The internet connects many networks. When you visit a website, packets can pass through several networks before a server sends a response.
 
 Think of a large restaurant chain with an intercom system connecting kitchens. Each kitchen is a computer, each intercom endpoint is a network connection, and the wiring between locations is the network. A cook does not need to know every wire route to ask another kitchen about supplies, but someone responsible for operations needs enough vocabulary to tell the difference between a broken intercom, a wrong extension number, and a kitchen that received the call but cannot fulfill the request.
 
 | Type | What It Is | Example |
 |------|-----------|---------|
-| **Local Network (LAN)** | Computers near each other, connected directly | Your laptop and printer on home Wi-Fi |
+| **Local Network (LAN)** | Devices connected within a local area | Your laptop and printer on home Wi-Fi |
 | **Internet (WAN)** | Computers anywhere in the world, connected through infrastructure | Your laptop talking to a server in Tokyo |
 
 That distinction matters because a command can succeed in one network context and fail in another. Your laptop may reach a printer at home because both devices are on the same LAN, while a friend across town cannot reach that same printer because private home addresses are not routed across the public internet. In Kubernetes, the same pattern appears when one Pod can reach another inside the cluster, but a browser outside the cluster needs a Service, Ingress, LoadBalancer, or other published path.
 
 A practical troubleshooting habit starts here: ask **which network path** you are testing. If you run a command from your laptop, you are testing the path from your laptop. If a Pod inside Kubernetes fails to reach a database, your laptop's success may not prove the Pod's path works. This is why engineers are careful about where they run a test, because the source of the request is part of the evidence.
+
+In this diagram, `203.0.113.55` is a documentation address, not a live public server.
 
 ```text
 Laptop on Wi-Fi       Home router          Internet           Public server
@@ -70,7 +72,7 @@ It proves your local network path to the router works. It does not prove that DN
 
 The goal is not to memorize every network layer today. The goal is to stop flattening every connectivity issue into "the network is broken." Once you can describe the path in pieces, you can use small terminal checks to learn whether the failure is local addressing, DNS name translation, port selection, firewall behavior, or an application response.
 
-There is another habit hidden in this model: describe the expected path before you run the command. If you expect a request to leave your laptop, pass through home Wi-Fi, cross the public internet, resolve a name, and land on an HTTPS service, then each test can confirm or challenge one part of that expectation. Without that path in your head, commands become a pile of output instead of a structured investigation.
+Describe the expected path before you run the command. For example, resolve the name, then expect the request to leave your laptop over Wi-Fi and cross the internet to an HTTPS service. Each test can confirm or challenge one part of that expectation.
 
 The same idea helps when two people report different results. One person may be testing from a corporate VPN, another from a home network, and another from inside a cloud environment. Those are not duplicate tests, because each one starts from a different source and may use different DNS resolvers, routes, and firewall rules. Good troubleshooting does not erase those differences; it names them so the team can compare evidence honestly.
 
@@ -89,24 +91,24 @@ An IP address is easiest to understand as a street address for a computer. If th
 | Concept | Network | Real World |
 |---------|---------|-----------|
 | IP Address | `192.168.1.42` | 123 Main Street |
-| What it does | Identifies one specific computer | Identifies one specific building |
-| Who assigns it | Your router (for local) or your ISP (for internet) | The city planning office |
+| What it does | Identifies a network endpoint | Identifies a building |
+| Who assigns it | Depends on the network configuration | The city planning office |
 
-The first surprise is that not every IP address is meant for the whole internet. Private addresses are reserved for local networks, and routers do not publish them as globally reachable destinations. That reservation is standardized in RFC 1918, which defines private IPv4 ranges that many home networks, offices, and data centers use internally.
+Not every IP address is meant for the whole internet. RFC 1918 reserves these private IPv4 ranges for private networks; their routing information should not be propagated across the public internet.
 
 ```text
-192.168.x.x    (most common for home networks)
-10.x.x.x       (common in offices and data centers)
-172.16-31.x.x  (less common but valid)
+192.168.x.x    (192.168.0.0/16)
+10.x.x.x       (10.0.0.0/8)
+172.16-31.x.x  (172.16.0.0/12)
 ```
 
-Private addresses are like apartment numbers that only make sense inside one building. If you are standing in the lobby, "Apartment 8" may be enough information; if you are across the city, it is not. Similarly, `192.168.1.42` may identify your laptop inside your home, but someone on another network cannot route directly to it without a public address and a router rule that decides where inbound traffic should go.
+Private addresses are like apartment numbers that need a building context. `192.168.1.42` may identify your laptop within your home network, but the same address can be used elsewhere. A remote user needs an appropriate route, such as a VPN, or a public endpoint that forwards traffic to the laptop.
 
-Public addresses are different because they are routable on the internet. Your home router usually has one public address assigned by your internet service provider, while the devices behind the router use private addresses. The router uses Network Address Translation, or NAT, to keep track of outbound connections so many local devices can share one public address without each device needing a globally unique IPv4 address.
+Public addresses can be routed on the internet, but an address alone does not guarantee reachability. In a common home setup, devices use private IPv4 addresses and a router uses Network Address Translation (NAT) to share a public IPv4 address for outbound connections. Other arrangements, including provider-side NAT, are possible.
 
-This is one reason "it works on my machine" can be true and still not help another person. A service bound to your laptop's private address may work from another device on the same Wi-Fi network, but it will not automatically work for a colleague elsewhere. The colleague needs a route to a public endpoint, and your router must know whether to forward that traffic to your laptop, which is rarely the default for good security reasons.
+A service bound to your laptop's private address may work from another device on the same Wi-Fi network without being reachable by a colleague elsewhere. The colleague needs an authorized route to it, such as a VPN or a public endpoint configured to forward the traffic.
 
-On macOS, the local Wi-Fi address is often available through `ipconfig`. Your interface name may differ if you are using Ethernet, a VPN, or a newer network setup, but `en0` is common enough for a first check on many Macs.
+The command outputs in this section are synthetic examples, not recordings from this host. On macOS, the local Wi-Fi address is often available through `ipconfig`. Your interface name may differ if you are using Ethernet, a VPN, or a newer network setup.
 
 ```bash
 $ ipconfig getifaddr en0
@@ -131,7 +133,7 @@ Pause and predict: before running `curl -s ifconfig.me`, what output do you expe
 
 <details><summary>Check your prediction</summary>
 
-Most home and office networks return a different public address because NAT sits between your machine and the rest of the internet. If you are on a cloud VM or a specialized network, the answer can differ, which is exactly why evidence beats assumption.
+In a network using NAT, the external service may see a different address from your private IPv4 address. A directly assigned public address or IPv6 connection can produce a different result.
 
 </details>
 
@@ -158,7 +160,7 @@ Port:        80               = Apartment 80
 Full address: 192.168.1.42:80 = 123 Main Street, Apt 80
 ```
 
-The colon in `192.168.1.42:80` is not decoration. It separates the host address from the service port, and many tools use this combined form when you need to be precise. A request to the right IP on the wrong port is like arriving at the right building and knocking on a storage closet instead of the help desk.
+The colon in `192.168.1.42:80` separates the IPv4 address from the service port. Many tools use this combined form. A request to the right IP on the wrong port is like arriving at the right building and knocking on a storage closet instead of the help desk. The transport protocol also matters: TCP and UDP have separate port spaces.
 
 | Port | Service | What It Does |
 |------|---------|-------------|
@@ -172,7 +174,7 @@ Ports also explain why a host can be reachable while an application is unavailab
 
 Hypothetical scenario: an internal dashboard was moved to a new VM, and someone copied the old hostname but forgot that the application now listens on port 8080 behind a reverse proxy. Basic ping checks succeed, and the server is not down, yet browsers fail when they try the default HTTPS path. The fix is not to reboot the network; the fix is to verify which process is listening on which port, then update the route or proxy configuration.
 
-In Kubernetes, ports appear everywhere. Containers expose container ports, Services accept traffic on service ports, Services forward to target ports, and the API server commonly listens securely on port 6443. Those names will make more sense later, but the core idea is already here: Kubernetes does a lot of careful port mapping so callers do not need to know every container's changing details.
+In Kubernetes, a Service can accept traffic on one port and forward it to a target port on selected Pods. The API server commonly listens securely on port 6443. These mappings let clients use a Service without knowing each Pod's address.
 
 ```text
 Browser request         Kubernetes Service          Pod container
@@ -184,11 +186,11 @@ Pause and predict: imagine a server at `203.0.113.55` replies to `ping`, but `cu
 
 <details><summary>Check your prediction</summary>
 
-It proved some network path to the host responds to ICMP traffic. It did not prove that an HTTP service is listening on port 80 or that a firewall allows traffic on that port.
+It showed that ICMP echo replies arrived for that probe. It did not prove that an HTTP service is listening on port 80 or that a firewall allows traffic on that port.
 
 </details>
 
-A port can be closed, filtered, or open. Closed usually means the destination actively rejects the connection because no service is listening there. Filtered usually means a firewall drops or blocks the attempt, causing a timeout. Open means something accepted the connection, though the application may still return an error if the request is malformed or the backend is unhealthy.
+A TCP connection can be accepted, refused, or time out. A refusal might mean no process is listening or that a device actively rejected the attempt. A timeout can have several causes, including filtering. Even an accepted connection does not prove that the application is healthy.
 
 For a beginner, the operational rule is simple: name the address and the port together when you discuss a network dependency. Saying "the database is at `10.0.5.50`" is incomplete if the application expects PostgreSQL on `5432`. Saying "the database is at `10.0.5.50:5432`" gives a teammate enough information to test the same destination and avoid accidentally checking a web port instead.
 
@@ -200,7 +202,7 @@ Kubernetes makes this concrete through Service port mapping. A Service can recei
 
 ## DNS: Turning Names into Addresses
 
-Humans are good at remembering names like `google.com`, `github.com`, and `api.example.com`. Computers route traffic using addresses, not friendly names, so there must be a translation step between what you type and where packets go. The **Domain Name System**, or DNS, performs that translation by answering questions such as "which IP address should I use for this name?"
+Humans use names like `google.com`, `github.com`, and `api.example.com`. Computers route traffic using addresses, so a client needs an address before it can connect. The **Domain Name System**, or DNS, can answer questions such as "which IP address should I use for this name?" The addresses in the following diagrams are illustrative and may not be current answers.
 
 ```text
 You type:    google.com
@@ -216,7 +218,7 @@ DNS is often described as the phone book of the internet. The analogy works beca
 | You need to memorize numbers | You just remember names |
 | Like the old days of memorizing phone numbers | Like your phone's contact list |
 
-A simplified DNS lookup has several steps. Your computer may first check local cache, then ask a configured resolver, often provided by your router, internet provider, operating system, or corporate network. That resolver may already know the answer from cache, or it may ask other DNS systems until it gets the address record it needs.
+A simplified DNS lookup has several steps. Your computer may first check a local cache, then ask a configured resolver. That resolver may have a cached answer or ask other DNS servers. The following example assumes the router forwards DNS queries; other networks use different resolvers.
 
 ```text
 1. You type: google.com
@@ -228,13 +230,13 @@ A simplified DNS lookup has several steps. Your computer may first check local c
 
 This usually happens so quickly that it feels invisible. That invisibility is convenient until DNS is the broken piece, because the visible symptom may look like a website or API outage. A browser saying it cannot find a server may mean the application is down, but it may also mean the name never resolved to an address.
 
-The most useful beginner distinction is between a **name failure** and an **address failure**. If `nslookup api.example.com` says the name does not exist, you have not yet tested the server; you have tested the phone book entry. If `curl http://203.0.113.100` works against the known IP, you have evidence that the server and network path can work while DNS still needs repair.
+The useful distinction is between a **name failure** and an **address failure**. If `nslookup api.example.com` says the name does not exist, you have tested a resolver's answer, not the application. If `curl http://203.0.113.100` receives a response, an HTTP responder answered that direct-IP request. It might be a different virtual host or intermediary, so it does not establish that the named application works.
 
 DNS also involves caching. Records include a time-to-live, often abbreviated TTL, that tells resolvers how long they may keep an answer before checking again. A low TTL can make planned migrations easier because clients refresh sooner, while a high TTL can reduce lookup load but make stale answers linger after an address changes.
 
 This is why DNS changes can feel inconsistent during cutovers. One user may receive the new address because their resolver refreshed, while another user keeps seeing the old address until cache expires. That does not require an invented outage story; it follows directly from how caching works, and it is one reason engineers plan DNS migrations instead of flipping records casually.
 
-Kubernetes uses DNS heavily inside a cluster. Services receive names that workloads can use instead of chasing individual Pod IPs, and cluster DNS returns the current service address. You will learn the details later, but the beginner lesson transfers cleanly: a name is not the destination itself; it is a lookup that should produce a destination.
+In Kubernetes 1.35, cluster DNS can give a normal Service a name that resolves to its cluster IP. A headless Service can instead resolve to backing endpoint addresses; its configuration determines the DNS records. A name is a lookup, not the destination itself.
 
 DNS failures are especially tempting to misread because they happen before the visible application conversation. If a name does not resolve, there may be no HTTP status code, no server log entry, and no useful application metric, because the request never found a destination. That absence of downstream evidence is itself useful. It tells you to inspect the name, resolver, zone, search suffix, or cache before changing the application.
 
@@ -244,7 +246,7 @@ The reverse mistake is also common: a name resolves successfully, so someone ass
 
 ## HTTP Responses and Terminal Evidence
 
-Once DNS produces an address and a port accepts a connection, the application protocol still has to respond. For web traffic, that protocol is HTTP or HTTPS, and the response includes a status code. A status code is not a vague mood indicator; it is structured evidence about what happened after the server received the request.
+For web traffic, HTTP responses include a status code. An HTTP responder might be the intended server or an intermediary, so the status is evidence about the response to this request, not proof of which backend handled it.
 
 `200 OK` reports a successful request. `404 Not Found` means the responding server did not find a current representation or is unwilling to disclose one; it does not prove the resource is absent. `500 Internal Server Error` reports an unexpected server condition. These responses establish an HTTP exchange, not the health of every backend or the identity of the intended destination.
 
@@ -254,7 +256,7 @@ Once DNS produces an address and a port accepts a connection, the application pr
 | 404 | Not found or not disclosed | "That dish is not available on this menu." |
 | 500 | Server error - something broke on their end | "The kitchen is on fire." |
 
-The restaurant analogy is helpful if you keep the sequence straight. DNS is finding the restaurant address, the IP route is traveling to the restaurant, the port is choosing the correct counter, and HTTP is the conversation after you arrive. If the kitchen says the dish is not on the menu, your taxi route was not the problem.
+In the restaurant analogy, DNS finds an address, the IP route gets you there, the port selects a counter, and HTTP is the conversation. A response means someone answered; it does not prove you reached the intended kitchen.
 
 Visiting a website is like sending a letter with several pieces of addressing information. You start with a name, look up the numeric destination, choose the service door, send the request, and wait for a response. Each step can fail in a different way, and each failure should change what you test next.
 
@@ -280,7 +282,7 @@ Visiting a website is like sending a letter with several pieces of addressing in
 
 The commands in this module give you evidence at different points in that chain. `nslookup` checks whether a name becomes an address. `ping` can show whether a host responds to ICMP probes, though not every host allows them. `curl` tests web protocols and can show response headers, status codes, redirects, and raw content.
 
-`ping` sends small diagnostic messages and waits for replies. It is like knocking on a door to see whether anyone responds, but it is not the same as asking the web application for a page. Many systems intentionally ignore ping traffic, so a failed ping is a clue, not a final verdict.
+`ping` sends ICMP echo requests and waits for replies. It is like knocking on a door to see whether anyone responds, but it is not the same as asking the web application for a page. A failed ping is a clue, not a final verdict. The following outputs are synthetic examples, not live captures.
 
 ```bash
 $ ping -c 4 google.com
@@ -318,7 +320,7 @@ Content-Type: text/html; charset=UTF-8
 ...
 ```
 
-`nslookup` asks DNS to resolve a name manually. The exact output varies by operating system and resolver, but the shape is consistent: you see which DNS server answered and which address or addresses it returned. If a name fails here, fix the name or DNS record before blaming the web app.
+`nslookup` asks a DNS server about a name. In the example below, the first address is the DNS server queried; the address under `Name` is the answer. Output varies by system and query result. If a lookup fails, investigate the name and resolver before changing a record or blaming the web app.
 
 ```bash
 $ nslookup google.com
@@ -336,11 +338,11 @@ Pause and predict: a user reports that `api.example.com` is down, but you know t
 
 <details><summary>Check your prediction</summary>
 
-Checking DNS first tells you whether the name maps to an address; checking `curl` against the known IP can separate DNS trouble from application trouble. The right sequence depends on the symptom, but the habit is the same: isolate one layer at a time.
+Checking DNS first shows the queried resolver's answer. A direct-IP HTTP response shows that a responder answered that request, but it may be an intermediary or a different virtual host. The right sequence depends on the symptom; compare each result with the expected endpoint.
 
 </details>
 
-There is a useful way to read command output under pressure: translate it into a sentence beginning with "this proves." `nslookup` returning an address proves the resolver has some mapping for the name. `ping` replies prove ICMP traffic received responses from a host or network endpoint. `curl -I` returning `200 OK` proves an HTTP server answered that request successfully. Each proof is narrow, and that narrowness is the point.
+Translate command output into a narrow observation. `nslookup` returning an address shows that the queried DNS server supplied an answer for that name. `ping` replies show that ICMP echo responses arrived. `curl -I` returning `200 OK` shows that an HTTP responder reported success for that request.
 
 The opposite sentence is just as important: "this does not prove." A DNS answer does not prove the web app is healthy. Ping replies do not prove HTTPS works. A `404` does not prove routing is broken. A `500` does not prove the customer typed the wrong URL. Beginners often want one command that declares the whole system healthy or unhealthy, but real troubleshooting is usually a chain of smaller, honest claims.
 
@@ -383,11 +385,11 @@ Use deeper tools when the first checks narrow the problem but do not explain it.
 | Host may be unreachable | `ping -c 4` | Whether ICMP replies arrive | Test the actual application port |
 | Website or API misbehaves | `curl -I` | HTTP status and headers | Inspect app logs, proxy logs, or routes |
 | Local and public addresses differ | `curl -s ifconfig.me` | What public address the internet sees | Review NAT, firewall, or load balancer rules |
-| Kubernetes API is unreachable | Full `kubectl` command output | Whether the client can reach the API server | Check cluster endpoint, credentials, and port 6443 |
+| Kubernetes API is unreachable | Full `kubectl` command output | What error the client reports | Check the configured endpoint and credentials; 6443 is a common API server port |
 
-For Kubernetes 1.35 and later, keep the same logic in mind when reading cluster documentation. A Service name depends on DNS, a Service port depends on port mapping, and `kubectl` depends on reaching the API server endpoint with the right credentials. Networking problems in Kubernetes can become complex, but they are still easier to approach when you preserve the distinction between name, address, port, and protocol response.
+For Kubernetes 1.35, apply the same logic to cluster documentation. Service names use cluster DNS, Service ports can map to Pod target ports, and `kubectl` needs the API server endpoint and appropriate credentials. Keep name, address, port, and protocol response distinct.
 
-The alternative to this layered approach is usually tool hopping. Someone opens a cloud console, changes a security rule, restarts a deployment, flushes DNS, and reruns a browser test, all without knowing which layer changed the result. That may occasionally stumble into a fix, but it leaves the team with no explanation and no confidence. A short sequence of terminal checks is slower by seconds and faster by hours because it preserves cause and effect.
+Changing several things at once makes it difficult to tell which change affected the result. Record each test and change so the next person can follow the evidence.
 
 Use the deeper alternatives when the first evidence points there. If DNS resolves to the expected address and `curl` returns a `500`, application logs are a better next stop than more DNS commands. If the address and port time out from one network but work from another, firewall or routing evidence matters more than code changes. The beginner tools do not solve every issue; they tell you where a sharper tool belongs.
 
@@ -397,8 +399,8 @@ Keep this decision framework in your notes as a small checklist, not as a script
 
 ## Did You Know?
 
-1. **DNS replaced a hand-maintained host list.** Before DNS became standard in 1983, early internet hosts relied on a centrally distributed `HOSTS.TXT` file; as the network grew, that single-file approach stopped scaling. DNS was introduced in 1983, and the familiar hierarchical design most systems use today was documented in 1987 (RFC 1034).
-2. **IPv4 has about 4.3 billion possible addresses.** That once sounded enormous, but the public internet, mobile devices, cloud platforms, and always-connected systems made address sharing and IPv6 adoption necessary.
+1. **DNS replaced a host list.** RFC 1034 describes how the centrally maintained `HOSTS.TXT` approach became harder to manage as the network grew. DNS specifications appeared in 1983; RFC 1034 documented its concepts in 1987.
+2. **IPv4 has about 4.3 billion possible addresses.** Its 32-bit address space contains 2³² possible values, including addresses reserved for special purposes.
 3. **Ports have a standardized registry.** RFC 6335 describes how service names and port numbers are managed, which is why familiar services such as HTTP, HTTPS, DNS, and SSH have widely recognized default ports.
 4. **Kubernetes has its own default API port.** The Kubernetes API server commonly uses secure port 6443, so beginner port reasoning applies directly when `kubectl` cannot reach a cluster.
 
@@ -409,7 +411,7 @@ Keep this decision framework in your notes as a small checklist, not as a script
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
 | Forgetting `-c` with ping | On Linux and macOS, `ping` often keeps running until interrupted | Use `ping -c 4 host.example` or press **Ctrl+C** to stop a long-running probe |
-| Pinging a site that blocks ICMP | Many servers and firewalls drop diagnostic ping traffic while allowing web traffic | Treat ping failure as a clue, then test the real service with `curl -I` |
+| Pinging a site that blocks ICMP | A server or firewall may drop ping traffic while allowing web traffic | Treat ping failure as a clue, then test the real service with `curl -I` |
 | Confusing IP address and port | Both appear near each other in connection strings, so beginners merge them mentally | Say the full destination as `address:port`, such as `192.168.1.42:80` |
 | Treating a private IP as publicly reachable | Addresses like `192.168.x.x` work inside a local network, not across the internet | Use a public endpoint, VPN, tunnel, or explicit router forwarding when remote access is intended |
 | Forgetting the URL scheme with curl | `curl example.com` may not test the same protocol path as a browser using HTTPS | Be explicit with `curl http://example.com` or `curl https://example.com` |
@@ -423,25 +425,25 @@ Keep this decision framework in your notes as a small checklist, not as a script
 
 <details><summary>Question 1: Your friend says their new laptop's address is `192.168.1.42` and asks you to connect to it from your house. You try, but it fails. Based on the type of address provided, why did this not work?</summary>
 
-`192.168.1.42` is a private IPv4 address, so it is meaningful only inside the local network where it was assigned. Your house and your friend's house are separate networks, and the public internet will not route directly to that private address. To make the laptop reachable remotely, your friend would need a public endpoint such as a VPN, tunnel, cloud host, or router forwarding rule that maps public traffic to the laptop. This diagnoses an address scope problem, not proof that the laptop itself is broken.
+`192.168.1.42` is a private IPv4 address and is not globally reachable through the public internet. Separate private networks can be connected by an appropriate route, such as a VPN, or through a public endpoint configured to forward traffic. The failed attempt alone does not prove the laptop is broken.
 
 </details>
 
 <details><summary>Question 2: You can successfully run `ping 203.0.113.55` and receive replies, but `curl http://203.0.113.55` times out. What layer is most likely still failing?</summary>
 
-The ping result suggests that at least one network path to the host responds to ICMP traffic, but it does not prove a web service is available. `curl http://203.0.113.55` attempts HTTP on port 80, so the remaining failure is likely at the port, firewall, or web server layer. The host may be online while no process listens on port 80, or a firewall may allow ping while dropping HTTP. The next check should focus on the intended application port and service configuration.
+The ping result shows echo replies arrived; it does not prove a web service is available. `curl http://203.0.113.55` attempts HTTP on port 80, but the timeout does not identify its cause. A firewall or a service problem are possibilities. Check the intended endpoint, application port, and path before changing configuration.
 
 </details>
 
 <details><summary>Question 3: A user cannot access `api.example.com`. `nslookup api.example.com` says the name cannot be resolved, but `curl http://203.0.113.100` returns `200 OK`. What should you diagnose first?</summary>
 
-The evidence points first to DNS resolution. The direct IP request proves that the server can respond over HTTP, so the application and at least one network path are working. The failed name lookup means clients cannot translate `api.example.com` into the address they need before connecting. You should inspect the DNS record, DNS zone, recent changes, and cache behavior before changing application code.
+The queried resolver could not resolve the name. The direct-IP response shows an HTTP responder reported success for that request; it may be a different virtual host or intermediary and does not establish that the named application works. Check the resolver's answer and compare it with the expected DNS records and endpoint.
 
 </details>
 
 <details><summary>Question 4: A customer says the website is down. You run `curl -I https://example.com` and receive `500 Internal Server Error`. Is the first suspect DNS, the customer's internet, or the server-side application path?</summary>
 
-The first suspect is the server-side application path. A `500` response means DNS resolved, the network connection reached the server or gateway, and the HTTP request was processed far enough for the server to return an error status. That does not guarantee every customer path is perfect, but it does show this test reached the application side. The next evidence should come from application logs, upstream dependency checks, or gateway logs rather than DNS records.
+An HTTP responder reported an unexpected condition for this request. It could be a gateway or another intermediary, so the response alone does not prove that the intended application was reached or that DNS selected the expected endpoint. Compare the destination with the expected endpoint and inspect gateway and application logs.
 
 </details>
 
@@ -453,13 +455,13 @@ The conclusion treated ping as a complete application health check. The HTTPS re
 
 <details><summary>Question 6: An application should connect to a database at `10.0.5.50:5432`, but the logs say `Connection refused to 10.0.5.50 on port 80`. What is the most likely configuration error?</summary>
 
-The application is using the correct host address but the wrong port. Port 80 is the conventional HTTP port, while the expected database endpoint in the scenario is port 5432. A connection refused error often means the destination rejected the attempt because no service is listening on that port. Fix the connection string or environment configuration so the application targets `10.0.5.50:5432`.
+The logged attempt uses the expected address but the wrong port. Port 80 is the conventional HTTP port, while the scenario specifies port 5432 for the database. A refusal can result from a missing listener or an active rejection. Check the connection configuration and verify the intended database endpoint before changing it.
 
 </details>
 
 <details><summary>Question 7: Your team launched `promo.company.com`, but `nslookup promo.company.com` returns `NXDOMAIN`. The lead engineer says the server is running at `198.51.100.22`. What system needs attention?</summary>
 
-The DNS records for the domain need attention. `NXDOMAIN` means the requested name does not exist in DNS from the resolver's point of view, so clients cannot discover the server address by using the hostname. The server may be healthy at `198.51.100.22`, but the public name has no usable mapping yet. Create or correct the DNS record, then account for TTL and resolver cache timing.
+The queried resolver reported that the name does not exist. Check the spelling, resolver and authoritative DNS records before changing them; a cached or resolver-specific answer does not establish what every client sees. The response says nothing about the health of the server at `198.51.100.22`.
 
 </details>
 
@@ -524,11 +526,11 @@ $ hostname -I
 
 <details><summary>Solution notes</summary>
 
-Write down the local address and label it as local, not public. If you see multiple addresses, you may have multiple network interfaces, a VPN, or container networking on the machine. For this exercise, identify the address associated with your normal internet connection.
+Write down the address and determine whether it is private or public. If you see multiple addresses, you may have multiple network interfaces, a VPN, or container networking on the machine. For this exercise, identify the address associated with your normal internet connection.
 
 </details>
 
-4. **Discover your public IP address.** Use `curl` in silent mode to fetch the page at `ifconfig.me`. Compare this result with your local address and explain why they are usually different on a home or office network.
+4. **Discover your public IP address.** Use `curl` in silent mode to fetch the page at `ifconfig.me`. Compare this result with your local address and consider how NAT, a proxy, or the address family can affect the comparison.
 
 ```bash
 $ curl -s ifconfig.me
@@ -572,7 +574,7 @@ $ curl -I example.com
 
 <details><summary>Solution notes</summary>
 
-A `200 OK` status means the request reached a server that returned the requested resource successfully. If you see a redirect status instead, that is still useful HTTP evidence; it means the server responded with instructions to use a different location.
+A `200 OK` status means the responder reports success for the request. With `-I`, the request is HEAD and returns headers rather than the resource body. A redirect is also HTTP evidence; inspect its headers for the next location.
 
 </details>
 
@@ -597,13 +599,13 @@ $ cat my-first-webpage.html
 
 <details><summary>Solution notes</summary>
 
-This step connects terminal networking with file redirection. The command writes the HTTP response body into a local file, and `cat` confirms that the file contains HTML. If the file is empty, rerun the command without `-s` or inspect the exit status and network response.
+This step connects terminal networking with file redirection. The command writes the response body into a local file, and `cat` displays what was received. It might be HTML, a redirect, or an error response. If the file is empty, rerun the command without `-s` or inspect the exit status and network response.
 
 </details>
 
 ### Diagnostic Challenge: Four Network Incidents, No Recipe
 
-The cookbook tasks above guided you through exact arguments. Real problems arrive as ambiguous reports and output. For each frozen transcript below, distinguish the observed symptom from possible causes, identify which layers deserve investigation, and choose a justified next check. State what remains unknown; do not invent a single failing device, layer, or configuration merely because the challenge asks for a diagnosis. Write down your reasoning before each reveal.
+The cookbook tasks above guided you through exact arguments. The four transcripts below are synthetic examples, not captures of real incidents. For each, distinguish the observed symptom from possible causes, identify which layers deserve investigation, and choose a justified next check. State what remains unknown; do not invent a single failing device, layer, or configuration. Write down your reasoning before each reveal.
 
 ```text
 $ nslookup api.example.com
@@ -626,7 +628,7 @@ Date: Thu, 17 Sep 2026 11:20:00 GMT
 
 **Evidence:** The queried DNS resolver reported `NXDOMAIN`, while the direct-IP HTTP request received `200`. Investigate the name and resolver response, but do not call the API fully healthy: an IP request can reach a different virtual host, and one response does not verify every application function or the intended name mapping.
 
-**Next Check or Action:** Verify the DNS zone configuration, registrar, or authoritative name server to ensure an `A` record points `api.example.com` to `203.0.113.100`, and check whether recent DNS record edits have propagated or expired according to their TTL. Do not restart the server or application.
+**Next Check or Action:** Verify the intended endpoint and compare the resolver's answer with the authoritative DNS zone and recent changes. Check cache behavior before changing a record; the direct-IP response alone does not prove that address is the correct target for the name.
 
 </details>
 
@@ -701,7 +703,7 @@ PING 10.0.5.50 (10.0.5.50): 56 data bytes
 
 </details>
 
-Mastering these four diagnostic patterns ensures that you do not jump to premature conclusions when faced with a broken network path. In Kubernetes and cloud infrastructure, the same four failure modes reappear constantly: a Pod cannot resolve a Service name (DNS), a network policy blocks cross-namespace traffic (reachability), a Service selects a container port that is not listening (port mismatch), or an Ingress routes to a path that does not exist in the backend application (HTTP 404). By gathering disciplined evidence before changing code or configuration, you will diagnose issues faster and avoid creating new outages.
+The same questions apply in Kubernetes: check a Service name, the path from a Pod, and the Service's target port. An HTTP response still needs interpretation in context. Record what each check shows before changing configuration.
 
 ### Success Criteria
 
@@ -715,7 +717,7 @@ You have completed this exercise when you can explain the evidence from each com
 - [ ] Identify `200 OK` and `404 Not Found` as different HTTP responses.
 - [ ] Save a web page to a file and read that file from the terminal.
 - [ ] Explain whether each command tested DNS, address reachability, a port, or HTTP behavior.
-- [ ] Diagnose unguided network incidents by identifying whether DNS, reachability, port configuration, or application HTTP routing failed.
+- [ ] Explain what each diagnostic transcript shows, what remains uncertain, and what to check next.
 - [ ] Explain how Kubernetes Service names, Pod IPs, and API server port 6443 map to DNS, address, port, and protocol response.
 
 ---
@@ -723,17 +725,23 @@ You have completed this exercise when you can explain the evidence from each com
 ## Sources
 
 - [RFC 1918: Address Allocation for Private Internets](https://www.rfc-editor.org/rfc/rfc1918)
+- [RFC 3022: Traditional IP Network Address Translator](https://www.rfc-editor.org/rfc/rfc3022)
+- [RFC 5737: IPv4 Address Blocks Reserved for Documentation](https://www.rfc-editor.org/rfc/rfc5737)
 - [RFC 6335: Service Name and Transport Protocol Port Number Registry Procedures](https://www.rfc-editor.org/rfc/rfc6335)
-- [Kubernetes API Access Control](https://kubernetes.io/docs/reference/access-authn-authz/controlling-access/)
+- [Kubernetes 1.35: Service](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/)
+- [Kubernetes 1.35: DNS for Services and Pods](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+- [Kubernetes 1.35: Pods](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/)
 - [RFC 1034: Domain Names - Concepts and Facilities](https://www.rfc-editor.org/rfc/rfc1034)
+- [RFC 1035: Domain Names - Implementation and Specification](https://www.rfc-editor.org/rfc/rfc1035)
 - [RFC 883: Domain Names - Implementation and Specification](https://www.rfc-editor.org/rfc/rfc883)
 - [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110)
-- [Kubernetes Ports and Protocols](https://kubernetes.io/docs/reference/ports-and-protocols/)
+- [Kubernetes 1.35: Ports and Protocols](https://v1-35.docs.kubernetes.io/docs/reference/networking/ports-and-protocols/)
 - [RFC 8200: Internet Protocol, Version 6 Specification](https://www.rfc-editor.org/rfc/rfc8200)
 - [RFC 9293: Transmission Control Protocol](https://www.rfc-editor.org/rfc/rfc9293)
 - [RFC 768: User Datagram Protocol](https://www.rfc-editor.org/rfc/rfc768)
 - [IANA Service Name and Transport Protocol Port Number Registry](https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml)
 - [curl command line tool manual](https://curl.se/docs/manpage.html)
+- [Linux ping manual](https://man7.org/linux/man-pages/man8/ping.8.html)
 
 ## Next Module
 
