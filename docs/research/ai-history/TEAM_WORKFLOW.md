@@ -11,7 +11,7 @@ Honesty over output is the highest rule. Expansion must come from verified evide
 - Human editor: sets ambition and book-level direction, resolves material scope or taste disagreements, and spot-reads within available time. Record the material actually read and any decisions; never infer a whole-chapter read or a human verdict.
 - GPT-6.1 Sol: owns the verified factual and conceptual spine, chapter contract, evidence boundaries and author-side semantic check of the prose and its qualifiers.
 - GPT-6.1 Terra: writes and revises clear prose within the verified spine and anchored capacity plan.
-- Claude Opus 5.5 editor: reads a run of chapters together and marks requested changes without rewriting prose.
+- Claude Opus 5.5 editor: reads a run of chapters together and marks requested changes without rewriting prose. It is not the human editor; where this document says "the editor" without "Opus", it means the human editor.
 - Claude Haiku 5.5: scouts candidate sources for requested additions; it does not write the contract, spine or prose.
 - Claude Opus 5.5: independently challenges eligible OpenAI-authored work, using separate fresh contexts for the mandatory source-fidelity and prose-quality judgments. Both contexts require the relevant source material, contract and exact prose revision.
 
@@ -125,9 +125,9 @@ The verifier's length diagnostics do not reject a chapter by themselves. Evidenc
 
 ### 5a. Editorial pass
 
-Before independent review, an Opus 5.5 editor reads a run of chapters together and reads the house style sheet below. It first marks cuts for padding, repetition, duplication across chapters and off-topic background. Each cut identifies the passage and explains why the learner loses nothing a stated outcome needs; never cut the only explanation, example or step for an outcome. Each requested addition identifies the outcome it serves. The editor marks requests and never rewrites: Claude-authored prose would make the material mixed-family and ineligible for Opus review. Terra executes the requests. Refer scope and taste questions to the human editor as short decisions with options.
+Before independent review, an Opus 5.5 editor reads a run of chapters together and reads the house style sheet below. It first marks cuts for padding, repetition, duplication across chapters and off-topic background. Each cut identifies the passage and explains why the learner loses nothing a stated outcome needs; never cut the only explanation, example or step for an outcome. Each requested addition identifies the outcome it serves. The Opus editor marks requests and never rewrites: Claude-authored prose would make the material mixed-family and ineligible for Opus review. Terra executes the requests. Refer scope and taste questions to the human editor as short decisions with options.
 
-For each requested addition, Haiku 5.5 scouts candidate sources with a quote, locator and date. Sol confirms only the shortlist and records it in the contract or spine. Drop and record an addition with no confirmed source. Haiku writes neither contract, spine nor prose. The strict source rule still applies to Terra's revision; Sol checks the revised prose as author QA before review.
+For each requested addition, Haiku 5.5 scouts candidate sources with a quote, locator and date. Sol confirms only the shortlist and records it in the contract or spine. Drop and record an addition with no confirmed source. Haiku writes neither contract, spine nor prose. The strict source rule still applies to Terra's revision. Before review, Sol repeats the step 5 author-side check on the revised prose, including a new material-claim inventory bound to that exact revision.
 
 This pass is not a review of record and does not consume the whole-page review counter: it requests changes rather than judging the final revision. Sol's check remains author QA; the independent source-fidelity and prose-quality reviews below remain required and use their existing counter.
 
