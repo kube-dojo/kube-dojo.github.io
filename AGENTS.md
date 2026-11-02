@@ -95,6 +95,10 @@ below. After they pass, repeat or broaden them only for new changes, failures,
 or unresolved risks. Do not weaken assertions, disable lint rules, add empty
 skips, or hide missing imports to obtain a pass.
 
+For markdown-only content changes the required PR CI job "Astro build (render +
+schema)" is the build gate; do not run a local full-site build. Run one locally
+only for code, configuration, schema or Astro-layer changes, one at a time, and
+not while the machine is under load. When you do, note that
 `npm run build` also runs from a `.worktrees/*` checkout inside the primary
 checkout's directory tree (kube-dojo PR #3781): worktrees have no dependency
 install of their own (a build leaves only a `node_modules/.astro` cache), and
@@ -117,7 +121,7 @@ prompts. Its guard is `scripts/ops/smoketest_ab_codex_danger.sh`.
 
 - [ ] `.venv/bin/ruff check` clean on every Python file you changed
 - [ ] `.venv/bin/python scripts/test_pipeline.py` — 0 new failures (2 pre-existing `check_failures` tests + 1 `TestStatusFourStage` order flake are acceptable until their dedicated cleanup lands)
-- [ ] `npm run build` passes if you touched content under `src/content/docs/` or Astro config (skip for pure-Python-script changes)
+- [ ] Build: markdown-only content changes rely on the required CI job "Astro build (render + schema)" (no local full-site build); for code, config, schema or Astro-layer changes, `npm run build` passes locally (one build at a time, not on a loaded machine)
 - [ ] No `sys.executable` anywhere — always `.venv/bin/python` explicitly
 - [ ] No `@pytest.mark.skip` with empty `pass` bodies, no double-skip decorators
 - [ ] Assertions not weakened (no `is True` → `isinstance(..., bool)`)

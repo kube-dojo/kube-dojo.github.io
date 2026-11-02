@@ -80,6 +80,8 @@ npx astro dev              # dev server with hot reload
 npx astro preview          # preview built site
 ```
 
+Build gate: for markdown-only content PRs the required CI job "Astro build (render + schema)" is the gate — do not run a local full-site build; build locally only for code, config, schema or Astro-layer changes, one at a time, never on a loaded machine.
+
 ## Key Files
 
 | File | Purpose |
@@ -122,7 +124,7 @@ src/content/docs/          # English content (648 files)
 
 - Branch: `main`
 - Commits: `feat:`, `docs:`, `fix:` prefixes with `#N` issue refs
-- Build before push (0 warnings)
+- Build gate: CI "Astro build (render + schema)" for markdown-only PRs; local build (0 warnings) only for code/config/schema/Astro changes
 - Never push without verifying
 
 ## Links

@@ -241,7 +241,7 @@ elif [ "${SESSION_HANDOFF_AGENT:-}" = "claude-infra" ]; then
 Load-bearing discipline (do NOT violate):
   - Branch in .worktrees/ — NEVER branch/switch in the primary dir; never push direct to main.
   - PR + cross-family adversarial review before every merge.
-  - Lint per edit, test per phase; \`npm run build\` must be 0 errors before push.
+  - Lint per edit, test per phase; markdown-only PRs use the CI job \"Astro build (render + schema)\" as the build gate (no local full build); build locally only for code/config/schema/Astro changes, one at a time, not on a loaded machine.
 
 $INFRA_LEAD
 

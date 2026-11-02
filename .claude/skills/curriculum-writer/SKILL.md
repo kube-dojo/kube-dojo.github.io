@@ -37,6 +37,6 @@ Read [module-templates.md](module-templates.md) when drafting a new module or re
 
 ## Validation and references
 
-Run `.venv/bin/python scripts/quality/verify_module.py <path>`. Test executable examples in an appropriate isolated environment; report unavailable dependencies rather than implying a run. Follow repository rules for `npm run build` (zero warnings) and `.venv/bin/python scripts/check_site_health.py` (zero errors), including the primary-checkout build constraint.
+Run `.venv/bin/python scripts/quality/verify_module.py <path>`. Test executable examples in an appropriate isolated environment; report unavailable dependencies rather than implying a run. Run `.venv/bin/python scripts/check_site_health.py` (zero errors). For markdown-only content the required CI job "Astro build (render + schema)" is the build gate; do not run a local full-site build.
 
 Read repository-root `docs/pedagogical-framework.md` for pedagogical detail and `scripts/prompts/module-writer.md` for the standard writing prompt when relevant. The lead owns cross-family review and publication under current repository policy; this skill does not authorize dispatch, PR creation, or merge.

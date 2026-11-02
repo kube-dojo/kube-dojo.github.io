@@ -68,7 +68,7 @@ Full ritual: [`scripts/prompts/cold-start.md`](../../../scripts/prompts/cold-sta
 
 ### Before pushing
 - Branch + worktree + PR + rebase-merge. **Never** `git checkout -b` in primary repo dir ([[feedback_never_branch_in_primary_dir]], [[feedback_no_direct_push_to_main]]).
-- Build green (`npm run build`, ~38s, 0 warnings).
+- Build gate: markdown-only content PRs rely on the required CI job "Astro build (render + schema)" (no local full-site build); run `npm run build` locally only for code/config/schema/Astro changes, one at a time, not on a loaded machine.
 - For `.github/workflows/**` changes: `uvx zizmor --offline --strict-collection .github/` ([[.claude/rules/github-actions-security]]).
 
 ## Agent roster — activity matrix (2026-06-04)

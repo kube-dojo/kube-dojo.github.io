@@ -148,7 +148,7 @@ npx astro dev      # local dev server with hot reload
 **How to contribute:**
 - Open an issue to discuss before large PRs.
 - Follow the existing module structure.
-- Test all commands and YAML before submitting, and run `npm run build` (0 errors) before opening a PR.
+- Test all commands and YAML before submitting. For markdown-only content PRs the required CI job "Astro build (render + schema)" is the build gate, so no local full-site build is needed; run `npm run build` locally only for code, configuration, schema or Astro-layer changes.
 
 ---
 
