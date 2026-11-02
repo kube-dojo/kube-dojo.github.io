@@ -79,3 +79,25 @@ def test_nonstandard_or_too_deep_sidecar_json_is_malformed(tmp_path, monkeypatch
         monkeypatch.setattr(verify_module.json, "loads", lambda *a, **k: (_ for _ in ()).throw(RecursionError()))
     monkeypatch.setattr(verify_module, "REPO_ROOT", tmp_path)
     assert verify_module._declared_body_budget(module)["status"] == "malformed"
+
+
+@pytest.mark.parametrize(
+    "sidecar",
+    ['{"body_words_min": true}', '{"body_words_min": "3000"}', '{"body_words_min": 3000.5}', '{"body_words_min": 0}',
+     '{"body_words_min": -1}', '{"body_words_min": Infinity}', '{"other": 1}', "[3000]", "not json"],
+)
+def test_malformed_sidecar_is_reported_and_never_creates_acceptance(tmp_path, monkeypatch, sidecar) -> None:
+    def run(root, text: str | None) -> dict[str, object]:
+        module = _make_module(root / "src/content/docs/c1/module.md")
+        if text is not None:
+            budget = root / ".pipeline" / "budgets" / f"{_module_slug_for_budgets(root, module)}.json"
+            budget.parent.mkdir(parents=True)
+            budget.write_text(text, encoding="utf-8")
+        monkeypatch.setattr(verify_module, "REPO_ROOT", root)
+        return verify_module.verify(module, skip_source_check=True, max_workers=1)
+
+    baseline, result = run(tmp_path / "base", None), run(tmp_path / "bad", sidecar)
+    assert result["declared_body_budget"]["status"] == "malformed"
+    assert any("budget sidecar ignored as malformed" in item for item in result["diagnostics"])
+    for key in ("gates", "passed", "tier", "tier_reasons"):
+        assert result[key] == baseline[key]

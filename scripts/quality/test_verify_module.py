@@ -263,6 +263,110 @@ def test_short_choppy_module_has_no_length_or_density_gate() -> None:
     assert not {"sources_min_10", "structure_did_you_know_4", "structure_common_mistakes_6_8"} & gates.keys()
 
 
+_CONCISE_MODULE = """---
+title: "Module 1.1: Probe"
+slug: k8s/demo/module-1.1-probe
+sidebar:
+  order: 1
+---
+> **Complexity**: `[QUICK]`
+>
+> **Time to Complete**: 15 minutes
+>
+> **Prerequisites**: None
+
+---
+
+## What You'll Be Able to Do
+
+After this module you will be able to:
+- **Explain** how a Deployment reconciles replicas against pods.
+- **Debug** a Deployment whose replicas never become ready.
+
+## Why This Module Matters
+
+Operators who cannot reason about reconciliation guess at fixes instead of reading the controller's state.
+
+## How Reconciliation Works
+
+A Deployment declares a desired replica count, and its controller compares that count with the observed pods. When they differ the controller creates or deletes pods until they match, which explains why deleting a pod only produces a replacement.
+
+## Debugging Unready Replicas
+
+When replicas never become ready, read the pod events first, because the scheduler and kubelet record why a pod is pending or failing.
+
+## Did You Know?
+
+The controller never edits pods in place; it replaces them.
+
+## Common Mistakes
+
+| Mistake | Cause | Fix |
+|---|---|---|
+| Deleting pods to scale | Misreading desired state | Edit the Deployment |
+
+## Quiz
+
+**1. Why does deleting a pod create a new one?**
+
+<details>
+<summary>Answer</summary>
+
+The Deployment controller reconciles observed pods toward the declared replica count.
+
+</details>
+
+## Hands-On Exercise
+
+- [ ] Create a Deployment with three replicas.
+- [ ] Delete one pod and watch the replacement.
+
+## Next Module
+
+Continue to [Module 1.2](module-1.2-next/).
+"""
+_FILLER = (
+    "A Deployment declares a desired replica count, and its controller compares that count with the "
+    "observed pods, which is the same point restated once more without adding anything new.\n\n"
+)
+
+
+def _verify_text(tmp_path: Path, name: str, text: str) -> dict[str, object]:
+    module = tmp_path / f"{name}.md"
+    module.write_text(text, encoding="utf-8")
+    return verify_module.verify(module, skip_source_check=True, max_workers=1)
+
+
+def test_concise_supported_module_is_not_rejected_for_length(tmp_path: Path) -> None:
+    result = _verify_text(tmp_path, "concise", _CONCISE_MODULE)
+
+    assert result["metrics"]["body_words"] < 1000
+    assert (result["passed"], result["tier"], result["tier_reasons"]) == (True, "T0", [])
+    assert result["declared_body_budget"] == {"status": "none"}
+    assert not any(key.startswith(("density_", "body_words", "sentence_length")) for key in result["gates"])
+
+
+def test_padding_cannot_gain_acceptance_signals_from_length(tmp_path: Path) -> None:
+    marker = "## Debugging Unready Replicas"
+    padded_text = _CONCISE_MODULE.replace(marker, _FILLER * 400 + marker)
+    uncovered = _CONCISE_MODULE.replace(
+        "**Debug** a Deployment whose replicas never become ready.",
+        "**Configure** quota admission webhooks for tenant namespaces.",
+    )
+    short, padded = (_verify_text(tmp_path, n, t) for n, t in (("short", _CONCISE_MODULE), ("padded", padded_text)))
+    uncovered_short = _verify_text(tmp_path, "uncovered", uncovered)
+    uncovered_padded = _verify_text(tmp_path, "uncovered_padded", uncovered.replace(marker, _FILLER * 400 + marker))
+
+    # Padding adds thousands of reported words but moves no gate, verdict or tier.
+    assert padded["metrics"]["body_words"] > 10 * short["metrics"]["body_words"]
+    assert (padded["gates"], padded["passed"], padded["tier"]) == (short["gates"], short["passed"], short["tier"])
+    # An uncovered outcome is rejected at any length, and padding does not change that.
+    for result in (uncovered_short, uncovered_padded):
+        assert result["gates"]["outcomes_aligned"] is False
+        assert (result["passed"], result["tier"]) == (False, "T3")
+    assert uncovered_padded["gates"] == uncovered_short["gates"]
+
+
 def test_max_consecutive_short_run_edge_case() -> None:
     two_short = verify_module.density_metrics(
         "one two three.\n\nfour five six.\n\n"
