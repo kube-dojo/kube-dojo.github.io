@@ -64,7 +64,7 @@ removal, mark the worktree registry record `archived`.
 | **Create** | `git fetch origin && git worktree add -b codex/<name> .worktrees/<name> origin/main` |
 | **One concern** | One worktree ≈ one PR / one packet. Do not pile unrelated epics into one tree. |
 | **Cap** | Honor the epic’s worktree/disk cap; quote it from the issue. Before fan-out: `git worktree list` + `df -h`; assess eligible closeout under the hygiene policy. |
-| **Build exception** | `npm run build` / Astro validation runs from the **primary** checkout against the **intended revision** (worktree `node_modules` layout is shallow). Fetch/test that revision; do not pretend a primary build validates unmerged worktree files still only on disk. |
+| **Build exception** | Markdown-only content PRs: the required CI job "Astro build (render + schema)" is the build gate; no local full-site build. For code/config/schema/Astro changes, one build at a time, not on a loaded machine, `npm run build` / Astro validation runs from the **primary** checkout against the **intended revision** (worktree `node_modules` layout is shallow). Fetch/test that revision; do not pretend a primary build validates unmerged worktree files still only on disk. |
 | **Danger / dispatch** | `dispatch_smart` danger-mode and authors/reviewers run **in** the worktree path. |
 | **Closeout** | READY requires that packet’s worktree **removed** and branch deleted locally+remotely (see **C** below). |
 
@@ -82,8 +82,9 @@ primary to a clean `main` (preserve unrelated pre-existing dirty files).
 2. Scope limits honored (owned paths, LOC/file budget, no unrelated edits,
    no cloud/book unless the issue says so).
 3. Required **local** proof done when the change is user-visible
-   (`verify_module`, scenario tests, primary-checkout `npm run build` when
-   content/Astro touched). Unrun labs stay `unknown`, never claimed `pass`.
+   (`verify_module`, scenario tests; primary-checkout `npm run build` only when
+   code/config/schema/Astro touched — markdown-only content relies on the CI
+   job "Astro build (render + schema)"). Unrun labs stay `unknown`, never claimed `pass`.
 4. Dual-repo: if the packet spans site + `kubedojo-labs`, **both** sides meet
    their criteria or an explicit residual issue exists for the other repo.
 5. EN-only work does **not** close a bilingual/UK obligation; do not
@@ -364,7 +365,9 @@ Never treat `gh pr merge --auto` as a substitute for CF. Blocking CI red →
 never `--admin`. A driver merges **its own lane's** PR after CF+CI; flag
 another lane's PR rather than merging it.
 
-`npm run build` for content/Astro changes runs from the **primary checkout**
+Markdown-only content PRs need no local full-site build (the required CI job
+"Astro build (render + schema)" gates them). `npm run build` for code, config,
+schema or Astro changes runs one at a time, not on a loaded machine, from the **primary checkout**
 against the intended revision — not inside `.worktrees/` (symlink
 `node_modules` is one level too shallow).
 
@@ -386,7 +389,7 @@ READY/COMPLETED until A–D are done. Then take the next open child.
 
 | Kind | Driver owns? |
 | --- | --- |
-| Local proof (API smoke, `npm run build`, scenario `test-scenario.sh`) | **Yes** |
+| Local proof (API smoke, `npm run build` for code/config/schema/Astro changes only, scenario `test-scenario.sh`) | **Yes** |
 | Billable cloud / AWS / GCP / Azure provisioning | **Only on present-tense operator GO** |
 | Killercoda **hosted interactive** smoke | Record as residual unless platform access exists |
 | Production Pages cutover | CI deploy after merge; do not claim prod HA |

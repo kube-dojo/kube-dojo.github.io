@@ -45,10 +45,12 @@ work to the default lane and vice versa.
   primary dir. (`.claude/hooks/block-branch-create-in-primary.sh` enforces this.)
 - **Never push direct to `main`.** PR + rebase-merge is the floor.
 - **Cross-family adversarial review before every merge** (`docs/review-protocol.md`).
-- **Lint per edit, test per phase, build before push.** Python: `.venv/bin/ruff
+- **Lint per edit, test per phase, build per the CI build-gate rule.** Python: `.venv/bin/ruff
   check <file>`. TS/JS: `npx tsc --noEmit` + `npx eslint <file> --quiet`. Run the
-  relevant `scripts/quality/test_*.sh` after a logical phase. `npm run build` must
-  be 0 errors before any push (pipe the log to a file; never Read raw build logs).
+  relevant `scripts/quality/test_*.sh` after a logical phase. For code, config,
+  schema or Astro-layer changes `npm run build` passes before push (one build at a
+  time, not on a loaded machine; pipe the log to a file, never Read raw build
+  logs); markdown-only PRs rely on the CI job "Astro build (render + schema)".
 - **GitHub Actions security** (`.claude/rules/github-actions-security.md`): every
   `uses:` SHA-pinned with a version comment; `persist-credentials: false`; job-
   scoped permissions; run `uvx zizmor --offline --strict-collection .github/`.

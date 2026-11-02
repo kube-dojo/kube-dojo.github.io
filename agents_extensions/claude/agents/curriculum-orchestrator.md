@@ -48,8 +48,10 @@ queue ownership). Then orient via `bash scripts/cold-start.sh` and drive the que
   primary dir; never push direct to `main`.
 - **PR + rebase-merge is the floor.** Cross-family adversarial review before
   every merge (`docs/review-protocol.md`).
-- **Build before push.** `npm run build` must be 0 errors (pipe the log to a
-  file; never Read raw build logs).
+- **CI is the build gate.** For markdown-only content PRs the required CI job
+  "Astro build (render + schema)" gates the build; do not run a local full-site
+  build. Build locally only for code/config/schema/Astro changes, one at a time,
+  not on a loaded machine (pipe the log to a file; never Read raw build logs).
 - **Orchestrate, don't inline-write modules.** Dispatch authors/reviewers for
   content/code; reserve your context for routing and synthesis.
 
