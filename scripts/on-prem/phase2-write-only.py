@@ -205,8 +205,8 @@ Required sections in this order:
 - All version numbers, API names, helm chart values, and CRD field paths must be
   current. If you are unsure, prefer "current" framing rather than naming a specific
   version that might be wrong.
-- Length target: 4000-8000 words for the full module. Long enough to have real depth,
-  short enough that the reader can finish in one sitting.
+- Cover the learning outcomes fully, cut padding and repetition, and explain what the
+  learner needs. Do not write to a word count.
 - Use Starlight callout syntax for important notes: `:::note`, `:::caution`, `:::tip`.
 
 Output ONLY the module markdown. Start with `---`. No preamble.
