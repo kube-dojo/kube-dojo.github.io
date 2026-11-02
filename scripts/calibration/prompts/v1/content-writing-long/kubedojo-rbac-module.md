@@ -1,4 +1,4 @@
-Write a 5000-word KubeDojo module on Kubernetes RBAC.
+Write a KubeDojo module on Kubernetes RBAC that explains the concepts and operator decisions, with worked examples and checks for learner practice.
 
 Constraints:
 

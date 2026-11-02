@@ -177,9 +177,9 @@ def route_one(slug: str) -> None:
 
     Route rules (post-#388):
 
-    * Density numbers are diagnostics only (#3744): the both-tails
-      ``attention`` flags are recorded on the route for the reviewer and
-      never choose the track. The audit score and missing sections do.
+    * Density numbers are diagnostics only (#3744): both-tails
+      ``attention`` flags are recorded on the route and never choose the
+      track. The reviewer receives flags for the module under review.
     * If audit score ≥ 4.0 AND no missing structural sections →
       ``CITATION_CLEANUP_ONLY`` (citation pass still runs — everything goes
       through verify).
@@ -227,9 +227,8 @@ def route_one(slug: str) -> None:
     # score-≥4-with-clean-structure paths keeps the queue scoped to
     # actual writer work.
     if needs_writer:
-        # set_banner=False — banners are committed by ``triage --apply``
-        # in their own user-visible PR; mutating frontmatter here would
-        # dirty primary and break merge_one's pre-flight check.
+        # Avoid mutating primary frontmatter and breaking merge_one's
+        # pre-flight check. Triage is a read-only scan.
         queue.ensure_queued(slug, module_path, set_banner=False)
 
     with state.state_lease(slug) as lease:
@@ -899,6 +898,12 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             _fail_and_cleanup(st, f"review: module missing at {module_file}")
             return
         module_text = module_file.read_text(encoding="utf-8")
+        density_attention = None
+        if module_text.strip():
+            try:
+                density_attention = {"module": density.evaluate_text(module_text).attention()}
+            except Exception:
+                pass  # Density is diagnostic and must not interrupt review.
 
         prompt = review_prompt(
             module_path=module_rel,
@@ -906,6 +911,7 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             writer_agent=st["writer"],
             track=track,
             original_gaps=build_audit_context(st.get("audit")),
+            density_attention=density_attention,
         )
 
         try:

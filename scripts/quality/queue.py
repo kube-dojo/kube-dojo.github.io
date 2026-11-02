@@ -213,14 +213,10 @@ def ensure_queued(
     Routes the writer per :func:`route_writer` if no queue doc exists yet,
     or returns the existing one (writer assignment is sticky across calls).
 
-    When ``set_banner=True`` (the default — used by the ``triage --apply``
-    CLI subcommand), also sets ``revision_pending: true`` on the module's
-    frontmatter so the Starlight banner renders for learners during the
-    queue lifetime. The pipeline's :mod:`stages.route_one` passes
-    ``set_banner=False`` because banner placement is a one-shot triage
-    decision committed in its own PR — mutating frontmatter inside
-    ``route_one`` would dirty the primary checkout and break
-    ``merge_one``'s pre-flight check.
+    When ``set_banner=True`` (the default), also sets ``revision_pending:
+    true`` in frontmatter. No production caller currently uses that default;
+    tests exercise it. ``stages.route_one`` passes ``set_banner=False`` to
+    avoid dirtying the primary checkout and breaking merge pre-flight checks.
     """
     with state_lease(slug):
         state = load_state(slug)

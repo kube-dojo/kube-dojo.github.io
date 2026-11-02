@@ -564,6 +564,8 @@ def test_reviewer_reads_module_from_worktree_not_primary(fake_repo, monkeypatch)
 
     stages.write_one(slug, timeout=10)
     stages.citation_verify_one(slug)
+    module_file = stages._module_path_in_worktree(slug, "src/content/docs/k8s/cka/module-1.1-pods.md")
+    expected_flags = stages.density.evaluate_text(module_file.read_text()).attention()
     stages.review_one(slug, timeout=10)
 
     assert captured_review_prompt, "reviewer was never invoked"
@@ -573,6 +575,8 @@ def test_reviewer_reads_module_from_worktree_not_primary(fake_repo, monkeypatch)
     # guard: the NEW text must be in the reviewer prompt.
     assert "Rewritten pedagogically sound content" in prompt
     assert "Original content about pods" not in prompt
+    assert not expected_flags
+    assert "## Density attention" not in prompt
 
 
 # ---- REVIEW_CHANGES retry loop (Codex must-fix #4) -------------------
