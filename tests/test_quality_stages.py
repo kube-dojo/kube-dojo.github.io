@@ -2021,6 +2021,37 @@ F.
     assert any(flag_fragment in f for f in st["route"]["density"]["attention"])
 
 
+def test_density_alone_never_enqueues_a_rewrite_or_sets_revision_pending(
+    fake_repo, monkeypatch, capsys,
+):
+    """The triage scan reports density as reviewer-attention flags and
+    mutates nothing (#3744): no state file, no queue doc, no live
+    ``revision_pending`` banner, even for a module far outside the short tail
+    and even for a caller that still passes the retired ``apply`` option."""
+    from scripts.quality import density as _density
+    monkeypatch.setattr(
+        _density, "evaluate_text",
+        lambda _text: _density.DensityMetrics(
+            prose_words=300, textual_words=320, nonblank_lines=60,
+            total_paragraphs=60, prose_paragraphs=60,
+            w_per_line=5.0, w_per_para=5.0,
+        ),
+    )
+    module = pipeline.iter_all_modules()[0]
+    before = module.read_text(encoding="utf-8")
+
+    rc = pipeline.cmd_triage(
+        argparse.Namespace(only=None, min_prose=10, verbose=True, apply=True)
+    )
+
+    assert rc == 0
+    assert module.read_text(encoding="utf-8") == before
+    assert "revision_pending" not in before
+    assert state.load_state(state.slug_for(module)) is None
+    out = capsys.readouterr().out
+    assert "wpp 5.00 < 18" in out  # reported as a flag, nothing more
+
+
 def test_density_gate_failure_bounces_to_write_pending(fake_repo, monkeypatch):
     """When merge_one's density diagnostics cannot read the module (the only
     way they raise, #3744), the slug must go back to WRITE_PENDING with the

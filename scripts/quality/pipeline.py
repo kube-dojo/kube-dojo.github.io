@@ -34,7 +34,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from . import density, queue, stages, state
+from . import density, stages, state
 from .dispatchers import DispatcherUnavailable
 from .prompts import assert_required_docs_exist
 from .queue import set_citations_verified_frontmatter
@@ -874,100 +874,54 @@ def cmd_backfill_pending(args: argparse.Namespace) -> int:
 
 
 def cmd_triage(args: argparse.Namespace) -> int:
-    """Classify every module via the density triple gate and (optionally)
-    queue REWRITE-tier modules + set the student-facing revision banner.
+    """Report which modules carry density attention flags. Read-only.
 
     This is **stage [1] of the #388 pipeline**: deterministic, free, no
     LLM calls. The scan walks ``CONTENT_ROOT`` (excluding ``uk/`` and
-    ``index.md`` per :func:`iter_all_modules`), runs
-    :func:`density.classify`, and aggregates counts.
+    ``index.md`` per :func:`iter_all_modules`) and lists the both-tail
+    flags from :meth:`density.DensityMetrics.attention`.
 
-    Default mode is dry-run (``--apply`` required to mutate). The first
-    user-visible site change happens here — banner frontmatter on ~165
-    REWRITE-tier modules — so the explicit opt-in is intentional.
+    Density numbers are diagnostics for the reviewer, never a route
+    (#3744, operator balance rule 2026-11-02): the scan writes no state,
+    enqueues nothing and sets no ``revision_pending`` banner, because a
+    short, long, choppy or walled page is judged against its outcomes,
+    not rewritten for a number.
     """
-    write_pending = args.apply
     minimum_prose = args.min_prose
 
-    pass_count = review_count = rewrite_count = skipped_count = 0
-    rewrite_modules: list[tuple[Path, density.DensityMetrics]] = []
-    review_modules: list[tuple[Path, density.DensityMetrics]] = []
+    examined = skipped_count = 0
+    flagged: list[tuple[Path, list[str]]] = []
 
     modules = iter_all_modules() if not args.only else [
         p for p in iter_all_modules() if state.slug_for(p) in set(args.only)
     ]
     for module_path in modules:
         metrics = density.evaluate_module(module_path)
-        # Prose-paragraph floor: skip stub/index-shaped files. Without
-        # this, every UK-stub module evaluates as REWRITE which is
-        # noise (UK content lives under uk/ — already excluded — but
-        # English stub modules with one prose paragraph still slip
-        # through). The default 10 matches the density.py CLI.
+        # Prose-paragraph floor: skip stub/index-shaped files, whose
+        # density numbers are noise. The default 10 matches the
+        # density.py CLI.
         if metrics.prose_paragraphs < minimum_prose:
             skipped_count += 1
             continue
-        verdict = metrics.classify()
-        if verdict == density.DensityVerdict.PASS:
-            pass_count += 1
-            continue
-        if verdict == density.DensityVerdict.REVIEW:
-            review_count += 1
-            review_modules.append((module_path, metrics))
-            continue
-        # REWRITE
-        rewrite_count += 1
-        rewrite_modules.append((module_path, metrics))
+        examined += 1
+        flags = metrics.attention()
+        if flags:
+            flagged.append((module_path, flags))
 
     print(
-        f"triage scan: {len(modules)} module(s) examined "
+        f"triage scan: {examined} module(s) examined "
         f"(skipped {skipped_count} below --min-prose {minimum_prose})"
     )
-    print(f"  PASS:    {pass_count}")
-    print(f"  REVIEW:  {review_count}  (LLM judge needed; deferred to Phase 2a)")
-    print(f"  REWRITE: {rewrite_count}  (clear rewrite candidates)")
-
-    if not write_pending:
-        print()
-        print("DRY RUN — no state files written, no banners set.")
-        print("Re-run with --apply to enqueue REWRITE-tier modules + set banners.")
-        if rewrite_modules and args.verbose:
-            print()
-            print("Top 20 REWRITE candidates by ascending wpp:")
-            for path, m in sorted(rewrite_modules, key=lambda r: r[1].w_per_para)[:20]:
-                rel = path.resolve().relative_to(_REPO_ROOT)
-                print(f"  wpp={m.w_per_para:5.1f} w/ln={m.w_per_line:5.1f} words={m.prose_words:5d}  {rel}")
-        return 0
-
-    # --apply: bootstrap state if needed, then ensure_queued for each
-    # REWRITE-tier module. ensure_queued sets the banner via
-    # set_revision_pending_frontmatter (idempotent). REVIEW-tier is
-    # NOT enqueued in v1 — those need the teaching-judge LLM (Phase 2a).
-    enqueued = banner_set = banner_skipped = state_missing = 0
-    for module_path, metrics in rewrite_modules:
-        slug = state.slug_for(module_path)
-        st = state.load_state(slug)
-        if st is None:
-            # Bootstrap-on-demand: a state file is needed before the queue
-            # can attach. Use a high index so it sorts after the
-            # bootstrapped indexes — alphabetical re-bootstrap will
-            # re-key it stably anyway.
-            st = state.new_state(module_path, module_index=10**9)
-            state.save_state(st)
-            state_missing += 1
-        before_text = module_path.read_text(encoding="utf-8")
-        queue.ensure_queued(slug, module_path)
-        after_text = module_path.read_text(encoding="utf-8")
-        if "revision_pending: true" in after_text and "revision_pending: true" not in before_text:
-            banner_set += 1
-        elif "revision_pending: true" in after_text:
-            banner_skipped += 1  # already set
-        enqueued += 1
-
+    print(f"  flagged for reviewer attention: {len(flagged)}")
+    print(f"  no flags:                       {examined - len(flagged)}")
     print()
-    print(f"applied: {enqueued} module(s) enqueued for rewrite")
-    print(f"  banners newly set:   {banner_set}")
-    print(f"  banners already set: {banner_skipped}")
-    print(f"  state files created: {state_missing}")
+    print("Diagnostic only — nothing is queued, bannered, rewritten or rejected.")
+    if flagged and args.verbose:
+        print()
+        for path, flags in flagged:
+            print(path.resolve().relative_to(_REPO_ROOT))
+            for flag in flags:
+                print(f"  - {flag}")
     return 0
 
 
@@ -1095,12 +1049,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_triage = sub.add_parser(
         "triage",
-        help="#388 stage [1]: classify every module by density triple gate; --apply to queue REWRITE-tier",
-    )
-    p_triage.add_argument(
-        "--apply",
-        action="store_true",
-        help="mutate: bootstrap state for REWRITE-tier, enqueue, set banner frontmatter",
+        help="#388 stage [1]: report density attention flags (both tails); read-only, never queues or banners",
     )
     p_triage.add_argument(
         "--only",
@@ -1116,7 +1065,7 @@ def main(argv: list[str] | None = None) -> int:
     p_triage.add_argument(
         "-v", "--verbose",
         action="store_true",
-        help="(dry-run only) print the top 20 REWRITE candidates ranked by wpp",
+        help="list each flagged module and its attention flags",
     )
     p_triage.set_defaults(func=cmd_triage)
 
