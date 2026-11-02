@@ -85,18 +85,18 @@ For practice-question / mock-exam modules, preserve exam-style MCQ structure. Ea
 
 ## VERIFICATION (blocking gates vs reported diagnostics)
 
-The deterministic verifier (`scripts/quality/verify_module.py`, `gate_results`) computes these **blocking gates**; all must pass before commit:
+The verifier (`scripts/quality/verify_module.py`, `gate_results`) computes these **blocking gate keys**. Its output, not this summary, decides whether each one passed. Several gates are narrow heuristics, so a pass does not show that this brief's rules were followed, and a rule in this brief binds even where its gate would not fire. All gates must pass before commit:
 
-1. `gate_no_source_h1`: no source `# ` heading in the body.
-2. `structure_sections_present`: Learning Outcomes, Why This Module Matters and a Next Module link exist. `structure_order_correct`: the Learning Outcomes, Why, Did You Know, Common Mistakes, Quiz, Hands-On and Next Module headings all exist, in that order.
+1. `gate_no_source_h1`: see NO SOURCE H1 above.
+2. `structure_sections_present`, `structure_order_correct`: the required sections and their order from `module-writer.md`.
 3. `structure_quiz_answers_have_details`: every quiz item carries a `<details>` answer block. The verifier checks presence only; the answer must still explain why, not just name the fix.
 4. `sources_all_reachable`: no link under the Sources heading is a 404 or fetch failure (not computed under `--skip-source-check`; a page with no links passes this gate).
-5. `anti_leak`: no leaked tokens, no emojis, no number 47.
-6. `runnable_no_kubectl_alias`: no `alias k=kubectl` and no `k <subcommand>` in runnable shell code blocks.
-7. `lab_image_binary_match`: every `kubectl exec POD -- BIN` uses a binary its image has.
-8. `anti_fabrication_no_unsourced_anecdote`: no unsourced anecdote framing.
-9. `practice_mcq_four_options_with_distractors`: practice-question modules only; at least four visible options and answer reasoning covering the correct option and the distractors.
-10. `outcomes_aligned`: each Learning Outcome's key terms appear in a core section and in a quiz item or hands-on task. This is a token-overlap heuristic, not proof that the outcome is taught.
+5. `anti_leak`: leaked tokens, emojis and the number 47.
+6. `runnable_no_kubectl_alias`: the alias rule under RUNNABILITY below.
+7. `lab_image_binary_match`: the image-binary compatibility section below.
+8. `anti_fabrication_no_unsourced_anecdote`: the unsourced-anecdote rule below.
+9. `practice_mcq_four_options_with_distractors`: the practice-question rule below (practice-question modules only).
+10. `outcomes_aligned`: every Learning Outcome bullet must be taught in a core section and assessed by a quiz item or lab task. The verifier checks this by key-term overlap, so it is a heuristic and not proof that the outcome is taught.
 
 Content rules the verifier does not check still bind: `## Sources` is the last H2 before `## Next Module`; every source is primary/vendor documentation (bare `- https://...` or `- [title](https://...)`) and supports the claims it is cited for, with no minimum count; K8s 1.35+ for exam-pinned cert modules (see `module-writer.md`); runnable commands; explanatory quiz answers.
 

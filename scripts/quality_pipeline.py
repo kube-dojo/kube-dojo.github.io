@@ -515,7 +515,7 @@ def _section_prompt(state: dict[str, Any], args: argparse.Namespace, module_text
 ```
 
 ## Your task
-Rewrite ONLY the '{args.section}' section to improve its accuracy, explanation and formatting, while keeping ALL other sections of the file identical. Cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples.
+Rewrite ONLY the '{args.section}' section to improve its accuracy, explanation and formatting, while keeping ALL other sections of the file identical. Cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples (balance both ways with equal weight).
 For example, if target is 'prereqs', update the prerequisites in the frontmatter or initial block.
 
 Output ONLY the new full module markdown (including frontmatter). No prose before or after. No code fence around the whole output. The output will be written directly to {state['module_path']} verbatim.
