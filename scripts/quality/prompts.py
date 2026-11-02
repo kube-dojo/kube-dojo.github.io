@@ -110,7 +110,7 @@ Mandatory:
 
 Before writing, use the lead-supplied researched coverage_plan from this page's existing docs/citation-seeds JSON (matching module_path/module_key; outcomes, essential_topics, source_basis). Scope and omission grounds belong in that non-published plan and require independent acceptance. If these inputs are unavailable, return the evidence-shortfall report; do not invent them or insert planning records into lesson prose.
 
-Migration until #3744: legacy density rejection (1000 prose words / 12 words per line / 18 words per paragraph), the verifier's 5000-word default, short-page tiering and source-count gates may still disagree. Report that disagreement as a non-module shortfall for the lead instead of padding. The runner preserves extraction failures rather than publishing reports.
+Under #3744 the standalone verifier reports length, density and section/source counts without gating on them; the v2 density REWRITE band (under 1000 prose words, 12 words per line or 18 words per paragraph) may still route or reject a page. Cover the outcomes fully, cut padding and repetition, and explain what the learner needs. If a count check disagrees with supported concise work, report it as a non-module shortfall for the lead instead of padding. The runner preserves extraction failures rather than publishing reports.
 
 **Teaching prose:**
 - Explain mechanisms, decisions, examples, tradeoffs and failure recovery in connected prose appropriate to the topic and audience. Lists are useful for genuine steps, options and comparisons.
@@ -159,7 +159,7 @@ Return the COMPLETE module with the applicable missing sections added in the cor
 
 Shortfall format: plain text starting `EVIDENCE_SHORTFALL:`, then `Missing inputs:` and `Next action:`. Include no frontmatter, code fences or copied lesson body.
 
-Use the lead-supplied coverage_plan from this page's existing docs/citation-seeds JSON; record scope/exclusion grounds there for independent acceptance, never in published lesson prose. If the plan is unavailable, use the shortfall path. Until #3744 lands, legacy density (1000/12/18), 5000-word, short-page and source-count checks may still reject concise work; report disagreements without padding.
+Use the lead-supplied coverage_plan from this page's existing docs/citation-seeds JSON; record scope/exclusion grounds there for independent acceptance, never in published lesson prose. If the plan is unavailable, use the shortfall path. Under #3744 the verifier only reports length, density and counts; the v2 density REWRITE band (1000/12/18) may still reject concise work. Report disagreements without padding.
 
 If a section to add is `quiz`: outcome-aligned questions with explanatory `<details>` answers, after applicable concept and practice sections.
 If `hands-on-exercise`: multi-step `- [ ]` checklist, placed after the quiz.
@@ -233,7 +233,7 @@ Rules:
 - must_fix entries must be specific — "Quiz Q3 tests recall (what is a Pod?); rewrite as scenario" NOT "improve quiz".
 - Ignore the `## Sources` section for scoring — citation insertion runs in a SEPARATE downstream stage (`scripts/citation_backfill.py`), so neither the rubric's "Citation Gate" nor the absence of a Sources section should reduce the score here. The writer was instructed to preserve any pre-existing Sources verbatim and not add a new one; verify that instruction was honored (do not flag absence as a must-fix).
 - For track=structural: verify existing content was PRESERVED verbatim (zero edits to pre-existing lines). If any existing line was modified, verdict must be changes_requested.
-- For track=rewrite: verify narrative flow (not a bullet list), worked examples present before learner is asked to solve similar, at least 2 inline active-learning prompts.
+- For track=rewrite: verify narrative flow (not a bullet list), worked examples present before learner is asked to solve similar, and inline active-learning prompts where they serve the outcomes (no fixed count).
 - Verify the top-of-module format: no source-level `# Module ...` heading after frontmatter, blockquote metadata for complexity/time/prerequisites, separator, then `## What You'll Be Able to Do`. Flag duplicate H1 or inline metadata as a must-fix.
 - Preserved visual aids (ASCII, Mermaid, tables): must be present and not removed.
 

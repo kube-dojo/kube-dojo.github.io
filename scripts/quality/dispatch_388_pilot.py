@@ -28,7 +28,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -144,7 +144,7 @@ def _write_budget_sidecar(module_path: str, body_words_min: int) -> Path:
     payload = {
         "body_words_min": int(body_words_min),
         "source_module": module_path,
-        "set_at": datetime.now(timezone.utc).isoformat(),
+        "set_at": datetime.now(UTC).isoformat(),
     }
     slug = _module_budget_slug(module_path)
     sidecar = REPO / ".pipeline" / "budgets" / f"{slug}.json"
@@ -190,10 +190,13 @@ def make_worktree(slug: str, module_path: str) -> Path:
     return wt
 
 
-def codex_prompt(module_path: str, body_words_target: int = 5000) -> str:
-    brief = BRIEF.read_text().replace("{{BODY_WORDS_TARGET}}", str(body_words_target))
-    writer = WRITER_BRIEF.read_text().replace("{{BODY_WORDS_TARGET}}", str(body_words_target))
-    return f"""You are rewriting one KubeDojo module to clear all #388 verifier gates.
+_NO_LENGTH_TARGET = "none (#3744: there is no word target; cover the outcomes fully)"
+
+
+def codex_prompt(module_path: str) -> str:
+    brief = BRIEF.read_text().replace("{{BODY_WORDS_TARGET}}", _NO_LENGTH_TARGET)
+    writer = WRITER_BRIEF.read_text().replace("{{BODY_WORDS_TARGET}}", _NO_LENGTH_TARGET)
+    return f"""You are rewriting one KubeDojo module so no blocking verifier gate fails and every learning outcome is taught and assessed.
 
 MODULE TO REWRITE (relative to repo root): {module_path}
 
@@ -205,8 +208,9 @@ PROCEDURE
 3. Rewrite the module IN PLACE at the path above.
 4. Run the deterministic verifier:
      .venv/bin/python scripts/quality/verify_module.py --glob {module_path} --skip-source-check --summary --quiet
-   Iterate until tier == T0 OR all density+structure+alignment+anti_leak+protected_assets gates pass. Sources gate may fail (we skip source check).
-   Hard requirements: body_words >= {body_words_target}, mean_wpp >= 30, median_wpp >= 28, short_paragraph_rate <= 0.20, max_consecutive_short_run <= 2, exactly 4 Did You Know, 6-8 Common Mistakes, 6-8 Quiz with <details>, Hands-On with `- [ ]`. Section order per writer brief. No emojis. No number 47. K8s 1.35+. Never use `alias k=kubectl` or `k <subcommand>` in runnable bash/sh/shell/zsh code blocks; use full `kubectl`.
+   Iterate until no gate in "gates" is false (the skipped source-reachability gate reports null). Blocking: no source H1, required sections in order, quiz answers in <details>, no emojis, no number 47, no leaked tokens, no unsourced anecdotes, practice MCQ format, every outcome taught and assessed. K8s 1.35+. Never use `alias k=kubectl` or `k <subcommand>` in runnable bash/sh/shell/zsh code blocks; use full `kubectl`.
+   Word counts, paragraph/sentence density and Did You Know / Common Mistakes / quiz / source counts are reported only (#3744). Do not write to a number. Cover the outcomes fully, cut padding and repetition, and explain what the learner needs; if verified material cannot support the scope, report the shortfall instead of padding.
+   The briefs below may still state word targets, density thresholds or section counts. Where they do, this step overrides them.
 5. Set frontmatter `revision_pending: false` (it is currently `true` — clear it as part of the rewrite). Then commit (sign-off optional, no --no-verify):
      git add {module_path}
      git commit -m "feat(388): density+structure rewrite of <module title> (#388 pilot)"
@@ -227,12 +231,12 @@ DO NOT modify any file outside {module_path}. DO NOT change scripts/, docs/, sib
 """
 
 
-def dispatch_codex(module_path: str, wt: Path, slug: str, body_words_target: int = 5000):
+def dispatch_codex(module_path: str, wt: Path, slug: str):
     log({"event": "codex_dispatch_start", "module": module_path, "slug": slug, "wt": str(wt)})
     try:
         result = invoke(
             agent_name="codex",
-            prompt=codex_prompt(module_path, body_words_target),
+            prompt=codex_prompt(module_path),
             mode="danger",
             cwd=wt,
             model="gpt-5.5",
@@ -647,10 +651,9 @@ def main(argv: list[str] | None = None) -> int:
         queue = queue[: args.max]
     log({"event": "pilot_start", "count": len(queue), "input": str(input_file), "repo": str(REPO)})
     for module_path, requested_budget in queue:
-        body_words_target = requested_budget if requested_budget is not None else 5000
-        if requested_budget is not None:
-            _write_budget_sidecar(module_path, body_words_target)
-            log({"event": "budget_sidecar_written", "module": module_path, "body_words_min": body_words_target})
+        if requested_budget is not None:  # declared for visibility only; never a writer target or gate
+            _write_budget_sidecar(module_path, requested_budget)
+            log({"event": "budget_sidecar_written", "module": module_path, "body_words_min": requested_budget})
         slug = module_slug_for_pipeline(module_path)
         log({"event": "module_start", "module": module_path, "slug": slug})
         try:
@@ -658,7 +661,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:  # noqa: BLE001
             log({"event": "worktree_error", "module": module_path, "error": repr(e)})
             continue
-        codex_result = dispatch_codex(module_path, wt, slug, body_words_target)
+        codex_result = dispatch_codex(module_path, wt, slug)
         if codex_result is None or not codex_result.ok:
             log({"event": "module_skip", "module": module_path, "reason": "codex_failed"})
             continue

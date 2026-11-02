@@ -72,7 +72,7 @@ def queue_file(tmp_path):
     return queue
 
 
-def test_yaml_queue_dispatch_writes_budget_sidecar_and_defaults_to_5000(
+def test_yaml_queue_dispatch_writes_budget_sidecar_without_a_length_target(
     tmp_path, isolated_pilot, queue_file,
 ) -> None:
     rc = pilot.main(["--input", str(queue_file), "--log", str(tmp_path / "dispatch.log")])
@@ -88,8 +88,10 @@ def test_yaml_queue_dispatch_writes_budget_sidecar_and_defaults_to_5000(
         call.args[0]["event"] == "budget_sidecar_written"
         for call in isolated_pilot["log"].call_args_list
     )
-    assert isolated_pilot["codex"].call_args_list[0].args[3] == 3000
-    assert isolated_pilot["codex"].call_args_list[1].args[3] == 5000
+    assert [c.args for c in isolated_pilot["codex"].call_args_list] == [
+        ("src/content/docs/ai/module-a.md", tmp_path, "ai-module-a"),
+        ("src/content/docs/cloud/module-b.md", tmp_path, "cloud-module-b"),
+    ]
     assert isolated_pilot["source_recheck"].call_args_list == [
         call(tmp_path, "src/content/docs/ai/module-a.md"),
         call(tmp_path, "src/content/docs/cloud/module-b.md"),
@@ -135,7 +137,7 @@ def test_real_provider_wrappers_stop_at_invoke_guard(tmp_path, isolated_pilot, n
     real_dispatch = isolated_pilot["originals"][name]
     with pytest.raises(pytest.fail.Exception, match="unexpected provider or process dispatch"):
         if name == "codex":
-            real_dispatch("src/content/docs/ai/module-a.md", tmp_path, "module-a", 3000)
+            real_dispatch("src/content/docs/ai/module-a.md", tmp_path, "module-a")
         else:
             real_dispatch(1, "src/content/docs/ai/module-a.md", "module-a")
 

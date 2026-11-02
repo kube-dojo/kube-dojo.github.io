@@ -2,8 +2,8 @@
 
 Per the 2026-04-29 prose pipeline pivot (TEAM_WORKFLOW.md § 5):
 
-    Approved contract → Gemini first draft (~3k) →
-        Codex expansion to cap (DEFAULT)
+    Approved contract → Gemini first draft →
+        Codex expansion up to the approved cap (DEFAULT)
         Claude expansion (FALLBACK when Codex bandwidth exhausted)
         → Claude source-fidelity review
         → Gemini or Claude prose-quality review
@@ -32,14 +32,14 @@ Usage:
     .venv/bin/python scripts/dispatch_chapter_prose.py 6 \
         --slug ch-06-the-cybernetics-movement \
         --research-branch claude/394-ch06-research \
-        --cap-words 5000 \
+        --cap-words <approved-cap> \
         --verdict-notes-pr 467 \
         --phases agy,codex               # default Codex pipeline
 
     .venv/bin/python scripts/dispatch_chapter_prose.py 6 \
         --slug ch-06-the-cybernetics-movement \
         --research-branch claude/394-ch06-research \
-        --cap-words 5000 \
+        --cap-words <approved-cap> \
         --verdict-notes-pr 467 \
         --phases agy,claude              # Claude-fallback pipeline
 
@@ -190,15 +190,15 @@ def agy_draft_prompt(*, slug: str, ch_num: int, cap_words: int,
 
         ```
         1. Approved contract        ← staged on disk, paths listed below
-        2. Gemini first draft       ← THIS STEP, target ~3,000 words
-        3. Codex expansion to cap   ← downstream, will tighten + lengthen
+        2. Gemini first draft       ← THIS STEP
+        3. Codex expansion          ← downstream, will tighten + extend anchored layers
         4. Cross-family review      ← downstream
         ```
 
-        Don't try to hit the final {cap_words}-word cap. Write a tight,
-        evidence-backed ~3,000-word first draft that captures every
-        scene from the contract; Codex will expand the technical and
-        biographical layers from the same contract.
+        Write a tight, evidence-backed first draft that captures every
+        scene from the contract without padding or repetition; Codex
+        will extend the technical and biographical layers from the same
+        contract where the anchors support it.
 
         ## Your whitelist (where you add value)
 
@@ -214,8 +214,7 @@ def agy_draft_prompt(*, slug: str, ch_num: int, cap_words: int,
         ## Other hard rules
 
         1. **Cap: {cap_words} words HARD CEILING** for the final
-           chapter. Your first draft should land at ~3,000 words —
-           well under.
+           chapter. It is an upper bound, never a target.
         2. **Use the Boundary Contract.** The brief defines what the
            chapter is NOT. Don't anticipate later chapters.
         3. **Yellow claims hedge; Red claims stay out.** Yellow needs
@@ -258,7 +257,7 @@ def agy_draft_prompt(*, slug: str, ch_num: int, cap_words: int,
         2. Replace `{prose_path}` with your draft. Use the title
            from `brief.md`'s thesis. Use scene structure from
            `scene-sketches.md`.
-        3. Self-check: word count ~3,000, every Green claim has a
+        3. Self-check: every Green claim has a
            `sources.md`-traceable phrasing, Yellow claims hedged,
            Red claims absent, no fabricated anchors.
         4. `git add {prose_path}` and commit:
@@ -295,8 +294,9 @@ def _expansion_prompt(*, agent_label: str, slug: str, ch_num: int,
 
         You ({agent_label}) have **workspace-write** in this worktree.
         Gemini drafted prose at `{prose_path}` against the anchored
-        research contract. Your job is to expand the draft from ~3k to
-        {cap_words} words while sharpening anchor discipline and
+        research contract. Your job is to extend the draft where the
+        contract's anchored layers are under-developed (never beyond
+        the {cap_words}-word ceiling) while sharpening anchor discipline and
         tightening narrative coherence.
 
         ## Pipeline position (post-2026-04-29 prose pivot)
@@ -306,7 +306,7 @@ def _expansion_prompt(*, agent_label: str, slug: str, ch_num: int,
         ```
         1. Approved contract        ← staged on disk, paths below
         2. Gemini first draft       ← already on disk at {prose_path}
-        3. Expansion to cap         ← THIS STEP — you ({agent_label})
+        3. Expansion within the cap  ← THIS STEP — you ({agent_label})
         4. Cross-family review      ← downstream (Claude source-fidelity, Gemini/Claude prose-quality)
         ```
 
@@ -377,7 +377,7 @@ def _expansion_prompt(*, agent_label: str, slug: str, ch_num: int,
            stay under the cap.
         4. `git add {prose_path}` and commit:
            ```
-           docs(ch-{ch_num:02d}): expand prose to verdict cap with anchored layers (#394)
+           docs(ch-{ch_num:02d}): extend prose with anchored layers (#394)
            ```
         5. Print final word count and the layers you expanded. Note
            any layer you left thin because evidence ran out.
