@@ -96,10 +96,11 @@ or unresolved risks. Do not weaken assertions, disable lint rules, add empty
 skips, or hide missing imports to obtain a pass.
 
 `npm run build` also runs from a `.worktrees/*` checkout inside the primary
-checkout's directory tree (kube-dojo PR #3781): worktrees carry no
-`node_modules`, and Node resolves packages by walking up to the primary
-checkout's, so the build uses the primary's installed dependency versions and
-does not validate `package.json` or lockfile changes. A worktree outside the
+checkout's directory tree (kube-dojo PR #3781): worktrees have no dependency
+install of their own (a build leaves only a `node_modules/.astro` cache), and
+Node resolves packages by walking up to the primary checkout's `node_modules`,
+so the build uses the primary's installed dependency versions and does not
+validate `package.json` or lockfile changes. A worktree outside the
 primary tree would still fail, and `astro dev` from a worktree is unverified.
 Keep primary on `main` and preserve its changes. Fetching a branch alone does
 not put its content into a main-checkout build: report the revision actually
