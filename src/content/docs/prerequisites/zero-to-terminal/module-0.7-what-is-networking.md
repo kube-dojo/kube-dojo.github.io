@@ -20,7 +20,7 @@ After this module, you will be able to:
 - **Diagnose** basic connectivity failures by separating DNS resolution, IP reachability, ports, and HTTP response status.
 - **Compare** private and public IP addresses and decide when NAT, router forwarding, or a public endpoint matters.
 - **Implement** terminal checks with `ping`, `curl`, and `nslookup` so you gather evidence before changing configuration.
-- **Evaluate** how beginner networking ideas show up in Kubernetes Services, Pods, and the Kubernetes 1.35 API server.
+- **Identify** the name, address, ports, and protocol response in a Kubernetes Service example.
 
 ---
 
@@ -760,7 +760,7 @@ You have completed this exercise when you can explain the evidence from each com
 - [ ] Save a web page to a file and read that file from the terminal.
 - [ ] Explain whether each command tested DNS, address reachability, a port, or HTTP behavior.
 - [ ] Explain what each diagnostic transcript shows, what remains uncertain, and what to check next.
-- [ ] Explain how Kubernetes Service names, Pod IPs, and API server port 6443 map to DNS, address, port, and protocol response.
+- [ ] Identify the name, address, ports, and protocol response in a Kubernetes Service example.
 
 ---
 
