@@ -100,8 +100,6 @@ The command targets the current directory of the remote shell on `10.0.0.5`. Che
 
 </details>
 
-For each operation, ask where the work happens.
-
 <details>
 <summary>Quick check: classify these operations as local or remote.</summary>
 
@@ -346,7 +344,7 @@ Exercise scenario: you are told to connect as `ubuntu` but you try `admin` three
 
 One practice target is `localhost`, your own computer, if an authorized SSH server is available. It lets you practice the client, server, authentication, host-key, shell, command, and disconnect flow without a separate machine. It does not test a remote network path.
 
-Before connecting, record your local context. This gives you something to compare after login and trains the muscle memory you will later use on cloud servers and Kubernetes nodes. If you use `ssh localhost`, the hostname may be identical before and after because both sides are the same machine, so the proof is the session establishment and the authentication flow rather than a different host name.
+Before connecting, record your local context. This gives you something to compare after login and trains the muscle memory you will later use on cloud servers and Kubernetes nodes. With `ssh localhost`, a matching hostname does not by itself show whether you are inside the SSH session. Use clues such as the connection output and, inside an SSH session, the `SSH_CONNECTION` environment variable (documented in ssh(1), ENVIRONMENT).
 
 ```bash
 hostname
@@ -378,7 +376,7 @@ ls
 echo "Hello from SSH!"
 ```
 
-Disconnect cleanly when finished. Your prompt should return to the local shell after the remote shell exits. Because both shells run on the same machine, `hostname` alone cannot distinguish them; check the session's disconnect message as well.
+Disconnect cleanly when finished. Your prompt should return to the local shell after the remote shell exits. Because both shells run on the same machine, `hostname` alone cannot distinguish them; use the session clues above. A disconnect message may also appear.
 
 ```bash
 exit
@@ -434,7 +432,6 @@ cat /etc/os-release    # Shows the server's operating system
 exit
 ```
 
-The same local-versus-remote discipline applies when you move on to Kubernetes.
 
 ## How SSH Thinking Transfers to Kubernetes
 
@@ -562,7 +559,7 @@ Work slowly enough to record evidence at each stage. A good operator's notes are
 - [ ] Record your local context by running `hostname`, `whoami`, and `pwd` before any SSH command.
 - [ ] Open an SSH connection to `localhost`, accepting the first-time host key only after independently verifying its fingerprint.
 - [ ] Inside the SSH session, run `hostname`, `whoami`, `pwd`, `ls`, and `echo "Hello from SSH!"`.
-- [ ] Disconnect with `exit`, then check the disconnect message and run `hostname` again to compare with your local notes.
+- [ ] Disconnect with `exit`, then use the session clues above and run `hostname` again to compare with your local notes.
 - [ ] Write one sentence explaining whether the hostname changed and why that result makes sense for `localhost`.
 - [ ] Build, but do not run, the command that would connect as `admin` to `10.0.0.5` on port `2222` with key file `~/.ssh/work_key`.
 - [ ] Diagnose the three connection failures in Incident A by matching each error symptom to its failure layer and identifying an initial diagnostic check.
@@ -594,7 +591,7 @@ $ ssh -i ~/.ssh/id_ed25519 devops@198.51.100.26
 devops@198.51.100.26: Permission denied (publickey).
 ```
 
-Examine the three recorded errors. A team lead initially claims all servers suffered the same crash. Explain what each symptom establishes, which causes remain hypotheses, and which authorized check would narrow them. Distinguish connection establishment from authentication without pretending each error identifies a unique failing device or mechanism. Optional transfer: a teammate sees the same host-key warning after a planned test-server rebuild. Explain what independent evidence you would obtain before changing `known_hosts`, and what you would do if the fingerprints differ.
+Examine the three synthetic errors. A team lead initially claims all servers suffered the same crash. Explain what each symptom establishes, which causes remain hypotheses, and which authorized check would narrow them. Distinguish connection establishment from authentication without pretending each error identifies a unique failing device or mechanism. Optional transfer: a teammate sees the same host-key warning after a planned test-server rebuild. Explain what independent evidence you would obtain before changing `known_hosts`, and what you would do if the fingerprints differ.
 <details><summary>Hint 1</summary>Decide whether each message occurs before or during authentication.</details><details><summary>Hint 2</summary>Separate what the message reports from explanations that still need evidence.</details><details><summary>Hint 3</summary>For session 3, consider whether `-i` proves which identity was offered; verbose output can help you check.</details>
 
 <details>
@@ -723,6 +720,7 @@ Your notes should show before/inside/after context checks and a clean disconnect
 - [Apple macOS User Guide: Allow a remote computer to access your Mac](https://support.apple.com/guide/mac-help/allow-a-remote-computer-to-access-your-mac-mchlp1066/mac)
 - [Microsoft Learn: OpenSSH for Windows overview](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_overview)
 - [Kubernetes Documentation: Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/)
+- [Secure Shell](https://en.wikipedia.org/wiki/Secure_Shell)
 
 ## Next Module
 
