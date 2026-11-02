@@ -25,7 +25,7 @@ After this module, you will be able to:
 
 - **Diagnose** whether a command is running locally or on a remote server by checking `hostname`, `whoami`, and `pwd`.
 - **Implement** a basic SSH connection using the correct `username@host` syntax, optional port selection, and a deliberate disconnect.
-- **Compare** password authentication with SSH key authentication and choose the safer method for human and automated access.
+- **Compare** password and SSH key authentication, including their operational tradeoffs.
 - **Evaluate** server access risks before running commands that change files, logs, configuration, or service state.
 
 ## Why This Module Matters
@@ -34,15 +34,15 @@ Hypothetical scenario: you are helping a teammate investigate a service that wor
 
 Servers are ordinary computers doing a particular job for other computers, but the way you operate them changes the moment they are not sitting in front of you. You do not rely on a screen, a mouse pointer, or the visual cues of your laptop desktop. You rely on a terminal session, the identity of the machine, the identity of the user, and the confidence that each command is running where you think it is running.
 
-Kubernetes makes this foundation more important, not less. A Kubernetes 1.35 cluster is built from servers called nodes, and even when `kubectl` becomes your main cluster interface, you still need the mental model that a command has a location, a user, and a blast radius. This module gives you that model before the command surface becomes larger.
+Later modules apply this context-checking habit to Kubernetes.
 
-You will practice SSH in the safest possible way by connecting back to `localhost`, which means your own computer. That may sound artificial, but the protocol steps are the same as connecting to a cloud VM across the internet: the client contacts a host, the host asks for proof, the shell opens, commands run on the other side of the connection, and you disconnect when the work is finished.
+You can practice SSH by connecting to `localhost`, your own computer, if you have an authorized SSH server. Verify the host key and authenticate before opening a shell; an internet connection adds network and exposure considerations that localhost practice does not cover.
 
 ## Servers Are Computers With a Job
 
-A server is not a mystical machine category. It is a computer assigned to serve something to other computers, such as web pages, database responses, files, logs, build artifacts, or API calls. Your laptop is optimized for one person sitting at it, while a server is optimized for being reachable over a network and doing repeatable work for many clients.
+A server provides a service to other computers, such as web pages, files, or API responses. A laptop can provide a service too.
 
-The original beginner distinction is worth preserving because it prevents a lot of false intimidation. A server can have a CPU, memory, storage, a network card, fans, an operating system, and files just like your laptop. The difference is usually packaging, reliability expectations, remote management, and the narrowness of its job.
+A server can have a CPU, memory, storage, a network interface, an operating system, and files just like your laptop.
 
 ```text
 Your laptop:
@@ -52,31 +52,14 @@ Your laptop:
   - You browse the web, write documents, watch videos
 
 A server:
-  - Often has NO screen, keyboard, or mouse
-  - Designed to serve MANY users/computers simultaneously
-  - Usually runs ONLY a terminal interface (no desktop)
-  - It hosts websites, runs databases, processes data
+  - May serve users or other computers
+  - May be administered through a terminal
+  - It can host websites or run databases
 ```
 
-The kitchen analogy still works because it separates the worker from the customer. Your laptop is like a home kitchen where the cook and diner are usually the same person. A server is like a restaurant kitchen: customers do not stand next to the stove, but they still receive food because a clear request path exists between the dining room and the kitchen.
+When your browser opens a web page, it sends a request over the network to a server and receives a response.
 
-When your browser opens a web page, it behaves like the customer in that dining room. It sends a request over the network to a server, the server processes that request, and the server sends a response back. You do not need to see the server's screen because the useful work is already happening through the request and response path.
-
-Under the hood, the comparison is practical rather than magical. The following table keeps the original shape of the module while making the operational meaning clearer: more cores and memory usually help with many simultaneous requests, less attached display hardware reduces waste, and Linux is common because it is scriptable, stable, and deeply integrated with server tooling.
-
-| Component | Your Laptop | A Typical Server |
-|-----------|-------------|-----------------|
-| CPU | 4-8 cores | 16-128 cores |
-| RAM | 8-32 GB | 64-512 GB |
-| Storage | 256 GB - 2 TB | 1 TB - 100 TB+ |
-| Screen | Yes | Usually no |
-| Keyboard | Yes | Usually no |
-| Operating System | macOS/Windows | Linux (almost always) |
-| Purpose | One person, many tasks | Many clients, specific tasks |
-
-The table does not mean a laptop can never serve traffic or a server can never have a keyboard. It means the design center is different. A laptop assumes a nearby person, while a server assumes a network client and a remote operator.
-
-The beginner trap is thinking remote machines are less real because they are not visible. They are very real. If you create a file on a server, disk space is consumed on that server; if you delete a directory on a server, that directory is gone from the server; if you restart a process on a server, users who depend on that process may notice.
+Capacity, operating system, and attached devices depend on the particular machine and its job.
 
 Pause and predict: if a production web server has no physical monitor, keyboard, or display cable attached, how can an operations engineer know whether its storage disk is completely full or its background service has crashed?
 
@@ -89,16 +72,16 @@ Operators inspect headless servers through network-accessible remote interfaces:
 
 ## Local and Remote Are About Where Work Runs
 
-Local means the command runs on the computer in front of you. Remote means the command runs on another computer reached over a network. The same command can be harmless in one place and risky in another because the command's location decides which files, processes, users, and network interfaces it touches.
+Local means the command runs in your current computer's environment. A remote shell runs through a connection to a server, which may be another computer or a localhost service on the same machine. The command's context determines which files and processes it can affect.
 
 ```text
 Local:  Your kitchen. You're standing in it.
 Remote: A kitchen in another city. You call them on the phone to give orders.
 ```
 
-When you open Terminal and type `ls`, the shell on your own computer lists files from your own current directory. When you connect to a server with SSH and then type `ls`, the shell on the server lists files from the server's current directory. The letters on your keyboard are local, but the command execution after login is remote.
+When you open Terminal and type `ls`, you ask your local shell to list its current directory. After an SSH login, `ls` asks the remote shell to list its current directory. The command may fail, for example if permissions deny access.
 
-This is why experienced engineers build a habit of checking context before acting. The prompt may show a user and host, but prompts are customizable and sometimes misleading. Commands such as `hostname`, `whoami`, and `pwd` give you independent evidence about the machine, account, and directory you are currently controlling.
+Check context before acting. Prompts are customizable and can mislead; `hostname`, `whoami`, and `pwd` provide additional clues about the machine, account, and directory.
 
 ```bash
 hostname
@@ -106,18 +89,16 @@ whoami
 pwd
 ```
 
-The three checks answer three separate questions. `hostname` answers "which machine is executing this command?" `whoami` answers "which account is executing this command?" `pwd` answers "where in the file system am I standing?" Together they reduce the chance that you apply a fix to your laptop while believing you are on the server, or worse, apply a destructive change to production while believing you are in a practice environment.
+The three checks report the hostname, effective account, and current directory. Compare those clues with the expected context; names can be reused and do not replace host-key verification.
 
 Pause and predict: you open a terminal, immediately run `hostname`, and observe your laptop name. Then you run `ssh admin@10.0.0.5`, authenticate successfully, run `hostname` again, and see a different server name. Which machine will receive a `touch practice.txt` command now, and where in the infrastructure will that file reside?
 
 <details>
 <summary>Check your prediction</summary>
 
-The file is created on the remote server (`10.0.0.5`) in the current working directory of that remote user session. Once an SSH login succeeds, your local terminal window acts strictly as an input display and keyboard relay; the active shell process interpreting your commands and writing files belongs entirely to the remote operating system.
+The command targets the current directory of the remote shell on `10.0.0.5`. Check its exit status and inspect that directory before claiming the file was created. The terminal is local; the shell receiving this command is remote.
 
 </details>
-
-The following quick classification exercise is retained from the original module because it trains the most important beginner reflex. Do not answer by looking for a fancy command; answer by asking where the work happens.
 
 <details>
 <summary>Quick check: classify these operations as local or remote.</summary>
@@ -130,13 +111,11 @@ The following quick classification exercise is retained from the original module
 
 </details>
 
-Exercise scenario: you are documenting a deployment process and want the first line of every troubleshooting session to prove context. A strong runbook does not start with "restart the service." It starts with "connect to the correct host, record `hostname`, record `whoami`, record `pwd`, then inspect the service." That order may feel slow, but it protects the system before the commands become powerful.
-
 ## SSH Opens a Secure Shell on Another Machine
 
 SSH stands for Secure Shell. It is both a protocol and a family of tools that let one computer open an authenticated, encrypted terminal session on another computer. In everyday terms, SSH is a secure phone line to a remote kitchen: you dial the remote address, prove who you are, receive a shell, and then your typed commands are carried out on the other side.
 
-The secure part matters because server administration often crosses networks you do not fully control. Without encryption, someone positioned on the network could read commands, outputs, passwords, or sensitive file contents. SSH protects confidentiality and integrity for the session, which is why it replaced older plaintext remote-login habits for normal shell administration.
+The secure part matters because server administration can cross networks you do not control. SSH provides confidentiality and integrity protections for the session when appropriate algorithms are negotiated.
 
 SSH has two main sides. The SSH client is the program you run from your terminal, usually named `ssh`. The SSH server is the service listening on the remote machine, commonly provided by OpenSSH on Linux systems. If the remote SSH service is not installed, not running, blocked by a firewall, or listening on a different port, your client will not open the session.
 
@@ -166,12 +145,12 @@ The connection sequence is not complicated, but naming each step makes failures 
 3. The server asks: "Who are you? Prove it."
 4. You provide proof (password or key -- more on this below)
 5. The server says: "Welcome, chef. Here's your terminal."
-6. Your prompt changes to show the remote server's name
-7. Every command you type now runs on the REMOTE server
+6. A configured shell may display a different prompt
+7. Ordinary shell commands you type now run on the REMOTE server
 8. Type "exit" to disconnect and return to your local terminal
 ```
 
-Your prompt might change from a local-looking prompt to a remote-looking prompt. Treat that as a helpful clue, not as the only proof. A prompt is text generated by a shell configuration, while `hostname` asks the operating system directly.
+Your prompt might change from a local-looking prompt to a remote-looking prompt. The following prompts are illustrative. Treat a prompt as a clue, not proof: shell configuration can change it, and different machines can share a hostname.
 
 ```text
 yourname@your-laptop ~ $
@@ -200,7 +179,7 @@ Pause and predict: if you open an SSH connection to a remote server using `ssh c
 <details>
 <summary>Check your prediction</summary>
 
-It prints `chef`, because the command executes inside the remote session under the remote user account you authenticated as during login. If you expected your local laptop username, you were thinking about where your physical keyboard is located rather than where the active shell process is evaluating its environment variables.
+It may print `chef` if the remote environment sets `USER` to that value. Environment variables can be unset or changed, so use `whoami` to check the effective account rather than relying on `USER` alone.
 
 </details>
 
@@ -212,12 +191,12 @@ The default SSH port is usually 22, but real systems sometimes choose a differen
 | `-i` | Use a specific key file | `ssh -i ~/.ssh/mykey chef@server.com` |
 | `-v` | Verbose mode (shows what's happening -- useful for debugging) | `ssh -v chef@server.com` |
 
-Pause and predict: before running `ssh -v chef@server.com`, what kind of output do you expect to see on your screen during connection negotiation, and will enabling verbose mode alter how the remote shell behaves once connected?
+Pause and predict: before running `ssh -v chef@server.com`, what kind of output do you expect during connection negotiation?
 
 <details>
 <summary>Check your prediction</summary>
 
-You should expect detailed diagnostic trace text showing every phase of the connection handshake—including DNS address resolution, TCP port handshakes, server host-key verification, cipher selection, and authentication credential exchanges—before the login succeeds or fails. Verbose output exists purely for troubleshooting observation; it does not change the behavior, permissions, or shell environment of the remote host.
+Expect debugging messages about the client's progress. The messages depend on how far the connection gets and can help diagnose connection, authentication, and configuration problems. Treat the output as potentially sensitive.
 
 </details>
 
@@ -238,29 +217,25 @@ Authentication is the step where the server decides whether you are allowed to b
 ```bash
 ssh chef@kitchen.example.com
 # Server asks: chef@kitchen.example.com's password:
-# You type your password (it won't show on screen -- that's normal)
+# Type your password at the prompt; it may not be displayed.
 ```
 
-SSH intentionally hides password input. The absence of dots, asterisks, or moving characters is not a bug; it prevents someone nearby from learning password length. The correct response is to type the password carefully and press Enter, not to paste it into a chat window, command line, or visible note because you think the prompt is frozen.
+Password input may not echo characters. Type it at the password prompt and press Enter; do not paste it into a chat window, command line, or visible note because the prompt appears frozen.
 
 Passwords have three practical weaknesses in server operations. Humans reuse them, attackers phish them, and automation handles them badly. A deployment script that waits for someone to type a password is not automation, while a deployment script that stores a reusable password in plain text creates a new secret-management problem.
 
-SSH keys solve a different version of the identity problem. Instead of sending a shared secret to the server, you keep a private key on your machine and place the matching public key on servers that should trust you. During login, the server can verify that your client possesses the private key without receiving the private key itself.
+With public-key authentication, you protect a private key on the client and arrange for the server to authorize its matching public key. The client signs authentication data with the private key; the server verifies the signature with the public key. The private key itself is not sent to the server. Server policy can require additional authentication.
 
 ```text
-You have a KEY (private key) -- kept on your computer, never shared.
-The server has a LOCK (public key) -- it knows what key fits.
-
 When you connect:
-1. You present your key
-2. The server checks: "Does this key fit my lock?"
-3. If yes: "Come in!" (no password needed)
-4. If no: "Access denied."
+Client: keeps the private key and signs authentication data.
+Server: checks that the public key is authorized and verifies the signature.
+The server may require another authentication step or reject the login.
 ```
 
-The original house-key analogy is useful as long as you keep the sharing rule exact. Your private key is the house key, and your public key is the lock information that servers can store. You may share the public key with systems that should allow your login, but you never share the private key because anyone who possesses it may be able to authenticate as you.
+Share the public key with systems that should allow your login, and protect the private key because someone who obtains it may be able to authenticate as you.
 
-Generating an Ed25519 key is usually done with `ssh-keygen`. You do not need to generate a new key just to read this module, but you should recognize the command and the default file names it creates. Ed25519 is widely recommended for modern SSH key use because it is compact, fast, and supported by current OpenSSH releases.
+OpenSSH's `ssh-keygen` can generate an Ed25519 key pair. You do not need to generate a key to read this module. If you try it, choose a new file name and avoid overwriting an existing key.
 
 ```bash
 ssh-keygen -t ed25519
@@ -273,15 +248,15 @@ The command commonly creates two files under your home directory's `.ssh` direct
 ~/.ssh/id_ed25519.pub  public key, copied to systems that should trust you
 ```
 
-On many Linux servers, the public keys allowed for an account live in `~/.ssh/authorized_keys` for that account. That file is not magic either; it is a list the SSH server checks during authentication. If your public key is present and file permissions allow the SSH service to read it safely, your matching private key can prove your identity.
+OpenSSH can use `~/.ssh/authorized_keys` for an account's authorized public keys. Server configuration and file ownership and permissions affect whether a key is accepted; a matching key alone does not guarantee login.
 
 ```text
 remote user home
 └── .ssh
-    └── authorized_keys   accepts matching private keys for this account
+    └── authorized_keys   may list public keys authorized for this account
 ```
 
-Host trust is separate from user authentication. The first time you connect to a new host, SSH may warn that the authenticity of the host has not been established and show a fingerprint. That is the client asking, "Am I really talking to the server I think I am talking to?" not the server asking who you are.
+Host trust is separate from user authentication. The first time you connect to a new host, SSH may warn that the authenticity of the host has not been established and show a fingerprint. The following prompt is synthetic. It illustrates the client asking whether you trust the host key, not the server asking who you are.
 
 ```text
 The authenticity of host 'localhost (127.0.0.1)' can't be established.
@@ -289,14 +264,14 @@ ED25519 key fingerprint is SHA256:AbCdEf123456...
 Are you sure you want to continue connecting (yes/no)?
 ```
 
-For a local practice connection to `localhost`, accepting the prompt is reasonable because the host is your own machine. For a production server, you should verify the fingerprint through a trusted source such as cloud console metadata, a team runbook, or an administrator-provided value. Blindly accepting changed host keys trains the exact habit SSH is trying to prevent.
+Before accepting a host key, including for `localhost`, compare its fingerprint with a value obtained through a trusted, independent channel. For a production host, the responsible administrator or an authenticated runbook may provide it. A name alone does not verify the key.
 
 Pause and predict: which access architecture would you choose for team administration and why: sharing a single administrative account password among five engineers, or issuing five separate SSH key pairs with five distinct public keys installed on the server?
 
 <details>
 <summary>Check your prediction</summary>
 
-The separate key pair architecture is far superior because each individual team member can be granted access, audited in server authentication logs, and revoked independently when someone leaves the project. Shared passwords eliminate individual accountability and make credential revocation dangerous, requiring every remaining person to coordinate changing the password simultaneously across multiple systems.
+Separate credentials let an administrator authorize and revoke each key independently. Whether activity can be attributed to a person also depends on account, logging, and key-management practices. A shared password must be changed for everyone when access is withdrawn.
 
 </details>
 
@@ -311,7 +286,7 @@ Your computer                          Remote server
     |                                       |  "Connection request received"
     |  <--- "Prove your identity" --------  |
     |                                       |
-    |  --- sends key/password ----------->  |
+    |  --- sends signature or password -->  |
     |                                       |  "Identity confirmed"
     |  <--- "Welcome! Here's a shell" ----  |
     |                                       |
@@ -328,7 +303,7 @@ Pause and predict: look closely at `BLANK 1` and `BLANK 2` in the lifecycle diag
 <details>
 <summary>Check your prediction</summary>
 
-`BLANK 1` represents command output: the remote operating system executes the requested binary, captures stdout and stderr, and transmits the resulting text back across the encrypted SSH connection to display in your local terminal. `BLANK 2` represents the `exit` command (or pressing `Ctrl + D` to send end-of-file), which closes the remote shell process, terminates the TCP session, and returns prompt control to your local workstation shell.
+`BLANK 1` represents output from the remote commands, displayed in your local terminal. `BLANK 2` represents the shell's `exit` command (or `Ctrl + D` to send end-of-file). After the shell exits, check that you have returned to the local session; other SSH channels can affect when the connection closes.
 
 </details>
 
@@ -352,7 +327,7 @@ pwd
 date
 ```
 
-The command `date` is included because time matters in troubleshooting. If logs are in UTC but your laptop clock displays local time, you may search the wrong window. The date output also confirms that the remote system clock is not wildly wrong, which can affect certificates, authentication, scheduled jobs, and log ordering.
+The command `date` helps you compare the displayed time and time zone with your logs. Compare it with a trusted clock before concluding that the system clock is correct.
 
 Connection failures are part of the lifecycle too. A timeout leaves routing, filtering, host availability, and addressing as hypotheses. A refusal suggests a missing listener or active rejection, possibly by an intermediary; it does not identify the cause alone. SSH's "Permission denied" indicates authentication failed after reaching an SSH service.
 
@@ -367,9 +342,9 @@ Exercise scenario: you are told to connect as `ubuntu` but you try `admin` three
 
 ## Practicing SSH Without a Cloud Server
 
-The safest first practice target is `localhost`, which is a standard name for your own machine. Connecting to `localhost` through SSH may feel like calling yourself on the phone, but it tests the same client, server, authentication, host-key, shell, command, and disconnect flow. The only difference is that the remote host happens to be the same physical computer.
+One practice target is `localhost`, your own computer, if an authorized SSH server is available. It lets you practice the client, server, authentication, host-key, shell, command, and disconnect flow without a separate machine. It does not test a remote network path.
 
-Before connecting, record your local context. This gives you something to compare after login and trains the muscle memory you will later use on cloud servers and Kubernetes nodes. If you use `ssh localhost`, the hostname may be identical before and after because both sides are the same machine, so the proof is the session establishment and the authentication flow rather than a different host name.
+Before connecting, record your local context. This gives you something to compare after login and trains the muscle memory you will later use on cloud servers and Kubernetes nodes. With `ssh localhost`, a matching hostname does not by itself show whether you are inside the SSH session. Use clues such as the connection output and, inside an SSH session, the `SSH_CONNECTION` environment variable (documented in ssh(1), ENVIRONMENT).
 
 ```bash
 hostname
@@ -377,13 +352,13 @@ whoami
 pwd
 ```
 
-On macOS, you may need to enable Remote Login before an SSH server accepts local connections. Open System Settings, go to General, then Sharing, and turn on Remote Login. After that, the command shape is the same as it would be for a server elsewhere.
+If you already have an authorized local SSH server, use the same command shape as for a server elsewhere. Otherwise, read the example without connecting.
 
 ```bash
 ssh localhost
 ```
 
-The first connection to a new host record often displays a host authenticity prompt. For this local exercise, answer `yes` when you intentionally connected to your own machine. Then enter your Mac password if prompted; the password characters will not appear while you type.
+The first connection to a new host record may display a host authenticity prompt. Verify the presented fingerprint independently before answering `yes`. The following prompt is synthetic, not a recording from a real host.
 
 ```text
 The authenticity of host 'localhost (127.0.0.1)' can't be established.
@@ -401,13 +376,13 @@ ls
 echo "Hello from SSH!"
 ```
 
-Disconnect cleanly when finished. Your prompt should return to the local shell after the remote shell exits. If you are unsure whether you are back, run `hostname` again and compare it with your notes.
+Disconnect cleanly when finished. Your prompt should return to the local shell after the remote shell exits. Because both shells run on the same machine, `hostname` alone cannot distinguish them; use the session clues above. A disconnect message may also appear.
 
 ```bash
 exit
 ```
 
-Optional server setup is only for a disposable Debian/Ubuntu VM that you own or are explicitly authorized to administer, with a console and a network restricted to the lab. Installing SSH exposes a login service; do not do this on a shared host or your everyday machine just to complete the lesson. The following commands install and start it in that VM. Skip setup and read the examples if no authorized VM is available.
+Optional server setup is only for a disposable Debian/Ubuntu VM that you own or are explicitly authorized to administer, with a console and a network restricted to the lab. Do not do this on a shared host or your everyday machine just to complete the lesson. Use the following setup commands only in that VM. Skip setup and read the examples if no authorized VM is available.
 
 ```bash
 sudo apt update
@@ -415,13 +390,13 @@ sudo apt install -y openssh-server
 sudo systemctl start ssh
 ```
 
-Then test the same local connection flow. If this fails, read the error text rather than retrying blindly. A missing service, blocked port, or wrong account name produces a different symptom than a wrong password.
+Then test the same local connection flow. If this fails, read the error text rather than retrying blindly. An error can narrow the investigation, but it may have more than one cause.
 
 ```bash
 ssh localhost
 ```
 
-After disconnecting, tear down the disposable VM through the same lab system that created it, including any lab-only network exposure. Do not blindly disable or remove an existing SSH service: another user may depend on it. On Windows, localhost setup depends on the installed server feature; practice command reading without changing services when no authorized disposable environment is available.
+After disconnecting, tear down the disposable VM through the same lab system that created it, including any lab-only network exposure. Do not blindly disable or remove an existing SSH service: another user may depend on it. Practice command reading without changing services when no authorized disposable environment is available. The following transcript is synthetic.
 
 ```text
 # This is what connecting to a real server would look like:
@@ -433,11 +408,11 @@ yourname@192.168.1.100's password:
 # After entering the password:
 yourname@remote-server:~$
 
-# Now every command runs on the remote server.
+# Ordinary shell commands now run on the remote server.
 # Type "exit" to disconnect.
 ```
 
-With an authorized cloud server, the lifecycle is still connect, authenticate, verify context, work, and disconnect. The following is documentation only: `192.0.2.24` is a reserved example address, not a connection target. Substitute only a host and account your lab owner has explicitly authorized; never probe an arbitrary public address copied from an example.
+With an authorized cloud server, the lifecycle is still connect, authenticate, verify context, work, and disconnect. The following transcript is synthetic: `192.0.2.24` is a reserved example address, not a connection target. Substitute only a host and account your lab owner has explicitly authorized; never probe an arbitrary public address copied from an example.
 
 ```text
 # Connect to a server in the cloud
@@ -447,7 +422,7 @@ ssh ubuntu@192.0.2.24
 ubuntu@training-server:~$
 
 # Now you're inside a Linux server in a data center somewhere
-# Every command runs there:
+# Ordinary shell commands run there:
 ls          # Shows files on the server
 pwd         # Shows your path on the server
 nano        # Opens nano on the server
@@ -457,39 +432,20 @@ cat /etc/os-release    # Shows the server's operating system
 exit
 ```
 
-Kubernetes does not remove this knowledge. In many managed clusters you rarely SSH to nodes, and that is usually a good thing because the cluster API should be the normal control surface. In learning labs, bare-metal clusters, emergency diagnostics, and some self-managed environments, SSH still appears, and the same local-versus-remote discipline protects you from misreading the machine you are operating.
 
 ## How SSH Thinking Transfers to Kubernetes
-
-Kubernetes introduces new nouns, but it does not repeal the old ones. A node is still a server, a process is still running somewhere, a file path still belongs to a particular machine or container, and an operator still needs to know the target before acting. The difference is that Kubernetes adds an API layer that can schedule work across many servers, so the target may be selected indirectly rather than by opening a shell to one host.
-
-In Kubernetes 1.35, you will usually inspect cluster resources through `kubectl` rather than by logging into every node. That is a higher-level habit and it is the right default for most workload questions. Still, the SSH mental model helps because `kubectl` has its own version of local versus remote: the command runs locally, the API request goes to the cluster, and the effect happens on resources managed by remote servers.
-
-Think about the chain from your keyboard to a workload. Your terminal sends a command to a local program. That program sends an authenticated request to the Kubernetes API server. The control plane stores or reads desired state, and worker nodes run the containers that satisfy that state. If you understand where each part runs, you will be less likely to blame your laptop for a node problem or blame a node for a local configuration problem.
-
-The same context habit becomes more specific later. With SSH you ask, "Which host, which user, which directory?" With Kubernetes you ask, "Which cluster, which namespace, which resource, which container?" The habit is identical even though the commands are different. You prove the target first because a correct command aimed at the wrong target is still a bad operation.
-
-For example, a future troubleshooting flow may start with `kubectl get pods` to identify a failing workload, then `kubectl logs` to read its container output, then `kubectl describe node` to inspect the node where it is scheduled. Most of that work should not require SSH. If the node itself has a disk, network, or system-service issue beyond what the cluster API explains, an operator may then open an SSH session to that specific node and use the same context checks from this module.
-
-The important lesson is not "SSH into everything." The important lesson is "know which control surface you are using." SSH controls a machine shell. `kubectl` controls Kubernetes resources through the Kubernetes API. A cloud console controls provider resources. Mixing those surfaces without naming them leads to confusion because each one has different permissions, audit trails, failure modes, and recovery paths.
-
-Exercise scenario: a pod fails because it is unable to write to a mounted volume, and a learner immediately wants to SSH to the worker node. A better first move is to inspect the pod events, volume configuration, namespace, and storage class through the Kubernetes API. SSH becomes reasonable only if the evidence points to a node-level condition such as a full disk, broken mount, or failed system service that the higher-level tools do not resolve.
-
-This transfer also explains why senior engineers can sound cautious about direct node access. Direct SSH can be necessary, but it bypasses some of the review and intent captured in Kubernetes resource definitions. If a manual node change fixes the symptom but never becomes documented configuration, the next node rebuild may erase it, and the team may rediscover the same problem later.
 
 The beginner-friendly way to keep this straight is to describe every action in a sentence before running it. "I am running a local command that opens a remote shell on host `x` as user `y`." "I am running a local command that asks the Kubernetes API for pods in namespace `z`." If that sentence does not come out clearly, pause until the target and control surface are both clear.
 
 ## Reading Prompts, Paths, and Output Carefully
 
-Remote work rewards slow reading. Many mistakes happen because the operator reads only the command they intended to type, not the output the system actually returned. SSH output often tells you whether the failure is network reachability, host trust, authentication, or remote shell startup, but only if you pause long enough to classify the message.
-
-Begin with the prompt, but do not stop there. A prompt such as `ubuntu@ip-10-0-1-25:~$` suggests a user, host, and directory, yet it is still a convention created by shell configuration. The stronger evidence comes from commands whose purpose is to ask the system directly. That is why this module repeats `hostname`, `whoami`, and `pwd` until they feel ordinary.
+Read the output as well as the command. A prompt such as `ubuntu@ip-10-0-1-25:~$` suggests a user, host, and directory, but shell configuration controls it. Use the context checks and host-key verification before acting.
 
 Paths deserve the same care. The path `/home/admin/app` on your laptop and `/home/admin/app` on a server can have identical spelling and entirely different contents. The path text alone does not identify the machine. You need the host context and the current session context before the path becomes meaningful.
 
 Output can also contain hints about privilege. If `whoami` prints `root`, your commands may have broad authority on the remote machine, and caution should increase. If it prints a regular account such as `ubuntu`, some commands may require `sudo`, and some files may be intentionally unavailable. Neither result is automatically good or bad; it tells you what kind of power the current shell has.
 
-The same careful reading helps with passwords and keys. If SSH says `Permission denied (publickey)`, the server may not accept password login at all, and typing your normal account password repeatedly will not help. If it says `Permission denied, please try again`, password authentication may be allowed but the value is wrong. If it never reaches an authentication message, you may be dealing with a network or service problem instead.
+The same careful reading helps with passwords and keys. If SSH says `Permission denied (publickey)`, check which authentication methods the server permits. `Permission denied, please try again` does not by itself establish why an attempt failed. If authentication never begins, investigate the connection or service first.
 
 Treat copied commands as drafts, not as truth. A runbook may contain the right pattern but the wrong host for your situation, or a teammate may paste a command from a staging environment while you are investigating production. Before pressing Enter, read the username, host, port, key path, and current shell context as separate pieces of information.
 
@@ -499,20 +455,18 @@ This is why the hands-on exercise asks for written notes. Writing the before and
 
 ## When This Applies and When It Does Not
 
-Use SSH when you need an interactive shell on a specific machine, a small remote command, secure file transfer through related tools, or a direct diagnostic path that the higher-level platform does not expose. It is especially useful in labs because it lets you feel the difference between your laptop and a server without introducing a full automation system too early.
+Use SSH when you need an interactive shell or a remote command on a specific machine, or a diagnostic path that a higher-level platform does not expose. A lab can make the difference between your laptop and a server concrete.
 
 Do not treat SSH as the only way to manage servers. Configuration management, cloud-init, immutable images, Kubernetes controllers, CI pipelines, and GitOps workflows exist because repeated manual shell work does not scale well. SSH is a sharp, useful tool, but if every production change requires a person typing commands into many hosts, the process will eventually drift.
 
 | Pattern | Use It When | Why It Works |
 |---------|-------------|--------------|
-| Verify context after login | You have just opened any SSH session | It proves machine, user, and directory before risky commands |
+| Verify context after login | You have just opened any SSH session | It supplies clues about machine, user, and directory before risky commands |
 | Prefer individual SSH keys | Multiple people or systems need access | Access can be granted and revoked without sharing one secret |
 | Keep manual SSH changes small | You are learning or diagnosing a narrow issue | Small changes are easier to reason about, record, and undo |
 | Move repeated work into automation | The same command must run on many servers | Automation reduces drift and makes review possible before execution |
 
-The strongest beginner pattern is "connect, verify, then act." It sounds almost too simple, but it generalizes. You will later use the same idea with Kubernetes contexts and namespaces: select the target, prove the target, then run the command. The technology changes, but the safety pattern remains recognizable.
-
-The matching anti-pattern is "prompt blindness." Prompt blindness happens when the terminal looks familiar enough that you stop seeing where it points. Teams fall into it because local and remote shells both accept the same command language, and because productive operators move quickly. The fix is not fear; the fix is a tiny verification ritual that survives speed.
+Connect, verify the target, then act. A familiar prompt alone is not enough to establish context.
 
 ## Decision Framework
 
@@ -524,18 +478,13 @@ Choose your remote-access method by asking what level of control you need, how o
 | Inspect one server interactively | SSH with context checks | Fast and direct, but easy to forget documentation |
 | Copy a public key to allow login | SSH account setup process | Simple for small teams, but needs ownership and revocation discipline |
 | Change many servers the same way | Automation or configuration management | More setup, but safer review and repeatability |
-| Work with Kubernetes workloads | Kubernetes API through `kubectl` | Higher-level and auditable, but node-level issues may still need SSH |
-
-The decision also depends on whether the server is cattle or a pet. A pet server is lovingly modified in place, which can be understandable in a small lab but dangerous at scale. A cattle-style server is replaceable from configuration, and direct SSH becomes a diagnostic escape hatch rather than the normal way to make changes.
 
 When in doubt, start with observation rather than mutation. Connect, verify context, read files, inspect service state, and write down what you see. Only after the target and problem are clear should you edit files, restart services, or delete data. This bias toward observation is one of the habits that separates calm operations from frantic guessing.
 
 ## Did You Know?
 
 - **SSH's architecture is standardized in RFC 4251.** The RFC describes SSH as secure remote login and other secure network services over an insecure network, which is exactly the beginner mental model you need before server work becomes routine.
-- **Port 22 is the registered default SSH port.** The IANA service-name registry assigns `ssh` to TCP port 22, which is why examples and firewall rules often mention 22 unless an administrator deliberately chooses another port.
-- **OpenSSH first appeared in 1999 as part of the OpenBSD project.** It became the common SSH implementation on Unix-like systems because it provided a free, practical suite for remote login, remote command execution, and related secure operations.
-- **Kubernetes 1.35 still runs on servers called nodes.** Even when you use the Kubernetes API instead of SSH for normal workload management, node identity, remote execution, and careful context checks remain part of the operational vocabulary.
+- **OpenSSH defaults to port 22.** An administrator can configure another port.
 
 ## Common Mistakes
 
@@ -543,26 +492,26 @@ When in doubt, start with observation rather than mutation. Connect, verify cont
 |---------|----------------|---------------|
 | Sharing your private key | People confuse the private key with the public key because both files have similar names | Never share `id_ed25519`; share only `id_ed25519.pub` or another public key file |
 | Forgetting you are on a remote server | The terminal window looks the same after login, so the operator relies on habit | Run `hostname`, `whoami`, and `pwd` after connecting and before changing anything |
-| Typing a password into the wrong place | SSH hides password input, which makes beginners think the prompt is not receiving keystrokes | Type the password at the SSH prompt, expect no visible characters, and press Enter |
+| Typing a password into the wrong place | A password prompt may not display keystrokes | Type the password at the SSH prompt and press Enter |
 | Using the wrong remote username | Cloud images and lab environments often use account names such as `ubuntu`, `ec2-user`, or `admin` | Read the lab or provider instructions and put the correct user before the `@` sign |
 | Ignoring host key warnings | People treat the warning as a nuisance instead of a host identity check | Verify the fingerprint through trusted documentation or an administrator before accepting it |
-| Leaving sessions open after the task | The terminal stays connected because nothing forces the user to close the shell | Type `exit` or press `Ctrl + D`, then confirm you are back at the local prompt |
+| Leaving sessions open after the task | A session can remain open after the work ends | Type `exit` or press `Ctrl + D`, then confirm you are back at the local prompt |
 | Automating with passwords | A script that needs a human password prompt feels easy at first but breaks unattended operation | Use key-based authentication with proper secret handling and per-system access controls |
-| Panicking when a connection drops | Network interruptions feel like data loss when the remote/local model is new | Reconnect, verify context again, and remember that remote files remain on the server |
+| Panicking when a connection drops | Network interruptions make the remote state uncertain | Reconnect through an authorized path, verify context, and inspect the remote state |
 
 ## Quiz
 
 <details>
 <summary>Question 1: You SSH into a server, run `hostname`, and it shows your laptop name. What do you check before running any more commands?</summary>
 
-You should first decide whether the SSH connection actually succeeded or whether you are already back in your local shell. A local hostname after an attempted remote login usually means the connection failed, you exited without noticing, or you connected to `localhost` intentionally. Check the command output above the prompt, run `whoami` and `pwd`, and reconnect only after you know which shell is active. The safe response is to stop and verify context, not to continue with server commands.
+Check whether the SSH connection succeeded or you are back in your local shell. A failed connection, an exited session, a localhost connection, or two machines sharing a hostname could explain the result. Check the connection output, `whoami` and `pwd`; verify the host identity independently before proceeding.
 
 </details>
 
 <details>
 <summary>Question 2: Your teammate asks you to send your private key so they can log in quickly. What should you do instead?</summary>
 
-You should refuse to share the private key and ask the teammate to generate their own key pair. They can send you their public key, which can then be added to the appropriate account on the server if they are authorized. This preserves individual accountability and makes later revocation possible without replacing your own key. The private key is proof of your identity, so sending it turns your identity into a shared credential.
+You should refuse to share the private key and ask the teammate to generate their own key pair. They can send you their public key, which can then be added to the appropriate account on the server if they are authorized. Separate keys permit independent revocation; attribution also depends on logging and account practices. Sharing a private key makes it a shared credential.
 
 </details>
 
@@ -574,9 +523,9 @@ The public key belongs on the database server, usually in the target account's `
 </details>
 
 <details>
-<summary>Question 4: You are connected to `ssh admin@10.0.0.5` and run `touch recipe.txt`. Where is the file created, and how can you prove it?</summary>
+<summary>Question 4: You are connected to `ssh admin@10.0.0.5` and run `touch recipe.txt`. Where does the command target, and how can you check whether it succeeded?</summary>
 
-The file is created on the remote machine at `10.0.0.5`, in the current directory of the remote shell. You can prove the context by running `hostname`, `whoami`, and `pwd` before or after the command, then listing the directory with `ls`. Your keyboard and terminal window are local, but the shell receiving commands is remote. If you type `exit` and then run `ls` locally, you are looking at a different file system context.
+The command targets the current directory of the remote shell at `10.0.0.5`; it may fail. Check the exit status immediately, then inspect the remote directory with `ls`. Use `hostname`, `whoami`, and `pwd` to check context. After `exit`, a local `ls` checks the local directory instead.
 
 </details>
 
@@ -595,7 +544,7 @@ Manual SSH does not scale cleanly because each server becomes a separate chance 
 </details>
 
 <details>
-<summary>Question 7: After connecting to a new production host, SSH warns that the host key changed. What is the careful response?</summary>
+<summary>Question 7: While connecting to a production host, SSH warns that the host key changed. What is the careful response?</summary>
 
 Stop and verify the host identity through a trusted source before accepting the changed key. A changed host key can be harmless if the server was rebuilt, but it can also indicate that you are not talking to the machine you expect. Ask for the expected fingerprint from the runbook, cloud console, or responsible administrator. Continuing blindly defeats one of SSH's core protections.
 
@@ -608,25 +557,25 @@ This exercise uses `localhost` so you can practice the SSH lifecycle without nee
 Work slowly enough to record evidence at each stage. A good operator's notes are simple: the command used, the host observed, the user observed, the directory observed, and the command used to disconnect. Those notes make it obvious whether the session was local, remote, or a loopback connection to the same machine.
 
 - [ ] Record your local context by running `hostname`, `whoami`, and `pwd` before any SSH command.
-- [ ] Open an SSH connection to `localhost`, accepting the first-time host prompt only if you intentionally connected to your own machine.
+- [ ] Open an SSH connection to `localhost`, accepting the first-time host key only after independently verifying its fingerprint.
 - [ ] Inside the SSH session, run `hostname`, `whoami`, `pwd`, `ls`, and `echo "Hello from SSH!"`.
-- [ ] Disconnect with `exit`, then run `hostname` again to confirm you are back at a local prompt.
+- [ ] Disconnect with `exit`, then use the session clues above and run `hostname` again to compare with your local notes.
 - [ ] Write one sentence explaining whether the hostname changed and why that result makes sense for `localhost`.
 - [ ] Build, but do not run, the command that would connect as `admin` to `10.0.0.5` on port `2222` with key file `~/.ssh/work_key`.
-- [ ] Diagnose the three connection failures in Incident A by matching each error symptom to its failure layer and identifying the initial diagnostic command.
+- [ ] Diagnose the three connection failures in Incident A by matching each error symptom to its failure layer and identifying an initial diagnostic check.
 - [ ] Analyze Incident B to identify the command's reported target and the missing exit-status/file checks, without claiming unverified file creation.
 - [ ] Evaluate the changed host key warning in Incident C to explain why immediate key removal is hazardous and detail the out-of-band verification procedure.
 
 <details>
 <summary>Solution guidance</summary>
 
-Your local context block should show the machine, user, and directory before connection. The localhost SSH command is `ssh localhost`, though some systems may require a username such as `ssh yourname@localhost` depending on account setup. Inside the SSH session, the command output may look very similar because the remote endpoint is the same physical computer, but the SSH authentication and shell lifecycle still happened. The final command for the remote example is `ssh -p 2222 -i ~/.ssh/work_key admin@10.0.0.5`.
+Your local context block should show the machine, user, and directory before connection. The localhost SSH command is `ssh localhost`, though some systems may require a username such as `ssh yourname@localhost` depending on account setup. Inside the SSH session, the command output may look very similar because the endpoint is local, but the SSH authentication and shell lifecycle still happened. The final command for the remote example is `ssh -p 2222 -i ~/.ssh/work_key admin@10.0.0.5`.
 
 </details>
 
 ### Diagnostic Challenge: SSH Failure Layers and Context Evidence
 
-The guided steps above followed a predictable recipe where the server and credentials were known in advance. In actual infrastructure operations, SSH issues arrive without recipes: a teammate cannot reach a newly deployed host, a connection is rejected during a high-priority incident, or an engineer runs commands without knowing whether the changes landed on their laptop or a remote server. In this unguided challenge, examine three frozen terminal transcripts. For each incident, identify the failing layer or machine context, point to the exact evidence in the transcript, and determine the safest immediate next step.
+In this unguided challenge, examine three synthetic terminal transcripts. They are examples, not recordings of real incidents. For each, identify the failing layer or machine context, point to the evidence, and determine a safe next step.
 
 ```text
 # Terminal session 1:
@@ -642,7 +591,8 @@ $ ssh -i ~/.ssh/id_ed25519 devops@198.51.100.26
 devops@198.51.100.26: Permission denied (publickey).
 ```
 
-Examine the three recorded errors. A team lead initially claims all servers suffered the same crash. Explain what each symptom establishes, which causes remain hypotheses, and which authorized check would narrow them. Distinguish connection establishment from authentication without pretending each error identifies a unique failing device or mechanism.
+Examine the three synthetic errors. A team lead initially claims all servers suffered the same crash. Explain what each symptom establishes, which causes remain hypotheses, and which authorized check would narrow them. Distinguish connection establishment from authentication without pretending each error identifies a unique failing device or mechanism. Optional transfer: a teammate sees the same host-key warning after a planned test-server rebuild. Explain what independent evidence you would obtain before changing `known_hosts`, and what you would do if the fingerprints differ.
+<details><summary>Hint 1</summary>Decide whether each message occurs before or during authentication.</details><details><summary>Hint 2</summary>Separate what the message reports from explanations that still need evidence.</details><details><summary>Hint 3</summary>For session 3, consider whether `-i` proves which identity was offered; verbose output can help you check.</details>
 
 <details>
 <summary>Diagnosis and layer analysis for Incident A</summary>
@@ -730,19 +680,19 @@ While investigating an alert on an API server, an engineer encounters the securi
 <summary>Diagnosis and host-trust analysis for Incident C</summary>
 
 **Security Layer and Mechanism:**
-This alert is triggered by the SSH Host Identity Trust layer (specifically client-side host key validation via `~/.ssh/known_hosts`). The client compares the cryptographic public host key presented by `prod-api.example.com` against the fingerprint recorded during the initial trusted connection. Because the key does not match, the SSH client terminates the connection to protect the user from sending credentials or commands to an untrusted endpoint.
+The client compares the presented public host key with the key recorded in `~/.ssh/known_hosts`. In this synthetic example the keys differ and host-key verification fails. The warning does not establish why the key changed.
 
 **Hazard of Immediate Key Removal:**
-OpenSSH displays this warning specifically to guard against Man-in-the-Middle (MITM) attacks, DNS spoofing, or ARP poisoning, where an attacker intercepts network traffic and impersonates the destination server. Running `ssh-keygen -R` immediately wipes the stored fingerprint and blinds the operator to potential interception. If an attacker is actively spoofing the host, blindly deleting the record and accepting the new key will hand your credentials and private session traffic directly to the attacker.
+The mismatch may indicate interception or a legitimate change. Removing the stored host-key record before verification discards the comparison that produced the warning; blindly accepting a replacement can expose the session to an impostor.
 
 **Benign Causes vs Attack Scenarios:**
-A host key change is frequently benign in cloud environments—for example, if the instance was reprovisioned from a fresh operating system image, rebuilt by an automated pipeline, or if an elastic IP address was reassigned to a new virtual machine. However, the engineer must never guess or assume benign re-imaging without independent confirmation.
+A rebuild or a different machine at the same address may explain a change. Neither explanation is established by the warning; verify the expected key independently.
 
 **Required Verification Procedure:**
 1. Stop connection attempts immediately; do not delete line 42 from `~/.ssh/known_hosts`.
-2. Contact the server administrator or inspect authoritative out-of-band infrastructure sources (such as cloud provider instance system logs, cloud-init provisioning logs, or Terraform/Ansible deployment outputs) to obtain the authentic public key fingerprint generated on the host.
+2. Obtain the expected host-key fingerprint from the administrator through an authenticated, independent channel.
 3. Compare the verified fingerprint against the fingerprint reported in the warning banner (`SHA256:uR9v8Kx3Jb5Pq1Lm9N0w2Z4y7Xa6Ce8Gh0Ik2Mo4Qs8`).
-4. If and only if the fingerprints match precisely: remove the obsolete key from the local registry using `ssh-keygen -R prod-api.example.com` and reconnect, verifying the fingerprint prompt before typing `yes`. If the fingerprints do not match, escalate the incident immediately to security and network operations as an unauthorized host replacement or network interception event.
+4. If the fingerprints match and the change is authorized, remove the obsolete host record using `ssh-keygen -R prod-api.example.com` and reconnect, verifying the fingerprint prompt before typing `yes`. If they do not match, stop and escalate the unexplained mismatch for investigation.
 
 </details>
 
