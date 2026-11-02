@@ -594,12 +594,13 @@ def _module_budget_slug(module_path: str) -> str:
     return rel.replace("/", "__")
 
 
-def _declared_body_budget(module_path: Path) -> dict[str, object]:
-    """Report an explicit per-page budget sidecar. Diagnostic only (#3744).
+def _reject_json_constant(name: str) -> object:
+    raise ValueError(f"non-standard JSON constant {name}")
 
-    A budget is never a gate, tier input or acceptance evidence, and there is no
-    default. Malformed data is surfaced as ``malformed`` instead of being coerced.
-    """
+
+def _declared_body_budget(module_path: Path) -> dict[str, object]:
+    """Report an explicit per-page budget sidecar: diagnostic only, no default (#3744).
+    Malformed data is surfaced as ``malformed``, never coerced into a floor."""
     sidecar_path = REPO_ROOT / ".pipeline" / "budgets" / f"{_module_budget_slug(str(module_path))}.json"
     try:
         raw = sidecar_path.read_text(encoding="utf-8")
@@ -608,8 +609,8 @@ def _declared_body_budget(module_path: Path) -> dict[str, object]:
     except (OSError, ValueError) as exc:  # ValueError covers UnicodeDecodeError
         return {"status": "malformed", "reason": f"unreadable: {exc.__class__.__name__}"}
     try:
-        sidecar = json.loads(raw)
-    except ValueError:
+        sidecar = json.loads(raw, parse_constant=_reject_json_constant)
+    except (ValueError, RecursionError):  # RecursionError: nesting past the decoder limit
         return {"status": "malformed", "reason": "not valid JSON"}
     value = sidecar.get("body_words_min") if isinstance(sidecar, dict) else None
     if isinstance(value, int) and not isinstance(value, bool) and value > 0:
@@ -1673,13 +1674,9 @@ def gate_results(
     skip_source_check: bool,
     source_h1: dict[str, object] | None = None,
 ) -> dict[str, bool | None]:
-    """Blocking defects only (#3744).
-
-    Source, render, executable-safety, unsupported-anecdote and outcome-alignment
-    protections stay. Length, density and template quantities never gate, tier or
-    reward; they stay visible in the record's ``metrics``, ``structure`` and ``sources``
-    blocks. ``passed`` therefore means "no blocking verifier defect", not coverage or
-    acceptance evidence.
+    """Blocking defects only (#3744). Length, density and template quantities never gate,
+    tier or reward; they stay visible in ``metrics``, ``structure`` and ``sources``.
+    ``passed`` means "no blocking verifier defect", not coverage or acceptance evidence.
     """
     quiz_count = int(structure["quiz_count"])
     gates: dict[str, bool | None] = {
