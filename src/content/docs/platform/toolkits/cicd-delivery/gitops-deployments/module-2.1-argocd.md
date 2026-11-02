@@ -225,8 +225,8 @@ helm upgrade --install argocd argo/argo-cd \
   --set controller.replicas=1
 ```
 
-The application controller is commonly kept as a single active reconciler because it coordinates sync state and uses
-leader election when multiple replicas are configured. Scaling ArgoCD is therefore not just "increase every Deployment."
+The application controller can shard clusters across replicas. To enable sharding, set the StatefulSet replica count and
+`ARGOCD_CONTROLLER_REPLICAS` to the same number. Scaling Argo CD is not just "increase every Deployment."
 Repo-server replicas help when rendering is expensive, API-server replicas help with UI and CLI concurrency, and controller
 tuning helps when many applications reconcile at once. Treat those as different bottlenecks, not one generic capacity knob.
 

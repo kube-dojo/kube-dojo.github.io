@@ -12,7 +12,7 @@ sidebar:
 
 By the end of this module, you will be able to apply the following serving skills in production-style designs and labs:
 - **Design** robust, scalable model serving architectures utilizing load balancers, API gateways, and specialized inference serving layers.
-- **Evaluate** and **compare** advanced, framework-specific serving solutions (Triton, TorchServe) against general-purpose web frameworks for production workloads.
+- **Evaluate** and **compare** framework-specific serving solutions such as Triton against general-purpose web frameworks for production workloads, and recognize TorchServe as a legacy option.
 - **Implement** canary rollouts on Kubernetes v1.35+ and explain when blue-green cutover is preferable for instant rollback.
 - **Diagnose** production bottlenecks by implementing rigorous request validation, health checks, and graceful shutdown patterns.
 - **Debug** misconfigured serving infrastructures by analyzing resource saturation and latency telemetry.
@@ -25,7 +25,7 @@ A serving-focused reading of this kind of failure is instructive: had the system
 
 Model serving is where machine learning becomes a product. Training optimizes accuracy on historical data; serving optimizes reliability, latency, throughput, and safe change under live traffic. A classifier that scores well offline can still harm users if the API returns 500 errors during rollout, if GPU memory spikes under batch load, or if a new model version silently degrades tail latency for your most active customers. Serving engineers therefore design around failure modes that data scientists rarely encounter in notebooks: cold starts, queue buildup, protocol overhead, accelerator saturation, schema drift between training and inference, and the human cost of an incident at 2 a.m.
 
-The durable pattern across every stack—whether you choose FastAPI, KServe, Seldon Core, BentoML, Triton, TorchServe, or vLLM—is the same. You expose a versioned inference endpoint behind load balancing and health gating, you measure latency and error budgets continuously, you batch or scale to match hardware economics, and you roll out changes progressively so a bad artifact never takes 100% of traffic instantly. You also document which metric proves success for each model—latency for routing, calibration for risk, conversion for recommendations—because serving without an evaluation contract invites endless post-incident arguments. This module teaches that spine tool-agnostically and uses concrete frameworks as worked examples.
+Across serving stacks such as FastAPI, KServe, Seldon Core, BentoML, Triton, and vLLM, the pattern is similar. You expose a versioned inference endpoint behind load balancing and health gating, measure latency and error budgets, batch or scale to match hardware costs, and roll out changes progressively. Document which metric measures success for each model, such as latency for routing or calibration for risk. This module uses concrete frameworks as examples.
 
 ## Did You Know?
 
@@ -605,7 +605,7 @@ When teams ask "which server is best," translate the question into workload cons
 
 ### Framework Comparison
 
-| Feature | FastAPI | TorchServe | Triton | TF Serving |
+| Feature | FastAPI | TorchServe (legacy) | Triton | TF Serving |
 |---|---|---|---|---|
 | Framework | Any | PyTorch | Multi | TensorFlow |
 | Protocol | REST | REST/gRPC | REST/gRPC | REST/gRPC |
@@ -613,7 +613,7 @@ When teams ask "which server is best," translate the question into workload cons
 | GPU Support | Manual | Built-in | Built-in | Built-in |
 | Model Format | Any | TorchScript | ONNX/TRT | SavedModel |
 | Complexity | Low | Medium | High | Medium |
-| Use Case | Simple APIs | PyTorch models | High perf multi-model | TF models |
+| Use Case | Simple APIs | Inherited PyTorch deployments | High perf multi-model | TF models |
 
 Choosing between custom FastAPI and a dedicated server is a capacity and governance question. FastAPI wins when models are small, traffic is moderate, and teams want full control in Python. Triton wins when dynamic batching, multi-model GPU sharing, or standardized metrics matter more than writing your own handlers; TorchServe remains relevant only for legacy PyTorch fleets you have not yet migrated. KServe and Seldon add Kubernetes CRDs and traffic policies when platform teams must enforce uniform rollouts across dozens of models owned by different product groups.
 

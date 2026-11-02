@@ -119,7 +119,7 @@
     },
     {
       "claim_id": "C009",
-      "claim_text": "TorchServe is jointly maintained by Amazon and Meta and supports batched inference, multi-model management, and metrics.",
+      "claim_text": "TorchServe was developed by AWS and Meta, supports batched inference and multi-model management, and is no longer actively maintained.",
       "claim_class": "vendor_capability",
       "span_hint": "section: TorchServe",
       "disposition": "supported",
@@ -129,7 +129,7 @@
       "anchor_text": null,
       "suggested_rewrite": null,
       "lesson_point_url": null,
-      "rationale": "The TorchServe GitHub README and repository disclaimer directly support the maintainers and capability list."
+      "rationale": "The TorchServe GitHub README describes its capabilities and states that the project is no longer actively maintained."
     },
     {
       "claim_id": "C010",
