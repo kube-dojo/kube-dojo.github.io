@@ -1,8 +1,10 @@
-"""Tests for per-module body-word floor sidecar behavior."""
+"""Per-module body-word budget sidecars are reported diagnostics only (#3744)."""
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -29,14 +31,15 @@ def _module_slug_for_budgets(root: Path, module_path: Path) -> str:
     return module_path.relative_to(root / "src" / "content" / "docs").as_posix().replace("/", "__")
 
 
-def test_verify_module_body_word_floor_uses_default_5000(tmp_path, monkeypatch) -> None:
+def test_verify_module_has_no_default_body_word_floor(tmp_path, monkeypatch) -> None:
     module = _make_module(tmp_path / "src/content/docs/c1/module.md")
     monkeypatch.setattr(verify_module, "REPO_ROOT", tmp_path)
     result = verify_module.verify(module, skip_source_check=True, max_workers=1)
-    assert result["gates"]["body_words_floor_met"] is False
+    assert "body_words_floor_met" not in result["gates"]
+    assert result["declared_body_budget"] == {"status": "none"}
 
 
-def test_verify_module_body_word_floor_reads_sidecar_3000(tmp_path, monkeypatch) -> None:
+def test_verify_module_reports_sidecar_3000_without_gating(tmp_path, monkeypatch) -> None:
     module = _make_module(tmp_path / "src/content/docs/c1/module.md")
     budgets = tmp_path / ".pipeline" / "budgets"
     budgets.mkdir(parents=True, exist_ok=True)
@@ -46,10 +49,12 @@ def test_verify_module_body_word_floor_reads_sidecar_3000(tmp_path, monkeypatch)
         encoding="utf-8",
     )
     monkeypatch.setattr(verify_module, "REPO_ROOT", tmp_path)
-    assert verify_module.verify(module, skip_source_check=True, max_workers=1)["gates"]["body_words_floor_met"] is True
+    result = verify_module.verify(module, skip_source_check=True, max_workers=1)
+    assert result["declared_body_budget"] == {"status": "declared", "body_words_min": 3000}
+    assert "body_words_floor_met" not in result["gates"]
 
 
-def test_verify_module_body_word_floor_reads_sidecar_4000(tmp_path, monkeypatch) -> None:
+def test_verify_module_reports_sidecar_4000_without_gating(tmp_path, monkeypatch) -> None:
     module = _make_module(tmp_path / "src/content/docs/c1/module.md")
     budgets = tmp_path / ".pipeline" / "budgets"
     budgets.mkdir(parents=True, exist_ok=True)
@@ -59,4 +64,18 @@ def test_verify_module_body_word_floor_reads_sidecar_4000(tmp_path, monkeypatch)
         encoding="utf-8",
     )
     monkeypatch.setattr(verify_module, "REPO_ROOT", tmp_path)
-    assert verify_module.verify(module, skip_source_check=True, max_workers=1)["gates"]["body_words_floor_met"] is False
+    result = verify_module.verify(module, skip_source_check=True, max_workers=1)
+    assert result["declared_body_budget"] == {"status": "declared", "body_words_min": 4000}
+    assert "body_words_floor_met" not in result["gates"]
+
+
+@pytest.mark.parametrize("raw", ['{"body_words_min": 1000, "x": NaN}', '{"body_words_min": 1000, "x": -Infinity}', "too deep"])
+def test_nonstandard_or_too_deep_sidecar_json_is_malformed(tmp_path, monkeypatch, raw) -> None:
+    module = _make_module(tmp_path / "src/content/docs/c1/module.md")
+    sidecar = tmp_path / ".pipeline" / "budgets" / f"{_module_slug_for_budgets(tmp_path, module)}.json"
+    sidecar.parent.mkdir(parents=True)
+    sidecar.write_text('{"body_words_min": 1000}' if raw == "too deep" else raw, encoding="utf-8")
+    if raw == "too deep":  # decoder nesting limits differ by Python version, so force the failure
+        monkeypatch.setattr(verify_module.json, "loads", lambda *a, **k: (_ for _ in ()).throw(RecursionError()))
+    monkeypatch.setattr(verify_module, "REPO_ROOT", tmp_path)
+    assert verify_module._declared_body_budget(module)["status"] == "malformed"

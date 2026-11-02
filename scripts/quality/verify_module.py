@@ -594,19 +594,28 @@ def _module_budget_slug(module_path: str) -> str:
     return rel.replace("/", "__")
 
 
-def _body_words_floor_for_module(module_path: Path) -> int:
+def _reject_json_constant(name: str) -> object:
+    raise ValueError(f"non-standard JSON constant {name}")
+
+
+def _declared_body_budget(module_path: Path) -> dict[str, object]:
+    """Report an explicit per-page budget sidecar: diagnostic only, no default (#3744).
+    Malformed data is surfaced as ``malformed``, never coerced into a floor."""
     sidecar_path = REPO_ROOT / ".pipeline" / "budgets" / f"{_module_budget_slug(str(module_path))}.json"
     try:
-        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return 5000
-    body_words_min = sidecar.get("body_words_min") if isinstance(sidecar, dict) else None
-    if isinstance(body_words_min, bool):
-        return 5000
+        raw = sidecar_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {"status": "none"}
+    except (OSError, ValueError) as exc:  # ValueError covers UnicodeDecodeError
+        return {"status": "malformed", "reason": f"unreadable: {exc.__class__.__name__}"}
     try:
-        return int(body_words_min)
-    except (TypeError, ValueError):
-        return 5000
+        sidecar = json.loads(raw, parse_constant=_reject_json_constant)
+    except (ValueError, RecursionError):  # RecursionError: nesting past the decoder limit
+        return {"status": "malformed", "reason": "not valid JSON"}
+    value = sidecar.get("body_words_min") if isinstance(sidecar, dict) else None
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return {"status": "declared", "body_words_min": value}
+    return {"status": "malformed", "reason": "body_words_min must be a positive integer"}
 
 
 def _strip_frontmatter(text: str) -> tuple[dict[str, object], str]:
@@ -1654,7 +1663,6 @@ def alignment_metrics(text: str) -> dict[str, object]:
 
 
 def gate_results(
-    metrics: dict[str, float | int],
     structure: dict[str, object],
     sources: dict[str, object],
     anti_leak: dict[str, object],
@@ -1665,28 +1673,19 @@ def gate_results(
     alignment: dict[str, object],
     skip_source_check: bool,
     source_h1: dict[str, object] | None = None,
-    body_words_floor: int = 5000,
 ) -> dict[str, bool | None]:
+    """Blocking defects only (#3744). Length, density and template quantities never gate,
+    tier or reward; they stay visible in ``metrics``, ``structure`` and ``sources``.
+    ``passed`` means "no blocking verifier defect", not coverage or acceptance evidence.
+    """
     quiz_count = int(structure["quiz_count"])
     gates: dict[str, bool | None] = {
         "gate_no_source_h1": not source_h1["violation"] if source_h1 is not None else True,
-        "density_mean_wpp_30": float(metrics["mean_wpp"]) >= 30,
-        "density_median_wpp_28": float(metrics["median_wpp"]) >= 28,
-        "density_short_rate_20pct": float(metrics["short_paragraph_rate"]) <= 0.20,
-        "density_max_consecutive_short_2": int(metrics["max_consecutive_short_run"]) <= 2,
-        "body_words_floor_met": int(metrics["body_words"]) >= int(body_words_floor),
-        "sentence_length_12_28": 12 <= float(metrics["mean_sentence_length"]) <= 28,
         "structure_sections_present": bool(structure["has_learning_outcomes"])
-        and 3 <= int(structure["learning_outcome_count"]) <= 5
         and bool(structure["has_why_matters"])
         and bool(structure["next_module_link"]),
         "structure_order_correct": bool(structure["section_order_correct"]),
-        "structure_did_you_know_4": int(structure["did_you_know_count"]) == 4,
-        "structure_common_mistakes_6_8": 6 <= int(structure["common_mistakes_rows"]) <= 8,
-        "structure_quiz_6_8_with_details": 6 <= quiz_count <= 8
-        and int(structure["quiz_with_details"]) == quiz_count,
-        "structure_hands_on_checkboxes": int(structure["hands_on_checkboxes"]) >= 3,
-        "sources_min_10": int(sources["count"]) >= 10,
+        "structure_quiz_answers_have_details": int(structure["quiz_with_details"]) == quiz_count,
         "sources_all_reachable": None
         if skip_source_check
         else not any(int(sources["url_status"].get(key, 0)) for key in ("404", "fetch_failed")),  # type: ignore[union-attr]
@@ -1704,34 +1703,18 @@ def gate_results(
     return gates
 
 
-def classify_tier(metrics: dict[str, float | int], gates: dict[str, bool | None]) -> tuple[str, list[str]]:
+def classify_tier(gates: dict[str, bool | None]) -> tuple[str, list[str]]:
+    """Route by blocking defects only; length, density and counts never move a tier."""
     failed = [key for key, value in gates.items() if value is False]
-    if int(metrics["body_words"]) < 3000:
-        return "T3", failed
     if not failed:
         return "T0", []
-    density_keys = {
-        "density_mean_wpp_30",
-        "density_median_wpp_28",
-        "density_short_rate_20pct",
-        "density_max_consecutive_short_2",
-        "sentence_length_12_28",
-        "body_words_floor_met",
-    }
     structure_failed = [key for key in failed if key.startswith("structure_")]
-    density_failed = [key for key in failed if key in density_keys]
     lab_failed = [key for key in failed if key == "lab_image_binary_match"]
-    other_failed = [
-        key for key in failed if key not in density_keys and not key.startswith("structure_") and key not in lab_failed
-    ]
-    if density_failed and structure_failed:
-        return "T3", failed
-    if structure_failed and not density_failed and not lab_failed and not other_failed and len(structure_failed) <= 2:
+    other_failed = [key for key in failed if not key.startswith("structure_") and key not in lab_failed]
+    if structure_failed and not lab_failed and not other_failed and len(structure_failed) <= 2:
         return "T1", failed
-    if density_failed and not structure_failed and not other_failed:
-        return "T2", failed
     # Lab-runnability failures are blocking but localized, so lab-only failures classify with T2.
-    if lab_failed and not density_failed and not structure_failed and not other_failed:
+    if lab_failed and not structure_failed and not other_failed:
         return "T2", failed
     return "T3", failed
 
@@ -1751,9 +1734,8 @@ def verify(path: str | Path, skip_source_check: bool = False, max_workers: int =
     practice_mcq = practice_mcq_metrics(module_path, text)
     alignment = alignment_metrics(text)
     source_h1 = source_h1_metrics(text)
-    body_words_floor = _body_words_floor_for_module(module_path)
+    budget = _declared_body_budget(module_path)
     gates = gate_results(
-        metrics,
         structure,
         sources,
         anti,
@@ -1764,11 +1746,12 @@ def verify(path: str | Path, skip_source_check: bool = False, max_workers: int =
         alignment,
         skip_source_check,
         source_h1,
-        body_words_floor=body_words_floor,
     )
-    tier, reasons = classify_tier(metrics, gates)
+    tier, reasons = classify_tier(gates)
     passed = all(value is not False for value in gates.values())
     diagnostics = [str(source_h1["message"])] if source_h1["message"] else []
+    if budget["status"] == "malformed":
+        diagnostics.append(f"budget sidecar ignored as malformed: {budget['reason']}")
     try:
         display_path = str(module_path.relative_to(REPO_ROOT))
     except ValueError:
@@ -1791,6 +1774,7 @@ def verify(path: str | Path, skip_source_check: bool = False, max_workers: int =
         "source_h1": source_h1,
         "diagnostics": diagnostics,
         "gates": gates,
+        "declared_body_budget": budget,
         "passed": passed,
         "frontmatter": frontmatter,
     }

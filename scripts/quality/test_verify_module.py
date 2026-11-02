@@ -12,19 +12,9 @@ from scripts.quality import verify_module
 def _base_gates() -> dict[str, bool | None]:
     return {
         "gate_no_source_h1": True,
-        "density_mean_wpp_30": True,
-        "density_median_wpp_28": True,
-        "density_short_rate_20pct": True,
-        "density_max_consecutive_short_2": True,
-        "body_words_floor_met": True,
-        "sentence_length_12_28": True,
         "structure_sections_present": True,
         "structure_order_correct": True,
-        "structure_did_you_know_4": True,
-        "structure_common_mistakes_6_8": True,
-        "structure_quiz_6_8_with_details": True,
-        "structure_hands_on_checkboxes": True,
-        "sources_min_10": True,
+        "structure_quiz_answers_have_details": True,
         "sources_all_reachable": None,
         "anti_leak": True,
         "runnable_no_kubectl_alias": True,
@@ -43,14 +33,6 @@ def _gate_results(
     practice_mcq: dict[str, object] | None = None,
 ) -> dict[str, bool | None]:
     return verify_module.gate_results(
-        {
-            "mean_wpp": 35,
-            "median_wpp": 35,
-            "short_paragraph_rate": 0.0,
-            "max_consecutive_short_run": 0,
-            "body_words": 6000,
-            "mean_sentence_length": 18,
-        },
         {
             "has_learning_outcomes": True,
             "learning_outcome_count": 3,
@@ -273,34 +255,12 @@ k get pods
     assert _gate_results(runnable_shell=metrics)["runnable_no_kubectl_alias"] is True
 
 
-def test_density_metrics_on_synthetic_short_module_fail() -> None:
+def test_short_choppy_module_has_no_length_or_density_gate() -> None:
     metrics = verify_module.density_metrics("Tiny.\n\nShort too.\n")
-    gates = verify_module.gate_results(
-        metrics,
-        {
-            "has_learning_outcomes": True,
-            "learning_outcome_count": 3,
-            "has_why_matters": True,
-            "did_you_know_count": 4,
-            "common_mistakes_rows": 6,
-            "quiz_count": 6,
-            "quiz_with_details": 6,
-            "hands_on_checkboxes": 3,
-            "section_order_correct": True,
-            "next_module_link": True,
-        },
-        {"count": 10, "url_status": {"skipped": 10}, "urls": []},
-        {"forbidden_tokens": [], "has_emoji": False, "has_47": False},
-        {"kubectl_alias_violations": []},
-        {"image_binary_violations": [], "unknown_images": []},
-        {"unsourced_anecdotes": []},
-        {"applies": False, "question_count": 0, "violations": []},
-        {"all_outcomes_covered": True},
-        skip_source_check=True,
-    )
-    assert metrics["body_words"] < 5000
-    assert gates["density_mean_wpp_30"] is False
-    assert gates["body_words_floor_met"] is False
+    gates = _gate_results()
+    assert metrics["body_words"] < 5000 and metrics["mean_wpp"] < 30
+    assert not any(key.startswith(("density_", "sentence_length", "body_words")) for key in gates)
+    assert not {"sources_min_10", "structure_did_you_know_4", "structure_common_mistakes_6_8"} & gates.keys()
 
 
 def test_max_consecutive_short_run_edge_case() -> None:
@@ -317,24 +277,20 @@ def test_max_consecutive_short_run_edge_case() -> None:
 
 
 def test_tier_classification_variants() -> None:
-    metrics = {"body_words": 6000}
-    gates = _base_gates()
-    assert verify_module.classify_tier(metrics, gates) == ("T0", [])
+    assert verify_module.classify_tier(_base_gates()) == ("T0", [])
 
     structure_only = _base_gates()
     structure_only["structure_order_correct"] = False
-    assert verify_module.classify_tier(metrics, structure_only)[0] == "T1"
+    assert verify_module.classify_tier(structure_only)[0] == "T1"
 
-    density_only = _base_gates()
-    density_only["density_max_consecutive_short_2"] = False
-    assert verify_module.classify_tier(metrics, density_only)[0] == "T2"
+    lab_only = _base_gates()
+    lab_only["lab_image_binary_match"] = False
+    assert verify_module.classify_tier(lab_only)[0] == "T2"
 
     both = _base_gates()
-    both["density_max_consecutive_short_2"] = False
+    both["lab_image_binary_match"] = False
     both["structure_order_correct"] = False
-    assert verify_module.classify_tier(metrics, both)[0] == "T3"
-
-    assert verify_module.classify_tier({"body_words": 2999}, _base_gates())[0] == "T3"
+    assert verify_module.classify_tier(both)[0] == "T3"
 
 
 def test_sources_url_extraction_handles_markdown_and_bare_urls() -> None:
@@ -664,7 +620,7 @@ def test_cli_all_revision_pending_writes_jsonl(tmp_path: Path, monkeypatch) -> N
     out = tmp_path / "records.jsonl"
 
     def fake_verify(path: Path, skip_source_check: bool = False, max_workers: int = 8) -> dict[str, object]:
-        return {"path": str(path), "tier": "T3", "tier_reasons": ["body_words_floor_met"]}
+        return {"path": str(path), "tier": "T3", "tier_reasons": ["anti_leak"]}
 
     monkeypatch.setattr(verify_module, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(verify_module, "verify", fake_verify)
