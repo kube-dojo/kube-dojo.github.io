@@ -36,7 +36,9 @@ This module matters because Kubernetes usually enters the story after a team has
 
 The common joke says that the cloud is "just someone else's computer." It is memorable because it punctures the mystery, and it is useful because it keeps you from treating cloud services as magic. At the same time, the joke is incomplete in the same way that calling a hotel "someone else's bed" is incomplete. The bed is real, but the hotel also provides cleaning, locks, fire alarms, plumbing, front-desk systems, booking software, staff, and a business model that lets you use a room for one night without buying a building.
 
-Cloud computing works the same way. Instead of buying servers, storage arrays, network switches, backup power, cooling units, racks, cages, and spare parts, you rent useful infrastructure from a provider that has already built those layers at enormous scale. You still decide what kind of capacity you need, what operating systems or managed services you trust, what data belongs where, and what security boundaries matter. The provider handles a large part of the undifferentiated work that would otherwise distract your team from the application you are trying to run.
+With a public cloud, you can rent infrastructure from a provider instead of buying and operating every physical layer yourself. You still decide what capacity and services you need, where data belongs, and what security boundaries matter. The kitchen analogy helps compare ownership and rental, but cloud billing and responsibilities depend on the service and its terms.
+
+NIST describes cloud computing through on-demand self-service, network access, pooled resources, rapid elasticity, and measured service. Its models also include private clouds, which can be operated for one organization and may be on or off premises; cloud is broader than renting from a public provider.
 
 The most important hidden ingredient is the control plane. A traditional server room might require a ticket, a person with physical access, and a checklist before anything changes. A cloud provider exposes infrastructure through APIs, so creating a server, attaching storage, adding a firewall rule, or deleting a test environment can be automated and repeated. That is why cloud computing became so closely tied to DevOps, infrastructure as code, and Kubernetes: once infrastructure is programmable, teams can treat operations as a design problem rather than a collection of one-off manual tasks.
 
@@ -54,7 +56,7 @@ The kitchen analogy is a practical way to keep the tradeoff honest. If you own a
     You still pay for the empty kitchen
 ```
 
-That first option is similar to traditional on-premises infrastructure, often shortened to "on-prem." A company buys or leases physical space, installs equipment, connects the network, and builds internal processes for operating the machines. On-prem can be the right choice when workloads are steady, data-location requirements are strict, specialized hardware is needed, or the organization already has the staff and facilities to run servers well. It becomes painful when the organization needs capacity quickly or when demand is too uncertain to justify a large purchase.
+That first option is similar to traditional on-premises infrastructure, often shortened to "on-prem." A company buys or leases physical space, installs equipment, connects the network, and builds internal processes for operating the machines. On-prem can be the right choice when workloads are steady, data-location requirements are strict, specialized hardware is needed, or the organization already has the staff and facilities to run servers well. Obtaining more capacity can take time when demand changes.
 
 Owning infrastructure also changes the failure conversation. When the power supply fails, the network switch misbehaves, the disk fills, or the cooling system struggles, the organization must either fix the problem directly or pay a specialist to do so. That control can be valuable, especially in regulated or specialized environments, but it means capacity planning becomes a long-term commitment. A beginner should not hear "on-prem" as outdated; hear it as an ownership model with strong control and strong responsibility.
 
@@ -71,7 +73,7 @@ Owning infrastructure also changes the failure conversation. When the power supp
 
 That second option is the cloud model. The provider has already built the data centers and control systems, so you request capacity through a web console, API, command-line tool, or infrastructure-as-code workflow. You can request, measure, resize, automate, and release resources as needs change. Reducing charges depends on each resource's billing rules and what remains allocated, not merely whether a VM is running.
 
-Renting also changes how teams learn. A student, startup, or internal platform team can create a small environment, test an idea, collect evidence, and delete the environment before committing to a bigger design. That short feedback loop is one reason cloud platforms are common in modern engineering education. The risk is that speed can hide weak thinking, so responsible teams pair fast provisioning with naming conventions, account boundaries, access reviews, and written cleanup expectations.
+Renting also lets a team create a small environment, test an idea, and delete the environment before committing to a bigger design. Pair provisioning with account boundaries, access reviews, and cleanup expectations.
 
 Pause and predict: if a test environment is used only during business hours, which model makes it easier to reduce idle compute charges at night, and what must the team check about retained resources so that the savings actually happen? Commit to an answer in your own words before opening the reveal.
 
@@ -83,9 +85,11 @@ The rented cloud model can reduce idle compute charges when stopping is supporte
 
 ## Build Versus Rent: The Operational Tradeoff
 
-The cloud exists because buying infrastructure has three stubborn problems: it is slow, it is expensive before you know whether the project will succeed, and it forces you to guess capacity in advance. Those problems matter even for beginner-level work. A personal website may need only a small server, but the same decision pattern appears in professional systems that serve customers, process data, host internal tools, or support a product launch.
+Buying infrastructure can involve lead time, upfront spending, and capacity estimates before demand is known. A personal website may need only a small server, but the same tradeoffs arise in larger systems.
 
 The first problem is lead time. Physical servers are not created by a command; someone must approve a budget, order equipment, wait for shipping, rack the machines, cable them, install operating systems, configure networking, apply updates, and connect monitoring. Large organizations can streamline this, but physics and purchasing still impose delays. Cloud providers reduce that delay by keeping pooled capacity ready and exposing it through software interfaces.
+
+Synthetic dialogue; actual procurement times vary:
 
 ```
 Company: "We need 10 servers for our new project."
@@ -103,6 +107,8 @@ Company: "But we need to launch next week..."
 
 The contrast is not that cloud providers skip engineering. They did the engineering earlier, at scale, and then wrapped the result in a control plane that lets customers request a slice of it. That control plane is why cloud infrastructure feels different from remote access to a single server. You are not asking one machine to do more work; you are asking a platform to allocate machines, disks, IP addresses, firewall rules, identities, and related services on demand.
 
+Synthetic dialogue; availability and provisioning time vary:
+
 ```
 Engineer: "We need 10 servers."
 *types a command*
@@ -116,47 +122,23 @@ Hypothetical scenario: a small game launches with a modest audience estimate, th
 
 The third problem is maintenance. Servers need power, cooling, physical security, network redundancy, replacement parts, firmware updates, operating-system patching, backup planning, and failure procedures. Cloud does not make those responsibilities vanish; it moves many of them to the provider and leaves you with a different set of responsibilities. You still own application design, identity configuration, data protection choices, access policies, cost controls, and the decision to use managed services wisely.
 
-Cloud teams often describe this as a shared responsibility model. The provider is responsible for security and reliability of the cloud: facilities, physical hosts, core networking, and foundational services. You are responsible for security and reliability in the cloud: accounts, permissions, network exposure, data classification, backups, application configuration, and how you combine services. Remembering that distinction prevents a common beginner mistake: assuming rented infrastructure means someone else is also operating your application correctly.
+Cloud teams often describe this as a shared responsibility model. For AWS, the provider secures the infrastructure underlying its services, while the customer's responsibilities vary with the service and configuration. Accounts, permissions, data protection, backups, and application settings still need attention. Check the actual service terms rather than assuming the provider operates your application correctly.
 
 The shared-responsibility idea also explains why cloud skills are more than clicking buttons in a console. If a storage bucket is public when it should be private, the provider did not necessarily fail; the customer may have configured access incorrectly. If a database has no usable backup, the managed service may still be functioning exactly as configured. Cloud literacy means asking where each responsibility sits, how you would prove it is handled, and what evidence would alert you before a mistake becomes an outage or exposure.
 
 This is also why cloud diagrams usually show boundaries. One boundary separates the provider's facilities from the customer's accounts. Another boundary separates public traffic from private services. A third boundary separates human users from automated service identities. You do not need to master those diagrams yet, but you should start noticing the questions they answer. Where does traffic enter, where is data stored, who can change the system, and which part would still be your team's problem during an incident?
 
-## The Big Three Providers and the Services They Sell
+## Cloud providers and the services they sell
 
-Public cloud is dominated by three major providers: Amazon Web Services, Microsoft Azure, and Google Cloud. Market-share rankings change over time, and exact percentages differ by analyst method, but AWS, Azure, and Google Cloud have consistently been the largest public-cloud platforms in recent industry reporting. You do not need to choose one today, and you do not need to memorize every product name; at this stage, the goal is to recognize that the same basic categories appear across providers with different labels.
+Amazon Web Services (AWS), Microsoft Azure, and Google Cloud are examples of public cloud providers. You do not need to choose one today; the goal is to recognize service categories across providers with different labels. Product names and offerings can change, so check the provider's current documentation.
 
-AWS launched its early public cloud services in 2006 and became the reference point for many cloud concepts that engineers still use. It has a broad catalog, a large ecosystem, and a long history with startups and enterprises. Its product names can feel strange at first, but many of them map cleanly to concepts you already know: EC2 means virtual servers, S3 means object storage, VPC means private networking, and RDS means managed relational databases.
+AWS offers services for compute, object storage, networking, and managed databases. The names in the mapping below are examples, not an exhaustive catalog.
 
-```
-- The first major cloud provider (launched 2006)
-- AWS is generally the largest public cloud by revenue, with Microsoft Azure and Google Cloud the other two leaders
-- The "original" -- many companies' first cloud platform
-- Kitchen analogy: The biggest chain, the one everyone knows
-```
-
-Microsoft Azure launched later but became especially important for organizations already invested in Microsoft identity, Windows Server, SQL Server, Office, and enterprise contracts. That does not mean Azure is only for Microsoft workloads, but it explains why many companies naturally evaluate it when they already use Microsoft tooling across their business. In the kitchen analogy, Azure is the commercial kitchen chain that can integrate with a lot of equipment the company already owns.
-
-```
-- Launched 2010
-- Commonly ranked among the top cloud providers
-- Popular with companies already using Microsoft products
-- Kitchen analogy: The chain that integrates with your existing equipment
-```
-
-Google Cloud reflects Google's background in large-scale infrastructure, data systems, and machine learning. It is also historically important for Kubernetes because Kubernetes grew out of Google's experience running containerized workloads internally. That origin story matters because Kubernetes is not a random tool bolted onto the cloud world; it is a response to the operational problem of scheduling, scaling, and recovering applications across many machines.
-
-```
-- Launched 2008 (public in 2011)
-- Commonly ranked among the top cloud providers
-- Known for data analytics and machine learning
-- Fun fact: Kubernetes was INVENTED at Google
-- Kitchen analogy: The chain with the fanciest kitchen technology
-```
+Azure and Google Cloud offer comparable categories, though their services and interfaces differ. Kubernetes builds on Google's experience running containerized workloads and can run on different cloud providers or on premises.
 
 Smaller providers also matter. DigitalOcean, Linode under Akamai, Hetzner, OVHcloud, and regional providers can be cheaper, simpler, closer to particular users, or better aligned with a team's needs. The beginner trap is to treat provider choice like a brand identity instead of an engineering decision. First learn the categories, then evaluate a provider based on workload shape, budget, compliance needs, operational skill, support model, and the services your team can run responsibly.
 
-Portability deserves a careful, realistic definition here. Basic concepts transfer well: compute runs code, storage keeps data, networking connects systems, identity controls access, and observability tells you what is happening. Exact services do not always transfer cleanly because each provider has its own APIs, limits, pricing models, managed database features, load-balancer behavior, and account structures. Kubernetes can reduce some differences for application deployment, but it does not erase cloud-specific networking, storage, identity, or billing decisions.
+Portability deserves a careful, realistic definition here. Basic concepts transfer well: compute runs code, storage keeps data, networking connects systems, identity controls access, and observability tells you what is happening. Exact services may not transfer cleanly; compare APIs, limits, pricing, database features, load-balancer behavior, and account structures before moving. Kubernetes can reduce some differences for application deployment, but cloud-specific networking, storage, identity, and billing decisions remain.
 
 Provider-neutral thinking is still worth practicing because it keeps your mental model from becoming a product catalog. When you see a new service name, ask what job it performs before asking whether it is impressive. Does it run code, store data, connect systems, protect access, observe behavior, or automate operations? That habit lets you learn one provider deeply without becoming helpless in another provider's documentation. It also prepares you to read Kubernetes documentation, where the same discipline of mapping names to responsibilities is essential.
 
@@ -184,7 +166,7 @@ Cloud service: Virtual Machine (VM) / Instance
 
 Kitchen analogy: Renting a cooking station.
   You choose the size (small burner or industrial oven)
-  and pay by the hour.
+  with billing determined by the provider's current terms.
 ```
 
 Storage is the cloud category for keeping data after a process stops. Object storage is common for images, backups, logs, static website assets, exports, and large files because it is durable, API-driven, and separated from any one server. Block storage and file storage also exist, but object storage is the easiest beginner mental model: you put named objects into a bucket or container, set access rules, and pay for stored data plus operations and transfer.
@@ -198,7 +180,7 @@ Cloud service: Object Storage
   - GCP calls it: Cloud Storage
 
 Kitchen analogy: Renting pantry shelves.
-  You pay per shelf used, per month.
+  Storage, requests, and transfer may have separate charges.
 ```
 
 Networking is the cloud category for connecting resources safely. A virtual network lets you decide which machines can talk privately, which traffic can come from the internet, which ports are exposed, and where load balancers route requests. The terminology varies, but the concept is familiar from earlier modules: computers need addresses, routes, and rules so traffic reaches the right service without exposing everything to everyone.
@@ -215,7 +197,7 @@ Kitchen analogy: Renting the delivery drivers and route planning.
   Your kitchens need roads between them and routes to customers.
 ```
 
-Databases are where the cloud begins to show a more subtle advantage. You can run a database yourself on a virtual machine, but many teams prefer managed databases because backups, patching, replication, monitoring hooks, and failover behavior are partly handled by the provider. Managed does not mean decision-free; you still choose sizes, versions, schemas, access controls, backup windows, retention, and cost boundaries. It simply means you are renting an operated database system rather than assembling every operational piece yourself.
+You can run a database yourself on a virtual machine or use a managed database. Depending on the service and configuration, the provider may handle tasks such as backups, patching, and monitoring. You still need to choose settings, access controls, retention, and cost boundaries.
 
 ```
 "I need to store and query structured data."
@@ -252,7 +234,7 @@ Cloud pricing is often usage-based, which means you can pay for capacity while y
 
 ```
 Example:
-  A small server costs about $0.01/hour on AWS
+  Assume a fictional server rate of $0.01/hour
   Running it 24/7 for a month: $0.01 x 24 x 30 = $7.20
 
   Need it only 8 hours a day for testing?
@@ -262,11 +244,11 @@ Example:
   $0.01 x 100 x 2 = $2.00
 ```
 
-The numbers in that example are intentionally simple, not a price quote. Real pricing depends on region, instance family, operating system, commitment model, storage type, data transfer, taxes, discounts, and provider changes. The lesson is the shape of the decision: variable demand fits rented capacity well because you can turn resources on, resize them, or stop them when the work is done. Steady demand may still favor owned infrastructure or committed cloud discounts if the workload is predictable enough.
+The numbers are hypothetical, not a provider price quote. Actual rates and billing units depend on the service and can change; check the provider's pricing page, including storage and outbound data transfer. Stopping compute may leave other charges. Steady demand may favor owned infrastructure or committed cloud discounts, depending on the full cost.
 
 Hypothetical scenario: your team creates a performance-test environment with many servers for a two-hour benchmark, then forgets to delete it before the weekend. The cloud made the benchmark easy because capacity arrived quickly, but the same ease made the mistake expensive because the resources kept running without anyone cooking in the kitchen. Cost controls, budgets, tags, cleanup routines, alerts, and ownership labels are not paperwork; they are part of operating cloud systems responsibly.
 
-Cloud cost thinking is also a preparation for Kubernetes. Kubernetes can ask for more capacity, run multiple copies of an application, attach storage, expose services, and move workloads after failures. Those behaviors are useful, but every automated action has a cost shape behind it. A skilled operator learns to ask both reliability questions and budget questions: how many copies do we need, where do they run, what happens when demand spikes, and what tells us to scale back down?
+Cloud cost thinking is also a preparation for Kubernetes. Kubernetes can run multiple copies of an application, use storage, expose services, and replace workloads after failures. Additional capacity and cloud resources depend on the cluster's integrations and configuration. Ask both reliability and budget questions: how many copies do we need, where do they run, and what tells us to scale back down?
 
 Cost visibility is a technical practice, not only an accounting practice. Engineers influence cost when they choose instance sizes, logging volume, storage classes, data-transfer paths, retry behavior, and scaling thresholds. Finance may receive the bill, but architecture creates the bill. In healthy cloud teams, cost dashboards, resource tags, budgets, and cleanup reviews are part of the same operating rhythm as monitoring and incident review because all of them describe whether the system is behaving as intended.
 
@@ -277,12 +259,12 @@ Pause and predict: your new app gets ten times more traffic on weekends than on 
 <details>
 <summary>Check your prediction</summary>
 
-Compute is the natural candidate to scale up because more copies of the app, or larger machines, absorb the weekend surge, and the load balancer and network path may need to grow with it. Data that must stay consistent, such as the primary database and its backups, is usually changed more cautiously, and access controls should not loosen just because traffic grew. The signal to scale back down is measured behavior, not the calendar: utilization falling back toward weekday levels while latency and error rates stay healthy. Scaling on a timer alone risks paying Monday prices for Sunday traffic that never arrived, or shrinking while users are still waiting.
+Compute is one candidate to scale up, if the application can distribute the extra work; the load balancer and network path may also need capacity. The database may be the bottleneck instead, so measure before choosing. Check utilization, latency, and errors before scaling back down. A timer alone can add capacity when traffic does not arrive or remove it while users are still waiting.
 </details>
 
 ## Where Kubernetes Fits
 
-Kubernetes belongs at the end of this beginner path because it manages the complexity that appears when one server is no longer enough. A single server can run a small app, but professional systems often need multiple copies for reliability, extra capacity during spikes, rolling updates without downtime, and recovery when machines fail. Humans can handle some of that by hand for a while, but manual placement becomes fragile when the number of services and servers grows.
+Kubernetes helps manage containerized applications across machines. A single server can run a small app, but other systems need multiple copies, extra capacity, rolling updates, and recovery when machines fail. These capabilities require suitable application design, capacity, and configuration; downtime is not automatically prevented.
 
 ```
 Module 0.1: You learned about one computer (one kitchen)
@@ -292,12 +274,14 @@ Module 0.8: You learned to connect to remote kitchens (servers and SSH)
 Module 0.9: You learned to install software and manage packages on those kitchens
 Module 0.10: You learned that the cloud has THOUSANDS of kitchens for rent
 
-NOW: Kubernetes is the system that manages all of those kitchens.
+Kubernetes can coordinate workloads on a set of those machines.
 ```
 
 Kubernetes, often written as K8s because there are eight letters between K and s, was created from Google's experience operating large fleets of containerized workloads and is now a vendor-neutral open source project under the Cloud Native Computing Foundation. Its job is not to replace cloud providers. Its job is to give you a declarative control system for running applications across available machines, whether those machines come from AWS, Azure, Google Cloud, another provider, or your own data center.
 
 Without Kubernetes, an engineer may choose a specific server and place the app there manually. That can work while the system is tiny, but the operational burden grows quickly. The engineer must notice failures, decide where to restart the app, ensure the new server has capacity, update routing, and avoid breaking other applications. The problem is not that engineers are careless; the problem is that humans are poor schedulers for constantly changing infrastructure.
+
+Synthetic dialogue:
 
 ```
 Engineer: "Deploy the app to server-42."
@@ -308,12 +292,13 @@ Engineer: "Ugh... let me move it to server-43 manually."
 
 With Kubernetes, the engineer describes desired state: for example, keep three copies of this application running. Kubernetes watches actual state and takes action when actual state diverges from desired state. If one server fails, the cluster can place a replacement copy elsewhere, subject to the capacity and policy available. The important mental shift is that you stop thinking only in commands to individual machines and start thinking in declarations to a system that reconciles reality.
 
+Synthetic dialogue; recovery depends on capacity and configuration:
+
 ```
 Engineer: "I need 3 copies of this app running."
 Kubernetes: "Done. Running on server-42, server-67, and server-91."
 *server-42 crashes at 3 AM*
-Kubernetes: "Server-42 is down. Moving that copy to server-15. Done."
-Engineer: *sleeping peacefully*
+Kubernetes: "Server-42 is down. A replacement can be scheduled on an available node."
 ```
 
 This is why cloud concepts matter before Kubernetes concepts. If you do not understand rented compute, storage, networking, and pay-as-you-go capacity, Kubernetes can feel like a pile of strange objects and commands. If you do understand the cloud model, Kubernetes becomes easier to place: it is the restaurant manager coordinating many kitchens, not the kitchen building itself. It decides where work should run, watches for failure, and helps teams operate applications at a scale where manual placement is too slow.
@@ -365,11 +350,11 @@ Platform Engineering
 
 Cloud computing is not automatically the best answer for every workload. If a workload has extremely steady demand, strict physical control requirements, special hardware constraints, unusual licensing terms, or a team that already operates efficient data centers, on-premises infrastructure may be a rational choice. The question is not "cloud or no cloud" as a slogan; the question is which model gives the organization enough speed, control, reliability, compliance, and cost predictability for the work at hand.
 
-The same caution applies inside the cloud. A virtual machine may be better than a managed platform when the team needs low-level control, while a managed service may be better when the team wants the provider to handle routine operations. Object storage may be excellent for uploaded files and backups, but it is not a replacement for a relational database when the application needs structured transactions. Good engineering is often less about finding the fanciest service and more about matching the service boundary to the problem boundary.
+The same caution applies inside the cloud. A virtual machine may be better than a managed platform when the team needs low-level control, while a managed service may be better when the team wants the provider to handle routine operations. Object storage may work well for uploaded files and backups, but may not meet an application's need for structured transactions. Match the service to the problem.
 
 A useful pattern is to start uncertain workloads in the cloud because rented capacity lowers the cost of learning. Early prototypes, training environments, temporary test systems, bursty data-processing jobs, and applications with unknown demand usually benefit from fast provisioning and easy teardown. The scaling consideration is discipline: as experiments become permanent, the team must add ownership tags, budgets, monitoring, backups, and architecture reviews so that a cheap experiment does not become an unmanaged production system.
 
-Another pattern is to use managed services when operations are not the product differentiator. If your value comes from the application, not from hand-maintaining database replicas, a managed database may be a better teaching path and a better business choice. The tradeoff is dependency on provider behavior, pricing, limits, and features. Good teams make that dependency visible, document why it is acceptable, and avoid pretending that managed always means portable.
+Another pattern is to use managed services when operations are not the product differentiator. A managed database may reduce operational work, but can create dependencies on provider behavior, pricing, limits, and features. Document those dependencies and assess how they affect portability.
 
 The main anti-pattern is cloud adoption by hype. Teams sometimes move workloads because the provider is popular, a conference talk sounded convincing, or a competitor announced a migration. That skips the engineering work. A better alternative is to write down the workload shape, data needs, failure tolerance, expected traffic, compliance concerns, team skills, and cost model before choosing the platform. Cloud is a tool, not a maturity badge.
 
@@ -385,10 +370,9 @@ A simple decision framework is to separate reversible decisions from sticky deci
 
 ## Did You Know?
 
-- AWS launched its first broadly available infrastructure services in 2006, which is why many cloud terms and mental models still use AWS examples even when the same idea exists elsewhere.
 - The National Institute of Standards and Technology published Special Publication 800-145 in 2011, and its definition of cloud computing still anchors many formal discussions of on-demand self-service, broad network access, resource pooling, rapid elasticity, and measured service.
 - Kubernetes means "helmsman" in Greek, which fits the ship-wheel logo and the idea of steering many containers across a fleet of machines.
-- Kubernetes v1.35 is the version target for this curriculum, so later Kubernetes modules will use current command behavior rather than examples frozen around older cluster releases.
+- Kubernetes v1.35 is the exam-pinned target for this curriculum. Check the version on a real cluster before relying on a command example.
 
 ## Common Mistakes
 
@@ -521,6 +505,11 @@ Review your notes and mark whether each provider separated compute, storage, eli
 ## Sources
 
 - [AWS EC2: Stop and start instances, including retained-resource charges](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html)
+- [AWS EC2 pricing](https://aws.amazon.com/ec2/pricing/on-demand/)
+- [Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html), [S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html), [VPC](https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html), and [RDS](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Welcome.html)
+- [Azure Virtual Machines](https://learn.microsoft.com/en-us/azure/virtual-machines/overview), [Blob Storage](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-overview), [Virtual Network](https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-overview), and [SQL Database](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview)
+- [Google Compute Engine](https://cloud.google.com/compute/docs/instances), [Cloud Storage](https://cloud.google.com/storage/docs/introduction), [VPC](https://cloud.google.com/vpc/docs/overview), and [Cloud SQL](https://cloud.google.com/sql/docs/introduction)
+- [Kubernetes v1.35 Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 
 - [Kubernetes Project Journey Report](https://www.cncf.io/reports/kubernetes-project-journey-report/)
 - [The NIST Definition of Cloud Computing](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-145.pdf)
