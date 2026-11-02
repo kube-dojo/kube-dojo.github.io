@@ -1174,7 +1174,7 @@ Blue-green deployment. Canary routing limits blast radius gradually but still mi
 
 <details>
 <summary>8. Framework choice: You need to serve a high-throughput recommendation model and frequently test model architecture variants. Which serving stack is the better baseline to support dynamic batching and mixed precision across multiple frameworks, and when might TorchServe still appear in production?</summary>
-Triton is the better baseline when you need cross-framework flexibility, advanced tensor engine features, and aggressive batching optimizations across mixed model types. TorchServe may still appear in inherited PyTorch estates, but as of 2026-06 it is no longer actively maintained with planned security patches—do not choose it for new greenfield serving. Prefer Triton, KServe, BentoML, or a maintained custom layer unless migration constraints force you to operate an existing TorchServe fleet.
+Triton is the better baseline when you need cross-framework flexibility, advanced tensor engine features, and aggressive batching optimizations across mixed model types. TorchServe may still appear in inherited PyTorch estates, but as of 2026-06 it is no longer actively maintained and has no planned security patches—do not choose it for new greenfield serving. Prefer Triton, KServe, BentoML, or a maintained custom layer unless migration constraints force you to operate an existing TorchServe fleet.
 </details>
 
 <details>
