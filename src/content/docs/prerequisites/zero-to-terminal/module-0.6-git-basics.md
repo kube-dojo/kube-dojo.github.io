@@ -85,7 +85,7 @@ The staging area (or index) lets you save only the real fix while keeping the te
 
 Git is a command-line tool at its core, even when teams use graphical clients or web interfaces around it. Platform engineers must be comfortable with the terminal version because many workflows happen over SSH, inside automation logs, or on machines where a graphical client is unavailable. The goal is not to memorize every option. The goal is to become fluent enough that repository state is visible instead of mysterious.
 
-Start by checking that Git is installed. This lesson's local practice was tested with Git 2.56.0; the [Git 2.56.0 release commit](https://github.com/git/git/commit/a018953688f1b10bddf91bff8747068f5f4746a4) pins the documentation used below. Older versions may lack commands or options used here; consult your installed version's documentation or update Git before continuing. If Git is missing, follow the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+Start by checking that Git is installed. The hands-on tasks and selected local examples were checked with Git 2.53.0 on 2026-11-02; the [Git 2.56.0 release commit](https://github.com/git/git/commit/a018953688f1b10bddf91bff8747068f5f4746a4) pins the documentation used below. Other versions may lack commands or options used here; consult your installed version's documentation or update Git before continuing. If Git is missing, follow the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
 ```bash
 git --version
