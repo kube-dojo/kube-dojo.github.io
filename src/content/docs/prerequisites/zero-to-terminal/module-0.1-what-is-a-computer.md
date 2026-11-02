@@ -100,6 +100,8 @@ RAM holds active program code and data. The operating system can bring needed po
 
 When RAM fills up, the operating system has several unpleasant choices. It can compress memory, discard cached data that can be recreated, move less active data to disk, or in severe cases terminate programs. Moving data between RAM and disk is called swapping or paging, depending on the system. Swapping can keep a machine alive, but it is much slower than working directly in RAM, especially if the disk is also busy.
 
+Available memory estimates RAM that applications can use without swapping; memory pressure describes how well memory is serving current work. Swap is disk space used to move less active data out of RAM, while disk activity means input/output (I/O), or reads and writes, not the amount of free space. On macOS, Activity Monitor's Memory tab shows the Memory Pressure graph and Swap Used, and its Disk tab shows disk activity. On Windows, Task Manager's Performance view has Memory and Disk sections; on Linux, `free -h` shows the available memory column and swap row, `top` shows CPU and memory summaries, and `iostat` shows device I/O if already available.
+
 > **Pause and predict**: You have 8 GB of RAM and you open a web browser with 30 tabs, a video editor, and a music player all at once. What do you think happens? Make a specific guess about what the operating system does next.
 
 <details>
@@ -428,7 +430,7 @@ Use the labels and roles, not which number is larger: installed memory or RAM is
 <details>
 <summary>Solution guidance for Task 3</summary>
 
-Available memory estimates RAM that applications can use without swapping; memory pressure describes how well memory is serving current work. Swap is disk space used to move less active data out of RAM, while disk activity means reads and writes, not the amount of free space. On macOS, Activity Monitor's Memory tab shows the Memory Pressure graph and Swap Used, and its Disk tab shows disk activity. On Windows, Task Manager's Performance view has Memory and Disk sections; on Linux, `free -h` shows available memory and swap, and `top` shows CPU and memory summaries. For Linux disk reads and writes, use `iostat` if already available; otherwise record the missing I/O evidence. A swap total alone does not show ongoing paging, and activity alone does not prove a bottleneck.
+If `iostat` is unavailable on Linux, record the missing I/O evidence. A swap total alone does not show ongoing paging, and activity alone does not prove a bottleneck.
 
 Example output below is **synthetic**, not a measurement of your computer:
 
