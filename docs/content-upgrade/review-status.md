@@ -1,6 +1,8 @@
 # Whole-content review results
 
-Continuation 2026-10-25: [execution plan](execution-plan.md), [tracked page receipts](page-reviews.json), reporting #3539. Prerequisites and Linux are the first 100-page milestone; all English pages remain in scope. The historical checkpoint below is preserved. Supplied current receipts record eight revise dispositions, not eight fully accepted pages; digest reconciliation after scoped repairs does not claim exhaustive current-head review.
+Order OO-KD-REREVIEW-1102 (C-4156), 2026-11-02, resets current page review and acceptance status for the new workflow. The ledger retains previous rows under `superseded_pages` and `superseded_work` as history; their reviews, receipts, acceptance references and findings do not establish current acceptance. New work rows start at zero of two review calls and require fresh whole-page review. Refresh a work row digest when its page changes. The checkpoint below is historical.
+
+Historical continuation 2026-10-25: [execution plan](execution-plan.md), [tracked page receipts](page-reviews.json), reporting #3539. Prerequisites and Linux are the first 100-page milestone; all English pages remain in scope. At that checkpoint, supplied receipts recorded eight revise dispositions, not eight fully accepted pages; digest reconciliation after scoped repairs did not claim exhaustive current-head review.
 
 Checkpoint: 2026-10-24, source revision `b61061d6385bd706557dbd1ddd78ba7055d1412c`. Owners: [program #2272](https://github.com/kube-dojo/kube-dojo.github.io/issues/2272), source review #2275, assessment #2277; this documentation packet #3533.
 
