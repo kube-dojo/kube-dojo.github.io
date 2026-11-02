@@ -1,4 +1,6 @@
 // @ts-check
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 import { unified } from '@astrojs/markdown-remark';
@@ -9,6 +11,19 @@ import { routeManifestIntegration } from './scripts/quality/route-manifest-integ
 import { progressIntegration } from './scripts/progress-integration.mjs';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
+
+// src/layouts/Homepage.astro bypasses Starlight's layout but needs its base CSS
+// (layers.css, props.css, util.css). Starlight's package.json "exports" map
+// publishes only ./style/markdown.css, so those siblings cannot be imported by
+// package specifier, and a relative `../../node_modules/...` path only resolves
+// where node_modules sits inside the checkout (it does not in .worktrees/*).
+// Resolve the one exported file through Node module resolution (which walks up
+// parent directories) and alias its directory.
+// Node: https://nodejs.org/api/packages.html#package-entry-points (exports) and
+// https://nodejs.org/api/module.html#modulecreaterequirefilename
+const starlightStyleDir = dirname(
+  createRequire(import.meta.url).resolve('@astrojs/starlight/style/markdown.css'),
+);
 const ignoredDevWatchPaths = [
   '.bridge',
   '.cache',
@@ -63,6 +78,13 @@ export default defineConfig({
     }),
   },
   vite: {
+    resolve: {
+      // Vite: https://vite.dev/config/shared-options.html#resolve-alias
+      // Astro passes `vite` through: https://docs.astro.build/en/reference/configuration-reference/#vite
+      alias: {
+        '~starlight-style': starlightStyleDir,
+      },
+    },
     server: {
       watch: {
         ignored: ignoredDevWatchPaths,
