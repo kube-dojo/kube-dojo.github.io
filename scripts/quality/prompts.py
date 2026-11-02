@@ -194,7 +194,7 @@ def review_prompt(
         else "(no prior audit gaps)"
     )
     density_context = ""
-    if density_attention:
+    if density_attention and any(density_attention.values()):
         flags = "\n".join(
             f"- {source}: {', '.join(values) or '(none)'}"
             for source, values in density_attention.items()

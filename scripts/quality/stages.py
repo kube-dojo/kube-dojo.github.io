@@ -177,9 +177,9 @@ def route_one(slug: str) -> None:
 
     Route rules (post-#388):
 
-    * Density numbers are diagnostics only (#3744): the both-tails
-      ``attention`` flags are recorded on the route for the reviewer and
-      never choose the track. The audit score and missing sections do.
+    * Density numbers are diagnostics only (#3744): both-tails
+      ``attention`` flags are recorded on the route and never choose the
+      track. The reviewer receives flags for the module under review.
     * If audit score ≥ 4.0 AND no missing structural sections →
       ``CITATION_CLEANUP_ONLY`` (citation pass still runs — everything goes
       through verify).
@@ -898,6 +898,12 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             _fail_and_cleanup(st, f"review: module missing at {module_file}")
             return
         module_text = module_file.read_text(encoding="utf-8")
+        density_attention = None
+        if module_text.strip():
+            try:
+                density_attention = {"module": density.evaluate_text(module_text).attention()}
+            except Exception:
+                pass  # Density is diagnostic and must not interrupt review.
 
         prompt = review_prompt(
             module_path=module_rel,
@@ -905,11 +911,7 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             writer_agent=st["writer"],
             track=track,
             original_gaps=build_audit_context(st.get("audit")),
-            density_attention={
-                source: st[source]["density"]["attention"]
-                for source in ("route", "commit")
-                if (st.get(source) or {}).get("density", {}).get("attention") is not None
-            },
+            density_attention=density_attention,
         )
 
         try:
