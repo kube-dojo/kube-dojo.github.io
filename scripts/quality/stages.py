@@ -177,12 +177,12 @@ def route_one(slug: str) -> None:
 
     Route rules (post-#388):
 
-    * Density classifier runs first. ``REWRITE`` overrides the audit score
-      and forces ``track="rewrite"`` — modules that game the audit rubric
-      with pad-bombs / punchy-bullets / essay-filler still get rewritten.
-    * If density is ``PASS`` AND audit score ≥ 4.0 AND no missing
-      structural sections → ``CITATION_CLEANUP_ONLY`` (citation pass still
-      runs — everything goes through verify).
+    * Density numbers are diagnostics only (#3744): the both-tails
+      ``attention`` flags are recorded on the route for the reviewer and
+      never choose the track. The audit score and missing sections do.
+    * If audit score ≥ 4.0 AND no missing structural sections →
+      ``CITATION_CLEANUP_ONLY`` (citation pass still runs — everything goes
+      through verify).
     * If audit score ≥ 4.0 but structural sections are missing →
       ``ROUTED`` with track=structural.
     * Otherwise → ``ROUTED`` with track=rewrite.
@@ -211,25 +211,20 @@ def route_one(slug: str) -> None:
     audit_pre = pre_st.get("audit") or {}
     score_pre = _audit_score(audit_pre)
     density_metrics = density.evaluate_text(text)
-    density_verdict = density_metrics.classify()
     density_payload = {
-        "verdict": density_verdict.value,
         "prose_words": density_metrics.prose_words,
         "w_per_line": round(density_metrics.w_per_line, 2),
         "w_per_para": round(density_metrics.w_per_para, 2),
+        "attention": density_metrics.attention(),
     }
 
-    needs_writer = _needs_writer(
-        density_verdict=density_verdict,
-        score=score_pre,
-        missing=missing,
-    )
+    needs_writer = _needs_writer(score=score_pre, missing=missing)
 
     # Pre-lease queue setup ONLY when the module is actually heading to
     # a writer. ``ensure_queued`` acquires its own ``state_lease`` so it
     # must run outside the lease block below (fcntl.flock isn't
     # re-entrant per process). Codex must #2: skipping cleanup-only and
-    # PASS+REVIEW-with-clean-structure paths keeps the queue scoped to
+    # score-≥4-with-clean-structure paths keeps the queue scoped to
     # actual writer work.
     if needs_writer:
         # set_banner=False — banners are committed by ``triage --apply``
@@ -250,17 +245,12 @@ def route_one(slug: str) -> None:
         score = _audit_score(audit)
 
         if not needs_writer:
-            # PASS-tier or REVIEW-tier with no other concerns → cleanup
-            # only. Codex must #1: REVIEW-tier with score≥4 + complete
-            # structure routes here (NOT to a no-op structural prompt).
-            # The teaching-judge LLM (deferred to Phase 2a) will be
-            # responsible for sending REVIEW-tier modules to rewrite
-            # when warranted.
+            # Score ≥ 4 with complete structure → cleanup only. Density
+            # flags ride along on the route for the reviewer; they do not
+            # send a module to a writer.
             reason_bits = [f"score {score:.1f}", "structure complete"]
-            if density_verdict == density.DensityVerdict.PASS:
-                reason_bits.append("density PASS")
-            else:
-                reason_bits.append("density REVIEW (judge deferred)")
+            if density_payload["attention"]:
+                reason_bits.append("density flags for reviewer")
             state.transition(
                 st, "AUDITED", "CITATION_CLEANUP_ONLY",
                 route={
@@ -272,16 +262,9 @@ def route_one(slug: str) -> None:
             )
             return
 
-        if density_verdict == density.DensityVerdict.REWRITE:
-            track = "rewrite"
-            track_reason = (
-                f"density REWRITE: {'; '.join(density_metrics.reasons_failed())}"
-            )
-        else:
-            # density is PASS or REVIEW here AND needs_writer is True,
-            # so either score<4 or missing!=[] forced us into this path.
-            track = "rewrite" if score < SCORE_SKIP_THRESHOLD else "structural"
-            track_reason = f"score {score:.1f}, missing={missing}"
+        # needs_writer is True, so either score<4 or missing!=[] forced us here.
+        track = "rewrite" if score < SCORE_SKIP_THRESHOLD else "structural"
+        track_reason = f"score {score:.1f}, missing={missing}"
 
         # claim() is a read-only peek (no lease needed). Returns None
         # when the queue's blocked_until is still in the future, which
@@ -316,7 +299,6 @@ def route_one(slug: str) -> None:
 
 def _needs_writer(
     *,
-    density_verdict: "density.DensityVerdict",
     score: float,
     missing: list[str],
 ) -> bool:
@@ -326,8 +308,6 @@ def _needs_writer(
     short-circuit and the in-lease transition agree on whether to
     enqueue. Modules that don't need a writer go to CITATION_CLEANUP_ONLY.
     """
-    if density_verdict == density.DensityVerdict.REWRITE:
-        return True
     if score < SCORE_SKIP_THRESHOLD:
         return True
     if missing:
