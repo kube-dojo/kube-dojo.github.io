@@ -308,7 +308,7 @@ def handler_quiz(doc: module_sections.ModuleDocument, module_key: str) -> Handle
         return HandlerResult(True, doc, _module_text(doc))
 
     prompt = (
-        "Write exactly 6-8 scenario-based quiz questions for the following KubeDojo module.\n"
+        "Write scenario-based quiz questions that test each learning outcome of the following KubeDojo module (no filler questions).\n"
         "Each question must be:\n"
         "- scenario-based (not recall; something like 'Your team deployed X...')\n"
         "- answerable using the module's content\n"
@@ -337,7 +337,7 @@ def handler_quiz(doc: module_sections.ModuleDocument, module_key: str) -> Handle
 def handler_mistakes(doc: module_sections.ModuleDocument, module_key: str) -> HandlerResult:
     prompt = (
         "Write a 'Common Mistakes' markdown table for the following module.\n"
-        "Exactly 6-8 rows. Columns: Mistake | Why it's wrong | Fix.\n"
+        "One row per mistake learners actually make; no filler rows. Columns: Mistake | Why it's wrong | Fix.\n"
         "Do not include a heading; the section heading is inserted automatically.\n"
         f"{_OUTPUT_ONLY_CONTRACT}\n\n"
         f"Module key: {module_key}\n\n"

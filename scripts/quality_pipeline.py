@@ -437,11 +437,11 @@ Rewrite this module to fix the audit gaps while preserving strengths. Output ONL
 Hard requirements:
 - Keep the frontmatter (title, slug, sidebar order) unchanged unless slug is wrong.
 - Bloom's Level 3+ (Apply/Analyze/Evaluate/Create) — no pure recall.
-- At least 2 inline active-learning prompts embedded in content (not just final quiz).
-- At least 1 worked example before asking learner to solve a similar problem.
+- Active-learning prompts (predict, diagnose, compare) embedded in the content where they serve the outcomes, not only in the final quiz.
+- A worked example for each key skill before asking the learner to practice a similar problem.
 - Narrative flow: sections build on each other; no rearrangeable listicle.
-- 600-800+ lines of content minimum (visual aids don't count toward the minimum).
-- Required sections: Learning Outcomes, Why This Module Matters, core content, Did You Know (4 facts), Common Mistakes (table), Quiz (6-8 scenario questions), Hands-On Exercise, Next Module link.
+- Balance both ways with equal weight: cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples. Do not write to a line or word count; visual aids supplement explanation, they do not replace it.
+- Required sections: Learning Outcomes, Why This Module Matters, core content, Did You Know (supported facts only), Common Mistakes (table), Quiz (outcome-aligned scenario questions), Hands-On Exercise, Next Module link.
 - Do NOT repeat the number 47 (known LLM pattern).
 - Do NOT use emojis.
 - Preserve existing Mermaid/ASCII diagrams; improve them, don't remove.
@@ -477,9 +477,9 @@ Canonical section order (place the new section(s) accordingly):
 2. Learning Outcomes
 3. Why This Module Matters
 4. Core content (unchanged)
-5. Did You Know (exactly 4 facts, if adding)
-6. Common Mistakes (table with 6-8 rows, if adding)
-7. Quiz (6-8 scenario-based questions with <details> answers, if adding)
+5. Did You Know (supported facts only, if adding)
+6. Common Mistakes (table of the mistakes learners actually make, if adding)
+7. Quiz (outcome-aligned scenario-based questions with <details> answers, if adding)
 8. Hands-On Exercise (multi-step with - [ ] success criteria, if adding)
 9. Next Module link
 
@@ -514,7 +514,7 @@ def _section_prompt(state: dict[str, Any], args: argparse.Namespace, module_text
 ```
 
 ## Your task
-Rewrite ONLY the '{args.section}' section to improve its quality, depth, or formatting, while keeping ALL other sections of the file identical.
+Rewrite ONLY the '{args.section}' section to improve its accuracy, explanation and formatting, while keeping ALL other sections of the file identical. Cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples.
 For example, if target is 'prereqs', update the prerequisites in the frontmatter or initial block.
 
 Output ONLY the new full module markdown (including frontmatter). No prose before or after. No code fence around the whole output. The output will be written directly to {state['module_path']} verbatim.

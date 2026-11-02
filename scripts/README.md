@@ -242,7 +242,7 @@ python scripts/quality/verify_module.py \
 python scripts/quality/verify_module.py --all-revision-pending --out logs/audit.jsonl
 ```
 
-Gates: density (mean_wpp ≥ 30, median_wpp ≥ 28, short ≤ 20%, max-run ≤ 2), structure (4 Did You Know, 6-8 Common Mistakes, 6-8 Quiz with `<details>`, Hands-On with `- [ ]`), section order, anti-leak, protected assets, sources. Tiers: T0 (all pass) → T3 (multiple gate failures).
+Blocking gates: no source H1, required sections present and in order, quiz answers explained in `<details>`, source links reachable, anti-leak, no runnable `kubectl` alias, lab image/binary match, no unsourced anecdote, practice MCQ shape, outcome alignment. Word counts, density (wpp, short-paragraph rate), sentence length and template counts (Did You Know, Common Mistakes, quiz items, sources) are reported in the record as diagnostics, and `length_attention` flags unusually short or long pages for their outcomes; none of them rejects, tiers or rewards a page (#3744). Tiers follow blocking defects only: T0 (none) → T3 (several).
 
 #### `dispatch_388_pilot.py` — per-module orchestrator
 
@@ -280,7 +280,7 @@ python scripts/quality/cleanup_388_pilot.py --input <file> --no-fetch
 Held PRs require orchestrator judgment — the C3 fix-up lane was deliberated in `ab discuss day3-388` (2026-05-02). The summary at the end of `run_388_batch.py` lists each held PR with its gemini review URL:
 
 - **APPROVE_WITH_NITS** (URL fix, redundant alias, typo, single-line removal) → fix inline on the branch + `gh pr merge --squash --delete-branch <num>`
-- **NEEDS CHANGES** (structural failure, missing section, density regression) → close PR, or re-dispatch codex on the existing branch with the gemini review as the brief:
+- **NEEDS CHANGES** (structural failure, missing section, or a reviewer-confirmed loss of needed explanation or added padding) → close PR, or re-dispatch codex on the existing branch with the gemini review as the brief:
   ```bash
   codex exec -C .worktrees/codex-388-pilot-<slug> \
     -m gpt-5.5 --dangerously-bypass-approvals-and-sandbox - <<< "<gemini's review as the brief>"

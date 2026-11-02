@@ -1214,15 +1214,15 @@ TOPICS TO COVER (from plan):
 {plan}
 
 QUALITY REQUIREMENTS:
-- 600-800 lines of content minimum (visual aids don't count toward this)
-- Learning Outcomes: 3-5 measurable, Bloom's L3+ verbs (debug, design, evaluate, compare, diagnose, implement)
-- Why This Module Matters: open with dramatic real-world incident, real company, real financial impact. 2-3 paragraphs.
-- Core content (3-6 sections): explanations with analogies, runnable code blocks, Mermaid diagrams (preferred over ASCII), tables, war stories
-- At least 2 inline active learning prompts distributed throughout: > **Pause and predict**: or > **Stop and think**:
-- Did You Know?: exactly 4 facts with real numbers/dates
-- Common Mistakes: table with 6-8 rows (Mistake | Why | Fix)
-- Quiz: 6-8 questions in <details> tags, at least 4 scenario-based. Answers 3-5 sentences explaining WHY.
-- Hands-On Exercise: 4-6 progressive tasks with solutions in <details> tags, success checklist
+- Cover the learning outcomes fully. Balance both ways with equal weight: cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples. Do not write to a line or word count; visual aids do not count as explanation.
+- Learning Outcomes: measurable, Bloom's L3+ verbs (debug, design, evaluate, compare, diagnose, implement)
+- Why This Module Matters: open with a sourced real incident (cite it) or a scenario explicitly labeled `Hypothetical scenario:`; never invent a company, incident or number.
+- Core content: explanations with analogies, runnable code blocks, Mermaid diagrams (preferred over ASCII), tables, sourced incidents or labeled hypotheticals only
+- Inline active learning prompts distributed throughout where they serve the outcomes: > **Pause and predict**: or > **Stop and think**:
+- Did You Know?: supported facts only, each traceable to a source; do not manufacture numbers or dates
+- Common Mistakes: table (Mistake | Why | Fix) of the mistakes learners actually make
+- Quiz: outcome-aligned scenario-based questions in <details> tags. Answers explain WHY.
+- Hands-On Exercise: progressive tasks matched to the outcomes with solutions in <details> tags, success checklist
 - Next Module: link with teaser
 - NO emojis, NO recall quiz questions, NO thin outlines, NO number 47
 - CONVERT all ASCII art diagrams to Mermaid (```mermaid blocks). Use flowchart for architecture, sequenceDiagram for flows, graph TD for hierarchies. ASCII art is fragile and hard to maintain — Mermaid renders natively in our site.

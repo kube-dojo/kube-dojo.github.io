@@ -10,7 +10,7 @@ Review KubeDojo modules against `docs/review-contract.md` and `docs/quality-rubr
 ## How to Review
 
 1. **Read the module fully** — line-by-line, not skim.
-2. **Run the verifier first**: `.venv/bin/python scripts/quality/verify_module.py <path>`. Report its actual results. Word, density and template counts are diagnostics, not proof of learning quality; until #3744 lands, the verifier may still enforce legacy count gates, so report that conflict and any unresolved gate separately.
+2. **Run the verifier first**: `.venv/bin/python scripts/quality/verify_module.py <path>`. Report its actual results. Since #3744, word, density and template counts are diagnostics only: they flag unusually short or choppy AND unusually long or walled pages for your attention and never reject or reward, so judge coverage against the page's outcomes. Treat BLOAT (padding, repetition, duplication, off-topic background) and UNDER-EXPLANATION (a term used before it is explained, a skipped reasoning step, a list where the why is needed, a missing worked example for a key skill, an abrupt transition) as equal blocking classes, and for any cut you recommend say what the learner keeps.
 3. **Score against ALL 8 rubric dimensions** (1-5 each).
 4. **Be STRICT** — a 4 means genuinely good, a 5 is exceptional.
 5. **Flag specific issues with line numbers**.
