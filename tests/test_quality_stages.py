@@ -107,15 +107,13 @@ Question 1.
     monkeypatch.setenv("KUBEDOJO_GATES_SAMPLE_RATE", "0")
     # Prompt docs aren't present in the fake repo; stub the startup check.
     monkeypatch.setattr("scripts.quality.pipeline.assert_required_docs_exist", lambda: None)
-    # #388 density-gate bypass: the seed/rewrite fixtures are intentionally
-    # tiny (~5 prose words) to keep the suite fast and readable. The
-    # production density gate would (correctly) reject them as REWRITE-
-    # tier, but every existing test was written to validate stage
-    # mechanics, NOT density. Density behavior is exercised by dedicated
-    # tests in test_quality_density.py and the round-trip test in this
-    # file. The bypass forces ``classify() == PASS`` everywhere these
-    # stub modules are read; tests that specifically need REWRITE-tier
-    # behavior can monkeypatch this back to the real implementation.
+    # #388 density bypass: the seed/rewrite fixtures are intentionally tiny
+    # (~5 prose words) to keep the suite fast and readable. Routing would
+    # classify them REWRITE-tier, but every existing test validates stage
+    # mechanics, NOT density. Density behavior is exercised by
+    # test_quality_density.py and the tests below. The bypass forces
+    # ``classify() == PASS`` wherever these stub modules are read; tests that
+    # need REWRITE-tier behavior can monkeypatch this back.
     from scripts.quality import density as _density
     def _always_pass(_text: str) -> _density.DensityMetrics:
         return _density.DensityMetrics(
@@ -2016,8 +2014,9 @@ F.
 
 
 def test_density_gate_failure_bounces_to_write_pending(fake_repo, monkeypatch):
-    """When merge_one's density gate raises, the slug must go back to
-    WRITE_PENDING with the reason in retry context (not FAILED)."""
+    """When merge_one's density diagnostics cannot read the module (the only
+    way they raise, #3744), the slug must go back to WRITE_PENDING with the
+    reason in retry context (not FAILED)."""
     slug = _bootstrap(fake_repo)
     # Drive to REVIEW_APPROVED — bypass writer/reviewer dispatch entirely
     # by hand-editing state.
@@ -2044,8 +2043,8 @@ def test_density_gate_failure_bounces_to_write_pending(fake_repo, monkeypatch):
     monkeypatch.setattr(stages, "remove_worktree", lambda primary, slug, delete_branch=True: None)
     monkeypatch.setattr(stages.gates, "assert_visual_aids_preserved", lambda *a, **kw: {})
     def _raise(*a, **kw):
-        raise _gates.GateError("density gate failed on test-slug: wpp 8.0 < 22.0")
-    monkeypatch.setattr(stages.gates, "assert_density_threshold", _raise)
+        raise _gates.GateError("density diagnostics could not read module.md at branch")
+    monkeypatch.setattr(stages.gates, "density_diagnostics", _raise)
 
     stages.merge_one(slug)
     st = state.load_state(slug)
@@ -2056,8 +2055,8 @@ def test_density_gate_failure_bounces_to_write_pending(fake_repo, monkeypatch):
 
 
 def test_density_gate_failure_after_retry_cap_marks_failed(fake_repo, monkeypatch):
-    """After RETRY_CAP density bounces, the next failure marks FAILED
-    (manual rewrite required)."""
+    """After RETRY_CAP density-diagnostics bounces, the next failure marks
+    FAILED (manual rewrite required)."""
     slug = _bootstrap(fake_repo)
     st = state.load_state(slug)
     st.update({
@@ -2077,10 +2076,10 @@ def test_density_gate_failure_after_retry_cap_marks_failed(fake_repo, monkeypatc
     monkeypatch.setattr(stages, "rebase_onto_main", lambda primary, slug: None)
     monkeypatch.setattr(stages, "remove_worktree", lambda primary, slug, delete_branch=True: None)
     monkeypatch.setattr(stages.gates, "assert_visual_aids_preserved", lambda *a, **kw: {})
-    monkeypatch.setattr(stages.gates, "assert_density_threshold",
-                        lambda *a, **kw: (_ for _ in ()).throw(_gates.GateError("density failed")))
+    monkeypatch.setattr(stages.gates, "density_diagnostics",
+                        lambda *a, **kw: (_ for _ in ()).throw(_gates.GateError("density unreadable")))
 
     stages.merge_one(slug)
     st = state.load_state(slug)
     assert st["stage"] == "FAILED"
-    assert "density gate failed after" in (st.get("failure_reason") or "")
+    assert "density diagnostics failed after" in (st.get("failure_reason") or "")

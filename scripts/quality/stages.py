@@ -1183,12 +1183,11 @@ def _clear_banner_and_complete_queue(
 
 
 def _handle_density_failure(st: dict[str, Any], reason: str) -> None:
-    """REVIEW_APPROVED + density-fail → WRITE_PENDING (retry) OR → FAILED.
+    """REVIEW_APPROVED + density diagnostics failed → WRITE_PENDING (retry) OR → FAILED.
 
-    Mirrors :func:`handle_review_changes` retry semantics. The writer's
-    output cleared the cross-family review on teaching merits but failed
-    the deterministic density triple gate — usually means the writer
-    over-compressed or padded its way through the prose. Bounce to
+    Mirrors :func:`handle_review_changes` retry semantics. Since #3744 a
+    density value never reaches here; only an unreadable module does (the
+    writer's branch tip has no module to measure). Bounce to
     WRITE_PENDING with the reasons in retry context, capped at
     :data:`RETRY_CAP`. Beyond the cap, mark FAILED so a human queues
     the rewrite manually.
@@ -1206,7 +1205,7 @@ def _handle_density_failure(st: dict[str, Any], reason: str) -> None:
         # is the correct ordering: state truth first, cleanup advisory.
         _fail_and_cleanup(
             st,
-            f"density gate failed after {RETRY_CAP} retries — manual rewrite required: {reason}",
+            f"density diagnostics failed after {RETRY_CAP} retries — manual rewrite required: {reason}",
         )
         return
     # Retry: back to WRITE_PENDING with the density failure as must_fix
@@ -1346,16 +1345,14 @@ def merge_one(slug: str) -> None:
                     except gates.GateError as gate_exc:
                         last_error = gate_exc
                         break  # don't retry — regression is deterministic
-                    # #388 stage [6]: density hard gate. A REWRITE-tier
-                    # output must clear the triple gate before landing.
-                    # Density signals are content-stable (rebase doesn't
-                    # change them) so a single failure is terminal for
-                    # this attempt. We bounce the slug back to
-                    # WRITE_PENDING with the reason as retry context (up
-                    # to RETRY_CAP) instead of FAILing it outright,
-                    # because the writer may simply have over-compressed.
+                    # #388 stage [6], now diagnostics only (#3744): record
+                    # the density signals and both-tails attention flags in
+                    # the commit record for the reviewer. A density value
+                    # never blocks the merge; only an unreadable module
+                    # raises, and that bounces the slug to WRITE_PENDING with
+                    # the reason as retry context (up to RETRY_CAP).
                     try:
-                        density_meta = gates.assert_density_threshold(
+                        density_meta = gates.density_diagnostics(
                             primary, slug, st["module_path"],
                         )
                     except gates.GateError as gate_exc:

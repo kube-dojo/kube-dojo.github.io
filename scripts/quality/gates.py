@@ -568,48 +568,32 @@ def assert_visual_aids_preserved(
     return result
 
 
-def assert_density_threshold(
+def density_diagnostics(
     primary: Path,
     slug: str,
     module_relpath: str,
 ) -> dict[str, Any]:
-    """Hard gate. Raises :class:`GateError` if the rewrite still classifies
-    as ``REWRITE`` on the density triple-gate.
+    """Diagnostics only (#3744): never rejects a module on a density value.
 
-    Reads the file at the writer's branch tip (matches
-    :func:`assert_visual_aids_preserved`'s ``after`` snapshot — same
-    rebased-onto-main branch the merge is about to fast-forward).
-    Verdicts ``PASS`` and ``REVIEW`` are both accepted: a borderline
-    rewrite still teaches better than the original (which was either
-    REWRITE-tier on density or REVIEW-tier with a "rewrite" judge
-    verdict, otherwise route_one wouldn't have sent it to the writer).
-
-    Returns a dict with the verdict + raw signals so callers can log
-    them. Per #388 stage [6]: fail = back to WRITE_PENDING, max 2
-    iterations, then human queue.
+    Reads the file at the writer's branch tip (same snapshot as
+    :func:`assert_visual_aids_preserved`'s ``after``) and returns the raw
+    signals plus the both-tails ``attention`` flags for the reviewer; a short,
+    choppy, long or walled page is flagged, not bounced. Raises
+    :class:`GateError` only when the file cannot be read, because then there
+    is nothing to measure (the same fail-closed case as the visual-aid gate).
     """
     branch = branch_name(slug)
     status, text, err = _git_show(primary, branch, module_relpath)
     if status != "ok" or text is None:
         raise GateError(
-            f"density gate could not read {module_relpath} at {branch}: {err or status}"
+            f"density diagnostics could not read {module_relpath} at {branch}: {err or status}"
         )
     metrics = density.evaluate_text(text)
-    verdict = metrics.classify()
-    if verdict == density.DensityVerdict.REWRITE:
-        # Report against REWRITE-tier floors (not PASS floors) so the
-        # bounce reason names the floor that actually fired the gate —
-        # otherwise REVIEW-band signals would appear in the message
-        # despite not being responsible for the failure.
-        raise GateError(
-            f"density gate failed on {slug}: "
-            + "; ".join(metrics.reasons_failed_rewrite())
-        )
     return {
-        "verdict": verdict.value,
         "prose_words": metrics.prose_words,
         "w_per_line": round(metrics.w_per_line, 2),
         "w_per_para": round(metrics.w_per_para, 2),
+        "attention": metrics.attention(),
     }
 
 
