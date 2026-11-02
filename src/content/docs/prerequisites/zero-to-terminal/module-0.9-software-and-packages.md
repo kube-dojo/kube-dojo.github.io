@@ -151,7 +151,7 @@ The first command is intentionally missing `sudo`, so on a typical Ubuntu or Deb
 
 When `sudo` prompts for a password, the terminal normally does not echo what you type. Type carefully and press Enter; the keyboard is still working even if the screen shows no characters. Configuration can change the prompt or authentication behavior.
 
-Homebrew takes a different path for day-to-day package management. Its normal design is to install packages into a Homebrew-managed location that your user can write to, so you usually do not put `sudo` in front of `brew install`. Using `sudo` with Homebrew can create permission mismatches that make future installs and upgrades harder. Different package managers have different privilege models, so copy commands with context instead of treating `sudo` as decoration.
+Homebrew takes a different path for day-to-day package management. Its documentation says formula installation and updates do not require `sudo`, so run Homebrew as the account that owns the installation. Follow the documentation for cases that need elevated privileges. Different package managers have different privilege models, so copy commands with context instead of treating `sudo` as decoration.
 
 ```bash
 brew install htop
@@ -259,7 +259,7 @@ On macOS, use the Homebrew form. Again, do not treat the Linux and macOS command
 brew install tree
 ```
 
-Once installed, run `tree` against a practice directory. If you completed the earlier file-system exercise, the path below should produce a small recipe-style structure. If that directory does not exist on your machine, the command will fail with a clear "No such file or directory" style message, which is useful feedback rather than a disaster.
+Once installed, run `tree` against a practice directory. If you completed the earlier file-system exercise, the path below should produce a small recipe-style structure. If that directory does not exist on your machine, `tree` reports an error such as `[error opening dir]` and shows zero directories and files.
 
 ```bash
 tree ~/kubedojo-practice
@@ -278,7 +278,7 @@ This synthetic example shows a possible directory outline. The actual path and f
         └── pasta-carbonara.txt
 ```
 
-Updating installed software is a separate operational decision. On Ubuntu and Debian, list packages with available upgrades before deciding what to change. The actual upgrade plan can hold packages back:
+Updating installed software is a separate operational decision. On Ubuntu and Debian, list packages with available upgrades before deciding what to change. `apt list --upgradable` reads the local index, which may be stale until you run `sudo apt update` as shown below. The actual upgrade plan can hold packages back:
 
 ```bash
 apt list --upgradable
@@ -290,7 +290,7 @@ On macOS, list outdated Homebrew packages with:
 brew outdated
 ```
 
-Refresh metadata before reviewing available upgrades. On Ubuntu and Debian, `apt update` refreshes the catalog and `apt upgrade` applies available upgrades, but holds back packages whose upgrade would require removing an installed package:
+After refreshing metadata, review available upgrades. On Ubuntu and Debian, `apt update` refreshes the catalog and `apt upgrade` applies available upgrades, but holds back packages whose upgrade would require removing an installed package:
 
 ```bash
 sudo apt update
@@ -444,7 +444,7 @@ If you are unsure, write down the reason for the installation before you run it:
 
 ## Did You Know?
 
-1. Homebrew calls its package definitions formulae and its installation directory for packages the Cellar.
+1. Homebrew calls its source-built package definitions formulae and the directory holding installed formula versions the Cellar. Casks are a separate kind of definition.
 2. Depending on policy, `sudo` can log commands for later review.
 3. Debian-based systems separate `apt update` from `apt upgrade`, which is why a machine can claim a package is current when its local package index is actually stale.
 4. Incompatible dependency requirements can make two programs difficult to install together in one shared environment.
@@ -491,7 +491,7 @@ Automatic upgrades can apply legitimate fixes at times when nobody is watching, 
 
 <details><summary>Question 5: You install a small weather CLI and the package manager plans to install several dependencies, including a networking library. Should you cancel just because extra packages appear?</summary>
 
-Not automatically. Extra packages often mean the package manager is resolving required dependencies, such as libraries for HTTP requests, terminal output, or language runtimes. You should read the dependency list and decide whether it is reasonable for the tool, especially if the package is unfamiliar or privileged. Cancel when the plan looks surprising or untrusted, but do not assume every dependency is a problem.
+Not automatically. Extra packages may be required dependencies, such as libraries for HTTP requests, terminal output, or language runtimes; `apt` also installs recommended packages by default. You should read the dependency list and decide whether it is reasonable for the tool, especially if the package is unfamiliar or privileged. Cancel when the plan looks surprising or untrusted, but do not assume every dependency is a problem.
 
 </details>
 
@@ -521,7 +521,7 @@ brew update
 
 <details><summary>Solution notes for Task 1</summary>
 
-The successful result is not a particular package count. The important sign is that the command completes without authentication, network, or repository errors. If Linux asks for your password after `sudo`, type it even though the terminal does not display characters.
+The successful result is not a particular package count. The important sign is that the command completes without authentication, network, or repository errors. If Linux asks for your password after `sudo`, type it even though the terminal normally does not display characters.
 
 </details>
 
@@ -719,6 +719,8 @@ Transcript C: These simulated outputs show different `htop` versions on two work
 - [Homebrew Documentation: Installation](https://docs.brew.sh/Installation)
 - [Homebrew Documentation: Manpage](https://docs.brew.sh/Manpage)
 - [Debian bookworm: apt manual](https://manpages.debian.org/bookworm/apt/apt.8.en.html)
+- [Debian bookworm: apt-secure manual](https://manpages.debian.org/bookworm/apt/apt-secure.8.en.html)
+- [Filesystem Hierarchy Standard](https://specifications.freedesktop.org/fhs/latest/)
 - [Debian Policy: package relationships](https://www.debian.org/doc/debian-policy/ch-relationships.html)
 - [Fedora quick docs: DNF](https://docs.fedoraproject.org/en-US/quick-docs/dnf/)
 - [ArchWiki: pacman](https://wiki.archlinux.org/title/Pacman)
