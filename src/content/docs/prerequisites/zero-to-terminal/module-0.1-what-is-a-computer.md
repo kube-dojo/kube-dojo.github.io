@@ -110,7 +110,7 @@ The result depends on how much memory those programs actually need; tab count al
 
 A slow video edit can justify checking CPU activity alongside other resources; editing software may use several cores. If a laptop slows after opening many applications, check memory pressure or available memory and ongoing paging. If opening files is slow, check storage activity. These checks help distinguish hypotheses; a symptom alone does not establish the cause.
 
-Before running this, what output do you expect from your own machine: a CPU model name, a large byte count for memory, or a percentage of current usage? These commands report processor and memory information and filesystem space, not a complete live performance diagnosis. Task 3 introduces observations of current activity.
+Before running this, what output do you expect from your own machine: a CPU model name, a large byte count for memory, or filesystem usage? These commands report processor and memory information and filesystem space, not a complete live performance diagnosis. `df -h` includes a percentage of filesystem space used. Task 3 introduces observations of current activity.
 
 ```bash
 # See your CPU info on macOS
@@ -159,22 +159,7 @@ The disk is the durable pantry. It stores the operating system, applications, ph
 
 People often use several words for storage. "Disk" is the generic word you will hear in operations conversations, even when the storage device is not a spinning disk. "Hard drive" usually means an HDD, a device with spinning platters and moving mechanical parts. "SSD" means Solid State Drive, which stores data in electronic memory chips with no moving arm. "Storage" is the everyday word for the amount of durable space available.
 
-```
-Two types of pantry:
-
-  HDD (Hard Disk Drive):
-    - Like a big walk-in pantry
-    - Capacity and price depend on the model
-    - Moving parts add seek time when locating data
-
-  SSD (Solid State Drive):
-    - Like a well-organized shelf right outside the kitchen
-    - No mechanical seek time when locating data
-    - Compare capacity and measured performance
-    - Check your own device's storage type
-```
-
-Keep units with the values in your inventory, because tools can use different scales. In decimal units, one gigabyte (GB) is one billion bytes and one terabyte is 1,000 GB. A gibibyte (GiB) is 1,073,741,824 bytes, so it is larger than a GB. [NIST's unit comparison](https://physics.nist.gov/cuu/Units/binary.html) explains the distinction; a different displayed number does not necessarily mean storage disappeared.
+Keep units with the values in your inventory, because tools can use different scales. In decimal units, one gigabyte (GB) is one billion bytes and one terabyte is 1,000 GB. A gibibyte (GiB) is 1,073,741,824 bytes, so it is larger than a GB. On Linux, `free -h` and GNU `df -h` use powers of 1024 by default; `df -H` uses powers of 1000. [NIST's unit comparison](https://physics.nist.gov/cuu/Units/binary.html) explains the distinction; a different displayed number does not necessarily mean storage disappeared.
 
 The difference between RAM and storage becomes obvious during a power failure. Suppose you are writing a document and the power goes out before autosave runs. The previously saved file will normally remain on storage, while unsaved changes held in RAM are at risk. A failed or interrupted write, storage damage, or another fault can still affect saved data; backups matter.
 
@@ -238,7 +223,7 @@ A program, also called an application or app, is a set of instructions. When you
 Some "recipes" you use every day:
 
   Web browser (Chrome, Firefox)  -> Recipe for displaying web pages
-  Text editor (Word, Notepad)    -> Recipe for editing text
+  Text editor (Notepad)          -> Recipe for editing text
   Terminal                       -> Text interface that hosts a command shell
 ```
 
@@ -246,7 +231,7 @@ The next module introduces the terminal. A graphical interface lets you ask for 
 
 Linux matters in this curriculum because Kubernetes control-plane components run on Linux and many of the later exercises use Linux tools. Kubernetes also supports Windows worker nodes for Windows workloads. The operating system on your learning laptop and the operating system running a cluster workload are separate choices.
 
-Many Kubernetes examples assume Linux commands, paths, process behavior, and container images. You can learn from a macOS or Windows laptop using Linux-like environments, remote shells, containers, or virtual machines.
+Many Kubernetes examples assume Linux commands, paths, process behavior, and container images. On Windows, Windows Subsystem for Linux (WSL) lets you use Linux tools. On Windows or macOS, you can run Linux in a virtual machine (VM), a software-based computer with its own operating system, or connect to a remote Linux machine and enter commands there. A container packages an application and its dependencies; for example, Docker Desktop runs Linux containers in a Linux VM. Check each exercise's requirements before choosing an environment.
 
 The [Kubernetes 1.35 Windows documentation](https://v1-35.docs.kubernetes.io/docs/concepts/windows/intro/#windows-nodes-in-kubernetes) supports that Linux-control-plane/Windows-worker distinction. It does not require your learning laptop to use the same operating system as a cluster node; keep the local desktop and server environment separate in your reasoning.
 
@@ -264,7 +249,7 @@ The distinction between a program problem and an operating-system problem become
 
 For a first pass, you may continue to [Reading Symptoms Like an Operator](#reading-symptoms-like-an-operator) and return here later. This preview connects the same resources to a future platform; the local spec inventory does not require a cluster or Kubernetes commands.
 
-Kubernetes sounds much larger than one laptop, but it does not escape the kitchen model. A Kubernetes cluster is a collection of computers, usually called nodes, coordinated to run workloads. Each node has CPU, RAM, disk, an operating system, networking, and background agents. Kubernetes adds a scheduling and reconciliation layer above those computers, but it still depends on their ordinary hardware limits.
+Kubernetes sounds much larger than one laptop, but it does not escape the kitchen model. A Kubernetes cluster is a collection of computers, usually called nodes, coordinated to run workloads. Each node has CPU, RAM, disk, an operating system, networking, and background agents. Kubernetes coordinates work across those computers, but it still depends on their ordinary hardware limits.
 
 Cloud virtual machines also offer combinations of resources: a type might advertise vCPUs, memory, local storage, network performance, and sometimes specialized hardware. Choosing an instance involves matching those resources to the workload.
 
@@ -272,7 +257,7 @@ Containers also do not remove these limits. A container packages a program and i
 
 When you later read about Kubernetes requests and limits, you will see CPU and memory again. A workload may request enough CPU and memory to run properly, and Kubernetes uses those requests when choosing a node. If a workload exceeds its memory limit, it may be terminated. Requests guide placement; limits constrain consumption.
 
-Storage also reappears in Kubernetes: images, logs, and application files consume capacity even when CPU and RAM are available. Storage lifetime is a separate question. Ephemeral volumes have lifetimes tied to a Pod, while persistent volumes can outlive an individual Pod. The word "storage" alone does not promise that Kubernetes will retain the data.
+Storage also reappears in Kubernetes: images, logs, and application files consume capacity even when CPU and RAM are available. A Pod is a group of one or more containers that Kubernetes runs together. Ephemeral volumes have lifetimes tied to a Pod, while persistent volumes can outlive an individual Pod. The word "storage" alone does not promise that Kubernetes will retain the data.
 
 The operating system also remains central. Kubernetes does not run directly on bare metal without an OS layer doing ordinary OS work. Linux nodes run Linux processes, use Linux filesystems, and rely on Linux networking behavior. Windows worker nodes exist for Windows workloads, but Kubernetes control plane components are Linux-based. This is why the curriculum moves from "what is a computer" to "what is a terminal" and then toward Linux fundamentals.
 
@@ -289,7 +274,7 @@ Pause and predict: if a Kubernetes node has plenty of CPU available but almost n
 <details>
 <summary>Check your prediction</summary>
 
-CPU capacity cannot substitute for memory capacity. In Kubernetes, however, the scheduler normally compares declared resource requests with node allocatable capacity and existing requests, rather than simply reading a live free-memory percentage. Reported memory pressure also affects scheduling through node taints. Distinguish the workload's needs, its declared requests, and the node's observed condition before predicting placement.
+CPU capacity cannot substitute for memory capacity. The scheduler compares the workload's declared memory request with the resources available for workloads after existing requests, rather than simply reading a live free-memory percentage. A node reporting memory pressure can also have restrictions on which workloads may be placed there. Check both the request and the node's condition before predicting placement.
 </details>
 
 ## Reading Symptoms Like an Operator
@@ -312,11 +297,7 @@ A good hypothesis includes both a resource and a reason. "It is slow because com
 
 This table is a decision aid, not a law of nature. Real incidents can involve several resources at once. A browser can consume CPU, RAM, disk cache, and network bandwidth in the same session. A full disk can make memory pressure worse by limiting swap. Keep asking which resource is constrained and what evidence supports that claim.
 
-Hypothetical scenario: your laptop has 16 GB of RAM and a large SSD, but becomes sluggish during a video export. Across repeated samples, the system-wide CPU summary is almost fully busy and the editor accounts for most CPU time; memory pressure is low. CPU contention is the leading hypothesis. Compare responsiveness when the export is paused before considering an upgrade.
-
-Hypothetical scenario: switching windows slows after you open several applications. The system monitor shows high memory use and increasing swap usage. Suspect RAM pressure, then check available memory or the pressure indicator and ongoing paging where observable. Reducing memory-heavy work and comparing responsiveness tests that hypothesis; these observations alone do not justify a purchase.
-
-## Patterns & Anti-Patterns
+## Patterns
 
 Keep the resources distinct and map symptoms to possible causes before choosing an action.
 
@@ -325,12 +306,6 @@ Keep the resources distinct and map symptoms to possible causes before choosing 
 | Name the resource before naming the fix | Any time a computer is slow, full, hot, or unreliable | It forces diagnosis before spending time or money |
 | Compare RAM and storage explicitly | Any time someone says "memory" ambiguously | It prevents confusing temporary workspace with durable files |
 | Inspect first, then change | Before upgrades, restarts, deletions, or scaling decisions | Evidence reduces guesswork and protects unrelated work |
-
-| Anti-Pattern | What Goes Wrong | Better Alternative |
-|---|---|---|
-| "Just restart it" as the only strategy | Temporary relief hides recurring CPU, RAM, disk, or program problems | Restart when useful, then inspect what pressure returns |
-| "Buy a bigger hard drive" for every slow machine | Storage capacity may not affect CPU or RAM bottlenecks | Check CPU, memory, disk fullness, and disk type separately |
-| "Linux is only for experts" | Kubernetes control-plane components run on Linux | Learn basic Linux commands through the guided exercises |
 
 ## When You'd Use This vs Alternatives
 
@@ -347,13 +322,9 @@ Use more detailed models when an initial resource check cannot answer your quest
 
 ## Did You Know?
 
-- **Historical memory counts need context.** The [Apollo Guidance Computer's logical-design description](https://ntrs.nasa.gov/api/citations/19660019469/downloads/19660019469.pdf#page=120) lists 36,864 words of fixed, read-only memory and 2,048 words of erasable memory. Those are word counts: check the word format and memory role before comparing them with a modern machine's byte-based RAM figure.
-
 - **Memory has used magnetic rings.** The [Computer History Museum](https://www.computerhistory.org/revolution/memory-storage/8/253) describes core memory in MIT's Whirlwind in 1953. Each ring stored one bit through its magnetization. This is a different implementation from the modern volatile RAM used in the laptop examples above.
 
 - **SSDs avoid spinning mechanisms.** [Sandisk's comparison](https://www.sandisk.com/solutions/ssd-vs-hdd) distinguishes NAND flash cells in SSDs from the spinning platters and moving mechanisms of HDDs. That explains an important access-time and mechanical-shock difference; it does not guarantee that every SSD will outperform every HDD for every workload or survive every failure.
-
-- **A famous early computer "bug" was a literal bug.** In 1947, engineers on the Harvard Mark II found a moth in the machine and taped it into the logbook. The [Smithsonian's artifact record](https://americanhistory.si.edu/collections/object/nmah_334663) explains that engineers had already used “bug” for faults long before this incident; the moth did not originate the term.
 
 ## Common Mistakes
 
@@ -383,7 +354,7 @@ The unsaved changes were likely in RAM, which is temporary and requires power to
 <details>
 <summary>3. Optional preview: a future Kubernetes node reports that it has CPU available but is under memory pressure. What else do you need to predict placement of a memory-heavy workload?</summary>
 
-Do not decide from CPU availability alone. Compare the Pod's declared memory request with the node's allocatable memory and existing requests, and inspect the node's memory-pressure condition and taints. Kubernetes scheduling is not a direct comparison with current free RAM: a low request can understate a workload's eventual use. The resource distinction still matters, but a prediction needs those additional facts.
+Do not decide from CPU availability alone. Compare the workload's declared memory request with the resources available for workloads after existing requests, and check whether the node's memory-pressure condition restricts placement. A low request can understate eventual use; current free RAM alone does not determine the scheduler's choice.
 </details>
 
 <details>
@@ -393,9 +364,9 @@ Compare repeated system-wide and editor CPU readings with memory pressure or ava
 </details>
 
 <details>
-<summary>5. Two otherwise comparably capable, supported laptops both have enough free storage for your intended beginner Kubernetes lab. One has a small SSD and 16 GB of RAM; the other has a large HDD and 4 GB of RAM. Your measured workload needs more than 4 GB of available memory. Which tradeoff matters for running it?</summary>
+<summary>5. Two otherwise comparably capable, supported laptops both have enough free storage for your intended beginner Kubernetes lab. One has a small SSD and 16 GB of RAM; the other has a large HDD and 4 GB of RAM. What measurements would help you choose between them?</summary>
 
-Under those assumptions, the 16 GB machine has more room for the memory-demanding workload; the larger HDD does not replace RAM. Check the actual tools' CPU, memory, disk and environment requirements before choosing. If either machine lacks sufficient free storage or compatible virtualization, the comparison changes; 16 GB is not a universal lab requirement.
+Check the workload's CPU, memory, disk and environment requirements. If it needs more than 4 GB of available memory, the 16 GB machine has more room; the larger HDD does not replace RAM. Compatible virtualization and sufficient free storage also matter; 16 GB is not a universal lab requirement.
 </details>
 
 <details>
@@ -457,7 +428,21 @@ Use the labels and roles, not which number is larger: installed memory or RAM is
 <details>
 <summary>Solution guidance for Task 3</summary>
 
-On macOS, Activity Monitor has CPU and Memory tabs. On Windows, Task Manager has Processes and Performance views. On Linux, `top` shows CPU and memory activity. A busy process or high used-memory number is a clue, not proof of a bottleneck. Check sustained system-wide CPU activity against available capacity, and memory pressure or available memory alongside ongoing paging when your tools expose it. A swap-usage total in `top` does not by itself establish ongoing paging; if you cannot observe ongoing activity, record that gap. Cached data and allocated swap can remain when applications are responsive. Filesystem fullness is not evidence of slow disk I/O; record insufficient evidence if the observations do not explain the slowdown.
+Available memory estimates RAM that applications can use without swapping; memory pressure describes how well memory is serving current work. Swap is disk space used to move less active data out of RAM, while disk activity means reads and writes, not the amount of free space. On macOS, Activity Monitor's Memory tab shows the Memory Pressure graph and Swap Used, and its Disk tab shows disk activity. On Windows, Task Manager's Performance view has Memory and Disk sections; on Linux, `free -h` shows available memory and swap, and `top` shows CPU and memory summaries. For Linux disk reads and writes, use `iostat` if already available; otherwise record the missing I/O evidence. A swap total alone does not show ongoing paging, and activity alone does not prove a bottleneck.
+
+Example output below is **synthetic**, not a measurement of your computer:
+
+```text
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:            8.0Gi       6.0Gi       0.5Gi       0.1Gi       1.5Gi       1.2Gi
+Swap:           2.0Gi       0.5Gi       1.5Gi
+
+$ top
+%Cpu(s): 20.0 us,  5.0 sy,  0.0 ni, 75.0 id,  0.0 wa
+```
+
+Here `available` estimates 1.2 GiB for new applications without swapping; 0.5 GiB of swap is allocated, but one snapshot cannot show whether paging is ongoing. The `top` CPU summary reports 75% idle in this example. Compare repeated observations with the time of the symptom before drawing a conclusion.
 </details>
 
 ### Task 4: Predict an upgrade correctly
@@ -509,7 +494,7 @@ CPU contention is the leading hypothesis because the system-wide summary stays a
 <details>
 <summary>Check your diagnosis for Profile C</summary>
 
-Filesystem space pressure is a leading hypothesis: root is 99% used and writes are failing, but the failing paths may be on a different filesystem and fullness alone does not prove the cause. For a hypothetical GNU/Linux check, use `df -h PATH` for space and `df -i PATH` for inode availability, which is relevant to creating files. Replace `PATH` with an existing file or directory on the relevant filesystem; for a failed file creation, use its existing containing directory. Describe these checks rather than running them: this fictional profile supplies no real path. If pressure is confirmed, a possible action is to move data or expand that filesystem after checking what is safe to change. Do not delete files as part of this exercise.
+Filesystem space pressure is a leading hypothesis: root is 99% used and writes are failing, but the failing paths may be on a different filesystem and fullness alone does not prove the cause. For a hypothetical GNU/Linux check, use `df -h PATH` for space and `df -i PATH` for availability of inodes, the filesystem's file records. Replace `PATH` with an existing file or directory on the relevant filesystem; for a failed file creation, use its existing containing directory. Describe these checks rather than running them: this fictional profile supplies no real path. If pressure is confirmed, a possible action is to move data or expand that filesystem after checking what is safe to change. Do not delete files as part of this exercise.
 </details>
 
 ### Success Criteria
@@ -527,12 +512,16 @@ Filesystem space pressure is a leading hypothesis: root is 99% used and writes a
 - [NIST: Decimal and binary units](https://physics.nist.gov/cuu/Units/binary.html)
 - [Sandisk: SSD and HDD storage mechanisms](https://www.sandisk.com/solutions/ssd-vs-hdd)
 - [Apple: View memory usage and Memory Pressure](https://support.apple.com/guide/activity-monitor/view-memory-usage-actmntr1004/mac)
+- [Apple: View disk activity](https://support.apple.com/guide/activity-monitor/view-disk-activity-actmntr1005/mac)
 - [procps: free — available memory and reclaimable cache](https://man7.org/linux/man-pages/man1/free.1.html)
 - [procps: top — CPU percentages and Irix/Solaris modes](https://man7.org/linux/man-pages/man1/top.1.html)
+- [sysstat: iostat — device input/output statistics](https://man7.org/linux/man-pages/man1/iostat.1.html)
+- [Microsoft: Linux environments on Windows and macOS](https://learn.microsoft.com/en-us/linux/install)
+- [Docker: Docker Desktop container virtual machine](https://docs.docker.com/faqs/platform/)
+- [Kubernetes 1.35: Pods](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/)
 - [Intel: Hyper-Threading and shared physical cores](https://www.intel.com/content/www/us/en/gaming/resources/hyper-threading.html)
 - [Kubernetes 1.35: Scheduling resource requests](https://v1-35.docs.kubernetes.io/docs/concepts/configuration/manage-resources-containers/#how-pods-with-resource-requests-are-scheduled)
 - [Kubernetes 1.35: Memory-pressure node conditions and taints](https://v1-35.docs.kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/#node-conditions)
-- [Smithsonian: Log Book With Computer Bug](https://americanhistory.si.edu/collections/object/nmah_334663)
 - [Kubernetes 1.35: Linux control plane and Windows worker nodes](https://v1-35.docs.kubernetes.io/docs/concepts/windows/intro/#windows-nodes-in-kubernetes)
 - [AWS Well-Architected Framework: Select the correct resource type, size, and number](https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/select-the-correct-resource-type-size-and-number.html)
 - [Apple Support: Find out how much storage is available on your Mac](https://support.apple.com/en-us/102624)
@@ -554,7 +543,6 @@ Filesystem space pressure is a leading hypothesis: root is 99% used and writes a
 - [Intel: Clock speed, processor design, and workload](https://www.intel.com/content/www/us/en/gaming/resources/cpu-clock-speed.html)
 - [Kubernetes 1.35: Ephemeral and persistent volume lifetimes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/volumes/#how-volumes-work)
 - [Computer History Museum: Magnetic Core Memory](https://www.computerhistory.org/revolution/memory-storage/8/253)
-- [NASA: Apollo Guidance Computer logical design, Chapter VI-2, PDF page 120](https://ntrs.nasa.gov/api/citations/19660019469/downloads/19660019469.pdf#page=120)
 
 ## Next Module
 
