@@ -110,7 +110,7 @@ Mandatory:
 
 Before writing, use the lead-supplied researched coverage_plan from this page's existing docs/citation-seeds JSON (matching module_path/module_key; outcomes, essential_topics, source_basis). Scope and omission grounds belong in that non-published plan and require independent acceptance. If these inputs are unavailable, return the evidence-shortfall report; do not invent them or insert planning records into lesson prose.
 
-Under #3744 the standalone verifier reports length, density and section/source counts without gating on them; the v2 density REWRITE band (under 1000 prose words, 12 words per line or 18 words per paragraph) may still route or reject a page. Cover the outcomes fully. Cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples; give both equal weight. If a count check disagrees with supported concise work, report it as a non-module shortfall for the lead instead of padding. The runner preserves extraction failures rather than publishing reports.
+Under #3744 length, density and section/source counts are diagnostics, not grounds to route or reject a page. Cover the outcomes fully. Cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples; give both equal weight. If a count check disagrees with supported concise work, report it as a non-module shortfall for the lead instead of padding. The runner preserves extraction failures rather than publishing reports.
 
 **Teaching prose:**
 - Explain mechanisms, decisions, examples, tradeoffs and failure recovery in connected prose appropriate to the topic and audience. Lists are useful for genuine steps, options and comparisons.
@@ -159,7 +159,7 @@ Return the COMPLETE module with the applicable missing sections added in the cor
 
 Shortfall format: plain text starting `EVIDENCE_SHORTFALL:`, then `Missing inputs:` and `Next action:`. Include no frontmatter, code fences or copied lesson body.
 
-Use the lead-supplied coverage_plan from this page's existing docs/citation-seeds JSON; record scope/exclusion grounds there for independent acceptance, never in published lesson prose. If the plan is unavailable, use the shortfall path. Under #3744 the verifier only reports length, density and counts; the v2 density REWRITE band (1000/12/18) may still reject concise work. Report disagreements without padding.
+Use the lead-supplied coverage_plan from this page's existing docs/citation-seeds JSON; record scope/exclusion grounds there for independent acceptance, never in published lesson prose. If the plan is unavailable, use the shortfall path. Under #3744 length, density and counts are diagnostics, not grounds to reject concise work. Report disagreements without padding.
 
 If a section to add is `quiz`: outcome-aligned questions with explanatory `<details>` answers, after applicable concept and practice sections.
 If `hands-on-exercise`: multi-step `- [ ]` checklist, placed after the quiz.
@@ -177,6 +177,7 @@ def review_prompt(
     writer_agent: str,
     track: str,
     original_gaps: list[str],
+    density_attention: dict[str, list[str]] | None = None,
 ) -> str:
     """Cross-family review prompt.
 
@@ -192,6 +193,16 @@ def review_prompt(
         if original_gaps
         else "(no prior audit gaps)"
     )
+    density_context = ""
+    if density_attention:
+        flags = "\n".join(
+            f"- {source}: {', '.join(values) or '(none)'}"
+            for source, values in density_attention.items()
+        )
+        density_context = (
+            "\n## Density attention\nBoth tails are flags for your judgment, "
+            f"not a pass/fail, not a target; coverage and clarity decide.\n{flags}\n"
+        )
     return f"""You are reviewing a KubeDojo module that was just {track}-ed by {writer_agent}. This is a cross-family review (you must be from a different LLM family than the writer).
 
 ## Module path
@@ -199,6 +210,7 @@ def review_prompt(
 
 ## Original audit gaps that should now be fixed
 {gaps}
+{density_context}
 
 ## Quality rubric (scoring dimensions)
 {rubric}

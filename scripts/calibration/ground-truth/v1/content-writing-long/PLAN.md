@@ -21,7 +21,7 @@
 
 ## Acceptance criteria per fixture
 
-- Passing answers satisfy the density gates from `feedback_388_verifier_first_pilot_then_volume.md`: `body_words >= 5000` for T0, `median_wpp >= 28`, `mean_wpp >= 30`, and `short_paragraph_rate <= 20%`.
+- Passing answers cover the stated outcomes with explanations, worked examples, operator decisions, and checks that support learner practice.
 - Strong answers score `judge_score>=7`, teach through decisions and checks, and avoid padding, fabricated facts, or upstream-doc paraphrase.
 - Any fixture with deterministic content gates must pass those gates before qualitative judge scoring is accepted.
 

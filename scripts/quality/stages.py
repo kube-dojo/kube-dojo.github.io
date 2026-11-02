@@ -227,9 +227,8 @@ def route_one(slug: str) -> None:
     # score-≥4-with-clean-structure paths keeps the queue scoped to
     # actual writer work.
     if needs_writer:
-        # set_banner=False — banners are committed by ``triage --apply``
-        # in their own user-visible PR; mutating frontmatter here would
-        # dirty primary and break merge_one's pre-flight check.
+        # Avoid mutating primary frontmatter and breaking merge_one's
+        # pre-flight check. Triage is a read-only scan.
         queue.ensure_queued(slug, module_path, set_banner=False)
 
     with state.state_lease(slug) as lease:
@@ -906,6 +905,11 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
             writer_agent=st["writer"],
             track=track,
             original_gaps=build_audit_context(st.get("audit")),
+            density_attention={
+                source: st[source]["density"]["attention"]
+                for source in ("route", "commit")
+                if (st.get(source) or {}).get("density", {}).get("attention") is not None
+            },
         )
 
         try:
