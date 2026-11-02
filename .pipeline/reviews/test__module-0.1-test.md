@@ -1,12 +1,1255 @@
 # Review Audit: test/module-0.1-test
 
-**Path**: `/var/folders/pd/wvj52r1j3bd4z9y3dfc2k4180000gn/T/tmp1bj3ddxt/module-0.1-test.md`
+**Path**: `/tmp/tmpbhpfoxlt/module-0.1-test.md`
 **First pass**: 2026-04-14T07:42:47Z
-**Last pass**: 2026-06-14T01:17:06Z
-**Total passes**: 2166
+**Last pass**: 2026-11-02T21:51:06Z
+**Total passes**: 2287
 **Current phase**: pending
 **Current reviewer**: -
 **Current severity**: -
+
+---
+
+## 2026-11-02T21:51:06Z — `INTEGRITY_FAIL`
+
+**Errors**:
+
+---
+
+## 2026-11-02T21:51:06Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:06Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:06Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:06Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:06Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:06Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:06Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:06Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 1ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:06Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:06Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:06Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:06Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:06Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:06Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:06Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:06Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:06Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: targeted
+**Duration**: 0ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: minor accuracy issue
+
+**Feedback**:
+> Minor accuracy fix.
+
+---
+
+## 2026-11-02T21:51:06Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:06Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:06Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: targeted
+**Duration**: 0ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: one anchor
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+**Feedback**:
+> All good.
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: rewrite
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> STALE TARGETED FIX PLAN
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: rewrite
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> SEVERE REWRITE REQUIRED. The binary quality gate flagged 2 failed checks (LAB, QUIZ) and the pipeline could not repair them via structured edits. Rewrite the module from scratch, addressing EVERY failed check explicitly while preserving all preserved content, labs, quizzes, and diagrams from the original.
+>
+> Failed checks and evidence:
+>
+> - LAB: wrong flag
+> - QUIZ: recall
+>
+> Reviewer's full feedback:
+> Two targeted issues.
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: severe
+**Duration**: 3ms
+**Checks**: 5/7 passed (COV EXAM DEPTH WHY PRES) | **Failed**: LAB QUIZ
+
+**Failed check evidence**:
+- **LAB**: wrong flag
+- **QUIZ**: recall
+
+**Feedback**:
+> Two targeted issues.
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: rewrite
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> SEVERE REWRITE REQUIRED. The binary quality gate flagged 6 failed checks (LAB, COV, QUIZ, DEPTH, WHY, PRES) and the pipeline could not repair them via structured edits. Rewrite the module from scratch, addressing EVERY failed check explicitly while preserving all preserved content, labs, quizzes, and diagrams from the original.
+>
+> Failed checks and evidence:
+>
+> - LAB: lab broken
+> - COV: outcome 3 missing
+> - QUIZ: recall-only
+> - DEPTH: no gotchas
+> - WHY: no rationale
+> - PRES: missing unique value
+>
+> Reviewer's full feedback:
+> Severely broken module.
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: severe
+**Duration**: 0ms
+**Checks**: 1/7 passed (EXAM) | **Failed**: LAB COV QUIZ DEPTH WHY PRES
+
+**Failed check evidence**:
+- **LAB**: lab broken
+- **COV**: outcome 3 missing
+- **QUIZ**: recall-only
+- **DEPTH**: no gotchas
+- **WHY**: no rationale
+- **PRES**: missing unique value
+
+**Feedback**:
+> Severely broken module.
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: rewrite
+**Output**: 8055 chars
+**Duration**: 1ms
+
+**Plan**:
+> SEVERE REWRITE REQUIRED. The binary quality gate flagged 6 failed checks (LAB, COV, QUIZ, DEPTH, WHY, PRES) and the pipeline could not repair them via structured edits. Rewrite the module from scratch, addressing EVERY failed check explicitly while preserving all preserved content, labs, quizzes, and diagrams from the original.
+>
+> Failed checks and evidence:
+>
+> - LAB: lab broken
+> - COV: outcome 3 missing
+> - QUIZ: recall-only
+> - DEPTH: no gotchas
+> - WHY: no rationale
+> - PRES: missing unique value
+>
+> Reviewer's full feedback:
+> Severely broken module.
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: severe
+**Duration**: 0ms
+**Checks**: 1/7 passed (EXAM) | **Failed**: LAB COV QUIZ DEPTH WHY PRES
+
+**Failed check evidence**:
+- **LAB**: lab broken
+- **COV**: outcome 3 missing
+- **QUIZ**: recall-only
+- **DEPTH**: no gotchas
+- **WHY**: no rationale
+- **PRES**: missing unique value
+
+**Feedback**:
+> Severely broken module.
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 304 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: codex
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gpt-5.3-codex-spark
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+**Reviewer fallback used**: true
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: claude-sonnet-4-6
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: claude
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: claude-sonnet-4-6
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+**Reviewer fallback used**: true
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: claude-sonnet-4-6
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: claude
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: claude-sonnet-4-6
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+**Reviewer fallback used**: true
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 5ms
+**Warnings**: 3
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 1ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 7ms
+**Warnings**: 3
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 1ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: claude-sonnet-4-6
+**Mode**: targeted fix
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> TARGETED FIX. LAB check failed — fix per reviewer feedback.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+**Reviewer fallback used**: true
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 9ms
+**Warnings**: 3
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 1ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/1
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/1
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:05Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:05Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: targeted
+**Duration**: 0ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: minor accuracy
+
+**Feedback**:
+> Minor accuracy fix.
+
+---
+
+## 2026-11-02T21:51:05Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/2
+**Severity**: targeted
+**Duration**: 0ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: minor accuracy
+
+**Feedback**:
+> Minor accuracy fix.
+
+---
+
+## 2026-11-02T21:51:04Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: rewrite
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> SEVERE REWRITE REQUIRED. The binary quality gate flagged 1 failed checks (LAB) and the pipeline could not repair them via structured edits. Rewrite the module from scratch, addressing EVERY failed check explicitly while preserving all preserved content, labs, quizzes, and diagrams from the original.
+>
+> Failed checks and evidence:
+>
+> - LAB: rewrite required
+>
+> Reviewer's full feedback:
+> Needs a rewrite first.
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/2
+**Severity**: severe
+**Duration**: 0ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: rewrite required
+
+**Feedback**:
+> Needs a rewrite first.
+
+---
+
+## 2026-11-02T21:51:04Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/2
+**Severity**: severe
+**Duration**: 0ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: minor accuracy
+
+**Feedback**:
+> Minor accuracy fix.
+
+---
+
+## 2026-11-02T21:51:04Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: rewrite
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> SEVERE REWRITE REQUIRED. The binary quality gate flagged 1 failed checks (LAB) and the pipeline could not repair them via structured edits. Rewrite the module from scratch, addressing EVERY failed check explicitly while preserving all preserved content, labs, quizzes, and diagrams from the original.
+>
+> Failed checks and evidence:
+>
+> - LAB: rewrite required
+>
+> Reviewer's full feedback:
+> Needs a rewrite first.
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/2
+**Severity**: severe
+**Duration**: 1ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: rewrite required
+
+**Feedback**:
+> Needs a rewrite first.
+
+---
+
+## 2026-11-02T21:51:04Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:04Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:04Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:04Z — `WRITE`
+
+**Writer**: claude-sonnet-4-6
+**Mode**: targeted fix
+**Output**: 8069 chars
+**Duration**: 0ms
+
+**Plan**:
+> FALLBACK FIX. The pipeline applied 3 of 5 structured edits deterministically; the remaining 2 could not be applied mechanically. Apply ONLY these remaining edits.
+>
+> Failed edit (reason: anchor not found): ```json
+> {"type": "replace", "find": "nonexistent", "new": "replacement"}
+> ```
+
+---
+
+## 2026-11-02T21:51:04Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:04Z — `CHECK_PASS`
+
+**Duration**: 0ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:04Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:04Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 2/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `REJECT`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: targeted
+**Duration**: 0ms
+**Checks**: 6/7 passed (COV QUIZ EXAM DEPTH WHY PRES) | **Failed**: LAB
+
+**Failed check evidence**:
+- **LAB**: one anchor
+
+---
+
+## 2026-11-02T21:51:04Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
+
+---
+
+## 2026-11-02T21:51:04Z — `DONE`
+
+**Pass sum**: all binary checks passed
+**Reviewer**: gemini
+
+---
+
+## 2026-11-02T21:51:04Z — `CHECK_PASS`
+
+**Duration**: 1ms
+**Warnings**: 0
+
+---
+
+## 2026-11-02T21:51:04Z — `REVIEW` — `APPROVE`
+
+**Reviewer**: gemini-3.1-pro-high
+**Attempt**: 1/5
+**Severity**: clean
+**Duration**: 0ms
+**Checks**: 7/7 passed (COV QUIZ EXAM DEPTH WHY PRES CITE)
+
+**Feedback**:
+> All good.
+
+---
+
+## 2026-11-02T21:51:04Z — `WRITE`
+
+**Writer**: gemini-3.1-pro-high
+**Mode**: write
+**Output**: 8055 chars
+**Duration**: 0ms
+
+**Plan**:
+> Draft or improve the module at test/module-0.1-test per the topic spec in the module frontmatter and any TODO comments in the existing stub.
 
 ---
 
