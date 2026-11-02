@@ -902,8 +902,8 @@ def review_one(slug: str, *, timeout: int = 900) -> None:
         if module_text.strip():
             try:
                 density_attention = {"module": density.evaluate_text(module_text).attention()}
-            except Exception:
-                pass  # Density is diagnostic and must not interrupt review.
+            except Exception as exc:
+                print(f"[warn] {slug}: density attention raised: {exc}")
 
         prompt = review_prompt(
             module_path=module_rel,

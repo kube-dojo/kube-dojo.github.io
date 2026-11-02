@@ -44,8 +44,6 @@ required_rule_citations:
       - "feedback_388_verifier_first"
       - "388_verifier_first_pilot_then_volume"
       - "verify_module.py"
-      - "density gates"
-      - "median_wpp"
       - "verifier"
       - "deterministic verifier"
 required_action_signals:
