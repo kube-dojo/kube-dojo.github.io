@@ -57,7 +57,7 @@ Here is the basic editing loop you will practice throughout this module. The loo
 +--------------------+      +--------------------+      +--------------------+
 ```
 
-Pause and predict: if you type three lines in `nano` but close the terminal window before saving, which copy of the file does a later `cat hello.txt` command read: the unsaved editor buffer or the file already stored on disk? Commit to an answer before revealing the explanation.
+Pause and predict: if you open an existing `hello.txt`, type three lines in `nano`, but close the terminal window before saving, which copy does a later `cat hello.txt` command read: the unsaved editor buffer or the file already stored on disk? Commit to an answer before revealing the explanation.
 
 <details>
 <summary>Check your prediction</summary>
@@ -79,7 +79,7 @@ Choose a tool that fits the task and the environment. This module introduces `na
 
 You will see the same idea when choosing between `nano` and `cat`. `nano` is for changing a file, while `cat` is for printing a file to the terminal. Opening an editor just to look at a file creates unnecessary risk because a stray keystroke can modify the buffer. Printing a file with `cat` when you meant to edit it is harmless but ineffective. The workflow is easier when each command has a clear job in your mind.
 
-Before running this, what output do you expect from `cat hello.txt` if `hello.txt` does not exist yet? Commit to an answer before revealing the explanation.
+What output do you expect from `cat hello.txt` if `hello.txt` does not exist yet? Commit to an answer before revealing the explanation.
 
 <details>
 <summary>Check your prediction</summary>
@@ -150,10 +150,10 @@ Today's special: Learning to edit files.
 Chef says: You're doing great.
 ```
 
-Your screen should now show the text and a modified-buffer indicator near the top. The tested GNU nano 7.2 screen shows `*`; its appearance may differ in another version. It warns that the buffer has changes not yet saved.
+Your screen should now show the text and a modified-buffer indicator near the top. By default, GNU nano 7.2 displays `Modified`; with some options it displays `*` instead. The indicator warns that the buffer has changes not yet saved.
 
 ```text
-  GNU nano 7.2                    hello.txt *
+  GNU nano 7.2                    hello.txt                     Modified
 
 Welcome to the Kitchen!
 Today's special: Learning to edit files.
@@ -181,6 +181,8 @@ To leave `nano`, press Ctrl+X. If the buffer has no unsaved changes, `nano` exit
 ```text
 Ctrl + X
 ```
+
+Illustrative prompt (the choices may appear in the footer):
 
 ```text
 Save modified buffer?  Y Yes  N No  ^C Cancel
@@ -338,7 +340,7 @@ Your current directory is: /home/yourname/kubedojo-editing
 Great job, chef! Your first script works!
 ```
 
-The exact date, username, and workspace path will vary. If execute permission is present but "Permission denied" persists, stop and ask your instructor or administrator to check path access or a filesystem mounted with execution disabled (`noexec`); repeating `chmod` does not fix those causes. The [Linux execve error list](https://man7.org/linux/man-pages/man2/execve.2.html) distinguishes these access failures. If Bash reports a syntax error, reopen the file with `nano` and inspect the reported line. That is a different layer from permission to start the script.
+The exact date, username, and workspace path will vary. If execute permission is present but "Permission denied" persists, stop and ask your instructor or administrator to check path access or a filesystem mounted with execution disabled (`noexec`); repeating `chmod` does not fix those causes. The [Linux execve error list](https://man7.org/linux/man-pages/man2/execve.2.html) distinguishes these access failures. If Bash reports a syntax error, reopen the file with `nano` and inspect the reported line. For an unterminated quote, Bash can report the end of the file; look upward for a quote without a match. That is a different layer from permission to start the script.
 
 This small debugging sequence is the beginning of a useful diagnostic habit. First ask whether the file can be executed at all. Then ask whether the selected interpreter can parse it. Then ask whether the commands inside do what you intended. Those are different layers, and separating them prevents the frustrating habit of changing random lines without knowing which layer failed.
 
@@ -353,8 +355,6 @@ The practical question is always "what is the safest tool for the current job?" 
 There is one more judgment call: avoid editing binary files with a text editor. Images, compiled programs, archives, and many database files are not plain text. Opening one in `nano` may show strange characters, and saving it can corrupt the file. When you are unsure, run `file filename` before editing. Plain text, shell scripts, Markdown, YAML, JSON, and many configuration files are appropriate targets for a terminal text editor.
 
 Configuration files deserve extra caution because programs read them literally. A stray quote, missing colon, or wrong indentation level can change behavior. Later Kubernetes modules will ask you to edit YAML manifests, where YAML structure determines how the configuration is read. The habits from this module transfer directly: open the right file, make a focused edit, save, validate, and then let the system read it.
-
-This is why "quick edit" should not mean "careless edit." A quick edit is small, focused, and verified; a careless edit is rushed, unverified, and often performed in the wrong place. The terminal rewards precision because it gives you compact tools with very little ceremony. It also exposes mistakes quickly because those tools do exactly what you ask. Your goal is to become calm with that literalness rather than intimidated by it.
 
 Exercise scenario: you are about to change a remote service configuration, and you notice your terminal prompt includes a hostname you do not recognize. Pause and predict: what is the safest next step, and why is "edit and hope" dangerous here? Commit to an answer before revealing the explanation.
 
@@ -384,21 +384,14 @@ For this module, the decision framework is intentionally simple. Choose the tool
 
 | Need | Better Choice | Why |
 |------|---------------|-----|
-| See a short file exactly once | `cat filename` | It cannot accidentally edit the file |
 | Make a beginner-friendly terminal edit | `nano filename` | Visible shortcuts reduce memory burden |
 | Make repeated advanced terminal edits | `vim filename` | Motions and commands scale after practice |
 | Run saved commands repeatedly | Inspect `ls -l script.sh`, add a missing owner execute bit to your owned training script, then `./script.sh` | Direct execution needs the appropriate access; persistent errors need diagnosis |
-| Confirm where you are before editing | `pwd` and `hostname` | Location mistakes are easier to prevent than repair |
-
-You can also think in terms of reversibility. Viewing is easy to back out of because it changes nothing. Editing is reversible only if you know what changed or have a backup. Running a script can affect many files or commands at once, so scripts deserve both content verification and permission awareness. This ladder of risk helps you slow down at the right moments without becoming afraid of the terminal.
-
-The best choice is often the one that leaves the most evidence. A `cat` command leaves visible output in your terminal scrollback. A saved script leaves a file you can reopen and inspect. A `chmod +x` command changes a permission bit that can be checked later with tools you will learn in the next terminal lessons. When you choose tools this way, you build a trail that helps you and other engineers understand what happened.
 
 ## Common Mistakes
 
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
-| Confusing suspension with exit | A suspended editor has not exited | If the shell reports a stopped editor, run `fg` to resume it, then use the displayed exit command |
 | Forgetting to save before exiting | Beginners expect autosave, but `nano` writes only when told to write out | Press Ctrl+O and Enter before Ctrl+X, or answer `Y` carefully when prompted |
 | Typing `^O` literally into the file | The caret notation looks like two printable characters if you have not seen terminal shortcuts before | Hold Ctrl and press O; do not type the caret character |
 | Using `nano` when you meant to use `cat` | You wanted to inspect a file but opened an editor capable of changing it | Use `cat filename` for short read-only checks and reserve `nano` for edits |
@@ -430,9 +423,16 @@ The message identifies an access failure, but does not establish its exact cause
 </details>
 
 <details>
-<summary>A script starts with `echo "Starting backup"` and no shebang. It runs with `bash backup.sh` but behaves unpredictably with `./backup.sh`. What should you change?</summary>
+<summary>A script starts with `echo "Starting backup"` and no shebang. It runs with `bash backup.sh`. How can you make the intended interpreter explicit when running `./backup.sh`?</summary>
 
-Add a shebang such as `#!/bin/bash` as the first line when the script is intended to run directly. Running `bash backup.sh` chooses Bash explicitly, so the script can work in that form even without a shebang. Direct execution asks the operating system to choose an interpreter, and a shebang states that choice on this Linux training host. After editing, save, verify the first line, and make sure execute permission is present.
+Add `#!/bin/bash` as the first line. Running `bash backup.sh` chooses Bash explicitly. Without a shebang, direct execution may depend on the launcher: Bash can interpret an unrecognized executable file itself, while other launchers may fail. On this Linux training host, the shebang specifies the interpreter for direct execution. After editing, save, verify the first line, and make sure execute permission is present.
+
+</details>
+
+<details>
+<summary>You need to make a small terminal edit and have not learned Vim's modes. Would you choose nano or Vim for this lesson, and why?</summary>
+
+Choose nano for this lesson: its visible shortcuts guide saving and exiting, and typing enters text. Vim uses modes, so typing can issue commands instead of inserting text.
 
 </details>
 
@@ -571,7 +571,6 @@ Chef on duty: yourname
 
 --- Files in current directory ---
 hello.txt    kitchen-memo.txt    kitchen-report.sh    my-first-script.sh
-...
 
 Report complete. Kitchen is running smoothly!
 ```
@@ -592,9 +591,24 @@ cat kitchen-memo.txt
 Save the file, then run it directly with `./broken-report.sh`. Something is wrong at more than one layer, and this time nobody tells you which layer fails first. Work the diagnostic sequence from this module: read the exact error message, decide whether the failure is permission, interpreter parsing, or script logic, fix only that layer, and run the script again. Repeat until the script prints the heading, the date, and the memo contents. Before you call it fixed, verify the final file contents with `cat broken-report.sh` so you can see exactly what changed.
 
 <details>
+<summary>Hint</summary>
+
+Check whether the script can start before looking for a problem in its contents.
+
+</details>
+
+<details>
 <summary>Check your diagnosis</summary>
 
 In this fresh workspace, inspect `ls -l broken-report.sh` after an access error. If the owner's execute bit is missing, add it with `chmod +x broken-report.sh` and retry. If it is already set or access still fails, stop and ask for help checking path access or execution restrictions. Once Bash starts, the first `echo` line's missing closing quotation mark causes an unterminated-string error. Correct it to `echo "=== Broken Kitchen Report ==="` with `nano`, save, and run `./broken-report.sh` again. A correct run prints the heading, current date, "Memo follows:", and six memo lines. These are separate access and parsing layers; the error message and mode check determine which one to address. Running `bash broken-report.sh` selects Bash explicitly and can reveal the content error before adding execute permission.
+
+For example, Bash 5.3.9 reported this when reading the script through standard input; the line number points near the end rather than to the faulty `echo`:
+
+```text
+bash: line 5: unexpected EOF while looking for matching `"'
+```
+
+Look upward for the unmatched quote.
 
 </details>
 
