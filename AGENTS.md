@@ -95,12 +95,16 @@ below. After they pass, repeat or broaden them only for new changes, failures,
 or unresolved risks. Do not weaken assertions, disable lint rules, add empty
 skips, or hide missing imports to obtain a pass.
 
-Builds run from the primary checkout, not `.worktrees/*`, because the existing
-Astro dependency layout has a worktree resolution limitation. Keep primary on
-`main` and preserve its changes. Fetching a branch alone does not put its content
-into a main-checkout build: report the revision actually tested and use branch
-CI to verify a proposed change before merge. Do not claim a main build validates
-unmerged worktree edits.
+`npm run build` also runs from a `.worktrees/*` checkout inside the primary
+checkout's directory tree (kube-dojo PR #3781): worktrees carry no
+`node_modules`, and Node resolves packages by walking up to the primary
+checkout's, so the build uses the primary's installed dependency versions and
+does not validate `package.json` or lockfile changes. A worktree outside the
+primary tree would still fail, and `astro dev` from a worktree is unverified.
+Keep primary on `main` and preserve its changes. Fetching a branch alone does
+not put its content into a main-checkout build: report the revision actually
+tested and use branch CI to verify a proposed change before merge. Do not claim
+a main build validates unmerged worktree edits.
 
 For Codex-from-bridge invocations use `scripts/ab`. The wrapper currently pins
 `CODEX_BRIDGE_MODE=danger`; do not duplicate contradictory sandbox defaults in
