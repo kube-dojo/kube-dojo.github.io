@@ -26,7 +26,7 @@ After this module, you will be able to perform these beginner terminal tasks and
 
 ## Why This Module Matters
 
-Hypothetical scenario: you are following a Kubernetes setup guide for version 1.35, and the first instruction says to open a terminal and run a command. If the terminal feels mysterious, the guide stops being a guide and becomes a wall. You might not know whether to type the `$` symbol, whether the command has already run, why the cursor moved to a new line, or how to cancel something that is printing too much output.
+Hypothetical scenario: you are following a Kubernetes setup guide, and the first instruction says to open a terminal and run a command. If the terminal feels mysterious, the guide stops being a guide and becomes a wall. You might not know whether to type the `$` symbol, whether the command has already run, why the cursor moved to a new line, or how to cancel something that is printing too much output.
 
 Tools you will meet later, such as Git and `kubectl`, can be used through commands. This module introduces how to read a prompt, enter a command, and connect its output to the machine you are using.
 
@@ -50,7 +50,7 @@ That single symbol is easy to underestimate. It means the shell is ready for a c
 
 Choose according to the task. A GUI can help with visual inspection and discovery; a terminal can help you write down and repeat commands, work remotely, or automate a sequence. You can use both in the same workflow.
 
-A command is text that can be saved in a note or script, reviewed, and run again. Before repeating it, check that its effects and target are still appropriate.
+A command is text that can be saved in a note or script, reviewed, and run again. A script is a text file containing commands. Before repeating a command, check that its effects and target are still appropriate.
 
 Later, you can use `kubectl` to ask questions about Kubernetes resources. Here you will practice the same input-and-output pattern with commands that print information.
 
@@ -84,7 +84,7 @@ The loop is an illustration of how text can describe a repeated action. You will
 
 Opening the terminal is slightly different on each operating system, but the first goal is the same everywhere: get to a window that shows a prompt and a blinking cursor. On macOS, press Cmd + Space, type Terminal, and press Enter. On many Linux desktops, Ctrl + Alt + T opens a terminal, and the applications menu usually has a Terminal entry if the shortcut is disabled.
 
-Windows has several valid options, and they serve different purposes. Windows Terminal is Microsoft's modern terminal application and is a good day-to-day container for shells. WSL, the Windows Subsystem for Linux, gives you a Linux-style shell on Windows; use a WSL tab for the Unix command names in this module (`date`, `date -u`, and bash-style examples such as `$(date)`). PowerShell is a separate shell with its own command names and subexpression syntax. Profiles can define aliases or functions, so availability depends on the host; for a predictable PowerShell path in this module, use the native `Get-Date` and `Write-Output` examples below. WSL is recommended for the rest of this curriculum when later modules expect Unix command names.
+Windows has several valid options. To start, open the Start menu, type Windows PowerShell, select Windows PowerShell, and select Open. Alternatively, you can use [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/install), Microsoft's terminal application. For an installed WSL distribution, use the arrow next to the plus button in Windows Terminal to select its profile. WSL, the Windows Subsystem for Linux, gives you a Linux-style shell on Windows; use a WSL tab for the Unix command names in this module (`date`, `date -u`, and bash-style examples such as `$(date)`). PowerShell is a separate shell with its own command names and subexpression syntax. An alias is an alternate name for a command. Profiles can define aliases or functions, so availability depends on the host; for a predictable PowerShell path in this module, use the native `Get-Date` and `Write-Output` examples below. WSL is recommended for the rest of this curriculum when later modules expect Unix command names.
 
 If you choose WSL later, Microsoft's installation guide uses PowerShell opened as administrator, followed by a restart. The command below installs Ubuntu by default when WSL is not already installed; for an existing WSL setup, check the guide's instructions instead. This is an optional preview: do not run the installer for this module.
 
@@ -119,7 +119,7 @@ Here is the same prompt broken into parts. Treat it like a map label printed at 
 | `~` | Your home directory |
 | `$` or `%` | The shell is ready for your command |
 
-PowerShell can show a normal prompt such as `PS C:\Users\Learner>`. Its final `>` is part of that prompt, not automatically unfinished input. Continuation examples include `>` in Bash and `dquote>` for an open double quote in zsh; PSReadLine's documented default is `>>`. Prompt text is customizable, so compare the change with your own starting prompt rather than trusting one symbol alone.
+PowerShell can show a normal prompt such as `PS C:\Users\Learner>`. Its final `>` is part of that prompt, not automatically unfinished input. Continuation examples include `>` in Bash and `dquote>` for an open double quote in zsh; PSReadLine's documented default is `>>`. PSReadLine provides command-line editing in PowerShell. Compare the change with your own starting prompt rather than trusting one symbol alone.
 
 This curriculum sometimes shows a prompt symbol at the start of an example line to distinguish the prompt from the command:
 
@@ -249,7 +249,7 @@ echo "Hello"
 
 The command is `echo`, and the argument is `"Hello"`. The shell removes the quotes as syntax and gives the command the text inside them. That distinction is subtle at first: quotes are not decorations for humans, they are instructions to the shell about how to group words before the command receives them.
 
-Options change behavior. The macOS and GNU versions of `date` use `-u` to request UTC rather than the configured local time. Keep the timezone with a timestamp when comparing records from different systems. Follow the command branch for your shell; the PowerShell examples use `Get-Date`.
+Options change behavior. This Unix example uses `-u` with the macOS and GNU versions of `date` to request UTC rather than the configured local time. Keep the timezone with a timestamp when comparing records from different systems. PowerShell learners can read this example without running it.
 
 ```bash
 date -u
@@ -271,21 +271,19 @@ The diagram shows the roles in three examples. The shell processes spaces, quote
 +----------------------+----------------------+----------------------+
 ```
 
-An opening quote without its closing partner leaves this command unfinished. Instead of running it, the shell may show a continuation prompt such as `>` and wait for the rest of the text.
+Compare `Hello World` with `"Hello World"`: the first contains two unquoted words; the second groups the text as one argument.
 
-Compare `Hello World` with `"Hello World"`: the first contains two unquoted words; the second groups the text as one argument. A command can interpret those argument lists differently.
+An opening quote without its closing partner leaves this command unfinished. Instead of running it, the shell may show a continuation prompt and wait for the rest of the text.
 
 ```bash
 echo "This command is missing its closing quote
 ```
 
-You can type the missing quote and press Enter, or cancel the unfinished input with Ctrl+C and return to a fresh prompt. In Unix terminals, Ctrl+C normally generates an interrupt signal, SIGINT. PowerShell and terminal hosts also have cancellation behavior, but keyboard bindings and text selection can change what the key does; check that your normal prompt returned.
-
 ```text
 >
 ```
 
-Here the prompt changed after an unfinished quote, so the shell is asking for more input. Your shell might show `>`, `dquote>`, or `>>`, depending on its language and configuration. The important evidence is the incomplete command and the change from your normal prompt, rather than the presence of a particular angle bracket.
+Here the prompt changed after an unfinished quote, so the shell is asking for more input. You can type the missing quote and press Enter, or cancel the unfinished input with Ctrl+C. Keyboard bindings and text selection can change what the key does; check that your normal prompt returned.
 
 Try one more safe combination. These examples insert command output into a sentence using shell-specific command names. You do not need to master command substitution or subexpressions yet; just notice that terminal commands can be composed.
 
@@ -307,7 +305,7 @@ Composition combines smaller commands into a larger instruction. Here, the inner
 
 There is a safety lesson inside composition too. When a command contains smaller commands, the shell has to evaluate some parts before the final command runs. That is powerful, but it also means you should read composed commands more carefully than single-word commands. In this module the composed command only prints text, so it is a good place to see the mechanism without risking files or system settings.
 
-Longer commands can also include subcommands, resource names, and options. Identify each part's role and consult the command's documentation when you are unsure.
+Longer commands can also include resource names and options. Identify each part's role and consult the command's documentation when you are unsure.
 
 ## Recovering When the Terminal Feels Stuck
 
@@ -315,23 +313,23 @@ Before correcting a mistake, identify the shell's state and whether a command is
 
 The first recovery habit is to compare the display with the normal prompt you saw when you opened this shell. If that prompt has returned, you can enter another command. If output keeps arriving without it, a command may still be running. If an unfinished quote changes the prompt, the shell is waiting for more input. PowerShell's normal prompt can already end in `>`, so that character alone is not a diagnosis.
 
-Ctrl+C is a useful first cancellation attempt when a command runs too long or waits unexpectedly. In Unix terminals it normally sends SIGINT to the foreground process group. In PowerShell with common PSReadLine bindings, Ctrl+C can copy selected text instead of canceling input; deselect the text before trying to cancel. Host applications and key bindings vary, so watch for the normal prompt rather than assuming the key always stopped the command.
+Ctrl+C is a useful first cancellation attempt when a command runs too long or waits unexpectedly. In Unix terminals it normally asks the running command to stop. In PowerShell with common PSReadLine bindings, Ctrl+C can copy selected text instead of canceling input; deselect the text before trying to cancel. Host applications and key bindings vary, so watch for the normal prompt rather than assuming the key always stopped the command.
 
 ```text
 Ctrl+C
 ```
 
-Ctrl+C is not universal, so keep the boundary clear. If the terminal application itself is frozen, closing and reopening the window may be more practical. If you are inside a full-screen program such as `less`, `top`, or `vim`, that program may have its own quit key. If a program deliberately ignores SIGINT, you may need a stronger tool later, but that is beyond today's beginner scope.
+Ctrl+C is not universal, so keep the boundary clear. If the terminal application itself is frozen, closing and reopening the window may be more practical. If you are inside a full-screen program such as `less`, `top`, or `vim`, that program may have its own quit key. A program may ignore the cancellation request; stronger tools are beyond today's beginner scope.
 
 Another common recovery move is reading errors literally. If the shell says `command not found`, it usually means the first word did not match an installed command or program. That can happen because of a typo, wrong capitalization, copying the prompt symbol, or trying to run a tool before installing it. The error sounds severe, but it is often just the shell saying it cannot find a program by that name.
 
 ```text
-echoo: command not found
+zsh: command not found: echoo
 ```
 
 Before running a copied command, check for a leading prompt symbol, balanced quotes, and the capitalization shown in the example. Does the command change something or only print information? Check its documented effects when you are unsure.
 
-Later Kubernetes examples use full commands such as `kubectl get pods`; aliases do not reliably expand in non-interactive scripts. Check the current context, namespace, and output when working with a cluster.
+Later Kubernetes examples use full commands such as `kubectl get pods`. Check the current context, namespace, and output when working with a cluster.
 
 Recovery also includes preserving useful evidence. If a command prints an error, resist the urge to clear the screen immediately. Read the first line, look for the command name, and notice whether the message is about spelling, permissions, missing files, or incomplete input. Even when you cannot fix the problem yet, keeping the message visible gives you something specific to search, ask about, or compare with documentation.
 
@@ -389,9 +387,7 @@ The same decision applies inside a single workflow. You might use a GUI dashboar
 
 2. **A terminal could be a physical keyboard and screen.** The [DEC VT100 User Guide](https://vt100.net/docs/vt100-ug/chapter1.html) describes a keyboard that sends information to a computer and a video screen that displays data sent back by that computer. This division helps explain a modern terminal emulator: it provides the input/output interface, while the shell is the program that interprets your commands.
 
-3. **SSH has been standardized for decades as a secure remote-login protocol family.** RFC 4251 describes the Secure Shell architecture. OpenSSH provides SSH tools, including a client and a server.
-
-4. **Windows Terminal was announced in 2019; version 1.0 was released in May 2020.** Microsoft's [announcement](https://devblogs.microsoft.com/commandline/introducing-windows-terminal/) and [1.0 release post](https://devblogs.microsoft.com/commandline/windows-terminal-1-0/) distinguish preview history from the stable release. It can host PowerShell, Command Prompt and WSL profiles; the terminal application and the shell are separate programs.
+3. **Windows Terminal was announced in 2019; version 1.0 was released in May 2020.** Microsoft's [announcement](https://devblogs.microsoft.com/commandline/introducing-windows-terminal/) and [1.0 release post](https://devblogs.microsoft.com/commandline/windows-terminal-1-0/) distinguish preview history from the stable release. It can host PowerShell, Command Prompt and WSL profiles; the terminal application and the shell are separate programs.
 
 ## Common Mistakes
 
@@ -413,7 +409,7 @@ Test your understanding by answering each scenario before opening the explanatio
 <details>
 <summary>Question 1: You accidentally start a command that is printing endless lines of text, and you cannot type a new command. What is your immediate next step, and why?</summary>
 
-Press Ctrl+C once, with no text selected, and watch for the normal prompt to return. In Unix terminals this normally sends SIGINT to the foreground process group; other hosts may handle cancellation differently. The command may still control the foreground until it responds. Full-screen programs can have their own quit keys, so consult the program's help if the normal prompt does not return.
+Press Ctrl+C once, with no text selected, and watch for the normal prompt to return. In Unix terminals this normally asks the running command to stop; other hosts may handle cancellation differently. The command may still be running until it responds. Full-screen programs can have their own quit keys, so consult the program's help if the normal prompt does not return.
 
 </details>
 
@@ -621,20 +617,10 @@ zsh: command not found: $
 yourname@your-mac ~ %
 ```
 
-Transcript D: two windows from the same practice lab, both waiting for input. You need to run a practice command that should affect only the training machine, so decide which window to use and which part of the prompt told you.
-
-```text
-alex@laptop ~ $
-```
-
-```text
-alex@training-vm /tmp $
-```
-
 <details>
 <summary>Check your diagnosis</summary>
 
-Transcript A shows unfinished quoted input; finish the quote or cancel and compare with the normal prompt. Transcript B shows continuing output without a returned prompt; try Ctrl+C once and check the result. Transcript C shows a copied `$` prompt symbol being treated as a command; retype `echo 'Hello, World!'` without it. In the synthetic Transcript D, choose the window labeled `alex@training-vm /tmp $`. In real sessions, confirm the connection you opened and read the user/hostname checks before changing anything; customized labels alone are not proof.
+Transcript A shows unfinished quoted input; finish the quote or cancel and compare with the normal prompt. Transcript B shows continuing output without a returned prompt; try Ctrl+C once and check the result. Transcript C shows a copied `$` prompt symbol being treated as a command; retype `echo 'Hello, World!'` without it.
 
 </details>
 
@@ -660,8 +646,11 @@ You've completed this exercise when you can demonstrate each item below without 
 - [zsh: Prompt expansion and parser-state markers](https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html)
 - [zsh: Interactive history expansion, including `!` inside double quotes](https://zsh.sourceforge.io/Doc/Release/Expansion.html#History-Expansion)
 - [PowerShell 7.5: Single- and double-quoted strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5)
-- [RFC 4251: The Secure Shell (SSH) Protocol Architecture](https://www.rfc-editor.org/info/rfc4251)
-- [OpenSSH manual pages](https://www.openssh.org/manual.html)
+- [Starting Windows PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/windows-powershell/starting-windows-powershell)
+- [Windows Terminal installation and profiles](https://learn.microsoft.com/en-us/windows/terminal/install)
+- [PowerShell: aliases](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_aliases)
+- [PowerShell: scripts](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_scripts)
+- [PSReadLine: command-line editing](https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline)
 - [Windows Terminal documentation](https://learn.microsoft.com/en-us/windows/terminal/)
 - [Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
 - [GNU Coreutils manual: date invocation](https://www.gnu.org/software/coreutils/manual/html_node/date-invocation.html)
