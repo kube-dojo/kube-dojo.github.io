@@ -28,10 +28,9 @@ Calibration anchors (from `.calibration/teaching-rewrite/` outputs):
 | Gemini-3.1-pro × 1.1 rewrite (good)     |  2568 | 21.8 | 69.8 |
 | Codex gpt-5.5 × 1.1 rewrite (good)      |  3604 | 23.7 | 60.3 |
 
-The conservative ``passes_teaching_threshold`` defaults below are
-``words >= 1500 AND w_per_line >= 18 AND w_per_para >= 22`` — clears all known
-good rewrites in calibration and rejects every flagged module in the corpus
-scan (validated 2026-04-25).
+The ``classify()`` PASS band is ``words >= 1500 AND w_per_line >= 18 AND
+w_per_para >= 22`` — it clears all known good rewrites in calibration and was
+validated against every flagged module in the corpus scan (2026-04-25).
 """
 from __future__ import annotations
 
@@ -75,10 +74,10 @@ W_PER_PARA_CEILING_ATTENTION = 120.0
 class DensityVerdict(str, Enum):
     """Descriptive density bands for the triage scan's report (#388 stage [1]).
 
-    A label, not an action: ``merge_one`` no longer rejects or retries on a
-    band (#3744). ``route_one`` and the triage scan still read it until their
-    own changes land. Use :meth:`DensityMetrics.attention` for the both-tails
-    reviewer flags.
+    A label, not an action: ``route_one`` and ``merge_one`` no longer route,
+    retry or reject on a band (#3744). Only the triage scan
+    (``pipeline.cmd_triage``) still reads it. Use
+    :meth:`DensityMetrics.attention` for the both-tails reviewer flags.
     """
 
     PASS = "pass"
@@ -113,18 +112,6 @@ class DensityMetrics:
     prose_paragraphs: int
     w_per_line: float
     w_per_para: float
-
-    def passes_teaching_threshold(
-        self,
-        words_floor: int = WORDS_FLOOR,
-        w_per_line_floor: float = W_PER_LINE_FLOOR,
-        w_per_para_floor: float = W_PER_PARA_FLOOR,
-    ) -> bool:
-        return (
-            self.prose_words >= words_floor
-            and self.w_per_line >= w_per_line_floor
-            and self.w_per_para >= w_per_para_floor
-        )
 
     def classify(self) -> DensityVerdict:
         """Three-way verdict for #388 triage stage.
@@ -169,36 +156,6 @@ class DensityMetrics:
         elif self.w_per_para > W_PER_PARA_CEILING_ATTENTION:
             out.append(f"wpp {_toward_flag(self.w_per_para, up=True)} > {W_PER_PARA_CEILING_ATTENTION:g}: wall of text; check for steps, examples and breaks the learner needs")
         return out
-
-    def reasons_failed(
-        self,
-        words_floor: int = WORDS_FLOOR,
-        w_per_line_floor: float = W_PER_LINE_FLOOR,
-        w_per_para_floor: float = W_PER_PARA_FLOOR,
-    ) -> list[str]:
-        out: list[str] = []
-        if self.prose_words < words_floor:
-            out.append(f"prose_words {self.prose_words} < {words_floor} (subject too thin or compressed past floor)")
-        if self.w_per_line < w_per_line_floor:
-            out.append(f"w/ln {self.w_per_line:.1f} < {w_per_line_floor:.1f} (pad-bomb signature: one-sentence-per-paragraph)")
-        if self.w_per_para < w_per_para_floor:
-            out.append(f"wpp {self.w_per_para:.1f} < {w_per_para_floor:.1f} (punchy-bullets or essay-filler — paragraphs don't teach)")
-        return out
-
-    def reasons_failed_rewrite(self) -> list[str]:
-        """Reasons against the REWRITE-tier floors specifically.
-
-        Used by the post-merge density hard gate (#388 stage [6]) so the
-        error message names the floor that actually fired the bounce —
-        ``reasons_failed`` reports against the PASS floors, which would
-        flag REVIEW-band signals as "violations" when only REWRITE-tier
-        signals can bounce a merge.
-        """
-        return self.reasons_failed(
-            words_floor=WORDS_FLOOR_REWRITE,
-            w_per_line_floor=W_PER_LINE_FLOOR_REWRITE,
-            w_per_para_floor=W_PER_PARA_FLOOR_REWRITE,
-        )
 
 
 def _toward_flag(x: float, *, up: bool) -> str:
@@ -254,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="python -m scripts.quality.density",
-        description="Score one or more modules against the teaching-density triple gate.",
+        description="Report density diagnostics and both-tail attention flags for one or more modules (never a gate).",
     )
     parser.add_argument("paths", nargs="+", type=Path, help="module .md files (or dirs to scan)")
     parser.add_argument(
@@ -264,9 +221,9 @@ def main(argv: list[str] | None = None) -> int:
         help="ignore files with fewer than N prose paragraphs (default: 10)",
     )
     parser.add_argument(
-        "--fail-only",
+        "--flagged-only",
         action="store_true",
-        help="only print modules that fail the gate",
+        help="only print modules with at least one attention flag",
     )
     args = parser.parse_args(argv)
 
@@ -277,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             targets.append(p)
 
-    fails = 0
+    flagged = 0
     rows: list[tuple[Path, DensityMetrics]] = []
     for path in targets:
         if path.name == "index.md":
@@ -287,23 +244,23 @@ def main(argv: list[str] | None = None) -> int:
             continue
         rows.append((path, m))
 
-    rows.sort(key=lambda r: (r[1].passes_teaching_threshold(), r[1].w_per_para))
+    rows.sort(key=lambda r: (not r[1].attention(), r[1].w_per_para))
 
-    print(f"{'prose_w':>7} {'text_w':>7} {'w/ln':>5} {'wpp':>5} {'prose':>5}  verdict  path")
+    print(f"{'prose_w':>7} {'text_w':>7} {'w/ln':>5} {'wpp':>5} {'prose':>5}  path / attention flags")
     for path, m in rows:
-        ok = m.passes_teaching_threshold()
-        if args.fail_only and ok:
+        flags = m.attention()
+        if args.flagged_only and not flags:
             continue
-        verdict = "PASS" if ok else "FAIL"
-        if not ok:
-            fails += 1
+        flagged += bool(flags)
         print(
             f"{m.prose_words:>7} {m.textual_words:>7} {m.w_per_line:>5.1f} {m.w_per_para:>5.1f} "
-            f"{m.prose_paragraphs:>5}  {verdict:>7}  {path}"
+            f"{m.prose_paragraphs:>5}  {path}"
         )
+        for flag in flags:
+            print(f"{'':>34}  - {flag}")
 
-    print(f"\nScanned {len(rows)} modules. Failed gate: {fails}.")
-    return 0 if fails == 0 else 1
+    print(f"\nScanned {len(rows)} modules. Flagged for reviewer attention: {flagged} (diagnostic only).")
+    return 0
 
 
 if __name__ == "__main__":

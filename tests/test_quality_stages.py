@@ -108,12 +108,11 @@ Question 1.
     # Prompt docs aren't present in the fake repo; stub the startup check.
     monkeypatch.setattr("scripts.quality.pipeline.assert_required_docs_exist", lambda: None)
     # #388 density bypass: the seed/rewrite fixtures are intentionally tiny
-    # (~5 prose words) to keep the suite fast and readable. Routing would
-    # classify them REWRITE-tier, but every existing test validates stage
-    # mechanics, NOT density. Density behavior is exercised by
-    # test_quality_density.py and the tests below. The bypass forces
-    # ``classify() == PASS`` wherever these stub modules are read; tests that
-    # need REWRITE-tier behavior can monkeypatch this back.
+    # (~5 prose words) to keep the suite fast and readable. Density numbers
+    # are diagnostics only (#3744), so they would just add reviewer flags, but
+    # every existing test validates stage mechanics, NOT density. The bypass
+    # returns in-bounds metrics (no attention flags) wherever these stub
+    # modules are read; tests that need flagged metrics can monkeypatch it.
     from scripts.quality import density as _density
     def _always_pass(_text: str) -> _density.DensityMetrics:
         return _density.DensityMetrics(
@@ -1960,12 +1959,26 @@ def test_run_order_is_worst_first(fake_repo, monkeypatch):
 # ---- #388 density-aware routing + density hard-gate -------------------
 
 
-def test_route_one_density_rewrite_overrides_high_audit_score(fake_repo, monkeypatch):
-    """A module with a 4.5 audit score AND complete structure that fails
-    the density classifier (REWRITE) must still go to track=rewrite —
-    pad-bombs and punchy-bullets are exactly what the audit missed."""
+@pytest.mark.parametrize(
+    "metrics_kwargs, flag_fragment",
+    [
+        # Short, choppy tail.
+        (dict(prose_words=200, textual_words=210, nonblank_lines=10,
+              total_paragraphs=4, prose_paragraphs=4,
+              w_per_line=21.0, w_per_para=10.0), "wpp 10.00 < 18"),
+        # Long, walled tail.
+        (dict(prose_words=9500, textual_words=9600, nonblank_lines=60,
+              total_paragraphs=60, prose_paragraphs=60,
+              w_per_line=40.0, w_per_para=150.0), "prose_words 9500 > 9000"),
+    ],
+)
+def test_route_one_density_flags_both_tails_but_never_override_audit_score(
+    fake_repo, monkeypatch, metrics_kwargs, flag_fragment,
+):
+    """A 4.5 audit score AND complete structure keeps the cleanup-only route
+    even when density is far outside either tail (#3744): the numbers are
+    recorded as reviewer-attention flags and never choose the track."""
     slug = _bootstrap(fake_repo)
-    # High audit score + structurally complete
     st = state.load_state(slug)
     st["audit"] = {"teaching_score": 4.5, "teaching_gaps": []}
     st["stage"] = "AUDITED"
@@ -1994,23 +2007,18 @@ F.
 """
     (fake_repo / st["module_path"]).write_text(full_module)
 
-    # Override the fixture-default density bypass with a REWRITE-tier
-    # DensityMetrics so route_one's density check fires the override path.
     from scripts.quality import density as _density
     monkeypatch.setattr(
         _density, "evaluate_text",
-        lambda _text: _density.DensityMetrics(
-            prose_words=200, textual_words=210, nonblank_lines=10,
-            total_paragraphs=4, prose_paragraphs=4,
-            w_per_line=21.0, w_per_para=10.0,  # wpp below REWRITE floor
-        ),
+        lambda _text: _density.DensityMetrics(**metrics_kwargs),
     )
 
     stages.route_one(slug)
     st = state.load_state(slug)
-    assert st["stage"] == "WRITE_PENDING"
-    assert st["route"]["track"] == "rewrite"
-    assert st["route"]["density"]["verdict"] == "rewrite"
+    assert st["stage"] == "CITATION_CLEANUP_ONLY"
+    assert st["route"]["track"] == "cleanup_only"
+    assert "verdict" not in st["route"]["density"]
+    assert any(flag_fragment in f for f in st["route"]["density"]["attention"])
 
 
 def test_density_gate_failure_bounces_to_write_pending(fake_repo, monkeypatch):
