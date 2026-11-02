@@ -85,27 +85,31 @@ For practice-question / mock-exam modules, preserve exam-style MCQ structure. Ea
 
 ## VERIFICATION (blocking gates vs reported diagnostics)
 
-The deterministic verifier (`scripts/quality/verify_module.py`) computes these. All **blocking gates** must pass before commit:
+The deterministic verifier (`scripts/quality/verify_module.py`, `gate_results`) computes these **blocking gates**; all must pass before commit:
 
-1. No source H1 (`gate_no_source_h1`).
-2. Required sections present and in the required order (`structure_sections_present`, `structure_order_correct`).
-3. Quiz answers explain reasoning in `<details>`, not just name the fix (`structure_quiz_answers_have_details`).
-4. `## Sources` is required as the **last H2** section before `## Next Module`. Every link under it (bare `- https://...` or `- [title](https://...)`) must be reachable (`sources_all_reachable`) and point to primary/vendor docs, not marketing fluff or dead redirects. Cite what the claims need; there is no minimum count, and citations elsewhere are not counted.
-5. `anti_leak`: no leaked tokens, no emojis, no number 47. Also no runnable `kubectl` alias shorthand, `lab_image_binary_match`, no unsourced anecdote framing, practice MCQ shape.
-6. `outcomes_aligned`: each Learning Outcome maps to >= 1 core section AND >= 1 quiz item OR lab task.
+1. `gate_no_source_h1`: no source `# ` heading in the body.
+2. `structure_sections_present`: Learning Outcomes, Why This Module Matters and a Next Module link exist. `structure_order_correct`: the Learning Outcomes, Why, Did You Know, Common Mistakes, Quiz, Hands-On and Next Module headings all exist, in that order.
+3. `structure_quiz_answers_have_details`: every quiz item carries a `<details>` answer block. The verifier checks presence only; the answer must still explain why, not just name the fix.
+4. `sources_all_reachable`: no link under the Sources heading is a 404 or fetch failure (not computed under `--skip-source-check`; a page with no links passes this gate).
+5. `anti_leak`: no leaked tokens, no emojis, no number 47.
+6. `runnable_no_kubectl_alias`: no `alias k=kubectl` and no `k <subcommand>` in runnable shell code blocks.
+7. `lab_image_binary_match`: every `kubectl exec POD -- BIN` uses a binary its image has.
+8. `anti_fabrication_no_unsourced_anecdote`: no unsourced anecdote framing.
+9. `practice_mcq_four_options_with_distractors`: practice-question modules only; at least four visible options and answer reasoning covering the correct option and the distractors.
+10. `outcomes_aligned`: each Learning Outcome's key terms appear in a core section and in a quiz item or hands-on task. This is a token-overlap heuristic, not proof that the outcome is taught.
 
-Content rules the verifier does not check still bind: K8s 1.35+ for exam-pinned cert modules (see `module-writer.md`), runnable commands, and source-supported claims.
+Content rules the verifier does not check still bind: `## Sources` is the last H2 before `## Next Module`; every source is primary/vendor documentation (bare `- https://...` or `- [title](https://...)`) and supports the claims it is cited for, with no minimum count; K8s 1.35+ for exam-pinned cert modules (see `module-writer.md`); runnable commands; explanatory quiz answers.
 
-**Reported only, never a gate:** body words, mean/median words per paragraph, short-paragraph rate, consecutive-short runs, mean sentence length, the counts of Did You Know, Common Mistakes, quiz items, hands-on checkboxes and sources, the declared-budget status, and `length_attention` (words per outcome, flagged `unusually_short_for_outcomes` or `unusually_long_for_outcomes`). They flag unusually short or choppy and unusually long or walled pages for the reviewer and never reject, tier or reward. The structural template in `module-writer.md` still applies (section presence and order, `<details>` quiz answers, Hands-On with `- [ ]` checkboxes).
+**Reported only, never a gate:** body words, mean/median words per paragraph, short-paragraph rate, consecutive-short runs, mean sentence length, the counts of Did You Know, Common Mistakes, quiz items, hands-on checkboxes and sources, the declared-budget status, and `length_attention` (words per outcome, flagged `unusually_short_for_outcomes` or `unusually_long_for_outcomes`). They flag unusually short or choppy and unusually long or walled pages for the reviewer and never reject, tier or reward. The structural template in `module-writer.md` still applies.
 
 ## TIER ROUTING
 
 Tiers follow the verifier's blocking gates only (length and density never move a tier). Classify each `revision_pending: true` module:
 
 - **T0** — no blocking gate fails. Action: clear the `revision_pending: true` flag. No content change.
-- **T1** — only 1-2 structure gates fail (missing section, wrong order, quiz answers without `<details>`). Action: targeted structural patch; alignment must still pass post-patch.
+- **T1** — only one or two `structure_*` gates fail (missing section, wrong order, quiz item without `<details>`). Action: targeted structural patch; alignment must still pass post-patch.
 - **T2** — only `lab_image_binary_match` fails. Action: fix the lab image/binary pairing.
-- **T3** — any other combination or more failures. Action: full rewrite preserving salvageable assets (labs, diagrams, code blocks, source URLs) extracted by the deterministic salvage parser.
+- **T3** — every other failing combination, including a single `anti_leak`, sources, anecdote or alignment failure. Action: full rewrite preserving salvageable assets (labs, diagrams, code blocks, source URLs) extracted by the deterministic salvage parser.
 
 ## REPORTING
 

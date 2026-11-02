@@ -242,7 +242,7 @@ python scripts/quality/verify_module.py \
 python scripts/quality/verify_module.py --all-revision-pending --out logs/audit.jsonl
 ```
 
-Blocking gates: no source H1, required sections present and in order, quiz answers explained in `<details>`, source links reachable, anti-leak, no runnable `kubectl` alias, lab image/binary match, no unsourced anecdote, practice MCQ shape, outcome alignment. Word counts, density (wpp, short-paragraph rate), sentence length and template counts (Did You Know, Common Mistakes, quiz items, sources) are reported in the record as diagnostics, and `length_attention` flags unusually short or long pages for their outcomes; none of them rejects, tiers or rewards a page (#3744). Tiers follow blocking defects only: T0 (none) → T3 (several).
+Blocking gates (`gate_results`): no source H1; required sections present and in order; every quiz item has a `<details>` answer; no 404/fetch-failed link under Sources; anti-leak (tokens, emoji, 47); no runnable `kubectl` alias; lab image/binary match; no unsourced anecdote; practice-MCQ shape (practice modules only); outcome alignment (token overlap). Word counts, density (wpp, short-paragraph rate), sentence length and template counts (Did You Know, Common Mistakes, quiz items, sources) are reported in the record as diagnostics, and `length_attention` flags unusually short or long pages for their outcomes; none of them rejects, tiers or rewards a page (#3744). Tiers (`classify_tier`): T0 no blocking failure; T1 one or two `structure_*` failures only; T2 `lab_image_binary_match` only; T3 any other failure.
 
 #### `dispatch_388_pilot.py` — per-module orchestrator
 

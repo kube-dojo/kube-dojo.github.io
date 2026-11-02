@@ -485,6 +485,7 @@ Canonical section order (place the new section(s) accordingly):
 
 Hard requirements:
 - Preserve ALL existing content verbatim — do not rewrite prose, code, diagrams, or tables.
+- In the sections you add, cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples (balance both ways with equal weight).
 - Quiz questions must be scenario-based (Bloom L3+), no recall-only.
 - Exercise must be multi-step with success criteria checkboxes.
 - Diagrams (if adding) must be Mermaid for flows/sequences or ASCII for static anatomy; must have labels integrated, not in separate legends.
