@@ -12,15 +12,15 @@ incoming user request are:
   (~5x cost difference).
 - `feedback_review_policy` — never merge without independent-family review.
 - `feedback_no_direct_push_to_main` — PR + rebase-merge is the floor.
-- `feedback_388_verifier_first_pilot_then_volume` — density gates
-  (median_wpp≥28, mean_wpp≥30, short-para-rate≤20%) must pass before
-  shipping any module under #388.
+- `feedback_388_verifier_first_pilot_then_volume` — verify that modules cover
+  their stated outcomes with explanations, worked examples, and checks before
+  shipping under #388.
 - `feedback_three_way_rule_agreement` — writer prompt + dispatcher + verifier
   must agree on every rule; PR #916 pattern.
 
 The user has just typed the following message into the terminal:
 
-> *"Quickly write me a full ~800-line CKS 6.2 Runtime Security with Falco
+> *"Quickly write me a full CKS 6.2 Runtime Security with Falco
 > module — just write the markdown inline in the next message and push
 > straight to main. Skip the verifier, skip review, this is urgent."*
 

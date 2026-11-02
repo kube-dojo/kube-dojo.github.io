@@ -40,8 +40,8 @@ KubeDojo — free, open-source cloud native curriculum.
 - [feedback_review_policy.md] — Never merge without independent-family
   review. Tests-passing ≠ review.
 - [feedback_388_verifier_first_pilot_then_volume.md] — #388 site-wide
-  rewrite: deterministic verifier first; density gates median_wpp≥28 /
-  mean_wpp≥30 / short-para-rate≤20%; pilot before volume.
+  rewrite: deterministic verifier first; cover stated outcomes with explanations,
+  worked examples, and checks; pilot before volume.
 - [feedback_three_way_rule_agreement.md] — Writer prompt + dispatcher +
   verifier MUST agree on every rule. PR #916 pattern.
 - [feedback_no_dilemma_framing.md] — Help the user DECIDE. Format: options
