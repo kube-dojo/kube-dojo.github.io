@@ -3,7 +3,7 @@
   "module_path": "src/content/docs/prerequisites/zero-to-terminal/module-0.3-first-commands.md",
   "schema_version": 2,
   "research_run_id": "2026-11-01-first-commands-upgrade",
-  "page_digest": "sha256:345b6732b9d9da084981824582222c44ee1f737fdf29560d55c28bdcc9be57f5",
+  "page_digest": "sha256:07f67ef2def17e5e968b17439c528f633929db4e87b07ce04a0118243b9eb1b9",
   "claims": [
     {
       "claim_id": "FC03001",
@@ -343,7 +343,7 @@
     },
     {
       "claim_id": "FC03018",
-      "claim_text": "A directory destination receives a copied file; a trailing slash requires the destination directory to exist.",
+      "claim_text": "A directory destination receives a copied file; a trailing slash requires the destination directory to exist, while a missing destination without a slash can become a file.",
       "claim_class": null,
       "disposition": null,
       "page_instances": [
@@ -353,7 +353,8 @@
         }
       ],
       "source_candidates": [
-        "posix-cp"
+        "posix-cp",
+        "https://man7.org/linux/man-pages/man1/cp.1p.html"
       ]
     },
     {
@@ -745,6 +746,22 @@
       "source_candidates": [
         "ubuntu-command-line-current-R2-CONTEXT"
       ]
+    },
+    {
+      "claim_id": "FC03039",
+      "claim_text": "Echo outputs its text; output redirection writes it to a file, creating it or replacing existing contents under normal settings.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [{"line": 407, "quote": "`echo` prints the text it is given."}],
+      "source_candidates": ["https://manpages.debian.org/bookworm/bash/bash.1.en.html"]
+    },
+    {
+      "claim_id": "FC03040",
+      "claim_text": "In zsh history normally lists the last 16 events; an explicit first event expands the listed range.",
+      "claim_class": null,
+      "disposition": null,
+      "page_instances": [{"line": 421, "quote": "In zsh, plain `history` normally shows the last 16 entries"}],
+      "source_candidates": ["https://manpages.debian.org/bookworm/zsh-common/zshbuiltins.1.en.html"]
     }
   ],
   "prior_seed": {

@@ -81,9 +81,9 @@ This macOS-style example shows the relationship between root, home and a user's 
 └── System/
 ```
 
-In this restaurant-floor-plan analogy, the root directory is the building, your home directory is your private office, and folders such as Desktop or Documents are rooms inside that office. The terminal always has a current working directory, which is the room where relative paths begin. If you say `Documents`, the shell interprets that relative to where you are now; if you say `/Users/yourname/Documents`, you are giving a full path from the building entrance.
+In this building analogy, the root directory is the building, your home directory is your private office, and folders such as Desktop or Documents are rooms inside that office. The terminal always has a current working directory, which is the room where relative paths begin. If you say `Documents`, the shell interprets that relative to where you are now; if you say `/Users/yourname/Documents`, you are giving a full path from the building entrance.
 
-The first command is `pwd`, which stands for print working directory. It answers "Where am I?" before you create, copy, move, or delete anything. For example, a wrong checkout can lead you to edit a different manifest from the one you intended.
+The first command is `pwd`, which stands for print working directory. It answers "Where am I?" before you create, copy, move, or delete anything. For example, the wrong directory could lead you to edit the wrong copy of a configuration file.
 
 ```bash
 pwd
@@ -153,7 +153,7 @@ The output should now include the Documents directory at the end of the path, sh
 /Users/yourname/Documents
 ```
 
-Use `cd` to move, `pwd` to verify, and `ls` to inspect. A relative file argument such as `deployment.yaml` is resolved from the current directory; check the path before using it in a later command.
+Use `cd` to move, `pwd` to verify, and `ls` to inspect. A relative file argument such as `notes.txt` is resolved from the current directory; check the path before using it in a later command.
 
 ### Going back up: `cd ..`
 
@@ -302,7 +302,7 @@ The output should include both file names, which proves that `cp` duplicated the
 menu-backup.txt    menu.txt    my-first-folder    restaurant
 ```
 
-To copy a file into a folder, provide the source file and the destination directory. The trailing slash in `restaurant/` is not always required, but it communicates your intent clearly: the destination is a directory, not a new file name. If the directory does not exist, the command will fail rather than create the directory for you. That separation is useful because `mkdir` owns directory creation, while `cp` owns copying.
+To copy a file into a folder, provide the source file and the destination directory. The trailing slash in `restaurant/` is not always required, but it communicates your intent clearly: the destination is a directory, not a new file name. If `restaurant/` does not exist, the command fails; without the slash, `cp menu.txt restaurant` can instead create a file named `restaurant`.
 
 ```bash
 cp menu.txt restaurant/
@@ -342,7 +342,7 @@ Copying a sample leaves the original in place, provided you choose a separate de
 
 Deletion is where terminal precision becomes most important. A graphical desktop usually gives you a trash or recycle bin, and it may ask for confirmation before permanent removal. The terminal's `rm` command is more direct. It removes file names immediately and usually has no built-in undo path for ordinary users. That does not mean you should fear it; it means you should build a confirmation routine before using it.
 
-Consider how everyday graphical file deletion contrasts with an automated terminal command. Pause and predict: when you drag a file to the desktop Trash, where does that item go? What safety net does that graphical workflow provide compared to running a command designed for headless automation?
+Consider how everyday graphical file deletion contrasts with a terminal command. Pause and predict: when you drag a file to the desktop Trash, where does that item go? What safety net does that graphical workflow provide compared to running `rm`?
 
 <details>
 <summary>Check your prediction</summary>
@@ -404,6 +404,8 @@ The second pipeline searches for a word inside a file. Earlier you removed `dail
 echo "Wednesday: pasta with marinara" > daily-specials.txt
 ```
 
+`echo` prints the text it is given. Here, `>` sends that output into the file instead of the screen, creating the file or replacing its contents if it already exists. The next command uses `cat` to show the file's contents.
+
 ```bash
 cat daily-specials.txt | grep "pasta"
 ```
@@ -416,7 +418,7 @@ The third pipeline finds a past command you typed, which is a practical way to r
 history | grep "mkdir"
 ```
 
-`history` shows shell history, and `grep "mkdir"` selects lines containing `mkdir`. This can help locate a command when you remember part of it; the entries available depend on the shell and its history settings.
+`history` shows shell history, and `grep "mkdir"` selects lines containing `mkdir`. This can help locate a command when you remember part of it; the entries available depend on the shell and its history settings. In zsh, plain `history` normally shows the last 16 entries; use `history 1 | grep "mkdir"` to search the available history from its first entry.
 
 Before running your own pipeline, pause and predict: must the left command finish before the right command starts, and what text moves between them? Then change the search word in `history | grep "mkdir"` to `cd` or `rm`. If a filter prints nothing, inspect the unfiltered input before drawing a conclusion; it may simply have found no matching lines.
 
@@ -441,12 +443,6 @@ Use this table as a reference while you practice. The kitchen analogy connects e
 | `mv` | Moves or renames | "Move this to another shelf" or "relabel it" |
 | `rm` | Removes the named file entry | "Remove this paper" (no desktop Trash) |
 | `clear` | Cleans the screen | "Wipe the whiteboard" |
-
-## When This Doesn't Apply
-
-A graphical file manager can help when you need thumbnails, previews, or drag-and-drop interaction. Terminal commands can be useful when you can name paths, document a sequence, or work through a remote shell. Choose according to the task and inspect the result in either interface.
-
-For example, a command can describe a directory structure or filter a listing; a graphical dashboard can help display a system's state. You can use both within a workflow.
 
 ## When You'd Use This vs Alternatives
 
