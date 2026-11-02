@@ -47,4 +47,4 @@ For each wave, freeze the inventory and dispositions, run structural checks, ver
 
 ## Word-floor harmonization
 
-The verifier’s existing 5,000-word default and the AI-history workflow’s evidence-based `4k-7k`/natural-range discipline remain in force. This contract does not lower, bypass, or reinterpret either gate. Open a separately reviewed policy issue to reconcile track-specific floors, explicit budgets, exceptions, and migration evidence across the verifier, rubric, and history workflow. Until that issue is accepted, expand only when verified evidence and learner need support it; document a naturally shorter page rather than padding it.
+The verifier no longer rejects on length (#3744). Length diagnostics and the AI-history `4k-7k`/natural-range labels are planning information, not acceptance gates; acceptance follows [`docs/review-contract.md`](../review-contract.md): concise material passes when nothing the learner needs is missing, and long material with padding does not. Expand only when verified evidence and learner need support it; document a naturally shorter page rather than padding it. Explicit caps approved separately still apply.
