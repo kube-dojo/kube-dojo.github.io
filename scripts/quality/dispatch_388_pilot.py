@@ -209,7 +209,7 @@ PROCEDURE
 4. Run the deterministic verifier:
      .venv/bin/python scripts/quality/verify_module.py --glob {module_path} --skip-source-check --summary --quiet
    Iterate until no gate in "gates" is false (the skipped source-reachability gate reports null). Blocking: no source H1, required sections in order, quiz answers in <details>, no emojis, no number 47, no leaked tokens, no unsourced anecdotes, practice MCQ format, every outcome taught and assessed. K8s 1.35+. Never use `alias k=kubectl` or `k <subcommand>` in runnable bash/sh/shell/zsh code blocks; use full `kubectl`.
-   Word counts, paragraph/sentence density and Did You Know / Common Mistakes / quiz / source counts are reported only (#3744). Do not write to a number. Cover the outcomes fully, cut padding and repetition, and explain what the learner needs; if verified material cannot support the scope, report the shortfall instead of padding.
+   Word counts, paragraph/sentence density and Did You Know / Common Mistakes / quiz / source counts are reported only (#3744). Do not write to a number. Cover the outcomes fully. Cut padding and repetition, and explain every term, step and reason the learner needs, with worked examples; give both equal weight. If verified material cannot support the scope, report the shortfall instead of padding.
    The briefs below may still state word targets, density thresholds or section counts. Where they do, this step overrides them.
 5. Set frontmatter `revision_pending: false` (it is currently `true` — clear it as part of the rewrite). Then commit (sign-off optional, no --no-verify):
      git add {module_path}

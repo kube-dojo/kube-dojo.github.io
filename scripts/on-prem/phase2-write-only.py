@@ -205,8 +205,9 @@ Required sections in this order:
 - All version numbers, API names, helm chart values, and CRD field paths must be
   current. If you are unsure, prefer "current" framing rather than naming a specific
   version that might be wrong.
-- Cover the learning outcomes fully, cut padding and repetition, and explain what the
-  learner needs. Do not write to a word count.
+- Cover the learning outcomes fully. Cut padding and repetition, and explain every term,
+  step and reason the learner needs, with worked examples; give both equal weight. Do
+  not write to a word count.
 - Use Starlight callout syntax for important notes: `:::note`, `:::caution`, `:::tip`.
 
 Output ONLY the module markdown. Start with `---`. No preamble.

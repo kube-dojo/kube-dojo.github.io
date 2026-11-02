@@ -196,9 +196,11 @@ def agy_draft_prompt(*, slug: str, ch_num: int, cap_words: int,
         ```
 
         Write a tight, evidence-backed first draft that captures every
-        scene from the contract without padding or repetition; Codex
-        will extend the technical and biographical layers from the same
-        contract where the anchors support it.
+        scene from the contract. Cut padding and repetition, and explain
+        every term, step and reason the reader needs, with source-supported
+        worked examples where the contract has them; give both equal
+        weight. Codex will extend the technical and biographical layers
+        from the same contract where the anchors support it.
 
         ## Your whitelist (where you add value)
 
@@ -297,7 +299,9 @@ def _expansion_prompt(*, agent_label: str, slug: str, ch_num: int,
         research contract. Your job is to extend the draft where the
         contract's anchored layers are under-developed (never beyond
         the {cap_words}-word ceiling) while sharpening anchor discipline and
-        tightening narrative coherence.
+        tightening narrative coherence. Cut padding and repetition, and
+        explain every term, step and reason the reader needs, with
+        source-supported worked examples; give both equal weight.
 
         ## Pipeline position (post-2026-04-29 prose pivot)
 
