@@ -9,7 +9,7 @@ sidebar:
 >
 > **Time to Complete**: 90–120 minutes (long-form beginner read + practice)
 >
-> **Prerequisites**: [Module 0.3: First Terminal Commands](../module-0.3-first-commands/) — You should be able to open a terminal, run basic commands such as `echo` and `pwd`, and read their output. Module 0.3 builds on [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/), so complete both before starting here.
+> **Prerequisites**: [Module 0.3: First Terminal Commands](../module-0.3-first-commands/) — You should be able to open a terminal, run commands such as `echo`, `pwd`, `mkdir`, and `touch`, and read their output. Module 0.3 builds on [Module 0.2: What is a Terminal?](../module-0.2-what-is-a-terminal/), so complete both before starting here.
 
 ---
 
@@ -106,8 +106,10 @@ The second question is answered by `ls`, which lists directory contents. With no
 ls
 ```
 
+Sample output; yours will differ:
+
 ```text
-Desktop    Documents    Downloads    Music    Pictures
+Desktop    Documents    notes.txt
 ```
 
 The `-l` option asks for long format, which includes file type, permissions, owner, group, size, timestamp, and name. You do not need to understand every column immediately, but the first column is worth recognizing early because it tells you whether an entry is a file or directory and who can use it. Later in this module, you will decode strings such as `drwxr-xr-x` and `-rw-r--r--`.
@@ -295,7 +297,7 @@ Navigation becomes more useful when you can create a small structure of your own
 
 The earlier navigation ended at `/`; do not create practice files there. You can use the [Ubuntu playground](https://killercoda.com/playgrounds/scenario/ubuntu) for the self-checked exercises. If its terminal starts as root, run `su - ubuntu` to use the existing unprivileged account. For every file-changing example below, use a new directory that you create solely for this lesson and keep under your exclusive control. Being inside your home directory alone does not make existing files disposable.
 
-Run these commands **one line at a time**. After any `mkdir` or `cd` error, stop: do not run the next line or any file-writing command. If `mkdir` reports that the name exists (including a file or symbolic link), leave it untouched, choose an unused name such as `kubedojo-practice-2`, and substitute that name in every later project path. Do not use `mkdir -p` for this workspace root: it would accept an existing directory instead of establishing a fresh one.
+A symbolic link is a file that points to another path. Run these commands **one line at a time**. After any `mkdir` or `cd` error, stop: do not run the next line or any file-writing command. If `mkdir` reports that the name exists (including a file or symbolic link), leave it untouched, choose an unused name such as `kubedojo-practice-2`, and substitute that name in every later project path. Do not use `mkdir -p` for this workspace root: it would accept an existing directory instead of establishing a fresh one.
 
 ```bash
 cd ~
@@ -355,6 +357,8 @@ Pause and predict: if plain `ls` does not show `.practice-hidden`, can you addre
 
 Yes, if the file exists and you have access: the leading dot affects the default listing, not the name used in the path. Addressing the file directly does not depend on whether plain `ls` displayed it.
 
+Try `ls -l .practice-hidden` in your workspace to inspect the entry directly.
+
 </details>
 
 ## Reading Permission Strings from `ls -l`
@@ -366,7 +370,7 @@ drwxr-xr-x  2 yourname yourname 4096 Mar 23 10:00 Desktop
 -rw-r--r--  1 yourname yourname  220 Mar 23 08:30 notes.txt
 ```
 
-The first character tells you the type of entry. A `d` means directory, while `-` means a regular file. The next nine characters come in three groups of three: permissions for the owner, permissions for the group, and permissions for everyone else. Each group uses `r` for read, `w` for write, `x` for execute or directory entry, and `-` when that permission is absent.
+The first character tells you the type of entry. A `d` means directory, while `-` means a regular file. The next nine characters come in three groups of three: permissions for the owner, permissions for the group, and permissions for everyone else. Each group uses `r` for read, `w` for write, `x` for execute or directory entry, and `-` when that permission is absent. Run `id` to see the current process's user and group information, then compare its groups with the group shown by `ls -l`.
 
 ```text
 -  rw-  r--  r--
@@ -496,6 +500,7 @@ This "read, create, replace, or move" classification also helps with command fea
 | `tail` | Prints the end of a file | Low, especially useful for logs |
 | `mkdir -p` | Creates missing directories | Moderate because it changes the tree |
 | `touch` | Creates an empty file or updates timestamp | Moderate because it changes metadata |
+| `>` | Redirects output, replacing existing contents under Bash's default settings | High because it can destroy existing content |
 
 The secret caution in the table is not theoretical. Kubernetes client configuration may include certificate data, tokens, context names, user names, and cluster addresses. A beginner who runs `cat ~/.kube/config` on a shared screen may reveal more than intended. You still need to know where the file lives, but reading the whole thing into the terminal is not always the right inspection method.
 
@@ -564,68 +569,7 @@ ls -l recipes/appetizers/bruschetta.txt
 
 You can also use checkpoints to avoid accidental writes. Before creating a file with `touch` or replacing content with `>`, run `pwd` and `ls` to confirm the destination. In a beginner lab, the worst mistake is usually a messy practice directory. In professional work, writing to the wrong path can overwrite a configuration file, create a directory structure in the wrong place, or leave a script writing logs where nobody expects to find them.
 
-### Diagnose It Yourself: Two Broken Reads
-
-Everything above gave you the checkpoint method in a guided order. This challenge removes the guardrails: you get two failure symptoms and no step list. For each symptom, before opening its reveal, write down what you think went wrong and which two or three commands you would run, in which order, to confirm it. There is no single correct command sequence, but some sequences gather evidence faster than others, so be ready to defend your ordering.
-
-**Symptom one**: you are standing in `~/kubedojo-practice`, and you run `cat recipes/appetizers/bruschetta.txt`. The shell answers `No such file or directory`. You remember creating that file in the hands-on exercise, and you are sure the practice tree exists. What are the two most likely explanations, and which command settles between them fastest?
-
-<details>
-<summary>Reveal a worked diagnosis for symptom one</summary>
-
-The error is a clue to check the starting directory and each name in the path. Run `pwd`; if it confirms your workspace, inspect `ls recipes` and then `ls recipes/appetizers`. For example, a hypothetical `brushetta.txt` would differ from `bruschetta.txt` by a missing `c`. Check the actual listing before choosing a diagnosis.
-
-</details>
-
-**Symptom two**: on a shared lab machine, a teammate asks you to review `recipes/desserts/tiramisu.txt` inside the same project. The path is correct — `ls recipes/desserts` shows the file — but `cat recipes/desserts/tiramisu.txt` answers `Permission denied`. What do you inspect, and how do you explain to your teammate who has to act?
-
-<details>
-<summary>Reveal a worked diagnosis for symptom two</summary>
-
-"Permission denied" redirects the investigation away from spelling and toward access, so the checkpoint list changes: run `ls -l recipes/desserts/tiramisu.txt` to read the file's permission string, owner, and group, and run `ls -ld recipes recipes/desserts` to inspect parent traversal permissions. Suppose the file shows `-rw-r-----` with the teammate as owner and a group you do not belong to. Under ordinary mode-bit checks, the others segment `---` prevents your read; additional access rules need separate inspection. Because this module teaches reading permissions, not changing them, explain your evidence to the teammate and ask the owner or an authorized administrator to arrange appropriate access. Do not change someone else's permissions or infer the file's mode from the error alone.
-
-</details>
-
-The two messages suggest different first checks: path checkpoints for the missing-file example, and file and directory permissions for the access example. Neither message alone describes every possible cause.
-
-## When This Doesn't Apply
-
-These commands are the foundation, but they are not the whole file-management universe. Graphical file browsers are still useful for visual inspection, drag-and-drop work, and previewing media. Integrated development environments are better for editing multi-file projects. Search tools such as `find`, `grep`, and `rg` become more useful once the number of files grows beyond what you can scan with `ls`.
-
-The pattern is to use the terminal when precision, repeatability, remote access, or automation matters. Use `pwd`, `ls`, `cd`, `cat`, `head`, `tail`, `mkdir`, and `touch` when you need a reliable command that you can repeat, paste into notes, or use over SSH on a server. Use a graphical tool when the task is exploratory and the machine has a desktop environment available.
-
-| Use This | When | Why It Works |
-|----------|------|--------------|
-| Terminal navigation | You need exact paths or remote access | Commands work over SSH and can be repeated |
-| GUI file browser | You need visual previews or drag-and-drop | The interface is optimized for browsing human media |
-| `cat`, `head`, `tail` | You need quick text inspection | Read all, first, or last lines according to the question |
-| Specialized search tools | You need to find content across many files | Listing one directory at a time becomes too slow |
-
-The anti-pattern is pretending one tool fits every job. Printing a massive log with `cat`, manually clicking through a server over a remote desktop, or using relative paths in a script with no control over the starting directory all come from ignoring the task shape. The better habit is to ask: am I locating something, inspecting something, creating structure, or diagnosing access?
-
-## When You'd Use This vs Alternatives
-
-For a quick decision, start with the question you need answered. If you need to know where you are, use `pwd`. If you need to know what is nearby, use `ls` or `ls -la`. If you need to move, use `cd` with a path that fits the context. If you need to read a small file, use `cat`; if you need the beginning, use `head`; if you need the latest log entries, use `tail`.
-
-```text
-Need to answer a filesystem question?
-|
-+-- Where am I? ------------------> pwd
-|
-+-- What is here? ----------------> ls
-|                                  ls -la
-|
-+-- How do I move? ---------------> cd <path>
-|                                  cd ..
-|                                  cd ~
-|
-+-- What is inside this file? ----> cat <small-file>
-|                                  head -n <count> <file>
-|                                  tail -n <count> <file>
-|
-+-- Who can access it? -----------> ls -l <file>
-                                   ls -ld <directory>
-```
+## Choosing a Command
 
 | Need | First Command to Try | Safer Follow-Up |
 |------|----------------------|-----------------|
@@ -641,7 +585,7 @@ Need to answer a filesystem question?
 | Mistake | Why It Happens | How to Fix It |
 |---------|----------------|---------------|
 | Trying to `cd` into a regular file | The path exists, so the beginner assumes it can be entered like a folder | Use `cat`, `head`, or `tail` for files; use `cd` only for directories |
-| Forgetting the space between command and path | The command and argument visually blend together while typing quickly | Write commands as verb plus target, such as `cd Documents`, and use Tab completion |
+| Forgetting the space between command and path | The command and argument visually blend together while typing quickly | Write commands as verb plus target, such as `cd Documents`. In Bash, Tab attempts to complete the text before the cursor |
 | Using backslashes `\` in Linux or macOS paths | Windows examples use backslashes, so the habit carries over | Use forward slashes, such as `/home/you/Documents`, in Unix-like shells |
 | Creating a file when a program expects a directory | `touch` and `mkdir` both create names, but the resulting object type differs | Use `mkdir` for containers and `touch` for empty files, then confirm with `ls -l` |
 | Getting lost in nested directories | Relative paths stop matching the learner's mental model | Run `pwd`, list nearby files with `ls`, or return home with `cd ~` before continuing |
@@ -706,14 +650,14 @@ In this exercise, you will create a small recipe project, navigate through it, c
 
 ### Setup
 
-Continue in the disposable workspace you created above. If you skipped those examples, complete **Create Your Disposable Workspace First** before starting here. If you are repeating the lesson, create a fresh workspace with an unused name; do not adopt an existing project. Run each command separately and stop on any error, especially a failed `mkdir` or `cd`, before creating or overwriting files.
+Continue in the disposable workspace and complete the file-creating examples above first, including the desserts example. If you are repeating the lesson, create a fresh workspace with an unused name; do not adopt an existing project. Run each command separately and stop on any error, especially a failed `mkdir` or `cd`, before creating or overwriting files.
 
 ```bash
 pwd
 ls -a
 ```
 
-Confirm that `pwd` identifies your owned workspace. Following the earlier examples, its top level contains `recipes`, `shopping-list.txt`, and `.practice-hidden`; a newly created workspace is empty apart from `.` and `..`. Unexpected entries mean stop and establish a fresh workspace. The tasks deliberately reuse only the disposable recipe files you create in this lesson.
+Confirm that `pwd` identifies your owned workspace and its top level contains `recipes`, `shopping-list.txt`, and `.practice-hidden`. Unexpected entries mean stop and establish a fresh workspace. The tasks reuse only the disposable recipe files you create in this lesson.
 
 ### Tasks
 
@@ -722,7 +666,6 @@ Confirm that `pwd` identifies your owned workspace. Following the earlier exampl
 ```bash
 mkdir -p recipes/appetizers
 mkdir -p recipes/main-courses
-mkdir -p recipes/desserts
 ```
 
 <details>
@@ -752,12 +695,11 @@ The `pwd` output should identify your workspace, and `ls` should include `recipe
 
 </details>
 
-3. **Create recipe files in each category.** New files start empty. If you followed the worked example, `tiramisu.txt` already contains one line; `touch` preserves that content while updating its timestamp.
+3. **Create the remaining recipe files.** The worked example already created `tiramisu.txt`.
 
 ```bash
 touch recipes/appetizers/bruschetta.txt
 touch recipes/main-courses/pasta-carbonara.txt
-touch recipes/desserts/tiramisu.txt
 ```
 
 <details>
@@ -772,13 +714,12 @@ Each path is relative to your chosen workspace, which is why it starts with `rec
 ```bash
 echo 'Ingredients: bread, tomatoes, basil, olive oil' > recipes/appetizers/bruschetta.txt
 echo 'Ingredients: pasta, eggs, pancetta, parmesan' > recipes/main-courses/pasta-carbonara.txt
-echo 'Ingredients: coffee, mascarpone, ladyfingers, cocoa' > recipes/desserts/tiramisu.txt
 ```
 
 <details>
 <summary>Solution notes for task 4</summary>
 
-The `>` redirect replaces the file's contents with the text produced by `echo`. Here you are intentionally writing or replacing only your disposable lesson files, including `tiramisu.txt` from the worked example. In real work, be careful with `>` because it overwrites existing content; later modules will cover safer editing habits.
+The `>` redirect replaces the file's contents with the text produced by `echo`. Here you are intentionally writing only your disposable lesson files. In real work, be careful with `>` because it overwrites existing content; later modules will cover safer editing habits.
 
 </details>
 
@@ -820,47 +761,42 @@ The file entry for `bruschetta.txt` should begin with `-` because it is a regula
 
 </details>
 
-7. **Reveal a controlled hidden file in your workspace.** The earlier example created `.practice-hidden`. If you skipped it, first confirm that name is absent, including as a symbolic link, then run `touch .practice-hidden`. Compare the listings:
-
-```bash
-ls
-ls -a
-```
-
-<details>
-<summary>Solution notes for task 7</summary>
-
-The second command shows `.practice-hidden`; the first omits it. A leading dot affects the default listing, not whether a path can be addressed.
-
-</details>
-
-8. **Move around and recover your location.** Use `pwd` after each movement until the mental model feels automatic.
+7. **Move around and recover your location.** Use `pwd` after each movement until the mental model feels automatic.
 
 ```bash
 cd recipes/desserts
 pwd
 cd ..
 pwd
+cd -
+pwd
 cd ~
 pwd
 ```
 
 <details>
-<summary>Solution notes for task 8</summary>
+<summary>Solution notes for task 7</summary>
 
-The first `pwd` should identify `recipes/desserts` inside your chosen workspace. After `cd ..`, it should identify that workspace's `recipes` directory. After `cd ~`, it should identify your home directory. If any prediction is wrong, pause and explain which relative path assumption changed.
+The first `pwd` should identify `recipes/desserts` inside your chosen workspace. After `cd ..`, it should identify that workspace's `recipes` directory. `cd -` returns to `recipes/desserts`; after `cd ~`, `pwd` identifies your home directory. If any prediction is wrong, pause and explain which relative path assumption changed.
 
 </details>
 
 ### Diagnostic Challenge: Three Failures, No Recipe
 
-The tasks above told you which command to run at each step. This challenge gives you only symptoms. Diagnose all three using nothing but the checkpoint commands from this module — `pwd`, `ls`, `ls -a`, `ls -l`, and `ls -ld` — and write down your diagnosis for each symptom before opening the reveal. Do not fix anything yet; the goal is to name the exact checkpoint where each failure happens.
+The tasks above told you which command to run at each step. This challenge gives you only symptoms. Diagnose all three using nothing but the checkpoint commands from this module — `pwd`, `ls`, `ls -a`, `ls -l`, `ls -ld`, and `id` — and write down your diagnosis for each symptom before opening the reveal. Do not fix anything yet; the goal is to name the exact checkpoint where each failure happens.
 
 **Symptom 1: wrong starting point.** You are inside `~/kubedojo-practice/recipes/desserts` and run `cat recipes/appetizers/bruschetta.txt`. The shell answers `No such file or directory`, but you are sure the file exists because you created it in task 3. Where did the relative path actually start, and which directory did the shell go looking in?
 
 **Symptom 2: file treated as a directory.** From inside the project, you run `cd recipes/desserts/tiramisu.txt` and the shell refuses with `Not a directory`. What kind of entry does the path end in, and which character of an `ls -l` permission string would have told you that in advance?
 
-**Symptom 3: access, not spelling.** On the Ubuntu playground as the unprivileged `ubuntu` user, `ls /root` reports `Permission denied`. Which command shows the permissions on the `/root` directory entry itself, and what do the mode bits grant?
+**Symptom 3: access, not spelling.** A shared recipe file exists, but reading it returns `Permission denied`. Suppose `ls -l` shows `-rw-r-----`, your teammate owns it, and its group is absent from your `id` output. What do you inspect, and who can arrange access?
+
+<details>
+<summary>Hint: choose a checkpoint</summary>
+
+Start with the current directory for symptom 1, the entry type for symptom 2, and the file and parent permissions for symptom 3.
+
+</details>
 
 <details>
 <summary>One possible diagnosis for each symptom</summary>
@@ -869,7 +805,7 @@ Symptom 1 is a relative-path failure. Running `pwd` shows you are in `.../recipe
 
 Symptom 2 is a type mismatch. `tiramisu.txt` is a regular file, and `cd` can only enter directories. Running `ls -l recipes/desserts/` shows the entry's permission string beginning with `-` instead of `d`, which is the advance clue that the target can be read with `cat` but never entered.
 
-Symptom 3 is a permission failure. On the tested playground, `ls -ld /root` showed `drwx------` owned by `root`: the ordinary bits grant the owner read and search, but grant neither to group or others. Other rules and privileges can also affect access.
+Symptom 3 is a permission failure. Inspect the file with `ls -l` and its parent directories with `ls -ld`. Under ordinary mode-bit checks, the others segment `---` prevents your read; additional access rules need separate inspection. Ask the owner or an authorized administrator to arrange access.
 
 </details>
 
@@ -897,6 +833,9 @@ You may keep your recipe files. To remove them, follow the [owned-workspace clea
 ## Sources
 
 - [Linux open(2): access and file-creation errors](https://man7.org/linux/man-pages/man2/open.2.html)
+- [Linux id(1): user and group information](https://man7.org/linux/man-pages/man1/id.1.html)
+- [Linux symlink(7): symbolic links](https://man7.org/linux/man-pages/man7/symlink.7.html)
+- [Bash manual: completion and redirection](https://man7.org/linux/man-pages/man1/bash.1.html)
 - [Linux unlink(2): directory access and removal restrictions](https://man7.org/linux/man-pages/man2/unlink.2.html)
 - [Linux capabilities(7): privileged access checks](https://man7.org/linux/man-pages/man7/capabilities.7.html)
 - [Linux proc(5): process and system information](https://man7.org/linux/man-pages/man5/proc.5.html)
