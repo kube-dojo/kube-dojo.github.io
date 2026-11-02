@@ -6,18 +6,16 @@ Computes three signals over the prose paragraphs of a markdown module:
   list items, callouts, blockquotes — anything that isn't a prose paragraph).
 * **w_per_line** (``w/ln``) — words divided by non-blank lines. Below ~12
   signals one-sentence-per-paragraph padding (the Codex v2 pad-bomb signature).
-* **w_per_para** (``wpp``) — words per prose paragraph. Below ~22 signals
-  punchy-bullet v3 style or generic-essay LLM filler. Above ~50 with low
-  paragraph count signals walls-of-text without scaffolding.
+* **w_per_para** (``wpp``) — words per prose paragraph. Below ~18 signals
+  punchy-bullet v3 style or generic-essay LLM filler. Very high values signal
+  walls-of-text without scaffolding.
 
 These numbers are **diagnostics**, not gates (#3744, operator balance rule
 2026-11-02): ``attention()`` flags BOTH tails for the reviewer, and a flag never
-rejects, routes, tiers or rewards a page. A page inside every bound is not
-thereby accepted; outcome coverage is judged against the outcomes. The
-conjunction below is the legacy descriptive band, kept for the triage report.
-
-The pass-threshold is a **conjunction** of three checks. Any single signal is
-gameable on its own; the triple is much harder to pad.
+rejects, routes, tiers, enqueues or rewards a page. A page inside every bound is
+not thereby accepted; outcome coverage is judged against the outcomes. Any
+single signal is gameable on its own, which is one more reason none of them
+decides anything.
 
 Calibration anchors (from `.calibration/teaching-rewrite/` outputs):
 
@@ -27,36 +25,19 @@ Calibration anchors (from `.calibration/teaching-rewrite/` outputs):
 | original 1.1 v3 punchy-bullets          |  1729 | 7.5  | 15.6 |
 | Gemini-3.1-pro × 1.1 rewrite (good)     |  2568 | 21.8 | 69.8 |
 | Codex gpt-5.5 × 1.1 rewrite (good)      |  3604 | 23.7 | 60.3 |
-
-The ``classify()`` PASS band is ``words >= 1500 AND w_per_line >= 18 AND
-w_per_para >= 22`` — it clears all known good rewrites in calibration and was
-validated against every flagged module in the corpus scan (2026-04-25).
 """
 from __future__ import annotations
 
 import math
 import re
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
-# Threshold tuning notes:
-#   words: 1500 lets short beginner modules through (e.g. ai/foundations/1.1
-#          rewrites are 2,500–3,600 words). Modules under 1,500 prose words
-#          either don't have enough subject matter to teach or got compressed
-#          past the floor — both cases warrant human review.
-#   w_per_line: 18 separates the pad-bomb regime (7-13) from real prose (20+).
-#          Sits comfortably above the worst v4-Gemini-expansion module (13.6).
-#   w_per_para: 22 separates v3 punchy-bullets (8-17) from teaching prose
-#          (35-80). Pre-existing good modules average ~30-50.
-WORDS_FLOOR = 1500
-W_PER_LINE_FLOOR = 18.0
-W_PER_PARA_FLOOR = 22.0
-
-# Lower attention bounds (legacy ``*_REWRITE`` names kept for callers). Below
-# these the shape is clearly choppy or thin; anchored against the corpus' worst
-# pad-bomb (9.1 GPU at w/ln 7.5, wpp 10.9) and punchy-bullets (1.1 v3 at w/ln
-# 7.5, wpp 15.6). Diagnostic only: ``attention()`` flags them, nothing rejects.
+# Lower attention bounds (legacy ``*_REWRITE`` names; ``attention()`` is their
+# only reader). Below these the shape is clearly choppy or thin; anchored
+# against the corpus' worst pad-bomb (9.1 GPU at w/ln 7.5, wpp 10.9) and
+# punchy-bullets (1.1 v3 at w/ln 7.5, wpp 15.6). Diagnostic only:
+# ``attention()`` flags them, nothing rejects.
 WORDS_FLOOR_REWRITE = 1000
 W_PER_LINE_FLOOR_REWRITE = 12.0
 W_PER_PARA_FLOOR_REWRITE = 18.0
@@ -70,19 +51,6 @@ W_PER_PARA_FLOOR_REWRITE = 18.0
 WORDS_CEILING_ATTENTION = 9000
 W_PER_PARA_CEILING_ATTENTION = 120.0
 
-
-class DensityVerdict(str, Enum):
-    """Descriptive density bands for the triage scan's report (#388 stage [1]).
-
-    A label, not an action: ``route_one`` and ``merge_one`` no longer route,
-    retry or reject on a band (#3744). Only the triage scan
-    (``pipeline.cmd_triage``) still reads it. Use
-    :meth:`DensityMetrics.attention` for the both-tails reviewer flags.
-    """
-
-    PASS = "pass"
-    REVIEW = "review"
-    REWRITE = "rewrite"
 
 _FRONTMATTER_FENCE = re.compile(r"^---\s*\n.*?\n---\s*\n", flags=re.DOTALL)
 _FENCED_CODE = re.compile(r"```.*?```", flags=re.DOTALL)
@@ -112,29 +80,6 @@ class DensityMetrics:
     prose_paragraphs: int
     w_per_line: float
     w_per_para: float
-
-    def classify(self) -> DensityVerdict:
-        """Three-way verdict for #388 triage stage.
-
-        Order of checks matters: REWRITE wins over REVIEW because the
-        rewrite floors are strictly looser than the PASS floors. A
-        module with ``wpp == 10`` simultaneously fails the PASS floor
-        (22) and the rewrite floor (18); the REWRITE verdict is more
-        actionable so we return that.
-        """
-        if (
-            self.prose_words < WORDS_FLOOR_REWRITE
-            or self.w_per_line < W_PER_LINE_FLOOR_REWRITE
-            or self.w_per_para < W_PER_PARA_FLOOR_REWRITE
-        ):
-            return DensityVerdict.REWRITE
-        if (
-            self.prose_words >= WORDS_FLOOR
-            and self.w_per_line >= W_PER_LINE_FLOOR
-            and self.w_per_para >= W_PER_PARA_FLOOR
-        ):
-            return DensityVerdict.PASS
-        return DensityVerdict.REVIEW
 
     def attention(self) -> list[str]:
         """Reviewer-attention flags for BOTH tails. Diagnostic only.
