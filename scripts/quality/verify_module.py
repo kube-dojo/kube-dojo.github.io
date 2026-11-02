@@ -1703,6 +1703,25 @@ def gate_results(
     return gates
 
 
+# Reviewer-attention tails only (#3744). Measured 2026-11-02 over 841 English modules with outcomes:
+# words per outcome min 276, p2 714, median 1128, p98 1622, max 2261 (shaped by the old 5000 floor).
+# The bounds sit outside p2/p98 so only extremes are flagged. A flag never gates, tiers or rewards.
+ATTENTION_SHORT_WORDS_PER_OUTCOME = 400
+ATTENTION_LONG_WORDS_PER_OUTCOME = 1800
+
+
+def length_attention(metrics: dict[str, float | int], structure: dict[str, object]) -> dict[str, object]:
+    """Flag unusually short or long pages for their outcomes, for a reviewer to look at."""
+    outcomes = int(structure["learning_outcome_count"])
+    per_outcome = round(int(metrics["body_words"]) / outcomes) if outcomes else None
+    flag = None
+    if per_outcome is not None and per_outcome < ATTENTION_SHORT_WORDS_PER_OUTCOME:
+        flag = "unusually_short_for_outcomes"
+    elif per_outcome is not None and per_outcome > ATTENTION_LONG_WORDS_PER_OUTCOME:
+        flag = "unusually_long_for_outcomes"
+    return {"words_per_outcome": per_outcome, "flag": flag, "effect": "reviewer attention only; never rejects or rewards"}
+
+
 def classify_tier(gates: dict[str, bool | None]) -> tuple[str, list[str]]:
     """Route by blocking defects only; length, density and counts never move a tier."""
     failed = [key for key, value in gates.items() if value is False]
@@ -1775,6 +1794,7 @@ def verify(path: str | Path, skip_source_check: bool = False, max_workers: int =
         "diagnostics": diagnostics,
         "gates": gates,
         "declared_body_budget": budget,
+        "length_attention": length_attention(metrics, structure),
         "passed": passed,
         "frontmatter": frontmatter,
     }

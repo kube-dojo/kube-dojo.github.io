@@ -359,6 +359,9 @@ def test_padding_cannot_gain_acceptance_signals_from_length(tmp_path: Path) -> N
 
     # Padding adds thousands of reported words but moves no gate, verdict or tier.
     assert padded["metrics"]["body_words"] > 10 * short["metrics"]["body_words"]
+    # Both length tails are flagged for a reviewer, and neither flag moves the verdict.
+    assert short["length_attention"]["flag"] == "unusually_short_for_outcomes"
+    assert padded["length_attention"]["flag"] == "unusually_long_for_outcomes"
     assert (padded["gates"], padded["passed"], padded["tier"]) == (short["gates"], short["passed"], short["tier"])
     # An uncovered outcome is rejected at any length, and padding does not change that.
     for result in (uncovered_short, uncovered_padded):

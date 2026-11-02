@@ -196,7 +196,8 @@ def agy_draft_prompt(*, slug: str, ch_num: int, cap_words: int,
         ```
 
         Write a tight, evidence-backed first draft that captures every
-        scene from the contract without padding or repetition; Codex
+        scene from the contract without padding or repetition, and
+        explains every term and reason the reader needs; Codex
         will extend the technical and biographical layers from the same
         contract where the anchors support it.
 
