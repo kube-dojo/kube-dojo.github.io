@@ -121,11 +121,11 @@ The expansion budget is for the layers the contract's Prose Capacity Plan named:
 
 If a chapter cannot honestly reach the cap, write the natural chapter length and document why. The target is quality, not padding.
 
-The executable verifier's 5,000-word default and any conflict with a chapter cap remain unresolved under #2274. This workflow does not bypass or alter a runtime gate; reconcile the mismatch through separately reviewed policy and tooling work.
+The verifier's length diagnostics do not reject a chapter by themselves. Evidence boundaries and separately approved caps still apply.
 
 ### 5a. Editorial pass
 
-Before independent review, an Opus 5.5 editor reads a run of chapters together and reads the house style sheet below. It first marks cuts for padding, repetition, duplication across chapters and off-topic background, citing the exact passage and reason. It then requests additions only where explanation is genuinely missing. It marks requests and never rewrites: Claude-authored prose would make the material mixed-family and ineligible for Opus review. Terra executes the requests. Refer scope and taste questions to the human editor as short decisions with options.
+Before independent review, an Opus 5.5 editor reads a run of chapters together and reads the house style sheet below. It first marks cuts for padding, repetition, duplication across chapters and off-topic background. Each cut identifies the passage and explains why the learner loses nothing a stated outcome needs; never cut the only explanation, example or step for an outcome. Each requested addition identifies the outcome it serves. The editor marks requests and never rewrites: Claude-authored prose would make the material mixed-family and ineligible for Opus review. Terra executes the requests. Refer scope and taste questions to the human editor as short decisions with options.
 
 For each requested addition, Haiku 5.5 scouts candidate sources with a quote, locator and date. Sol confirms only the shortlist and records it in the contract or spine. Drop and record an addition with no confirmed source. Haiku writes neither contract, spine nor prose. The strict source rule still applies to Terra's revision; Sol checks the revised prose as author QA before review.
 
@@ -151,10 +151,12 @@ A separate fresh Opus 5.5 context, outside all families that authored the review
 - narrative coherence scene-to-scene
 - pacing, sentence variety, paragraph rhythm
 - whether the chapter transitions and part-level arc work
-- named bloat findings: padding, repetition, duplication across chapters, and off-topic background
-- under-explanation as a secondary finding where necessary explanation is missing
+- **BLOAT**: padding, repetition, duplication across chapters, and off-topic background
+- **UNDER-EXPLANATION**: a term used before explanation, a skipped reasoning step, a list missing the why, a missing worked example for a key skill, or an abrupt unexplained transition
 - cap discipline
 - book-level continuity
+
+BLOAT and UNDER-EXPLANATION are equally blocking: either requires `NEEDS_CHANGES`. Length diagnostics flag chapters unusually long or short for their outcomes for reviewer attention; neither flag rejects a chapter.
 
 Record its identity, exact prose/source bindings, findings and verdict separately from source fidelity. Neither context receives the other's findings or verdict before its own independent verdict. They are separate judgments, not different reviewer families; do not describe them as three-family review. Preserve prior failed or incomplete reviews and existing spent invocation counts across revisions.
 

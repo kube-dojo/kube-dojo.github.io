@@ -106,15 +106,19 @@ Use exact candidate-text evidence for coverage judgments. Counted headings,
 keywords, links, words or generated output cannot establish adequate coverage.
 Concise material passes when nothing the learner needs is missing; long material
 with padding does not. Unsupported or untaught outcomes must not pass.
-Length/density/template counts are diagnostics, not a default quota.
+Length diagnostics flag pages unusually long or short for their outcomes for
+reviewer attention; neither flag rejects a page. Density and template counts
+are diagnostics, not a default quota.
 Explicit per-page workload constraints need their rationale and scope recorded.
 Do not pad, manufacture numbered facts or repeat prose to satisfy a metric.
 
 The canonical module rubric remains all eight D1–D8 scores >=4 and total>=33/40;
 applicable lab review remains all five L1–L5 scores>=4 and total>=21/25.
-Module rubric findings name padding, repetition, duplication across pages and
-off-topic background as bloat; under-explanation is a secondary finding when
-needed explanation is missing. Support each finding with the exact passage and reason.
+Module rubric findings treat **BLOAT** (padding, repetition, duplication across
+pages and off-topic background) and **UNDER-EXPLANATION** (a term used before
+explanation, a skipped reasoning step, a list missing the why, a missing worked
+example for a key skill, or an abrupt unexplained transition) as equally blocking.
+Either requires `NEEDS_CHANGES`. Support each finding with the exact passage and reason.
 Scalar-only legacy review is insufficient for these judgments. Evidence-backed
 editorial approval is provisional until required claim/source checks complete.
 Real examples need verified versions, expected/observed labels and applicable
@@ -128,9 +132,11 @@ acceptance. Book-specific source/editor/cap rules retain their separate scope.
 Before independent module review, an Opus 5.5 editor reads a module track together
 and the [house style sheet](research/ai-history/TEAM_WORKFLOW.md#house-style-sheet).
 It first marks cuts for padding, repetition, duplication across pages and off-topic
-background with the exact passage and reason, then requests additions where
-explanation is genuinely missing. It never rewrites: Claude-authored prose would
-make the material mixed-family and ineligible for Opus review. Terra executes the
+background. Each cut identifies the passage and explains why the learner loses
+nothing a stated outcome needs; never cut the only explanation, example or step
+for an outcome. Each requested addition identifies the outcome it serves. It
+never rewrites: Claude-authored prose would make the material mixed-family and
+ineligible for Opus review. Terra executes the
 requests; scope and taste questions go to the human editor as short decisions with
 options. Human spot-read agree/disagree notes inform the linked house style sheet.
 
