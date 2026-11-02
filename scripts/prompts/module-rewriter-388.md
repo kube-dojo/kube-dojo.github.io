@@ -16,7 +16,7 @@ Cut padding and repetition, AND explain every term, step and reason the learner 
 
 ## NO SOURCE H1
 
-Starlight renders the page H1 from frontmatter `title:`. Do NOT write a `# Module X.Y: <Title>` heading anywhere in the body. The first heading after the frontmatter blockquote must be `## What You'll Be Able to Do` (or whatever the section's house standard is). A source `# ` line after frontmatter is a hard verifier failure.
+Starlight renders the page H1 from frontmatter `title:`. Do NOT write a `# Module X.Y: <Title>` heading anywhere in the body. The first heading after the frontmatter blockquote must be `## What You'll Be Able to Do` (or whatever the section's house standard is). A source `# ` line right after the frontmatter is flagged by the verifier (`gate_no_source_h1` looks at the first content line); one later in the body is still not allowed.
 
 ## PARAGRAPH STYLE
 
@@ -60,7 +60,7 @@ Do NOT rely on shell aliases in runnable Bash examples. Specifically: do NOT wri
 
 ## Image-binary compatibility (lab-runnability contract)
 
-Every `kubectl exec POD -- BIN` you write must satisfy BIN ∈ POD's image binary set. The verifier (`scripts/quality/verify_module.py` → `lab_runnability_metrics`) enforces this deterministically with an allowlist; the reviewer (LAB RUNNABILITY dimension (a)) checks it with citation.
+Every `kubectl exec POD -- BIN` you write must satisfy BIN ∈ POD's image binary set. The verifier (`scripts/quality/verify_module.py` → `lab_runnability_metrics`) checks this deterministically against an allowlist of known images (it skips an image it does not know, so the rule binds regardless); the reviewer (LAB RUNNABILITY dimension (a)) checks it with citation.
 
 Common image cheat-sheet (verified against Docker Hub overview pages):
 
@@ -88,14 +88,14 @@ For practice-question / mock-exam modules, preserve exam-style MCQ structure. Ea
 The verifier (`scripts/quality/verify_module.py`, `gate_results`) computes these **blocking gate keys**. Its output, not this summary, decides whether each one passed. Several gates are narrow heuristics, so a pass does not show that this brief's rules were followed, and a rule in this brief binds even where its gate would not fire. All gates must pass before commit:
 
 1. `gate_no_source_h1`: see NO SOURCE H1 above.
-2. `structure_sections_present`, `structure_order_correct`: the required sections and their order from `module-writer.md`.
+2. `structure_sections_present`, `structure_order_correct`: section presence and order checks. The verifier's own heading list decides them, so read its output for these two; `module-writer.md` is the authoring rule.
 3. `structure_quiz_answers_have_details`: every quiz item carries a `<details>` answer block. The verifier checks presence only; the answer must still explain why, not just name the fix.
 4. `sources_all_reachable`: no link under the Sources heading is a 404 or fetch failure (not computed under `--skip-source-check`; a page with no links passes this gate).
 5. `anti_leak`: leaked tokens, emojis and the number 47.
-6. `runnable_no_kubectl_alias`: the alias rule under RUNNABILITY below.
-7. `lab_image_binary_match`: the image-binary compatibility section below.
-8. `anti_fabrication_no_unsourced_anecdote`: the unsourced-anecdote rule below.
-9. `practice_mcq_four_options_with_distractors`: the practice-question rule below (practice-question modules only).
+6. `runnable_no_kubectl_alias`: the alias rule under RUNNABILITY.
+7. `lab_image_binary_match`: the image-binary compatibility section.
+8. `anti_fabrication_no_unsourced_anecdote`: the unsourced-anecdote rule.
+9. `practice_mcq_four_options_with_distractors`: the practice-question rule (practice-question modules only).
 10. `outcomes_aligned`: every Learning Outcome bullet must be taught in a core section and assessed by a quiz item or lab task. The verifier checks this by key-term overlap, so it is a heuristic and not proof that the outcome is taught.
 
 Content rules the verifier does not check still bind: `## Sources` is the last H2 before `## Next Module`; every source is primary/vendor documentation (bare `- https://...` or `- [title](https://...)`) and supports the claims it is cited for, with no minimum count; K8s 1.35+ for exam-pinned cert modules (see `module-writer.md`); runnable commands; explanatory quiz answers.
