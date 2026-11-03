@@ -225,6 +225,82 @@ def test_committable_seed_excludes_raw_bytes_and_navigation_but_retains_full_mai
     assert "requires retained capture" in builder.check(root, seed_path, receipt)["raw_byte_verification"]
 
 
+@pytest.mark.parametrize("primary", ["internal", "external"])
+def test_mixed_claim_builds_seed_packet_and_unchanged_receipt(external_bundle, primary):
+    bundle, captures_dir, captured = external_bundle
+    root, seed_path, packet_path, verdicts, proposals = bundle
+    proposals["claims"][0].update(kind="mixed", candidate_sources=[
+        {"path": PAGE}, {"capture": str(root / "capture.json")},
+    ])
+    data = builder.seed(root, PAGE, proposals, captures_dir)
+    seed_path.write_text(json.dumps(data))
+    packet = builder.packet(root, seed_path)
+    packet_path.write_text(json.dumps(packet))
+    blob = builder.git(root, "rev-parse", f"HEAD:{PAGE}").decode().strip()
+    refs = [f"git-object://{blob}", captured["retrieval_uri"]]
+    assert data["claims"][0]["kind"] == "mixed"
+    assert data["claims"][0]["candidate_source_refs"] == refs
+    assert packet["claims"] == data["claims"]
+    assert packet["sources"][refs[0]]["text"] == (root / PAGE).read_text()
+    assert data["sources"][refs[0]]["snapshot_digest"] == builder.digest((root / PAGE).read_bytes())
+    assert data["sources"][refs[1]] == builder.compact_source(captured)
+    assert builder.read_json(builder.capture_path(captures_dir, data["sources"][refs[1]])) == captured
+    verdicts.update(seed_digest=packet["seed_digest"], packet_digest=builder.digest(packet_path.read_bytes()))
+    selected = [{
+        "retrieval_uri": uri, "snapshot_digest": packet["sources"][uri]["snapshot_digest"],
+        "quote": "This hub has one module.", "locator": "source text",
+    } for uri in refs]
+    if primary == "external":
+        selected.reverse()
+    verdicts["claims"][0].update(source=selected[0], additional_sources=selected[1:])
+    receipt = builder.receipt(root, seed_path, packet_path, verdicts, captures_dir)
+    assert receipt["claims"] == verdicts["claims"]
+    assert receipt["schema"] == "kubedojo.source_acceptance.v1"
+    assert builder.check(root, seed_path, receipt)["accepted"] is True
+
+
+@pytest.mark.parametrize("kind", ["internal", "external"])
+def test_mixed_claim_requires_both_source_kinds_in_seed_and_packet(external_bundle, kind):
+    bundle, captures_dir, _ = external_bundle
+    root, seed_path, _, _, proposals = bundle
+    candidate = {"path": PAGE} if kind == "internal" else {"capture": str(root / "capture.json")}
+    proposals["claims"][0].update(kind="mixed", candidate_sources=[candidate])
+    with pytest.raises(ValueError, match="mixed claim requires both"):
+        builder.seed(root, PAGE, proposals, captures_dir)
+    proposals["claims"][0]["kind"] = kind
+    data = builder.seed(root, PAGE, proposals, captures_dir)
+    data["claims"][0]["kind"] = "mixed"
+    seed_path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="mixed claim requires both"):
+        builder.packet(root, seed_path)
+
+
+@pytest.mark.parametrize("candidate", [None, {}, {"url": "https://kubernetes.io/docs/"},
+                                      {"path": PAGE, "capture": "capture.json"},
+                                      {"path": PAGE, "extra": True}])
+def test_mixed_claim_refuses_other_candidate_shapes(bundle, candidate):
+    root, _, _, _, proposals = bundle
+    proposals["claims"][0].update(kind="mixed", candidate_sources=[candidate])
+    with pytest.raises(ValueError, match="candidate must contain exactly"):
+        builder.seed(root, PAGE, proposals)
+
+
+@pytest.mark.parametrize("fixture,wrong_kind", [("bundle", "external"), ("external_bundle", "internal")])
+def test_legacy_claim_kind_still_validates_and_refuses_mismatched_sources(request, fixture, wrong_kind):
+    value = request.getfixturevalue(fixture)
+    bundle = value[0] if fixture == "external_bundle" else value
+    root, seed_path, packet_path, _, proposals = bundle
+    assert builder.packet(root, seed_path) == builder.read_json(packet_path)
+    data = builder.read_json(seed_path)
+    data["claims"][0]["kind"] = wrong_kind
+    seed_path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="source kind mismatch"):
+        builder.packet(root, seed_path)
+    proposals["claims"][0]["kind"] = wrong_kind
+    with pytest.raises(ValueError, match="source kind mismatch"):
+        builder.seed(root, PAGE, proposals)
+
+
 @pytest.mark.parametrize("defect", ["raw_bytes", "text", "status", "truncated", "missing_capture", "missing_directory"])
 def test_receipt_reverifies_retained_capture_before_accepting(external_bundle, defect, capsys):
     bundle, captures_dir, captured = external_bundle
