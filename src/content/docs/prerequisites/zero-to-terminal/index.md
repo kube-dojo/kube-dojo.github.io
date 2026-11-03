@@ -87,7 +87,7 @@ On the **suggested prerequisites route**, continue to Cloud Native 101 and then 
 
 **Default next step:** [Cloud Native 101](../cloud-native-101/module-1.1-what-are-containers/) — containers, Docker, and the cloud-native ecosystem.
 
-**Optional fork:** [Linux](../../linux/) if you want deeper systems knowledge before operations-heavy work. Linux is not required before Cloud Native 101; you can pick it up anytime.
+**Optional fork:** [Linux](../../linux/) if you want deeper systems knowledge. Linux is not required before Cloud Native 101; you can pick it up anytime.
 
 ```text
                Zero to Terminal
