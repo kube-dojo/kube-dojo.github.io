@@ -22,4 +22,4 @@ We begin with containers and how they isolate processes. We then examine buildin
 
 Start with a working terminal and a machine where you can install Docker for module 1.2. For module 1.3's hands-on exercise, complete [Your First Cluster](../kubernetes-basics/module-1.1-first-cluster/) if needed and confirm the selected cluster is dedicated and disposable; then continue to [Kubernetes Basics](../kubernetes-basics/) after Cloud Native 101.
 
-These ranges are the Time to Complete values from the five module headers. Their arithmetic gives an aggregate range of **450–600 minutes (about 7 hours 30 minutes–10 hours)**; individual setup, reading, and practice time will vary.
+These ranges are the Time to Complete values from the five module headers. Their arithmetic gives an aggregate range of **450–600 minutes (about 7 hours 30 minutes–10 hours)**.
