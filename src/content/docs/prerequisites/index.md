@@ -15,7 +15,7 @@ This hub is the front door to KubeDojo. It covers the terminal, containers, Kube
 - learners who want a structured route into cloud-native systems
 - people who need enough fundamentals before choosing Linux, Kubernetes, cloud, platform, AI literacy, or AI/ML depth
 
-## Do Not Skip This If
+## Start Here If
 
 - you are still shaky on the terminal, files, SSH, or software installation
 - Kubernetes terminology still feels abstract
@@ -23,14 +23,14 @@ This hub is the front door to KubeDojo. It covers the terminal, containers, Kube
 
 This layer gives later tracks a shared foundation; use it when these topics are unfamiliar.
 
-> **Optional first-terminal preview:** You can preview the existing [terminal opening and prompt guide](zero-to-terminal/module-0.2-what-is-a-terminal/#opening-the-terminal-and-reading-the-prompt) and [first-terminal-session exercise](zero-to-terminal/module-0.2-what-is-a-terminal/#hands-on-exercise-your-first-terminal-session). Then start [Zero to Terminal](zero-to-terminal/) at [Module 0.1](zero-to-terminal/module-0.1-what-is-a-computer/) and follow it in order; the preview does not replace its modules. Before exercises, read the section's setup and each module's platform and cost notes where applicable.
+> **Optional first-terminal preview:** You can preview the existing [terminal opening and prompt guide](zero-to-terminal/module-0.2-what-is-a-terminal/#opening-the-terminal-and-reading-the-prompt) and [first-terminal-session exercise](zero-to-terminal/module-0.2-what-is-a-terminal/#hands-on-exercise-your-first-terminal-session). Then start [Zero to Terminal](zero-to-terminal/) at [Module 0.1](zero-to-terminal/module-0.1-what-is-a-computer/) and follow it in order; the preview does not replace its modules. Before exercises, read the [Zero to Terminal setup guidance](zero-to-terminal/#who-is-this-track-for) and each module's platform and cost notes where applicable.
 
 ---
 
 ## Core Sections
 
 ### [Zero to Terminal](zero-to-terminal/) — 11 modules
-For absolute beginners. From "what is a computer?" to deploying your first server from the command line.
+For absolute beginners. Learn computer and terminal fundamentals, then serve a website from the command line locally or on an authorized cloud VM.
 
 | Module | Topic |
 |--------|-------|
@@ -131,57 +131,15 @@ Modern DevOps
 
 Use [Git Deep Dive](git-deep-dive/) after you are comfortable with basic Git from [Zero to Terminal](zero-to-terminal/). It is not required before Cloud Native 101 or Kubernetes Basics; this curriculum recommends it before Modern DevOps and its IaC, GitOps, and CI/CD topics.
 
-For this curriculum, the suggested sequence is:
-
-```text
-0.6 Git Basics
-   |
-Git Deep Dive
-   |
-Modern DevOps / IaC / GitOps / CI-CD
-```
-
-## Recommended Git Preparation for Modern DevOps
-
-Start with [Git Basics](zero-to-terminal/module-0.6-git-basics/), then use [Git Deep Dive](git-deep-dive/) to practice repository history, collaboration, and recovery before continuing to [Modern DevOps](modern-devops/).
-
-## Common Next Routes
+## Where to go next
 
 - [Linux](../linux/) for deeper systems knowledge before operations-heavy work
 - [Kubernetes Certifications](../k8s/) for certification-oriented study
 - [Cloud](../cloud/) for provider-specific cloud foundations and managed Kubernetes topics
+- [On-Premises Kubernetes](../on-premises/) for running Kubernetes on your own hardware
 - [AI](../ai/) for beginner-oriented AI literacy and AI working habits
 - [AI/ML Engineering](../ai-ml-engineering/) for building AI systems, local models, or MLOps
-- [Modern DevOps](modern-devops/) after the recommended Git preparation above
 
 Before [Platform Engineering](../platform/), build comfort with Kubernetes, Linux troubleshooting, Git collaboration, and cloud-native vocabulary. Use its [entry checklist](../platform/#do-not-start-here-yet) to assess your readiness.
 
 Check each destination's entry requirements and choose the foundations that fit your goal. The full cloud-native route is a suggestion, not a requirement to complete all 44 modules before every path, including beginner AI.
-
----
-
-## Related Foundations
-
-These are not inside the `prerequisites/` section, but they are common next steps:
-
-| Path | Why It Matters |
-|------|----------------|
-| [Linux](../linux/) | Go deeper into processes, networking, storage, security, and operations |
-| [AI](../ai/) | Build practical AI literacy and AI working habits before advanced engineering depth |
-| [AI/ML Engineering](../ai-ml-engineering/) | Start the AI/ML track if your goal is LLMs, MLOps, or AI infrastructure |
-
----
-
-## After Prerequisites
-
-Ready to specialize? Choose your next track:
-
-| Goal | Next Step |
-|------|-----------|
-| Master Linux | [Linux](../linux/) |
-| Get certified | [Kubernetes Certifications](../k8s/) |
-| Learn cloud providers | [Cloud](../cloud/) |
-| Run Kubernetes on your own hardware | [On-Premises Kubernetes](../on-premises/) |
-| Go deeper into platform practices | [Platform Engineering](../platform/) |
-| Learn AI from zero | [AI](../ai/) |
-| Explore AI/ML systems | [AI/ML Engineering](../ai-ml-engineering/) |
