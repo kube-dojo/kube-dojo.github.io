@@ -127,6 +127,8 @@ Git Deep Dive
 Modern DevOps
 ```
 
+Before Modern DevOps, review Kubernetes Basics for deployments, Services, and manifests.
+
 Use [Git Deep Dive](git-deep-dive/) after you are comfortable with basic Git from [Zero to Terminal](zero-to-terminal/). It is not required before Cloud Native 101 or Kubernetes Basics; this curriculum recommends it before Modern DevOps and its IaC, GitOps, and CI/CD topics.
 
 ## Where to go next
