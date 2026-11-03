@@ -48,6 +48,13 @@ Capture through the existing fetcher before preparing the seed:
   --output docs/content-upgrade/reviews/kb-pods-capture.json
 ```
 
+Use `kind: "mixed"` when one claim needs both committed repository evidence and
+captured upstream support, such as sibling pages' `sidebar.order` values plus
+the Starlight documentation defining their meaning. Supply at least one
+`{"path": ...}` and one `{"capture": ...}` candidate. Each uses the same snapshot
+and capture checks as its respective source kind; the verifier cites its chosen
+`source` and any `additional_sources` in the existing verdict format.
+
 Capture uses `scripts.fetch_citation._fetch_once` and its text extractor. It
 retains the raw response bytes as base64, their SHA-256, extracted text, URL and
 retrieval date. The snapshot digest covers **raw response bytes**, not extracted

@@ -218,15 +218,18 @@ def seed(root: Path, page: str, proposals: dict, captures_dir: Path | None = Non
         require(type(start) is int and type(end) is int and 1 <= start <= end <= len(lines), "invalid claim span")
         quote = proposal["claim_text"]
         require(isinstance(quote, str) and bool(quote.strip()) and quote in "\n".join(lines[start - 1:end]), "claim text does not match its page span")
-        require(proposal["kind"] in {"internal", "external"}, "claim kind must be internal or external")
+        require(proposal["kind"] in {"internal", "external", "mixed"}, "claim kind must be internal, external or mixed")
         refs = []
         for candidate in proposal["candidate_sources"]:
-            if proposal["kind"] == "internal":
+            require(isinstance(candidate, dict) and set(candidate) in ({"path"}, {"capture"}), "candidate must contain exactly path or capture")
+            if "path" in candidate:
+                require(proposal["kind"] in {"internal", "mixed"}, "source kind mismatch")
                 path = repo_path(candidate["path"])
                 source_blob = git(root, "rev-parse", f"HEAD:{path}").decode().strip()
                 source_raw = git(root, "cat-file", "blob", source_blob)
                 source = {"retrieval_uri": f"git-object://{source_blob}", "snapshot_digest": digest(source_raw), "path": path}
             else:
+                require(proposal["kind"] in {"external", "mixed"}, "source kind mismatch")
                 require(captures_dir is not None, "external sources require --captures-dir outside the committed seed")
                 captured = read_json(Path(candidate["capture"]))
                 source = compact_source(captured)
@@ -241,6 +244,8 @@ def seed(root: Path, page: str, proposals: dict, captures_dir: Path | None = Non
             sources[key] = source
             refs.append(key)
         require(bool(refs), "claim has no candidate sources")
+        if proposal["kind"] == "mixed":
+            require(any(ref.startswith("git-object://") for ref in refs) and any(ref.startswith("https://") for ref in refs), "mixed claim requires both internal and external sources")
         claims.append({"claim_id": cid, "claim_text": quote, "line_start": start, "line_end": end, "kind": proposal["kind"], "candidate_source_refs": refs})
     ids = [c["claim_id"] for c in claims]
     require(bool(ids) and len(ids) == len(set(ids)), "empty or duplicate claim ids")
@@ -279,10 +284,13 @@ def packet(root: Path, seed_path: Path) -> dict:
         lines = raw.decode().splitlines()
         require(type(start) is int and type(end) is int and 1 <= start <= end <= len(lines), "invalid claim span")
         require(bool(claim["claim_text"].strip()) and claim["claim_text"] in "\n".join(lines[start - 1:end]), "claim text does not match page span")
-        require(claim["kind"] in {"internal", "external"}, "invalid claim kind")
+        require(claim["kind"] in {"internal", "external", "mixed"}, "invalid claim kind")
         refs = claim["candidate_source_refs"]
         require(bool(refs) and all(ref in sources for ref in refs), "missing candidate source")
-        require(all(ref.startswith("git-object://" if claim["kind"] == "internal" else "https://") for ref in refs), "source kind mismatch")
+        prefixes = {"internal": ("git-object://",), "external": ("https://",), "mixed": ("git-object://", "https://")}
+        require(all(ref.startswith(prefixes[claim["kind"]]) for ref in refs), "source kind mismatch")
+        if claim["kind"] == "mixed":
+            require(any(ref.startswith("git-object://") for ref in refs) and any(ref.startswith("https://") for ref in refs), "mixed claim requires both internal and external sources")
     return {
         "schema": "kubedojo.source_packet.v1", "page": data["module_path"],
         "page_digest": digest(raw), "seed_digest": digest(seed_raw),
