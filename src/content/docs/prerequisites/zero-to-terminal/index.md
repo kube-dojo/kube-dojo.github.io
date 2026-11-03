@@ -9,19 +9,11 @@ sidebar:
 
 ## Who Is This Track For?
 
-This track is for **absolute beginners**. No IT or coding background is assumed; use each module's platform guidance and setup notes as you go.
+This track is for **absolute beginners**. Module 0.1 needs no technical experience. Before exercises, read each module's platform and cost notes where applicable.
 
-You will need a browser for the interactive labs and website checks, and a terminal appropriate for your operating system. Modules 0.3–0.11 use Unix-style commands. On Windows, set up and open a WSL Ubuntu shell for them; [Module 0.2](module-0.2-what-is-a-terminal/) introduces WSL and also offers a PowerShell option for that module. See [Microsoft's WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install) for setup.
+Module 0.11 uses a browser to check the website. Modules 0.3–0.11 use Unix-style commands. On Windows, use a Linux shell such as WSL or a lab shell where the modules suggest one; [Module 0.2](module-0.2-what-is-a-terminal/) introduces WSL and also offers a PowerShell option for that module. See [Microsoft's WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install) for setup.
 
-The [capstone](module-0.11-your-first-server/) offers two paths. The local path needs Docker Engine, which runs containers, already configured on a computer you are allowed to use, such as your own laptop. Module 0.11 explains how to check that Docker is connected to your local machine and that the server version is at least 28.0.0. The cloud path needs an authorized cloud account and a temporary cloud computer you can delete afterward; provider steps and billing may apply. The track does not set these up for you. If neither environment is available, read the examples without starting resources.
-
-Maybe you're:
-- A student curious about technology
-- Someone switching careers into tech
-- A non-technical person who wants to understand what developers do
-- Someone who's been told "just open a terminal" and felt lost
-
-**You are welcome here.** Every expert was once a beginner.
+The [capstone](module-0.11-your-first-server/) offers two paths. The local path needs a preconfigured Docker Engine on a computer you are authorized to use. Module 0.11 explains how to check that Docker is connected to your local machine and that the server version is at least 28.0.0. The cloud path needs an authorized disposable VM, instructor-provided or created through a provider account; account steps and billing may apply. The track does not set these up for you. If neither environment is available, read the examples without starting resources.
 
 ---
 
@@ -36,7 +28,7 @@ By the end of this track, you'll be able to:
 - Know what "the cloud" actually means (spoiler: it's not magic)
 - **Use terminal commands to serve a website and check it in a browser**: locally on loopback, or on an authorized cloud VM for a public test
 
-This track leads into the main prerequisites route — **Cloud Native 101** and then **Kubernetes Basics** — with the **Linux** track as an optional systems-internals fork you can take anytime.
+This track leads into the main prerequisites route — **Cloud Native 101** and then **Kubernetes Basics** — with **Linux** as an optional systems fork you can pick up anytime.
 
 ### Optional first-terminal preview
 
@@ -55,11 +47,10 @@ Several modules use a **restaurant kitchen** analogy to introduce these terms:
 | Disk/SSD | The pantry (long-term storage) |
 | Operating System | The restaurant manager |
 | Programs | Recipes |
-| Terminal | A way to pass written requests to the kitchen |
 | Server | A restaurant kitchen (handles requests) |
 | Cloud | Renting a commercial kitchen instead of building your own |
 
-Use the kitchen table as an optional orientation aid, not a literal model. A terminal presents a text interface; a shell interprets commands, and permissions control what they can do. CPUs can have many cores, not just one chef. A server may be a program serving requests or the computer running it. Cloud services can be public or private, and renting a kitchen does not capture that distinction. Disk storage can outlast a power-off, but can still fail or be lost: keep backups of important data. The technical explanations, platform notes, and exercises give the details; skip the analogy if it obscures them.
+The kitchen analogy is not a literal model. The terminal application displays text and accepts keyboard input; a shell reads your command line and starts commands. File permissions govern access to files. CPUs can have many cores, not just one chef. A server may be a program serving requests or the computer running it. Cloud services can be public or private, and renting a kitchen does not capture that distinction. Disk storage can outlast a power-off, but can still fail or be lost: keep backups of important data. The technical explanations, platform notes, and exercises give the details.
 
 ---
 
@@ -79,7 +70,7 @@ Use the kitchen table as an optional orientation aid, not a literal model. A ter
 | 0.10 | [What is the Cloud?](module-0.10-what-is-the-cloud/) | 80–100 min | Cloud computing, AWS/Azure/GCP, where K8s fits |
 | 0.11 | [Your First Server -- Putting It All Together](module-0.11-your-first-server/) | 90–120 min | Capstone: serve and check a small website |
 
-These are planning estimates copied from the eleven module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **940–1220 minutes (about 15 hours 40 minutes–20 hours 20 minutes)**; individual setup, reading, and practice time will vary.
+These ranges are the Time to Complete values from the eleven module headers. Their arithmetic gives an aggregate range of **940–1220 minutes (about 15 hours 40 minutes–20 hours 20 minutes)**.
 
 ---
 
@@ -87,19 +78,16 @@ These are planning estimates copied from the eleven module headers, not measured
 
 1. **Follow the suggested order.** Later exercises combine earlier skills, although some introductions can stand alone.
 2. **Do the exercises.** Read the explanation, try the task, and compare your result with the success criteria.
-3. **Go at your own pace.** Spend more time on a topic when you need it.
-4. **Re-read if needed.** Return to an explanation or example when it helps.
-5. **Take breaks.** Pause and return when you are ready.
 
 ---
 
 ## What's Next?
 
-On the **suggested prerequisites route**, continue straight into Cloud Native 101 and then [Kubernetes Basics](../kubernetes-basics/)—the linear spine from terminal skills to hands-on cluster work.
+On the **suggested prerequisites route**, continue to Cloud Native 101 and then [Kubernetes Basics](../kubernetes-basics/).
 
 **Default next step:** [Cloud Native 101](../cloud-native-101/module-1.1-what-are-containers/) — containers, Docker, and the cloud-native ecosystem.
 
-**Optional fork:** [Linux](../../linux/) if you want deeper operating-system knowledge before operations-heavy work. Linux is not required for the main route; you can return to it anytime.
+**Optional fork:** [Linux](../../linux/) if you want deeper systems knowledge before operations-heavy work. Linux is not required before Cloud Native 101; you can pick it up anytime.
 
 ```text
                Zero to Terminal
@@ -114,7 +102,3 @@ On the **suggested prerequisites route**, continue straight into Cloud Native 10
           
           Linux  (optional fork — anytime)
 ```
-
----
-
-> **Start with one action.** Try it, check what happened, and ask questions before moving on. You do not need to master the whole track in one sitting.
