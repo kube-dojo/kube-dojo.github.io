@@ -59,7 +59,7 @@ The shared API is more important than it first appears. When every team invents 
 
 That common vocabulary also lets platform teams build guardrails without taking over every application. They can define default resource limits, admission checks, network rules, image policies, and observability conventions around Kubernetes resources. Application teams still own their code and manifests, but the platform can enforce baseline safety at the API boundary. This is one reason Kubernetes became more than a scheduler: it is also a policy and integration point for operating many services consistently.
 
-> **Stop and think**: You have 200 containers running across 15 servers. One server's hard drive fails at 3 AM. In a manual setup, someone gets paged, SSHs in, figures out what was running on that server, and manually redeploys those containers elsewhere. With Kubernetes, node-health detection and eviction delays precede replacement of controller-managed Pods; the scheduler can place replacements on healthy nodes only when suitable capacity exists. Bare Pods have no controller to replace them.
+> **Stop and think**: You have 200 containers running across 15 servers. One server's hard drive fails at 3 AM. How might Kubernetes respond, and what conditions could delay recovery? Node-health detection and eviction delays precede replacement of controller-managed Pods; the scheduler can place replacements on healthy nodes only when suitable capacity exists. Bare Pods have no controller to replace them.
 
 That example also shows the trade-off. Kubernetes is not magic resilience sprinkled over any application; it is a control system with opinions, resource models, and failure modes of its own. You gain a powerful reconciler, but you also agree to learn its API, model your applications as Kubernetes resources, and operate or rent the platform that runs those resources. The right question is not "is Kubernetes powerful?" The right question is "does this workload need the kind of operational contract Kubernetes provides?"
 
@@ -160,8 +160,6 @@ flowchart TD
     API <==>|"Manages"| K2
     API <==>|"Manages"| K3
 ```
-
-> **Restaurant analogy**: Picture a busy restaurant kitchen. The control plane is the management team that coordinates work without cooking every dish itself. The API Server is the front desk where all orders go, the Scheduler is the floor manager deciding which kitchen station handles which order, etcd is the order log recording the truth, and the Controller Manager is the shift supervisor checking that the right number of staff are working.
 
 The API server is the front door to the cluster. Every create, update, delete, and read operation goes through it, whether the request came from `kubectl`, a CI pipeline, a controller, or a custom operator. This central entry point gives Kubernetes a consistent place to authenticate users, authorize requests, validate resource shape, and store accepted changes. When the API server is unreachable, the cluster becomes hard to manage even if many workloads are still serving traffic.
 
@@ -293,7 +291,7 @@ The relationship among these resources is easier to read as a stack. Users and o
 
 The first trap for beginners is treating Kubernetes objects as isolated commands. A better mental model is to ask what contract each object creates. A Pod creates execution. A Deployment creates continuity and rollout control. A Service creates stable access. When you can name the contract, you can choose the right object and diagnose which contract is broken.
 
-Labels and selectors are the quiet glue behind those contracts. A Service does not usually point to a fixed list of Pod names; it selects Pods whose labels match its selector. A Deployment template gives Pods labels so other resources can find them. This means a typo in a label can be just as damaging as a broken container image, because the Pods may be healthy while the Service has no matching endpoints. When traffic disappears after a rollout, always check the relationship between labels, selectors, and readiness before assuming the network is haunted.
+Labels and selectors are the quiet glue behind those contracts. A Service does not usually point to a fixed list of Pod names; it selects Pods whose labels match its selector. A Deployment template gives Pods labels so other resources can find them. This means a typo in a label can be just as damaging as a broken container image, because the Pods may be healthy while the Service has no matching endpoints, the network addresses of its backends. When traffic disappears after a rollout, check the relationship between labels, selectors, and readiness before assuming a network fault.
 
 Readiness is another concept worth previewing now because it protects users during change. A Pod can be running from the container runtime's point of view while the application inside it is not ready to accept traffic. Kubernetes lets applications expose readiness checks so Services route only to Pods that are prepared to serve. This is how a rolling update avoids sending customers to a process that has started but has not loaded configuration, warmed caches, or opened its listening socket yet.
 
@@ -351,9 +349,9 @@ Docker and Kubernetes are not enemies, and Kubernetes did not make container ima
 | Feature | Docker (single host) | Kubernetes |
 |---------|---------------------|------------|
 | Multi-node | No | Yes |
-| Auto-scaling | No | Yes |
+| Auto-scaling | No | Yes, once configured (HPA and metrics) |
 | Recovery | Restart policies on the same host | Container restarts plus controller-driven Pod replacement across nodes |
-| Rolling updates | Manual | Automatic |
+| Rolling updates | Manual | Automatic for Deployments using the rolling update strategy |
 | Load balancing | Manual | Built-in |
 | Service discovery | Compose service-name DNS on its network | Services and cluster DNS |
 | Secrets management | Compose can mount supplied secrets | Secret API objects and access controls |
@@ -496,6 +494,8 @@ kubectl version
 
 - [ ] **Evaluate cluster shape** by listing nodes and deciding whether this environment is a local learning cluster, a managed cloud cluster, or a self-managed cluster.
 
+Hint: Look for a table with one row per node and columns for name, status, and role.
+
 ```bash
 kubectl get nodes
 ```
@@ -508,6 +508,8 @@ Look at the node names, roles, versions, and count. A kind cluster often shows n
 
 - [ ] **Diagnose control plane and worker support components** by inspecting the system namespace and identifying at least one component related to networking, DNS, or node operation.
 
+Hint: Look for Pod names and their status in the table; compare the names with the components above.
+
 ```bash
 kubectl get pods -n kube-system
 ```
@@ -515,10 +517,12 @@ kubectl get pods -n kube-system
 <details>
 <summary>Solution guide</summary>
 
-Expect to see system Pods rather than your application Pods. Depending on the distribution, you may see CoreDNS, kube-proxy or another networking component, and node-level agents. This output reinforces that Kubernetes itself is a set of running components that support the API, networking, and workload execution.
+Expect to see system Pods rather than your application Pods. Depending on the distribution, you may see CoreDNS, kube-proxy or another networking component, and node-level agents. On kubeadm clusters, look for the API server, scheduler, controller manager and, when local, etcd as well; a managed control plane may not appear in this listing. This output reinforces that Kubernetes itself is a set of running components that support the API, networking, and workload execution.
 </details>
 
 - [ ] **Compare namespace boundaries** by listing namespaces and explaining why teams use them to organize resources without treating them as complete security isolation.
+
+Hint: Look for namespace names and status in the listing, then consider which policies a namespace needs for isolation.
 
 ```bash
 kubectl get namespaces
@@ -531,6 +535,10 @@ Most clusters include namespaces such as `default`, `kube-system`, and `kube-pub
 </details>
 
 - [ ] **Implement a simple Pod** and then predict what information Kubernetes stores about scheduling, image pulling, and container state.
+
+In a fresh Bash terminal, run `kubectl config get-contexts` and confirm that the current context points to your dedicated disposable cluster from Your First Cluster. The example cluster named `dojo-basics` uses `kind-dojo-basics`; verify the cluster itself, since a name alone does not prove ownership. Export the verified context name, for example `export KUBEDOJO_LAB_CONTEXT=kind-dojo-basics`, replacing it with your actual context name if different.
+
+If you see `Setup incomplete; stop`, the variable may be unset, the context check may have failed, or namespace creation may have failed. Check the earlier output, clean up any owned namespace as instructed below, then verify and export the context in a fresh terminal before retrying.
 
 ```bash
 # In a fresh Bash terminal, export KUBEDOJO_LAB_CONTEXT with the verified context name first.
@@ -550,10 +558,12 @@ kubectl get pods
 <details>
 <summary>Solution guide</summary>
 
-The Pod should move from Pending to Running if the image can be pulled and a node has capacity. If it does not, use the status as a clue rather than a failure of the exercise. Pending points toward scheduling or image preparation, while Running means kubelet and the container runtime completed the local work.
+Look for a table with a `hello` row and a STATUS column. The Pod should move from Pending to Running if the image can be pulled and a node has capacity. If it does not, use the status as a clue rather than a failure of the exercise. Pending points toward scheduling or image preparation, while Running means kubelet and the container runtime completed the local work.
 </details>
 
 - [ ] **Diagnose the Pod lifecycle** by describing the Pod and finding the node assignment, container state, and recent events.
+
+Hint: Look for the Node, State, and Events sections in the detailed output.
 
 ```bash
 kubectl describe pod hello
@@ -575,7 +585,7 @@ kubectl get pods
 <details>
 <summary>Solution guide</summary>
 
-The Pod should disappear and stay gone because you created a standalone Pod with no higher-level controller. This is the contrast with a Deployment: a Deployment would notice that its desired replica count was no longer satisfied and create a replacement. That difference is the practical meaning of desired state.
+The listing should no longer contain a `hello` row once deletion completes. The Pod should disappear and stay gone because you created a standalone Pod with no higher-level controller. This is the contrast with a Deployment: a Deployment would notice that its desired replica count was no longer satisfied and create a replacement. That difference is the practical meaning of desired state.
 </details>
 
 After completion or interruption, run this in the same terminal. It deletes only the namespace successfully created above. If cleanup fails, retain the printed context/namespace and retry after restoring access; do not switch contexts or broaden deletion. These guards establish scope, not cluster disposability.
@@ -585,6 +595,8 @@ if [ "${EXAMPLE_OWNED:-}" = yes ]; then
   command kubectl --context "$EXAMPLE_CONTEXT" delete namespace "$EXAMPLE_NS" --ignore-not-found=true --wait=true --timeout=120s && EXAMPLE_READY=no && EXAMPLE_OWNED=no
 fi
 ```
+
+After successful cleanup, close this terminal to remove the temporary `kubectl` shell function.
 
 **Success criteria**: By the end of the exercise, you should be able to connect command output to a specific Kubernetes concept instead of merely copying commands from a tutorial.
 
