@@ -1,0 +1,24 @@
+{
+  "page": "src/content/docs/prerequisites/kubernetes-basics/index.md",
+  "page_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+  "publication": {
+    "http": {
+      "url": "https://kube-dojo.github.io/prerequisites/kubernetes-basics/",
+      "status": 200,
+      "retrieved_at": "2026-11-03T14:20:21.927179+00:00",
+      "html_sha256": "c1232fb09a9644bef2b7c10b36b98bb610db688a5db39f026fa3b0103fa67592",
+      "checks": {
+        "Kubernetes Basics": true,
+        "module-1.1-first-cluster/": true,
+        "This section teaches Kubernetes concepts and practical skills for people who know containers and want to learn Kubernetes.": true,
+        "Your First Cluster": true
+      },
+      "deployment": {
+        "conclusion": "success",
+        "headSha": "d9ba7ffdf8bae84c4fa36831691f794ddcf284ce",
+        "status": "completed",
+        "url": "https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/41646897906"
+      }
+    }
+  }
+}
