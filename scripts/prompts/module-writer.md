@@ -29,7 +29,7 @@ TASK: Write a complete KubeDojo educational module.
 
 ### Quality Standard: 10/10 on the Dojo Scale
 
-**DEPTH AND LENGTH**: Set the module's substantive scope from its topic, measurable outcomes, exercise, assessment, and verified evidence. Line and word counts are planning signals for routing and review; they are not proof of factual support, learning quality, or acceptance. Do not add repeated prose, decorative structure, or unsupported facts to reach a number. If verified material cannot support the requested scope, report the shortfall in the requested output format instead of inventing detail or claiming completion. Visual aids supplement teaching; they do not replace explanation.
+**DEPTH AND LENGTH**: Set the module's substantive scope from its topic, measurable outcomes, exercise, assessment, and verified evidence. Line and word counts are planning signals for routing and review; they are not proof of factual support, learning quality, or acceptance. Cut padding and repetition, AND explain every term, step and reason the learner needs, with worked examples: bloat and under-explanation carry equal weight, a cut must never remove the only explanation, example or step for an outcome, and every addition must serve a stated outcome. Do not add repeated prose, decorative structure, or unsupported facts to reach a number. If verified material cannot support the requested scope, report the shortfall in the requested output format instead of inventing detail or claiming completion. Visual aids supplement teaching; they do not replace explanation.
 
 Before drafting, record prerequisites, intended outcomes, essential topics, source basis and justified exclusions in the page's researched coverage plan. Compare scope to primary references or the applicable blueprint and learner needs. Map outcomes to teaching, practice and assessment; activities may serve several outcomes. Use `docs/review-contract.md`; page-kind omissions require independent acceptance. Report missing research inputs instead of inventing a plan or sources.
 
@@ -37,7 +37,7 @@ The lead owns this non-published input: the existing per-page JSON in `docs/cita
 
 Shortfall output is plain text starting `EVIDENCE_SHORTFALL:`, followed by `Missing inputs:` and `Next action:`; include no frontmatter, code fences or copied lesson body. The runner records this as a blocked extraction, preserving the original lesson.
 
-Migration: until #3744 lands, legacy verifiers may still reject prose below their 1000/12/18 density thresholds, the 5000-word default, short-page tiering or source-count checks. These are not teaching targets. Report the disagreement in a non-module shortfall report instead of padding; the runner preserves a failed extraction for the lead rather than publishing the report.
+Since #3744 the verifier and the route and merge stages report word, density, section and source counts as diagnostics only: none of them rejects, tiers or rewards a page (two legacy paths still use length: the `pipeline.py` triage scan bands pages by density, and the `quality_pipeline.py` route sends any page under 220 lines to rewrite), and an unusually short or unusually long page is flagged for a reviewer to check against the outcomes. These numbers are not teaching targets. If verified material cannot support the scope, report it in a non-module shortfall report instead of padding; the runner preserves a failed extraction for the lead rather than publishing the report.
 
 **REQUIRED SECTIONS** (in this exact order):
 
@@ -101,7 +101,7 @@ Migration: until #3744 lands, legacy verifiers may still reject prose below thei
 - Every module must operate at Bloom's Taxonomy Level 3 (Apply) or above
 - Constructive Alignment: learning outcomes, teaching activities, and assessment must test the same thing
 - Scaffold complexity: start simple, add layers. Don't dump the full picture first.
-- Include at least one worked example before asking the learner to solve a similar problem
+- Include a worked example for each key skill before asking the learner to solve a similar problem
 - Integrate labels directly into diagrams (no separate legends)
 - Active learning must be distributed throughout, not just at the end
 
@@ -118,7 +118,8 @@ Migration: until #3744 lands, legacy verifiers may still reject prose below thei
 - Use numbers only when supported by the example or verified evidence; do not invent numerical detail for variety.
 - Do NOT invent business incidents, client stories, anonymized companies, or anecdotal incident claims. Use sourced real incidents or clearly labeled hypothetical/exercise scenarios.
 - Do NOT add a mystery, clue hunt, or gamification layer solely to make a module engaging.
-- Do NOT write thin outlines — every section needs depth, examples, and explanation
+- Do NOT write thin outlines — every section needs the explanation, examples and steps its outcome requires
+- Do NOT pad: cut repetition, duplicated material and off-topic background, but never the only explanation, example or step an outcome needs
 - Do NOT skip the exercise — it's the most important part for learning
 - Do NOT use emojis
 - Use retrieval when it supports the outcomes, with reasoning or transfer where appropriate and explanatory feedback.

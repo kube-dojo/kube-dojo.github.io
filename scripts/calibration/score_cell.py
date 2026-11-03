@@ -205,6 +205,9 @@ class ContentWritingLongScorer:
         response: str,
         ground_truth: dict[str, Any],
     ) -> dict[str, bool]:
+        # Since #3744 the verifier tier follows blocking defects only; length,
+        # density and template counts no longer move it, so this gate does
+        # not reward or punish a response for being long or short.
         tier = _verifier_tier(response)
         accepted_tiers = set(ground_truth.get("accepted_verifier_tiers", ["T0", "T1"]))
         mermaid_pattern = re.compile(r"```\s*mermaid\b.*?```", re.IGNORECASE | re.DOTALL)
@@ -597,6 +600,8 @@ class SummarizationScorer:
     ) -> dict[str, bool]:
         must_mentions = list(ground_truth.get("must_mentions", []))
         banned = list(ground_truth.get("banned_hallucinations", []))
+        # Instruction-following for a fixture whose own prompt says "Stay
+        # within 180-220 words" (both tails); not a curriculum length quota.
         min_words = int(ground_truth.get("min_words", 180))
         max_words = int(ground_truth.get("max_words", 220))
         words = _word_count(response)

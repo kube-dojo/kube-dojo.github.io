@@ -1,34 +1,30 @@
-# #388 Module Rewriter — Density-First Brief Addendum
-Configured body-word budget for THIS module: {{BODY_WORDS_TARGET}}. Dispatch supplies a per-module budget when set, otherwise the pilot verifier uses its existing default of 5000. This prompt does not change that executable check or any acceptance state.
+# #388 Module Rewriter — Teaching-First Brief Addendum
+Configured body-word budget for THIS module: {{BODY_WORDS_TARGET}}. A declared per-module budget, when dispatch supplies one, is a planning and reporting signal only: the verifier reports it and never gates on it. This prompt does not change any executable check or acceptance state.
 
-This addendum is layered on top of `scripts/prompts/module-writer.md`. It is binding for all #388 site-wide rewrite dispatches. The audit gates here are derived from the Codex architectural consult of 2026-05-01 (bridge messages #3384 and #3386) and the empirical baseline established by the density fix-pass batch of the same session (PRs #720-723).
+This addendum is layered on top of `scripts/prompts/module-writer.md`. It is binding for all #388 site-wide rewrite dispatches. The protections here come from the Codex architectural consult of 2026-05-01 (bridge messages #3384 and #3386); the paragraph-density thresholds that consult derived were retired as gates by #3744 and are now reviewer diagnostics.
 
-The brief has historically optimized for visible structure and quotas (DYK count, sections, and sources). That conditioning produces choppy single-sentence prose and consistent failure on prose-density gates. This addendum reframes the contract.
+The brief has historically optimized for visible structure and quotas (DYK count, sections, and sources). That conditioning produces choppy single-sentence prose, and the opposite fix produces padding. This addendum asks for both corrections at once.
 
-## PROSE DENSITY IS A HARD GATE
+## BALANCE: CUT PADDING AND EXPLAIN WHAT THE LEARNER NEEDS
 
-Body teaching prose must pass all paragraph-density checks before final output:
+Two failures carry equal weight, and either one makes a rewrite unacceptable:
 
-- mean words per paragraph >= 30
-- median words per paragraph >= 28
-- short paragraph rate <= 20%, where short means <18 words
-- no run of 3 or more consecutive short paragraphs
+- **Bloat**: padding, repetition, restated theses, duplicated material, off-topic background, filler transitions.
+- **Under-explanation**: a term used before it is explained, a skipped reasoning step, a list where the learner needs the why, a missing worked example for a key skill, an abrupt unexplained transition.
 
-For this audit, count normal body prose paragraphs. Exclude frontmatter, headings, tables, lists, code fences, YAML, quiz answer blocks, sources, and HTML tags.
-
-If the draft fails any density check, revise the prose before reporting completion.
+Cut padding and repetition, AND explain every term, step and reason the learner needs, with worked examples. A cut must never remove the only explanation, example or step for a learning outcome, and every addition must serve a stated outcome. Word, paragraph, sentence and template counts are diagnostics that flag both tails (unusually short or choppy; unusually long or walled) for the reviewer. They never reject or reward a page, so do not write toward or away from a number.
 
 ## NO SOURCE H1
 
-Starlight renders the page H1 from frontmatter `title:`. Do NOT write a `# Module X.Y: <Title>` heading anywhere in the body. The first heading after the frontmatter blockquote must be `## What You'll Be Able to Do` (or whatever the section's house standard is). A source `# ` line after frontmatter is a hard verifier failure.
+Starlight renders the page H1 from frontmatter `title:`. Do NOT write a `# Module X.Y: <Title>` heading anywhere in the body. The first heading after the frontmatter blockquote must be `## What You'll Be Able to Do` (or whatever the section's house standard is). A source `# ` line right after the frontmatter is flagged by the verifier (`gate_no_source_h1` looks at the first content line); one later in the body is still not allowed.
 
 ## PARAGRAPH STYLE
 
-Write body sections as flowing instructional prose, not punchy note blocks. Most body paragraphs should be 3-5 sentences and 35-80 words. Single-sentence paragraphs are allowed only for deliberate emphasis, at most 5 times in the whole module, and never adjacent to another short paragraph.
+Write body sections as flowing instructional prose, not punchy note blocks. Let each paragraph carry a complete idea (claim, reason, example) rather than a one-line note. A single-sentence paragraph is for deliberate emphasis only and should not sit next to another one. Paragraph length is reported, not gated, so never lengthen or split paragraphs to reach a number.
 
 ## NO STACCATO RUNS
 
-Do not create sequences of standalone transition lines, thesis lines, warning lines, or recap lines. If two adjacent paragraphs are under 18 words, merge them into the surrounding explanation unless one is a heading, table row, list item, quiz option, code comment, or source entry.
+Do not create sequences of standalone transition lines, thesis lines, warning lines, or recap lines. If adjacent paragraphs are each a single short line, merge them into the surrounding explanation unless one is a heading, table row, list item, quiz option, code comment, or source entry.
 
 ## NO RESTATEMENT ACROSS H2 SECTIONS
 
@@ -48,15 +44,15 @@ The topic coverage bullets in the dispatch brief are inputs, not an outline. Do 
 
 ## STRUCTURE IS SECONDARY TO TEACHING FLOW
 
-Meet the required counts for Did You Know, Common Mistakes, quiz questions, hands-on tasks, and sources, but do not let those counts shape the surrounding prose into checklist writing. The main theory sections must read like a continuous lesson written by an expert instructor.
+Include the sections the template requires, but do not let section counts shape the surrounding prose into checklist writing, and never invent facts, mistakes or questions to fill a count (counts are reported only). The main theory sections must read like a continuous lesson written by an expert instructor.
 
 ## PRE-FINALIZATION SCAN
 
-Before finalizing, scan every consecutive body-prose paragraph. If three paragraphs in a row each have fewer than 18 words, the module is invalid. Merge, expand, or rewrite those paragraphs until the maximum consecutive short-paragraph run is 2 or less.
+Before finalizing, read the module twice as the target learner, using only the prerequisites the module states. Bloat pass: cut paragraphs that repeat an earlier point, background no outcome needs, and filler transitions. Clarity pass: find every term used before it is explained, skipped reasoning step, list that needs the why, key skill without a worked example, and abrupt transition, and fix each. Do both; finishing one pass does not excuse skipping the other.
 
 ## DEPTH AND EVIDENCE
 
-Use the configured budget as a planning and reporting signal for substantial depth, guided by the topic, outcomes, assessment, and verified material. Do not satisfy it by adding short lines, fragmented paragraphs, decorative structure, or restated content. The pilot verifier separately checks its configured body-word value; that number is not proof of factual support, learning, or publication acceptance. If evidence cannot support the requested scope or the configured check, report the shortfall in the required output rather than inventing detail or claiming completion; do not create a placeholder.
+Set depth from the topic, outcomes, assessment, and verified material. A declared budget, if any, is a planning and reporting signal: do not satisfy it with short lines, fragmented paragraphs, decorative structure, or restated content, and do not cut needed explanation to stay under it. That number is not proof of factual support, learning, or publication acceptance. If evidence cannot support the requested scope, report the shortfall in the required output rather than inventing detail or claiming completion; do not create a placeholder.
 
 ## RUNNABILITY, FABRICATION, AND PRACTICE QUESTIONS
 
@@ -64,7 +60,7 @@ Do NOT rely on shell aliases in runnable Bash examples. Specifically: do NOT wri
 
 ## Image-binary compatibility (lab-runnability contract)
 
-Every `kubectl exec POD -- BIN` you write must satisfy BIN ∈ POD's image binary set. The verifier (`scripts/quality/verify_module.py` → `lab_runnability_metrics`) enforces this deterministically with an allowlist; the reviewer (LAB RUNNABILITY dimension (a)) checks it with citation.
+Every `kubectl exec POD -- BIN` you write must satisfy BIN ∈ POD's image binary set. The verifier (`scripts/quality/verify_module.py` → `lab_runnability_metrics`) checks this deterministically against an allowlist of known images (it skips an image it does not know, so the rule binds regardless); the reviewer (LAB RUNNABILITY dimension (a)) checks it with citation.
 
 Common image cheat-sheet (verified against Docker Hub overview pages):
 
@@ -87,42 +83,41 @@ Do NOT invent business incidents, client stories, anonymized companies, or "war 
 
 For practice-question / mock-exam modules, preserve exam-style MCQ structure. Each question must include four visible answer options labeled `1-4` or `A-D` (visible in the rendered question, NOT hidden in `<details>`), followed by answer reasoning that explains why the correct option is correct AND why each distractor is wrong. The reasoning may live in `<details>` blocks; the numbered options must remain visible.
 
-## VERIFICATION GATES (in addition to module-writer.md structural gates)
+## VERIFICATION (blocking gates vs reported diagnostics)
 
-All must pass before commit. The deterministic verifier (`scripts/quality/verify_module.py`, to be built as Day 1 of #388) computes these:
+The verifier (`scripts/quality/verify_module.py`, `gate_results`) computes these **blocking gate keys**. Its output, not this summary, decides whether each one passed. Several gates are narrow heuristics, so a pass does not show that this brief's rules were followed, and a rule in this brief binds even where its gate would not fire. All gates must pass before commit:
 
-1. mean_wpp >= 30
-2. median_wpp >= 28
-3. short_paragraph_rate <= 20%
-4. max_consecutive_short_run <= 2
-5. The pilot verifier must check body words against its configured `{{BODY_WORDS_TARGET}}`; report its pass/fail result and any shortfall. A passing number is not evidence of factual support, learning effectiveness, or a v2 publication verdict.
-6. mean_sentence_length 12-28 words
-7. >= 2 inline active-learning prompts in core content (not just in the final hands-on)
-8. Each Learning Outcome maps to >= 1 core section AND >= 1 quiz item OR lab task
-9. Quiz answers explain reasoning (not just name the fix)
-10. `## Sources` is required as the **last H2** section before `## Next Module`. It must contain at least **10** unique URLs, each in either bare form (`- https://...`) or markdown form (`- [title](https://...)`), and all links must point to primary/vendor docs (not marketing fluff or dead redirects). Verifier counting applies only to links under `## Sources` (it does not count citations elsewhere).
+1. `gate_no_source_h1`: see NO SOURCE H1 above.
+2. `structure_sections_present`, `structure_order_correct`: section presence and order. Read the verifier's output for these two; `module-writer.md` is the authoring rule.
+3. `structure_quiz_answers_have_details`: every quiz item carries a `<details>` answer block. The verifier checks presence only; the answer must still explain why, not just name the fix.
+4. `sources_all_reachable`: no link under the Sources heading is a 404 or fetch failure (not computed under `--skip-source-check`; a page with no links passes this gate).
+5. `anti_leak`: leaked tokens, emojis and the number 47.
+6. `runnable_no_kubectl_alias`: the alias rule under RUNNABILITY.
+7. `lab_image_binary_match`: the image-binary compatibility section.
+8. `anti_fabrication_no_unsourced_anecdote`: the unsourced-anecdote rule.
+9. `practice_mcq_four_options_with_distractors`: the practice-question rule (practice-question modules only).
+10. `outcomes_aligned`: every Learning Outcome bullet must be taught in a core section and assessed by a quiz item or lab task. The verifier checks this by key-term overlap, so it is a heuristic and not proof that the outcome is taught.
 
-Plus the structural gates from `module-writer.md`: section presence + order, exactly 4 DYK, 6-8 Common Mistakes rows, 6-8 scenario quiz with `<details>`, Hands-On with `- [ ]` checkboxes, no emojis, no number 47, no runnable `kubectl` alias shorthand, no unsourced anecdote framing, K8s 1.35+, no anti-leak tokens.
+Content rules the verifier does not check still bind: `## Sources` is the last H2 before `## Next Module`; every source is primary/vendor documentation (bare `- https://...` or `- [title](https://...)`) and supports the claims it is cited for, with no minimum count; K8s 1.35+ for exam-pinned cert modules (see `module-writer.md`); runnable commands; explanatory quiz answers.
 
-The deterministic verifier counts links inside the Sources section only — citations elsewhere don't count.
+**Reported only, never a gate:** body words, mean/median words per paragraph, short-paragraph rate, consecutive-short runs, mean sentence length, the counts of Did You Know, Common Mistakes, quiz items, hands-on checkboxes and sources, the declared-budget status, and `length_attention` (words per outcome, flagged `unusually_short_for_outcomes` or `unusually_long_for_outcomes`). They flag unusually short or choppy and unusually long or walled pages for the reviewer and never reject, tier or reward. The structural template in `module-writer.md` still applies.
 
 ## TIER ROUTING
 
-Per the Codex consult, classify each `revision_pending: true` module into one of four tiers:
+Tiers follow the verifier's blocking gates only (length and density never move a tier). Classify each `revision_pending: true` module:
 
-- **T0** — passes all gates already. Action: clear the `revision_pending: true` flag. No content change.
-- **T1** — fails 1-2 structural gates only (missing section, wrong DYK count, wrong quiz format) but passes density. Action: targeted structural patch. Density and alignment must still pass post-patch.
-- **T2** — passes structural but fails density (the failure mode of this session's 8 modules). Action: prose expansion + reflow per the gates above.
-- **T3** — fails both density AND structure, OR has body_words < 3000. Action: full rewrite preserving salvageable assets (labs, diagrams, code blocks, source URLs) extracted by the deterministic salvage parser.
+- **T0** — no blocking gate fails. Action: clear the `revision_pending: true` flag. No content change.
+- **T1** — only one or two `structure_*` gates fail (missing section, wrong order, quiz item without `<details>`). Action: targeted structural patch; alignment must still pass post-patch.
+- **T2** — only `lab_image_binary_match` fails. Action: fix the lab image/binary pairing.
+- **T3** — every other failing combination, including a single `anti_leak`, sources, anecdote or alignment failure. Action: full rewrite preserving salvageable assets (labs, diagrams, code blocks, source URLs) extracted by the deterministic salvage parser.
 
 ## REPORTING
 
 After draft, the dispatched agent must report:
-- mean_wpp, median_wpp, short_paragraph_rate, max_consecutive_short_run, body_words, paragraph_count, mean_sentence_length
-- Which gates passed/failed
-- Body-words-before / body-words-after, the configured budget result, and any shortfall
+- Which blocking gates passed/failed
+- The reported diagnostics (mean_wpp, median_wpp, short_paragraph_rate, max_consecutive_short_run, body_words, paragraph_count, mean_sentence_length, `length_attention`) before and after, the declared-budget status, and, if the draft sits in either tail, why the page is still complete without padding
 - Salvageable assets preserved (count of code blocks, diagrams, tables before/after)
 - Forbidden tokens grep result
 - Sources verification status (200/redirect/404 + relevance assessment)
 
-If any gate fails, revise when verified material supports the needed correction; otherwise report the failed gate and material shortfall instead of claiming completion. The orchestrator's verifier re-checks before commit. This prompt-level honesty exception does not create a new machine-enforced publication guard.
+If a blocking gate fails, revise when verified material supports the needed correction; otherwise report the failed gate and material shortfall instead of claiming completion. The orchestrator's verifier re-checks before commit. This prompt-level honesty exception does not create a new machine-enforced publication guard.
