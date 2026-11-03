@@ -109,7 +109,7 @@ git config --get user.name
 git config --get user.email
 ```
 
-The `--global` flag changes account-wide configuration, usually in `~/.gitconfig`; this lesson does not change it. After successful initialization, `--local` writes only to that repository. The deliberately fictional training identity below is for disposable local commits, not publication. Before publishing real work, deliberately choose the appropriate author identity for that repository.
+The `--global` flag changes account-wide configuration, usually in `~/.gitconfig`; this lesson does not change it. After successful initialization, `--local` writes only to that repository. The deliberately fictional training identity below is for disposable local commits, not publication. For real work, choose your author identity and email deliberately: commit metadata includes the email. For example, in that repository you could set `git config --local user.name "Your Name"` and `git config --local user.email "your-chosen-email@example.com"`, replacing the placeholders. See [Git's identity setup](https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup).
 
 Choose a practice directory under your control, outside a real work repository. Start a disposable child Bash with the following command alone and wait for its prompt before pasting the entire grouped setup below. The prompt may look like your previous prompt. Stay in that child for the theory practice; when finished, type `exit` to return to its parent shell.
 
@@ -138,7 +138,7 @@ set +e
 }
 ```
 
-Expected output should confirm that Git created an empty repository database in a hidden `.git` directory.
+Example output confirms that Git created an empty repository database in a hidden `.git` directory. Your path will differ.
 
 ```text
 Initialized empty Git repository in /home/alex/k8s-webapp/.git/
@@ -152,7 +152,7 @@ What exactly changed? Git created a hidden `.git` directory inside `k8s-webapp`.
 ls -la
 ```
 
-Expected output should show the hidden `.git` directory beside the normal current and parent directory entries.
+Example output shows the hidden `.git` directory beside the current and parent directory entries. Names, dates, and sizes will differ.
 
 ```text
 total 12
@@ -233,13 +233,13 @@ Changes to be committed:
 	new file:   namespace.yaml
 ```
 
-Commit the staged change. The message should explain the reason for the snapshot at a level useful to a future reviewer. A message like "update" forces people to inspect the diff just to understand the intent. A message like "feat: add production namespace definition" gives the reader a quick summary and still lets them open the diff for detail when needed.
+Commit the staged change. The message should explain the reason for the snapshot at a level useful to a future reviewer. A message like "update" forces people to inspect the diff just to understand the intent. A message like "feat: add production namespace definition" gives the reader a quick summary and still lets them open the diff for detail when needed. The `feat:` prefix is an optional [commit-message convention](https://www.conventionalcommits.org/en/v1.0.0/), not Git syntax.
 
 ```bash
 git commit -m "feat: add production namespace definition"
 ```
 
-For this first commit, normal output can show a root-commit label, the commit subject, and a change summary with the number of inserted lines. The object ID and output can differ; quiet mode suppresses the summary. See Git 2.56's [commit command](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/builtin/commit.c) and [summary implementation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/sequencer.c).
+For this first commit, normal output can show a root-commit label, the commit subject, and a change summary with the number of inserted lines. The object ID and output can differ; quiet mode suppresses the summary. See the [Git 2.56 commit documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-commit.adoc).
 
 ```text
 [main (root-commit) a1b2c3d] feat: add production namespace definition
@@ -283,6 +283,8 @@ metadata:
     environment: production
 EOF
 ```
+
+A branch is a line of development whose name points to its latest commit and moves as you commit. `HEAD` normally refers to the current branch and thus its latest commit; the working tree starts from that commit and can contain later edits. See the [Git glossary](https://git-scm.com/docs/gitglossary).
 
 Before staging, read the diff. Plain `git diff` compares working files with the index, showing unstaged changes. Here nothing is staged, so it also reflects the edit since the last commit; use `git diff HEAD` to compare the working tree with that commit even when changes are staged. Read the patch before deciding what belongs in the next snapshot.
 
@@ -406,7 +408,7 @@ Pause and predict: you just ran `git commit -m "chore: add environment label to 
 <details>
 <summary>Check your prediction</summary>
 
-With normal untracked-file reporting, if you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`. Git is reporting no staged or unstaged tracked changes and no non-ignored untracked files; ignored files may still exist, and configured options can hide untracked files. If the result differs from your expectation, inspect the state before making another commit.
+If you have not edited or created any files since the commit, `git status` will output `nothing to commit, working tree clean`, subject to the [reporting caveats above](#build-commits-deliberately). If the result differs from your expectation, inspect the state before making another commit.
 
 </details>
 
@@ -436,7 +438,7 @@ git remote add origin https://github.com/yourusername/k8s-webapp.git
 
 If the repository already exists on the server, do not create a new local repository and try to glue the histories together. Use `git clone <url>` instead. Cloning initializes the local `.git` directory, downloads the repository history, checks out a working tree, and records the remote as `origin`. Most professional work starts from cloning because the team history already exists before you arrive.
 
-Pushing uploads your local commits to the remote branch. The first push of a new branch often includes `-u`, which sets an upstream tracking relationship so future `git push` and `git pull` commands can infer the remote branch. Check that the destination and branch relationship match your intention before sharing work.
+Pushing uploads your local commits to the remote branch. The first push of a new branch often includes `-u`, which sets an upstream tracking relationship: the upstream is the default branch to integrate from, and future `git push` and `git pull` commands can infer the remote branch. Check that the destination and branch relationship match your intention before sharing work.
 
 ```bash
 # Example only: requires your own prepared remote and branch
@@ -454,7 +456,9 @@ git log --oneline origin/main..HEAD
 git diff HEAD...origin/main
 ```
 
-The first log lists commits reachable from the fetched `origin/main` but not from `HEAD`; the second lists local-only commits. The three-dot diff compares the merge base with `origin/main`, showing changes on the fetched side since the histories met; it is not a direct comparison of the two tips. The initial status can show stale ahead/behind counts until you fetch.
+The first log lists commits reachable from the fetched `origin/main` but not from `HEAD`; the second lists local-only commits. A merge base is a best common ancestor of the two commits. The three-dot diff compares the merge base with `origin/main`, showing changes on the fetched side since the histories met; it is not a direct comparison of the two tips. The initial status can show stale ahead/behind counts until you fetch. See [Git's merge-base documentation](https://git-scm.com/docs/git-merge-base).
+
+A fast-forward moves a branch to a descendant commit without creating a merge commit. Histories diverge when each branch has commits missing from the other; integrating them cannot be a fast-forward of either branch. See the [Git glossary](https://git-scm.com/docs/gitglossary).
 
 When histories diverge, choose an integration method with your team. `git pull --no-rebase origin main` merges; `git pull --rebase origin main` replays local commits on the fetched branch and changes their IDs. Keep this rebase workflow for unshared local commits. `git pull --ff-only origin main` refuses if a fast-forward is impossible. Git 2.56 documents fast-forward-only as the default; an unconfigured plain pull therefore refuses divergent branches. Configuration and other versions can change that behavior. Ensure your working state is ready before integrating. See the [Git 2.56 pull documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-pull.adoc) and [diff documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-diff.adoc).
 
@@ -463,7 +467,7 @@ Pause and predict: you made two local commits while offline, and a colleague pus
 <details>
 <summary>Check your prediction</summary>
 
-The push can be rejected because the remote contains work missing locally; the rejection may say `fetch first` or `non-fast-forward`, depending on the situation. See the [Git 2.56 push status implementation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/transport.c). Fetch and inspect both histories, then choose an agreed merge or rebase, resolve any conflicts, verify the result, and retry the push. Fetching alone does not integrate the histories.
+The push can be rejected because the remote contains work missing locally; the rejection may say `fetch first` or `non-fast-forward`, depending on the situation. See the [Git 2.56 push documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-push.adoc). Fetch and inspect both histories, then choose an agreed merge or rebase, resolve any conflicts, verify the result, and retry the push. Fetching alone does not integrate the histories.
 
 </details>
 
@@ -561,8 +565,7 @@ The decision framework also helps you avoid destructive commands early in your G
 
 1. **Git began in 2005.** The Linux kernel community's free BitKeeper arrangement ended, and the project developed a distributed replacement. [Pro Git's history](https://github.com/progit/progit2/blob/a013e3230a1207cfa5ae94d28ba7d2021063c337/book/01-introduction/sections/history.asc) describes the context.
 2. **The name is intentionally cheeky.** The [Git project README](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/README.md) includes a playful explanation of the name.
-3. **Empty directories.** In one isolated Git 2.56 test repository, the authors created an empty directory: `git status` did not list it, and `git ls-files` printed no entry for it. In that same local test, adding a file made the directory appear as untracked with default reporting; `git status --untracked-files=all` listed the file, and staging it added the file to the index. These are observations from that fixture. Git's [status documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-status.adoc) describes reporting modes, and [ls-files](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-ls-files.adoc) describes listing index entries. The pinned [status implementation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/wt-status.c#L810-L834) and [directory traversal code](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/dir.c#L2124-L2147) show how normal reporting handles empty directories. Index entries typically represent files rather than directories; the [index format](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/gitformat-index.adoc) also describes the sparse-index directory-entry exception.
-4. **Object identifiers are part of Git's integrity model.** Git supports SHA-1 and SHA-256 repositories; the [Git 2.56 documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/object-format-disclaimer.adoc) notes they do not currently interoperate.
+3. **Object identifiers are part of Git's integrity model.** Git supports SHA-1 and SHA-256 repositories; the [Git 2.56 documentation](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/object-format-disclaimer.adoc) notes they do not currently interoperate.
 
 ## Common Mistakes
 
@@ -573,8 +576,8 @@ The decision framework also helps you avoid destructive commands early in your G
 | Getting "updates were rejected" during push | The remote branch may have commits the local branch lacks. | Inspect the error, fetch and compare histories, then choose how to integrate before retrying. |
 | Writing empty or meaningless commit messages | The learner treats commits as checkpoints for themselves rather than messages to future maintainers. | Amend an unpushed commit message when needed and practice explaining the operational reason for each snapshot. |
 | Forgetting to stage files before committing | The working directory contains changes, but the staging area is empty when `git commit` runs. | Run `git status`, stage the intended files with `git add <file>`, inspect again, and retry the commit. |
-| Committing generated or binary artifacts | Build outputs and logs sit beside source files, and the repository has no ignore policy yet. | To stop tracking a file while keeping its local copy, use `git rm --cached -- <file>`, review and commit the cleanup, and add a suitable `.gitignore` pattern. This does not erase earlier history. |
-| Adding an ignore rule after a file is already tracked | The learner expects `.gitignore` to override history for files already committed. | Remove the file from tracking with an index-only removal such as `git rm --cached <file>` and commit that change. If a real credential was pushed, revoke or rotate it; for local-only history, stop before pushing and follow the [credential response steps](#credential-response). This does not remove earlier history. |
+| Committing generated or binary artifacts | Build outputs and logs sit beside source files, and the repository has no ignore policy yet. | To stop tracking a file while keeping its local copy, use `git rm --cached -- <file>`, review and commit the cleanup, and add a suitable `.gitignore` pattern. See the [history caveat](#credential-response). |
+| Adding an ignore rule after a file is already tracked | The learner expects `.gitignore` to override history for files already committed. | Remove the file from tracking with an index-only removal such as `git rm --cached <file>` and commit that change. If a real credential was pushed, revoke or rotate it; for local-only history, stop before pushing and follow the [credential response steps](#credential-response). |
 
 ## Quiz
 
@@ -600,7 +603,7 @@ Run `git diff` before staging so you can inspect the exact unstaged line changes
 </details>
 
 <details>
-<summary>4. You cloned a repository and Git asks you to configure <code>user.name</code> and <code>user.email</code> before committing. Later, <code>git push</code> asks for remote credentials. Why are these two prompts different?</summary>
+<summary>4. You cloned a repository and Git refuses to commit because no author identity is configured. Later, <code>git push</code> asks for remote credentials. Why are these different?</summary>
 
 `user.name` and `user.email` supply commit attribution; they do not authenticate a push. Remote credentials authenticate to the host, and the host separately decides whether that identity is authorized to push. For example, [GitHub repository roles](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization) distinguish read access from permission to push. A successful local commit does not guarantee the remote will accept a push.
 
@@ -864,7 +867,7 @@ Use `git status`, `git diff --staged`, and `git diff` to inspect before changing
 
 </details>
 
-Challenge 2: The Divergent Timelines Diagnostic. A colleague reports that `git push origin main` was rejected. After a fetch, they share an illustrative local log and `origin/main`, their local record of the server branch at that moment:
+Challenge 2: The Divergent Timelines Diagnostic. This paper diagnostic is your practice comparing local and remote timelines. A colleague reports that `git push origin main` was rejected. After a fetch, they share an illustrative local log and `origin/main`, their local record of the server branch at that moment:
 
 ```text
 Local log:
@@ -920,7 +923,7 @@ For Challenge 1 (The Planted Workspace):
 4. To clean up safely:
    - Add narrow ignore patterns: append `incident-token.env` and `temp-notes.txt` to `.gitignore`.
    - Unstage the incomplete YAML change: run `git restore --staged deployment.yaml`. For this already-tracked file, `git reset HEAD deployment.yaml` is an alternative; `git rm --cached deployment.yaml` would remove the file from tracking entirely, which is not what you want here.
-   - Discard the unwanted scratch edits from the working copy: run `git restore deployment.yaml` (or remove the extra lines in `nano`).
+   - Discard the unwanted scratch edits from the working copy: run `git restore deployment.yaml` (or remove the extra lines in `nano`). Restore discards the unstaged edits in this file; only run it after confirming they are not needed, because Git cannot recover edits it never saved.
    - Leave the empty dummy files ignored, or remove them if you no longer need them.
    - Review `.gitignore` and stage it with `git add .gitignore`. If you completed Task 6, also review and stage the empty dummy `audit-trail.log`; otherwise there is no audit file to stage. Commit these intended files with `git commit -m "chore: record practice ignore rules"`, then run `git status` to confirm a clean working tree. Ignoring scratch files alone does not commit the ignore rules or the audit exception.
 
@@ -991,7 +994,6 @@ One possible approach is to choose two replicas for a smaller practice configura
 - [Git 2.56: clone](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-clone.adoc), [restore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-restore.adoc), [reset](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reset.adoc), and [remote](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-remote.adoc)
 - [Git 2.56: check-ignore](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-check-ignore.adoc), [reflog](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-reflog.adoc), [rm](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-rm.adoc), and [log](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-log.adoc)
 - [Git 2.56: status](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-status.adoc), [ls-files](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/git-ls-files.adoc), and [index format](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/Documentation/gitformat-index.adoc)
-- Git 2.56 implementation: [commit output](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/sequencer.c) and [push status](https://github.com/git/git/blob/a018953688f1b10bddf91bff8747068f5f4746a4/transport.c)
 
 Further reading (live documentation may change):
 
