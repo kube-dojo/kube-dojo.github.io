@@ -37,7 +37,7 @@ The lead owns this non-published input: the existing per-page JSON in `docs/cita
 
 Shortfall output is plain text starting `EVIDENCE_SHORTFALL:`, followed by `Missing inputs:` and `Next action:`; include no frontmatter, code fences or copied lesson body. The runner records this as a blocked extraction, preserving the original lesson.
 
-Since #3744 the verifier and the route and merge stages report word, density, section and source counts as diagnostics only: none of them rejects, tiers or rewards a page (a separate legacy triage scan still bands pages by density), and an unusually short or unusually long page is flagged for a reviewer to check against the outcomes. These numbers are not teaching targets. If verified material cannot support the scope, report it in a non-module shortfall report instead of padding; the runner preserves a failed extraction for the lead rather than publishing the report.
+Since #3744 the verifier and the route and merge stages report word, density, section and source counts as diagnostics only: none of them rejects, tiers or rewards a page (two legacy paths still use length: the `pipeline.py` triage scan bands pages by density, and the `quality_pipeline.py` route sends any page under 220 lines to rewrite), and an unusually short or unusually long page is flagged for a reviewer to check against the outcomes. These numbers are not teaching targets. If verified material cannot support the scope, report it in a non-module shortfall report instead of padding; the runner preserves a failed extraction for the lead rather than publishing the report.
 
 **REQUIRED SECTIONS** (in this exact order):
 

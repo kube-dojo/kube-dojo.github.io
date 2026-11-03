@@ -111,7 +111,7 @@ Per user policy refinement: every shipped module must carry a composer-2.5 cross
 
 - Never act on a file or directory without understanding its purpose.
 - Never modify a pipeline without reading design docs first.
-- Density and length numbers are diagnostics, not gates or targets (#3744): the verifier and the route and merge stages flag BOTH tails (unusually short or choppy, unusually long or walled) for the reviewer and never reject or reward (the legacy `pipeline.py triage --apply` scan still bands by density: a known gap). Do not expand or trim to move a number; cut padding and repetition AND explain every term, step and reason the learner needs, with worked examples (history: [[feedback_388_verifier_first_pilot_then_volume]]).
+- Density and length numbers are diagnostics, not gates or targets (#3744): the verifier and the route and merge stages flag BOTH tails (unusually short or choppy, unusually long or walled) for the reviewer and never reject or reward (two legacy paths still use length: the `pipeline.py triage --apply` scan bands by density, and the `quality_pipeline.py` route sends any page under 220 lines to rewrite; known gaps). Do not expand or trim to move a number; cut padding and repetition AND explain every term, step and reason the learner needs, with worked examples (history: [[feedback_388_verifier_first_pilot_then_volume]]).
 - Verifier ≠ pedagogical quality. A module that passes the verifier can still fail the 8-dimension rubric ([[feedback_teaching_not_listicles]]).
 - "Heuristic-green" ≠ "reviewed by composer-2.5". Two different axes on the `/quality` dashboard.
 - Never switch branches in the main project dir; all branch work in `.worktrees/`.
