@@ -1,0 +1,442 @@
+{
+  "schema_version": 2,
+  "module_path": "src/content/docs/prerequisites/cloud-native-101/index.md",
+  "module_key": "prerequisites/cloud-native-101/index",
+  "page_sha256": "17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+  "page_commit": "a8d1bfeef30df055666fab2f92cd1df50ab83804",
+  "page_blob": "f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
+  "author": {
+    "identity": "gpt-6.1-sol",
+    "family": "openai",
+    "evidence_ref": "/home/ops/learn-ukrainian/batch_state/tasks/kd-cn101-stage1d-sol-1.json#run_nonce=f915f02344914065890b23b5805237f7"
+  },
+  "claims": [
+    {
+      "claim_id": "CN001",
+      "claim_text": "title: \"Cloud Native 101\"",
+      "line_start": 2,
+      "line_end": 2,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
+        "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
+        "git-object://1861c60b318f129762a6a6c15f6018caed3c38ed"
+      ]
+    },
+    {
+      "claim_id": "CN002",
+      "claim_text": "  order: 0",
+      "line_start": 4,
+      "line_end": 4,
+      "kind": "mixed",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b",
+        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
+        "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
+        "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md"
+      ]
+    },
+    {
+      "claim_id": "CN003",
+      "claim_text": "This section covers containers, Kubernetes, and cloud native architecture.",
+      "line_start": 7,
+      "line_end": 7,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+      ]
+    },
+    {
+      "claim_id": "CN004",
+      "claim_text": "You will learn to evaluate whether Kubernetes is justified for a workload",
+      "line_start": 7,
+      "line_end": 7,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6"
+      ]
+    },
+    {
+      "claim_id": "CN005",
+      "claim_text": "and compare monolithic and microservice architectures.",
+      "line_start": 7,
+      "line_end": 7,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+      ]
+    },
+    {
+      "claim_id": "CN006",
+      "claim_text": "Module 1.1 requires no prior container knowledge.",
+      "line_start": 9,
+      "line_end": 9,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d"
+      ]
+    },
+    {
+      "claim_id": "CN007",
+      "claim_text": "You will learn to explain containers, Docker images, what Kubernetes adds, and when microservices are worth their cost.",
+      "line_start": 9,
+      "line_end": 9,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+      ]
+    },
+    {
+      "claim_id": "CN008",
+      "claim_text": "We begin with containers and how they isolate processes.",
+      "line_start": 11,
+      "line_end": 11,
+      "kind": "mixed",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/"
+      ]
+    },
+    {
+      "claim_id": "CN009",
+      "claim_text": "We then examine building Docker images and running containers, before learning to evaluate whether Kubernetes is justified for a workload.",
+      "line_start": 11,
+      "line_end": 11,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6"
+      ]
+    },
+    {
+      "claim_id": "CN010",
+      "claim_text": "building Docker images and running containers",
+      "line_start": 11,
+      "line_end": 11,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df"
+      ]
+    },
+    {
+      "claim_id": "CN011",
+      "claim_text": "learning to evaluate whether Kubernetes is justified for a workload.",
+      "line_start": 11,
+      "line_end": 11,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6"
+      ]
+    },
+    {
+      "claim_id": "CN012",
+      "claim_text": "Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem and explore the trade-offs between monoliths and microservices when choosing application architecture.",
+      "line_start": 11,
+      "line_end": 11,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+      ]
+    },
+    {
+      "claim_id": "CN013",
+      "claim_text": "Cloud Native Computing Foundation (CNCF)",
+      "line_start": 11,
+      "line_end": 11,
+      "kind": "external",
+      "candidate_source_refs": [
+        "https://www.cncf.io/about/who-we-are/",
+        "https://www.cncf.io/about/faq/"
+      ]
+    },
+    {
+      "claim_id": "CN014",
+      "claim_text": "| 1.1 | [What Are Containers?](module-1.1-what-are-containers/) | 80–110 min |",
+      "line_start": 17,
+      "line_end": 17,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d"
+      ]
+    },
+    {
+      "claim_id": "CN015",
+      "claim_text": "| 1.2 | [Docker Fundamentals](module-1.2-docker-fundamentals/) | 90–120 min |",
+      "line_start": 18,
+      "line_end": 18,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df"
+      ]
+    },
+    {
+      "claim_id": "CN016",
+      "claim_text": "| 1.3 | [What Is Kubernetes?](module-1.3-what-is-kubernetes/) | 90–120 min |",
+      "line_start": 19,
+      "line_end": 19,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6"
+      ]
+    },
+    {
+      "claim_id": "CN017",
+      "claim_text": "| 1.4 | [The Cloud Native Ecosystem](module-1.4-cloud-native-ecosystem/) | 100–130 min |",
+      "line_start": 20,
+      "line_end": 20,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56"
+      ]
+    },
+    {
+      "claim_id": "CN018",
+      "claim_text": "| 1.5 | [From Monolith to Microservices](module-1.5-monolith-to-microservices/) | 90–120 min |",
+      "line_start": 21,
+      "line_end": 21,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+      ]
+    },
+    {
+      "claim_id": "CN019",
+      "claim_text": "Containers explained and how they differ from virtual machines.",
+      "line_start": 17,
+      "line_end": 17,
+      "kind": "mixed",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/"
+      ]
+    },
+    {
+      "claim_id": "CN020",
+      "claim_text": "Building, running, and managing containers with Docker.",
+      "line_start": 18,
+      "line_end": 18,
+      "kind": "mixed",
+      "candidate_source_refs": [
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "https://docs.docker.com/get-started/docker-overview/"
+      ]
+    },
+    {
+      "claim_id": "CN021",
+      "claim_text": "The need for container orchestration and what Kubernetes provides.",
+      "line_start": 19,
+      "line_end": 19,
+      "kind": "mixed",
+      "candidate_source_refs": [
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "https://kubernetes.io/docs/concepts/overview/"
+      ]
+    },
+    {
+      "claim_id": "CN022",
+      "claim_text": "Navigating CNCF landscape maturity categories and key ecosystem projects.",
+      "line_start": 20,
+      "line_end": 20,
+      "kind": "mixed",
+      "candidate_source_refs": [
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "https://www.cncf.io/projects/"
+      ]
+    },
+    {
+      "claim_id": "CN023",
+      "claim_text": "Understanding the architectural evolution, benefits, and inherent trade-offs of microservices.",
+      "line_start": 21,
+      "line_end": 21,
+      "kind": "mixed",
+      "candidate_source_refs": [
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b",
+        "https://glossary.cncf.io/monolithic-apps/"
+      ]
+    },
+    {
+      "claim_id": "CN024",
+      "claim_text": "Start with a working terminal and a machine where you can install Docker for module 1.2. For module 1.3's hands-on exercise, complete [Your First Cluster](../kubernetes-basics/module-1.1-first-cluster/) if needed and confirm the selected cluster is dedicated and disposable; then continue to [Kubernetes Basics](../kubernetes-basics/) after Cloud Native 101.",
+      "line_start": 23,
+      "line_end": 23,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "git-object://1861c60b318f129762a6a6c15f6018caed3c38ed",
+        "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0"
+      ]
+    },
+    {
+      "claim_id": "CN025",
+      "claim_text": "These ranges are the Time to Complete values from the five module headers.",
+      "line_start": 25,
+      "line_end": 25,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+      ]
+    },
+    {
+      "claim_id": "CN026",
+      "claim_text": "Their arithmetic gives an aggregate range of **450–600 minutes (about 7 hours 30 minutes–10 hours)**.",
+      "line_start": 25,
+      "line_end": 25,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+      ]
+    }
+  ],
+  "sources": {
+    "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0": {
+      "retrieval_uri": "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
+      "snapshot_digest": "sha256:2de49e8931e3c72ddd837908a9f71c5b184a3b4f76d8ac3b384ba9108a473995",
+      "path": "src/content/docs/prerequisites/index.md"
+    },
+    "git-object://d436e089b39678df8bb761c3c94747d5195aafe5": {
+      "retrieval_uri": "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
+      "snapshot_digest": "sha256:4a98a56b7335a5a3fcb908c4efced004c274ae1ee1ab6f03ec873dc67b820f8f",
+      "path": "astro.config.mjs"
+    },
+    "git-object://1861c60b318f129762a6a6c15f6018caed3c38ed": {
+      "retrieval_uri": "git-object://1861c60b318f129762a6a6c15f6018caed3c38ed",
+      "snapshot_digest": "sha256:bd91f877c2a1116cd31fdb5b23fb781bd02681b042bb4dfd67e8734bd2d7a1ef",
+      "path": "src/content/docs/prerequisites/kubernetes-basics/module-1.1-first-cluster.md"
+    },
+    "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d": {
+      "retrieval_uri": "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+      "snapshot_digest": "sha256:c6041449aeefc71eb8af982b57c2af9997df565f9d71f94711801f389ac5f354",
+      "path": "src/content/docs/prerequisites/cloud-native-101/module-1.1-what-are-containers.md"
+    },
+    "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df": {
+      "retrieval_uri": "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+      "snapshot_digest": "sha256:b3b1e4a36e135fb983a3ae5c4991aa24dc6ce9843cd3662271c4919ddacc2257",
+      "path": "src/content/docs/prerequisites/cloud-native-101/module-1.2-docker-fundamentals.md"
+    },
+    "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6": {
+      "retrieval_uri": "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+      "snapshot_digest": "sha256:1f06c2ec50a31a25a35cafe46d0fa6258205f912a0167d193a9874b731c19bd9",
+      "path": "src/content/docs/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes.md"
+    },
+    "git-object://d55dfee27c3c78e1a8815243201874e20075be56": {
+      "retrieval_uri": "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+      "snapshot_digest": "sha256:30b1de3259883fc72090735aa32be4020cb9bebb5e8460b535337b1567a0940e",
+      "path": "src/content/docs/prerequisites/cloud-native-101/module-1.4-cloud-native-ecosystem.md"
+    },
+    "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b": {
+      "retrieval_uri": "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b",
+      "snapshot_digest": "sha256:2b30041aa5564a8aded090655c6dfd495e4ab2d490a985c64bf705256023d95b",
+      "path": "src/content/docs/prerequisites/cloud-native-101/module-1.5-monolith-to-microservices.md"
+    },
+    "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md": {
+      "retrieval_uri": "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md",
+      "final_url": "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md",
+      "retrieved_at": "2026-11-03T13:45:27.182746+00:00",
+      "content_type": "text/plain; charset=utf-8",
+      "snapshot_digest": "sha256:0571ffb3fa9c5f82a4f5389a8f762b9fde65b34586374296c788ffab18656e5d",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "---\ntitle: Frontmatter Reference\ndescription: An overview of the default frontmatter fields Starlight supports.\n---\n\nYou can customize individual Markdown and MDX pages in Starlight by setting values in their frontmatter. For example, a regular page might set `title` and `description` fields:\n\n```md {3-4}\n---\n# src/content/docs/example.md\ntitle: About this project\ndescription: Learn more about the project I’m working on.\n---\n\nWelcome to the about page!\n```\n\n## Frontmatter fields\n\n### `title` (required)\n\n**type:** `string`\n\nYou must provide a title for every page. This will be displayed at the top of the page, in browser tabs, and in page metadata.\n\n### `description`\n\n**type:** `string`\n\nThe page description is used for page metadata and will be picked up by search engines and in social media previews.\n\n### `slug`\n\n**type**: `string`\n\nOverride the slug of the page. See [“Defining custom IDs”](https://docs.astro.build/en/guides/content-collections/#defining-custom-ids) in the Astro docs for more details.\n\n### `editUrl`\n\n**type:** `string | boolean`\n\nOverrides the [global `editLink` config](/reference/configuration/#editlink). Set to `false` to disable the “Edit page” link for a specific page or provide an alternative URL where the content of this page is editable.\n\n### `head`\n\n**type:** [`HeadConfig[]`](/reference/configuration/#headconfig)\n\nYou can add additional tags to your page’s `<head>` using the `head` frontmatter field. This means you can add custom styles, metadata or other tags to a single page. Similar to the [global `head` option](/reference/configuration/#head).\n\n```md\n---\n# src/content/docs/example.md\ntitle: About us\nhead:\n  # Use a custom <title> tag\n  - tag: title\n    content: Custom about title\n---\n```\n\n### `tableOfContents`\n\n**type:** `false | { minHeadingLevel?: number; maxHeadingLevel?: number; }`\n\nOverrides the [global `tableOfContents` config](/reference/configuration/#tableofcontents).\nCustomize the heading levels to be included or set to `false` to hide the table of contents on this page.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with only H2s in the table of contents\ntableOfContents:\n  minHeadingLevel: 2\n  maxHeadingLevel: 2\n---\n```\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with no table of contents\ntableOfContents: false\n---\n```\n\n### `template`\n\n**type:** `'doc' | 'splash'`  \n**default:** `'doc'`\n\nSet the layout template for this page.\nPages use the `'doc'` layout by default.\nSet to `'splash'` to use a wider layout without any sidebars designed for landing pages.\n\n### `hero`\n\n**type:** [`HeroConfig`](#heroconfig)\n\nAdd a hero component to the top of this page. Works well with `template: splash`.\n\nFor example, this config shows some common options, including loading an image from your repository.\n\n```md\n---\n# src/content/docs/example.md\ntitle: My Home Page\ntemplate: splash\nhero:\n  title: 'My Project: Stellar Stuff Sooner'\n  tagline: Take your stuff to the moon and back in the blink of an eye.\n  image:\n    alt: A glittering, brightly colored logo\n    file: ~/assets/logo.png\n  actions:\n    - text: Tell me more\n      link: /getting-started/\n      icon: right-arrow\n    - text: View on GitHub\n      link: https://github.com/astronaut/my-project\n      icon: external\n      variant: minimal\n      attrs:\n        rel: me\n---\n```\n\nYou can display different versions of the hero image in light and dark modes.\n\n```md\n---\n# src/content/docs/example.md\nhero:\n  image:\n    alt: A glittering, brightly colored logo\n    dark: ~/assets/logo-dark.png\n    light: ~/assets/logo-light.png\n---\n```\n\n#### `HeroConfig`\n\n```ts\ninterface HeroConfig {\n  title?: string;\n  tagline?: string;\n  image?:\n    | {\n        // Relative path to an image in your repository.\n        file: string;\n        // Alt text to make the image accessible to assistive technology\n        alt?: string;\n      }\n    | {\n        // Relative path to an image in your repository to be used for dark mode.\n        dark: string;\n        // Relative path to an image in your repository to be used for light mode.\n        light: string;\n        // Alt text to make the image accessible to assistive technology\n        alt?: string;\n      }\n    | {\n        // Raw HTML to use in the image slot.\n        // Could be a custom `<img>` tag or inline `<svg>`.\n        html: string;\n      };\n  actions?: Array<{\n    text: string;\n    link: string;\n    variant?: 'primary' | 'secondary' | 'minimal';\n    icon?: string;\n    attrs?: Record<string, string | number | boolean>;\n  }>;\n}\n```\n\n### `banner`\n\n**type:** `{ content: string }`\n\nDisplays an announcement banner at the top of this page.\n\nThe `content` value can include HTML for links or other content.\nFor example, this page displays a banner including a link to `example.com`.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a banner\nbanner:\n  content: |\n    We just launched something cool!\n    <a href=\"https://example.com\">Check it out</a>\n---\n```\n\n### `lastUpdated`\n\n**type:** `Date | boolean`\n\nOverrides the [global `lastUpdated` option](/reference/configuration/#lastupdated). If a date is specified, it must be a valid [YAML timestamp](https://yaml.org/type/timestamp.html) and will override the date stored in Git history for this page.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a custom last update date\nlastUpdated: 2022-08-09\n---\n```\n\n### `prev`\n\n**type:** `boolean | string | { link?: string; label?: string }`\n\nOverrides the [global `pagination` option](/reference/configuration/#pagination). If a string is specified, the generated link text will be replaced and if an object is specified, both the link and the text will be overridden.\n\n```md\n---\n# src/content/docs/example.md\n# Hide the previous page link\nprev: false\n---\n```\n\n```md\n---\n# src/content/docs/example.md\n# Override the previous page link text\nprev: Continue the tutorial\n---\n```\n\n```md\n---\n# src/content/docs/example.md\n# Override both the previous page link and text\nprev:\n  link: /unrelated-page/\n  label: Check out this other page\n---\n```\n\n### `next`\n\n**type:** `boolean | string | { link?: string; label?: string }`\n\nSame as [`prev`](#prev) but for the next page link.\n\n```md\n---\n# src/content/docs/example.md\n# Hide the next page link\nnext: false\n---\n```\n\n### `pagefind`\n\n**type:** `boolean`  \n**default:** `true`\n\nSet whether this page should be included in the [Pagefind](https://pagefind.app/) search index. Set to `false` to exclude a page from search results:\n\n```md\n---\n# src/content/docs/example.md\n# Hide this page from the search index\npagefind: false\n---\n```\n\n### `draft`\n\n**type:** `boolean`  \n**default:** `false`\n\nSet whether this page should be considered a draft and not be included in [production builds](https://docs.astro.build/en/reference/cli-reference/#astro-build). Set to `true` to mark a page as a draft and make it only visible during development.\n\n```md\n---\n# src/content/docs/example.md\n# Exclude this page from production builds\ndraft: true\n---\n```\n\nBecause draft pages are not included in build output, you cannot add draft pages directly to your site sidebar config using [slugs](/guides/sidebar/#internal-links).\nDraft pages in directories used for [autogenerated sidebar links](/guides/sidebar/#autogenerated-links) are automatically excluded in production builds.\n\n### `sidebar`\n\n**type:** [`SidebarConfig`](#sidebarconfig)\n\nControl how this page is displayed in the [sidebar](/reference/configuration/#sidebar), when using an autogenerated link group.\n\n#### `SidebarConfig`\n\n```ts\ninterface SidebarConfig {\n  label?: string;\n  order?: number;\n  hidden?: boolean;\n  badge?: string | BadgeConfig;\n  attrs?: Record<string, string | number | boolean | undefined>;\n}\n```\n\n#### `label`\n\n**type:** `string`  \n**default:** the page [`title`](#title-required)\n\nSet the label for this page in the sidebar when displayed in an autogenerated group of links.\n\n```md\n---\n# src/content/docs/example.md\ntitle: About this project\nsidebar:\n  label: About\n---\n```\n\n#### `order`\n\n**type:** `number`\n\nControl the order of this page when sorting an autogenerated group of links.\nLower numbers are displayed higher up in the link group.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page to display first\nsidebar:\n  order: 1\n---\n```\n\n#### `hidden`\n\n**type:** `boolean`  \n**default:** `false`\n\nPrevents this page from being included in an autogenerated sidebar group.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page to hide from autogenerated sidebar\nsidebar:\n  hidden: true\n---\n```\n\n#### `badge`\n\n**type:** <code>string | <a href=\"/reference/configuration/#badgeconfig\">BadgeConfig</a></code>\n\nAdd a badge to the page in the sidebar when displayed in an autogenerated group of links.\nWhen using a string, the badge will be displayed with a default accent color.\nOptionally, pass a [`BadgeConfig` object](/reference/configuration/#badgeconfig) with `text`, `variant`, and `class` fields to customize the badge.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a badge\nsidebar:\n  # Uses the default variant matching your site’s accent color\n  badge: New\n---\n```\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a badge\nsidebar:\n  badge:\n    text: Experimental\n    variant: caution\n---\n```\n\n#### `attrs`\n\n**type:** `Record<string, string | number | boolean | undefined>`\n\nHTML attributes to add to the page link in the sidebar when displayed in an autogenerated group of links.\nIf [`autogenerate.attrs`](/guides/sidebar/#custom-html-attributes-for-autogenerated-links) is set on the autogenerated group this page belongs to, frontmatter attributes will be merged with the group attributes.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page opening in a new tab\nsidebar:\n  # Opens the page in a new tab\n  attrs:\n    target: _blank\n---\n```\n\n## Customize frontmatter schema\n\nThe frontmatter schema for Starlight’s `docs` content collection is configured in `src/content.config.ts` using the `docsSchema()` helper:\n\n```ts {4,7}\n// src/content.config.ts\nimport { defineCollection } from 'astro:content';\nimport { docsLoader, i18nLoader } from '@astrojs/starlight/loaders';\nimport { docsSchema } from '@astrojs/starlight/schema';\n\nexport const collections = {\n  docs: defineCollection({ loader: docsLoader(), schema: docsSchema() }),\n};\n```\n\nLearn more about content collection schemas in [“Defining a collection schema”](https://docs.astro.build/en/guides/content-collections/#defining-the-collection-schema) in the Astro docs.\n\n`docsSchema()` takes the following options:\n\n### `extend`\n\n**type:** Zod schema or function that returns a Zod schema  \n**default:** `z.object({})`\n\nExtend Starlight’s schema with additional fields by setting `extend` in the `docsSchema()` options.\nThe value should be a [Zod schema](https://docs.astro.build/en/guides/content-collections/#defining-datatypes-with-zod).\n\nIn the following example, we provide a stricter type for `description` to make it required and add a new optional `category` field:\n\n```ts {11-16}\n// src/content.config.ts\nimport { defineCollection } from 'astro:content';\nimport { z } from 'astro/zod';\nimport { docsLoader } from '@astrojs/starlight/loaders';\nimport { docsSchema } from '@astrojs/starlight/schema';\n\nexport const collections = {\n  docs: defineCollection({\n    loader: docsLoader(),\n    schema: docsSchema({\n      extend: z.object({\n        // Make a built-in field required instead of optional.\n        description: z.string(),\n        // Add a new field to the schema.\n        category: z.enum(['tutorial', 'guide', 'reference']).optional(),\n      }),\n    }),\n  }),\n};\n```\n\nTo take advantage of the [Astro `image()` helper](https://docs.astro.build/en/guides/images/#images-in-content-collections), use a function that returns your schema extension:\n\n```ts {11-16}\n// src/content.config.ts\nimport { defineCollection } from 'astro:content';\nimport { z } from 'astro/zod';\nimport { docsLoader } from '@astrojs/starlight/loaders';\nimport { docsSchema } from '@astrojs/starlight/schema';\n\nexport const collections = {\n  docs: defineCollection({\n    loader: docsLoader(),\n    schema: docsSchema({\n      extend: ({ image }) => {\n        return z.object({\n          // Add a field that must resolve to a local image.\n          cover: image(),\n        });\n      },\n    }),\n  }),\n};\n```\n",
+      "text_extraction": "full-v1"
+    },
+    "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/": {
+      "retrieval_uri": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
+      "final_url": "https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/",
+      "retrieved_at": "2026-11-03T14:39:49.181859+00:00",
+      "content_type": "text/html",
+      "snapshot_digest": "sha256:5f25f12fff9e877a948dcd9b3904ca1ee792a232d462bbe7882fe0ec795a795b",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "Back\n\nGet started\n\nGuides\n\nManuals\n\nReference\n\nTutorials\n\nContainerize an application\nSandbox a coding agent\nPilot an organization rollout\nGet Docker\nWhat is Docker?\n\nDocker concepts\n\nThe basics\n\nWhat is a container?\nWhat is an image?\nWhat is a registry?\nWhat is Docker Compose?\n\nBuilding images\n\nUnderstanding the image layers\nWriting a Dockerfile\nBuild, tag, and publish an image\nUsing the build cache\nMulti-stage builds\n\nRunning containers\n\nPublishing and exposing ports\nOverriding container defaults\nPersisting container data\nSharing local files with containers\nMulti-container applications\nEducational resources\n\nHome\n/\nGet started\n/\nDocker concepts\n/\nThe basics\n/\nWhat is a container?\nWhat is a container?\n\nAsk Gordon\n\nCopy Markdown\n\nView Markdown\n\nTable of contents\nExplanation\nContainers versus virtual machines (VMs)\nTry it out\nAdditional resources\nNext steps\n\nExplanation\nImagine you're developing a killer web app that has three main components - a React frontend, a Python API, and a PostgreSQL database. If you wanted to work on this project, you'd have to install Node, Python, and PostgreSQL.\nHow do you make sure you have the same versions as the other developers on your team? Or your CI/CD system? Or what's used in production?\nHow do you ensure the version of Python (or Node or the database) your app needs isn't affected by what's already on your machine? How do you manage potential conflicts?\nEnter containers!\nWhat is a container? Simply put, containers are isolated processes for each of your app's components. Each component - the frontend React app, the Python API engine, and the database - runs in its own isolated environment, completely isolated from everything else on your machine.\nHere's what makes them awesome. Containers are:\nSelf-contained. Each container has everything it needs to function with no reliance on any pre-installed dependencies on the host machine.\nIsolated. Since containers run in isolation, they have minimal influence on the host and other containers, increasing the security of your applications.\nIndependent. Each container is independently managed. Deleting one container won't affect any others.\nPortable. Containers can run anywhere! The container that runs on your development machine will work the same way in a data center or anywhere in the cloud!\nContainers versus virtual machines (VMs)\nWithout getting too deep, a VM is an entire operating system with its own kernel, hardware drivers, programs, and applications. Spinning up a VM only to isolate a single application is a lot of overhead.\nA container is simply an isolated process with all of the files it needs to run. If you run multiple containers, they all share the same kernel, allowing you to run more applications on less infrastructure.\nUsing VMs and containers together\nQuite often, you will see containers and VMs used together. As an example, in a cloud environment, the provisioned machines are typically VMs. However, instead of provisioning one machine to run one application, a VM with a container runtime can run multiple containerized applications, increasing resource utilization and reducing costs.\nTry it out\nIn this hands-on, you will see how to run a Docker container using the Docker Desktop GUI.\n\nUsing the GUI\n\nUsing the CLI\n\nUse the following instructions to run a container.\n\nOpen Docker Desktop and select the Search field on the top navigation bar.\n\nSpecify welcome-to-docker in the search input and then select the Pull button.\n\nOnce the image is successfully pulled, select the Run button.\n\nExpand the Optional settings.\n\nIn the Container name, specify welcome-to-docker.\n\nIn the Host port, specify 8080.\n\nSelect Run to start your container.\nCongratulations! You just ran your first container! 🎉\nView your container\nYou can view all of your containers by going to the Containers view of the Docker Desktop Dashboard.\n\nThis container runs a web server that displays a simple website. When working with more complex projects, you'll run different parts in different containers. For example, you might run a different container for the frontend, backend, and database.\nAccess the frontend\nWhen you launched the container, you exposed one of the container's ports onto your machine. Think of this as creating configuration to let you connect through the isolated environment of the container.\nFor this container, the frontend is accessible on port 8080. To open the website, select the link in the Port(s) column of your container or visit http://localhost:8080 in your browser.\n\nExplore your container\nDocker Desktop lets you explore and interact with different aspects of your container. Try it out yourself.\n\nGo to the Containers view in the Docker Desktop Dashboard.\n\nSelect your container.\n\nSelect the Files tab to explore your container's isolated file system.\n\nStop your container\nThe docker/welcome-to-docker container continues to run until you stop it.\n\nGo to the Containers view in the Docker Desktop Dashboard.\n\nLocate the container you'd like to stop.\n\nSelect the Stop action in the Actions column.\n\nFollow the instructions to run a container using the CLI:\n\nOpen your CLI terminal and start a container by using the\ndocker run command:\n\n$ docker run -d -p 8080:80 docker/welcome-to-docker\n\nThe output from this command is the full container ID.\nCongratulations! You just fired up your first container! 🎉\nView your running containers\nYou can verify if the container is up and running by using the\ndocker ps command:\n\ndocker ps\n\nYou will see output like the following:\n\n CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES\n a1f7a4bb3a27 docker/welcome-to-docker \"/docker-entrypoint.…\" 11 seconds ago Up 11 seconds 0.0.0.0:8080->80/tcp gracious_keldysh\n\nThis container runs a web server that displays a simple website. When working with more complex projects, you'll run different parts in different containers. For example, a different container for the frontend, backend, and database.\n\nTip\n\nThe docker ps command will show you only running containers. To view stopped containers, add the -a flag to list all containers: docker ps -a\nAccess the frontend\nWhen you launched the container, you exposed one of the container's ports onto your machine. Think of this as creating configuration to let you to connect through the isolated environment of the container.\nFor this container, the frontend is accessible on port 8080. To open the website, select the link in the Port(s) column of your container or visit http://localhost:8080 in your browser.\n\nStop your container\nThe docker/welcome-to-docker container continues to run until you stop it. You can stop a container using the docker stop command.\n\nRun docker ps to get the ID of the container\n\nProvide the container ID or name to the\ndocker stop command:\n\ndocker stop <the-container-id>\n\nTip\n\nWhen referencing containers by ID, you don't need to provide the full ID. You only need to provide enough of the ID to make it unique. As an example, the previous container could be stopped by running the following command:\n\ndocker stop a1f\n\nAdditional resources\nThe following links provide additional guidance into containers:\nRunning a container\nOverview of container\nWhy Docker?\nNext steps\nNow that you have learned the basics of a Docker container, it's time to learn about Docker images.What is an image?\n\nEdit this page\n\nRequest changes\n\nTable of contents\nExplanation\nContainers versus virtual machines (VMs)\nTry it out\nAdditional resources\nNext steps",
+      "text_extraction": "html-main-v1"
+    },
+    "https://www.cncf.io/about/who-we-are/": {
+      "retrieval_uri": "https://www.cncf.io/about/who-we-are/",
+      "final_url": "https://www.cncf.io/about/who-we-are/",
+      "retrieved_at": "2026-11-03T14:39:48.010223+00:00",
+      "content_type": "text/html; charset=utf-8",
+      "snapshot_digest": "sha256:0866bb521bdb7eb2fde10f1e8b6ebfefb4c30c738241a30d621d3a0916d927be",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "Who we are\n\nThe Cloud Native Computing Foundation (CNCF) hosts critical components of the global technology infrastructure.\n\nWe bring together the world’s top developers, end users, and vendors and run the largest open source developer conferences. CNCF is part of the nonprofit Linux Foundation.\n\nOur charter\n\n“CNCF’s mission is to make cloud native computing ubiquitous…”\n\nRead the CNCF charter\n\nUseful links\n\nRead about recent work and accomplishments in the CNCF Annual Report\n\nView our FAQ\n\nRead the CNCF Community Code of Conduct\n\nOur amazing events & members\n\nsee more\n\n \n\n \n\n \n \n\n \n \n\n \n \n\n \n\n \n Previous\n Photo\n \n \n \n Next\n Photo\n \n \n\n \n\nCloud Native Definition\n\nCloud native technologies empower organizations to build and run scalable applications in modern, dynamic environments such as public, private, and hybrid clouds. Containers, service meshes, microservices, immutable infrastructure, and declarative APIs exemplify this approach.\n\nThese techniques enable loosely coupled systems that are resilient, manageable, and observable. Combined with robust automation, they allow engineers to make high-impact changes frequently and predictably with minimal toil.\n\nThe Cloud Native Computing Foundation seeks to drive adoption of this paradigm by fostering and sustaining an ecosystem of open source, vendor-neutral projects. We democratize state-of-the-art patterns to make these innovations accessible for everyone.\n\nRead in other languages (and contribute) on GitHub.\n\nWe are a community of doers who enable open source projects including Kubernetes, Prometheus, Envoy, and many others.\n\nKubernetes and other CNCF projects have quickly gained adoption and secured diverse community support, becoming some of the highest velocity projects in the history of open source.\n\n \n\n \n\n \n\n \n \n\n \n\n \n\n \n 231 \n \n\n CNCF Projects\n \n \n \n\n \n\n \n\n \n\n \n \n\n \n\n \n\n \n 352 K+\n \n\n CNCF Project\n \nContributors\n \n \n \n\n \n\n \n\n \n\n \n \n\n \n\n \n\n \n 718 \n \n\n CNCF \nMembers\n \n \n \n\n \n\n \n\n \n\n \n \n\n \n\n \n\n \n 158 K+\n \n\n Cloud Native Community Members",
+      "text_extraction": "html-main-v1"
+    },
+    "https://www.cncf.io/about/faq/": {
+      "retrieval_uri": "https://www.cncf.io/about/faq/",
+      "final_url": "https://www.cncf.io/about/faq/",
+      "retrieved_at": "2026-11-03T14:39:49.678872+00:00",
+      "content_type": "text/html; charset=utf-8",
+      "snapshot_digest": "sha256:b450fcf07fbbeebb461fa7ad295064a36d0bee5a1b2d05708d713003f796ecfc",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "Table of contents\n\n \n\n \n\n \n \nWhat is cloud native?\n \n \nWhy is CNCF needed?\n \n \nDo I need to be a member to participate?\n \n \nWhy should I join CNCF as a member?\n \n \nHow can I sponsor CNCF events?\n \n \nWhat is the relationship between the CNCF and The Linux Foundation?\n \n \nWould my project be a good fit for the CNCF?\n \n \nCNCF and each of its projects have their own website. What is the relationship and why multiple sites?\n \n \nI have a question and I’m not sure who or where to ask?\n \n \n \n \n \n\n \n\n \n\nWhat is cloud native?\n\nPlease see the Cloud Native Definition.\n\nWhy is CNCF needed?\n\nCompanies are realizing that they need to be a software company, even if they are not in the software business. For example, Airbnb is revolutionizing the hospitality industry and more traditional hotels are struggling to compete. Cloud native allows IT and software to move faster. Adopting cloud native technologies and practices enables companies to create software in-house, allows business people to closely partner with IT people, keep up with competitors and deliver better services to their customers. CNCF technologies enable cloud portability without vendor lock-in.\n\nDo I need to be a member to participate?\n\nNo, all are welcome to participate in CNCF projects, the CNCF Slack channel, mailing lists, and CNCF events.\n\nWhy should I join CNCF as a member?\n\nThese slides give a good overview.\n\nHow can I sponsor CNCF events?\n\nPlease see our webpage on upcoming CNCF events. You can also download the sponsorship prospectus to see the current sponsorship opportunities. Any questions, email sponsor@cncf.io.\n\nWhat is the relationship between the CNCF and The Linux Foundation?\n\nThe Linux Foundation is the parent of CNCF. We are one of the LF’s largest sub-foundations. For more information on the LF project and how to get involved, visit their web page.\n\nWould my project be a good fit for the CNCF?\n\nTo make cloud native work, project interest of CNCF spans containers, microservices and programmable infrastructure as well as CI/CD networking, storage, logging, nodes, services, monitoring, visualization and more. Additionally we are interested in projects that demonstrate high quality and high velocity.\n\nFinally, we want to make sure the projects we work with are already up and running and proven to solve a problem for cloud native applications. Learn more here.\n\nCNCF and each of its projects have their own website. What is the relationship and why multiple sites?\n\nCNCF hosts many projects in the cloud native ecosystem. New projects are added as approved by the TOC (read the project lifecycle and process).\n\nCNCF provides many resources to the projects to support their adoption and assist with project velocity. But each project continues to operate independently under its pre-existing governance structure and with its existing maintainers. The project websites are the best place to learn about and work with each individual project. The CNCF website is a source for cross-project efforts like events and other initiatives.\n\nI have a question, and I’m not sure whom or where to ask.\n\nNo worries! Contact us and we will point you in the right direction.",
+      "text_extraction": "html-main-v1"
+    },
+    "https://docs.docker.com/get-started/docker-overview/": {
+      "retrieval_uri": "https://docs.docker.com/get-started/docker-overview/",
+      "final_url": "https://docs.docker.com/get-started/docker-overview/",
+      "retrieved_at": "2026-11-03T14:39:49.000452+00:00",
+      "content_type": "text/html",
+      "snapshot_digest": "sha256:5244f0214f3db04aefb73cdfa10e2ec25266a39331a738cb1552614252db5fc7",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "Back\n\nGet started\n\nGuides\n\nManuals\n\nReference\n\nTutorials\n\nContainerize an application\nSandbox a coding agent\nPilot an organization rollout\nGet Docker\nWhat is Docker?\n\nDocker concepts\n\nThe basics\n\nWhat is a container?\nWhat is an image?\nWhat is a registry?\nWhat is Docker Compose?\n\nBuilding images\n\nUnderstanding the image layers\nWriting a Dockerfile\nBuild, tag, and publish an image\nUsing the build cache\nMulti-stage builds\n\nRunning containers\n\nPublishing and exposing ports\nOverriding container defaults\nPersisting container data\nSharing local files with containers\nMulti-container applications\nEducational resources\n\nHome\n/\nGet started\n/\nWhat is Docker?\nWhat is Docker?\n\nAsk Gordon\n\nCopy Markdown\n\nView Markdown\n\nTable of contents\nThe Docker platform\nWhat can I use Docker for?\nFast, consistent delivery of your applications\nResponsive deployment and scaling\nRunning more workloads on the same hardware\nDocker architecture\nThe Docker daemon\nThe Docker client\nDocker Desktop\nDocker registries\nDocker objects\nThe underlying technology\nNext steps\nDocker is an open platform for developing, shipping, and running applications.\nDocker enables you to separate your applications from your infrastructure so\nyou can deliver software quickly. With Docker, you can manage your infrastructure\nin the same ways you manage your applications. By taking advantage of Docker's\nmethodologies for shipping, testing, and deploying code, you can\nsignificantly reduce the delay between writing code and running it in production.\nThe Docker platform\nDocker provides the ability to package and run an application in a loosely isolated\nenvironment called a container. The isolation and security let you run many\ncontainers simultaneously on a given host. Containers are lightweight and contain\neverything needed to run the application, so you don't need to rely on what's\ninstalled on the host. You can share containers while you work,\nand be sure that everyone you share with gets the same container that works in the\nsame way.\nDocker provides tooling and a platform to manage the lifecycle of your containers:\nDevelop your application and its supporting components using containers.\nThe container becomes the unit for distributing and testing your application.\nWhen you're ready, deploy your application into your production environment,\nas a container or an orchestrated service. This works the same whether your\nproduction environment is a local data center, a cloud provider, or a hybrid\nof the two.\nWhat can I use Docker for?\nFast, consistent delivery of your applications\nDocker streamlines the development lifecycle by allowing developers to work in\nstandardized environments using local containers which provide your applications\nand services. Containers are great for continuous integration and continuous\ndelivery (CI/CD) workflows.\nConsider the following example scenario:\nYour developers write code locally and share their work with their colleagues\nusing Docker containers.\nThey use Docker to push their applications into a test environment and run\nautomated and manual tests.\nWhen developers find bugs, they can fix them in the development environment\nand redeploy them to the test environment for testing and validation.\nWhen testing is complete, getting the fix to the customer is as simple as\npushing the updated image to the production environment.\nResponsive deployment and scaling\nDocker's container-based platform allows for highly portable workloads. Docker\ncontainers can run on a developer's local laptop, on physical or virtual\nmachines in a data center, on cloud providers, or in a mixture of environments.\nDocker's portability and lightweight nature also make it easy to dynamically\nmanage workloads, scaling up or tearing down applications and services as\nbusiness needs dictate, in near real time.\nRunning more workloads on the same hardware\nDocker is lightweight and fast. It provides a viable, cost-effective alternative\nto hypervisor-based virtual machines, so you can use more of your server\ncapacity to achieve your business goals. Docker is perfect for high density\nenvironments and for small and medium deployments where you need to do more with\nfewer resources.\nDocker architecture\nDocker uses a client-server architecture. The Docker client talks to the\nDocker daemon, which does the heavy lifting of building, running, and\ndistributing your Docker containers. The Docker client and daemon can\nrun on the same system, or you can connect a Docker client to a remote Docker\ndaemon. The Docker client and daemon communicate using a REST API, over UNIX\nsockets or a network interface. Another Docker client is Docker Compose,\nthat lets you work with applications consisting of a set of containers.\n\nThe Docker daemon\nThe Docker daemon (dockerd) listens for Docker API requests and manages Docker\nobjects such as images, containers, networks, and volumes. A daemon can also\ncommunicate with other daemons to manage Docker services.\nThe Docker client\nThe Docker client (docker) is the primary way that many Docker users interact\nwith Docker. When you use commands such as docker run, the client sends these\ncommands to dockerd, which carries them out. The docker command uses the\nDocker API. The Docker client can communicate with more than one daemon.\nDocker Desktop\nDocker Desktop is an easy-to-install application for your Mac, Windows, or Linux environment that enables you to build and share containerized applications and microservices. Docker Desktop includes the Docker daemon (dockerd), the Docker client (docker), Docker Compose, Docker Content Trust, Kubernetes, and Credential Helper. For more information, see\nDocker Desktop.\nDocker registries\nA Docker registry stores Docker images. Docker Hub is a public\nregistry that anyone can use, and Docker looks for images on\nDocker Hub by default. You can even run your own private registry.\nWhen you use the docker pull or docker run commands, Docker pulls the required images from your configured registry. When you use the docker push command, Docker pushes\nyour image to your configured registry.\nDocker objects\nWhen you use Docker, you are creating and using images, containers, networks,\nvolumes, plugins, and other objects. This section is a brief overview of some\nof those objects.\nImages\nAn image is a read-only template with instructions for creating a Docker\ncontainer. Often, an image is based on another image, with some additional\ncustomization. For example, you may build an image that is based on the Ubuntu image\nbut includes the Apache web server and your application, as well as the\nconfiguration details needed to make your application run.\nYou might create your own images or you might only use those created by others\nand published in a registry. To build your own image, you create a Dockerfile\nwith a simple syntax for defining the steps needed to create the image and run\nit. Each instruction in a Dockerfile creates a layer in the image. When you\nchange the Dockerfile and rebuild the image, only those layers which have\nchanged are rebuilt. This is part of what makes images so lightweight, small,\nand fast, when compared to other virtualization technologies.\nContainers\nA container is a runnable instance of an image. You can create, start, stop,\nmove, or delete a container using the Docker API or CLI. You can connect a\ncontainer to one or more networks, attach storage to it, or even create a new\nimage based on its current state.\nBy default, a container is relatively well isolated from other containers and\nits host machine. You can control how isolated a container's network, storage,\nor other underlying subsystems are from other containers or from the host\nmachine.\nA container is defined by its image as well as any configuration options you\nprovide to it when you create or start it. When a container is removed, any changes to\nits state that aren't stored in persistent storage disappear.\nExample docker run command\nThe following command runs an ubuntu container, attaches interactively to your\nlocal command-line session, and runs /bin/bash.\n\n$ docker run -i -t ubuntu /bin/bash\n\nWhen you run this command, the following happens (assuming you are using\nthe default registry configuration):\n\nIf you don't have the ubuntu image locally, Docker pulls it from your\nconfigured registry, as though you had run docker pull ubuntu manually.\n\nDocker creates a new container, as though you had run a docker container create\ncommand manually.\n\nDocker allocates a read-write filesystem to the container, as its final\nlayer. This allows a running container to create or modify files and\ndirectories in its local filesystem.\n\nDocker creates a network interface to connect the container to the default\nnetwork, since you didn't specify any networking options. This includes\nassigning an IP address to the container. By default, containers can\nconnect to external networks using the host machine's network connection.\n\nDocker starts the container and executes /bin/bash. Because the container\nis running interactively and attached to your terminal (due to the -i and -t\nflags), you can provide input using your keyboard while Docker logs the output to\nyour terminal.\n\nWhen you run exit to terminate the /bin/bash command, the container\nstops but isn't removed. You can start it again or remove it.\nThe underlying technology\nDocker is written in the Go programming language and takes\nadvantage of several features of the Linux kernel to deliver its functionality.\nDocker uses a technology called namespaces to provide the isolated workspace\ncalled the container. When you run a container, Docker creates a set of\nnamespaces for that container.\nThese namespaces provide a layer of isolation. Each aspect of a container runs\nin a separate namespace and its access is limited to that namespace.\nNext steps\nInstall Docker\nBuild and share a containerized application\n\nEdit this page\n\nRequest changes\n\nTable of contents\nThe Docker platform\nWhat can I use Docker for?\nFast, consistent delivery of your applications\nResponsive deployment and scaling\nRunning more workloads on the same hardware\nDocker architecture\nThe Docker daemon\nThe Docker client\nDocker Desktop\nDocker registries\nDocker objects\nThe underlying technology\nNext steps",
+      "text_extraction": "html-main-v1"
+    },
+    "https://kubernetes.io/docs/concepts/overview/": {
+      "retrieval_uri": "https://kubernetes.io/docs/concepts/overview/",
+      "final_url": "https://kubernetes.io/docs/concepts/overview/",
+      "retrieved_at": "2026-11-03T14:39:48.251714+00:00",
+      "content_type": "text/html; charset=utf-8",
+      "snapshot_digest": "sha256:a1de134447afaa33cdbeb0d56fc0a4ebb5d5ff6ce62696132015fbfe5c26c602",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "Kubernetes Documentation\nConcepts\nOverview\n\nOverview\nKubernetes is a portable, extensible, open source platform for managing containerized workloads and services that facilitate both declarative configuration and automation. It has a large, rapidly growing ecosystem. Kubernetes services, support, and tools are widely available.\nThis page is an overview of Kubernetes.\nThe name Kubernetes originates from Greek, meaning helmsman or pilot. K8s as an abbreviation\nresults from counting the eight letters between the \"K\" and the \"s\". Google open sourced the\nKubernetes project in 2014. Kubernetes combines\nover 15 years of Google's experience running\nproduction workloads at scale with best-of-breed ideas and practices from the community.\nWhy you need Kubernetes and what it can do\nContainers are a good way to bundle and run your applications. In a production\nenvironment, you need to manage the containers that run the applications and\nensure that there is no downtime. For example, if a container goes down, another\ncontainer needs to start. Wouldn't it be easier if this behavior was handled by a system?\nThat's how Kubernetes comes to the rescue! Kubernetes provides you with a framework\nto run distributed systems resiliently. It takes care of scaling and failover for\nyour application, provides deployment patterns, and more. For example: Kubernetes\ncan easily manage a canary deployment for your system.\nKubernetes provides you with:\nService discovery and load balancing\nKubernetes can expose a container using a DNS name or its own IP address.\nIf traffic to a container is high, Kubernetes is able to load balance and distribute\nthe network traffic so that the deployment is stable.\nStorage orchestration\nKubernetes allows you to automatically mount a storage system of your choice, such as\nlocal storage, public cloud providers, and more.\nAutomated rollouts and rollbacks\nYou can describe the desired state for your deployed containers using Kubernetes,\nand it can change the actual state to the desired state at a controlled rate.\nFor example, you can automate Kubernetes to create new containers for your\ndeployment, remove existing containers and adopt all their resources to the new container.\nAutomatic bin packing\nYou provide Kubernetes with a cluster of nodes that it can use to run containerized tasks.\nYou tell Kubernetes how much CPU and memory (RAM) each container needs. Kubernetes can fit\ncontainers onto your nodes to make the best use of your resources.\nSelf-healing\nKubernetes restarts containers that fail, replaces containers, kills containers that don't\nrespond to your user-defined health check, and doesn't advertise them to clients until they\nare ready to serve.\nSecret and configuration management\nKubernetes lets you store and manage sensitive information, such as passwords, OAuth tokens,\nand SSH keys. You can deploy and update secrets and application configuration without\nrebuilding your container images, and without exposing secrets in your stack configuration.\nBatch execution\nIn addition to services, Kubernetes can manage your batch and CI workloads, replacing containers that fail, if desired.\nHorizontal scaling\nScale your application up and down with a simple command, with a UI, or automatically based on CPU usage.\nIPv4/IPv6 dual-stack\nAllocation of IPv4 and IPv6 addresses to Pods and Services.\nDesigned for extensibility\nAdd features to your Kubernetes cluster without changing upstream source code.\nWhat Kubernetes is not\nKubernetes is not a traditional, all-inclusive PaaS (Platform as a Service) system.\nSince Kubernetes operates at the container level rather than at the hardware level,\nit provides some generally applicable features common to PaaS offerings, such as\ndeployment, scaling, load balancing, and lets users integrate their logging, monitoring,\nand alerting solutions. However, Kubernetes is not monolithic, and these default solutions\nare optional and pluggable. Kubernetes provides the building blocks for building developer\nplatforms, but preserves user choice and flexibility where it is important.\nKubernetes:\nDoes not limit the types of applications supported. Kubernetes aims to support an\nextremely diverse variety of workloads, including stateless, stateful, and data-processing\nworkloads. If an application can run in a container, it should run great on Kubernetes.\nDoes not deploy source code and does not build your application. Continuous Integration,\nDelivery, and Deployment (CI/CD) workflows are determined by organization cultures and\npreferences as well as technical requirements.\nDoes not provide application-level services, such as middleware (for example, message buses),\ndata-processing frameworks (for example, Spark), databases (for example, MySQL), caches, nor\ncluster storage systems (for example, Ceph) as built-in services. Such components can run on\nKubernetes, and/or can be accessed by applications running on Kubernetes through portable\nmechanisms, such as the Open Service Broker.\nDoes not dictate logging, monitoring, or alerting solutions. It provides some integrations\nas proof of concept, and mechanisms to collect and export metrics.\nDoes not provide nor mandate a configuration language/system (for example, Jsonnet). It provides\na declarative API that may be targeted by arbitrary forms of declarative specifications.\nDoes not provide nor adopt any comprehensive machine configuration, maintenance, management,\nor self-healing systems.\nAdditionally, Kubernetes is not a mere orchestration system. In fact, it eliminates the need\nfor orchestration. The technical definition of orchestration is execution of a defined workflow:\nfirst do A, then B, then C. In contrast, Kubernetes comprises a set of independent, composable\ncontrol processes that continuously drive the current state towards the provided desired state.\nIt shouldn't matter how you get from A to C. Centralized control is also not required. This\nresults in a system that is easier to use and more powerful, robust, resilient, and extensible.\nHistorical context for Kubernetes\nLet's take a look at why Kubernetes is so useful by going back in time.\n\nTraditional deployment era:\nEarly on, organizations ran applications on physical servers. There was no way to define\nresource boundaries for applications in a physical server, and this caused resource\nallocation issues. For example, if multiple applications run on a physical server, there\ncan be instances where one application would take up most of the resources, and as a result,\nthe other applications would underperform. A solution for this would be to run each application\non a different physical server. But this did not scale as resources were underutilized, and it\nwas expensive for organizations to maintain many physical servers.\nVirtualized deployment era:\nAs a solution, virtualization was introduced. It allows you\nto run multiple Virtual Machines (VMs) on a single physical server's CPU. Virtualization\nallows applications to be isolated between VMs and provides a level of security as the\ninformation of one application cannot be freely accessed by another application.\nVirtualization allows better utilization of resources in a physical server and allows\nbetter scalability because an application can be added or updated easily, reduces\nhardware costs, and much more. With virtualization you can present a set of physical\nresources as a cluster of disposable virtual machines.\nEach VM is a full machine running all the components, including its own operating\nsystem, on top of the virtualized hardware.\nContainer deployment era:\nContainers are similar to VMs, but they have relaxed\nisolation properties to share the Operating System (OS) among the applications.\nTherefore, containers are considered lightweight. Similar to a VM, a container\nhas its own filesystem, share of CPU, memory, process space, and more. As they\nare decoupled from the underlying infrastructure, they are portable across clouds\nand OS distributions.\nContainers have become popular because they provide extra benefits, such as:\nAgile application creation and deployment: increased ease and efficiency of\ncontainer image creation compared to VM image use.\nContinuous development, integration, and deployment: provides reliable\nand frequent container image build and deployment with quick and efficient\nrollbacks (due to image immutability).\nDev and Ops separation of concerns: create application container images at\nbuild/release time rather than deployment time, thereby decoupling\napplications from infrastructure.\nObservability: not only surfaces OS-level information and metrics, but also\napplication health and other signals.\nEnvironmental consistency across development, testing, and production: runs\nthe same on a laptop as it does in the cloud.\nCloud and OS distribution portability: runs on Ubuntu, RHEL, CoreOS, on-premises,\non major public clouds, and anywhere else.\nApplication-centric management: raises the level of abstraction from running an\nOS on virtual hardware to running an application on an OS using logical resources.\nLoosely coupled, distributed, elastic, liberated micro-services: applications are\nbroken into smaller, independent pieces and can be deployed and managed dynamically –\nnot a monolithic stack running on one big single-purpose machine.\nResource isolation: predictable application performance.\nResource utilization: high efficiency and density.\nWhat's next\nTake a look at the Kubernetes Components\nTake a look at the Kubernetes API\nTake a look at kubectl: the primary CLI for Kubernetes\nTake a look at the Cluster Architecture\nReady to Get Started?\n\nFeedback\nWas this page helpful?Yes\nNo\nThanks for the feedback. If you have a specific, answerable question about how to use Kubernetes, ask it on\nStack Overflow.\nOpen an issue in the GitHub Repository if you want to\nreport a problem\nor\nsuggest an improvement.\nLast modified May 30, 2026 at 6:09 PM PST: Add theme_lock front matter to concepts overview pages (6e5065edcf)",
+      "text_extraction": "html-main-v1"
+    },
+    "https://www.cncf.io/projects/": {
+      "retrieval_uri": "https://www.cncf.io/projects/",
+      "final_url": "https://www.cncf.io/projects/",
+      "retrieved_at": "2026-11-03T14:39:49.922213+00:00",
+      "content_type": "text/html; charset=utf-8",
+      "snapshot_digest": "sha256:578ca9550a056290c184f8e278ce3660d019a3319365abece5d2110b1633a757",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "Graduated and incubating projects are considered stable and are used successfully in production environments.\n\nProject Metrics\n\nView metrics of CNCF projects moving through the project maturity levels.\n\nview metrics\n\nOur Graduated Projects\n\nView on CNCF landscape\n\n \n\n \n\n \n \n \n Continuous Integration & Delivery\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Cloud Native Network\n \n \n\n \n\n \n \n \n Streaming & Messaging\n \n \n\n \n\n \n \n \n Container Runtime\n \n \n\n \n\n \n \n \n Coordination & Service Discovery\n \n \n\n \n\n \n \n \n Container Runtime\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Cloud Native Storage\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Container Registry\n \n \n\n \n\n \n \n \n Service Proxy\n \n \n\n \n\n \n \n \n Coordination & Service Discovery\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Observability\n \n \n\n \n\n \n \n \n Continuous Integration & Delivery\n \n \n\n \n\n \n \n \n Container Registry\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Service Mesh\n \n \n\n \n\n \n \n \n Observability\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Automation & Configuration\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Service Mesh\n \n \n\n \n\n \n \n \n Streaming & Messaging\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Observability\n \n \n\n \n\n \n \n \n Observability\n \n \n\n \n\n \n \n \n Cloud Native Storage\n \n \n\n \n\n \n \n \n Key Management\n \n \n\n \n\n \n \n \n Key Management\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Database\n \n \n\n \n\n \n \n \n Database\n \n \n \n\nOur Incubating Projects\n\nView on CNCF landscape\n\n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Chaos Engineering\n \n \n\n \n\n \n \n \n Automation & Configuration\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Cloud Native Network\n \n \n\n \n\n \n \n \n Service Proxy\n \n \n\n \n\n \n \n \n Observability\n \n \n\n \n\n \n \n \n API Gateway\n \n \n\n \n\n \n \n \n Certified Kubernetes - Distribution\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Remote Procedure Call\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Coordination & Service Discovery\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Framework\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Container Runtime\n \n \n\n \n\n \n \n \n Chaos Engineering\n \n \n\n \n\n \n \n \n Cloud Native Storage\n \n \n\n \n\n \n \n \n Automation & Configuration\n \n \n\n \n\n \n \n \n Automation & Configuration\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Continuous Optimization\n \n \n\n \n\n \n \n \n Feature Flagging\n \n \n\n \n\n \n \n \n Security & Compliance\n \n \n\n \n\n \n \n \n Continuous Integration & Delivery\n \n \n\n \n\n \n \n \n Automation & Configuration\n \n \n\n \n\n \n \n \n Application Definition & Image Build\n \n \n\n \n\n \n \n \n Streaming & Messaging\n \n \n\n \n\n \n \n \n Continuous Integration & Delivery\n \n \n\n \n\n \n \n \n Observability\n \n \n\n \n\n \n \n \n Scheduling & Orchestration\n \n \n\n \n\n \n \n \n Scheduling & Orchestration",
+      "text_extraction": "html-main-v1"
+    },
+    "https://glossary.cncf.io/monolithic-apps/": {
+      "retrieval_uri": "https://glossary.cncf.io/monolithic-apps/",
+      "final_url": "https://glossary.cncf.io/monolithic-apps/",
+      "retrieved_at": "2026-11-03T14:39:48.793972+00:00",
+      "content_type": "text/html; charset=utf-8",
+      "snapshot_digest": "sha256:5b4fea093e9bc0d8d8c6d590339aca9acbe9f68334346b7a4861f516b339ad81",
+      "capture_method": "scripts.fetch_citation._fetch_once",
+      "text": "Monolithic Apps\n\nArchitecture\nFundamental\nA monolithic application contains all functionality in a single deployable program.\nThis is often the simplest and easiest place to start when making an application.\nHowever, once the application grows in complexity, monoliths can become hard to maintain.\nWith more developers working on the same codebase,\nthe likelihood of conflicting changes and the need for interpersonal communication between developers increases.\nProblem it Addresses\nDevolving an application into microservices increases its operational overhead\n— there are more things to test, deploy, and keep running.\nEarly in a product’s lifecycle, it may be advantageous to defer this complexity and build a monolithic application\nuntil the product is determined successful.\nHow it Helps\nA well-designed monolith can uphold lean principles by being the simplest way to get an application up and running.\nWhen the business value of the monolithic application proves successful, it can be decomposed into microservices.\nCrafting a microservices-based app before it has proven valuable may be premature spending of engineering effort.\nIf the application yields no value, that effort becomes wasted.\n\nFeedback\nWas this page helpful?Yes\nNo\nThank you! Please let us know if you have any suggestions.\nThanks for your feedback. Please tell us how we can improve.\n\nLast modified March 27, 2024: [en] Update links to 'microservices' (#3009) (693b72b)",
+      "text_extraction": "html-main-v1"
+    },
+    "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4": {
+      "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+      "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+      "path": "src/content/docs/prerequisites/kubernetes-basics/index.md"
+    }
+  },
+  "notes": "Author proposals only; no source verdicts. Verifier must inspect the entire page for omitted material claims."
+}

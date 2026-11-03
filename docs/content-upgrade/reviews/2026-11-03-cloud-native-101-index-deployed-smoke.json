@@ -1,0 +1,24 @@
+{
+  "page": "src/content/docs/prerequisites/cloud-native-101/index.md",
+  "page_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+  "publication": {
+    "http": {
+      "url": "https://kube-dojo.github.io/prerequisites/cloud-native-101/",
+      "status": 200,
+      "retrieved_at": "2026-11-03T16:07:46.633774+00:00",
+      "html_sha256": "41e11a06c9ec8e31095c6d9f418c557a9b41f5503a190dbb0c994f0627f633a6",
+      "checks": {
+        "Cloud Native 101": true,
+        "module-1.1-what-are-containers/": true,
+        "What Is Kubernetes?": true,
+        "This section covers containers, Kubernetes, and cloud native architecture.": true
+      },
+      "deployment": {
+        "conclusion": "success",
+        "headSha": "37d2db1e5b67b84c34ee840bcc8e2be1617dcc8a",
+        "status": "completed",
+        "url": "https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/41667850469"
+      }
+    }
+  }
+}
