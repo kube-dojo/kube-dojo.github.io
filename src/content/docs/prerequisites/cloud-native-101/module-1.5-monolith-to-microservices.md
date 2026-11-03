@@ -513,7 +513,13 @@ Choose one application you know well enough to discuss honestly. It can be a wor
 - [ ] **Evaluate communication style**: Decide whether the extracted capability should use synchronous request-response, asynchronous events, or both, and explain the user-facing trade-off.
 - [ ] **Review the decision**: State why you are not extracting two additional services yet, using operational cost and domain uncertainty as part of the reasoning.
 
+**Nudge for Tasks 2 and 6:** Look for uneven demand and uncertain boundaries.
+
+<details>
+<summary>More help with Tasks 2 and 6</summary>
+
 For scaling pressure, compare the resources or workload peaks of one workflow with the rest. For the decision review, name the cost of operating each proposed service and what remains uncertain about its boundary.
+</details>
 
 <details>
 <summary>Solution guide: classification</summary>
@@ -546,28 +552,6 @@ Use synchronous calls when the user needs an immediate answer, such as authentic
 - [ ] You connected at least five Kubernetes features to the operational problems they solve.
 - [ ] You evaluated synchronous and asynchronous communication with failure behavior, not only convenience.
 - [ ] You explained why at least two possible services should remain inside the monolith for now.
-
-### Task: Diagnose failure boundaries
-
-For each card, name the failure layer and a next action before opening the reveal.
-
-**Card B: Checkout hangs with no budget.** A new service calls inventory over the network. The inventory process stalls. Checkout threads wait until the browser gives up. There is no timeout and no retry limit.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: the call treats the network like an in-process function. Next action: set a timeout budget and a bounded retry before you add another service hop.
-
-</details>
-
-**Card D: Four services, one release.** A team runs four services. Every feature still waits for all four pipelines to go green, and they share one database write path.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: a distributed monolith, not independent services. Next action: stop extracting the next noun, and name the release coupling before you add a fifth repository.
-
-</details>
 
 ## Sources
 
