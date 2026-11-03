@@ -113,6 +113,8 @@ A package is a structured bundle of files and metadata, which may include a vers
 
 A package manager can find packages in configured sources, install them, and later upgrade or remove them. Verification depends on the package manager and its configuration; installation is not proof that software is safe. A catalog is called a repository in many Linux systems and a tap in Homebrew.
 
+Homebrew calls a package definition a formula; a cask defines how to install precompiled software. The Cellar is the directory containing installed formula versions. Formulae can also use prebuilt bottles. See the [Homebrew terminology](https://docs.brew.sh/Formula-Cookbook#homebrew-terminology).
+
 ```bash
 sudo apt install htop
 brew install htop
@@ -160,6 +162,12 @@ brew install htop
 Trust is the other half of privilege. A package manager may run maintainer scripts, place binaries on your `PATH`, start services, or install libraries that other programs will load. That does not mean package managers are unsafe; it means installation is a security decision. Prefer official repositories, vendor documentation, and well-known package sources, and be especially cautious with commands copied from random comments or scripts that pipe a network download directly into a shell.
 
 Before running this, what output do you expect from `apt install tree` without `sudo` on a Linux system? Write down your prediction first, then try it in a disposable lab or local machine where you are allowed to test. Reading the exact error message teaches you more than memorizing a warning, because real troubleshooting starts with what the system actually said.
+
+<details><summary>Check your prediction</summary>
+
+An ordinary user may see a permission or lock-file error. The wording varies by system; read the actual error before retrying.
+
+</details>
 
 Privilege should feel deliberate, not scary. The healthiest habit is to pause when a command asks for administrator authority and ask what protected resource it needs. Installing a system package is a reasonable use of that authority; editing random files under `/usr` by hand usually is not. This pause becomes more important when you later install container runtimes, cloud CLIs, and Kubernetes helpers that can affect networking, credentials, or background services.
 
@@ -278,9 +286,10 @@ This synthetic example shows a possible directory outline. The actual path and f
         └── pasta-carbonara.txt
 ```
 
-Updating installed software is a separate operational decision. On Ubuntu and Debian, list packages with available upgrades before deciding what to change. `apt list --upgradable` reads the local index, which may be stale until you run `sudo apt update` as shown below. The actual upgrade plan can hold packages back:
+Updating installed software is a separate operational decision. On Ubuntu and Debian, refresh the index, then list available upgrades before deciding what to change. The actual upgrade plan can hold packages back:
 
 ```bash
+sudo apt update
 apt list --upgradable
 ```
 
@@ -319,6 +328,8 @@ Removing software should also go through the package manager when possible. If y
 sudo apt remove package-name
 ```
 
+`apt remove` removes the named package but normally leaves modified configuration files. `apt purge` also removes those packaged configuration files, but not data or configuration in your home directory. Automatically installed dependencies can remain after removal; `apt autoremove` removes those no longer needed. Read its proposed list before confirming, since it may include software you still use. See the [apt manual](https://manpages.debian.org/bookworm/apt/apt.8.en.html).
+
 Homebrew has the same idea with a different verb. If you installed a formula with Homebrew, uninstall it with Homebrew so the Cellar, links, and package records are handled consistently.
 
 ```bash
@@ -347,7 +358,7 @@ A blog post may be outdated or target a different release. `apt show` and `brew 
 
 </details>
 
-Updates and removals deserve the same discipline as installs because they change the dependency graph too. An upgrade can replace a library used by several tools, and a removal can leave an automatically installed dependency behind because another package still needs it. When the package manager displays a plan, treat it as a change request in miniature. Read the packages to be installed, upgraded, removed, or left unchanged, then decide whether the plan matches your intention.
+Updates and removals deserve the same discipline as installs because they change the dependency graph too. Read the packages to be installed, upgraded, removed, or left unchanged, then decide whether the plan matches your intention.
 
 ## Reading Package Metadata
 
@@ -357,7 +368,11 @@ On Ubuntu and Debian systems, `apt show` displays metadata for a package. The di
 
 ```bash
 apt show htop
+apt-cache policy htop
+command -v htop
 ```
+
+Compare the installed and candidate versions in the policy output; `command -v` identifies the command your shell finds.
 
 On macOS, Homebrew's equivalent inspection command is `brew info`. It shows the formula description, installed status, version, dependencies, install path, and related caveats when they exist. The exact fields vary by formula, but the habit is the same: inspect before you assume.
 
@@ -397,23 +412,11 @@ Metadata also teaches humility about cross-platform instructions. A package name
 
 ## Patterns & Anti-Patterns
 
-The strongest beginner pattern is to use the operating system's package manager first for system tools. It gives you a known repository, a record of installed files, a standard update path, and a common vocabulary for troubleshooting. You should still read the output, but you are starting from a workflow that the operating system ecosystem expects.
-
-Another good pattern is to inspect before you install when the tool is unfamiliar or security-sensitive. Search for the package, read its metadata, check the official vendor or project documentation, and notice the dependencies. This does not turn you into a security auditor overnight, but it prevents the most avoidable mistake: running installation commands without knowing what they claim to install.
-
-A third pattern is to separate development convenience from production stability. On a laptop, upgrading a small utility during the day is often fine. On a production server, updates should be planned, tested, monitored, and reversible because even a legitimate bug fix can change behavior. Package managers make updates easy to execute, but engineering judgment decides when and where to execute them.
-
 | Pattern | Use It When | Why It Works |
 |---------|-------------|--------------|
 | Prefer the platform package manager | You need common system tools such as `htop`, `tree`, `curl`, or editors | The package manager records versions, dependencies, and files so upgrades and removals remain manageable. |
 | Inspect package metadata first | The package is unfamiliar, privileged, network-facing, or part of a setup guide | Metadata reveals dependencies, descriptions, versions, and source information before the install changes your machine. |
 | Update metadata before install or upgrade | The system is new, recently offline, or responding to a security advisory | Refreshing retrieves available metadata; check for errors before relying on it. |
-
-The matching anti-pattern is copying random installation commands without context. A command that downloads a script and runs it may be legitimate when it comes from an official project page, but the same shape from a comment thread deserves skepticism. Package management is partly about trust boundaries: where did this package come from, who maintains it, and what privileges will it receive?
-
-Another anti-pattern is mixing installation methods for the same tool without a reason. If you install one `kubectl` binary manually, another with Homebrew, and a third with a language-specific tool, your shell may find a different one than you expect. That creates version confusion, especially when future Kubernetes 1.35+ exercises depend on a specific client behavior.
-
-A final anti-pattern is treating updates as either always safe or always dangerous. Never updating leaves known vulnerabilities and bugs in place. Blindly updating critical servers can break workloads at bad times. The professional habit is to evaluate risk, test changes where possible, update metadata, read the plan, apply the update deliberately, and verify the result.
 
 | Anti-Pattern | What Goes Wrong | Better Alternative |
 |--------------|-----------------|--------------------|
@@ -423,31 +426,12 @@ A final anti-pattern is treating updates as either always safe or always dangero
 
 ## When You'd Use This vs Alternatives
 
-Use the system package manager when the tool belongs to the operating system environment, should be available from the terminal, and benefits from normal system updates. `htop`, `tree`, shells, editors, network utilities, and many database clients fit this pattern. The package manager gives you consistent installation, removal, and metadata commands, which are more valuable than a one-time download.
-
-Use a vendor installer when the vendor's official documentation requires it or when the platform repository is too old for the task. Some tools publish their own repositories because they release faster than an operating system distribution. In that case, still keep the same questions: is this the official source, how are updates handled, what keys or signatures are used, and how will you remove the tool later?
-
-Use language-specific package managers for project dependencies rather than system tools. Python, Node.js, Go, and Rust all have ecosystem-specific workflows, and those workflows are useful when dependencies belong to one application instead of the whole machine. This is why a future app might use `npm` or `pip` inside a project while the machine itself still uses `apt` or `brew` for system utilities.
-
-Use isolation when two tools have legitimate but incompatible requirements. A container, virtual environment, or project-specific toolchain can let one application use the dependency version it needs without forcing the entire host to agree. This is not a replacement for system package management; it is a complement. The operating system still needs trusted base tools, while projects may need narrower environments for their own dependency decisions.
-
 | Situation | Prefer | Reason |
 |-----------|--------|--------|
 | Installing a common terminal utility | `apt`, `dnf`, `pacman`, or `brew` | The tool is part of the machine environment and should be updated with the machine. |
 | Installing a fast-moving vendor CLI | Official vendor repository or installer | The operating system repository may lag behind the vendor's supported version. |
 | Installing libraries for one application | Project-level package manager or isolated environment | The dependency belongs to the project, not every user and service on the host. |
 | Diagnosing what is already installed | Package metadata commands | The package database gives evidence about versions, dependencies, and install source. |
-
-The practical decision framework is simple enough to remember. Start with the platform package manager, verify the package and version meet your need, inspect dependencies if the tool is unfamiliar, and only switch to a vendor or project-specific installer when you can explain why the platform package is insufficient. That explanation matters because future you, a teammate, or an incident responder will inherit the installation choices you make today.
-
-If you are unsure, write down the reason for the installation before you run it: the tool name, the source you trust, the package manager you will use, the command, and the command you will use to verify success. This tiny checklist turns a risky impulse into an inspectable decision. It is the same professional move you will later use when changing cluster add-ons, cloud credentials, or automation scripts: state the intended change, perform it deliberately, and verify the outcome.
-
-## Did You Know?
-
-1. Homebrew calls its source-built package definitions formulae and the directory holding installed formula versions the Cellar. Casks are a separate kind of definition.
-2. Depending on policy, `sudo` can log commands for later review.
-3. Debian-based systems separate `apt update` from `apt upgrade`, which is why a machine can claim a package is current when its local package index is actually stale.
-4. Incompatible dependency requirements can make two programs difficult to install together in one shared environment.
 
 ## Common Mistakes
 
@@ -477,9 +461,9 @@ The shared concept is that these package managers can search configured catalogs
 
 </details>
 
-<details><summary>Question 3: A new Linux server says `E: Unable to locate package nginx`. What does this establish, and what should you inspect before retrying?</summary>
+<details><summary>Question 3: You no longer need a package on a shared Ubuntu server. What is the difference between remove, purge and autoremove, and what should you check first?</summary>
 
-APT could not locate the package using its available information; the message alone does not establish why. Check spelling and configured sources, refresh metadata on the authorized host, and inspect update errors and package availability before retrying. Refreshing a stale index does not repair every repository or package-name problem.
+`remove` removes the package while usually retaining modified configuration; `purge` also removes those configuration files. `autoremove` targets automatically installed dependencies that are no longer needed. Check the proposed removal list and whether other users or services need the software before confirming.
 
 </details>
 
@@ -491,7 +475,7 @@ Automatic upgrades can apply legitimate fixes at times when nobody is watching, 
 
 <details><summary>Question 5: You install a small weather CLI and the package manager plans to install several dependencies, including a networking library. Should you cancel just because extra packages appear?</summary>
 
-Not automatically. Extra packages may be required dependencies, such as libraries for HTTP requests, terminal output, or language runtimes; `apt` also installs recommended packages by default. You should read the dependency list and decide whether it is reasonable for the tool, especially if the package is unfamiliar or privileged. Cancel when the plan looks surprising or untrusted, but do not assume every dependency is a problem.
+Not automatically. Extra packages may be required dependencies, such as libraries for HTTP requests, terminal output, or language runtimes. You should read the dependency list and decide whether it is reasonable for the tool, especially if the package is unfamiliar or privileged. Cancel when the plan looks surprising or untrusted, but do not assume every dependency is a problem.
 
 </details>
 
@@ -504,6 +488,8 @@ On Ubuntu, use `apt show htop` and optionally `apt-cache depends htop`; on macOS
 ## Hands-On Exercise: Your First Software Installations
 
 This exercise asks you to update package metadata, install two small utilities, run them, search for related packages, and inspect dependency information. Use either the Ubuntu/Debian path or the macOS path depending on your machine. If you are using a temporary lab environment, it is normal for the package lists and installed package counts to differ from your personal computer.
+
+On Windows, use an authorized Ubuntu WSL shell or an appropriate Ubuntu lab shell; the [linked Killercoda scenario](https://killercoda.com/kubedojo/scenario/prereq-0.9-packages) is an additional option.
 
 ### Task 1: Refresh the Package Catalog
 
@@ -582,6 +568,10 @@ tree ~ -L 1
 The successful result is a directory tree, not a specific set of filenames. If `~/kubedojo-practice` is missing, that is a file-system state issue rather than a package issue, so test `tree` against another directory before reinstalling the package.
 
 </details>
+
+### Cleanup: Remove a lab package
+
+After completing the tasks, if you installed `tree` specifically for this exercise and no one else needs it, remove it on your authorized practice machine. Review the proposed changes before confirming. On Ubuntu or Debian run `sudo apt remove tree`; on macOS run `brew uninstall tree`. Otherwise leave it installed. Explain what `purge` or `autoremove` would change before considering either command, and check the package list to verify the result.
 
 ### Task 4: Search, List, and Check Versions
 
