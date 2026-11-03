@@ -583,6 +583,7 @@ Finish the earlier topology before starting this exercise: if this run still has
 2. Nudge: look for the destination and identity. Stronger hint: inspect the cluster, user and context entries with `kubectl config view`.
 3. Nudge: the node image determines the version. Stronger hint: use `lesson_create` with `--image` and the v1.34.11 digest from the release notes.
 4. Nudge: compare the client and server separately. Stronger hint: inspect the current context and switch with `kubectl config use-context`; an unexpected server version may mean the wrong context is active.
+5. Nudge: count the node roles in the configuration. Stronger hint: declare three `control-plane` nodes and no workers.
 6. Nudge: consider which container hosts the API. Stronger hint: use the recorded target with `lesson_fail` and try `kubectl get nodes`.
 
 ### Solutions
@@ -606,6 +607,8 @@ kubectl cluster-info
 # Alternatively, find the port mapping directly from Docker
 docker port primary-dojo-control-plane
 ```
+
+Expected outcome: one node and an API address on `127.0.0.1` with a randomly assigned port.
 </details>
 
 <details>
@@ -619,6 +622,8 @@ kubectl config view
 ```
 
 Locate `clusters:`, `users:`, and `contexts:` in the redacted private file. For `primary-dojo`, their referenced name is `kind-primary-dojo`. The file's current context determines the request destination; a stored context name alone is not proof that a cluster belongs to this lesson.
+
+Expected outcome: the context, cluster, and user references are named `kind-primary-dojo`.
 </details>
 
 <details>
@@ -632,6 +637,8 @@ lesson_create legacy-dojo --image kindest/node:v1.34.11@sha256:44e222ee2132dab25
 ```
 
 This command may take a moment if Docker must download the node image for version 1.34.11.
+
+Expected outcome: `legacy-dojo` runs Kubernetes v1.34.11, while `primary-dojo` runs v1.35.8.
 </details>
 
 <details>
@@ -660,6 +667,8 @@ kubectl version
 lesson_delete primary-dojo
 lesson_delete legacy-dojo
 ```
+
+Expected outcome: `kind-primary-dojo` reports server v1.35.8 and `kind-legacy-dojo` reports server v1.34.11.
 </details>
 
 <details>
@@ -723,6 +732,12 @@ lesson_delete broken-dojo
 </details>
 
 Before cleanup, reflect: which signals would distinguish a stopped node container from a wrong context or a wrong port?
+
+<details>
+<summary>Reflection answer</summary>
+
+`docker ps -a` shows an exited node container. `kubectl config current-context` shows a wrong context. A wrong port appears when `docker port broken-dojo-control-plane` differs from the server address in `kubectl cluster-info`.
+</details>
 
 ### Success Criteria
 
