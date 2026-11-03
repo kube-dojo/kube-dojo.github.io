@@ -32,11 +32,7 @@ After this module, you will be able to practice the following skills in a real t
 
 Hypothetical scenario: you are following a setup guide for a Kubernetes practice lab, and the guide tells you to create a configuration folder, copy a sample file, rename it, and remove the old version. Those relative paths depend on your current location. If you are in the wrong directory, a command may still succeed, but the file lands somewhere surprising, the copy is not where the next step expects it, or the cleanup command removes a path you meant to keep.
 
-These commands help you navigate project folders and prepare files for later work. A relative path depends on the current directory, so check your location and the target before changing anything.
-
-You will practice `pwd`, `ls`, `cd`, `mkdir`, `touch`, `cp`, `mv`, `rm`, and `clear`, then use pipes to connect commands. Check your location before acting, and inspect deletion targets before removing them.
-
-If a result differs from the guide, check where you are, what is there, and what changed. The exercises ask you to explain a command's target and verify its result.
+You will practice `pwd`, `ls`, `cd`, `mkdir`, `touch`, `cp`, `mv`, `rm`, and `clear`, then use pipes to connect commands. Check your location and targets before acting, and verify the results.
 
 ## Opening Your Terminal and Reading the Prompt
 
@@ -51,7 +47,7 @@ su - ubuntu
 pwd
 ```
 
-The [lab's verifier](https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/step1/verify.sh) checks the account's home directory. A file created under `/root` will not satisfy that check when it expects `/home/ubuntu`, even if the file contains the right answer. Stay in the Ubuntu account for all three lab tasks.
+The [lab's verifier](https://github.com/kube-dojo/kubedojo-labs/blob/fe6f47c3888ec1b7bc079781242d44e7f99e25ce/prereq-0.3-first-commands/step1/verify.sh) checks the account's home directory. A file created under `/root` will not satisfy that check when it expects `/home/ubuntu`, even if the file contains the right answer. Stay in the Ubuntu account for all three lab tasks. Complete those tasks after the in-page exercise.
 
 When the shell is ready, it displays a prompt, often ending in `$` or `%`; the root account in the linked lab may use `#`. The prompt's contents depend on the shell and its configuration. Read it as an invitation to enter a command, rather than text that must exactly match the example below.
 
@@ -420,7 +416,7 @@ history | grep "mkdir"
 
 `history` shows shell history, and `grep "mkdir"` selects lines containing `mkdir`. This can help locate a command when you remember part of it; the entries available depend on the shell and its history settings. In zsh, plain `history` normally shows the last 16 entries; use `history 1 | grep "mkdir"` to search the available history from its first entry.
 
-Before running your own pipeline, pause and predict: must the left command finish before the right command starts, and what text moves between them? Then change the search word in `history | grep "mkdir"` to `cd` or `rm`. If a filter prints nothing, inspect the unfiltered input before drawing a conclusion; it may simply have found no matching lines.
+Before running your own pipeline, pause and predict: what text moves between the commands? Then change the search word in `history | grep "mkdir"` to `cd` or `rm`. If a filter prints nothing, inspect the unfiltered input before drawing a conclusion; it may simply have found no matching lines.
 
 <details>
 <summary>Check your prediction</summary>
@@ -450,16 +446,9 @@ Use `pwd`, `ls`, and `cd` when your problem is orientation. They are the right t
 
 Use `mkdir`, `touch`, `cp`, and `mv` when your problem is controlled file organization. They are good when you can name the exact directory or file and want a repeatable action. Use an editor, integrated development environment, or file manager when you need to author content, compare documents visually, or drag files between applications. The tradeoff is that terminal commands are efficient after you know the target, but they are unforgiving when the target is vague.
 
-Use `rm` only when your problem is deliberate cleanup and you have confirmed the target. If you are unsure whether a file matters, prefer moving it into a temporary holding directory, making a copy, or leaving it alone until you can inspect it. Use `clear` when your problem is visual clutter, not disk clutter. These two commands are often confused emotionally because both make things disappear from view, but only one removes files.
+Use `rm` only when your problem is deliberate cleanup and you have confirmed the target. If you are unsure whether a file matters, prefer moving it into a temporary holding directory, making a copy, or leaving it alone until you can inspect it. Use `clear` when your problem is visual clutter, not disk clutter.
 
 Use pipes when your problem is too much output rather than too little output. A graphical search box can be comfortable for a single document, but a command pipeline can search command history, file listings, and tool output without opening separate windows. The tradeoff is that pipes require you to think about text flow: left command produces, right command filters. Once that model clicks, the terminal becomes less like a set of isolated commands and more like a small inspection language.
-
-## Did You Know?
-
-- **An empty-looking directory may contain dotfiles.** Plain `ls` normally omits names starting with `.`, while `ls -a` includes them. Use the latter before assuming that a practice directory has no contents; [the `ls` standard](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/ls.html) defines the difference.
-- **`touch` can change an existing file without changing its contents.** Its normal job is updating access and modification timestamps. Creating an empty file happens when the target does not exist, as explained in [the `touch` standard](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/touch.html).
-- **`mkdir -p` can succeed without creating anything.** If the directory path already exists, it accepts that state; ordinary `mkdir` reports an existing-path error. [The manual](https://manpages.ubuntu.com/manpages/noble/man1/mkdir.1.html) describes behavior useful for repeatable setup, but unsuitable for proving that your practice workspace is new.
-- **A pipe does not wait for a complete output file.** Commands can process a stream while an upstream command is still producing it. [Bash's pipeline documentation](https://manpages.ubuntu.com/manpages/noble/man1/bash.1.html#Pipelines) describes how standard output becomes standard input, allowing small tools to work together.
 
 ## Common Mistakes
 
@@ -698,6 +687,8 @@ The output for `storage/pantry/` now displays `flour.txt`, `olive-oil.txt`, and 
 ### Step 8: Clean up
 
 When you are done, return to your workspace and inspect its practice tree before removing it. Stop if the directory change fails, the location is wrong, a path is a symbolic link, or the tree contains anything you cannot identify as disposable practice data. Remove only the `restaurant` inside the fresh workspace:
+
+The `-R` option makes `ls` list the contents of subfolders too, so you can inspect the whole tree before deleting it.
 
 ```bash
 cd ~/kubedojo-first-commands

@@ -150,7 +150,7 @@
         },
         {
           "line": 463,
-          "quote": "An empty-looking directory may contain dotfiles"
+          "quote": "The `-a` flag stands for"
         }
       ],
       "source_candidates": [
@@ -245,7 +245,7 @@
         },
         {
           "line": 465,
-          "quote": "**`mkdir -p` can succeed"
+          "quote": "running the same command again does not fail simply because the directory already exists"
         },
         {
           "line": 504,
@@ -292,7 +292,7 @@
         },
         {
           "line": 464,
-          "quote": "**`touch` can change an existing file"
+          "quote": "It also updates timestamps"
         }
       ],
       "source_candidates": [
@@ -554,7 +554,7 @@
         },
         {
           "line": 466,
-          "quote": "**A pipe does not wait for a complete output file"
+          "quote": "The commands can run concurrently"
         }
       ],
       "source_candidates": [
