@@ -38,7 +38,7 @@ Kubernetes sits at the center of many cloud native platforms, but it is delibera
 
 The Cloud Native Computing Foundation exists partly because no single vendor can credibly own every layer of that operating model. CNCF hosts projects, defines governance expectations, publishes the landscape, and gives communities a neutral home under the Linux Foundation. Vendor neutrality matters when a tool becomes infrastructure. If your cluster networking, metrics, or delivery system depends on one company changing its license or roadmap overnight, the technical architecture has a business dependency hiding inside it.
 
-The current landscape can feel overwhelming because it contains more than one thousand entries across runtime, provisioning, orchestration, networking, observability, security, storage, database, streaming, and delivery categories. That size should not scare you into studying every project. A working engineer treats the landscape like a city map: you need to know the major districts, the roads you use every day, and the warning signs that tell you when you are entering unfamiliar territory.
+The landscape contains many projects and products. Learn the categories first rather than trying to study every entry.
 
 ```mermaid
 flowchart TD
@@ -81,8 +81,6 @@ The maturity labels in that diagram are not decoration. A graduated project has 
 Prefer the graduated or incubating project for a control that can stop production deployments. The risk you accept is fewer features. A sandbox project can be richer and still be the wrong foundation, because the risk you accept is that the block itself is immature. Write down which risk you are taking before you name a product.
 
 </details>
-
-Name the risk before you read the habit below. The next paragraph is about starting from the problem. It does not pick a maturity level for you.
 
 The important habit is to begin with the problem, then choose the category, then choose a tool. A team that says "we need Cilium" before it says "we need network policy enforcement, service visibility, and eBPF-based packet tracing" has skipped the reasoning step. Sometimes Cilium is exactly the right answer; sometimes Calico or a managed CNI is enough. The tool name should be the conclusion of an evaluation, not the opening sentence.
 
@@ -154,16 +152,12 @@ At least five moments, not one tool. Image scanning checks the image before it r
 
 </details>
 
-Count the moments before you read the tool table. The table is a menu of products. It is not the count.
-
 | Tool | What It Does |
 |------|--------------|
 | **Falco** | Runtime security monitoring |
 | **Trivy** | Container vulnerability scanning |
 | **OPA/Gatekeeper** | Policy enforcement |
 | **cert-manager** | Certificate management |
-
-The point of the question was the count, not a purchase. The storage layer that follows is a different problem. Do not collapse it into the security count you just made.
 
 The seventh layer is storage and recovery. Kubernetes can request and attach persistent volumes, but that does not automatically make state safe. Teams still need storage classes, replication choices, backup schedules, restore testing, and a plan for cluster metadata. Tools such as Rook and Longhorn operate storage inside or near Kubernetes, while Velero focuses on backup and disaster recovery workflows for cluster resources and persistent volume snapshots.
 
@@ -211,14 +205,7 @@ flowchart TD
 
 The diagram is simplified, but the separation is useful during design reviews. If a team complains that deployments are slow, the answer may belong in CI/CD or GitOps. If Pods cannot reach each other, the answer may involve Services, DNS, NetworkPolicy, or the CNI. If auditors need proof that production changes were reviewed, the answer may involve Git history, admission policy, and controller logs. The same incident can cross layers, so naming the layer prevents random tool selection.
 
-Here is the first command habit to keep: this curriculum writes out `kubectl` in copy-paste examples, because runnable snippets should behave the same way in an interactive shell, a script, and a training environment. Many engineers use a short interactive alias on their own machines, but shared curriculum examples should not depend on shell alias expansion. In later Kubernetes modules you will inspect cluster resources with commands such as `kubectl get pods -A` or `kubectl get svc -A`, and the full binary name makes the boundary between learner habit and automation habit explicit.
-
-```bash
-kubectl get pods -A
-kubectl get nodes -o wide
-```
-
-Those commands do not install ecosystem tools. They simply reinforce the boundary between the core Kubernetes API and the surrounding projects. When you run `kubectl get pods -A`, you are asking the cluster about workloads. When you install Prometheus, Argo CD, Cilium, or cert-manager, you are usually adding controllers, custom resources, agents, webhooks, or dashboards that extend how the platform behaves around those workloads.
+You can use `kubectl` to inspect Kubernetes resources, including workloads used by ecosystem tools, in the optional exercise below and in later modules.
 
 Consider a basic request path for a production web service. A developer changes application code, CI builds a container image, a scanner checks the image, Git receives an updated manifest or chart value, a GitOps controller reconciles the cluster, Kubernetes rolls out Pods, the CNI gives those Pods network connectivity, Services route traffic, observability tools collect signals, and security tools enforce or monitor policy. No single project owns the whole chain, which is exactly why ecosystem literacy matters.
 
@@ -226,18 +213,18 @@ The same chain also explains why tool choices compound. If the image scanner pro
 
 Which approach would you choose here and why: a startup with two services, no compliance burden, and one platform engineer could adopt managed Kubernetes, Helm, Prometheus, and basic log shipping first; a bank platform with dozens of teams may need GitOps, admission policy, certificate automation, network policy, backup automation, and audit logging from the beginning. The difference is not that one team is more serious. The difference is the cost of failure and the number of people depending on the platform.
 
-The CNCF trail map captures a common learning sequence: containerization, CI/CD, orchestration, observability, service mesh, and cloud native data management. The sequence is not a law, but it is a useful warning against adopting late-stage tools before early-stage foundations exist. A service mesh cannot compensate for missing deployment discipline. Distributed tracing cannot help if applications do not emit meaningful spans. A distributed database will not rescue a team that has never restored from backup.
+The following is a lesson summary of possible adoption areas, not the sequence of the [CNCF trail map](https://github.com/cncf/trailmap). Adapt the order to your needs. A service mesh cannot compensate for missing deployment discipline. Distributed tracing cannot help if applications do not emit meaningful spans. A distributed database will not rescue a team that has never restored from backup.
 
 ```mermaid
 flowchart TD
-    S1["1. CONTAINERIZATION<br/>Learn Docker, understand images and containers"]
-    S2["2. CI/CD<br/>Automated build and deployment pipelines"]
-    S3["3. ORCHESTRATION<br/>Kubernetes for managing containers at scale"]
-    S4["4. OBSERVABILITY<br/>Metrics, logs, traces for understanding systems"]
-    S5["5. SERVICE MESH<br/>Advanced traffic management and security"]
-    S6["6. DISTRIBUTED DATABASE<br/>Cloud-native data management"]
+    S1["CONTAINERIZATION<br/>Learn Docker, understand images and containers"]
+    S2["CI/CD<br/>Automated build and deployment pipelines"]
+    S3["ORCHESTRATION<br/>Kubernetes for managing containers at scale"]
+    S4["OBSERVABILITY<br/>Metrics, logs, traces for understanding systems"]
+    S5["SERVICE MESH<br/>Advanced traffic management and security"]
+    S6["DISTRIBUTED DATABASE<br/>Cloud-native data management"]
     
-    S1 --> S2 --> S3 --> S4 --> S5 --> S6
+    S1 ~~~ S2 ~~~ S3 ~~~ S4 ~~~ S5 ~~~ S6
 ```
 
 KubeDojo focuses heavily on orchestration because that is the foundation you need before ecosystem choices become meaningful. Once you know how Pods, Services, Deployments, probes, ConfigMaps, Secrets, storage claims, and NetworkPolicies behave, you can read ecosystem documentation with better questions. You can ask what controller is installed, what custom resources it adds, what failure it handles, what failure it creates, and how you would remove it if the tool disappointed you.
@@ -261,7 +248,7 @@ Maturity should be evaluated alongside team capability. A sophisticated service 
 
 Vendor neutrality is another adoption dimension. CNCF projects often have commercial distributions, managed offerings, and vendor-backed maintainers, which can be a strength. The risk appears when a team depends on provider-specific extensions without understanding the portability cost. A managed add-on can be the right pragmatic choice, but the team should know which manifests, APIs, dashboards, and operational procedures would need to change if the platform moved.
 
-The resume-driven development war story from the opening is common because new tools feel like progress. Engineers enjoy learning, vendors publish persuasive case studies, and architecture diagrams look more impressive when they contain familiar logos. Strong platform teams slow down that impulse by asking boring questions: what pain are we solving, who will operate the tool, what happens during upgrade, how do we observe it, how do we remove it, and what simpler option did we reject?
+New tools can feel like progress before they solve a known problem. Strong platform teams ask: what pain are we solving, who will operate the tool, what happens during upgrade, how do we observe it, how do we remove it, and what simpler option did we reject?
 
 Before adopting a project, read its release notes, security policy, upgrade guide, community activity, and production references. Check whether it supports your Kubernetes 1.35+ target, whether it relies on kernel or cloud-provider features you do not have, and whether it introduces custom resources that become part of your platform contract. A tool that installs easily in a demo can still be expensive if every application team must now learn its custom vocabulary.
 
@@ -288,8 +275,6 @@ The category shifts toward a service mesh, certificate automation, and possibly 
 
 </details>
 
-Name the category shift before you use the table as a shopping list. The table is a lookup. It does not decide whether this contract is enough reason to add a mesh.
-
 Here is the original quick-reference view, preserved and expanded as a decision aid. Read it left to right, not as a buying list. The phrase "when you need" should always be backed by a concrete incident, compliance requirement, scaling pressure, or developer workflow problem.
 
 | When You Need... | Consider... |
@@ -297,12 +282,13 @@ Here is the original quick-reference view, preserved and expanded as a decision 
 | Package management | Helm, Kustomize |
 | Monitoring | Prometheus + Grafana |
 | Logging | Fluentd + Loki |
-| Tracing | Jaeger, Tempo |
+| Tracing | Jaeger, [Tempo](https://grafana.com/docs/tempo/latest/) (a distributed tracing backend) |
 | Service mesh | Istio, Linkerd |
 | GitOps | ArgoCD, Flux |
-| Policy enforcement | OPA, Kyverno |
-| Security scanning | Trivy, Falco |
-| Secrets management | Vault, Sealed Secrets |
+| Policy enforcement | OPA, [Kyverno](https://kyverno.io/docs/introduction/) (a policy engine) |
+| Image scanning | Trivy |
+| Runtime security | Falco |
+| Secrets management | [Vault](https://developer.hashicorp.com/vault/docs/about-vault/what-is-vault) (centralized secrets management), [Sealed Secrets](https://github.com/bitnami/sealed-secrets) (encrypts Kubernetes Secrets) |
 | Certificates | cert-manager |
 | Backups | Velero |
 | Local development | kind, minikube |
@@ -333,7 +319,7 @@ Security tools span multiple levels of depth. Image scanning is usually easy to 
 
 Storage and backup knowledge should begin with one uncomfortable truth: highly available Pods do not equal durable data. Kubernetes can reschedule workloads, but it cannot recreate lost business data from good intentions. Even if a managed database handles most state, the platform may still contain persistent volumes, cluster resources, secrets, custom resources, and application configuration that require backup and restore planning. The first restore test teaches more than a dozen optimistic architecture diagrams.
 
-Local development tools such as kind and minikube are worth recognizing because they shorten the feedback loop. They are not production platforms, and that is exactly their value. A local cluster lets you practice manifests, controllers, networking assumptions, and `k` inspection without waiting for a shared environment. The skill is knowing which results transfer to production and which depend on local simplifications.
+Local development tools such as kind and minikube are worth recognizing because they shorten the feedback loop. They are not production platforms, and that is exactly their value. A local cluster lets you practice manifests, controllers, networking assumptions, and `kubectl` inspection without waiting for a shared environment. The skill is knowing which results transfer to production and which depend on local simplifications.
 
 The first-job learning path is therefore narrower than the landscape but wider than raw Kubernetes. Learn Kubernetes deeply, learn packaging enough to read what gets deployed, learn observability enough to debug symptoms, learn networking enough to ask layer-specific questions, and learn security categories enough to avoid shipping obvious risk. Everything else can be learned just-in-time when your team has a concrete problem, a chosen tool, and an operator who owns it.
 
@@ -389,7 +375,6 @@ This framework also keeps certifications in perspective. For your first Kubernet
 
 ## Did You Know?
 
-- **The CNCF landscape has more than 1,000 entries.** That size is a signal to learn categories first, because even experienced platform engineers specialize in a small slice of the ecosystem.
 - **Kubernetes entered CNCF as the first hosted project in 2016.** Its graduation helped make vendor-neutral orchestration a shared foundation rather than a single-provider product strategy.
 - **Prometheus became the second CNCF graduated project in 2018.** That history explains why Kubernetes and Prometheus are so often taught together in cloud native operations.
 - **The CNCF graduation process requires public evidence of adoption and governance.** Graduation is not a feature checklist; it is a maturity signal about community, maintainers, security practices, and production use.
@@ -398,7 +383,7 @@ This framework also keeps certifications in perspective. For your first Kubernet
 
 | Mistake | Why It Happens | How to Fix It |
 |---|---|---|
-| Ignoring CNCF maturity tiers | Teams see a shiny sandbox tool and deploy it to production because the demo looks polished | Prefer graduated or mature incubating projects for critical paths, and keep sandbox projects in labs unless the blast radius is small |
+| Ignoring CNCF maturity tiers | Teams see a shiny sandbox tool and deploy it to production because the demo looks polished | Prefer graduated or well-established incubating projects for critical paths, and keep sandbox projects in labs unless the blast radius is small |
 | Skipping observability until after an incident | The team focuses on getting Pods running and treats metrics, logs, and traces as a later improvement | Add basic metrics, dashboards, and log collection with the first production service so incidents have evidence |
 | Choosing tools based on blog hype instead of team capability | A case study from a larger company sounds impressive, so the team copies the stack without the same operators | Match the tool to a real pain point, available skills, upgrade capacity, and on-call ownership |
 | Creating vendor lock-in accidentally | Managed add-ons feel easy, and provider-specific APIs enter manifests before anyone notices | Document provider-specific choices and prefer standard Kubernetes or CNCF interfaces where portability matters |
@@ -412,7 +397,7 @@ This framework also keeps certifications in perspective. For your first Kubernet
 <details>
 <summary>Scenario: Your team wants to navigate CNCF landscape maturity categories for a new production policy engine. The most exciting option is sandbox, while a graduated option has fewer features. What should you recommend?</summary>
 
-Recommend the graduated or mature incubating option unless the sandbox project is isolated from critical production paths. Policy enforcement can block deployments or accidentally allow unsafe workloads, so maturity, security response, upgrade discipline, and operator knowledge matter more than a long feature list. A sandbox pilot can still run in a non-critical environment if the team wants to learn. The reasoning is to separate experimentation from production control-plane risk.
+Recommend the graduated or well-established incubating option unless the sandbox project is isolated from critical production paths. Policy enforcement can block deployments or accidentally allow unsafe workloads, so maturity, security response, upgrade discipline, and operator knowledge matter more than a long feature list. A sandbox pilot can still run in a non-critical environment if the team wants to learn. The reasoning is to separate experimentation from production control-plane risk.
 </details>
 
 <details>
@@ -459,7 +444,7 @@ Collect the project's CNCF maturity status, Kubernetes version compatibility, ke
 
 ## Hands-On Exercise: Build Your Stack
 
-This exercise is a design review rather than a cluster lab. You will use the CNCF landscape as a reference, but your deliverable is a reasoned stack proposal for a realistic organization. If you have a local or training cluster available, run `kubectl get pods -A` before you begin so you remember that ecosystem tools ultimately extend or operate around Kubernetes resources.
+This exercise is a design review rather than a cluster lab. You will use the CNCF landscape as a reference, but your deliverable is a reasoned stack proposal for a realistic organization.
 
 ### Scenario
 
@@ -467,29 +452,42 @@ You are architecting infrastructure for a rapidly growing fintech startup. The c
 
 ### Tasks
 
-- [ ] **Navigate CNCF landscape maturity categories**: Choose one graduated or mature incubating tool for each critical category, and explicitly mark any sandbox project as experimental rather than production-critical.
-- [ ] **Match observability, networking, security, CI/CD, and storage problems**: Write one sentence for each category explaining the problem it solves for the fintech scenario.
+- [ ] **Navigate CNCF maturity categories**: Check each selected tool on the [CNCF projects page](https://www.cncf.io/projects/) and record its listed maturity. If it is not listed, record that and assess its production use and support separately. Mark any sandbox project as experimental rather than production-critical.
+- [ ] **Match observability, networking, security, CI/CD, and storage problems**: Write one sentence for each category explaining the problem it solves for the fintech scenario. For security, explain where the tool acts in the workload lifecycle (build, admission, or runtime).
 - [ ] **Evaluate graduation, operational complexity, team capability, and vendor neutrality**: For two tools, document why the team can operate them and what provider-specific assumptions exist.
-- [ ] **Design a minimal first production stack for Kubernetes 1.35+**: Include packaging, deployment workflow, metrics, logs, image scanning, policy, certificate management, and backup or restore planning.
+- [ ] **Design a minimal first production stack for Kubernetes 1.35+**: Include the container runtime (or the managed runtime), packaging, deployment workflow, metrics, logs, image scanning, policy, certificate management, and backup or restore planning. State whether tracing is included or deferred, with the reason.
 - [ ] **Define a deferral list**: Name two attractive tools you would not adopt yet, and explain what future pain would justify revisiting them.
-- [ ] **Validate the command habit**: If a cluster is available, run `kubectl get pods -A` and record whether any installed ecosystem controllers are already present.
+- [ ] **Inspect an available cluster (optional)**: Run `kubectl get pods -A` and look for namespaces or pod names such as `argocd`, `cert-manager`, or `cilium`. Record possible ecosystem components for further investigation. Output depends on the cluster and may show none.
+- [ ] **Review recovery**: A scheduled backup completes, but a restore drill cannot recover a volume snapshot into a scratch namespace. Name the gap and the next action before opening the answer.
+
+<details>
+<summary>Check your recovery review</summary>
+
+The backup schedule alone did not prove recovery. Check whether the restore drill ran into a scratch namespace, whether the snapshot class and driver support restoring that volume, and whether restore permissions are in place. Correct the cause, repeat the drill, and record the result.
+</details>
+
+### Hints
+
+1. Which category addresses each scenario need before you choose a product?
+2. What would you check to establish whether each choice is ready for production or recovery?
+3. What upgrade, monitoring, and recovery work would each choice cost the team?
 
 <details>
 <summary>Solution guide: maturity choices</summary>
 
-A strong answer prefers graduated projects or well-established incubating projects for production-critical functions. For example, the team might choose Prometheus and Grafana for metrics and dashboards, Fluent Bit with Loki for logs, Argo CD or Flux for GitOps, Trivy for image scanning, OPA Gatekeeper or Kyverno for policy, cert-manager for certificates, and Velero for backup workflows. The exact choices can vary, but the reasoning should explain maturity and operations risk.
+A strong answer prefers graduated projects or well-established incubating projects for production-critical functions. For example, the team might choose Prometheus and Grafana for metrics and dashboards, Fluent Bit with Loki for logs, Argo CD or Flux for GitOps, Trivy for image scanning, OPA Gatekeeper or Kyverno for policy, cert-manager for certificates, and Velero for backup workflows. Tools not listed on the CNCF projects page need separate production-use and support evidence. The exact choices can vary, but the reasoning should explain maturity and operations risk.
 </details>
 
 <details>
 <summary>Solution guide: category matching</summary>
 
-Observability should mention metrics, logs, and possibly traces as separate signals. Networking should distinguish CNI capabilities, network policy, ingress, and service mesh rather than treating them as one product. Security should include image scanning, admission policy, runtime detection, and certificate management. CI/CD should explain how code becomes desired cluster state. Storage should discuss persistent volumes, snapshots, restore testing, and cluster resource backups.
+Observability should mention metrics, logs, and possibly traces as separate signals. Networking should distinguish CNI capabilities, network policy, ingress, and service mesh rather than treating them as one product. Security should include image scanning, admission policy, runtime detection, and certificate management. For example, Trivy scans the image during the build workflow before it reaches the registry. CI/CD should explain how code becomes desired cluster state. Storage should discuss persistent volumes, snapshots, restore testing, and cluster resource backups.
 </details>
 
 <details>
 <summary>Solution guide: minimal stack</summary>
 
-A reasonable first production stack uses managed Kubernetes, Helm or Kustomize for packaging, GitHub Actions or a similar CI system for image builds, Trivy for scanning, Argo CD or Flux for GitOps if the team accepts pull-based reconciliation, Prometheus and Grafana for metrics, Fluent Bit and Loki for logs, cert-manager for certificate automation, and Velero or provider snapshots for restore planning. A service mesh can be deferred until mutual TLS, traffic policy, or multi-team service ownership makes the additional control plane worthwhile.
+A reasonable first production stack uses managed Kubernetes, Helm or Kustomize for packaging, GitHub Actions or a similar CI system for image builds, Trivy for scanning, Argo CD or Flux for GitOps if the team accepts pull-based reconciliation, Prometheus and Grafana for metrics, Fluent Bit and Loki for logs, cert-manager for certificate automation, and Velero or provider snapshots for restore planning. Use the managed node runtime, such as containerd, and document which runtime the provider supplies. Defer tracing until request paths cross enough services to justify it. A service mesh can be deferred until mutual TLS, traffic policy, or multi-team service ownership makes the additional control plane worthwhile.
 </details>
 
 <details>
@@ -505,56 +503,17 @@ Good deferrals are not dismissals. A team might defer Istio until it has many se
 - [ ] You selected a GitOps or CI/CD approach and described how desired state reaches the cluster.
 - [ ] You identified a Security or Policy enforcement tool and explained where it acts in the workload lifecycle.
 - [ ] You selected a storage backup or restore strategy rather than assuming Kubernetes automatically protects data.
-- [ ] You verified that at least three selected tools are graduated or mature enough for the fintech scenario.
+- [ ] You recorded each selected tool's CNCF maturity from the projects page, or noted that it was not listed and recorded separate production-use and support evidence.
 - [ ] You wrote one-sentence justifications that connect each tool to scenario constraints instead of to popularity.
-
-- [ ] I named a failure layer and a next action for each frozen ecosystem-layer card before opening the reveal.
-
-A richer tool, a green scan, a new mesh, and a backup job can each look like the platform is finished. These cards freeze four transcripts so you can name the layer before you look.
-
-**Card A: The policy engine is a sandbox project.** It blocks more bad manifests than the graduated alternative. It has one maintainer and no documented security process. It sits on the production admission path.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: project maturity, not the feature list. Next action: move the production block to a graduated or incubating engine, and keep the sandbox project off the path that can stop deploys.
-
-</details>
-
-**Card B: Trivy is clean. The incident still happened.** CI scanning passed. The running container opened an unexpected outbound connection, and its certificate had already expired.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: one control treated as the whole program. Next action: add admission, runtime detection, network policy, and certificate automation as separate moments. Do not buy another scanner first.
-
-</details>
-
-**Card C: A mesh arrived with no contract.** The first stack added Istio "because production." There is one API and one worker. Nobody required mutual TLS. The team cannot explain the extra control plane during an incident.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: category chosen before the pain. Next action: remove the mesh until a contract or a real traffic-policy need exists, and keep certificate automation only where TLS is already terminated.
-
-</details>
-
-**Card D: Backups exist. Restore does not.** Velero runs every night. The first restore drill fails because nobody has tested a volume snapshot against a real namespace.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: recovery was never exercised. Next action: run one restore into a scratch namespace and write down what failed before you add another storage product.
-
-</details>
+- [ ] You identified the recovery gap and a next action in the restore scenario.
 
 ## Sources
 
 - [Argo CD: Automatic self-healing and its default](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/#automatic-self-healing)
-
 - [CNCF Landscape](https://landscape.cncf.io)
+- [CNCF Trail Map](https://github.com/cncf/trailmap)
 - [CNCF Project Maturity Levels](https://www.cncf.io/projects/)
-- [CNCF Graduation Criteria](https://github.com/cncf/toc/blob/main/process/graduation_criteria.md)
+- [CNCF Graduation Application](https://github.com/cncf/toc/blob/main/.github/ISSUE_TEMPLATE/template-graduation-application.md)
 - [Kubernetes Documentation - Concepts](https://kubernetes.io/docs/concepts/)
 - [Kubernetes Documentation - Command Line Tool kubectl](https://kubernetes.io/docs/reference/kubectl/)
 - [Helm Documentation](https://helm.sh/docs/)
