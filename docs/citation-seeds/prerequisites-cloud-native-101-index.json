@@ -2,13 +2,13 @@
   "schema_version": 2,
   "module_path": "src/content/docs/prerequisites/cloud-native-101/index.md",
   "module_key": "prerequisites/cloud-native-101/index",
-  "page_sha256": "0d05f1af9bc924c627708a7dc33cef2f3964301f711865ff85ef10c11c2a7c90",
-  "page_commit": "0da4135701b13ba05f427a7aaa6fe614b842a474",
-  "page_blob": "6812f22459e6700d2a8ab91ba19e5eba431d8126",
+  "page_sha256": "17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+  "page_commit": "a8d1bfeef30df055666fab2f92cd1df50ab83804",
+  "page_blob": "f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
   "author": {
     "identity": "gpt-6.1-sol",
     "family": "openai",
-    "evidence_ref": "/home/ops/learn-ukrainian/batch_state/tasks/kd-cn101-stage1c-sol-1.json#run_nonce=6bdee09dc3e049b1b267d1139fcfc08b"
+    "evidence_ref": "/home/ops/learn-ukrainian/batch_state/tasks/kd-cn101-stage1d-sol-1.json#run_nonce=f915f02344914065890b23b5805237f7"
   },
   "claims": [
     {
@@ -298,7 +298,7 @@
     },
     {
       "claim_id": "CN026",
-      "claim_text": "Their arithmetic gives an aggregate range of **450–600 minutes (about 7 hours 30 minutes–10 hours)**; individual setup, reading, and practice time will vary.",
+      "claim_text": "Their arithmetic gives an aggregate range of **450–600 minutes (about 7 hours 30 minutes–10 hours)**.",
       "line_start": 25,
       "line_end": 25,
       "kind": "internal",
