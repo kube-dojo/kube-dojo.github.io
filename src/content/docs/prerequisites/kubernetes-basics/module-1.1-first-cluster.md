@@ -21,13 +21,9 @@ lab:
 
 Throughout this module, `kubectl` is the official Kubernetes command-line client, and every runnable command uses the full binary name. Many engineers configure a short interactive alias on their own machines, but aliases are shell-local conveniences and do not expand reliably in scripts, copied command blocks, or non-interactive automation. Using `kubectl` everywhere keeps the examples clear, portable, and safe to paste into a terminal or lab notebook without hidden setup.
 
-```bash
-kubectl version --client
-```
-
 ## What You'll Be Able to Do
 
-- Construct and verify a Kubernetes 1.35+ local cluster with `kind`, Docker, and the `kubectl` command-line workflow.
+- Construct and verify a Kubernetes 1.35 local cluster with `kind`, Docker, and the `kubectl` command-line workflow.
 - Compare local cluster tools and design a topology that matches the development or testing problem in front of you.
 - Diagnose local cluster startup, networking, kubeconfig, and control plane failures by reading concrete signals from Docker and Kubernetes.
 - Evaluate how control plane and worker node components cooperate, then predict how failures affect scheduling and access.
@@ -37,21 +33,15 @@ kubectl version --client
 
 A Kubernetes cluster is a distributed control system, not a command-line tool that gets installed and forgotten. It runs an authenticated API, a scheduler that places workloads, controllers that continuously reconcile desired state against reality, a container runtime on every node, network translation between pods, and a key-value store holding the truth that the API server protects. The first time most engineers meet that machinery, it is in a shared environment — a team dev cluster, a staging GKE project, sometimes production itself. That is the wrong place to learn. Mistakes in a shared cluster spread outward: one bad manifest blocks other engineers, consumes scarce cloud resources, or quietly hides a bug behind someone else's active workload. The blast radius of a learning mistake should be the laptop the mistake was made on.
 
-A cluster is not just another command-line tool you install and forget. It is a distributed control system with authentication, desired state, schedulers, background controllers, network translation, container runtimes, and persistent state. When a team experiments directly in a shared environment, one mistaken manifest can block other engineers, consume scarce cloud resources, or hide a bug behind someone else's active changes. A local cluster gives you the opposite operating model: a private arena where failure is cheap, recovery is fast, and the blast radius stays on your laptop.
-
 Cloud-managed Kubernetes is the right answer for many production workloads, yet it is a poor first sandbox for learning. A managed control plane can take many minutes to provision, incurs a fee simply for existing, and often brings attached costs for nodes, disks, load balancers, and cross-zone traffic. A forgotten learning cluster can create a real invoice, while a local `kind` cluster can be deleted without leaving behind cloud infrastructure. This module teaches you to build that local arena, inspect its moving parts, and decide when a single-node cluster is enough versus when a multi-node topology is worth the extra resources.
 
 The goal is not to memorize a cluster creation command. The goal is to develop an operational model: you should know what `kind` builds, where `kubectl` sends requests, why kubeconfig controls your identity, which component schedules a Pod, why a local LoadBalancer stays pending, and how to recover when Docker, disk space, version skew, or the control plane fails. Once you can deliberately create, break, inspect, and delete your first cluster, later modules about workloads, services, storage, security, and automation become much less abstract.
-
-There is also a cultural lesson in this first module. Teams that are confident with disposable local clusters tend to write smaller experiments, reproduce bugs with fewer meetings, and describe failures with better evidence. Teams without that practice often treat every cluster problem as a shared emergency because nobody can quickly recreate the conditions alone. As you work through the module, keep asking which facts you can prove locally before involving a shared platform. That habit saves time, money, and credibility when the same diagnostic pattern later appears in a real environment.
 
 ## Section 1: Anatomy of a Kubernetes Cluster
 
 Before you construct a cluster, you need to know what is being assembled. Kubernetes is not a single process that "runs containers"; it is a collection of cooperating services that maintain desired state through an API. A useful first split is the control plane and the data plane. The control plane stores decisions and coordinates work, while the data plane runs the actual application containers on nodes. That separation is why a cluster can keep existing Pods running even when some management components are temporarily unhealthy, but it is also why new changes can freeze when the API or scheduler is unavailable.
 
 Think about an orchestra where the musicians are the worker nodes and the conductor is the control plane. The musicians create the sound, but the conductor decides timing, coordination, and interpretation of the score. In Kubernetes, your YAML manifests are the score: they describe what should exist, not every mechanical step required to create it. The control plane accepts that desired state, stores it, and continuously guides worker nodes toward it. If you remember that model, many confusing behaviors become predictable rather than mysterious.
-
-Another useful analogy is a shipping port. The cranes and dock workers move containers, but the port authority assigns berths, tracks manifests, checks credentials, and coordinates the overall flow. A worker node is like the machinery that physically moves cargo, while the control plane is the authority that decides what should move where. If the authority is temporarily unreachable, cargo already sitting on a dock does not vanish, but new instructions cannot be accepted cleanly. That is why a healthy cluster is more than "containers are still running"; it is the continued cooperation of state storage, API access, scheduling, and node execution.
 
 ```mermaid
 flowchart TD
@@ -128,17 +118,15 @@ The request can still be accepted and stored, but the new Pods remain Pending be
 
 </details>
 
-Name that split before you choose a local tool. The next section is about kind, minikube, and k3d. It does not describe this outage.
-
 ## Section 2: Choosing a Local Kubernetes Tool
 
 Local Kubernetes tools all answer the same high-level need, but they do not build the same kind of environment. Some tools create virtual machines, some run clusters inside containers, and some integrate with a desktop virtualization layer. The right choice depends on whether you care most about startup speed, distribution fidelity, resource limits, multi-node behavior, or convenience. For this curriculum, we use `kind` because it is fast, scriptable, upstream-oriented, and excellent for disposable clusters used in tests and exercises.
 
 | Tool | Underlying Architecture | Primary Use Case | Pros | Cons |
 |---|---|---|---|---|
-| **minikube** | Virtual Machines (historically) or Containers | Traditional local development | Massive feature set, mature ecosystem. VM mode uses fixed-size virtual disks, protecting host disk space. | Can be heavily resource intensive. Slower startup times. Driver and runtime choices, add-ons, and local-dev defaults differ from a bare upstream cluster even though minikube runs real Kubernetes locally. |
+| **minikube** | Virtual machines, containers, or bare metal | Traditional local development | Multiple driver choices. | Driver and runtime choices affect setup. |
 | **kind** (Kubernetes IN Docker) | Docker Containers acting as Nodes | CI/CD pipelines, automated testing, rigorous local dev | Extremely fast, identical to pure upstream Kubernetes, highly customizable multi-node topologies. | Requires Docker daemon. Complex networking edge cases when exposing services to host. |
-| **k3d** | Docker Containers running k3s | Edge computing simulation, IoT | Minimal memory footprint, extraordinarily fast startup. | Uses k3s (a stripped-down, modified Kubernetes distribution), which may lack 100% parity with cloud providers. |
+| **k3d** | Docker Containers running k3s | Edge computing simulation, IoT | Uses lightweight k3s. | k3s is a compliant Kubernetes distribution with bundled components and its own defaults. |
 | **Docker Desktop / Colima** | Integrated Hypervisor / Lightweight VM | Quick validation for Mac/Windows users | Zero configuration, GUI integration, easy volume mounting. | Inflexible compared with scriptable tools; Docker Desktop Kubernetes was historically single-node, though newer versions can provision multi-node clusters via the kind provisioner. Tightly coupled to the virtualization engine. |
 
 `kind` stands for Kubernetes IN Docker, and the name is literal. A `kind` node is a Docker container that is privileged enough to run Kubernetes node processes inside it. When you create a three-node `kind` cluster, Docker starts three node containers, and each node container runs its own kubelet and `containerd`. The cluster feels distributed to Kubernetes because each node has a separate identity and network address, even though all of those nodes are ultimately containers on your workstation. This is not the same as production hardware, but it is close enough to teach scheduling, kubeconfig, controller behavior, and many networking patterns.
@@ -259,8 +247,6 @@ Treat it as an incident now. Automated scanners look for exposed credentials, an
 
 </details>
 
-Decide the response before you bootstrap a cluster. The next section is about creating the first local cluster. It does not describe a leaked production file.
-
 ## Section 4: Bootstrapping and Verifying the First Cluster
 
 ### Set up the tools for your platform
@@ -273,7 +259,7 @@ Start with [Docker Fundamentals: Installing Docker](/prerequisites/cloud-native-
 | Ubuntu | Follow [Docker Engine's Ubuntu installation steps](https://docs.docker.com/engine/install/ubuntu/) for a supported release. Confirm the daemon is running and your account has authorized access to its socket. Do not copy Ubuntu package commands onto a different distribution. |
 | Other Linux distributions | Use the [Docker Engine installation guide](https://docs.docker.com/engine/install/) for your distribution rather than assuming its package manager or service setup matches Ubuntu. |
 
-Next install `kind` using its [Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), selecting the release binary for your operating system and CPU architecture. For [kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) or [Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/), use the specific-version download procedure with **v1.35.0**, not the page's latest-release default or `stable.txt`. For example, the Apple-silicon binary is `https://dl.k8s.io/release/v1.35.0/bin/darwin/arm64/kubectl`; Linux x86-64 uses `https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl`. Verify the matching `.sha256` download as the instructions show, then install using your platform's steps. This client supports both the v1.35.0 lesson clusters and the v1.34.0 comparison. An engine-bundled client may have a different version.
+Next install `kind` using its [Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), selecting the v0.33.0 release binary for your operating system and CPU architecture. This lesson's image pins are from the [v0.33.0 release notes](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0), checked 2026-11-03; for another kind release, check its release notes and update the pins. For [kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) or [Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/), use the specific-version download procedure with **v1.35.0**, not the page's latest-release default or `stable.txt`. For example, the Apple-silicon binary is `https://dl.k8s.io/release/v1.35.0/bin/darwin/arm64/kubectl`; Linux x86-64 uses `https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl`. Verify the matching `.sha256` download as the instructions show, then install using your platform's steps. This client supports both the v1.35.8 lesson clusters and the v1.34.11 comparison. An engine-bundled client may have a different version.
 
 Open a dedicated terminal and run `bash` before the checks and helpers below. Require kubectl minor v1.35 for this lesson; the check exits that dedicated shell if a different minor is selected.
 
@@ -333,10 +319,10 @@ Treat the helper block as lesson setup; you do not need to memorize its Bash syn
 
 Keep the API server on kind's loopback binding; do not change it to `0.0.0.0` or add public port mappings for this lesson. This also applies on a remote Linux machine: its API should stay private to that host. The exercise needs no publicly exposed application or Docker API port.
 
-A default `kind` cluster is created with one command. In that default topology, one container acts as both control plane and worker node. That is acceptable for first contact because it gives you the API server, `etcd`, scheduler, controller manager, kubelet, kube-proxy, CoreDNS, and a runtime in one compact environment. Pin the node image to the explicit v1.35.0 tag shown here so the exercise does not silently follow kind's changing default.
+A default `kind` cluster is created with one command. In that default topology, one container acts as both control plane and worker node. That is acceptable for first contact because it gives you the API server, `etcd`, scheduler, controller manager, kubelet, kube-proxy, CoreDNS, and a runtime in one compact environment. Pin the node image to the v1.35.8 tag and digest shown here so the exercise does not silently follow kind's changing default.
 
 ```bash
-lesson_create dojo-basics --image kindest/node:v1.35.0
+lesson_create dojo-basics --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
 ```
 
 When this command runs, `kind` pulls the `kindest/node` image, starts a privileged node container, generates certificates, runs `kubeadm init`, starts control plane components, installs networking, and writes access details into kubeconfig. That final kubeconfig step is why your next `kubectl` command knows where the new API server lives. The cluster is local, but it is not fake: you are talking to a real Kubernetes API server whose loopback port is mapped from your host into the node container.
@@ -374,8 +360,6 @@ Expect one outer Docker container for the single kind node, not one Docker conta
 
 </details>
 
-Write the count before you compare Docker and Kubernetes views. The next section is about how your laptop reaches Pod IPs. It does not answer this `docker ps` question.
-
 ## Section 5: Local Networking and Multi-Node Design
 
 Networking is where local clusters often stop feeling intuitive. Your Pods receive IP addresses from a cluster network, but your laptop does not automatically route to that Pod network. In a `kind` cluster, nodes sit on a Docker bridge network, and the API server is the one port mapped by default so `kubectl` can communicate. If you deploy a web application, a Pod IP such as `10.244.0.5` is meaningful inside the cluster, but your browser has no native route to that address from the host.
@@ -390,8 +374,6 @@ The quickest access pattern is port forwarding. A command like `kubectl port-for
 The tunnel disappears immediately because the forwarding path is maintained by the local process. Kubernetes did not create a durable Service exposure on your host. It carried traffic through a live debugging connection. Closing the terminal ends that connection.
 
 </details>
-
-Name what the browser loses before you read about multi-node placement. The next paragraph is about replicas and DaemonSets. It does not describe this tunnel.
 
 A single-node cluster is enough for many first exercises, but it cannot represent placement constraints. If every control plane process and every workload share one node, you cannot test whether replicas spread across nodes, whether a DaemonSet runs once per node, or whether a workload with a node selector lands only where intended. Multi-node `kind` clusters solve that by declaring multiple node containers in a configuration file. You still run locally, but Kubernetes now has a meaningful set of nodes to choose from.
 
@@ -422,7 +404,7 @@ lesson_delete dojo-basics
 Now create the multi-node topology. `kind` starts three Docker containers, initializes the first as the control plane, generates join material, and has the other two join as workers over the Docker bridge network. The command takes a little longer than the single-node cluster, but it gives you a topology that can teach scheduling decisions instead of merely API submission.
 
 ```bash
-lesson_create dojo-multi --config multi-node-config.yaml --image kindest/node:v1.35.0
+lesson_create dojo-multi --config multi-node-config.yaml --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
 ```
 
 Verify the architecture through Kubernetes, not only through Docker. The Kubernetes node list is what the scheduler uses when it chooses placement, so it is the view that matters for later workload behavior. Worker nodes normally show `<none>` in the roles column unless you label them, which is expected and not an error.
@@ -432,13 +414,13 @@ kubectl wait node --all --for=condition=Ready --timeout=120s
 kubectl get nodes
 ```
 
-Your terminal output should now accurately reflect the distributed topology:
+Illustrative output for the distributed topology (ages will differ):
 
 ```text
 NAME                        STATUS   ROLES           AGE     VERSION
-dojo-multi-control-plane    Ready    control-plane   2m14s   v1.35.0
-dojo-multi-worker           Ready    <none>          1m58s   v1.35.0
-dojo-multi-worker2          Ready    <none>          1m58s   v1.35.0
+dojo-multi-control-plane    Ready    control-plane   2m14s   v1.35.8
+dojo-multi-worker           Ready    <none>          1m58s   v1.35.8
+dojo-multi-worker2          Ready    <none>          1m58s   v1.35.8
 ```
 
 Run `kubectl get nodes -o wide` and examine the internal IPs. Each node is really a Docker container, yet Kubernetes sees distinct node addresses and can schedule across them. That makes the topology valuable for practicing node labels, taints, tolerations, affinity, anti-affinity, and DaemonSets. If you later test a workload that must run one copy per node, the multi-node cluster is the first topology in this module that can prove the behavior rather than merely accept the manifest.
@@ -457,7 +439,7 @@ If `kind create cluster` hangs at control-plane startup, inspect Docker first. A
 docker logs <container-id>
 ```
 
-Port conflicts produce a different failure shape. The API server listens on port 6443 inside the node container, and `kind` maps a host port to reach it. If you explicitly configure host ports for ingress or reuse a port already taken by another local process, the new cluster cannot bind it. On macOS or Linux, commands such as `lsof -i :6443` or `netstat -tulpn | grep 6443` identify the owner. Prefer choosing a different configured port over killing unknown processes unless you are certain what owns the socket.
+Port conflicts produce a different failure shape. By default, kind selects a random open host port for the API server; check the active address with `kubectl cluster-info` or the node mapping with `docker port primary-dojo-control-plane`. For an explicitly configured host port, use `lsof -i :PORT` on macOS or Linux, or `netstat -tulpn | grep PORT` on Linux, substituting that port. Prefer choosing a different configured port over killing unknown processes.
 
 Version skew can affect a client that is either too old or too new. Kubernetes supports kubectl within one minor version of the API server, so choosing the latest client is not always the repair. Check both versions and select a compatible client; use v1.35 for this lesson's v1.35/v1.34 comparison. Do not diagnose a client compatibility problem from healthy Docker containers alone.
 
@@ -467,11 +449,10 @@ The most basic failure is a missing container runtime. `kind` cannot create node
 failed to create cluster: failed to get docker info: Cannot connect to the Docker daemon at unix:///var/run/docker.sock.
 ```
 
-On Linux, verify the service and permissions. On desktop platforms, confirm the virtualization engine is running before retrying. If your user is not allowed to access the Docker socket, adding the user to the Docker group requires a new login session before the permission change applies. Do not debug Kubernetes scheduling when the node factory itself is unavailable.
+On Linux, verify the service and permissions. On desktop platforms, confirm the virtualization engine is running before retrying. The `docker` group grants root-level privileges; accept that trade-off only on a machine you own, and consult [Docker's post-install guide](https://docs.docker.com/engine/install/linux-postinstall/) for group and rootless options.
 
 ```bash
 systemctl status docker
-sudo usermod -aG docker $USER
 ```
 
 Disk pressure can come from node images, writable layers, or volumes, but the Docker daemon may also hold other projects. Inspect usage first. Do not run host-wide prune commands for this lesson; use the guarded cluster cleanup for successful creations and ask the runtime owner to review any retained artifacts individually. Unused does not mean disposable.
@@ -497,7 +478,7 @@ Reliable local Kubernetes work depends less on one clever command and more on re
 | Pattern | When to Use It | Why It Works |
 |---|---|---|
 | Disposable named clusters | Any learning lab, reproduction case, or integration test | Names make kubeconfig contexts obvious, while deletion keeps resource use and state drift under control. |
-| Version-pinned node images | Curriculum, CI, operator testing, and bug reproduction | Pinning Kubernetes 1.35+ behavior makes test results deterministic and avoids accidental release drift. |
+| Version-pinned node images | Curriculum, CI, operator testing, and bug reproduction | Pinning a node image avoids accidental release drift. |
 | Declarative topology files | Multi-node tests, ingress port mappings, or kubeadm patches | A checked-in config can be reviewed, recreated, and shared instead of reconstructed from memory. |
 | Host-first diagnostics | Cluster creation failures, Docker errors, disk pressure, and port conflicts | Local clusters depend on the host runtime, so Docker and OS signals often explain failures before Kubernetes exists. |
 
@@ -524,7 +505,7 @@ Start with the question you need to answer
 |   +-- No: create a single-node kind cluster.
 |
 +-- Do you need deterministic version behavior?
-|   +-- Yes: pin kindest/node:v1.35.0 or the required test version.
+|   +-- Yes: pin kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0 or the required test version.
 |   +-- No: still record the version so results are explainable.
 ```
 
@@ -532,10 +513,9 @@ The practical decision is usually about feedback speed and fidelity. Local clust
 
 ## Did You Know?
 
-1. Kubernetes 1.35 is the version target for this curriculum, so pinning local node images prevents examples from drifting as upstream releases continue.
-2. The name "Kubernetes" comes from a Greek word associated with a helmsman or pilot, which matches the project's steering-wheel logo.
-3. `kind` began as infrastructure for testing Kubernetes itself, which explains why it is fast, disposable, and friendly to automation.
-4. The abbreviation `k8s` is a numeronym: it keeps the first and last letters of Kubernetes and replaces the eight letters between them with `8`.
+1. The name "Kubernetes" comes from a Greek word associated with a helmsman or pilot, which matches the project's steering-wheel logo.
+2. `kind` began as infrastructure for testing Kubernetes itself, which explains why it is fast, disposable, and friendly to automation.
+3. The abbreviation `k8s` is a numeronym: it keeps the first and last letters of Kubernetes and replaces the eight letters between them with `8`.
 
 ## Common Mistakes
 
@@ -551,8 +531,8 @@ The practical decision is usually about feedback speed and fidelity. Local clust
 
 ## Quiz
 
-<details><summary><strong>[Tests LO4]</strong> You create a Deployment while the API server and `etcd` are healthy, but the scheduler Pod has been deleted. What state do the new Pods enter, and why?</summary>
-The Pods will be accepted into the API and remain Pending. The API server can validate and persist the desired state because `etcd` is available, but the scheduler is the component that assigns unscheduled Pods to nodes. Without that assignment, no kubelet receives responsibility for starting the containers. This is why a Pending Pod is often evidence of a scheduling break rather than an image pull or application crash.
+<details><summary><strong>[Tests LO4]</strong> A Pod has already been assigned to a node but its container fails to start. Which component should you inspect first?</summary>
+Inspect the kubelet and node events: the scheduler assigns the Pod, while the kubelet works with the container runtime to start its containers.
 </details>
 
 <details><summary><strong>[Tests LO2]</strong> Your team needs to test a DaemonSet that must run one Pod on every node. Should you use a single-node or multi-node `kind` cluster, and what would the single-node test fail to prove?</summary>
@@ -563,8 +543,8 @@ Use a multi-node `kind` cluster because the behavior depends on node count and p
 They should check whether the image was loaded into the `kind` cluster's internal runtime. Host Docker can know about an image while the node container's `containerd` cannot see it, so Kubernetes tries to pull the image from a registry and fails. The local fix is to run `kind load docker-image my-app:v1 --name <cluster-name>` before creating or restarting the Pod. In team workflows, pushing to a registry can be more repeatable.
 </details>
 
-<details><summary><strong>[Tests LO1]</strong> You are required to reproduce a bug on Kubernetes v1.35.0, but your default `kind` installation creates a different version. What is the safest local workflow?</summary>
-Use `lesson_create repro-135 --image kindest/node:v1.35.0` in the initialized lesson shell, then record the observed version. A pinned image supports reproduction; it does not authorize adopting or deleting an existing cluster. Stop on collision or failed creation and use `lesson_delete repro-135` only after successful owned creation.
+<details><summary><strong>[Tests LO1]</strong> You are required to reproduce a bug on Kubernetes v1.35.8, but your default `kind` installation creates a different version. What is the safest local workflow?</summary>
+Use `lesson_create repro-135 --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0` in the initialized lesson shell, then record the observed version. A pinned image supports reproduction; it does not authorize adopting or deleting an existing cluster. Stop on collision or failed creation and use `lesson_delete repro-135` only after successful owned creation.
 </details>
 
 <details><summary><strong>[Tests LO5]</strong> You receive a temporary kubeconfig for a staging cluster, but you do not want it merged into your default `~/.kube/config`. How should you use it?</summary>
@@ -590,12 +570,21 @@ Finish the earlier topology before starting this exercise: if this run still has
 
 ### Tasks
 
-1. **The Baseline Cluster Initialization:** Create a standard single-node cluster named `primary-dojo`. Verify it is running and determine the API server's host loopback address and port.
-2. **The Kubeconfig Deep Dive:** Use the redacted view of this lesson's private kubeconfig. Identify the cluster, user, and context references without printing raw credentials or opening your default configuration.
-3. **Strict Version Pinning:** Create a second, completely simultaneous cluster named `legacy-dojo`. This cluster must rigidly enforce running an older version of Kubernetes, specifically v1.34.0, utilizing the specific image tag `kindest/node:v1.34.0`.
-4. **Context Switching Mastery:** Use `kubectl config use-context` to choose each successfully created cluster in the private kubeconfig, then run `kubectl version`. Compare observed server versions without modifying the default file.
+1. Predict how many nodes and which address you expect to see. **The Baseline Cluster Initialization:** Create a standard single-node cluster named `primary-dojo`. Verify it is running and determine the API server's host loopback address and port.
+2. Predict which entries a context must connect. **The Kubeconfig Deep Dive:** Use the redacted view of this lesson's private kubeconfig. Identify the cluster, user, and context references without printing raw credentials or opening your default configuration.
+3. Predict whether this cluster will use the same server version as the first. **Strict Version Pinning:** Create a second, completely simultaneous cluster named `legacy-dojo`. This cluster must rigidly enforce running an older version of Kubernetes, specifically v1.34.11, utilizing the specific image tag `kindest/node:v1.34.11@sha256:44e222ee2132dab25ff87301682f89eb82c7880ea3a1bf543bfe9708fd08d67d`.
+4. Predict which client and server versions each context will report. **Context Switching Mastery:** Use `kubectl config use-context` to choose each successfully created cluster in the private kubeconfig, then run `kubectl version`. Compare observed server versions without modifying the default file.
 5. **Optional topology practice:** After cleaning up the two comparison clusters, create a declarative YAML configuration for `ha-dojo` with exactly three control-plane nodes and zero worker nodes. Keep this advanced local topology separate from the essential single-node and context exercises.
-6. **Simulated Catastrophic Failure:** Clean up `ha-dojo` if you completed optional Task 5; the comparison clusters were already removed after Task 4. Create a new `broken-dojo` with the guarded helper, then use `lesson_fail` to kill its single owned control-plane node. Stop on failed creation, collision, or uncertain ownership; never select an arbitrary Docker container from a listing.
+6. Predict what `kubectl get nodes` will report after the node stops, then explain the result. **Simulated Catastrophic Failure:** Clean up `ha-dojo` if you completed optional Task 5; the comparison clusters were already removed after Task 4. Create a new `broken-dojo` with the guarded helper, then use `lesson_fail` to kill its single owned control-plane node. Stop on failed creation, collision, or uncertain ownership; never select an arbitrary Docker container from a listing.
+
+### Hints
+
+1. Nudge: start with the cluster's name and connection details. Stronger hint: use the creation helper and `kubectl cluster-info`; a name-collision refusal means you must choose an unused name, not delete the existing cluster.
+2. Nudge: look for the destination and identity. Stronger hint: inspect the cluster, user and context entries with `kubectl config view`.
+3. Nudge: the node image determines the version. Stronger hint: use `lesson_create` with `--image` and the v1.34.11 digest from the release notes.
+4. Nudge: compare the client and server separately. Stronger hint: inspect the current context and switch with `kubectl config use-context`; an unexpected server version may mean the wrong context is active.
+5. Nudge: count the node roles in the configuration. Stronger hint: declare three `control-plane` nodes and no workers.
+6. Nudge: consider which container hosts the API. Stronger hint: use the recorded target with `lesson_fail` and try `kubectl get nodes`.
 
 ### Solutions
 
@@ -606,7 +595,7 @@ First, execute the standard creation command. The custom name makes the generate
 
 ```bash
 # Provision the cluster
-lesson_create primary-dojo --image kindest/node:v1.35.0
+lesson_create primary-dojo --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
 ```
 
 Once the cluster indicates it has started successfully, find out exactly where it is listening. `kind` maps a random high-numbered port on your host's localhost address to port 6443 inside the container.
@@ -618,6 +607,8 @@ kubectl cluster-info
 # Alternatively, find the port mapping directly from Docker
 docker port primary-dojo-control-plane
 ```
+
+Expected outcome: one node and an API address on `127.0.0.1` with a randomly assigned port.
 </details>
 
 <details>
@@ -631,6 +622,8 @@ kubectl config view
 ```
 
 Locate `clusters:`, `users:`, and `contexts:` in the redacted private file. For `primary-dojo`, their referenced name is `kind-primary-dojo`. The file's current context determines the request destination; a stored context name alone is not proof that a cluster belongs to this lesson.
+
+Expected outcome: the context, cluster, and user references are named `kind-primary-dojo`.
 </details>
 
 <details>
@@ -640,10 +633,12 @@ Run multiple `kind` clusters simultaneously only if your computer has enough mem
 
 ```bash
 # Provision the version-pinned cluster in parallel
-lesson_create legacy-dojo --image kindest/node:v1.34.0
+lesson_create legacy-dojo --image kindest/node:v1.34.11@sha256:44e222ee2132dab25ff87301682f89eb82c7880ea3a1bf543bfe9708fd08d67d
 ```
 
-This command may take a moment if Docker must download the node image for version 1.34.0.
+This command may take a moment if Docker must download the node image for version 1.34.11.
+
+Expected outcome: `legacy-dojo` runs Kubernetes v1.34.11, while `primary-dojo` runs v1.35.8.
 </details>
 
 <details>
@@ -659,19 +654,21 @@ kubectl config get-contexts
 # Explicitly switch the active context to the primary cluster
 kubectl config use-context kind-primary-dojo
 
-# Verify the observed server version matches the v1.35.0 pin
+# Verify the observed server version matches the v1.35.8 pin
 kubectl version
 
 # Explicitly switch the active context to the legacy cluster
 kubectl config use-context kind-legacy-dojo
 
-# Verify the server version matches exactly v1.34.0
+# Verify the server version matches exactly v1.34.11
 kubectl version
 
 # Record the comparison, then release both clusters before optional Task 5
 lesson_delete primary-dojo
 lesson_delete legacy-dojo
 ```
+
+Expected outcome: `kind-primary-dojo` reports server v1.35.8 and `kind-legacy-dojo` reports server v1.34.11.
 </details>
 
 <details>
@@ -694,7 +691,7 @@ Now instruct `kind` to read this file during cluster creation.
 
 ```bash
 # Provision the cluster using the configuration file
-lesson_create ha-dojo --config ha-config.yaml --image kindest/node:v1.35.0
+lesson_create ha-dojo --config ha-config.yaml --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
 
 # Validate the topology
 kubectl wait node --all --for=condition=Ready --timeout=120s
@@ -714,7 +711,7 @@ Finally, practice cleaning up the environment and observing a raw control plane 
 test ! -f "$lesson_dir/ha-dojo.owned" || lesson_delete ha-dojo || exit 1
 
 # Create the target cluster
-lesson_create broken-dojo --image kindest/node:v1.35.0
+lesson_create broken-dojo --image kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
 
 # The creation receipt contains the original control-plane Docker ID.
 # A later container reusing the name is never the failure target.
@@ -734,6 +731,14 @@ lesson_delete broken-dojo
 ```
 </details>
 
+Before cleanup, reflect: which signals would distinguish a stopped node container from a wrong context or a wrong port?
+
+<details>
+<summary>Reflection answer</summary>
+
+`docker ps -a` shows an exited node container. `kubectl config current-context` shows a wrong context. A wrong port appears when `docker port broken-dojo-control-plane` differs from the server address in `kubectl cluster-info`.
+</details>
+
 ### Success Criteria
 
 At the end, inspect the remaining `*.owned` receipts in the printed workspace and run `lesson_delete NAME` for each cluster from this run that you no longer need. Keep receipts if cleanup fails and ask the lab owner for recovery. Do not delete unrelated clusters, prune shared Docker state, or print the private kubeconfig. Run `lesson_finish` to restore the previous `KUBECONFIG` value (including unset or empty), then close the lesson shell. The default file and its stored context were never changed.
@@ -744,46 +749,6 @@ At the end, inspect the remaining `*.owned` receipts in the printed workspace an
 - [ ] If you attempted optional Task 5, you verified its declared three-control-plane topology and cleaned it up.
 - [ ] You empirically observed and documented the exact failure mode of `kubectl` when the control plane becomes catastrophically unreachable.
 - [ ] You practiced excellent infrastructure hygiene by successfully deleting all ephemeral clusters created during this exercise.
-
-- [ ] I named a failure layer and a next action for each frozen cluster-layer card before opening the reveal.
-
-A Pending Pod, a public file, a tidy `docker ps`, and a browser tab can each look like the cluster is fine. These cards freeze four transcripts so you can name the layer before you look.
-
-**Card A: The Deployment was accepted. The Pods stay Pending.** `kubectl apply` succeeds. `etcd` and the API server are healthy. New Pods have no node name. The scheduler process is gone. Older Pods are still Running.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: scheduling, not admission. Next action: restore the scheduler, then confirm a new Pod gets a node before you change the application.
-
-</details>
-
-**Card B: The kubeconfig is on GitHub.** A commit pushed `~/.kube/config` with production admin credentials. The repository is public. The cluster still answers `kubectl`.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: a leaked key, not a broken API. Next action: revoke those credentials and rotate them before you debug workloads.
-
-</details>
-
-**Card C: Host Docker shows one container.** `kind create cluster --name dojo-basics` finished. `kubectl get pods` lists several Pods. `docker ps` shows one container.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: you are looking at the node, not the Pods. Next action: inspect Pods with `kubectl`. Do not expect one host container per Pod.
-
-</details>
-
-**Card D: The page dies when the terminal closes.** `kubectl port-forward` was serving the app in a browser. You closed that window. The browser can no longer load the page. The Service still exists.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: the local tunnel, not the Service. Next action: restart the port-forward for debugging, or add a real exposure if the page must survive a closed terminal.
-
-</details>
 
 ## Sources
 
@@ -796,6 +761,10 @@ Failure layer: the local tunnel, not the Service. Next action: restart the port-
 - [Use Port Forwarding to Access Applications in a Cluster](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/)
 - [kind Project](https://kind.sigs.k8s.io/)
 - [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/)
+- [kind v0.33.0 release and node images](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0)
+- [minikube drivers](https://minikube.sigs.k8s.io/docs/drivers/)
+- [K3s documentation](https://docs.k3s.io/)
+- [k3d documentation](https://k3d.io/stable/)
 - [kind Configuration](https://kind.sigs.k8s.io/docs/user/configuration/)
 - [kind Known Issues](https://kind.sigs.k8s.io/docs/user/known-issues/)
 - [Docker inspect: object IDs and formatted output](https://docs.docker.com/reference/cli/docker/inspect/)
