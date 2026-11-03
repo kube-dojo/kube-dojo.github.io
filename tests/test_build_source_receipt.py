@@ -1,6 +1,7 @@
 """Offline defect cases for receipt production and deployed-smoke refusal."""
 
 import copy
+import base64
 import json
 import subprocess
 import sys
@@ -184,6 +185,126 @@ def test_off_allowlist_capture_requests_grant_before_fetch(monkeypatch):
     with pytest.raises(ValueError, match="grant request"):
         builder.capture("https://untrusted.invalid/source")
     fetch.assert_not_called()
+
+
+@pytest.fixture
+def external_bundle(bundle, monkeypatch):
+    root, seed_path, packet_path, verdicts, proposals = bundle
+    raw = b"<html><nav>Site navigation</nav><main><h1>Source</h1><p>This hub has one module.</p></main><footer>Site footer</footer></html>"
+    monkeypatch.setattr(builder.fetch_citation, "_fetch_once", MagicMock(return_value=(
+        {"status": 200, "truncated": False, "final_url": "https://kubernetes.io/docs/", "content_type": "text/html"}, raw,
+    )))
+    captured = builder.capture("https://kubernetes.io/docs/")
+    capture_file = root / "capture.json"
+    builder.write_json(capture_file, captured)
+    proposals["claims"][0].update(kind="external", candidate_sources=[{"capture": str(capture_file)}])
+    captures_dir = root / "verifier-evidence"
+    data = builder.seed(root, PAGE, proposals, captures_dir)
+    seed_path.write_text(json.dumps(data))
+    packet = builder.packet(root, seed_path)
+    packet_path.write_text(json.dumps(packet))
+    verdicts.update(seed_digest=packet["seed_digest"], packet_digest=builder.digest(packet_path.read_bytes()))
+    source = next(iter(packet["sources"].values()))
+    verdicts["claims"][0]["source"].update(retrieval_uri=source["retrieval_uri"], snapshot_digest=source["snapshot_digest"])
+    return bundle, captures_dir, captured
+
+
+def test_committable_seed_excludes_raw_bytes_and_navigation_but_retains_full_main(external_bundle):
+    bundle, captures_dir, captured = external_bundle
+    root, seed_path, packet_path, verdicts, _ = bundle
+    assert "body_base64" not in seed_path.read_text()
+    source = next(iter(json.loads(seed_path.read_bytes())["sources"].values()))
+    assert source["text"] == "Source\nThis hub has one module."
+    assert source["text_extraction"] == "html-main-v1"
+    assert {key: source[key] for key in builder.EXTERNAL_FIELDS} == {key: captured[key] for key in builder.EXTERNAL_FIELDS}
+    retained = builder.read_json(builder.capture_path(captures_dir, source))
+    assert retained == captured
+    assert "body_base64" not in packet_path.read_text()
+    receipt = builder.receipt(root, seed_path, packet_path, verdicts, captures_dir)
+    assert builder.check(root, seed_path, receipt)["accepted"] is True
+    assert "requires retained capture" in builder.check(root, seed_path, receipt)["raw_byte_verification"]
+
+
+@pytest.mark.parametrize("defect", ["raw_bytes", "text", "status", "truncated", "missing_capture", "missing_directory"])
+def test_receipt_reverifies_retained_capture_before_accepting(external_bundle, defect, capsys):
+    bundle, captures_dir, captured = external_bundle
+    root, seed_path, packet_path, verdicts, _ = bundle
+    source = next(iter(builder.read_json(seed_path)["sources"].values()))
+    retained = builder.capture_path(captures_dir, source)
+    if defect == "raw_bytes":
+        captured["body_base64"] = base64.b64encode(b"tampered raw response").decode()
+    elif defect == "text":
+        captured["text"] = "Invented text"
+    elif defect == "status":
+        captured["status"] = 503
+    elif defect == "truncated":
+        captured["truncated"] = True
+    elif defect == "missing_capture":
+        retained.unlink()
+    else:
+        captures_dir = None
+    if defect not in {"missing_capture", "missing_directory"}:
+        retained.write_text(json.dumps(captured))
+    args, output = run_receipt(bundle, verdicts)
+    if captures_dir is not None:
+        args += ["--captures-dir", str(captures_dir)]
+    with pytest.raises(SystemExit) as error:
+        builder.main(args)
+    assert error.value.code == 1
+    if defect == "raw_bytes":
+        assert "source snapshot digest is stale" in capsys.readouterr().err
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("defect", ["quote", "source_digest", "missing_claim", "family", "negative"])
+def test_compact_check_preserves_source_and_judgment_refusals(external_bundle, defect):
+    bundle, captures_dir, _ = external_bundle
+    root, seed_path, packet_path, verdicts, _ = bundle
+    receipt = builder.receipt(root, seed_path, packet_path, verdicts, captures_dir)
+    if defect == "quote":
+        receipt["claims"][0]["source"]["quote"] = "Site navigation"
+    elif defect == "source_digest":
+        receipt["claims"][0]["source"]["snapshot_digest"] = builder.digest(b"other")
+    elif defect == "missing_claim":
+        receipt["claims"] = []
+    elif defect == "family":
+        receipt["verifier"]["family"] = "codex"
+    else:
+        receipt["claims"][0]["verdict"] = "UNSUPPORTED"
+    with pytest.raises(ValueError):
+        builder.check(root, seed_path, receipt)
+
+
+def test_legacy_embedded_capture_seed_requires_regeneration(external_bundle):
+    bundle, _, captured = external_bundle
+    root, seed_path, _, _, _ = bundle
+    data = builder.read_json(seed_path)
+    data["sources"][captured["retrieval_uri"]] = captured
+    seed_path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="legacy seed contains body_base64; regenerate"):
+        builder.packet(root, seed_path)
+
+
+@pytest.mark.parametrize("content_type,raw,expected", [
+    ("text/plain", b"Complete plain text", "Complete plain text"),
+    ("text/html", b"<html><p>Complete HTML without main</p></html>", "Complete HTML without main"),
+])
+def test_compact_text_falls_back_to_full_extraction(monkeypatch, content_type, raw, expected):
+    monkeypatch.setattr(builder.fetch_citation, "_fetch_once", MagicMock(return_value=(
+        {"status": 200, "truncated": False, "final_url": "https://kubernetes.io/docs/", "content_type": content_type}, raw,
+    )))
+    compact = builder.compact_source(builder.capture("https://kubernetes.io/docs/"))
+    assert compact["text"] == expected
+    assert compact["text_extraction"] == "full-v1"
+
+
+@pytest.mark.parametrize("status,truncated", [(503, False), (200, True)])
+def test_capture_refuses_non_200_or_truncated_response(monkeypatch, status, truncated):
+    monkeypatch.setattr(builder.fetch_citation, "_fetch_once", MagicMock(return_value=(
+        {"status": status, "truncated": truncated}, b"unusable capture",
+    )))
+    with pytest.raises(ValueError, match="failed or truncated"):
+        builder.capture("https://kubernetes.io/docs/")
 
 
 @pytest.fixture

@@ -24,6 +24,63 @@ from scripts.quality.source_acceptance import SCHEMA, bind_page, evaluate_source
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW_DIR = Path("docs/content-upgrade/reviews")
 VERIFIER_SCHEMA = "kubedojo.source_verdicts.v1"
+EXTERNAL_FIELDS = ("retrieval_uri", "final_url", "retrieved_at", "content_type", "snapshot_digest", "capture_method")
+
+
+class MainTextExtractor(fetch_citation._TextExtractor):
+    """Keep the complete HTML main region, excluding site-wide navigation."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.depth = 0
+        self.found = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "main":
+            self.depth += 1
+            self.found = True
+        if self.depth:
+            super().handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        if self.depth:
+            super().handle_endtag(tag)
+            if tag == "main":
+                self.depth -= 1
+
+    def handle_data(self, data):
+        if self.depth:
+            super().handle_data(data)
+
+
+def compact_source(source: dict) -> dict:
+    validate_capture(source)
+    text, extraction = source["text"], "full-v1"
+    if "html" in source["content_type"]:
+        parser = MainTextExtractor()
+        parser.feed(base64.b64decode(source["body_base64"], validate=True).decode("utf-8"))
+        parser.close()
+        if parser.found:
+            require(parser.depth == 0 and bool(parser.text().strip()), "HTML main region is incomplete or unreadable")
+            text, extraction = parser.text(), "html-main-v1"
+    return {**{key: source[key] for key in EXTERNAL_FIELDS}, "text": text, "text_extraction": extraction}
+
+
+def validate_compact_source(source: dict) -> None:
+    require("body_base64" not in source, "legacy seed contains body_base64; regenerate seed and packet from retained captures")
+    require(set(source) == {*EXTERNAL_FIELDS, "text", "text_extraction"}, "invalid compact source fields; regenerate seed and packet")
+    for key in ("retrieval_uri", "final_url"):
+        require(urlsplit(source[key]).scheme == "https" and fetch_citation.allowlist_tier(source[key]) is not None, "domain grant request required")
+    require(datetime.fromisoformat(source["retrieved_at"].replace("Z", "+00:00")).tzinfo is not None, "source capture date lacks timezone")
+    require(re.fullmatch(r"sha256:[0-9a-f]{64}", source["snapshot_digest"]) is not None, "invalid snapshot digest")
+    require(source["capture_method"] == "scripts.fetch_citation._fetch_once", "source must use the existing fetcher")
+    require(source["text_extraction"] in {"html-main-v1", "full-v1"}, "unknown source text extraction")
+    require(isinstance(source["text"], str) and bool(source["text"].strip()), "source is unreadable")
+
+
+def capture_path(directory: Path, source: dict) -> Path:
+    key = (source["retrieval_uri"] + "\n" + source["snapshot_digest"]).encode()
+    return directory / (digest(key).removeprefix("sha256:") + ".capture.json")
 
 
 def digest(data: bytes) -> str:
@@ -128,10 +185,13 @@ def capture(url: str) -> dict:
         "snapshot_digest": digest(raw), "content_type": meta["content_type"],
         "body_base64": base64.b64encode(raw).decode(), "text": text,
         "capture_method": "scripts.fetch_citation._fetch_once",
+        "status": 200, "truncated": False,
     }
 
 
 def validate_capture(source: dict) -> str:
+    # Earlier capture files omit these fields; their producer checked both before writing.
+    require(source.get("status", 200) == 200 and source.get("truncated", False) is False, "source fetch failed or truncated")
     for key in ("retrieval_uri", "final_url"):
         url = source[key]
         require(urlsplit(url).scheme == "https" and fetch_citation.allowlist_tier(url) is not None, "domain grant request required")
@@ -145,7 +205,7 @@ def validate_capture(source: dict) -> str:
     return text
 
 
-def seed(root: Path, page: str, proposals: dict) -> dict:
+def seed(root: Path, page: str, proposals: dict, captures_dir: Path | None = None) -> dict:
     raw, blob = committed_page(root, page)
     author = identity(proposals["author"])
     require(bool(author.get("evidence_ref")), "author identity needs a work-record evidence_ref")
@@ -167,8 +227,15 @@ def seed(root: Path, page: str, proposals: dict) -> dict:
                 source_raw = git(root, "cat-file", "blob", source_blob)
                 source = {"retrieval_uri": f"git-object://{source_blob}", "snapshot_digest": digest(source_raw), "path": path}
             else:
-                source = read_json(Path(candidate["capture"]))
-                validate_capture(source)
+                require(captures_dir is not None, "external sources require --captures-dir outside the committed seed")
+                captured = read_json(Path(candidate["capture"]))
+                source = compact_source(captured)
+                captures_dir.mkdir(parents=True, exist_ok=True)
+                retained = capture_path(captures_dir, source)
+                if retained.exists():
+                    require(compact_source(read_json(retained)) == source, "conflicting retained capture")
+                else:
+                    write_json(retained, captured)
             key = source["retrieval_uri"]
             require(key not in sources or sources[key] == source, "conflicting source snapshots")
             sources[key] = source
@@ -205,8 +272,8 @@ def packet(root: Path, seed_path: Path) -> dict:
             require(digest(body) == source["snapshot_digest"], "source snapshot digest is stale")
             sources[key] = {**source, "text": body.decode()}
         else:
-            validate_capture(source)
-            sources[key] = {k: v for k, v in source.items() if k != "body_base64"}
+            validate_compact_source(source)
+            sources[key] = source
     for claim in claims:
         start, end = claim["line_start"], claim["line_end"]
         lines = raw.decode().splitlines()
@@ -225,21 +292,8 @@ def packet(root: Path, seed_path: Path) -> dict:
     }
 
 
-def receipt(root: Path, seed_path: Path, packet_path: Path, verdicts: dict) -> dict:
-    current = packet(root, seed_path)
-    packet_raw = packet_path.read_bytes()
-    require(json.loads(packet_raw) == current, "verifier packet is stale")
-    require(verdicts.get("schema") == VERIFIER_SCHEMA, "invalid verifier-output schema")
-    for field in ("page_digest", "seed_digest"):
-        require(verdicts.get(field) == current[field], f"{field} is stale")
-    require(verdicts.get("packet_digest") == digest(packet_raw), "packet digest is stale")
-    verifier = identity(verdicts["verifier"])
-    require(verifier["family"] != current["author"]["family"], "verifier family equals author family")
-    require(verdicts.get("coverage_complete") is True, "verifier found omitted or unreviewed material claims")
-    run = verdicts["run"]
-    require(isinstance(run, dict) and run.get("status") == "complete" and isinstance(run.get("identity"), str) and bool(run["identity"].strip()), "verifier run incomplete")
+def validate_judgments(current: dict, judgments: list) -> None:
     wanted = {c["claim_id"]: c for c in current["claims"]}
-    judgments = verdicts["claims"]
     ids = [c["claim_id"] for c in judgments]
     require(len(ids) == len(set(ids)) and set(ids) == set(wanted), "missing, extra or duplicate claim id")
     for judgment in judgments:
@@ -254,6 +308,29 @@ def receipt(root: Path, seed_path: Path, packet_path: Path, verdicts: dict) -> d
             require(supplied["snapshot_digest"] == captured["snapshot_digest"], "verifier source digest mismatch")
             require(isinstance(supplied.get("quote"), str) and bool(supplied["quote"].strip()) and supplied["quote"] in captured["text"], "verifier quote absent from source snapshot")
             require(isinstance(supplied.get("locator"), str) and bool(supplied["locator"].strip()), "verifier locator missing")
+
+
+def receipt(root: Path, seed_path: Path, packet_path: Path, verdicts: dict, captures_dir: Path | None = None) -> dict:
+    current = packet(root, seed_path)
+    for uri, source in current["sources"].items():
+        if not uri.startswith("git-object://"):
+            require(captures_dir is not None, "raw-byte verification requires retained capture --captures-dir")
+            require(compact_source(read_json(capture_path(captures_dir, source))) == source, "retained capture differs from seed")
+    packet_raw = packet_path.read_bytes()
+    require(json.loads(packet_raw) == current, "verifier packet is stale")
+    require(verdicts.get("schema") == VERIFIER_SCHEMA, "invalid verifier-output schema")
+    for field in ("page_digest", "seed_digest"):
+        require(verdicts.get(field) == current[field], f"{field} is stale")
+    require(verdicts.get("packet_digest") == digest(packet_raw), "packet digest is stale")
+    verifier = identity(verdicts["verifier"])
+    require(verifier["family"] != current["author"]["family"], "verifier family equals author family")
+    require(verdicts.get("coverage_complete") is True, "verifier found omitted or unreviewed material claims")
+    run = verdicts["run"]
+    require(isinstance(run, dict) and run.get("status") == "complete" and isinstance(run.get("identity"), str) and bool(run["identity"].strip()), "verifier run incomplete")
+    wanted = {c["claim_id"]: c for c in current["claims"]}
+    judgments = verdicts["claims"]
+    ids = [c["claim_id"] for c in judgments]
+    validate_judgments(current, judgments)
     result = {
         "schema": SCHEMA, "schema_version": 1, "disposition": "applicable",
         "page_digest": current["page_digest"], "seed_digest": current["seed_digest"],
@@ -268,6 +345,10 @@ def receipt(root: Path, seed_path: Path, packet_path: Path, verdicts: dict) -> d
 def check(root: Path, seed_path: Path, candidate: dict) -> dict:
     """Overlay candidate in a temporary copy of live ledger bytes; never edit it."""
     data = read_json(seed_path)
+    current = packet(root, seed_path)
+    validate_judgments(current, candidate["claims"])
+    require(identity(candidate["author"]) == current["author"], "receipt author differs from seed")
+    require(identity(candidate["verifier"])["family"] != current["author"]["family"], "verifier family equals author family")
     page = data["module_path"]
     raw, _ = committed_page(root, page)
     relative = page.removeprefix("src/content/docs/")
@@ -286,6 +367,7 @@ def check(root: Path, seed_path: Path, candidate: dict) -> dict:
         (overlay / "docs/citation-seeds" / name).write_bytes(seed_path.read_bytes())
         result = bind_page(overlay, relative, raw)
     result["live_ledger_digest"] = digest(ledger_raw)
+    result["raw_byte_verification"] = "not performed; requires retained capture files and receipt rebuild with --captures-dir"
     return result
 
 
@@ -300,10 +382,12 @@ def main(argv: list[str] | None = None) -> int:
     make_seed.add_argument("--page", required=True)
     make_seed.add_argument("--claims", type=Path, required=True)
     make_seed.add_argument("--output", type=Path, required=True)
+    make_seed.add_argument("--captures-dir", type=Path, help="Uncommitted verifier evidence directory for retained raw captures")
     for name, help_text in (("packet", "Emit full page, claim spans and captured source text for independent review"), ("receipt", "Ingest independent verifier JSON; refuse any incomplete, negative or stale result"), ("check", "Run bind_page on a candidate over live ledger bytes without changing the ledger")):
         sub = commands.add_parser(name, help=help_text)
         sub.add_argument("--seed", type=Path, required=True)
         if name == "receipt":
+            sub.add_argument("--captures-dir", type=Path, help="Retained raw capture evidence, required for external sources")
             sub.add_argument("--packet", type=Path, required=True)
             sub.add_argument("--verdicts", type=Path, required=True)
         if name == "check":
@@ -320,12 +404,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "capture":
             result = capture(args.url)
         elif args.command == "seed":
-            result = seed(root, args.page, read_json(args.claims))
+            result = seed(root, args.page, read_json(args.claims), args.captures_dir)
         elif args.command == "packet":
             result = packet(root, args.seed)
         else:
             review_output(root, args.output)
-            result = receipt(root, args.seed, args.packet, read_json(args.verdicts))
+            result = receipt(root, args.seed, args.packet, read_json(args.verdicts), args.captures_dir)
         write_json(args.output, result)
         print(json.dumps({"command": args.command, "claims": len(result.get("claims", [])), "sources": len(result.get("sources", {})), "output": args.output.as_posix()}))
         return 0

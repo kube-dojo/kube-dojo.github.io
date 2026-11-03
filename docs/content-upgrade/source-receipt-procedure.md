@@ -55,10 +55,33 @@ text. Off-allowlist domains require a grant request; do not widen the allowlist.
 Git snapshots hash exact blob bytes. Seeds use the existing `claims[].claim_id`
 and schema-version-2 shape, with extra binding and candidate-source fields.
 
+Commit only the canonical seed. Each external source retains its retrieval URI,
+final URL, retrieval date, content type, raw-byte snapshot digest, capture method
+and extracted `text`. HTML with a `<main>` region keeps that entire region's
+text, excluding site navigation. Other inputs keep the full extracted text.
+There is no character cutoff. `text_extraction` records `html-main-v1` or
+`full-v1`. The verifier reads and quotes this retained text.
+
+The Kubernetes Basics pilot measured 243,426 seed bytes, down from 7,791,841,
+and 827,533 packet bytes for 29 claims and 19 sources, including ten external
+captures. Its retained external text is 217,317 bytes. This measures that pilot,
+not a size ceiling for other pages; no source text is silently truncated.
+
+Raw bytes stay in the original capture and in a separate verifier evidence
+directory supplied as `--captures-dir`. Neither captures nor packets are
+committed. The seed command validates the capture's raw digest and full text,
+then retains a capture file keyed by URI and snapshot digest in that directory.
+Keep this directory with the packet and verifier run. The receipt command
+requires it for external sources and rechecks raw bytes, extraction and all
+source metadata against the seed. Older captures from the same tool lack
+`status` and `truncated` fields because their producer checked these before
+writing. New captures record both; non-200 or truncated captures are refused.
+
 ```sh
 .venv/bin/python -m scripts.quality.build_source_receipt seed \
   --page src/content/docs/prerequisites/kubernetes-basics/index.md \
-  --claims claims.json --output docs/citation-seeds/prerequisites-kubernetes-basics-index.json
+  --claims claims.json --captures-dir evidence/kb-captures \
+  --output docs/citation-seeds/prerequisites-kubernetes-basics-index.json
 .venv/bin/python -m scripts.quality.build_source_receipt packet \
   --seed docs/citation-seeds/prerequisites-kubernetes-basics-index.json \
   --output docs/content-upgrade/reviews/kb-packet.json
@@ -69,6 +92,12 @@ page or seed change, prepare a new packet and obtain a new recorded verdict.
 The packet includes full page text, claim spans and captured source text. Give
 it to the independent verifier, **Anthropic Claude for the OpenAI-authored pilot**.
 The author and builder cannot supply the verifier's judgments.
+
+Legacy seeds containing `body_base64` are refused with a regeneration message.
+Regenerate the seed and packet from retained proposals and captures, then get
+new verdicts bound to their new digests. The `kubedojo.source_verdicts.v1`
+schema and receipt schema are unchanged. A previous packet or verdict cannot
+be reused after seed bytes change.
 
 ## 2. Independent verifier writes JSON; lead builds and checks the receipt
 
@@ -113,6 +142,7 @@ uses the same shape and binding checks as `source`.
 .venv/bin/python -m scripts.quality.build_source_receipt receipt \
   --seed docs/citation-seeds/prerequisites-kubernetes-basics-index.json \
   --packet docs/content-upgrade/reviews/kb-packet.json \
+  --captures-dir evidence/kb-captures \
   --verdicts docs/content-upgrade/reviews/kb-verdicts.json \
   --output docs/content-upgrade/reviews/kb-source-acceptance.json
 .venv/bin/python -m scripts.quality.build_source_receipt check \
@@ -125,6 +155,12 @@ page/seed/packet/source bindings refuse receipt creation. Unsupported or
 contradicted claims require a page fix or the page stays unaccepted. `check`
 overlays the candidate on a temporary copy of the live ledger, runs `bind_page`,
 and reports acceptance/reasons plus the ledger digest without editing it.
+It also checks claim spans, source references and digests, independent family,
+positive judgments and literal quotes against retained seed text or exact Git
+blob bytes. It needs no capture directory. Its output explicitly says that it
+does **not** reverify external raw bytes; that requires the retained captures
+and a receipt rebuild. Neither a digest nor a matching quote establishes
+semantic support without the independent verifier's recorded judgment.
 
 ## 3. Lead records live deployed smoke, then adopts the evidence
 
