@@ -2,9 +2,9 @@
   "schema_version": 2,
   "module_path": "src/content/docs/prerequisites/zero-to-terminal/index.md",
   "module_key": "prerequisites/zero-to-terminal/index",
-  "page_sha256": "93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
-  "page_commit": "d3cb8edc2a24554b3b4ca5de24d6df24a499bffe",
-  "page_blob": "1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+  "page_sha256": "5690bb55a92442356c9c6b44685e74948c41ea6e69a043a65e2b35f5d95df2e5",
+  "page_commit": "637b94a9f06ba3a8a02c0fbc3197034dfcdb9c86",
+  "page_blob": "2d5a8ba85d72a78ad9b47e2bfa94f8ae99efbc88",
   "author": {
     "identity": "gpt-6.1-sol",
     "family": "openai",
@@ -18,7 +18,7 @@
       "line_end": 2,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8"
@@ -42,7 +42,7 @@
         "git-object://9b43496599781abb69ba1b20d89cb1ccd0569c5e",
         "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8",
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
         "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md"
       ]
@@ -57,7 +57,7 @@
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857"
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8"
       ]
     },
     {
@@ -67,7 +67,7 @@
       "line_end": 12,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8"
       ]
@@ -90,7 +90,7 @@
         "git-object://9b43496599781abb69ba1b20d89cb1ccd0569c5e",
         "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8",
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857"
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8"
       ]
     },
     {
@@ -292,7 +292,7 @@
       "line_end": 31,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
@@ -306,7 +306,7 @@
       "line_end": 35,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8"
       ]
     },
@@ -318,7 +318,7 @@
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857"
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8"
       ]
     },
     {
@@ -328,7 +328,7 @@
       "line_end": 35,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
         "git-object://346d9bed362784efed10a3d1a3551a830edf7fae",
@@ -842,7 +842,7 @@
       "line_end": 86,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
@@ -857,7 +857,7 @@
       "line_end": 88,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
         "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
@@ -866,12 +866,12 @@
     },
     {
       "claim_id": "ZT084",
-      "claim_text": "**Optional fork:** [Linux](../../linux/) if you want deeper systems knowledge before operations-heavy work. Linux is not required before Cloud Native 101; you can pick it up anytime.",
+      "claim_text": "**Optional fork:** [Linux](../../linux/) if you want deeper systems knowledge. Linux is not required before Cloud Native 101; you can pick it up anytime.",
       "line_start": 90,
       "line_end": 90,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
@@ -885,7 +885,7 @@
       "line_end": 104,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
@@ -894,9 +894,9 @@
     }
   ],
   "sources": {
-    "git-object://aed52c4a209e657bc04477e11927be658db4d857": {
-      "retrieval_uri": "git-object://aed52c4a209e657bc04477e11927be658db4d857",
-      "snapshot_digest": "sha256:246acf2bfd82cec62c0e0e85acb86dec08997266ca6cb54b97b17d808d7f72cb",
+    "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8": {
+      "retrieval_uri": "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
+      "snapshot_digest": "sha256:95eb742e1f9a7eb98b88285cdc7d82cced129e5f1cf10c9eb30e445c0e15883a",
       "path": "src/content/docs/prerequisites/index.md"
     },
     "git-object://d436e089b39678df8bb761c3c94747d5195aafe5": {
