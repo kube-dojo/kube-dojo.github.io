@@ -1,14 +1,14 @@
 {
   "schema": "kubedojo.source_packet.v1",
   "page": "src/content/docs/prerequisites/cloud-native-101/index.md",
-  "page_digest": "sha256:67894ddb4452433936f09ff254959dfd5215ab892d577db5e5c9643fc712c13e",
-  "seed_digest": "sha256:6666f060425189c277db3c2a46237d3251c922109fc6218969e03211260aa644",
+  "page_digest": "sha256:0d05f1af9bc924c627708a7dc33cef2f3964301f711865ff85ef10c11c2a7c90",
+  "seed_digest": "sha256:a623d36182b72a4cea42f06d19f111b6d4ce250bf7a8542b6e51d311813f6d16",
   "author": {
     "identity": "gpt-6.1-sol",
     "family": "openai",
-    "evidence_ref": "/home/ops/learn-ukrainian/batch_state/tasks/kd-cn101-stage1b-sol-1.json#run_nonce=74809fc1dd5e4f7b92099f055e788117"
+    "evidence_ref": "/home/ops/learn-ukrainian/batch_state/tasks/kd-cn101-stage1c-sol-1.json#run_nonce=6bdee09dc3e049b1b267d1139fcfc08b"
   },
-  "page_text": "---\ntitle: \"Cloud Native 101\"\nsidebar:\n  order: 0\n---\n\nThis section covers containers, Kubernetes, and cloud native architecture. You will learn to evaluate whether Kubernetes is justified for a workload and compare monolithic and microservice architectures.\n\nThis section is for learners who want a structured route into cloud-native systems. Module 1.1 requires no prior container knowledge. You will learn to explain containers, Docker images, what Kubernetes adds, and when microservices are worth their cost.\n\nWe begin with containers and how they isolate processes. We then examine building Docker images and running containers, before learning to evaluate whether Kubernetes is justified for a workload. Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem and explore the trade-offs between monoliths and microservices when choosing application architecture.\n\n## Modules\n\n| Module | Title | Time | Description |\n|--------|-------|------|-------------|\n| 1.1 | [What Are Containers?](module-1.1-what-are-containers/) | 80–110 min | Containers explained from first principles and how they differ from virtual machines. |\n| 1.2 | [Docker Fundamentals](module-1.2-docker-fundamentals/) | 90–120 min | Building, running, and managing containers effectively with Docker. |\n| 1.3 | [What Is Kubernetes?](module-1.3-what-is-kubernetes/) | 90–120 min | The need for container orchestration and what Kubernetes provides. |\n| 1.4 | [The Cloud Native Ecosystem](module-1.4-cloud-native-ecosystem/) | 100–130 min | Navigating CNCF landscape maturity categories and key ecosystem projects. |\n| 1.5 | [From Monolith to Microservices](module-1.5-monolith-to-microservices/) | 90–120 min | Understanding the architectural evolution, benefits, and inherent trade-offs of microservices. |\n\nStart with a working terminal and a machine where you can install Docker for module 1.2. For module 1.3's hands-on exercise, complete [Your First Cluster](../kubernetes-basics/module-1.1-first-cluster/) if needed and confirm the selected cluster is dedicated and disposable; then continue to [Kubernetes Basics](../kubernetes-basics/) after Cloud Native 101.\n\nThese are planning estimates copied from the five module headers, not measured learner completion times. Their arithmetic gives an aggregate range of **450–600 minutes (about 7 hours 30 minutes–10 hours)**; individual setup, reading, and practice time will vary.\n",
+  "page_text": "---\ntitle: \"Cloud Native 101\"\nsidebar:\n  order: 0\n---\n\nThis section covers containers, Kubernetes, and cloud native architecture. You will learn to evaluate whether Kubernetes is justified for a workload and compare monolithic and microservice architectures.\n\nModule 1.1 requires no prior container knowledge. You will learn to explain containers, Docker images, what Kubernetes adds, and when microservices are worth their cost.\n\nWe begin with containers and how they isolate processes. We then examine building Docker images and running containers, before learning to evaluate whether Kubernetes is justified for a workload. Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem and explore the trade-offs between monoliths and microservices when choosing application architecture.\n\n## Modules\n\n| Module | Title | Time | Description |\n|--------|-------|------|-------------|\n| 1.1 | [What Are Containers?](module-1.1-what-are-containers/) | 80–110 min | Containers explained and how they differ from virtual machines. |\n| 1.2 | [Docker Fundamentals](module-1.2-docker-fundamentals/) | 90–120 min | Building, running, and managing containers with Docker. |\n| 1.3 | [What Is Kubernetes?](module-1.3-what-is-kubernetes/) | 90–120 min | The need for container orchestration and what Kubernetes provides. |\n| 1.4 | [The Cloud Native Ecosystem](module-1.4-cloud-native-ecosystem/) | 100–130 min | Navigating CNCF landscape maturity categories and key ecosystem projects. |\n| 1.5 | [From Monolith to Microservices](module-1.5-monolith-to-microservices/) | 90–120 min | Understanding the architectural evolution, benefits, and inherent trade-offs of microservices. |\n\nStart with a working terminal and a machine where you can install Docker for module 1.2. For module 1.3's hands-on exercise, complete [Your First Cluster](../kubernetes-basics/module-1.1-first-cluster/) if needed and confirm the selected cluster is dedicated and disposable; then continue to [Kubernetes Basics](../kubernetes-basics/) after Cloud Native 101.\n\nThese ranges are the Time to Complete values from the five module headers. Their arithmetic gives an aggregate range of **450–600 minutes (about 7 hours 30 minutes–10 hours)**; individual setup, reading, and practice time will vary.\n",
   "claims": [
     {
       "claim_id": "CN001",
@@ -76,17 +76,12 @@
     },
     {
       "claim_id": "CN006",
-      "claim_text": "This section is for learners who want a structured route into cloud-native systems. Module 1.1 requires no prior container knowledge.",
+      "claim_text": "Module 1.1 requires no prior container knowledge.",
       "line_start": 9,
       "line_end": 9,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
-        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
-        "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
-        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
-        "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
-        "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
+        "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d"
       ]
     },
     {
@@ -219,7 +214,7 @@
     },
     {
       "claim_id": "CN019",
-      "claim_text": "Containers explained from first principles and how they differ from virtual machines.",
+      "claim_text": "Containers explained and how they differ from virtual machines.",
       "line_start": 17,
       "line_end": 17,
       "kind": "mixed",
@@ -230,7 +225,7 @@
     },
     {
       "claim_id": "CN020",
-      "claim_text": "Building, running, and managing containers effectively with Docker.",
+      "claim_text": "Building, running, and managing containers with Docker.",
       "line_start": 18,
       "line_end": 18,
       "kind": "mixed",
@@ -288,7 +283,7 @@
     },
     {
       "claim_id": "CN025",
-      "claim_text": "These are planning estimates copied from the five module headers, not measured learner completion times.",
+      "claim_text": "These ranges are the Time to Complete values from the five module headers.",
       "line_start": 25,
       "line_end": 25,
       "kind": "internal",
