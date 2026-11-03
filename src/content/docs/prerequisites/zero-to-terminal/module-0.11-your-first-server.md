@@ -19,7 +19,7 @@ After this module, you will be able to:
 
 - **Deploy** a terminal-driven web server using either a local container or a cloud VM, then explain which process is listening for requests.
 - **Trace** an HTTP request from a browser through ports, networking, nginx, the filesystem, and the response path back to the user.
-- **Diagnose** common first-server failures with `curl`, `docker ps`, `systemctl`, port checks, firewall checks, and careful path inspection.
+- **Diagnose** common first-server failures with `curl`, `docker ps`, `systemctl`, and careful path inspection.
 - **Compare** local Docker deployment and cloud VM deployment, choosing the safer option for a learning goal, a demo, or a real public test.
 
 ---
@@ -72,7 +72,7 @@ Pause and predict: if nginx is running but the expected file is missing, what mi
 <details>
 <summary>Check your prediction</summary>
 
-An HTTP error establishes a response; inspect content and configuration to diagnose a missing file. Refusal suggests a missing listener or active rejection, possibly by an intermediary. Timeout leaves routing, filtering, addressing, and availability as hypotheses. Symptoms guide checks rather than proving one cause or repair.
+An HTTP error establishes a response; inspect content and configuration to diagnose a missing file. See [Reading Server Symptoms](#reading-server-symptoms-like-an-operator) for other observations.
 
 </details>
 
@@ -96,12 +96,7 @@ The local option runs nginx in a Docker container rather than installing nginx d
 
 Use an up-to-date, preconfigured Docker Engine on a local machine you are authorized to use, with a local Docker context; a remote context changes which machine receives containers and published ports. The alternatives below illustrate runtime choices, but this exercise uses Docker's behavior. If no authorized runtime is available, read the examples or ask your instructor for a disposable environment rather than changing a shared machine.
 
-| Tool | Description | Terms |
-|------|----------|---------|
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Docker environment | Check current terms |
-| [OrbStack](https://orbstack.dev/) | macOS option | Check current terms |
-| [Podman Desktop](https://podman-desktop.io/) | Container management | Check current terms |
-| [Rancher Desktop](https://rancherdesktop.io/) | Container management | Check current terms |
+Runtime options include [Docker Desktop](https://www.docker.com/products/docker-desktop/), [OrbStack](https://orbstack.dev/), [Podman Desktop](https://podman-desktop.io/), and [Rancher Desktop](https://rancherdesktop.io/). Check their current terms.
 
 Optional Linux setup belongs only in an authorized disposable VM with a console and a teardown plan. Docker-group membership grants root-level privileges and persists beyond this lesson; starting the daemon also changes host state. Prefer the preconfigured runtime above. The following setup commands are illustrative, not instructions to modify your everyday or shared host.
 
@@ -142,6 +137,8 @@ The `-p 127.0.0.1:8080:80` mapping names the host address, host port, and contai
 
 > **Stop and think**: Consider the concept of network ports from Module 0.7. If a port acts as a dedicated receiving dock for network traffic on your machine, what happens at the operating system level when Docker attempts to bind to port 8080 while another background application is already actively listening on that exact same port?
 
+The bind can fail because the port is already allocated. Choose another unused host port and update the URL. If a failed run may have left a container behind, stop and ask the lab owner to verify its ownership and remove it before reusing the name; do not adopt an unverified container.
+
 Use the browser only after you have a reason to believe the process started. A browser is a friendly interface, but it compresses many different failures into a few vague messages. When you visit the local URL, you are asking the host side of Docker's port mapping to forward an HTTP request into nginx inside the container.
 
 ```
@@ -149,6 +146,13 @@ http://127.0.0.1:8080
 ```
 
 You should see an nginx welcome page. That confirms an HTTP response at the URL you requested, not every detail of the deployment. Corroborate it with `docker ps` for your lesson container and its published address/port. Later, serving your distinctive custom page supplies stronger evidence that this request reached the document you intended.
+
+For example, `docker ps` may show this synthetic `PORTS` entry; other columns and values vary:
+
+```text
+PORTS
+127.0.0.1:8080->80/tcp
+```
 
 Before customizing the page, predict what a refresh will show after the copy. Configuration and caches can affect what a client receives, so compare the response with the saved file if the result differs.
 
@@ -211,7 +215,7 @@ test -n "$lesson_container" && docker cp index.html "$lesson_container:/usr/shar
 
 Refresh `http://127.0.0.1:8080` after the copy completes. Your distinctive page shows that the tested URL returned that content. Corroborate the container and file separately. If the welcome page still appears, check the copy destination and browser URL.
 
-When done, stop and remove only the container you created for this lesson. If the name was already occupied or creation failed, stop rather than adopting or removing another container. Your workspace's `index.html` remains on the host; container removal does not remove it or undo host runtime setup.
+Keep the container running for the Hands-On Exercise. Use this cleanup block when Task 3 requests it and after the exercise. Stop and remove only the container you created for this lesson. If the name was already occupied or creation failed, stop rather than adopting or removing another container. Your workspace's `index.html` remains on the host; container removal does not remove it or undo host runtime setup. If the variable is empty, the guard does nothing; stop and recover the creation evidence with your instructor.
 
 ```bash
 test -n "$lesson_container" && docker stop "$lesson_container" && docker rm "$lesson_container" && lesson_container=''
@@ -227,16 +231,16 @@ The cloud option deliberately adds a public endpoint, unlike Option A's intended
 
 Free tiers change over time, so check the provider's current pricing and eligibility before creating anything. Use only an authorized disposable lab VM, record its related resources, and agree on teardown first. Stopping compute is not complete cleanup: retained resources may remain billable, so follow the inventory and verification steps below rather than assuming a free-tier label guarantees no charges.
 
-Sign up only if you are comfortable with the provider's account requirements and billing model. Create the smallest free-eligible Ubuntu VM you can find, download the SSH private key when prompted, and allow inbound SSH on port 22 plus inbound HTTP on port 80. Save the public IP address because it is the address your browser will contact after nginx is installed.
+This path requires an instructor-provisioned authorized disposable Ubuntu VM, or one you create using your provider's official quickstart, such as the [EC2 getting-started guide](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html). Otherwise read the example without executing it. Before connecting, obtain the public IP, the image's login user and the private key; protect the key. Arrange authorized inbound HTTP on port 80 and SSH on port 22, restricting SSH to your trusted source address where the provider allows it. Check current eligibility and charges before creating resources.
 
 When you download the SSH key, your computer may save it with permissions that SSH considers too open. The `chmod` command sets owner-read permission and removes group and other permissions; protect the key separately from disclosure. The `ssh` command attempts authentication with that key to the remote Ubuntu account.
 
 ```bash
 chmod 400 ~/Downloads/my-key.pem
-ssh -i ~/Downloads/my-key.pem ubuntu@YOUR_PUBLIC_IP
+ssh -i ~/Downloads/my-key.pem YOUR_USER@YOUR_PUBLIC_IP
 ```
 
-Replace `YOUR_PUBLIC_IP` with the actual IP address assigned to your VM, and replace the key path with the real path where your browser saved the file. If the command succeeds, the prompt changes because your terminal is now controlling a shell on the remote server. That shift is subtle but important: commands after SSH run on the cloud VM, not on your laptop.
+Replace `YOUR_PUBLIC_IP`, `YOUR_USER`, and the key path with the values for your VM. The login user depends on the provider and image; for example, AWS lists `ubuntu` for its Ubuntu images. If the command succeeds, subsequent commands run on the cloud VM, not on your laptop.
 
 Install nginx with the package manager. `apt update` refreshes the package index, and `apt install nginx -y` requests installation with automatic confirmation. Check the service state after installation; startup can depend on the environment.
 
@@ -266,7 +270,7 @@ Open your browser on your own computer and visit the public IP using plain HTTP.
 http://YOUR_PUBLIC_IP
 ```
 
-A welcome page demonstrates an HTTP response; corroborate the intended VM and listener separately. Timeout leaves addressing, routing, filtering, and availability open. Refusal suggests a missing listener or active rejection, possibly by an intermediary. Compare local and external evidence before choosing a cause.
+A welcome page demonstrates an HTTP response; corroborate the intended VM and listener separately. See [Reading Server Symptoms](#reading-server-symptoms-like-an-operator) if it fails.
 
 Edit the default page on the VM. Ubuntu's nginx package serves files from `/var/www/html/` by default, which differs from the official nginx Docker image path you used earlier. That difference is not a contradiction; it is configuration. The same nginx program can serve different directories depending on how it was packaged and configured.
 
@@ -274,7 +278,7 @@ Edit the default page on the VM. Ubuntu's nginx package serves files from `/var/
 sudo nano /var/www/html/index.html
 ```
 
-Delete the default content and paste the cloud version of your page. The HTML is nearly the same as the local option, but the text states that the server is a cloud VM reached through SSH. Keeping the pages similar makes it easier to compare deployment paths without confusing the result with unrelated styling changes.
+Create or replace the file's content with the cloud version of your page. Another configured index file can affect which page appears; check the actual configuration if your page does not appear.
 
 ```html
 <!DOCTYPE html>
@@ -318,11 +322,13 @@ A distinctive page at the authorized public URL supports that this request retur
 
 Stop and think: the web server translates URL paths into filesystem paths under a configured web root. If nginx maps the root URL `/` to `/var/www/html/`, what browser path would request an image saved at `/var/www/html/assets/logo.png`? The answer is not the full Linux path, because the browser never sees the server's private directory layout; it sees the URL path that nginx maps into that directory.
 
+The path is `/assets/logo.png`, under the stated mapping.
+
 Use `curl` when the browser result is ambiguous. A browser renders HTML, caches resources, hides some headers, and may retry requests in ways that obscure the simple request-response exchange. `curl` makes the exchange plain by sending an HTTP request and printing the response body or status information in the terminal, which is why it is a favorite first diagnostic tool for web servers.
 
 For the cloud path, run `curl http://localhost` inside the SSH session to observe that local request path. A successful response supports that request only; it does not prove complete nginx or filesystem health. Then run `curl http://YOUR_PUBLIC_IP` from your own machine as a separate observation of the external path. Compare the results with inventory, configuration and logs before attributing a difference to the firewall or another component.
 
-When finished, disconnect and inventory the resources created specifically for this authorized disposable lab. Terminate/delete the VM and review its owned retained disks, snapshots, reserved/public addresses, and other billable resources; release only those no longer needed and authorized for removal. Verify the resource inventory and billing afterward, allowing for reporting delay. Stopping compute or deleting one VM does not guarantee zero charges, and unrelated resources must remain untouched.
+After the Hands-On Exercise, disconnect and inventory the resources created specifically for this authorized disposable lab. Terminate/delete the VM and review its owned retained disks, snapshots, reserved/public addresses, and other billable resources; release only those no longer needed and authorized for removal. Verify the resource inventory and billing afterward, allowing for reporting delay. Stopping compute or deleting one VM does not guarantee zero charges, and unrelated resources must remain untouched.
 
 ```bash
 exit
@@ -336,6 +342,12 @@ Once you have seen both deployment paths, the most valuable practice is learning
 
 Start with the wording and timing of the failure. A refusal suggests a missing listener or active rejection, possibly by an intermediary; it does not identify the rejecting device. A timeout leaves routing, filtering, availability, and addressing as hypotheses. An HTTP error response establishes an exchange with a responder, so inspect the endpoint, request, routing, permissions, and served content before choosing a cause.
 
+For example, a failed `curl` request might produce this synthetic output; wording and timing vary:
+
+```text
+curl: (7) Failed to connect to 127.0.0.1 port 8080: Connection refused
+```
+
 The local Docker path gives you a clean place to practice this reading. If `localhost:8080` refuses the connection, check the published address and port, the container, and IPv4 versus IPv6 resolution. If `127.0.0.1:9090` works after you used `-p 127.0.0.1:9090:80`, the client URL was mismatched. If the welcome page appears after copying your file, inspect the copy destination and served file before changing ports.
 
 The cloud VM path adds a different diagnostic split. If local `curl` succeeds while an outside request times out, compare the requested address, listener binding, client path, and access policy; local success alone does not identify a firewall fault. If the local request fails, investigate that path before changing provider rules. Inside-out tests narrow the evidence without turning one successful response into a complete health verdict.
@@ -346,15 +358,9 @@ Before changing anything, compare the URL with the published port, inspect the c
 
 Production deployments can add load balancers, TLS, logs and other layers. Define the expected path, compare observations at each layer, and record what each test actually establishes.
 
-There is one more reason to practice symptom reading here: it reduces fear. The first time a server does not answer, it can feel like the whole system is opaque. After you have intentionally broken a port mapping and intentionally moved an index file out of the web root, the same failures become recognizable shapes. Recognition is powerful because it lets you slow down, gather evidence, and make one targeted change instead of many nervous changes.
-
-Think of the server as a series of doors. The browser must knock on the right address, the network must deliver the knock to the right machine, the port must have a listener behind it, nginx must know which shelf to check, and the file must be on that shelf. If a door is closed, the fix is not to repaint every door. The fix is to identify which door is closed, open that one, and test the path again.
-
 The exercise asks you to change one thing at a time and record the result. A changed port or renamed file gives you a hypothesis to test, but the observed response still depends on the rest of the environment.
 
 Keep explanations concrete. "The server is down" is vague. "The service manager reports nginx active, local `curl` returns my HTML, but external HTTP times out" records separate observations without assigning the timeout to one cause.
-
-When you can produce that kind of sentence, you are no longer just following the module. You are practicing the same reasoning that will later help with containers, Kubernetes Services, ingress controllers, cloud load balancers, and production incident response. The tools will change and the systems will get larger, but the first move remains familiar: trace the request, test the layer, and explain the evidence before changing the system.
 
 ---
 
@@ -362,21 +368,13 @@ When you can produce that kind of sentence, you are no longer just following the
 
 Test from the inside outward: inspect service state, compare a local response with the expected content, then test the client path. Corroborate the process and file separately; a response alone does not identify them.
 
-Another useful pattern is to keep names and paths explicit while learning. Naming the container `my-website`, typing the full web-root path, and writing the intended URL in your notes may feel slow, but explicitness gives you handles for diagnosis. Later, when tools automate deployment, the same precision will show up as service names, labels, manifests, and routing rules.
-
-A third pattern is choosing the smallest environment that proves the thing you need to learn. If your learning goal is "how does nginx respond to a browser request," local Docker is enough and avoids cloud account risk. If your learning goal is "how do SSH, public IPs, and cloud firewalls affect a server," a VM is the right environment because local Docker hides those layers.
-
 | Pattern | When to Use It | Why It Works |
 |---------|----------------|--------------|
 | Test inside-out | Browser cannot reach a page | Compares local and external observations before diagnosing a component |
 | Keep paths explicit | Learning a new runtime or package layout | Makes it easier to compare Docker and Ubuntu nginx paths |
 | Prefer the smallest useful environment | Practicing a concept for the first time | Avoids adding a cloud account when it is not needed |
 
-The matching anti-pattern is troubleshooting from the outside only. If you refresh a browser twenty times without checking whether the process is running, you are asking the least precise tool to answer the most important question. Browsers are excellent clients, but they are not complete diagnostic instruments, and they are especially weak when multiple layers can produce similar visible failures.
-
-Another anti-pattern is treating defaults as universal facts. Docker's nginx image uses `/usr/share/nginx/html/`, while Ubuntu's nginx package commonly uses `/var/www/html/`. Inspect the configuration for the actual installation.
-
-The final anti-pattern is leaving public resources around because the exercise felt small. A VM with a public IP is infrastructure, not a worksheet. It may have billing consequences, security exposure, or stale software if forgotten. The better habit is to decide before you create the resource whether it will be stopped, terminated, or kept for a specific next task.
+Avoid treating defaults as universal; inspect the actual configuration. Plan cleanup before creating public resources.
 
 ---
 
@@ -385,8 +383,6 @@ The final anti-pattern is leaving public resources around because the exercise f
 Use the local container path for fast feedback and deliberate loopback publication, subject to the Engine and routing caveats above. It is a good first choice for connecting files, ports, nginx, and browser requests. Remove only containers you created for this lesson; a disposable container does not make existing host files or runtime configuration disposable.
 
 Use the cloud VM path when the learning objective includes remote administration. SSH key permissions, package installation, service state, public IP addresses, and cloud firewalls are not side details; they are the reason to choose the VM path. The tradeoff is that you must be more careful with billing, cleanup, and public reachability.
-
-Use both paths if you want the clearest mental model. Run local Docker first, then deploy to a VM and compare what changed. You will see that nginx, HTTP, ports, and files are common to both paths, while container port publishing, SSH, provider firewalls, and package-managed services are environment-specific details.
 
 | Decision | Choose Local Docker | Choose Cloud VM |
 |----------|---------------------|-----------------|
@@ -489,6 +485,12 @@ Update your page so it includes your name or a pseudonym, three things you learn
 ```
 
 <details>
+<summary>Hint</summary>
+
+Which file did you edit in your chosen path, and how does its content reach nginx?
+</details>
+
+<details>
 <summary>Solution guidance</summary>
 
 For local Docker, confirm your owned workspace with `pwd`, edit `index.html`, and use the guarded copy block with your captured container ID. For the authorized disposable VM, edit `/var/www/html/index.html` over SSH. Refresh the correct URL and compare responses; a distinctive temporary sentence can help identify the saved content being served.
@@ -497,6 +499,12 @@ For local Docker, confirm your owned workspace with `pwd`, edit `index.html`, an
 ### Task 2: Test Before You Trust the Browser
 
 Use a terminal-based HTTP test before relying on the browser. For local Docker, test the host URL you published, `http://127.0.0.1:8080`. For the cloud VM, test `http://localhost` from inside the SSH session and then test the authorized public endpoint from your own machine to compare local and external responses.
+
+<details>
+<summary>Hint</summary>
+
+Which command in the cloud section prints the response in the terminal?
+</details>
 
 <details>
 <summary>Solution guidance</summary>
@@ -514,6 +522,14 @@ sudo mv /var/www/html/index.html /var/www/html/broken.html
 
 After the rename, test the root URL and compare the response with the previous page. Configuration, another index file or a cache can affect the result.
 
+The objective is to observe whether your custom content disappears, not to guarantee an HTTP error. If a welcome page appears, record that observation too.
+
+<details>
+<summary>Hint</summary>
+
+Compare the URL's port or the requested file with the value you changed.
+</details>
+
 <details>
 <summary>Solution guidance</summary>
 
@@ -525,10 +541,20 @@ The replacement Docker mapping uses 9090, not 8080; another service may still an
 Repair the deployment so the original expected URL works again. Then explain the request path out loud or in writing, starting with the browser and ending with the HTML response. Include the port, nginx, and the filesystem path in the explanation, because those are the layers most beginners accidentally skip.
 
 <details>
+<summary>Hint</summary>
+
+Reverse the change in Task 3, then test the same URL again.
+</details>
+
+<details>
 <summary>Solution guidance</summary>
 
 For Docker, use the guarded cleanup and original create blocks to restore `127.0.0.1:8080:80`, then use the guarded copy block with the new ID. For the lab VM, restore `/var/www/html/index.html` and compare local and external responses. Explain the changed observation and why the repair addresses that layer.
 </details>
+
+### Task 5: Clean up
+
+After testing, use the Option A cleanup block for your captured container, or follow the Option B teardown and billing inventory instructions. Remove only resources you own and are authorized to remove.
 
 ### Success Criteria
 
@@ -538,6 +564,7 @@ For Docker, use the guarded cleanup and original create blocks to restore `127.0
 - [ ] You used a terminal HTTP test to confirm the server response before or alongside the browser.
 - [ ] You deliberately broke the server, recorded the symptom, diagnosed the layer, and repaired it.
 - [ ] You can compare the local Docker path with the cloud VM path using ports, files, SSH, and firewall concepts.
+- [ ] You completed the cleanup for your chosen path.
 
 The success criteria ask you to explain and test the request path as well as load the page. Different faults can produce similar symptoms, so record the evidence before choosing a cause.
 
@@ -552,18 +579,15 @@ The success criteria ask you to explain and test the request path as well as loa
 - [AWS EC2: Stop and start instances, including retained-resource charges](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-stop-start-works.html)
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Docker Personal Subscription](https://www.docker.com/products/personal/)
 - [Docker run reference](https://docs.docker.com/reference/cli/docker/container/run/)
+- [Docker: port already allocated](https://docs.docker.com/desktop/troubleshoot-and-support/troubleshoot/topics/#port-already-allocated-errors)
+- [Docker container listing](https://docs.docker.com/reference/cli/docker/container/ls/)
+- [curl: connection refusal example](https://curl.se/mail/lib-2017-02/0075.html)
+- [AWS: connection prerequisites and image usernames](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/connection-prereqs-general.html)
+- [AWS: security group rules](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules-reference.html)
 - [nginx Docker Official Image overview](https://hub.docker.com/_/nginx)
 - [nginx official site](https://nginx.org/en/)
-- [Inside NGINX: How We Designed for Performance & Scale](https://blog.nginx.org/blog/inside-nginx-how-we-designed-for-performance-scale)
 - [A typical HTTP session](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Session?hl=en-US)
-- [Oracle Cloud Free Tier FAQ](https://www.oracle.com/cloud/free/faq/)
-- [Oracle Cloud Free](https://cloud.oracle.com/free)
-- [Google Cloud free tier](https://cloud.google.com/free/docs/gcp-free-tier)
-- [Google Cloud Free](https://cloud.google.com/free)
-- [Amazon EC2 Free Tier](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-free-tier-usage.html)
-- [AWS Free Tier](https://aws.amazon.com/free)
 - [CERN: Restoring the first website](https://first-website.web.cern.ch/)
 - [A short history of the Web](https://home.cern/science/computing/the-birth-of-the-web/short-history-web/)
 - [The birth of the Web](https://home.cern/science/computing/the-birth-of-the-web)
