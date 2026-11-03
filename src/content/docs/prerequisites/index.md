@@ -7,19 +7,15 @@ sidebar:
 
 **Start here for the beginner foundations that lead into Kubernetes and platform work.**
 
-This hub is the front door to KubeDojo. It covers the terminal, containers, Kubernetes basics, declarative thinking, Git, and modern delivery practices.
+This hub covers the terminal, containers, Kubernetes basics, declarative thinking, Git, and modern delivery practices.
 
 ## Who This Is For
 
 - absolute beginners who need a real starting point
-- learners who want a structured route into cloud-native systems
-- people who need enough fundamentals before choosing Linux, Kubernetes, cloud, platform, AI literacy, or AI/ML depth
 
 ## Start Here If
 
-- you are still shaky on the terminal, files, SSH, or software installation
-- Kubernetes terminology still feels abstract
-- you are tempted to jump straight into advanced tracks because they look interesting
+- you are still uncomfortable with the terminal, SSH, files, and packages
 
 This layer gives later tracks a shared foundation; use it when these topics are unfamiliar.
 
@@ -47,7 +43,7 @@ For absolute beginners. Learn computer and terminal fundamentals, then serve a w
 | 0.11 | [Your First Server](zero-to-terminal/module-0.11-your-first-server/) |
 
 ### [Cloud Native 101](cloud-native-101/) — 5 modules
-Containers, Docker, Kubernetes, and the cloud-native ecosystem from first principles.
+Containers, Docker, Kubernetes, and the cloud-native ecosystem.
 
 | Module | Topic |
 |--------|-------|
@@ -123,6 +119,8 @@ Cloud Native 101
 Kubernetes Basics
    |
 Philosophy & Design
+
+Zero to Terminal
    |
 Git Deep Dive
    |
@@ -133,7 +131,7 @@ Use [Git Deep Dive](git-deep-dive/) after you are comfortable with basic Git fro
 
 ## Where to go next
 
-- [Linux](../linux/) for deeper systems knowledge before operations-heavy work
+- [Linux](../linux/) for deeper systems knowledge
 - [Kubernetes Certifications](../k8s/) for certification-oriented study
 - [Cloud](../cloud/) for provider-specific cloud foundations and managed Kubernetes topics
 - [On-Premises Kubernetes](../on-premises/) for running Kubernetes on your own hardware
