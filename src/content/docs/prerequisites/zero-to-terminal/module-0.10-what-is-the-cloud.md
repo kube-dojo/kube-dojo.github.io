@@ -36,7 +36,7 @@ This module matters because Kubernetes usually enters the story after a team has
 
 The common joke says that the cloud is "just someone else's computer." It is memorable because it punctures the mystery, and it is useful because it keeps you from treating cloud services as magic. At the same time, the joke is incomplete in the same way that calling a hotel "someone else's bed" is incomplete. The bed is real, but the hotel also provides cleaning, locks, fire alarms, plumbing, front-desk systems, booking software, staff, and a business model that lets you use a room for one night without buying a building.
 
-With a public cloud, you can rent infrastructure from a provider instead of buying and operating every physical layer yourself. You still decide what capacity and services you need, where data belongs, and what security boundaries matter. The kitchen analogy helps compare ownership and rental, but cloud billing and responsibilities depend on the service and its terms.
+With a public cloud, you can rent infrastructure from a provider instead of buying and operating every physical layer yourself. You still decide what capacity and services you need, where data belongs, and what security boundaries matter. Cloud billing and responsibilities depend on the service and its terms.
 
 NIST describes cloud computing through on-demand self-service, network access, pooled resources, rapid elasticity, and measured service. Its models also include private clouds, which can be operated for one organization and may be on or off premises; cloud is broader than renting from a public provider.
 
@@ -71,7 +71,7 @@ Owning infrastructure also changes the failure conversation. When the power supp
     Downsize to a smaller kitchen, pay less
 ```
 
-That second option is the cloud model. The provider has already built the data centers and control systems, so you request capacity through a web console, API, command-line tool, or infrastructure-as-code workflow. You can request, measure, resize, automate, and release resources as needs change. Reducing charges depends on each resource's billing rules and what remains allocated, not merely whether a VM is running.
+That second option is the cloud model. The provider has already built the data centers and control systems, so you request capacity through a web console, API, command-line tool, or infrastructure-as-code workflow. You can request, measure, resize, automate, and release resources as needs change. Reducing charges depends on each resource's billing rules and what remains allocated, not merely whether a virtual machine (VM) is running.
 
 Renting also lets a team create a small environment, test an idea, and delete the environment before committing to a bigger design. Pair provisioning with account boundaries, access reviews, and cleanup expectations.
 
@@ -85,7 +85,7 @@ The rented cloud model can reduce idle compute charges when stopping is supporte
 
 ## Build Versus Rent: The Operational Tradeoff
 
-Buying infrastructure can involve lead time, upfront spending, and capacity estimates before demand is known. A personal website may need only a small server, but the same tradeoffs arise in larger systems.
+Buying infrastructure can involve lead time, upfront spending, and capacity estimates before demand is known.
 
 The first problem is lead time. Physical servers are not created by a command; someone must approve a budget, order equipment, wait for shipping, rack the machines, cable them, install operating systems, configure networking, apply updates, and connect monitoring. Large organizations can streamline this, but physics and purchasing still impose delays. Cloud providers reduce that delay by keeping pooled capacity ready and exposing it through software interfaces.
 
@@ -125,8 +125,6 @@ The third problem is maintenance. Servers need power, cooling, physical security
 Cloud teams often describe this as a shared responsibility model. For AWS, the provider secures the infrastructure underlying its services, while the customer's responsibilities vary with the service and configuration. Accounts, permissions, data protection, backups, and application settings still need attention. Check the actual service terms rather than assuming the provider operates your application correctly.
 
 The shared-responsibility idea also explains why cloud skills are more than clicking buttons in a console. If a storage bucket is public when it should be private, the provider did not necessarily fail; the customer may have configured access incorrectly. If a database has no usable backup, the managed service may still be functioning exactly as configured. Cloud literacy means asking where each responsibility sits, how you would prove it is handled, and what evidence would alert you before a mistake becomes an outage or exposure.
-
-This is also why cloud diagrams usually show boundaries. One boundary separates the provider's facilities from the customer's accounts. Another boundary separates public traffic from private services. A third boundary separates human users from automated service identities. You do not need to master those diagrams yet, but you should start noticing the questions they answer. Where does traffic enter, where is data stored, who can change the system, and which part would still be your team's problem during an incident?
 
 ## Cloud providers and the services they sell
 
@@ -219,7 +217,7 @@ Observability is another supporting category that becomes important as soon as a
 
 ### Classification checkpoint (unguided)
 
-This diagnostic has no answer key on purpose. Write your answers in your notes file, then revisit them after the quiz to see how your reasoning held up. For each workload, name the cloud service category you would reach for first: compute, storage, networking, database, identity, or observability.
+For each workload, name the cloud service category you would reach for first: compute, storage, networking, database, identity, or observability. Write your answers in a scratch note before checking the reveal.
 
 1. A photo-sharing app must keep millions of uploaded images available even if any single server dies, and the images are fetched through URLs rather than through one machine's filesystem.
 2. A data team needs two hundred machines for a three-hour processing job every night, then nothing until the next night.
@@ -227,6 +225,17 @@ This diagnostic has no answer key on purpose. Write your answers in your notes f
 4. A contractor who left the project two weeks ago can still delete production file uploads because nothing ever revoked the access.
 
 Now the failure story. On a Monday morning, customers report that the site is down. Using only the categories above, write the sequence of checks you would walk through: which category tells you whether users can reach the system at all, which tells you whether the application code is running, which tells you whether stored data is intact, which tells you whether an automated system did something it was not allowed to do, and which tells you what actually happened overnight. There is no single correct ordering, but a useful sequence moves from what users observe toward the layer where the evidence lives.
+
+<details>
+<summary>Check your classifications</summary>
+
+1. **Storage:** The images need a place to persist independently of one server.
+2. **Compute:** The job needs machines to run its processing work.
+3. **Identity:** Correct passwords followed by permission errors suggest checking authorization first; application or database faults may also need investigation.
+4. **Identity:** The contractor's access needs to be revoked.
+
+One outage sequence is networking (reachability), compute (running application), storage (data), identity (permissions), then observability (logs and other evidence). The evidence may lead you to revisit an earlier layer.
+</details>
 
 ## Pay-As-You-Go Changes the Budget and the Failure Mode
 
@@ -246,11 +255,11 @@ Example:
 
 The numbers are hypothetical, not a provider price quote. Actual rates and billing units depend on the service and can change; check the provider's pricing page, including storage and outbound data transfer. Stopping compute may leave other charges. Steady demand may favor owned infrastructure or committed cloud discounts, depending on the full cost.
 
-Hypothetical scenario: your team creates a performance-test environment with many servers for a two-hour benchmark, then forgets to delete it before the weekend. The cloud made the benchmark easy because capacity arrived quickly, but the same ease made the mistake expensive because the resources kept running without anyone cooking in the kitchen. Cost controls, budgets, tags, cleanup routines, alerts, and ownership labels are not paperwork; they are part of operating cloud systems responsibly.
+Hypothetical scenario: your team creates a performance-test environment with many servers for a two-hour benchmark, then forgets to delete it before the weekend. The resources keep running and accumulating charges.
 
 Cloud cost thinking is also a preparation for Kubernetes. Kubernetes can run multiple copies of an application, use storage, expose services, and replace workloads after failures. Additional capacity and cloud resources depend on the cluster's integrations and configuration. Ask both reliability and budget questions: how many copies do we need, where do they run, and what tells us to scale back down?
 
-Cost visibility is a technical practice, not only an accounting practice. Engineers influence cost when they choose instance sizes, logging volume, storage classes, data-transfer paths, retry behavior, and scaling thresholds. Finance may receive the bill, but architecture creates the bill. In healthy cloud teams, cost dashboards, resource tags, budgets, and cleanup reviews are part of the same operating rhythm as monitoring and incident review because all of them describe whether the system is behaving as intended.
+Cost visibility is a technical practice, not only an accounting practice. Engineers influence cost when they choose instance sizes, logging volume, storage classes, data-transfer paths, retry behavior, and scaling thresholds. Use ownership tags, budgets, alerts, dashboards, and cleanup reviews to track resources and their costs.
 
 A useful beginner habit is to ask what should happen when nobody is using a resource. A production database may need to stay available, but a practice VM, temporary load test, preview environment, or throwaway storage bucket probably does not. Cloud platforms make it easy to create those resources, so the cleanup rule must be designed before the environment exists. This habit will matter later when Kubernetes creates resources indirectly, because deleting an application object may or may not remove every cloud resource attached to it.
 
@@ -303,7 +312,7 @@ Kubernetes: "Server-42 is down. A replacement can be scheduled on an available n
 
 This is why cloud concepts matter before Kubernetes concepts. If you do not understand rented compute, storage, networking, and pay-as-you-go capacity, Kubernetes can feel like a pile of strange objects and commands. If you do understand the cloud model, Kubernetes becomes easier to place: it is the restaurant manager coordinating many kitchens, not the kitchen building itself. It decides where work should run, watches for failure, and helps teams operate applications at a scale where manual placement is too slow.
 
-Managed Kubernetes services make this relationship even clearer. Providers can operate parts of the Kubernetes control plane for you, while you still decide what workloads to deploy, what permissions to grant, what network exposure is acceptable, and how much capacity the cluster needs. That split follows the same shared-responsibility pattern you have already seen. A managed cluster reduces some operational work, but it does not make architecture, security, or cost decisions on behalf of your team.
+Managed Kubernetes services make this relationship even clearer. The Kubernetes control plane manages the cluster and is separate from the provider's infrastructure control plane described earlier. Providers can operate parts of the Kubernetes control plane for you, while you still decide what workloads to deploy, what permissions to grant, what network exposure is acceptable, and how much capacity the cluster needs. That split follows the same shared-responsibility pattern you have already seen. A managed cluster reduces some operational work, but it does not make architecture, security, or cost decisions on behalf of your team.
 
 Kubernetes also shows why abstraction is useful but never free. A Deployment can describe three copies of an application without naming the exact machines, which is much easier than hand-picking servers. Under the abstraction, real CPU, memory, disk, network routes, load balancers, and credentials still exist. When something breaks, operators often move between layers: they inspect the Kubernetes object, then the node, then the cloud resource, then the application logs. The cloud mental model helps you avoid getting lost during that movement.
 
@@ -352,19 +361,17 @@ Cloud computing is not automatically the best answer for every workload. If a wo
 
 The same caution applies inside the cloud. A virtual machine may be better than a managed platform when the team needs low-level control, while a managed service may be better when the team wants the provider to handle routine operations. Object storage may work well for uploaded files and backups, but may not meet an application's need for structured transactions. Match the service to the problem.
 
-A useful pattern is to start uncertain workloads in the cloud because rented capacity lowers the cost of learning. Early prototypes, training environments, temporary test systems, bursty data-processing jobs, and applications with unknown demand usually benefit from fast provisioning and easy teardown. The scaling consideration is discipline: as experiments become permanent, the team must add ownership tags, budgets, monitoring, backups, and architecture reviews so that a cheap experiment does not become an unmanaged production system.
+A useful pattern is to start uncertain workloads in the cloud because rented capacity lowers the cost of learning. Early prototypes, training environments, temporary test systems, bursty data-processing jobs, and applications with unknown demand can benefit from fast provisioning and teardown. As experiments become permanent, review their production requirements.
 
 Another pattern is to use managed services when operations are not the product differentiator. A managed database may reduce operational work, but can create dependencies on provider behavior, pricing, limits, and features. Document those dependencies and assess how they affect portability.
 
 The main anti-pattern is cloud adoption by hype. Teams sometimes move workloads because the provider is popular, a conference talk sounded convincing, or a competitor announced a migration. That skips the engineering work. A better alternative is to write down the workload shape, data needs, failure tolerance, expected traffic, compliance concerns, team skills, and cost model before choosing the platform. Cloud is a tool, not a maturity badge.
 
-Another anti-pattern is treating the first working setup as the final architecture. Cloud platforms make it easy to create a server, open a port, attach storage, and declare victory. That is fine for learning, but production requires a second pass: remove public access that is not needed, document ownership, add backups, define monitoring, test recovery, and make cost visible. The beginner version of this habit is simple: every time you create a resource, ask who owns it, what it costs, what data it touches, and how it will be deleted.
+Another anti-pattern is treating the first working setup as the final architecture. Before production, remove unneeded public access, add backups, define monitoring, and test recovery. Apply the cost and cleanup practices described above.
 
 ## When You'd Use This vs Alternatives
 
-Use cloud computing when you need capacity quickly, when demand may change, when experiments should be cheap to start and cheap to stop, or when managed services remove work your team is not trying to specialize in. Use on-premises infrastructure when long-lived predictable demand, physical control, specialized hardware, existing facilities, or regulatory constraints make ownership more sensible. Use a hybrid model when the organization has real reasons to keep some systems close while still using cloud capacity for burst, development, analytics, or newer application platforms.
-
-When choosing among providers, start with the service categories rather than the brand names. Ask where the application code runs, where durable data lives, how users reach it, how operators authenticate, how backups work, how cost is tracked, and what happens during failure. Then compare providers on the details that affect those questions. The right answer for a beginner exercise is often whichever provider has the clearest free-tier documentation and lowest risk for learning; the right answer for a company includes contracts, compliance, support, staffing, integration, and exit strategy.
+As the earlier tradeoffs show, cloud, on-premises, and hybrid models fit different workloads. Compare providers on workload needs, contracts, compliance, support, staffing, integration, and exit strategy.
 
 A simple decision framework is to separate reversible decisions from sticky decisions. Creating a temporary VM for a lab is usually reversible because you can delete it and try another provider later. Choosing a proprietary database feature, embedding provider-specific event services throughout an application, or building networking around a complex account structure is stickier because later migration touches code, data, operations, and people. Reversible choices are good places to learn quickly; sticky choices deserve slower review and clearer documentation.
 
@@ -476,9 +483,10 @@ GCP Free Tier:
 
 Azure Free Tier:
 - Compute: record the current VM or credit-based offer, including any signup or plan conditions
-- Storage: record the current Blob Storage allowance and whether it comes from credit, a limited-time offer, or an always-free limit
+- Storage: record the current Blob Storage allowance and whether it comes from credit, a limited-time offer, or an always-free limit; if it is not listed on this page, write "not listed on this page"
 
 Notes:
+- Service name mapped: <name> -> compute/storage/networking/database
 - These offers are time-sensitive and full of conditions
 - Some benefits depend on account age, region, plan, or eligible machine families
 - Always check the current limits, regions, and account eligibility rules
