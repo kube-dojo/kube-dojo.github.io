@@ -2,9 +2,9 @@
   "schema_version": 2,
   "module_path": "src/content/docs/prerequisites/index.md",
   "module_key": "prerequisites/index",
-  "page_sha256": "2de49e8931e3c72ddd837908a9f71c5b184a3b4f76d8ac3b384ba9108a473995",
-  "page_commit": "e841ba462a56547841129687a5c6010bd4e9bec2",
-  "page_blob": "f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
+  "page_sha256": "246acf2bfd82cec62c0e0e85acb86dec08997266ca6cb54b97b17d808d7f72cb",
+  "page_commit": "e6996c73b7e3f5a837f3263b3667c545660e5421",
+  "page_blob": "aed52c4a209e657bc04477e11927be658db4d857",
   "author": {
     "identity": "gpt-6.1-sol",
     "family": "openai",
@@ -22,7 +22,7 @@
         "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
         "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
         "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
-        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0"
+        "git-object://aed52c4a209e657bc04477e11927be658db4d857"
       ]
     },
     {
@@ -40,13 +40,13 @@
         "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
         "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
         "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
         "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
-        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
+        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
         "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md"
       ]
     },
@@ -63,7 +63,7 @@
         "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0",
         "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
         "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
-        "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
+        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
         "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md"
       ]
     },
@@ -78,32 +78,19 @@
         "git-object://82221e55de68ccf6c3fdc917c08e9883066b0190",
         "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0",
         "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://b5e29acf92289936a433660aa294a41c39df72a4"
       ]
     },
     {
-      "claim_id": "PI005",
-      "claim_text": "This hub is the front door to KubeDojo.",
-      "line_start": 10,
-      "line_end": 10,
-      "kind": "internal",
-      "candidate_source_refs": [
-        "git-object://fa9530b79bd481f9b0f8489842edca80db12e9ce",
-        "git-object://82221e55de68ccf6c3fdc917c08e9883066b0190",
-        "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0",
-        "git-object://d436e089b39678df8bb761c3c94747d5195aafe5"
-      ]
-    },
-    {
       "claim_id": "PI006",
-      "claim_text": "It covers the terminal, containers, Kubernetes basics, declarative thinking, Git, and modern delivery practices.",
+      "claim_text": "This hub covers the terminal, containers, Kubernetes basics, declarative thinking, Git, and modern delivery practices.",
       "line_start": 10,
       "line_end": 10,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
@@ -119,52 +106,20 @@
       "line_end": 14,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://fa9530b79bd481f9b0f8489842edca80db12e9ce",
         "git-object://82221e55de68ccf6c3fdc917c08e9883066b0190",
         "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0"
-      ]
-    },
-    {
-      "claim_id": "PI008",
-      "claim_text": "- learners who want a structured route into cloud-native systems",
-      "line_start": 15,
-      "line_end": 15,
-      "kind": "internal",
-      "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
-        "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
-        "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
-        "git-object://fa9530b79bd481f9b0f8489842edca80db12e9ce",
-        "git-object://82221e55de68ccf6c3fdc917c08e9883066b0190",
-        "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0"
-      ]
-    },
-    {
-      "claim_id": "PI009",
-      "claim_text": "- people who need enough fundamentals before choosing Linux, Kubernetes, cloud, platform, AI literacy, or AI/ML depth",
-      "line_start": 16,
-      "line_end": 16,
-      "kind": "internal",
-      "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
-        "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
-        "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
-        "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
-        "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
-        "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
-        "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
-        "git-object://b5e29acf92289936a433660aa294a41c39df72a4"
       ]
     },
     {
       "claim_id": "PI010",
-      "claim_text": "- you are still shaky on the terminal, files, SSH, or software installation",
-      "line_start": 20,
-      "line_end": 20,
+      "claim_text": "- you are still uncomfortable with the terminal, SSH, files, and packages",
+      "line_start": 18,
+      "line_end": 18,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8",
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
@@ -175,45 +130,18 @@
         "git-object://f8afd0e4f4a816d8dacf1cf3bffb6dd7b1c2bf2e",
         "git-object://a0666484c8c0d4d10c5b44c7c4ae29ee7c714341",
         "git-object://74e001ab733f41b236f21b0ec0819db6df978a80",
-        "git-object://9b43496599781abb69ba1b20d89cb1ccd0569c5e"
-      ]
-    },
-    {
-      "claim_id": "PI011",
-      "claim_text": "- Kubernetes terminology still feels abstract",
-      "line_start": 21,
-      "line_end": 21,
-      "kind": "internal",
-      "candidate_source_refs": [
-        "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
-        "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
-        "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
-        "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
-        "git-object://b5e29acf92289936a433660aa294a41c39df72a4"
-      ]
-    },
-    {
-      "claim_id": "PI012",
-      "claim_text": "- you are tempted to jump straight into advanced tracks because they look interesting",
-      "line_start": 22,
-      "line_end": 22,
-      "kind": "internal",
-      "candidate_source_refs": [
-        "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
-        "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
-        "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
-        "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
-        "git-object://3797ba08ce5a29036369cc1e860eb657891035fe"
+        "git-object://9b43496599781abb69ba1b20d89cb1ccd0569c5e",
+        "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a"
       ]
     },
     {
       "claim_id": "PI013",
       "claim_text": "This layer gives later tracks a shared foundation; use it when these topics are unfamiliar.",
-      "line_start": 24,
-      "line_end": 24,
+      "line_start": 20,
+      "line_end": 20,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
@@ -228,45 +156,45 @@
     {
       "claim_id": "PI014",
       "claim_text": "**Optional first-terminal preview:** You can preview the existing [terminal opening and prompt guide](zero-to-terminal/module-0.2-what-is-a-terminal/#opening-the-terminal-and-reading-the-prompt) and [first-terminal-session exercise](zero-to-terminal/module-0.2-what-is-a-terminal/#hands-on-exercise-your-first-terminal-session).",
-      "line_start": 26,
-      "line_end": 26,
+      "line_start": 22,
+      "line_end": 22,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9"
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388"
       ]
     },
     {
       "claim_id": "PI015",
       "claim_text": "Then start [Zero to Terminal](zero-to-terminal/) at [Module 0.1](zero-to-terminal/module-0.1-what-is-a-computer/) and follow it in order;",
-      "line_start": 26,
-      "line_end": 26,
+      "line_start": 22,
+      "line_end": 22,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826"
       ]
     },
     {
       "claim_id": "PI016",
       "claim_text": "the preview does not replace its modules.",
-      "line_start": 26,
-      "line_end": 26,
+      "line_start": 22,
+      "line_end": 22,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9"
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388"
       ]
     },
     {
       "claim_id": "PI017",
       "claim_text": "Before exercises, read the [Zero to Terminal setup guidance](zero-to-terminal/#who-is-this-track-for) and each module's platform and cost notes where applicable.",
-      "line_start": 26,
-      "line_end": 26,
+      "line_start": 22,
+      "line_end": 22,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8",
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
@@ -283,11 +211,11 @@
     {
       "claim_id": "PI018",
       "claim_text": "### [Zero to Terminal](zero-to-terminal/) — 11 modules",
-      "line_start": 32,
-      "line_end": 32,
+      "line_start": 28,
+      "line_end": 28,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8",
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
@@ -305,11 +233,11 @@
     {
       "claim_id": "PI019",
       "claim_text": "For absolute beginners. Learn computer and terminal fundamentals, then serve a website from the command line locally or on an authorized cloud VM.",
-      "line_start": 33,
-      "line_end": 33,
+      "line_start": 29,
+      "line_end": 29,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
         "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8",
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
@@ -326,8 +254,8 @@
     {
       "claim_id": "PI020",
       "claim_text": "| 0.1 | [What is a Computer?](zero-to-terminal/module-0.1-what-is-a-computer/) |",
-      "line_start": 37,
-      "line_end": 37,
+      "line_start": 33,
+      "line_end": 33,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826"
@@ -336,8 +264,8 @@
     {
       "claim_id": "PI021",
       "claim_text": "| 0.2 | [What is a Terminal?](zero-to-terminal/module-0.2-what-is-a-terminal/) |",
-      "line_start": 38,
-      "line_end": 38,
+      "line_start": 34,
+      "line_end": 34,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8"
@@ -346,8 +274,8 @@
     {
       "claim_id": "PI022",
       "claim_text": "| 0.3 | [First Terminal Commands](zero-to-terminal/module-0.3-first-commands/) |",
-      "line_start": 39,
-      "line_end": 39,
+      "line_start": 35,
+      "line_end": 35,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://346d9bed362784efed10a3d1a3551a830edf7fae"
@@ -356,8 +284,8 @@
     {
       "claim_id": "PI023",
       "claim_text": "| 0.4 | [Files and Directories](zero-to-terminal/module-0.4-files-and-directories/) |",
-      "line_start": 40,
-      "line_end": 40,
+      "line_start": 36,
+      "line_end": 36,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://d119cae33fa0572262823213568b6b194b2b7729"
@@ -366,8 +294,8 @@
     {
       "claim_id": "PI024",
       "claim_text": "| 0.5 | [Editing Files](zero-to-terminal/module-0.5-editing-files/) |",
-      "line_start": 41,
-      "line_end": 41,
+      "line_start": 37,
+      "line_end": 37,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://c1d7259cc7d3142e71649e29ea507638a17832bc"
@@ -376,8 +304,8 @@
     {
       "claim_id": "PI025",
       "claim_text": "| 0.6 | [Git Basics](zero-to-terminal/module-0.6-git-basics/) |",
-      "line_start": 42,
-      "line_end": 42,
+      "line_start": 38,
+      "line_end": 38,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://f8afd0e4f4a816d8dacf1cf3bffb6dd7b1c2bf2e"
@@ -386,8 +314,8 @@
     {
       "claim_id": "PI026",
       "claim_text": "| 0.7 | [What is Networking?](zero-to-terminal/module-0.7-what-is-networking/) |",
-      "line_start": 43,
-      "line_end": 43,
+      "line_start": 39,
+      "line_end": 39,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://a0666484c8c0d4d10c5b44c7c4ae29ee7c714341"
@@ -396,8 +324,8 @@
     {
       "claim_id": "PI027",
       "claim_text": "| 0.8 | [Servers and SSH](zero-to-terminal/module-0.8-servers-and-ssh/) |",
-      "line_start": 44,
-      "line_end": 44,
+      "line_start": 40,
+      "line_end": 40,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://74e001ab733f41b236f21b0ec0819db6df978a80"
@@ -406,8 +334,8 @@
     {
       "claim_id": "PI028",
       "claim_text": "| 0.9 | [Software and Packages](zero-to-terminal/module-0.9-software-and-packages/) |",
-      "line_start": 45,
-      "line_end": 45,
+      "line_start": 41,
+      "line_end": 41,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://9b43496599781abb69ba1b20d89cb1ccd0569c5e"
@@ -416,8 +344,8 @@
     {
       "claim_id": "PI029",
       "claim_text": "| 0.10 | [What is the Cloud?](zero-to-terminal/module-0.10-what-is-the-cloud/) |",
-      "line_start": 46,
-      "line_end": 46,
+      "line_start": 42,
+      "line_end": 42,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8"
@@ -426,8 +354,8 @@
     {
       "claim_id": "PI030",
       "claim_text": "| 0.11 | [Your First Server](zero-to-terminal/module-0.11-your-first-server/) |",
-      "line_start": 47,
-      "line_end": 47,
+      "line_start": 43,
+      "line_end": 43,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5"
@@ -436,8 +364,8 @@
     {
       "claim_id": "PI031",
       "claim_text": "### [Cloud Native 101](cloud-native-101/) — 5 modules",
-      "line_start": 49,
-      "line_end": 49,
+      "line_start": 45,
+      "line_end": 45,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
@@ -451,9 +379,9 @@
     },
     {
       "claim_id": "PI032",
-      "claim_text": "Containers, Docker, Kubernetes, and the cloud-native ecosystem from first principles.",
-      "line_start": 50,
-      "line_end": 50,
+      "claim_text": "Containers, Docker, Kubernetes, and the cloud-native ecosystem.",
+      "line_start": 46,
+      "line_end": 46,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
@@ -467,8 +395,8 @@
     {
       "claim_id": "PI033",
       "claim_text": "| 1.1 | [What Are Containers?](cloud-native-101/module-1.1-what-are-containers/) |",
-      "line_start": 54,
-      "line_end": 54,
+      "line_start": 50,
+      "line_end": 50,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d"
@@ -477,8 +405,8 @@
     {
       "claim_id": "PI034",
       "claim_text": "| 1.2 | [Docker Fundamentals](cloud-native-101/module-1.2-docker-fundamentals/) |",
-      "line_start": 55,
-      "line_end": 55,
+      "line_start": 51,
+      "line_end": 51,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df"
@@ -487,8 +415,8 @@
     {
       "claim_id": "PI035",
       "claim_text": "| 1.3 | [What Is Kubernetes?](cloud-native-101/module-1.3-what-is-kubernetes/) |",
-      "line_start": 56,
-      "line_end": 56,
+      "line_start": 52,
+      "line_end": 52,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6"
@@ -497,8 +425,8 @@
     {
       "claim_id": "PI036",
       "claim_text": "| 1.4 | [Cloud Native Ecosystem](cloud-native-101/module-1.4-cloud-native-ecosystem/) |",
-      "line_start": 57,
-      "line_end": 57,
+      "line_start": 53,
+      "line_end": 53,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://d55dfee27c3c78e1a8815243201874e20075be56"
@@ -507,8 +435,8 @@
     {
       "claim_id": "PI037",
       "claim_text": "| 1.5 | [Monolith to Microservices](cloud-native-101/module-1.5-monolith-to-microservices/) |",
-      "line_start": 58,
-      "line_end": 58,
+      "line_start": 54,
+      "line_end": 54,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b"
@@ -517,8 +445,8 @@
     {
       "claim_id": "PI038",
       "claim_text": "### [Kubernetes Basics](kubernetes-basics/) — 8 modules",
-      "line_start": 60,
-      "line_end": 60,
+      "line_start": 56,
+      "line_end": 56,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
@@ -536,8 +464,8 @@
     {
       "claim_id": "PI039",
       "claim_text": "The practical Kubernetes starter path with `kubectl`, Pods, Deployments, Services, config, and YAML.",
-      "line_start": 61,
-      "line_end": 61,
+      "line_start": 57,
+      "line_end": 57,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
@@ -554,8 +482,8 @@
     {
       "claim_id": "PI040",
       "claim_text": "| 1.1 | [Your First Cluster](kubernetes-basics/module-1.1-first-cluster/) |",
-      "line_start": 65,
-      "line_end": 65,
+      "line_start": 61,
+      "line_end": 61,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://1861c60b318f129762a6a6c15f6018caed3c38ed"
@@ -564,8 +492,8 @@
     {
       "claim_id": "PI041",
       "claim_text": "| 1.2 | [kubectl Basics](kubernetes-basics/module-1.2-kubectl-basics/) |",
-      "line_start": 66,
-      "line_end": 66,
+      "line_start": 62,
+      "line_end": 62,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://52c6b5a61b357f9ee86b0475298f34fa00e77128"
@@ -574,8 +502,8 @@
     {
       "claim_id": "PI042",
       "claim_text": "| 1.3 | [Pods - The Atomic Unit](kubernetes-basics/module-1.3-pods/) |",
-      "line_start": 67,
-      "line_end": 67,
+      "line_start": 63,
+      "line_end": 63,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://308ea401d28ac31aef5e00b432e8a98c776b258f"
@@ -584,8 +512,8 @@
     {
       "claim_id": "PI043",
       "claim_text": "| 1.4 | [Deployments - Managing Apps](kubernetes-basics/module-1.4-deployments/) |",
-      "line_start": 68,
-      "line_end": 68,
+      "line_start": 64,
+      "line_end": 64,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://5b483551ba25ff1e2592d933506d84db33f11aa0"
@@ -594,8 +522,8 @@
     {
       "claim_id": "PI044",
       "claim_text": "| 1.5 | [Services - Stable Networking](kubernetes-basics/module-1.5-services/) |",
-      "line_start": 69,
-      "line_end": 69,
+      "line_start": 65,
+      "line_end": 65,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://bd0014c67f770117fff01cd8f57fe12b338739ed"
@@ -604,8 +532,8 @@
     {
       "claim_id": "PI045",
       "claim_text": "| 1.6 | [ConfigMaps & Secrets](kubernetes-basics/module-1.6-configmaps-secrets/) |",
-      "line_start": 70,
-      "line_end": 70,
+      "line_start": 66,
+      "line_end": 66,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://3c5ed141caab9587ea3a9153e4dd11e3da716c27"
@@ -614,8 +542,8 @@
     {
       "claim_id": "PI046",
       "claim_text": "| 1.7 | [Namespaces & Labels](kubernetes-basics/module-1.7-namespaces-labels/) |",
-      "line_start": 71,
-      "line_end": 71,
+      "line_start": 67,
+      "line_end": 67,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://bb047217c19ba0de6cd44e7582a600a5d9c3a067"
@@ -624,8 +552,8 @@
     {
       "claim_id": "PI047",
       "claim_text": "| 1.8 | [YAML for Kubernetes](kubernetes-basics/module-1.8-yaml-kubernetes/) |",
-      "line_start": 72,
-      "line_end": 72,
+      "line_start": 68,
+      "line_end": 68,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://368dbdbd85b3dd2e88273a22eba6cadcc90745a4"
@@ -634,8 +562,8 @@
     {
       "claim_id": "PI048",
       "claim_text": "### [Philosophy & Design](philosophy-design/) — 4 modules",
-      "line_start": 74,
-      "line_end": 74,
+      "line_start": 70,
+      "line_end": 70,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
@@ -649,8 +577,8 @@
     {
       "claim_id": "PI049",
       "claim_text": "Kubernetes design choices, goal-based study planning, and technology tradeoffs; assess a technology's value in your own context.",
-      "line_start": 75,
-      "line_end": 75,
+      "line_start": 71,
+      "line_end": 71,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
@@ -663,8 +591,8 @@
     {
       "claim_id": "PI050",
       "claim_text": "| 1.1 | [Why Kubernetes Won](philosophy-design/module-1.1-why-kubernetes-won/) |",
-      "line_start": 79,
-      "line_end": 79,
+      "line_start": 75,
+      "line_end": 75,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://0ddb9bd09a87d3f11612f041173e1f455adb66f8"
@@ -673,8 +601,8 @@
     {
       "claim_id": "PI051",
       "claim_text": "| 1.2 | [Declarative vs Imperative](philosophy-design/module-1.2-declarative-vs-imperative/) |",
-      "line_start": 80,
-      "line_end": 80,
+      "line_start": 76,
+      "line_end": 76,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://cfc79c2366ddc0ce873295e2ec6597e60d739cda"
@@ -683,8 +611,8 @@
     {
       "claim_id": "PI052",
       "claim_text": "| 1.3 | [Plan Study Scope by Goal](philosophy-design/module-1.3-what-we-dont-cover/) |",
-      "line_start": 81,
-      "line_end": 81,
+      "line_start": 77,
+      "line_end": 77,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://3797ba08ce5a29036369cc1e860eb657891035fe"
@@ -693,8 +621,8 @@
     {
       "claim_id": "PI053",
       "claim_text": "| 1.4 | [Dead Ends - Technologies We Skip](philosophy-design/module-1.4-dead-ends/) |",
-      "line_start": 82,
-      "line_end": 82,
+      "line_start": 78,
+      "line_end": 78,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://03fd8ad29071189fe1ca910e6e96b9b5da9ab656"
@@ -703,8 +631,8 @@
     {
       "claim_id": "PI054",
       "claim_text": "### [Git Deep Dive](git-deep-dive/) — 10 modules",
-      "line_start": 84,
-      "line_end": 84,
+      "line_start": 80,
+      "line_end": 80,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
@@ -724,8 +652,8 @@
     {
       "claim_id": "PI055",
       "claim_text": "Explore Git internals, rebasing, recovery, scale, collaboration, and the bridge into GitOps.",
-      "line_start": 85,
-      "line_end": 85,
+      "line_start": 81,
+      "line_end": 81,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
@@ -744,8 +672,8 @@
     {
       "claim_id": "PI056",
       "claim_text": "| 1 | [Git Internals](git-deep-dive/module-1-git-internals/) |",
-      "line_start": 89,
-      "line_end": 89,
+      "line_start": 85,
+      "line_end": 85,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://d95d8ef75200f3e441d137d565789275a2bef39b"
@@ -754,8 +682,8 @@
     {
       "claim_id": "PI057",
       "claim_text": "| 2 | [Advanced Merging](git-deep-dive/module-2-advanced-merging/) |",
-      "line_start": 90,
-      "line_end": 90,
+      "line_start": 86,
+      "line_end": 86,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://eb3262c2bfb553aa6a7b263bd5634a9f0f8a8b2d"
@@ -764,8 +692,8 @@
     {
       "claim_id": "PI058",
       "claim_text": "| 3 | [Interactive Rebasing](git-deep-dive/module-3-interactive-rebasing/) |",
-      "line_start": 91,
-      "line_end": 91,
+      "line_start": 87,
+      "line_end": 87,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://213808cf0b0fe3bec8d716ca75caf5cc7313db0f"
@@ -774,8 +702,8 @@
     {
       "claim_id": "PI059",
       "claim_text": "| 4 | [Undo and Recovery](git-deep-dive/module-4-undo-recovery/) |",
-      "line_start": 92,
-      "line_end": 92,
+      "line_start": 88,
+      "line_end": 88,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://a5df919a62fb3997c2606230c72ec01c26e3fe98"
@@ -784,8 +712,8 @@
     {
       "claim_id": "PI060",
       "claim_text": "| 5 | [Worktrees and Stashing](git-deep-dive/module-5-worktrees-stashing/) |",
-      "line_start": 93,
-      "line_end": 93,
+      "line_start": 89,
+      "line_end": 89,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://e65e18f15eae7467b9d29479db06f336e0d1075b"
@@ -794,8 +722,8 @@
     {
       "claim_id": "PI061",
       "claim_text": "| 6 | [Troubleshooting and Search](git-deep-dive/module-6-troubleshooting/) |",
-      "line_start": 94,
-      "line_end": 94,
+      "line_start": 90,
+      "line_end": 90,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://108ff86a3b19e2720b80637e3db5ecf6d8afac67"
@@ -804,8 +732,8 @@
     {
       "claim_id": "PI062",
       "claim_text": "| 7 | [Remotes and PRs](git-deep-dive/module-7-remotes-prs/) |",
-      "line_start": 95,
-      "line_end": 95,
+      "line_start": 91,
+      "line_end": 91,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://4d5851b7ddec6e350c548c2fb77c017d9bec901e"
@@ -814,8 +742,8 @@
     {
       "claim_id": "PI063",
       "claim_text": "| 8 | [Sparse Checkout and LFS](git-deep-dive/module-8-scale/) |",
-      "line_start": 96,
-      "line_end": 96,
+      "line_start": 92,
+      "line_end": 92,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://162aac3c0554950aa9b4a43623af022c4424de4c"
@@ -824,8 +752,8 @@
     {
       "claim_id": "PI064",
       "claim_text": "| 9 | [Hooks and Rerere](git-deep-dive/module-9-hooks-rerere/) |",
-      "line_start": 97,
-      "line_end": 97,
+      "line_start": 93,
+      "line_end": 93,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://8c01e4ed49984f9d73868644ef18b2fd98b2b8b2"
@@ -834,8 +762,8 @@
     {
       "claim_id": "PI065",
       "claim_text": "| 10 | [Bridge to GitOps](git-deep-dive/module-10-gitops-bridge/) |",
-      "line_start": 98,
-      "line_end": 98,
+      "line_start": 94,
+      "line_end": 94,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://73e4b4af55ba4107349bd921d9bf8e65acd882f0"
@@ -844,8 +772,8 @@
     {
       "claim_id": "PI066",
       "claim_text": "### [Modern DevOps](modern-devops/) — 6 modules",
-      "line_start": 100,
-      "line_end": 100,
+      "line_start": 96,
+      "line_end": 96,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
@@ -861,8 +789,8 @@
     {
       "claim_id": "PI067",
       "claim_text": "IaC, GitOps, CI/CD, observability, platform engineering, and DevSecOps.",
-      "line_start": 101,
-      "line_end": 101,
+      "line_start": 97,
+      "line_end": 97,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
@@ -877,8 +805,8 @@
     {
       "claim_id": "PI068",
       "claim_text": "| 1.1 | [Infrastructure as Code](modern-devops/module-1.1-infrastructure-as-code/) |",
-      "line_start": 105,
-      "line_end": 105,
+      "line_start": 101,
+      "line_end": 101,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://c33cd50384e4dffc475b39494dd06426e26f3223"
@@ -887,8 +815,8 @@
     {
       "claim_id": "PI069",
       "claim_text": "| 1.2 | [GitOps](modern-devops/module-1.2-gitops/) |",
-      "line_start": 106,
-      "line_end": 106,
+      "line_start": 102,
+      "line_end": 102,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://73ce080619daa90c81d35481f84a2768c04c8157"
@@ -897,8 +825,8 @@
     {
       "claim_id": "PI070",
       "claim_text": "| 1.3 | [CI/CD Pipelines](modern-devops/module-1.3-cicd-pipelines/) |",
-      "line_start": 107,
-      "line_end": 107,
+      "line_start": 103,
+      "line_end": 103,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://9c112e7878f8d0c5ec50eb87fbbd874c366d6243"
@@ -907,8 +835,8 @@
     {
       "claim_id": "PI071",
       "claim_text": "| 1.4 | [Observability Fundamentals](modern-devops/module-1.4-observability/) |",
-      "line_start": 108,
-      "line_end": 108,
+      "line_start": 104,
+      "line_end": 104,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://1aa91a01315bbffade09949aa54a5b823748cd70"
@@ -917,8 +845,8 @@
     {
       "claim_id": "PI072",
       "claim_text": "| 1.5 | [Platform Engineering](modern-devops/module-1.5-platform-engineering/) |",
-      "line_start": 109,
-      "line_end": 109,
+      "line_start": 105,
+      "line_end": 105,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://d58f7890520c382ae0d3275c3e38675ca12cb5a9"
@@ -927,8 +855,8 @@
     {
       "claim_id": "PI073",
       "claim_text": "| 1.6 | [Security Practices (DevSecOps)](modern-devops/module-1.6-devsecops/) |",
-      "line_start": 110,
-      "line_end": 110,
+      "line_start": 106,
+      "line_end": 106,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://cab6070a1b49ce6bf5c8a3146381cf4a430824c7"
@@ -936,12 +864,12 @@
     },
     {
       "claim_id": "PI074",
-      "claim_text": "Zero to Terminal\n   |\n   +--> Linux track (if you want deeper systems knowledge)\n   |\nCloud Native 101\n   |\nKubernetes Basics\n   |\nPhilosophy & Design\n   |\nGit Deep Dive\n   |\nModern DevOps",
-      "line_start": 117,
-      "line_end": 129,
+      "claim_text": "Zero to Terminal\n   |\n   +--> Linux track (if you want deeper systems knowledge)\n   |\nCloud Native 101\n   |\nKubernetes Basics\n   |\nPhilosophy & Design\n\nZero to Terminal\n   |\nGit Deep Dive\n   |\nModern DevOps",
+      "line_start": 113,
+      "line_end": 127,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
@@ -954,12 +882,12 @@
     {
       "claim_id": "PI075",
       "claim_text": "Use [Git Deep Dive](git-deep-dive/) after you are comfortable with basic Git from [Zero to Terminal](zero-to-terminal/).",
-      "line_start": 132,
-      "line_end": 132,
+      "line_start": 130,
+      "line_end": 130,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://f8afd0e4f4a816d8dacf1cf3bffb6dd7b1c2bf2e",
         "git-object://d95d8ef75200f3e441d137d565789275a2bef39b"
       ]
@@ -967,13 +895,13 @@
     {
       "claim_id": "PI076",
       "claim_text": "It is not required before Cloud Native 101 or Kubernetes Basics;",
-      "line_start": 132,
-      "line_end": 132,
+      "line_start": 130,
+      "line_end": 130,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
         "git-object://1861c60b318f129762a6a6c15f6018caed3c38ed"
       ]
@@ -981,8 +909,8 @@
     {
       "claim_id": "PI077",
       "claim_text": "this curriculum recommends it before Modern DevOps and its IaC, GitOps, and CI/CD topics.",
-      "line_start": 132,
-      "line_end": 132,
+      "line_start": 130,
+      "line_end": 130,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
@@ -994,9 +922,9 @@
     },
     {
       "claim_id": "PI078",
-      "claim_text": "- [Linux](../linux/) for deeper systems knowledge before operations-heavy work",
-      "line_start": 136,
-      "line_end": 136,
+      "claim_text": "- [Linux](../linux/) for deeper systems knowledge",
+      "line_start": 134,
+      "line_end": 134,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc"
@@ -1005,8 +933,8 @@
     {
       "claim_id": "PI079",
       "claim_text": "- [Kubernetes Certifications](../k8s/) for certification-oriented study",
-      "line_start": 137,
-      "line_end": 137,
+      "line_start": 135,
+      "line_end": 135,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a"
@@ -1015,8 +943,8 @@
     {
       "claim_id": "PI080",
       "claim_text": "- [Cloud](../cloud/) for provider-specific cloud foundations and managed Kubernetes topics",
-      "line_start": 138,
-      "line_end": 138,
+      "line_start": 136,
+      "line_end": 136,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f"
@@ -1025,8 +953,8 @@
     {
       "claim_id": "PI081",
       "claim_text": "- [On-Premises Kubernetes](../on-premises/) for running Kubernetes on your own hardware",
-      "line_start": 139,
-      "line_end": 139,
+      "line_start": 137,
+      "line_end": 137,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920"
@@ -1035,8 +963,8 @@
     {
       "claim_id": "PI082",
       "claim_text": "- [AI](../ai/) for beginner-oriented AI literacy and AI working habits",
-      "line_start": 140,
-      "line_end": 140,
+      "line_start": 138,
+      "line_end": 138,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee"
@@ -1045,8 +973,8 @@
     {
       "claim_id": "PI083",
       "claim_text": "- [AI/ML Engineering](../ai-ml-engineering/) for building AI systems, local models, or MLOps",
-      "line_start": 141,
-      "line_end": 141,
+      "line_start": 139,
+      "line_end": 139,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf"
@@ -1055,8 +983,8 @@
     {
       "claim_id": "PI084",
       "claim_text": "Before [Platform Engineering](../platform/), build comfort with Kubernetes, Linux troubleshooting, Git collaboration, and cloud-native vocabulary.",
-      "line_start": 143,
-      "line_end": 143,
+      "line_start": 141,
+      "line_end": 141,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
@@ -1068,8 +996,8 @@
     {
       "claim_id": "PI085",
       "claim_text": "Use its [entry checklist](../platform/#do-not-start-here-yet) to assess your readiness.",
-      "line_start": 143,
-      "line_end": 143,
+      "line_start": 141,
+      "line_end": 141,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://b5e29acf92289936a433660aa294a41c39df72a4"
@@ -1078,8 +1006,8 @@
     {
       "claim_id": "PI086",
       "claim_text": "Check each destination's entry requirements and choose the foundations that fit your goal.",
-      "line_start": 145,
-      "line_end": 145,
+      "line_start": 143,
+      "line_end": 143,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
@@ -1096,11 +1024,11 @@
     {
       "claim_id": "PI087",
       "claim_text": "The full cloud-native route is a suggestion, not a requirement to complete all 44 modules before every path, including beginner AI.",
-      "line_start": 145,
-      "line_end": 145,
+      "line_start": 143,
+      "line_end": 143,
       "kind": "internal",
       "candidate_source_refs": [
-        "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
+        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
         "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
         "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
@@ -1182,9 +1110,9 @@
       "snapshot_digest": "sha256:67e705b4a1bca444afc5398afc1b95c8e990917fdf6caa65991eaa244af0b61d",
       "path": "src/content/docs/ai-ml-engineering/index.md"
     },
-    "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0": {
-      "retrieval_uri": "git-object://f6034901ab9070caaee33b3d53f3f8ef07d84dc0",
-      "snapshot_digest": "sha256:2de49e8931e3c72ddd837908a9f71c5b184a3b4f76d8ac3b384ba9108a473995",
+    "git-object://aed52c4a209e657bc04477e11927be658db4d857": {
+      "retrieval_uri": "git-object://aed52c4a209e657bc04477e11927be658db4d857",
+      "snapshot_digest": "sha256:246acf2bfd82cec62c0e0e85acb86dec08997266ca6cb54b97b17d808d7f72cb",
       "path": "src/content/docs/prerequisites/index.md"
     },
     "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc": {
@@ -1207,9 +1135,9 @@
       "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
       "path": "src/content/docs/platform/index.md"
     },
-    "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9": {
-      "retrieval_uri": "git-object://964c160102c4ee61351f9d3dcd0dd4dddd53fdf9",
-      "snapshot_digest": "sha256:9a18867efb6da41757d7f4b4f2dbcc4de66e19a0ef9dcdcb45e53f97a366c54c",
+    "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388": {
+      "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+      "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
       "path": "src/content/docs/prerequisites/zero-to-terminal/index.md"
     },
     "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1": {
@@ -1322,16 +1250,6 @@
       "snapshot_digest": "sha256:28cb8847916f65f32f58ba4a47148258bcd917306803ad395349e226460c884a",
       "path": "src/content/docs/prerequisites/zero-to-terminal/module-0.9-software-and-packages.md"
     },
-    "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6": {
-      "retrieval_uri": "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
-      "snapshot_digest": "sha256:1f06c2ec50a31a25a35cafe46d0fa6258205f912a0167d193a9874b731c19bd9",
-      "path": "src/content/docs/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes.md"
-    },
-    "git-object://3797ba08ce5a29036369cc1e860eb657891035fe": {
-      "retrieval_uri": "git-object://3797ba08ce5a29036369cc1e860eb657891035fe",
-      "snapshot_digest": "sha256:1e38d685b1cf2db82696a80e5fbedaba9466c3b50952ef0f84bc701d7ed637d9",
-      "path": "src/content/docs/prerequisites/philosophy-design/module-1.3-what-we-dont-cover.md"
-    },
     "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d": {
       "retrieval_uri": "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
       "snapshot_digest": "sha256:c6041449aeefc71eb8af982b57c2af9997df565f9d71f94711801f389ac5f354",
@@ -1341,6 +1259,11 @@
       "retrieval_uri": "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
       "snapshot_digest": "sha256:b3b1e4a36e135fb983a3ae5c4991aa24dc6ce9843cd3662271c4919ddacc2257",
       "path": "src/content/docs/prerequisites/cloud-native-101/module-1.2-docker-fundamentals.md"
+    },
+    "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6": {
+      "retrieval_uri": "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+      "snapshot_digest": "sha256:1f06c2ec50a31a25a35cafe46d0fa6258205f912a0167d193a9874b731c19bd9",
+      "path": "src/content/docs/prerequisites/cloud-native-101/module-1.3-what-is-kubernetes.md"
     },
     "git-object://d55dfee27c3c78e1a8815243201874e20075be56": {
       "retrieval_uri": "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
@@ -1396,6 +1319,11 @@
       "retrieval_uri": "git-object://0ddb9bd09a87d3f11612f041173e1f455adb66f8",
       "snapshot_digest": "sha256:b2e88df4d83b0b564c40fda29afb1394a8ca93a4a036b34b8af6d0630c6ef5f7",
       "path": "src/content/docs/prerequisites/philosophy-design/module-1.1-why-kubernetes-won.md"
+    },
+    "git-object://3797ba08ce5a29036369cc1e860eb657891035fe": {
+      "retrieval_uri": "git-object://3797ba08ce5a29036369cc1e860eb657891035fe",
+      "snapshot_digest": "sha256:1e38d685b1cf2db82696a80e5fbedaba9466c3b50952ef0f84bc701d7ed637d9",
+      "path": "src/content/docs/prerequisites/philosophy-design/module-1.3-what-we-dont-cover.md"
     },
     "git-object://03fd8ad29071189fe1ca910e6e96b9b5da9ab656": {
       "retrieval_uri": "git-object://03fd8ad29071189fe1ca910e6e96b9b5da9ab656",
