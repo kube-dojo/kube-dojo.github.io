@@ -27,38 +27,31 @@ By the end of this module, you will be able to perform these tasks in a local te
 
 ## Why This Module Matters
 
-In 2017, Equifax disclosed a breach that exposed sensitive data for roughly 143 million people after attackers exploited an unpatched web application component. The incident was not a Docker story, but it is the kind of operational failure containers make painfully visible: an application runs with too much privilege, ships with too much surface area, hides its exact dependency state, and gives responders too little confidence about what is actually deployed. When teams package software into images without understanding build context, layer history, tags, runtime users, and logs, they reproduce those same failure patterns inside a newer delivery pipeline.
-
 Docker became popular because it gave developers a portable way to turn an application and its runtime assumptions into a single image. That image can run on a laptop, in CI, or as input to an orchestrator, and the surrounding command line makes the lifecycle easy enough to practice before Kubernetes enters the picture. Kubernetes no longer uses Docker Engine as its node runtime, but the Docker workflow still teaches the same image, process, filesystem, port, and environment concepts that every container platform builds on.
 
 This module focuses on practical Docker literacy rather than Docker trivia. You will install or verify the tooling, run containers with realistic options, build images from Dockerfiles, observe layer caching, use Compose for a local multi-container stack, and connect the habits back to Kubernetes 1.35+. The goal is not to turn you into a Docker specialist; it is to make sure that when a Pod fails later, you can reason from first principles instead of memorizing commands.
 
 There is also an economic reason to learn these details early. Every unnecessary megabyte in an image is pulled by CI runners, developer laptops, staging clusters, and production nodes. Every vague tag creates work during rollback because no one can prove which bytes were running. Every missing log or hidden environment assumption lengthens an incident. Docker fundamentals look like local commands, but they shape the delivery path long before a container reaches a cluster.
 
-Before you touch Kubernetes commands in this course, verify that the full `kubectl` client works on your machine. Many engineers use personal shell aliases interactively, but learning materials and copy-paste examples should use the complete command name so they remain runnable in scripts, terminals, and CI jobs without relying on local shell setup. Kubernetes 1.35+ keeps the same core troubleshooting shape you will practice with Docker here: inspect the declared configuration, read process output, enter a running workload only when needed, and keep runtime state separate from the image that produced it.
-
-```bash
-kubectl version --client
-```
-
 ## Installing Docker
 
 Docker installation looks simple from the outside, but it hides one important architectural detail: Linux can run containers directly through the kernel primitives that containers use, while macOS and Windows need a small Linux virtual machine because their kernels do not expose the same container interfaces. Docker Desktop packages that VM, the Docker Engine, the CLI, credential helpers, networking integration, and a GUI into one product. On a Linux workstation, Docker Engine and the CLI can be installed more directly, and the user permission model becomes more visible because the Docker socket can control containers on the host.
 
-On macOS, Docker Desktop is the normal path because it gives you a supported Linux environment without requiring you to manage the VM yourself. The Homebrew command below installs the desktop application, but you still need to launch it once so the background engine starts. The original module linked the Docker Desktop product page, and that remains the right source for licensing and platform details: https://docker.com/products/docker-desktop.
+On macOS, Docker Desktop is the normal path because it gives you a supported Linux environment without requiring you to manage the VM yourself. The Homebrew command below installs the desktop application, but you still need to launch it once so the background engine starts. See the [Docker Desktop page](https://docker.com/products/docker-desktop) for licensing and platform details.
 
 ```bash
 # Install Docker Desktop
 # Download from https://docker.com/products/docker-desktop
 # Or use Homebrew:
-brew install --cask docker
+brew install --cask docker-desktop
 ```
 
-On Ubuntu or Debian, the convenience script is useful for a learning workstation because it installs the current Docker packages and configures the repository for you. In a production fleet, you would usually prefer a pinned package source and a configuration management tool so every machine is reproducible. Notice the `usermod` line: it adds your account to the `docker` group, which removes the need to prefix every command with `sudo`, but it also grants powerful access because anyone who can talk to the Docker socket can effectively start privileged workloads.
+On Ubuntu or Debian, the convenience script is for development and testing. Read the downloaded script before running it with elevated privileges. In a production fleet, you would usually prefer a pinned package source and a configuration management tool so every machine is reproducible. Notice the `usermod` line: it adds your account to the `docker` group, which removes the need to prefix every command with `sudo`, but it also grants powerful access because anyone who can talk to the Docker socket can effectively start privileged workloads.
 
 ```bash
 # Official installation
 curl -fsSL https://get.docker.com -o get-docker.sh
+# Read get-docker.sh before running it.
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 # Log out and back in for group changes
@@ -74,8 +67,6 @@ Verification should test both the client and the engine. The two commands below 
 `docker --version` can succeed because it only reads local client metadata. `docker run hello-world` needs the daemon: it must contact the engine, pull an image, create a container, start the process, and attach to its output. An unstarted Desktop VM, a socket permission error, and a blocked registry are different failures. Read the error before you reinstall.
 
 </details>
-
-Name the working command before you run the pair. The diagram after these commands is the client-server picture, not the answer to this case.
 
 ```bash
 docker --version
@@ -108,7 +99,7 @@ A client that answers locally is not the same as a client that reached the engin
 
 ## Running Your First Container
 
-Use a Bash-compatible terminal (WSL or the lab shell on Windows) and an authorized local Docker endpoint. Check `docker context show`, `docker context inspect`, and `docker version`: confirm the endpoint is local and the **Server** Engine is at least 28.0.0, not merely the client. Older Engines have a documented same-L2 localhost-publication caveat. Loopback publication below avoids the all-host default but does not override custom routing or firewall policy. Use the explicit IPv4 URLs below.
+Use a Bash-compatible terminal (WSL or the lab shell on Windows). A Docker context tells the client which engine to use; run `docker context show` and `docker context inspect` to check that it points to your own local engine, not a shared remote machine. This check protects other people's containers from accidental changes. Run `docker version` and check the **Server** version: with an Engine older than 28.0.0, other machines on the same network may reach ports published to localhost. Upgrade Docker or avoid untrusted networks. Loopback publication below does not override custom routing or firewall policy. Use the explicit IPv4 URLs below.
 
 Keep this shell and context throughout. Each `*_id=$(docker run ...) || *_id=''` assignment captures your successful creation result and clears it on failure. Later nonempty-ID checks prevent acting on a default name after failure; they are not general ownership proof. Choose unused container names and image tags, substituting consistently rather than overwriting existing tags. Never manually fill an ID variable from an unfamiliar container, and stop if ownership or context becomes uncertain.
 
@@ -121,11 +112,9 @@ The nginx example is small, but it contains almost every runtime concept you nee
 <details>
 <summary>Check your prediction</summary>
 
-The host port is occupied. Choose a free loopback host port such as `-p 127.0.0.1:8081:80`, retaining container port 80. Do not broaden publication to all host addresses to solve a port conflict.
+The run reports a bind error. A failed start may leave a created container holding the name. List candidates with `docker ps -a --filter name=my-nginx` and ask the lab owner (the person who manages the machine, usually you) to identify any leftover; do not delete by name. Retry the assignment with both an unused name such as `my-nginx-2` and a free loopback port such as `-p 127.0.0.1:8081:80`, retaining container port 80. Use the new port for the curl check.
 
 </details>
-
-Read the publish flag before you decide which number to change. The notes under the command describe a successful start. They do not describe this collision.
 
 ```bash
 # Run nginx (a web server)
@@ -174,7 +163,7 @@ docker run [OPTIONS] IMAGE [COMMAND]
 docker run -d nginx                    # Detached (background)
 docker run -it ubuntu bash             # Interactive terminal
 docker run -p 127.0.0.1:8080:80 nginx  # Loopback port mapping
-docker run -v /host/path:/container/path nginx  # Volume mount
+docker run -v /host/path:/container/path nginx  # Bind mount
 docker run --name myapp nginx         # Named container
 docker run -e MY_VAR=value nginx      # Environment variable
 docker run --rm nginx                 # Remove when stopped
@@ -215,7 +204,7 @@ kubectl exec -it nginx-practice -- sh
 
 Debugging a container starts with a discipline: observe before you mutate. Logs tell you what the main process wrote to standard output and standard error. Process listings tell you whether the expected command is still running. Inspect output shows the configuration Docker used when it created the container. Interactive exec sessions are powerful, but they should come after the non-invasive checks because typing commands inside a running container can change the very state you are trying to understand.
 
-> **Stop and think**: When a container is not behaving right, these three commands are your debugging toolkit in this order: `docker logs` asks what happened, `docker exec -it ... bash` lets you look inside, and `docker inspect` shows the full configuration. This same pattern applies in Kubernetes later: `kubectl logs`, `kubectl exec`, and `kubectl describe` give you the equivalent layers of evidence.
+> **Stop and think**: Read `docker logs`, check processes with `docker top` or `docker ps`, inspect configuration with `docker inspect`, and use `docker exec` when a running container needs closer inspection.
 
 ```bash
 # View logs
@@ -348,7 +337,7 @@ Record the Python dependency in `requirements.txt` so dependency installation ca
 flask==3.0.0
 ```
 
-> **Stop and think**: If you run `docker build .` in your home directory without a `.dockerignore`, Docker will try to copy everything — Documents, Downloads, Pictures — into the build context, which can hang the build and exhaust memory. That's why build context belongs in your artifact design, not left to default.
+> **Stop and think**: Building from your home directory without a `.dockerignore` can include unrelated files in the build context. Use a focused project directory and exclude files the build does not need.
 
 Now create the Dockerfile for the application image, keeping the dependency copy before the source copy so normal code edits do not reinstall Flask.
 ```dockerfile
@@ -400,22 +389,24 @@ coverage
 
 Layer caching is where Docker starts to reward careful ordering. Each Dockerfile instruction creates or reuses a layer, and Docker can skip work when the instruction and the files it depends on have not changed. If you copy all source files before installing dependencies, every small code change invalidates the dependency installation layer. If you copy dependency manifests first, install dependencies, and copy application code later, ordinary code edits reuse the expensive dependency layer.
 
-> **Stop and think**: Think about this. If you change one line of Python code, do you want Docker to reinstall all dependencies, which might take 2 minutes, or just copy the changed file, which takes about 1 second? The answer depends entirely on the order of instructions in your Dockerfile, and the bad versus good example below shows why ordering matters.
+> **Stop and think**: When one line of application code changes, which ordering lets Docker reuse the dependency installation layer?
 
 ```dockerfile
 # BAD: Code changes invalidate dependency cache
 FROM python:3.12-slim
 WORKDIR /app
-COPY . .                              # Any change busts cache
-RUN pip install -r requirements.txt   # Reinstalls every time!
+# Source changes invalidate the following layer
+COPY . .
+RUN pip install -r requirements.txt
 CMD ["python", "app.py"]
 
 # GOOD: Dependencies cached separately
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .               # Only changes when deps change
-RUN pip install -r requirements.txt   # Cached unless deps change
-COPY . .                              # App changes don't bust pip cache
+# Install dependencies before copying application code
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
 CMD ["python", "app.py"]
 ```
 
@@ -462,10 +453,14 @@ volumes:
 ```
 
 ```bash
+# Choose and export your own verified unused project name before running this block.
 # Start all services
 docker compose -p "${compose_project:?Set the verified unused lab project name first}" up -d
 
-# View logs
+# Verify services and the web response
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" ps && curl http://127.0.0.1:8000
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" exec db getent hosts db
+# View logs; press Ctrl-C to stop following
 docker compose -p "${compose_project:?Set the verified unused lab project name first}" logs -f
 
 # Stop all services
@@ -489,31 +484,29 @@ flowchart TD
     F --> G{{Container: running instance}}
 ```
 
-The workflow diagram is intentionally linear, but real teams repeat it many times per day. A developer edits code, rebuilds an image, runs it locally, pushes it to a registry, and lets CI or a cluster consume it. Every weak habit in the early steps compounds later. The next section asks you to name that cost before the comparison table.
+The workflow diagram is intentionally linear, but real teams repeat it many times per day. A developer edits code, rebuilds an image, runs it locally, pushes it to a registry, and lets CI or a cluster consume it. Every weak habit in the early steps compounds later.
 
 ## Image Quality, Security, and Runtime Shape
 
-**Pause and predict:** If you use a full OS image like `ubuntu:24.04` just to run a simple Python application, what are two major downsides?
+**Pause and predict:** What should you compare before choosing a base image for a Python application?
 
 <details>
 <summary>Check your prediction</summary>
 
-Image pulls are slower because the file is large, and the attack surface is larger because unused packages can still contain vulnerabilities. A full OS image feels comfortable because it has familiar tools, but it also brings packages you do not need.
+Compare the finished image size and the packages needed to run the application. Installing Python on a base changes the final image; compare the resulting images, rather than assuming a bare OS image is larger.
 
 </details>
 
-Hold those two costs before you read the comparison. The table is the menu of base images. It is not a substitute for naming the costs yourself.
-
 Base image choice is one of the earliest design decisions in a Dockerfile. A slim image removes some bulk while keeping mainstream compatibility. Alpine is smaller, but its musl libc can surprise applications or dependencies expecting glibc behavior. Distroless images remove shells and package managers, which is excellent for production hardening but requires more mature observability and build discipline.
 
-| Base Image Type | Example | Size | Security Surface | Best For |
-|-----------------|---------|------|------------------|----------|
-| Full OS | `ubuntu:24.04` | ~70MB | Large (contains full utilities) | Complex legacy apps needing many system dependencies |
-| Slim | `python:3.12-slim` | ~40MB | Medium (stripped down Debian) | Most standard applications, good balance of size and compatibility |
-| Alpine | `python:3.12-alpine` | ~15MB | Small (uses musl instead of glibc) | Ultra-small images, but can cause compilation issues with C-extensions |
-| Distroless | `gcr.io/distroless/static` | ~2MB | Minimal (no shell or package manager) | Production deployments of compiled languages (Go, Rust) |
+| Base Image Type | Example | Consideration |
+|-----------------|---------|---------------|
+| Full OS | `ubuntu:24.04` | Add the application runtime and dependencies yourself |
+| Slim | `python:3.12-slim` | Python runtime with a reduced Debian base |
+| Alpine | `python:3.12-alpine` | musl can affect compatibility with C extensions |
+| Distroless | `gcr.io/distroless/static` | No shell or package manager for interactive debugging |
 
-The table gives approximate sizes because tags change over time, but the tradeoff is stable. Smaller is not automatically better if it costs hours of debugging native dependencies, and larger is not automatically wrong if an application genuinely needs system libraries. The decision should be explicit: choose the smallest base that supports the application without forcing fragile workarounds, and revisit the choice as the service matures.
+As of 2026-11-03, Docker Hub reports compressed Linux amd64 sizes of about 30 MB for `ubuntu:24.04` and 43 MB for `python:3.12-slim`. Sizes vary by tag and architecture. Compare finished images with the same application and dependencies. Smaller is not automatically better if it costs hours of debugging native dependencies.
 
 Patch strategy belongs in the same conversation as base image choice. A service that builds from `python:3.12-slim` inherits operating system packages from that base image, so rebuilding after the publisher updates the tag can pick up security fixes. A service pinned by digest is more reproducible, but it will not move until you deliberately update the digest. Mature teams combine rebuild automation, vulnerability scanning, and release review rather than relying on either floating tags or permanent pins alone.
 
@@ -525,13 +518,13 @@ COPY . .
 # Note: In Ubuntu 24.04, system-wide pip installs require --break-system-packages
 RUN pip3 install --break-system-packages -r requirements.txt
 
-# GOOD: Slim base, smaller image
+# Slim base
 FROM python:3.12-slim
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# BETTER: Alpine (tiny base)
+# Alpine base
 FROM python:3.12-alpine
 # Note: Alpine uses apk, not apt, and musl instead of glibc
 ```
@@ -549,13 +542,12 @@ They immediately gain root privileges inside the container. That makes it easier
 
 </details>
 
-Name the privilege they inherit before you read the `USER` example. The Dockerfile below is the fix shape, not the description of the breach.
-
 ```dockerfile
 # BAD: Running as root
 FROM python:3.12-slim
 COPY . .
-CMD ["python", "app.py"]  # Runs as root!
+# Runs as root
+CMD ["python", "app.py"]
 
 # GOOD: Non-root user
 FROM python:3.12-slim
@@ -714,7 +706,7 @@ Use a volume at the database's configured data directory, such as `-v db_data:/v
 <details>
 <summary>Scenario: Your web application container starts successfully, but `localhost:8080` returns a 500 Internal Server Error instead of application content. What are the first two Docker commands you should run, and what are you looking for?</summary>
 
-Start with `docker logs <container>` because the application may already be reporting a stack trace, missing environment variable, failed database connection, or startup warning. If the logs are not enough, use `docker exec -it <container> bash` or `sh` to inspect the runtime environment from inside the container. Inside the container, check environment variables, mounted files, process state, and whether the app responds on its internal port. This sequence avoids guessing from the host side before reading the evidence the process already produced.
+Start with `docker logs <container>` for application errors, then use `docker inspect <container>` to check its configuration. If it is running and you need more evidence, use `docker exec -it <container> sh` to inspect files and the environment inside it.
 
 </details>
 
@@ -799,6 +791,7 @@ Debug a failing container using logs and environment variables. PostgreSQL inten
 4. Remove the failed container.
 5. Run it again, this time passing the required environment variable `POSTGRES_PASSWORD=secret`.
 6. Verify it stays running.
+7. For the running replacement, read logs, check processes, inspect a file inside, and check the configured environment. What changes if it exits before `exec`?
 
 <details>
 <summary>View Solution</summary>
@@ -821,10 +814,41 @@ fi
 
 # Checkpoint: verify it stays running
 docker ps
+test -n "$db_id" && docker logs "$db_id"
+test -n "$db_id" && docker top "$db_id"
+test -n "$db_id" && docker exec "$db_id" ls /var/lib/postgresql/data
+test -n "$db_id" && docker inspect --format '{{json .Config.Env}}' "$db_id"
 ```
+If it exits, `exec` and `top` cannot inspect a running process; use `docker ps -a`, logs and inspect instead. Inspect output can contain secrets; do not share it.
 </details>
 
-### Level 3: Advanced (Optimization and Exec)
+**Volume practice:** A bind mount uses a host path; a named volume is managed by Docker. Choose and export your own unused volume name with the lab owner. Run the check below and stop if any name is listed. Write a marker, remove its container, and predict what a replacement will read.
+
+<details>
+<summary>Show the worked answer</summary>
+
+```bash
+docker volume ls --filter "name=${volume_name:?Set the unused volume name first}"
+# Stop if any name is listed or the check fails; otherwise run the rest.
+docker volume create "${volume_name:?Set the unused volume name first}" &&
+volume_id=$(docker run -d -v "${volume_name:?Set the unused volume name first}:/data" ubuntu:24.04 sh -c 'echo retained > /data/marker') &&
+docker wait "$volume_id" && docker rm "$volume_id" &&
+docker run --rm -v "${volume_name:?Set the unused volume name first}:/data" ubuntu:24.04 cat /data/marker
+# Expected: retained
+```
+
+If any command fails or the marker is missing, stop and investigate with the lab owner. Once the replacement has exited, list and remove only the confirmed exercise volume:
+
+```bash
+docker volume ls --filter "name=${volume_name:?Set the unused volume name first}"
+# After confirming the volume belongs to this exercise:
+docker volume rm "${volume_name:?Set the unused volume name first}"
+```
+
+The replacement reads `retained`: removing the first container did not remove the named volume. Stop if ownership is uncertain; do not remove someone else's volume.
+</details>
+
+### Level 3: Advanced (Build and Exec)
 
 Optimize a build and explore the running container. This level is deliberately less polished than a production image because it teaches the mechanics of package installation, interactive containers, and the difference between a foreground shell and a long-running background process.
 
@@ -875,10 +899,14 @@ test -n "$db_id" && docker stop "$db_id" && docker rm "$db_id" && db_id=''
 test -n "$curl_id" && docker stop "$curl_id" && docker rm "$curl_id" && curl_id=''
 ```
 
+After confirming these tags were created for this exercise and are no longer used, remove them with `docker image rm dojo-web:v1 hello-flask:v1 my-ubuntu-curl`. In the Compose directory, use `docker compose -p "${compose_project:?Set the verified unused lab project name first}" down -v` only for the verified disposable project and volume described above.
+
 - [ ] You built `dojo-web:v1` from a Dockerfile and verified it with `curl http://127.0.0.1:8080`.
 - [ ] You explained why host port 8080 maps to container port 80 in the nginx example.
 - [ ] You used the captured container ID to diagnose the failed PostgreSQL container before fixing it.
 - [ ] You reran PostgreSQL with the required environment variable and confirmed it stayed running.
+- [ ] You used logs, top, exec and inspect on the running PostgreSQL container.
+- [ ] The volume marker survived container removal, and you removed only the exercise volume.
 - [ ] You built `my-ubuntu-curl` and entered it with an interactive shell.
 - [ ] You explained why `apt-get update` and `apt-get install` belong in the same `RUN` instruction.
 - [ ] You cleaned up containers you created during the lab.
@@ -901,7 +929,7 @@ Failure layer: the engine, not the CLI binary. Next action: start Docker Desktop
 <details>
 <summary>Check your prediction</summary>
 
-Failure layer: host publication. Retry the guarded create assignment with a free loopback port such as `-p 127.0.0.1:8081:80`, leaving container port 80 unchanged. Inspect any failed-attempt state with the lab owner rather than deleting by name.
+Failure layer: host publication. A failed start may leave a created container with the proposed name. List candidates with `docker ps -a --filter name=my-nginx` and ask the lab owner to identify any leftover. Retry the guarded assignment with an unused name such as `my-nginx-2` and a free loopback port such as `-p 127.0.0.1:8081:80`; leave container port 80 unchanged.
 
 </details>
 
@@ -927,6 +955,9 @@ Failure layer: the container user, not only the application bug. Next action: re
 
 - [Docker port publishing and localhost caveats](https://docs.docker.com/engine/network/port-publishing/)
 - [Docker writable container layers](https://docs.docker.com/engine/storage/drivers/#container-and-layers)
+- [Docker volumes](https://docs.docker.com/engine/storage/volumes/)
+- [Docker contexts](https://docs.docker.com/engine/manage-resources/contexts/)
+- [Python slim tag](https://hub.docker.com/v2/repositories/library/python/tags/3.12-slim) and [Ubuntu tag](https://hub.docker.com/v2/repositories/library/ubuntu/tags/24.04)
 
 - [Docker overview](https://docs.docker.com/get-started/docker-overview/)
 - [Docker Desktop product page](https://docker.com/products/docker-desktop)
