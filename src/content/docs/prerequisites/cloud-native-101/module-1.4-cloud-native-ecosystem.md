@@ -205,7 +205,7 @@ flowchart TD
 
 The diagram is simplified, but the separation is useful during design reviews. If a team complains that deployments are slow, the answer may belong in CI/CD or GitOps. If Pods cannot reach each other, the answer may involve Services, DNS, NetworkPolicy, or the CNI. If auditors need proof that production changes were reviewed, the answer may involve Git history, admission policy, and controller logs. The same incident can cross layers, so naming the layer prevents random tool selection.
 
-In later modules, `kubectl` lets you inspect Kubernetes resources, including workloads used by ecosystem tools.
+You can use `kubectl` to inspect Kubernetes resources, including workloads used by ecosystem tools, in the optional exercise below and in later modules.
 
 Consider a basic request path for a production web service. A developer changes application code, CI builds a container image, a scanner checks the image, Git receives an updated manifest or chart value, a GitOps controller reconciles the cluster, Kubernetes rolls out Pods, the CNI gives those Pods network connectivity, Services route traffic, observability tools collect signals, and security tools enforce or monitor policy. No single project owns the whole chain, which is exactly why ecosystem literacy matters.
 
@@ -453,9 +453,9 @@ You are architecting infrastructure for a rapidly growing fintech startup. The c
 ### Tasks
 
 - [ ] **Navigate CNCF maturity categories**: Check each selected tool on the [CNCF projects page](https://www.cncf.io/projects/) and record its listed maturity. If it is not listed, record that and assess its production use and support separately. Mark any sandbox project as experimental rather than production-critical.
-- [ ] **Match observability, networking, security, CI/CD, and storage problems**: Write one sentence for each category explaining the problem it solves for the fintech scenario.
+- [ ] **Match observability, networking, security, CI/CD, and storage problems**: Write one sentence for each category explaining the problem it solves for the fintech scenario. For security, explain where the tool acts in the workload lifecycle (build, admission, or runtime).
 - [ ] **Evaluate graduation, operational complexity, team capability, and vendor neutrality**: For two tools, document why the team can operate them and what provider-specific assumptions exist.
-- [ ] **Design a minimal first production stack for Kubernetes 1.35+**: Include packaging, deployment workflow, metrics, logs, image scanning, policy, certificate management, and backup or restore planning.
+- [ ] **Design a minimal first production stack for Kubernetes 1.35+**: Include the container runtime (or the managed runtime), packaging, deployment workflow, metrics, logs, image scanning, policy, certificate management, and backup or restore planning. State whether tracing is included or deferred, with the reason.
 - [ ] **Define a deferral list**: Name two attractive tools you would not adopt yet, and explain what future pain would justify revisiting them.
 - [ ] **Inspect an available cluster (optional)**: Run `kubectl get pods -A` and look for namespaces or pod names such as `argocd`, `cert-manager`, or `cilium`. Record possible ecosystem components for further investigation. Output depends on the cluster and may show none.
 - [ ] **Review recovery**: A scheduled backup completes, but a restore drill cannot recover a volume snapshot into a scratch namespace. Name the gap and the next action before opening the answer.
@@ -463,31 +463,31 @@ You are architecting infrastructure for a rapidly growing fintech startup. The c
 <details>
 <summary>Check your recovery review</summary>
 
-The backup schedule alone did not prove recovery. Investigate the failed snapshot restore and repeat the drill after correcting the cause; record the result.
+The backup schedule alone did not prove recovery. Check whether the restore drill ran into a scratch namespace, whether the snapshot class and driver support restoring that volume, and whether restore permissions are in place. Correct the cause, repeat the drill, and record the result.
 </details>
 
 ### Hints
 
-1. Match each scenario need to a tool category before choosing a product.
-2. Check CNCF maturity where listed; for other tools, record evidence of production use and support.
-3. Compare the team's capacity with the upgrade, monitoring, and recovery work each choice adds.
+1. Which category addresses each scenario need before you choose a product?
+2. What would you check to establish whether each choice is ready for production or recovery?
+3. What upgrade, monitoring, and recovery work would each choice cost the team?
 
 <details>
 <summary>Solution guide: maturity choices</summary>
 
-A strong answer prefers graduated projects or well-established incubating projects for production-critical functions. For example, the team might choose Prometheus and Grafana for metrics and dashboards, Fluent Bit with Loki for logs, Argo CD or Flux for GitOps, Trivy for image scanning, OPA Gatekeeper or Kyverno for policy, cert-manager for certificates, and Velero for backup workflows. The exact choices can vary, but the reasoning should explain maturity and operations risk.
+A strong answer prefers graduated projects or well-established incubating projects for production-critical functions. For example, the team might choose Prometheus and Grafana for metrics and dashboards, Fluent Bit with Loki for logs, Argo CD or Flux for GitOps, Trivy for image scanning, OPA Gatekeeper or Kyverno for policy, cert-manager for certificates, and Velero for backup workflows. Tools not listed on the CNCF projects page need separate production-use and support evidence. The exact choices can vary, but the reasoning should explain maturity and operations risk.
 </details>
 
 <details>
 <summary>Solution guide: category matching</summary>
 
-Observability should mention metrics, logs, and possibly traces as separate signals. Networking should distinguish CNI capabilities, network policy, ingress, and service mesh rather than treating them as one product. Security should include image scanning, admission policy, runtime detection, and certificate management. CI/CD should explain how code becomes desired cluster state. Storage should discuss persistent volumes, snapshots, restore testing, and cluster resource backups.
+Observability should mention metrics, logs, and possibly traces as separate signals. Networking should distinguish CNI capabilities, network policy, ingress, and service mesh rather than treating them as one product. Security should include image scanning, admission policy, runtime detection, and certificate management. For example, Trivy scans the image during the build workflow before it reaches the registry. CI/CD should explain how code becomes desired cluster state. Storage should discuss persistent volumes, snapshots, restore testing, and cluster resource backups.
 </details>
 
 <details>
 <summary>Solution guide: minimal stack</summary>
 
-A reasonable first production stack uses managed Kubernetes, Helm or Kustomize for packaging, GitHub Actions or a similar CI system for image builds, Trivy for scanning, Argo CD or Flux for GitOps if the team accepts pull-based reconciliation, Prometheus and Grafana for metrics, Fluent Bit and Loki for logs, cert-manager for certificate automation, and Velero or provider snapshots for restore planning. A service mesh can be deferred until mutual TLS, traffic policy, or multi-team service ownership makes the additional control plane worthwhile.
+A reasonable first production stack uses managed Kubernetes, Helm or Kustomize for packaging, GitHub Actions or a similar CI system for image builds, Trivy for scanning, Argo CD or Flux for GitOps if the team accepts pull-based reconciliation, Prometheus and Grafana for metrics, Fluent Bit and Loki for logs, cert-manager for certificate automation, and Velero or provider snapshots for restore planning. Use the managed node runtime, such as containerd, and document which runtime the provider supplies. Defer tracing until request paths cross enough services to justify it. A service mesh can be deferred until mutual TLS, traffic policy, or multi-team service ownership makes the additional control plane worthwhile.
 </details>
 
 <details>
@@ -505,13 +505,11 @@ Good deferrals are not dismissals. A team might defer Istio until it has many se
 - [ ] You selected a storage backup or restore strategy rather than assuming Kubernetes automatically protects data.
 - [ ] You recorded each selected tool's CNCF maturity from the projects page, or noted that it was not listed and recorded separate production-use and support evidence.
 - [ ] You wrote one-sentence justifications that connect each tool to scenario constraints instead of to popularity.
-
 - [ ] You identified the recovery gap and a next action in the restore scenario.
 
 ## Sources
 
 - [Argo CD: Automatic self-healing and its default](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/#automatic-self-healing)
-
 - [CNCF Landscape](https://landscape.cncf.io)
 - [CNCF Trail Map](https://github.com/cncf/trailmap)
 - [CNCF Project Maturity Levels](https://www.cncf.io/projects/)
