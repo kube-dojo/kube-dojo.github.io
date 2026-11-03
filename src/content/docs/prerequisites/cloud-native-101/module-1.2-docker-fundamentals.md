@@ -112,7 +112,7 @@ The nginx example is small, but it contains almost every runtime concept you nee
 <details>
 <summary>Check your prediction</summary>
 
-The run reports a bind error. A failed start may leave a created container holding the name. List candidates with `docker ps -a --filter name=my-nginx` and ask the lab owner to identify any leftover; do not delete by name. Retry the assignment with both an unused name such as `my-nginx-2` and a free loopback port such as `-p 127.0.0.1:8081:80`, retaining container port 80. Use the new port for the curl check.
+The run reports a bind error. A failed start may leave a created container holding the name. List candidates with `docker ps -a --filter name=my-nginx` and ask the lab owner (the person who manages the machine, usually you) to identify any leftover; do not delete by name. Retry the assignment with both an unused name such as `my-nginx-2` and a free loopback port such as `-p 127.0.0.1:8081:80`, retaining container port 80. Use the new port for the curl check.
 
 </details>
 
@@ -453,14 +453,13 @@ volumes:
 ```
 
 ```bash
-# Substitute your verified unused project name
-compose_project=your-unused-project
+# Choose and export your own verified unused project name before running this block.
 # Start all services
 docker compose -p "${compose_project:?Set the verified unused lab project name first}" up -d
 
 # Verify services and the web response
-docker compose -p "$compose_project" ps && curl http://127.0.0.1:8000
-docker compose -p "$compose_project" exec db getent hosts db
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" ps && curl http://127.0.0.1:8000
+docker compose -p "${compose_project:?Set the verified unused lab project name first}" exec db getent hosts db
 # View logs; press Ctrl-C to stop following
 docker compose -p "${compose_project:?Set the verified unused lab project name first}" logs -f
 
@@ -485,7 +484,7 @@ flowchart TD
     F --> G{{Container: running instance}}
 ```
 
-The workflow diagram is intentionally linear, but real teams repeat it many times per day. A developer edits code, rebuilds an image, runs it locally, pushes it to a registry, and lets CI or a cluster consume it. Every weak habit in the early steps compounds later. The next section asks you to name that cost before the comparison table.
+The workflow diagram is intentionally linear, but real teams repeat it many times per day. A developer edits code, rebuilds an image, runs it locally, pushes it to a registry, and lets CI or a cluster consume it. Every weak habit in the early steps compounds later.
 
 ## Image Quality, Security, and Runtime Shape
 
@@ -823,27 +822,27 @@ test -n "$db_id" && docker inspect --format '{{json .Config.Env}}' "$db_id"
 If it exits, `exec` and `top` cannot inspect a running process; use `docker ps -a`, logs and inspect instead. Inspect output can contain secrets; do not share it.
 </details>
 
-**Volume practice:** A bind mount uses a host path; a named volume is managed by Docker. Choose a verified unused volume name with the lab owner. Write a marker, remove its container, and predict what a replacement will read.
+**Volume practice:** A bind mount uses a host path; a named volume is managed by Docker. Choose and export your own unused volume name with the lab owner. Run the check below and stop if any name is listed. Write a marker, remove its container, and predict what a replacement will read.
 
 <details>
 <summary>Show the worked answer</summary>
 
 ```bash
-# Use only a verified unused name; stop on any failure.
-volume_name=your-unused-volume
-docker volume create "$volume_name" &&
-volume_id=$(docker run -d -v "$volume_name:/data" ubuntu:24.04 sh -c 'echo retained > /data/marker') &&
+docker volume ls --filter "name=${volume_name:?Set the unused volume name first}"
+# Stop if any name is listed or the check fails; otherwise run the rest.
+docker volume create "${volume_name:?Set the unused volume name first}" &&
+volume_id=$(docker run -d -v "${volume_name:?Set the unused volume name first}:/data" ubuntu:24.04 sh -c 'echo retained > /data/marker') &&
 docker wait "$volume_id" && docker rm "$volume_id" &&
-docker run --rm -v "$volume_name:/data" ubuntu:24.04 cat /data/marker
+docker run --rm -v "${volume_name:?Set the unused volume name first}:/data" ubuntu:24.04 cat /data/marker
 # Expected: retained
 ```
 
 If any command fails or the marker is missing, stop and investigate with the lab owner. Once the replacement has exited, list and remove only the confirmed exercise volume:
 
 ```bash
-docker volume ls --filter "name=$volume_name"
+docker volume ls --filter "name=${volume_name:?Set the unused volume name first}"
 # After confirming the volume belongs to this exercise:
-docker volume rm "$volume_name"
+docker volume rm "${volume_name:?Set the unused volume name first}"
 ```
 
 The replacement reads `retained`: removing the first container did not remove the named volume. Stop if ownership is uncertain; do not remove someone else's volume.
@@ -900,12 +899,14 @@ test -n "$db_id" && docker stop "$db_id" && docker rm "$db_id" && db_id=''
 test -n "$curl_id" && docker stop "$curl_id" && docker rm "$curl_id" && curl_id=''
 ```
 
-After confirming these tags were created for this exercise and are no longer used, remove them with `docker image rm dojo-web:v1 hello-flask:v1 my-ubuntu-curl`. In the Compose directory, use `docker compose -p "$compose_project" down -v` only for the verified disposable project and volume described above.
+After confirming these tags were created for this exercise and are no longer used, remove them with `docker image rm dojo-web:v1 hello-flask:v1 my-ubuntu-curl`. In the Compose directory, use `docker compose -p "${compose_project:?Set the verified unused lab project name first}" down -v` only for the verified disposable project and volume described above.
 
 - [ ] You built `dojo-web:v1` from a Dockerfile and verified it with `curl http://127.0.0.1:8080`.
 - [ ] You explained why host port 8080 maps to container port 80 in the nginx example.
 - [ ] You used the captured container ID to diagnose the failed PostgreSQL container before fixing it.
 - [ ] You reran PostgreSQL with the required environment variable and confirmed it stayed running.
+- [ ] You used logs, top, exec and inspect on the running PostgreSQL container.
+- [ ] The volume marker survived container removal, and you removed only the exercise volume.
 - [ ] You built `my-ubuntu-curl` and entered it with an interactive shell.
 - [ ] You explained why `apt-get update` and `apt-get install` belong in the same `RUN` instruction.
 - [ ] You cleaned up containers you created during the lab.
