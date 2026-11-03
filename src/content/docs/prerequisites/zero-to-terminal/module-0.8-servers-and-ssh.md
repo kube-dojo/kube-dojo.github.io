@@ -36,8 +36,6 @@ Servers are ordinary computers doing a particular job for other computers, but t
 
 Later modules apply this context-checking habit to Kubernetes.
 
-You can practice SSH by connecting to `localhost`, your own computer, if you have an authorized SSH server. Verify the host key and authenticate before opening a shell; an internet connection adds network and exposure considerations that localhost practice does not cover.
-
 ## Servers Are Computers With a Job
 
 A server provides a service to other computers, such as web pages, files, or API responses. A laptop can provide a service too.
@@ -150,7 +148,7 @@ The connection sequence is not complicated, but naming each step makes failures 
 8. Type "exit" to disconnect and return to your local terminal
 ```
 
-Your prompt might change from a local-looking prompt to a remote-looking prompt. The following prompts are illustrative. Treat a prompt as a clue, not proof: shell configuration can change it, and different machines can share a hostname.
+Your prompt might change from a local-looking prompt to a remote-looking prompt. The following prompts are illustrative.
 
 ```text
 yourname@your-laptop ~ $
@@ -266,6 +264,12 @@ Are you sure you want to continue connecting (yes/no)?
 
 Before accepting a host key, including for `localhost`, compare its fingerprint with a value obtained through a trusted, independent channel. For a production host, the responsible administrator or an authenticated runbook may provide it. A name alone does not verify the key.
 
+A host key is the server's own public and private key pair; its fingerprint is a short hash of the public key. When you accept a new key at this prompt, OpenSSH normally records it in `~/.ssh/known_hosts` and compares it on later connections. A changed key causes a warning. On the server machine's trusted console, you can check the fingerprint of its Ed25519 public host key with the command below. Compare it with the presented fingerprint of the same key type; if the file is absent or the values differ, stop and ask the administrator.
+
+```bash
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
 Pause and predict: which access architecture would you choose for team administration and why: sharing a single administrative account password among five engineers, or issuing five separate SSH key pairs with five distinct public keys installed on the server?
 
 <details>
@@ -333,7 +337,7 @@ Connection failures are part of the lifecycle too. A timeout leaves routing, fil
 
 | Symptom | Likely Layer | First Beginner Check |
 |---------|--------------|----------------------|
-| Connection timed out | Network path or firewall | Confirm host, network, VPN, and security group rules |
+| Connection timed out | Network path or firewall | Confirm host, network, and firewall rules |
 | Connection refused | Listener or active rejection | Check the intended endpoint, listener and rejection policy with its owner |
 | Permission denied | Authentication | Confirm username, key file, password, and account access |
 | Host key warning changed | Host identity | Stop and verify whether the server was rebuilt or intercepted |
@@ -358,13 +362,7 @@ If you already have an authorized local SSH server, use the same command shape a
 ssh localhost
 ```
 
-The first connection to a new host record may display a host authenticity prompt. Verify the presented fingerprint independently before answering `yes`. The following prompt is synthetic, not a recording from a real host.
-
-```text
-The authenticity of host 'localhost (127.0.0.1)' can't be established.
-ED25519 key fingerprint is SHA256:AbCdEf123456...
-Are you sure you want to continue connecting (yes/no)?
-```
+If the host authenticity prompt shown earlier appears, verify its fingerprint independently before answering `yes`.
 
 Once connected, run a small set of harmless commands. The point is not to discover surprising files. The point is to prove that the remote shell accepts ordinary terminal commands and returns ordinary output through the encrypted session.
 
@@ -396,21 +394,7 @@ Then test the same local connection flow. If this fails, read the error text rat
 ssh localhost
 ```
 
-After disconnecting, tear down the disposable VM through the same lab system that created it, including any lab-only network exposure. Do not blindly disable or remove an existing SSH service: another user may depend on it. Practice command reading without changing services when no authorized disposable environment is available. The following transcript is synthetic.
-
-```text
-# This is what connecting to a real server would look like:
-ssh yourname@192.168.1.100
-
-# You would see:
-yourname@192.168.1.100's password:
-
-# After entering the password:
-yourname@remote-server:~$
-
-# Ordinary shell commands now run on the remote server.
-# Type "exit" to disconnect.
-```
+After disconnecting, tear down the disposable VM through the same lab system that created it, including any lab-only network exposure. Do not blindly disable or remove an existing SSH service: another user may depend on it. Practice command reading without changing services when no authorized disposable environment is available.
 
 With an authorized cloud server, the lifecycle is still connect, authenticate, verify context, work, and disconnect. The following transcript is synthetic: `192.0.2.24` is a reserved example address, not a connection target. Substitute only a host and account your lab owner has explicitly authorized; never probe an arbitrary public address copied from an example.
 
@@ -439,7 +423,7 @@ The beginner-friendly way to keep this straight is to describe every action in a
 
 ## Reading Prompts, Paths, and Output Carefully
 
-Read the output as well as the command. A prompt such as `ubuntu@ip-10-0-1-25:~$` suggests a user, host, and directory, but shell configuration controls it. Use the context checks and host-key verification before acting.
+Read the output as well as the command. Use the context checks and host-key verification before acting.
 
 Paths deserve the same care. The path `/home/admin/app` on your laptop and `/home/admin/app` on a server can have identical spelling and entirely different contents. The path text alone does not identify the machine. You need the host context and the current session context before the path becomes meaningful.
 
@@ -466,7 +450,7 @@ Do not treat SSH as the only way to manage servers. Configuration management, cl
 | Keep manual SSH changes small | You are learning or diagnosing a narrow issue | Small changes are easier to reason about, record, and undo |
 | Move repeated work into automation | The same command must run on many servers | Automation reduces drift and makes review possible before execution |
 
-Connect, verify the target, then act. A familiar prompt alone is not enough to establish context.
+Connect, verify the target, then act.
 
 ## Decision Framework
 
@@ -552,14 +536,14 @@ Stop and verify the host identity through a trusted source before accepting the 
 
 ## Hands-On Exercise: SSH to Localhost
 
-This exercise uses `localhost` so you can practice the SSH lifecycle without needing a cloud account. If your operating system does not currently run an SSH server, use the relevant setup notes in the practice section above, or read the command flow carefully and complete the written checks. The goal is not to make your laptop more complicated; the goal is to make the remote-shell model concrete.
+This exercise uses `localhost` to practice the SSH lifecycle. You need an authorized SSH server; if none is available, use the disposable-VM path above or read the example and complete the written checks without connecting.
 
 Work slowly enough to record evidence at each stage. A good operator's notes are simple: the command used, the host observed, the user observed, the directory observed, and the command used to disconnect. Those notes make it obvious whether the session was local, remote, or a loopback connection to the same machine.
 
-- [ ] Record your local context by running `hostname`, `whoami`, and `pwd` before any SSH command.
-- [ ] Open an SSH connection to `localhost`, accepting the first-time host key only after independently verifying its fingerprint.
-- [ ] Inside the SSH session, run `hostname`, `whoami`, `pwd`, `ls`, and `echo "Hello from SSH!"`.
-- [ ] Disconnect with `exit`, then use the session clues above and run `hostname` again to compare with your local notes.
+- [ ] Record your local context by running `hostname`, `whoami`, `pwd`, and `echo $SSH_CONNECTION` before any SSH command.
+- [ ] On the server's trusted console, check its public host-key fingerprint as shown above. Open an SSH connection to `localhost`, accepting the first-time key only after comparing fingerprints.
+- [ ] Inside the SSH session, run `hostname`, `whoami`, `pwd`, `ls`, `echo "Hello from SSH!"`, and `echo $SSH_CONNECTION`.
+- [ ] Disconnect with `exit`, then run `hostname` and `echo $SSH_CONNECTION` again and compare with your local notes.
 - [ ] Write one sentence explaining whether the hostname changed and why that result makes sense for `localhost`.
 - [ ] Build, but do not run, the command that would connect as `admin` to `10.0.0.5` on port `2222` with key file `~/.ssh/work_key`.
 - [ ] Diagnose the three connection failures in Incident A by matching each error symptom to its failure layer and identifying an initial diagnostic check.
@@ -569,7 +553,7 @@ Work slowly enough to record evidence at each stage. A good operator's notes are
 <details>
 <summary>Solution guidance</summary>
 
-Your local context block should show the machine, user, and directory before connection. The localhost SSH command is `ssh localhost`, though some systems may require a username such as `ssh yourname@localhost` depending on account setup. Inside the SSH session, the command output may look very similar because the endpoint is local, but the SSH authentication and shell lifecycle still happened. The final command for the remote example is `ssh -p 2222 -i ~/.ssh/work_key admin@10.0.0.5`.
+Your local context block should show the machine, user, and directory before connection. The localhost SSH command is `ssh localhost`, though some systems may require a username such as `ssh yourname@localhost` depending on account setup. Inside the session, `echo $SSH_CONNECTION` normally shows four values: client address and port, then server address and port. Outside an SSH session it is normally empty; an existing SSH session or a modified environment can change that baseline. Other output may look similar because the endpoint is local. The final command for the remote example is `ssh -p 2222 -i ~/.ssh/work_key admin@10.0.0.5`.
 
 </details>
 
@@ -600,7 +584,7 @@ Examine the three synthetic errors. A team lead initially claims all servers suf
 **Session 1 (`198.51.100.24` - `Connection timed out`):**
 - **Observed Layer:** Connection establishment timed out before SSH authentication.
 - **Evidence and Mechanism:** The client did not establish the connection within its timeout. Filtering, routing trouble, an unavailable host, or loss are hypotheses; the message alone does not show packet captures or identify which device caused the failure.
-- **First Diagnostic Check:** Check cloud provider security group rules to confirm inbound TCP port 22 is permitted from your client IP, verify VPN connectivity if connecting to private subnets, and check instance health and power status in the cloud management console.
+- **First Diagnostic Check:** Check cloud provider network access rules to confirm inbound TCP port 22 is permitted from your client IP, verify private-network connectivity if needed, and check instance health and power status in the cloud management console.
 
 **Session 2 (`198.51.100.25` - `Connection refused`):**
 - **Observed Layer:** The connection to port 22 was actively refused before SSH authentication.
@@ -613,6 +597,8 @@ Examine the three synthetic errors. A team lead initially claims all servers suf
 - **First Diagnostic Check:** On the authorized host only, use verbose client output to inspect identity selection and actual offers, verify the username, and ask the administrator to check authorized keys and access policy. Treat debug output as potentially sensitive; do not blindly append keys or change server files from this error alone.
 
 </details>
+
+Incident B transcript (synthetic, not a real recording):
 
 ```text
 laptop-user@workstation:~$ ssh deployer@worker-prod-04
@@ -630,12 +616,14 @@ Fast-forward
 deployer@worker-prod-04:~$ touch maintenance.flag
 deployer@worker-prod-04:~$ exit
 logout
-Connection to 192.0.2.85 closed.
+Connection to worker-prod-04 closed.
 laptop-user@workstation:~$ ls -la maintenance.flag
 ls: cannot access 'maintenance.flag': No such file or directory
 ```
 
-An engineer intended to test a maintenance flag script locally, ran the sequence above, disconnected, and then grew alarmed when `ls -la maintenance.flag` failed on their workstation. What does the transcript establish about the `touch` command's target, and which checks are missing before you can declare success? Cite the session-boundary evidence and evaluate the operational risk introduced by confusing local and remote context.
+An engineer connected to production to update the site, then intended to test a maintenance flag locally but forgot to disconnect first. After disconnecting, they grew alarmed when `ls -la maintenance.flag` failed on their workstation. What does the transcript establish about the `touch` command's target, and which checks are missing before you can declare success? Cite the session-boundary evidence and evaluate the operational risk introduced by confusing local and remote context.
+
+<details><summary>Hint</summary>Track which shell receives each command and distinguish reported changes from unverified ones.</details>
 
 <details>
 <summary>Diagnosis and context analysis for Incident B</summary>
@@ -650,13 +638,15 @@ If `touch` succeeded, its target was `/var/www/site/maintenance.flag` on the rem
 - The prompt `laptop-user@workstation:~$ ssh deployer@worker-prod-04` initiated a remote SSH session.
 - In this illustrative session, `whoami` returned `deployer`, `hostname` returned `worker-prod-04`, and `pwd` returned `/var/www/site`. These outputs identify the reported user, host, and directory within the session; they do not replace SSH host-identity verification.
 - The command `touch maintenance.flag` executed while the shell was still active on `worker-prod-04`.
-- The command `exit` closed the remote session, verified by `logout` and `Connection to 192.0.2.85 closed.`, returning the prompt to `laptop-user@workstation:~$`.
+- The command `exit` closed the remote session, verified by `logout` and `Connection to worker-prod-04 closed.`, returning the prompt to `laptop-user@workstation:~$`.
 - The final command `ls -la maintenance.flag` ran in the local workstation directory and found no file there; it says nothing about the remote path.
 
 **Operational Risk:**
-The engineer intended a local test but targeted a production path. If `touch` succeeded there, an application configured to treat that flag as maintenance mode could change behavior. The transcript alone proves neither file creation nor an outage. Assuming failure from the later local listing could lead to repeated writes before the remote state is checked.
+The `git pull` output reports a fast-forward that changed `app.js` on the production host. The engineer then targeted a production path with the intended local test. If `touch` succeeded there, an application configured to treat that flag as maintenance mode could change behavior. The transcript alone proves neither flag creation nor an outage. Assuming failure from the later local listing could lead to repeated writes before the remote state is checked.
 
 </details>
+
+Incident C warning (synthetic, not a real recording):
 
 ```text
 $ ssh admin@prod-api.example.com
@@ -675,6 +665,8 @@ Host key verification failed.
 ```
 
 While investigating an alert on an API server, an engineer encounters the security warning displayed above. A forum post suggests immediately running `ssh-keygen -R prod-api.example.com` to remove line 42 from `known_hosts` so the connection can proceed without warnings. Why is deleting this host key record without out-of-band verification hazardous, which security layer is raising this alert, and what exact procedure must the engineer follow before connecting?
+
+<details><summary>Hint</summary>Ask what evidence the saved key provides and how to verify the presented key independently.</details>
 
 <details>
 <summary>Diagnosis and host-trust analysis for Incident C</summary>
@@ -717,9 +709,6 @@ Your notes should show before/inside/after context checks and a clean disconnect
 - [OpenSSH Manual Page: sshd](https://man.openbsd.org/sshd)
 - [OpenSSH Manual Page: authorized_keys](https://man.openbsd.org/sshd#AUTHORIZED_KEYS_FILE_FORMAT)
 - [Ubuntu Server Documentation: OpenSSH Server](https://documentation.ubuntu.com/server/how-to/security/openssh-server/)
-- [Apple macOS User Guide: Allow a remote computer to access your Mac](https://support.apple.com/guide/mac-help/allow-a-remote-computer-to-access-your-mac-mchlp1066/mac)
-- [Microsoft Learn: OpenSSH for Windows overview](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_overview)
-- [Kubernetes Documentation: Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/)
 - [Secure Shell](https://en.wikipedia.org/wiki/Secure_Shell)
 
 ## Next Module
