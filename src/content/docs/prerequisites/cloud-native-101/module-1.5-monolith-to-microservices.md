@@ -67,7 +67,7 @@ That togetherness is why a monolith is often the fastest way to build a young pr
 
 The same togetherness becomes painful when growth makes local coupling visible. If the order workflow needs ten replicas during a holiday sale but the product catalog needs only two, the monolith usually scales all of it. If a risky payment change must wait for unrelated catalog changes to finish testing, the release process becomes an organizational queue rather than a technical pipeline.
 
-The shared database is the most important hidden boundary in many monoliths. It gives you easy ACID transactions, simple joins, and direct reporting queries, but it also lets unrelated code paths affect one another through locks, slow queries, schema changes, and accidental coupling. A clean code module is not truly independent if every other module can reach into its tables.
+The shared database is the most important hidden boundary in many monoliths. It gives you easy ACID transactions: updates succeed or fail together, respect constraints, remain isolated from concurrent work, and persist after commit. It also gives you simple joins and direct reporting queries, but lets unrelated code paths affect one another through locks, slow queries, schema changes, and accidental coupling. A clean code module is not truly independent if every other module can reach into its tables.
 
 **Pause and predict:** If a monolith shares a single database, what happens when the Order module accidentally executes a poorly written query that consumes all available database CPU? What does a user of the User module see?
 
@@ -78,13 +78,9 @@ The User module slows down because the shared dependency is saturated. The failu
 
 </details>
 
-Hold the user-facing effect before you read on. The next paragraph is about a large company that kept one deployable unit. It does not describe what the saturated database did to login.
-
 A good monolith is not a bad architecture waiting to be rescued. Shopify's long-running "modular monolith" framing is a useful reminder that a carefully maintained monolith can serve very large businesses when teams invest in modularity, testing, observability, and disciplined ownership. The trap is not the monolith itself; the trap is allowing "single deployable unit" to become "single tangled unit."
 
 For Kubernetes learners, a monolith also teaches a useful baseline. You can run a monolith in a container, deploy it with a Deployment, expose it with a Service, configure it with ConfigMaps and Secrets, and restart it with probes. Kubernetes does not require microservices; it manages containers and desired state, which can be useful before an application is decomposed.
-
-The first Kubernetes command you will eventually use in many modules is `kubectl`, and this curriculum writes commands with the full binary name so examples remain copy-paste safe in scripts and non-interactive shells. For example, when you later inspect workloads with `kubectl get pods -A`, you are asking Kubernetes about runtime units, not asking it whether those units contain monolithic or microservice code.
 
 ## The Microservices Approach
 
@@ -120,6 +116,8 @@ The diagram shows a more explicit architecture than the monolith. The gateway ac
 
 This independence changes how teams work. A user service team can release a profile fix without waiting for the order service team, and the order service can scale based on checkout pressure without scaling the product catalog. A service can also use the language, framework, or storage model that fits its domain, although that flexibility becomes expensive if every team invents a separate operational universe.
 
+A distributed monolith has multiple services that still require coordinated releases or shared data writes for most changes.
+
 The price is the distributed system tax. A function call inside a monolith becomes an HTTP, gRPC, or message-broker interaction across a network. That network call can time out, retry, duplicate, arrive late, return a partial response, or fail because another service is rolling out. The code may still be simple, but the behavior is no longer local.
 
 **Pause and predict:** In a monolith, a function call usually takes microseconds and fails only when the process or the called code fails. In microservices, a network call often takes milliseconds and can fail because of timeouts, network partitions, overloaded dependencies, certificate issues, or a remote deployment. How should that change the way you design error handling and user-facing workflows?
@@ -127,15 +125,13 @@ The price is the distributed system tax. A function call inside a monolith becom
 <details>
 <summary>Check your prediction</summary>
 
-Microservice code must assume partial failure as a normal case. Timeouts need budgets, retries need limits, idempotency needs design, and fallbacks need product decisions. Without those habits, splitting the system moves failure from compile time and test time into production traffic.
+Microservice code must assume partial failure as a normal case. Timeouts need budgets, retries need limits, idempotency needs design, and fallbacks need product decisions. Idempotency means repeating an operation has the same effect as performing it once. Without those habits, splitting the system moves failure from compile time and test time into production traffic.
 
 </details>
 
-Write that design change down before the schema discussion. The next paragraph is about who owns the tables. It is not the error-handling answer.
-
 The database-per-service pattern is another example of a trade-off rather than a slogan. It improves ownership because one service controls its schema and invariants. It also makes cross-service reporting, transactions, and consistency harder, because you cannot simply wrap a user update, inventory reservation, and payment authorization in one local transaction.
 
-Teams handle that complexity with events, sagas, outbox tables, reconciliation jobs, and careful product semantics. A checkout system may accept an order, publish an event, reserve inventory asynchronously, and later notify the customer if the reservation fails. That feels less tidy than one database transaction, but it can be more resilient when high traffic or temporary dependency failures are expected.
+Teams handle that complexity with events, sagas (coordinated sequences of local transactions), outbox tables (messages stored with a database update for later sending), reconciliation jobs, and careful product semantics. A checkout system may accept an order, publish an event, reserve inventory asynchronously, and later notify the customer if the reservation fails. That feels less tidy than one database transaction, but it can be more resilient when high traffic or temporary dependency failures are expected.
 
 **Pause and predict:** A five-person startup is building its first product, still changing its user model every week, and has no dedicated platform engineer. Should it begin with separate user, billing, catalog, recommendation, and notification services, or should it keep one modular deployable unit until the domain stabilizes?
 
@@ -145,8 +141,6 @@ Teams handle that complexity with events, sagas, outbox tables, reconciliation j
 A modular monolith is usually the more honest decision. The team needs fast learning, cheap refactoring, and fewer moving parts. Separate services make more sense when boundaries are stable enough to become contracts and when independent deployability solves a real bottleneck.
 
 </details>
-
-List the operational work before you read how team count changes the same choice. The following paragraph is about several teams that already exist. It assumes you have already picked a starting shape.
 
 Microservices are at their strongest when the organization already has multiple teams with distinct ownership. If one team owns checkout reliability, another owns search relevance, and another owns identity, forcing them through one release train creates friction. Separate services can align the software boundary with the team boundary, which is why Conway's Law appears in nearly every serious discussion of this topic.
 
@@ -277,7 +271,7 @@ flowchart LR
     SvcB1 -->|Response| SvcA1
 ```
 
-Synchronous calls are appropriate when the user genuinely needs the answer before continuing. Logging in, checking whether a username exists, or calculating a price may need immediate feedback. Even then, teams should define timeouts, circuit breakers, retry budgets, and clear error behavior so one slow service does not consume every caller's threads.
+Synchronous calls are appropriate when the user genuinely needs the answer before continuing. Logging in, checking whether a username exists, or calculating a price may need immediate feedback. Even then, teams should define timeouts, circuit breakers (which temporarily block calls after repeated failures), retry budgets, and clear error behavior so one slow service does not consume every caller's threads.
 
 Asynchronous communication changes the user and system contract. A service publishes an event or message, and another service consumes it later. The user may receive confirmation that work has been accepted rather than completed, while the backend gains buffering, retry, and isolation from temporary spikes.
 
@@ -287,9 +281,9 @@ flowchart LR
     Queue --> SvcB2[Service B]
 ```
 
-This pattern fits workflows where eventual consistency is acceptable. Sending email, updating recommendations, resizing images, and synchronizing analytics rarely need to block the user's request. The trade-off is that the system must handle duplicate messages, out-of-order events, poison messages, and operational visibility into queues.
+This pattern fits workflows where eventual consistency is acceptable: a read may temporarily show older data before updates reach it. Sending email, updating recommendations, resizing images, and synchronizing analytics rarely need to block the user's request. The trade-off is that the system must handle duplicate messages, out-of-order events, poison messages, and operational visibility into queues.
 
-An API gateway creates a single entry point for client traffic. It can centralize authentication, authorization, rate limiting, request routing, and protocol translation. In Kubernetes, an Ingress controller or a dedicated gateway implementation often plays this role, although the exact product choice depends on traffic needs and organizational standards.
+An API gateway creates a single entry point for client traffic. It can centralize authentication, authorization, rate limiting, request routing, and protocol translation. In Kubernetes, an Ingress controller or a dedicated gateway implementation often plays this role, although the exact product choice depends on traffic needs and organizational standards. As of November 2026, the [Kubernetes project recommends Gateway API](https://kubernetes.io/docs/concepts/services-networking/ingress/) over the frozen Ingress API.
 
 ```mermaid
 flowchart TD
@@ -306,7 +300,7 @@ flowchart TD
 
 A gateway is useful because clients should not need to understand every internal service boundary. Mobile apps, browsers, and external partners need stable public contracts. Internal services can change behind the gateway more freely, as long as the gateway contract and compatibility rules are managed carefully.
 
-The sidecar pattern adds a helper container beside the main application container. In Kubernetes, this works naturally because a Pod can contain multiple containers that share networking and lifecycle. The helper can collect logs, proxy traffic, handle certificates, or adapt protocols without forcing the application team to rewrite core business code.
+The sidecar pattern adds a helper container beside the main application container. In Kubernetes, this works naturally because a Pod can contain multiple containers that share networking and storage and are scheduled together. The helper can collect logs, proxy traffic, handle certificates, or adapt protocols without forcing the application team to rewrite core business code.
 
 ```mermaid
 flowchart LR
@@ -317,7 +311,7 @@ flowchart LR
     end
 ```
 
-A service mesh builds on the sidecar idea by placing proxies around service-to-service traffic and controlling them through a shared control plane. The mesh can provide mutual TLS, traffic splitting, retries, metrics, and policy enforcement across services written in different languages. That power is real, but so is the operational cost.
+A service mesh can build on the sidecar idea by placing proxies around service-to-service traffic and controlling them through a shared control plane. The mesh can provide mutual TLS, traffic splitting, retries, metrics, and policy enforcement across services written in different languages. That power is real, but so is the operational cost.
 
 > **Stop and think**: If your company mandates strict mTLS encryption between 50 different microservices written in three different languages, how would you enforce it without rewriting all 50 codebases? Consider who owns certificates, retries, telemetry, and rollout policy when every team uses a different application framework.
 
@@ -378,17 +372,15 @@ The most common anti-pattern is splitting a system before the team understands t
 | Gateway contains business rules | The gateway becomes a second monolith with unclear ownership | Keep routing and edge policy in the gateway, business logic in services |
 | Service mesh as first platform feature | Teams inherit complex networking before they need fleet-wide policy | Begin with Kubernetes Services, probes, metrics, and clear timeouts |
 
-The original misconceptions are worth preserving because they are still the traps learners hear in real teams:
-
 | Misconception | Reality |
 |---------------|---------|
-| "Microservices are always better" | They add massive operational complexity. Often a disastrous choice for startups or small teams searching for product-market fit. |
-| "Monoliths don't scale" | They do! Shopify handles massive global e-commerce traffic with a monolithic Ruby on Rails application. |
+| "Microservices are always better" | Their operational complexity can outweigh the benefits for small teams still finding product-market fit. |
+| "Monoliths don't scale" | Shopify's 2019 engineering post describes a large Ruby on Rails codebase that the company evolved into a modular monolith. |
 | "Microservices fix bad code" | They actually amplify it. Distributed bad code across network boundaries is much harder to debug, trace, and fix than bad code contained within a single monolithic process. |
-| "Smaller = micro" | Size isn't the point, bounded context is. A service should be exactly as big as its domain requires. Splitting services purely by lines of code creates tightly coupled, chatty networks. |
-| "You need a service mesh from day 1" | Service meshes like Istio add immense cognitive and operational load. Start with basic Kubernetes networking and only adopt a mesh when advanced observability or strict mTLS mandates require it. |
+| "Smaller = micro" | Size isn't the point; a bounded context is the boundary within which a domain model has a consistent meaning. Splitting services purely by lines of code creates tightly coupled, chatty networks. |
+| "You need a service mesh from day 1" | Service meshes like Istio add operational work. Start with basic Kubernetes networking and adopt a mesh when its benefits justify the cost. |
 | "Microservices mean REST APIs only" | Many high-scale microservices communicate via asynchronous event brokers like Kafka or RabbitMQ, or high-performance binary RPCs such as gRPC, rather than only standard HTTP REST calls. |
-| "Microservices = using Kubernetes" | You can run a containerized monolith on Kubernetes as a majestic monolith. Kubernetes is infrastructure orchestration, not an architectural enforcer. |
+| "Microservices = using Kubernetes" | You can run a containerized monolith on Kubernetes. Kubernetes is infrastructure orchestration, not an architectural enforcer. |
 | "Each microservice needs its own database" | While the database-per-service pattern ensures strong decoupling, it makes distributed transactions hard. Pragmatic teams sometimes start with logically separated schemas inside one shared database. |
 
 ## Decision Framework
@@ -444,7 +436,7 @@ That habit also prepares you for Kubernetes work. Every manifest you write later
 ## Did You Know?
 
 - **Container restart and Pod replacement are different operations.** Restart policy governs containers within a Pod; a workload controller manages replacement Pods for its desired replicas. Neither operation repairs a broken application dependency or supplies missing cluster capacity.
-- **Segment's U-Turn**: In 2018, Segment described moving away from hundreds of small services because operational overhead and duplicated work were hurting engineering velocity.
+- **Segment's U-Turn**: In 2018, Segment described consolidating more than 140 services because operational overhead and duplicated work were hurting engineering velocity.
 - **The Term "Microservices"**: The architectural style was discussed at a software architects workshop near Venice in May 2011 and was later popularized by James Lewis and Martin Fowler in their March 25, 2014 article.
 - **Conway's Law**: Melvin Conway's 1968 observation still matters because systems often mirror the communication patterns of the organizations that build them.
 
@@ -521,6 +513,14 @@ Choose one application you know well enough to discuss honestly. It can be a wor
 - [ ] **Evaluate communication style**: Decide whether the extracted capability should use synchronous request-response, asynchronous events, or both, and explain the user-facing trade-off.
 - [ ] **Review the decision**: State why you are not extracting two additional services yet, using operational cost and domain uncertainty as part of the reasoning.
 
+**Nudge for Tasks 2 and 6:** Look for uneven demand and uncertain boundaries.
+
+<details>
+<summary>More help with Tasks 2 and 6</summary>
+
+For scaling pressure, compare the resources or workload peaks of one workflow with the rest. For the decision review, name the cost of operating each proposed service and what remains uncertain about its boundary.
+</details>
+
 <details>
 <summary>Solution guide: classification</summary>
 
@@ -553,50 +553,9 @@ Use synchronous calls when the user needs an immediate answer, such as authentic
 - [ ] You evaluated synchronous and asynchronous communication with failure behavior, not only convenience.
 - [ ] You explained why at least two possible services should remain inside the monolith for now.
 
-- [ ] I named a failure layer and a next action for each frozen boundary-layer card before opening the reveal.
-
-A slow login, a hung checkout, a week-one split, and a release train can each look like an application bug. These cards freeze four transcripts so you can name the layer before you look. Read the symptom, name the boundary, and only then open the reveal.
-
-**Card A: Login is slow. The User package is healthy.** A holiday sale runs a bad Order query. Database CPU is pegged. Login requests time out. The User code did not change, and its tests still pass.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: the shared database, not the User package. Next action: find the query that holds the CPU, and do not start by rewriting the login handler.
-
-</details>
-
-**Card B: Checkout hangs with no budget.** A new service calls inventory over the network. The inventory process stalls. Checkout threads wait until the browser gives up. There is no timeout and no retry limit.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: the call treats the network like an in-process function. Next action: set a timeout budget and a bounded retry before you add another service hop.
-
-</details>
-
-**Card C: Five services in week one.** Five people split user, billing, catalog, recommendation, and notification into separate deployables. The user model still changes every week. There is no platform engineer.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: the split arrived before a stable boundary. Next action: put the changing model back in one deployable unit until a real bottleneck shows up.
-
-</details>
-
-**Card D: Four services, one release.** The diagram shows four services. Every feature still waits for all four pipelines to go green, and they share one database write path.
-
-<details>
-<summary>Check your prediction</summary>
-
-Failure layer: a distributed monolith, not independent services. Next action: stop extracting the next noun, and name the release coupling before you add a fifth repository.
-
-</details>
-
 ## Sources
 
 - [Kubernetes 1.35: Pod lifecycle and restart policy](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
-- [Amazon Builders' Library - Going faster with continuous delivery](https://aws.amazon.com/builders-library/going-faster-with-continuous-delivery/)
 - [Martin Fowler - Microservices](https://martinfowler.com/articles/microservices.html)
 - [Martin Fowler - Strangler Fig Application](https://martinfowler.com/bliki/StranglerFigApplication.html)
 - [Martin Fowler - Monolith First](https://martinfowler.com/bliki/MonolithFirst.html)
