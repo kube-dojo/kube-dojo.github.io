@@ -2,9 +2,9 @@
   "schema_version": 2,
   "module_path": "src/content/docs/prerequisites/index.md",
   "module_key": "prerequisites/index",
-  "page_sha256": "246acf2bfd82cec62c0e0e85acb86dec08997266ca6cb54b97b17d808d7f72cb",
-  "page_commit": "e6996c73b7e3f5a837f3263b3667c545660e5421",
-  "page_blob": "aed52c4a209e657bc04477e11927be658db4d857",
+  "page_sha256": "95eb742e1f9a7eb98b88285cdc7d82cced129e5f1cf10c9eb30e445c0e15883a",
+  "page_commit": "84f80f242d91a8358d13f19324ee0e63876f68c5",
+  "page_blob": "eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
   "author": {
     "identity": "gpt-6.1-sol",
     "family": "openai",
@@ -22,49 +22,7 @@
         "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
         "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
         "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857"
-      ]
-    },
-    {
-      "claim_id": "PI002",
-      "claim_text": "  order: 1",
-      "line_start": 4,
-      "line_end": 4,
-      "kind": "mixed",
-      "candidate_source_refs": [
-        "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
-        "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
-        "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
-        "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
-        "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
-        "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
-        "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
-        "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
-        "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
-        "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
-        "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
-        "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
-        "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
-        "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
-        "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md"
-      ]
-    },
-    {
-      "claim_id": "PI003",
-      "claim_text": "  label: \"Fundamentals\"",
-      "line_start": 5,
-      "line_end": 5,
-      "kind": "mixed",
-      "candidate_source_refs": [
-        "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
-        "git-object://fa9530b79bd481f9b0f8489842edca80db12e9ce",
-        "git-object://82221e55de68ccf6c3fdc917c08e9883066b0190",
-        "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0",
-        "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
-        "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
-        "git-object://aed52c4a209e657bc04477e11927be658db4d857",
-        "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md"
+        "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8"
       ]
     },
     {
@@ -876,14 +834,30 @@
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
         "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
-        "git-object://d436e089b39678df8bb761c3c94747d5195aafe5"
+        "git-object://d436e089b39678df8bb761c3c94747d5195aafe5",
+        "git-object://73ce080619daa90c81d35481f84a2768c04c8157"
+      ]
+    },
+    {
+      "claim_id": "PI088",
+      "claim_text": "Before Modern DevOps, review Kubernetes Basics for deployments, Services, and manifests.",
+      "line_start": 130,
+      "line_end": 130,
+      "kind": "internal",
+      "candidate_source_refs": [
+        "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+        "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+        "git-object://5b483551ba25ff1e2592d933506d84db33f11aa0",
+        "git-object://bd0014c67f770117fff01cd8f57fe12b338739ed",
+        "git-object://368dbdbd85b3dd2e88273a22eba6cadcc90745a4",
+        "git-object://73ce080619daa90c81d35481f84a2768c04c8157"
       ]
     },
     {
       "claim_id": "PI075",
       "claim_text": "Use [Git Deep Dive](git-deep-dive/) after you are comfortable with basic Git from [Zero to Terminal](zero-to-terminal/).",
-      "line_start": 130,
-      "line_end": 130,
+      "line_start": 132,
+      "line_end": 132,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
@@ -895,8 +869,8 @@
     {
       "claim_id": "PI076",
       "claim_text": "It is not required before Cloud Native 101 or Kubernetes Basics;",
-      "line_start": 130,
-      "line_end": 130,
+      "line_start": 132,
+      "line_end": 132,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
@@ -909,8 +883,8 @@
     {
       "claim_id": "PI077",
       "claim_text": "this curriculum recommends it before Modern DevOps and its IaC, GitOps, and CI/CD topics.",
-      "line_start": 130,
-      "line_end": 130,
+      "line_start": 132,
+      "line_end": 132,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
@@ -923,8 +897,8 @@
     {
       "claim_id": "PI078",
       "claim_text": "- [Linux](../linux/) for deeper systems knowledge",
-      "line_start": 134,
-      "line_end": 134,
+      "line_start": 136,
+      "line_end": 136,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc"
@@ -933,8 +907,8 @@
     {
       "claim_id": "PI079",
       "claim_text": "- [Kubernetes Certifications](../k8s/) for certification-oriented study",
-      "line_start": 135,
-      "line_end": 135,
+      "line_start": 137,
+      "line_end": 137,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a"
@@ -943,8 +917,8 @@
     {
       "claim_id": "PI080",
       "claim_text": "- [Cloud](../cloud/) for provider-specific cloud foundations and managed Kubernetes topics",
-      "line_start": 136,
-      "line_end": 136,
+      "line_start": 138,
+      "line_end": 138,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f"
@@ -953,8 +927,8 @@
     {
       "claim_id": "PI081",
       "claim_text": "- [On-Premises Kubernetes](../on-premises/) for running Kubernetes on your own hardware",
-      "line_start": 137,
-      "line_end": 137,
+      "line_start": 139,
+      "line_end": 139,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920"
@@ -963,8 +937,8 @@
     {
       "claim_id": "PI082",
       "claim_text": "- [AI](../ai/) for beginner-oriented AI literacy and AI working habits",
-      "line_start": 138,
-      "line_end": 138,
+      "line_start": 140,
+      "line_end": 140,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee"
@@ -973,8 +947,8 @@
     {
       "claim_id": "PI083",
       "claim_text": "- [AI/ML Engineering](../ai-ml-engineering/) for building AI systems, local models, or MLOps",
-      "line_start": 139,
-      "line_end": 139,
+      "line_start": 141,
+      "line_end": 141,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf"
@@ -983,8 +957,8 @@
     {
       "claim_id": "PI084",
       "claim_text": "Before [Platform Engineering](../platform/), build comfort with Kubernetes, Linux troubleshooting, Git collaboration, and cloud-native vocabulary.",
-      "line_start": 141,
-      "line_end": 141,
+      "line_start": 143,
+      "line_end": 143,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
@@ -996,8 +970,8 @@
     {
       "claim_id": "PI085",
       "claim_text": "Use its [entry checklist](../platform/#do-not-start-here-yet) to assess your readiness.",
-      "line_start": 141,
-      "line_end": 141,
+      "line_start": 143,
+      "line_end": 143,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://b5e29acf92289936a433660aa294a41c39df72a4"
@@ -1006,8 +980,8 @@
     {
       "claim_id": "PI086",
       "claim_text": "Check each destination's entry requirements and choose the foundations that fit your goal.",
-      "line_start": 143,
-      "line_end": 143,
+      "line_start": 145,
+      "line_end": 145,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
@@ -1024,8 +998,8 @@
     {
       "claim_id": "PI087",
       "claim_text": "The full cloud-native route is a suggestion, not a requirement to complete all 44 modules before every path, including beginner AI.",
-      "line_start": 143,
-      "line_end": 143,
+      "line_start": 145,
+      "line_end": 145,
       "kind": "internal",
       "candidate_source_refs": [
         "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
@@ -1110,70 +1084,10 @@
       "snapshot_digest": "sha256:67e705b4a1bca444afc5398afc1b95c8e990917fdf6caa65991eaa244af0b61d",
       "path": "src/content/docs/ai-ml-engineering/index.md"
     },
-    "git-object://aed52c4a209e657bc04477e11927be658db4d857": {
-      "retrieval_uri": "git-object://aed52c4a209e657bc04477e11927be658db4d857",
-      "snapshot_digest": "sha256:246acf2bfd82cec62c0e0e85acb86dec08997266ca6cb54b97b17d808d7f72cb",
+    "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8": {
+      "retrieval_uri": "git-object://eb91d9e20a72552057cd9cbe7b554e1b78e2d5c8",
+      "snapshot_digest": "sha256:95eb742e1f9a7eb98b88285cdc7d82cced129e5f1cf10c9eb30e445c0e15883a",
       "path": "src/content/docs/prerequisites/index.md"
-    },
-    "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc": {
-      "retrieval_uri": "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
-      "snapshot_digest": "sha256:af35dfe498ae28f0f036be236a01dca29ab6e37748891d146db8e20e27404f35",
-      "path": "src/content/docs/linux/index.md"
-    },
-    "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920": {
-      "retrieval_uri": "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
-      "snapshot_digest": "sha256:d116819b4ca1c35f63566dda2a39df4abafac23e46aff6d3127d04be1911d7cb",
-      "path": "src/content/docs/on-premises/index.md"
-    },
-    "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee": {
-      "retrieval_uri": "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
-      "snapshot_digest": "sha256:bf15204e193f686612360d995933e29c8bbe52cebb359861c3ee566740dbee9a",
-      "path": "src/content/docs/ai/index.md"
-    },
-    "git-object://b5e29acf92289936a433660aa294a41c39df72a4": {
-      "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
-      "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
-      "path": "src/content/docs/platform/index.md"
-    },
-    "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388": {
-      "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
-      "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
-      "path": "src/content/docs/prerequisites/zero-to-terminal/index.md"
-    },
-    "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1": {
-      "retrieval_uri": "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
-      "snapshot_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
-      "path": "src/content/docs/prerequisites/cloud-native-101/index.md"
-    },
-    "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4": {
-      "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
-      "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
-      "path": "src/content/docs/prerequisites/kubernetes-basics/index.md"
-    },
-    "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec": {
-      "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
-      "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
-      "path": "src/content/docs/prerequisites/philosophy-design/index.md"
-    },
-    "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293": {
-      "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
-      "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
-      "path": "src/content/docs/prerequisites/git-deep-dive/index.md"
-    },
-    "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a": {
-      "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
-      "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
-      "path": "src/content/docs/prerequisites/modern-devops/index.md"
-    },
-    "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md": {
-      "retrieval_uri": "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md",
-      "final_url": "https://raw.githubusercontent.com/withastro/starlight/afe57bbbc254b957b969d581d0f861925035bdcf/docs/src/content/docs/reference/frontmatter.md",
-      "retrieved_at": "2026-11-03T13:45:27.182746+00:00",
-      "content_type": "text/plain; charset=utf-8",
-      "snapshot_digest": "sha256:0571ffb3fa9c5f82a4f5389a8f762b9fde65b34586374296c788ffab18656e5d",
-      "capture_method": "scripts.fetch_citation._fetch_once",
-      "text": "---\ntitle: Frontmatter Reference\ndescription: An overview of the default frontmatter fields Starlight supports.\n---\n\nYou can customize individual Markdown and MDX pages in Starlight by setting values in their frontmatter. For example, a regular page might set `title` and `description` fields:\n\n```md {3-4}\n---\n# src/content/docs/example.md\ntitle: About this project\ndescription: Learn more about the project I’m working on.\n---\n\nWelcome to the about page!\n```\n\n## Frontmatter fields\n\n### `title` (required)\n\n**type:** `string`\n\nYou must provide a title for every page. This will be displayed at the top of the page, in browser tabs, and in page metadata.\n\n### `description`\n\n**type:** `string`\n\nThe page description is used for page metadata and will be picked up by search engines and in social media previews.\n\n### `slug`\n\n**type**: `string`\n\nOverride the slug of the page. See [“Defining custom IDs”](https://docs.astro.build/en/guides/content-collections/#defining-custom-ids) in the Astro docs for more details.\n\n### `editUrl`\n\n**type:** `string | boolean`\n\nOverrides the [global `editLink` config](/reference/configuration/#editlink). Set to `false` to disable the “Edit page” link for a specific page or provide an alternative URL where the content of this page is editable.\n\n### `head`\n\n**type:** [`HeadConfig[]`](/reference/configuration/#headconfig)\n\nYou can add additional tags to your page’s `<head>` using the `head` frontmatter field. This means you can add custom styles, metadata or other tags to a single page. Similar to the [global `head` option](/reference/configuration/#head).\n\n```md\n---\n# src/content/docs/example.md\ntitle: About us\nhead:\n  # Use a custom <title> tag\n  - tag: title\n    content: Custom about title\n---\n```\n\n### `tableOfContents`\n\n**type:** `false | { minHeadingLevel?: number; maxHeadingLevel?: number; }`\n\nOverrides the [global `tableOfContents` config](/reference/configuration/#tableofcontents).\nCustomize the heading levels to be included or set to `false` to hide the table of contents on this page.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with only H2s in the table of contents\ntableOfContents:\n  minHeadingLevel: 2\n  maxHeadingLevel: 2\n---\n```\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with no table of contents\ntableOfContents: false\n---\n```\n\n### `template`\n\n**type:** `'doc' | 'splash'`  \n**default:** `'doc'`\n\nSet the layout template for this page.\nPages use the `'doc'` layout by default.\nSet to `'splash'` to use a wider layout without any sidebars designed for landing pages.\n\n### `hero`\n\n**type:** [`HeroConfig`](#heroconfig)\n\nAdd a hero component to the top of this page. Works well with `template: splash`.\n\nFor example, this config shows some common options, including loading an image from your repository.\n\n```md\n---\n# src/content/docs/example.md\ntitle: My Home Page\ntemplate: splash\nhero:\n  title: 'My Project: Stellar Stuff Sooner'\n  tagline: Take your stuff to the moon and back in the blink of an eye.\n  image:\n    alt: A glittering, brightly colored logo\n    file: ~/assets/logo.png\n  actions:\n    - text: Tell me more\n      link: /getting-started/\n      icon: right-arrow\n    - text: View on GitHub\n      link: https://github.com/astronaut/my-project\n      icon: external\n      variant: minimal\n      attrs:\n        rel: me\n---\n```\n\nYou can display different versions of the hero image in light and dark modes.\n\n```md\n---\n# src/content/docs/example.md\nhero:\n  image:\n    alt: A glittering, brightly colored logo\n    dark: ~/assets/logo-dark.png\n    light: ~/assets/logo-light.png\n---\n```\n\n#### `HeroConfig`\n\n```ts\ninterface HeroConfig {\n  title?: string;\n  tagline?: string;\n  image?:\n    | {\n        // Relative path to an image in your repository.\n        file: string;\n        // Alt text to make the image accessible to assistive technology\n        alt?: string;\n      }\n    | {\n        // Relative path to an image in your repository to be used for dark mode.\n        dark: string;\n        // Relative path to an image in your repository to be used for light mode.\n        light: string;\n        // Alt text to make the image accessible to assistive technology\n        alt?: string;\n      }\n    | {\n        // Raw HTML to use in the image slot.\n        // Could be a custom `<img>` tag or inline `<svg>`.\n        html: string;\n      };\n  actions?: Array<{\n    text: string;\n    link: string;\n    variant?: 'primary' | 'secondary' | 'minimal';\n    icon?: string;\n    attrs?: Record<string, string | number | boolean>;\n  }>;\n}\n```\n\n### `banner`\n\n**type:** `{ content: string }`\n\nDisplays an announcement banner at the top of this page.\n\nThe `content` value can include HTML for links or other content.\nFor example, this page displays a banner including a link to `example.com`.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a banner\nbanner:\n  content: |\n    We just launched something cool!\n    <a href=\"https://example.com\">Check it out</a>\n---\n```\n\n### `lastUpdated`\n\n**type:** `Date | boolean`\n\nOverrides the [global `lastUpdated` option](/reference/configuration/#lastupdated). If a date is specified, it must be a valid [YAML timestamp](https://yaml.org/type/timestamp.html) and will override the date stored in Git history for this page.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a custom last update date\nlastUpdated: 2022-08-09\n---\n```\n\n### `prev`\n\n**type:** `boolean | string | { link?: string; label?: string }`\n\nOverrides the [global `pagination` option](/reference/configuration/#pagination). If a string is specified, the generated link text will be replaced and if an object is specified, both the link and the text will be overridden.\n\n```md\n---\n# src/content/docs/example.md\n# Hide the previous page link\nprev: false\n---\n```\n\n```md\n---\n# src/content/docs/example.md\n# Override the previous page link text\nprev: Continue the tutorial\n---\n```\n\n```md\n---\n# src/content/docs/example.md\n# Override both the previous page link and text\nprev:\n  link: /unrelated-page/\n  label: Check out this other page\n---\n```\n\n### `next`\n\n**type:** `boolean | string | { link?: string; label?: string }`\n\nSame as [`prev`](#prev) but for the next page link.\n\n```md\n---\n# src/content/docs/example.md\n# Hide the next page link\nnext: false\n---\n```\n\n### `pagefind`\n\n**type:** `boolean`  \n**default:** `true`\n\nSet whether this page should be included in the [Pagefind](https://pagefind.app/) search index. Set to `false` to exclude a page from search results:\n\n```md\n---\n# src/content/docs/example.md\n# Hide this page from the search index\npagefind: false\n---\n```\n\n### `draft`\n\n**type:** `boolean`  \n**default:** `false`\n\nSet whether this page should be considered a draft and not be included in [production builds](https://docs.astro.build/en/reference/cli-reference/#astro-build). Set to `true` to mark a page as a draft and make it only visible during development.\n\n```md\n---\n# src/content/docs/example.md\n# Exclude this page from production builds\ndraft: true\n---\n```\n\nBecause draft pages are not included in build output, you cannot add draft pages directly to your site sidebar config using [slugs](/guides/sidebar/#internal-links).\nDraft pages in directories used for [autogenerated sidebar links](/guides/sidebar/#autogenerated-links) are automatically excluded in production builds.\n\n### `sidebar`\n\n**type:** [`SidebarConfig`](#sidebarconfig)\n\nControl how this page is displayed in the [sidebar](/reference/configuration/#sidebar), when using an autogenerated link group.\n\n#### `SidebarConfig`\n\n```ts\ninterface SidebarConfig {\n  label?: string;\n  order?: number;\n  hidden?: boolean;\n  badge?: string | BadgeConfig;\n  attrs?: Record<string, string | number | boolean | undefined>;\n}\n```\n\n#### `label`\n\n**type:** `string`  \n**default:** the page [`title`](#title-required)\n\nSet the label for this page in the sidebar when displayed in an autogenerated group of links.\n\n```md\n---\n# src/content/docs/example.md\ntitle: About this project\nsidebar:\n  label: About\n---\n```\n\n#### `order`\n\n**type:** `number`\n\nControl the order of this page when sorting an autogenerated group of links.\nLower numbers are displayed higher up in the link group.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page to display first\nsidebar:\n  order: 1\n---\n```\n\n#### `hidden`\n\n**type:** `boolean`  \n**default:** `false`\n\nPrevents this page from being included in an autogenerated sidebar group.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page to hide from autogenerated sidebar\nsidebar:\n  hidden: true\n---\n```\n\n#### `badge`\n\n**type:** <code>string | <a href=\"/reference/configuration/#badgeconfig\">BadgeConfig</a></code>\n\nAdd a badge to the page in the sidebar when displayed in an autogenerated group of links.\nWhen using a string, the badge will be displayed with a default accent color.\nOptionally, pass a [`BadgeConfig` object](/reference/configuration/#badgeconfig) with `text`, `variant`, and `class` fields to customize the badge.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a badge\nsidebar:\n  # Uses the default variant matching your site’s accent color\n  badge: New\n---\n```\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page with a badge\nsidebar:\n  badge:\n    text: Experimental\n    variant: caution\n---\n```\n\n#### `attrs`\n\n**type:** `Record<string, string | number | boolean | undefined>`\n\nHTML attributes to add to the page link in the sidebar when displayed in an autogenerated group of links.\nIf [`autogenerate.attrs`](/guides/sidebar/#custom-html-attributes-for-autogenerated-links) is set on the autogenerated group this page belongs to, frontmatter attributes will be merged with the group attributes.\n\n```md\n---\n# src/content/docs/example.md\ntitle: Page opening in a new tab\nsidebar:\n  # Opens the page in a new tab\n  attrs:\n    target: _blank\n---\n```\n\n## Customize frontmatter schema\n\nThe frontmatter schema for Starlight’s `docs` content collection is configured in `src/content.config.ts` using the `docsSchema()` helper:\n\n```ts {4,7}\n// src/content.config.ts\nimport { defineCollection } from 'astro:content';\nimport { docsLoader, i18nLoader } from '@astrojs/starlight/loaders';\nimport { docsSchema } from '@astrojs/starlight/schema';\n\nexport const collections = {\n  docs: defineCollection({ loader: docsLoader(), schema: docsSchema() }),\n};\n```\n\nLearn more about content collection schemas in [“Defining a collection schema”](https://docs.astro.build/en/guides/content-collections/#defining-the-collection-schema) in the Astro docs.\n\n`docsSchema()` takes the following options:\n\n### `extend`\n\n**type:** Zod schema or function that returns a Zod schema  \n**default:** `z.object({})`\n\nExtend Starlight’s schema with additional fields by setting `extend` in the `docsSchema()` options.\nThe value should be a [Zod schema](https://docs.astro.build/en/guides/content-collections/#defining-datatypes-with-zod).\n\nIn the following example, we provide a stricter type for `description` to make it required and add a new optional `category` field:\n\n```ts {11-16}\n// src/content.config.ts\nimport { defineCollection } from 'astro:content';\nimport { z } from 'astro/zod';\nimport { docsLoader } from '@astrojs/starlight/loaders';\nimport { docsSchema } from '@astrojs/starlight/schema';\n\nexport const collections = {\n  docs: defineCollection({\n    loader: docsLoader(),\n    schema: docsSchema({\n      extend: z.object({\n        // Make a built-in field required instead of optional.\n        description: z.string(),\n        // Add a new field to the schema.\n        category: z.enum(['tutorial', 'guide', 'reference']).optional(),\n      }),\n    }),\n  }),\n};\n```\n\nTo take advantage of the [Astro `image()` helper](https://docs.astro.build/en/guides/images/#images-in-content-collections), use a function that returns your schema extension:\n\n```ts {11-16}\n// src/content.config.ts\nimport { defineCollection } from 'astro:content';\nimport { z } from 'astro/zod';\nimport { docsLoader } from '@astrojs/starlight/loaders';\nimport { docsSchema } from '@astrojs/starlight/schema';\n\nexport const collections = {\n  docs: defineCollection({\n    loader: docsLoader(),\n    schema: docsSchema({\n      extend: ({ image }) => {\n        return z.object({\n          // Add a field that must resolve to a local image.\n          cover: image(),\n        });\n      },\n    }),\n  }),\n};\n```\n",
-      "text_extraction": "full-v1"
     },
     "git-object://fa9530b79bd481f9b0f8489842edca80db12e9ce": {
       "retrieval_uri": "git-object://fa9530b79bd481f9b0f8489842edca80db12e9ce",
@@ -1189,6 +1103,41 @@
       "retrieval_uri": "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0",
       "snapshot_digest": "sha256:2c9ed8bb8d87817540187e5941e6ece158c47b031022b7847de643d7b5fad6eb",
       "path": "src/i18n/homepage.ts"
+    },
+    "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388": {
+      "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+      "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+      "path": "src/content/docs/prerequisites/zero-to-terminal/index.md"
+    },
+    "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4": {
+      "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+      "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+      "path": "src/content/docs/prerequisites/kubernetes-basics/index.md"
+    },
+    "git-object://b5e29acf92289936a433660aa294a41c39df72a4": {
+      "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
+      "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
+      "path": "src/content/docs/platform/index.md"
+    },
+    "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1": {
+      "retrieval_uri": "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
+      "snapshot_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+      "path": "src/content/docs/prerequisites/cloud-native-101/index.md"
+    },
+    "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec": {
+      "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
+      "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
+      "path": "src/content/docs/prerequisites/philosophy-design/index.md"
+    },
+    "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293": {
+      "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+      "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+      "path": "src/content/docs/prerequisites/git-deep-dive/index.md"
+    },
+    "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a": {
+      "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+      "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+      "path": "src/content/docs/prerequisites/modern-devops/index.md"
     },
     "git-object://cfc79c2366ddc0ce873295e2ec6597e60d739cda": {
       "retrieval_uri": "git-object://cfc79c2366ddc0ce873295e2ec6597e60d739cda",
@@ -1249,6 +1198,21 @@
       "retrieval_uri": "git-object://9b43496599781abb69ba1b20d89cb1ccd0569c5e",
       "snapshot_digest": "sha256:28cb8847916f65f32f58ba4a47148258bcd917306803ad395349e226460c884a",
       "path": "src/content/docs/prerequisites/zero-to-terminal/module-0.9-software-and-packages.md"
+    },
+    "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc": {
+      "retrieval_uri": "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
+      "snapshot_digest": "sha256:af35dfe498ae28f0f036be236a01dca29ab6e37748891d146db8e20e27404f35",
+      "path": "src/content/docs/linux/index.md"
+    },
+    "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920": {
+      "retrieval_uri": "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
+      "snapshot_digest": "sha256:d116819b4ca1c35f63566dda2a39df4abafac23e46aff6d3127d04be1911d7cb",
+      "path": "src/content/docs/on-premises/index.md"
+    },
+    "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee": {
+      "retrieval_uri": "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
+      "snapshot_digest": "sha256:bf15204e193f686612360d995933e29c8bbe52cebb359861c3ee566740dbee9a",
+      "path": "src/content/docs/ai/index.md"
     },
     "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d": {
       "retrieval_uri": "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
