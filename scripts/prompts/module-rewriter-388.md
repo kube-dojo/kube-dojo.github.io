@@ -88,7 +88,7 @@ For practice-question / mock-exam modules, preserve exam-style MCQ structure. Ea
 The verifier (`scripts/quality/verify_module.py`, `gate_results`) computes these **blocking gate keys**. Its output, not this summary, decides whether each one passed. Several gates are narrow heuristics, so a pass does not show that this brief's rules were followed, and a rule in this brief binds even where its gate would not fire. All gates must pass before commit:
 
 1. `gate_no_source_h1`: see NO SOURCE H1 above.
-2. `structure_sections_present`, `structure_order_correct`: section presence and order checks. The verifier's own heading list decides them, so read its output for these two; `module-writer.md` is the authoring rule.
+2. `structure_sections_present`, `structure_order_correct`: section presence and order. Read the verifier's output for these two; `module-writer.md` is the authoring rule.
 3. `structure_quiz_answers_have_details`: every quiz item carries a `<details>` answer block. The verifier checks presence only; the answer must still explain why, not just name the fix.
 4. `sources_all_reachable`: no link under the Sources heading is a 404 or fetch failure (not computed under `--skip-source-check`; a page with no links passes this gate).
 5. `anti_leak`: leaked tokens, emojis and the number 47.
