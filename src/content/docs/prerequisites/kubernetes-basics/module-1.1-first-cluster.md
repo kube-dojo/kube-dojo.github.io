@@ -668,7 +668,7 @@ lesson_delete primary-dojo
 lesson_delete legacy-dojo
 ```
 
-Expected outcome: `kind-primary-dojo` reports server v1.35.8 and `kind-legacy-dojo` reports server v1.34.11.
+Expected outcome: both contexts report client v1.35.x; `kind-primary-dojo` reports server v1.35.8 and `kind-legacy-dojo` reports server v1.34.11.
 </details>
 
 <details>
@@ -725,10 +725,6 @@ kubectl get nodes
 
 The connection will either hang until timeout or immediately fail with a TCP connection refused error. This demonstrates that without the API server container operating, the cluster interface is unavailable. You cannot read state through Kubernetes, nor can you alter it, even if some previous workload process might have existed before the control plane disappeared.
 
-```bash
-# Remove the failure-lab cluster when you are done observing
-lesson_delete broken-dojo
-```
 </details>
 
 Before cleanup, reflect: which signals would distinguish a stopped node container from a wrong context or a wrong port?
@@ -738,6 +734,11 @@ Before cleanup, reflect: which signals would distinguish a stopped node containe
 
 `docker ps -a` shows an exited node container. `kubectl config current-context` shows a wrong context. A wrong port appears when `docker port broken-dojo-control-plane` differs from the server address in `kubectl cluster-info`.
 </details>
+
+```bash
+# Remove the failure-lab cluster when you are done observing
+lesson_delete broken-dojo
+```
 
 ### Success Criteria
 
