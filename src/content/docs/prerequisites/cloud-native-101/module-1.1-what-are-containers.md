@@ -9,7 +9,7 @@ sidebar:
 >
 > **Time to Complete**: 80–110 minutes (long-form read + hands-on exercise)
 >
-> **Prerequisites**: none beyond a terminal for the optional Docker lab and curiosity about why deployment environments drift.
+> **Prerequisites**: no prior container knowledge. The optional lab needs Docker and a Bash-compatible terminal.
 
 ---
 
@@ -29,7 +29,7 @@ Hypothetical scenario: a small Node.js service passes every test on developer la
 
 That failure is the reason containers matter before Kubernetes matters. Kubernetes is an orchestrator, which means it schedules, restarts, connects, and scales running containers, but it does not magically make a vague application package precise. If a team cannot explain what is inside a container image, what is borrowed from the host kernel, what disappears when a container is replaced, and what must be pinned for repeatability, Kubernetes turns those misunderstandings into faster-moving production incidents.
 
-This module builds the mental model you will use throughout the cloud native track. You will treat a container as an isolated Linux process with a packaged filesystem, not as a tiny virtual machine or a persistent server. That distinction seems simple, but it explains why containers start quickly, why the same image can run on a laptop and in a cluster, why memory limits matter, why `latest` tags cause surprises, and why storage must be designed deliberately. Later Kubernetes examples assume version 1.35 or newer, and runnable command blocks in this curriculum use the full `kubectl` command name so examples remain copy-pasteable in scripts and non-interactive shells.
+This module builds the mental model you will use throughout the cloud native track. You will treat a container as an isolated Linux process with a packaged filesystem, not as a tiny virtual machine or a persistent server. That distinction explains why memory limits matter, why `latest` tags cause surprises, and why storage must be designed deliberately.
 
 ## The Problem Containers Solve: Environment Drift
 
@@ -59,8 +59,7 @@ Virtual machines solved a larger slice of the problem by packaging an entire gue
 ```text
 Ship the entire operating system:
 - Works consistently
-- But 10GB+ per application
-- Minutes to start
+- Image size and startup time vary by workload
 - Heavy resource usage
 - Hard to manage at scale
 ```
@@ -90,13 +89,7 @@ The host does not suddenly become cleaner. The service carries the needed user-s
 
 </details>
 
-Name the boundary before you read on. The next paragraphs describe how teams use that package. They do not repeat this library case.
-
 This contract is especially useful for teams that deploy many small services. A platform team cannot safely hand-tune every server for every application version, and an application team cannot debug every production host by memory. Containers make the application artifact more complete, which lets automation do repeatable work. A scheduler can pull an image, start a process, enforce limits, restart a failed instance, and repeat the same action across hundreds of machines without reinterpreting a setup guide.
-
-Another way to say this is that containers move deployment knowledge from a human checklist into a machine-readable artifact. The difference is not merely convenience. A checklist can be skipped, interpreted differently, or applied to a server that already has old packages installed. An image records the filesystem and startup metadata that the runtime will use, so the deployment system has a concrete object to fetch, verify, cache, and run.
-
-That machine-readable artifact also changes how teams investigate failures. Instead of asking whether the staging host had the same Python patch level as production, the team can ask which image digest was running in each environment. Instead of comparing manual setup histories, they compare artifacts and runtime settings. This does not make all failures easy, but it removes a whole class of guesswork from the first hour of incident response.
 
 ## Containers vs. Virtual Machines
 
@@ -130,8 +123,8 @@ The diagram shows why startup time and density differ. A VM boots a guest OS bef
 
 | Aspect | Virtual Machine | Container |
 |--------|-----------------|-----------|
-| Size | Gigabytes | Megabytes |
-| Startup | Minutes | Seconds |
+| Size | Often gigabytes | Often megabytes; varies by image |
+| Startup | Often slower; boots a guest OS | Often faster; starts a process |
 | OS | Full guest OS per VM | Shared host kernel |
 | Isolation | Hardware virtualization | Process isolation |
 | Portability | VM image formats vary | Often portable across hosts with the same OS kernel family and CPU architecture |
@@ -181,8 +174,6 @@ Only one process can bind that port on the shared host network stack. The failur
 
 </details>
 
-Hold that prediction before the cgroup section. Resource limits are a different layer from the port you just considered.
-
 Resource limits come from control groups, usually called cgroups. Namespaces decide what a process can see. Cgroups decide how much CPU, memory, and other resources the process group can consume. This matters because isolation without limits is only a partial defense. A runaway memory leak in one application should not be allowed to starve the database, the node agent, or unrelated containers on the same host.
 
 ```mermaid
@@ -195,7 +186,7 @@ flowchart LR
     style Host fill:#f9f,stroke:#333,stroke-width:2px,color:#111
 ```
 
-Cgroups also explain why Kubernetes resource requests and limits are more than scheduling decoration. A memory limit becomes an enforcement boundary, and a container that exceeds it can be killed rather than taking down the node. A CPU limit affects scheduling and throttling behavior. The exact mechanics differ by runtime and cgroup version, but the operational lesson is stable: a container is not inherently polite. You must give the platform enough information to protect neighboring workloads.
+Cgroups also help enforce Kubernetes resource limits. A resource request is the amount a workload asks for when the scheduler chooses a node; a CPU limit is enforced by throttling. If no request or admission default is set, Kubernetes copies the limit into the request. A container exceeding its memory limit may be killed under memory pressure. Set resource boundaries to help protect neighboring workloads.
 
 The third major idea is the layered filesystem. A container image is built from layers, and each layer records filesystem changes from a build step. Layers can be cached, shared, downloaded once, and reused by many images. When a container starts, the runtime gives it a writable layer on top of the read-only image layers. That writable layer belongs to the container instance, not to the image blueprint.
 
@@ -272,6 +263,8 @@ docker pull us-docker.pkg.dev/my-project/my-repo/my-app:latest
 
 Image references carry a specific structure. The registry portion is optional because Docker Hub is the default in many tools. A namespace or organization may be present. The repository identifies the image name, and the tag identifies a named version or channel. The danger is that tags are not guaranteed to be immutable unless your registry policy enforces it. A tag is a pointer, and pointers can move.
 
+Google shut down Container Registry on March 18, 2025; Artifact Registry can host `gcr.io` repositories.
+
 ```text
 [registry/][namespace/]repository[:tag]
 
@@ -280,7 +273,7 @@ nginx                           # Docker Hub, library/nginx:latest
 nginx:1.31.1                    # Docker Hub, specific version
 mycompany/myapp:v1.0.0         # Docker Hub, custom namespace
 us-docker.pkg.dev/my-project/my-repo/my-app:latest  # Google Artifact Registry
-gcr.io/myproject/myapp:latest  # Legacy Google Container Registry (read-only; migrated to Artifact Registry)
+gcr.io/myproject/myapp:latest  # gcr.io repository hosted on Artifact Registry
 ghcr.io/username/app:sha-abc123 # GitHub Container Registry
 ```
 
@@ -289,18 +282,24 @@ Production deployments should avoid mutable tags like `latest` because they hide
 ```text
 nginx:latest     # Whatever is newest (unpredictable!)
 nginx:1.31       # Specific version line (better)
-nginx:1.31.1     # Exact patch version (best for production)
+nginx:1.31.1     # Patch version tag (better; a digest is stronger)
 
 Rule: Never use :latest in production
 ```
+
+**Practice:** Compare `nginx:latest`, `nginx:1.31.1`, and a reference pinned by digest. Which is easiest to repeat if a tag moves?
+
+<details>
+<summary>Answer</summary>
+
+The digest identifies the content. Both tags can move unless the registry enforces immutability; `latest` also leaves the version unclear.
+</details>
 
 Hypothetical scenario: a team runs `postgres:latest` for months because the first demo worked and nobody revisits the image reference. The container starts cleanly after each routine restart until a host reboot pulls a newer major image with incompatible expectations for the data directory. The database refuses to start, recovery requires downgrading and careful data handling, and the team loses most of a night to a deployment choice that had looked harmless. Pinning tags is not bureaucracy; it is how you make time behave when automation repeats a deployment after humans have stopped watching the registry.
 
 Before running this in your own environment, what output would you expect if you pulled `nginx:1.31.1` twice in a row? The second pull should reuse layers already present locally unless the registry metadata has changed. That small observation previews a major operational benefit: layered images make repeated deployments cheaper because unchanged content does not need to move again.
 
-Image naming also becomes a supply-chain control. A registry path can tell you who owns the artifact, a tag can tell you the intended release channel, and a digest can tell you the exact content. Mature teams use all three pieces deliberately. They avoid ambiguous image names, restrict who can push production repositories, scan images before promotion, and record the image reference used in each deployment so an incident can be traced to a precise artifact.
-
-There is a social benefit too. When application teams and platform teams argue about a deployment, an image reference gives them a shared object to inspect. The application team can reproduce the artifact locally, while the platform team can inspect pull events, runtime settings, and node placement. Without that shared object, conversations drift back toward assumptions about which branch, package cache, or server setup was involved. Containers are not just technology; they are a coordination tool.
+A registry path can identify an artifact's owner, while its digest identifies its content.
 
 ## The Shipping-Container Analogy and Ephemeral State
 
@@ -342,11 +341,20 @@ No, unless you deliberately wrote it to external storage or a mounted volume. Th
 
 </details>
 
-Write the prediction down before you read the replacement rule below. The following paragraphs assume you have already decided what happens to a file that exists only inside the removed container.
-
 This is where the container mental model becomes operational rather than philosophical. Stateless processes are easy to replace because their important state lives elsewhere, such as in a database, queue, object store, or mounted volume. Stateful systems can run in containers, but they need explicit storage design, backup strategy, and careful lifecycle management. Kubernetes does not change that law; it gives you primitives such as volumes and StatefulSets, which still require correct design.
 
 A practical engineering habit is to ask, "What must survive replacement?" before choosing where data goes. Application binaries, libraries, and default configuration belong in the image. Temporary cache files may belong in the container filesystem if they can be rebuilt. User uploads, database files, message queues, and audit logs need external persistence. Once you sort data by replacement tolerance, the container lifecycle becomes much less mysterious.
+
+A Docker volume is storage managed by Docker outside the container's writable layer. A named volume can be mounted into a replacement container. A bind mount instead connects a file or directory on the host to the container. Neither choice replaces a backup and recovery plan. The next module covers the commands.
+
+For an example service, plan storage like this:
+
+| Data | Location | Reason |
+|---|---|---|
+| Application binaries | Image | Shipped with the application |
+| Rebuildable cache | Writable layer | Losing it on replacement is acceptable |
+| User uploads | Volume or external store | Must survive replacement |
+| Database file | Persistent storage with backups | Must survive replacement and be recoverable |
 
 Designing persistence is not the same as refusing containers for stateful workloads. Databases and queues can run in containers when their storage, identity, backup, and recovery rules are designed carefully. The beginner mistake is running stateful software as if the container's writable layer were a durable disk. The professional approach is to separate the process package from the data lifecycle, then decide which platform primitives are responsible for each part.
 
@@ -357,16 +365,6 @@ This separation also helps during local development. A developer may destroy and
 Good container practice begins with treating images as immutable release artifacts. Build an image once in CI, scan it, tag it clearly, and promote that same artifact across environments. Do not rebuild "the same version" separately for dev, staging, and production because those builds may capture different base images or dependency versions. Promotion should move a known artifact forward, not recreate it and hope it matches.
 
 A second pattern is keeping containers focused on one primary process. This does not mean a container can never have helper processes, but it should have one clear responsibility, one lifecycle, and one health model. When a container behaves like a small general-purpose server with several unrelated daemons, restart behavior becomes confusing. A clean container should be easy to start, stop, observe, and replace.
-
-A third pattern is making state explicit. If data matters, put it in a volume, managed database, object store, or another durable system with a recovery plan. If data does not matter, allow it to disappear and document that expectation. Ambiguity is the risky middle ground, because engineers may assume a file is durable simply because it was visible during a shell session inside a running container.
-
-The common anti-pattern is treating containers like VMs. Teams SSH or exec into a running container, install packages by hand, edit configuration files, and then feel surprised when replacement erases the changes. That habit is understandable because many engineers learned operations on long-lived servers. In container operations, the better response is to modify the image build or deployment configuration, then roll out a new container instance.
-
-Another anti-pattern is trusting defaults as if they were production policy. Default tags, root users, unbounded resources, broad filesystem write access, and missing health checks may all work during a demo. Production turns those defaults into risk because the container is now part of a larger scheduling and failure-recovery system. Defaults are starting points for learning, not proof that a workload is ready.
-
-The final anti-pattern is pretending containers remove the need to understand Linux. Containers hide many details, but the failure modes still come from processes, filesystems, networking, permissions, and kernel resource enforcement. When a container cannot bind a port, cannot write a file, gets killed for memory, or cannot resolve a name, the diagnosis is often a Linux diagnosis through a container lens.
-
-Patterns also become more important as teams move from Docker on one laptop to Kubernetes across many nodes. A weak local habit can become a fleet-wide incident when automation repeats it quickly. Mutable tags, missing limits, root containers, and hidden writable state may all seem harmless in one manual test. In a scheduler, those choices are multiplied across rollouts, restarts, and scale events, so the cost of ambiguity rises sharply.
 
 ## When You'd Use This vs Alternatives
 
@@ -382,14 +380,11 @@ The decision is rarely permanent. A team may start by putting a legacy applicati
 
 When you apply this framework in a real design review, listen for hidden lifecycle words. "Install," "patch," "tune," and "log in to fix" often describe server thinking, while "build," "promote," "replace," and "roll back" describe artifact thinking. Neither vocabulary is morally superior, but mixing them without noticing creates confusion. If the team says it wants containers yet also expects manual changes inside running instances, pause the design and clarify which parts belong in the image, which parts belong in configuration, and which parts belong in persistent services. That conversation is cheaper before the first deployment than during an incident.
 
-The same vocabulary check helps during reviews of learning labs. A command that creates a disposable process should be safe to repeat, while a command that creates durable data should name where that data lives. Beginners build confidence faster when the exercise makes that boundary visible instead of hiding it behind successful output.
-
 ## Did You Know?
 
 - **Containers are older than Docker.** The ideas trace back through Unix chroot, BSD jails, and Linux container features, which Docker made approachable for everyday use in 2013.
 - **Alpine Linux is tiny by design.** A minimal Alpine base image is commonly only a few megabytes, while a general Ubuntu base is much larger and a full VM image can be measured in gigabytes.
 - **Container images are intended to be immutable release artifacts.** Once an image is built and identified by digest, changing behavior should mean building a new image rather than editing a running container by hand.
-- **The Docker whale is named Moby Dock.** The mascot works because the metaphor connects software containers to standardized shipping containers carried across different transport systems.
 
 ## Common Mistakes
 
@@ -451,7 +446,13 @@ The `latest` tag probably moved to a different image between Tuesday and Thursda
 
 This lab proves that a container is an isolated process, not a magical separate machine. You will start a long-running Alpine container, inspect its process view from inside, compare that with the host view, and then destroy data written only to the container filesystem. The exercise is intentionally small because the goal is not Docker fluency yet. The goal is to make the core mental model visible.
 
-Requirements: use a Bash-compatible terminal (WSL or the lab shell on Windows) and Docker in an authorized local context. Keep the same shell and context throughout. Each ID assignment captures your successful creation result and clears it on failure; never populate it with an existing container's ID. Set `isolation_name` below to an unused name once, keeping it for the replacement. A collision means stop, not remove or adopt an existing container. On Desktop, the host-process comparison concerns its Linux VM rather than the native host.
+Before starting:
+
+- Use a Bash-compatible terminal (WSL or the lab shell on Windows) on a machine you are authorized to use.
+- [Install Docker](https://docs.docker.com/get-docker/) and check that `docker version` works with your local Docker context. Keep the same shell and context throughout.
+- Check `docker ps -a` for the name `isolation-test`. If it is in use, choose a different unused name below; do not remove or use someone else's container.
+
+The lab stores the ID of each newly created container so cleanup targets only that container. Never fill the ID variable with an existing container's ID. Docker Desktop runs the Linux container in a VM, so its native host process view differs.
 
 **Task 1: Start a long-running container process.** Run a simple Alpine container that sleeps for an hour. The `-d` flag starts it in the background so your terminal returns immediately while the process keeps running.
 
@@ -493,7 +494,7 @@ ps aux | grep "sleep 3600"
 <details>
 <summary>Solution notes for Task 3</summary>
 
-On native Linux, the process should exist on the host with a normal host PID rather than PID 1. On Docker Desktop, you may not see it from the macOS or Windows host because the compatible Linux kernel is inside Docker's managed VM. In either case, the result supports the same lesson: containers require a Linux process environment, and the apparent machine boundary is built from isolation features.
+The output includes the `grep` command itself; do not mistake that line for `sleep`. On native Linux, find the separate `sleep 3600` line and read its PID in the second column, rather than the in-container PID 1. Other unrelated sleep processes may also appear. On Docker Desktop, the container's process may not appear on the macOS or Windows host because the Linux kernel is inside Docker's managed VM.
 </details>
 
 **Task 4: Prove ephemerality by losing disposable data.** Create a file inside the running container, verify it exists, then remove and recreate the container with the same name. You are deliberately writing to the container's own filesystem, not to a mounted volume.
@@ -508,7 +509,7 @@ Verify it exists before removing the container so you can separate successful fi
 test -n "$isolation_id" && docker exec "$isolation_id" cat /secret.txt
 ```
 
-Now stop and remove the container, then start a new one with the exact same name so the replacement boundary is impossible to miss.
+Now stop and remove the container, then start a new one with the exact same name so the replacement boundary is impossible to miss. Stopping may take the default grace period of 10 seconds for a Linux container.
 
 ```bash
 if test -n "$isolation_id" && docker stop "$isolation_id" && docker rm "$isolation_id"; then
@@ -540,49 +541,67 @@ test -n "$isolation_id" && docker stop "$isolation_id" && docker rm "$isolation_
 Cleanup targets only the recorded container from this run and clears its ID afterward. Stop if any step fails. Forced removal is unnecessary here: it can kill a running process, so it is not a general safe response to a familiar name. The lesson is deliberate creation, inspection, and removal of known disposable state.
 </details>
 
+**Task 6: Plan persistence.** List three data items from a service you know and say where each lives and why. For practice, use an app with code, a rebuildable cache, and user uploads if you cannot think of a service.
+
+<details>
+<summary>Hint 1</summary>
+
+Which items must survive container replacement?
+</details>
+
+<details>
+<summary>Hint 2</summary>
+
+Compare the image, writable layer, and storage outside the container in the table above.
+</details>
+
+<details>
+<summary>Example answer</summary>
+
+Put code in the image, the rebuildable cache in the writable layer, and uploads in a volume or external store with a backup plan. The uploads must survive replacement; the cache can be rebuilt.
+</details>
+
 ### Success Criteria
 
 - [ ] You verified that the container process believes it is PID 1 because of namespace isolation.
 - [ ] You located the same process from the host or explained why Docker Desktop hides it inside a Linux VM.
 - [ ] You removed a container and observed that data written only inside it disappeared.
 - [ ] You can explain the difference between an image, a container, and a writable container layer.
-- [ ] You designed a simple persistence plan for data that must avoid losing state when a container is replaced.
+- [ ] You listed three data items and chose where each lives, including storage for data that must survive replacement.
 
-- [ ] I named a failure layer and a next action for each frozen container-layer card before opening the reveal.
-
-A missing import, a bind error, a vanished file, and an empty process list can each look like the runtime is broken. These cards freeze four transcripts so you can name the layer before you look.
+A missing import, a bind error, a vanished file, and a missing process can each look like the runtime is broken. For each case, name the failure layer and a next action before opening the answer.
 
 **Card A: Import fails only in production.** The image starts. Python cannot import a native module. That module is installed on the developer laptop. It is not installed on the production host. The Dockerfile never mentioned it.
 
 <details>
-<summary>Check your prediction</summary>
+<summary>Answer</summary>
 
 Failure layer: the image does not carry the user-space dependency. Next action: add the library to the image build, then run the import in a container that does not have the laptop's packages.
 
 </details>
 
-**Card B: Two of three servers cannot bind.** Three containers request port 8080. Two exit with "address already in use". PID, mount, and user namespaces still look separate.
+**Card B: Two of three servers cannot bind.** Three containers share the host network and each tries to listen on port 8080. Two exit with "address already in use". PID, mount, and user namespaces still look separate.
 
 <details>
-<summary>Check your prediction</summary>
+<summary>Answer</summary>
 
-Failure layer: network namespace, not the application port choice. Next action: confirm each container has its own `NET` namespace before you change the listen port.
+Failure layer: the shared network namespace. Next action: check the network configuration and give the containers separate network namespaces if appropriate. Publishing multiple containers to the same host port is a separate possible collision.
 
 </details>
 
 **Card C: The upload is gone after replace.** A profile picture was written to `/data/photo.jpg` inside the container. No volume was mounted. After `docker rm` and a new container with the same name, the file is not there.
 
 <details>
-<summary>Check your prediction</summary>
+<summary>Answer</summary>
 
 Failure layer: writable container layer, not the image. Next action: put the upload on a volume or an external store, then replace the container again and read the file from that store.
 
 </details>
 
-**Card D: The Mac shows no sleep process.** Task 3 is `ps aux | grep "sleep 3600"` on Docker Desktop. The Mac prints nothing. `docker ps` still lists `isolation-test`.
+**Card D: The Mac shows no container sleep process.** Task 3 on Docker Desktop shows the `grep` line but no separate `sleep 3600` process. `docker ps` still lists `isolation-test`.
 
 <details>
-<summary>Check your prediction</summary>
+<summary>Answer</summary>
 
 Failure layer: you are looking at the desktop OS, not the Linux kernel the container shares. Next action: treat the missing host PID as the Docker Desktop VM boundary, and use `docker exec` for the in-container view.
 
@@ -592,6 +611,9 @@ Failure layer: you are looking at the desktop OS, not the Linux kernel the conta
 
 - [Docker Docs: What is a container?](https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/)
 - [Docker Docs: Understanding image layers](https://docs.docker.com/get-started/docker-concepts/building-images/understanding-image-layers/)
+- [Docker Docs: Volumes](https://docs.docker.com/engine/storage/volumes/)
+- [Docker Docs: Bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)
+- [Docker CLI: docker container stop](https://docs.docker.com/reference/cli/docker/container/stop/)
 - [Docker CLI: docker container run](https://docs.docker.com/reference/cli/docker/container/run/)
 - [Docker CLI: docker container exec](https://docs.docker.com/reference/cli/docker/container/exec/)
 - [Docker CLI: docker image pull](https://docs.docker.com/reference/cli/docker/image/pull/)
