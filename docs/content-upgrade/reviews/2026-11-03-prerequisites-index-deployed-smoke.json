@@ -1,0 +1,24 @@
+{
+  "page": "src/content/docs/prerequisites/index.md",
+  "page_digest": "sha256:95eb742e1f9a7eb98b88285cdc7d82cced129e5f1cf10c9eb30e445c0e15883a",
+  "publication": {
+    "http": {
+      "url": "https://kube-dojo.github.io/prerequisites/",
+      "status": 200,
+      "retrieved_at": "2026-11-03T18:07:18.285047+00:00",
+      "html_sha256": "7f06b940e6940c0cb8b8d3e556d150965f590fcbf2db5a80446f6e46942227db",
+      "checks": {
+        "Prerequisites": true,
+        "zero-to-terminal/": true,
+        "kubernetes-basics/": true,
+        "review Kubernetes Basics for deployments, Services, and manifests": true
+      },
+      "deployment": {
+        "conclusion": "success",
+        "headSha": "758d820a2074b1afc890acdfb6cfbcd4658c6041",
+        "status": "completed",
+        "url": "https://github.com/kube-dojo/kube-dojo.github.io/actions/runs/41688085552"
+      }
+    }
+  }
+}

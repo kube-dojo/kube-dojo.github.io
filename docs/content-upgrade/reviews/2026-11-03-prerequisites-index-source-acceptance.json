@@ -1,0 +1,1370 @@
+{
+  "schema": "kubedojo.source_acceptance.v1",
+  "schema_version": 1,
+  "disposition": "applicable",
+  "page_digest": "sha256:95eb742e1f9a7eb98b88285cdc7d82cced129e5f1cf10c9eb30e445c0e15883a",
+  "seed_digest": "sha256:cda01d3adeb5e5a82dfa8b08f8b2fc8829a092da258d0fce9b935d6a7b07ad83",
+  "coverage": {
+    "material_claim_ids": [
+      "PI001",
+      "PI004",
+      "PI006",
+      "PI007",
+      "PI010",
+      "PI013",
+      "PI014",
+      "PI015",
+      "PI016",
+      "PI017",
+      "PI018",
+      "PI019",
+      "PI020",
+      "PI021",
+      "PI022",
+      "PI023",
+      "PI024",
+      "PI025",
+      "PI026",
+      "PI027",
+      "PI028",
+      "PI029",
+      "PI030",
+      "PI031",
+      "PI032",
+      "PI033",
+      "PI034",
+      "PI035",
+      "PI036",
+      "PI037",
+      "PI038",
+      "PI039",
+      "PI040",
+      "PI041",
+      "PI042",
+      "PI043",
+      "PI044",
+      "PI045",
+      "PI046",
+      "PI047",
+      "PI048",
+      "PI049",
+      "PI050",
+      "PI051",
+      "PI052",
+      "PI053",
+      "PI054",
+      "PI055",
+      "PI056",
+      "PI057",
+      "PI058",
+      "PI059",
+      "PI060",
+      "PI061",
+      "PI062",
+      "PI063",
+      "PI064",
+      "PI065",
+      "PI066",
+      "PI067",
+      "PI068",
+      "PI069",
+      "PI070",
+      "PI071",
+      "PI072",
+      "PI073",
+      "PI074",
+      "PI088",
+      "PI075",
+      "PI076",
+      "PI077",
+      "PI078",
+      "PI079",
+      "PI080",
+      "PI081",
+      "PI082",
+      "PI083",
+      "PI084",
+      "PI085",
+      "PI086",
+      "PI087"
+    ],
+    "reviewed_claim_ids": [
+      "PI001",
+      "PI004",
+      "PI006",
+      "PI007",
+      "PI010",
+      "PI013",
+      "PI014",
+      "PI015",
+      "PI016",
+      "PI017",
+      "PI018",
+      "PI019",
+      "PI020",
+      "PI021",
+      "PI022",
+      "PI023",
+      "PI024",
+      "PI025",
+      "PI026",
+      "PI027",
+      "PI028",
+      "PI029",
+      "PI030",
+      "PI031",
+      "PI032",
+      "PI033",
+      "PI034",
+      "PI035",
+      "PI036",
+      "PI037",
+      "PI038",
+      "PI039",
+      "PI040",
+      "PI041",
+      "PI042",
+      "PI043",
+      "PI044",
+      "PI045",
+      "PI046",
+      "PI047",
+      "PI048",
+      "PI049",
+      "PI050",
+      "PI051",
+      "PI052",
+      "PI053",
+      "PI054",
+      "PI055",
+      "PI056",
+      "PI057",
+      "PI058",
+      "PI059",
+      "PI060",
+      "PI061",
+      "PI062",
+      "PI063",
+      "PI064",
+      "PI065",
+      "PI066",
+      "PI067",
+      "PI068",
+      "PI069",
+      "PI070",
+      "PI071",
+      "PI072",
+      "PI073",
+      "PI074",
+      "PI088",
+      "PI075",
+      "PI076",
+      "PI077",
+      "PI078",
+      "PI079",
+      "PI080",
+      "PI081",
+      "PI082",
+      "PI083",
+      "PI084",
+      "PI085",
+      "PI086",
+      "PI087"
+    ],
+    "uncovered_claim_ids": []
+  },
+  "claims": [
+    {
+      "claim_id": "PI001",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
+        "snapshot_digest": "sha256:d037dfb033e3e9f754c1dd3d81012dc0eb37a8aba8f6df52bd39a17f12ca873b",
+        "quote": "you already finished [Prerequisites](/prerequisites/) or equivalent hands-on fundamentals",
+        "locator": "k8s/index.md"
+      },
+      "rationale": "Sibling track pages name this hub Prerequisites and link /prerequisites/; sidebar label is non-assertive (lead ruling)."
+    },
+    {
+      "claim_id": "PI004",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
+        "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
+        "quote": "Start with [Fundamentals](/prerequisites/) if you are still learning the terminal, Git, containers, Kubernetes objects, YAML, or basic networking.",
+        "locator": "platform/index.md"
+      },
+      "rationale": "Platform page sends beginners here before platform work; homepage says start here if new.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0",
+          "snapshot_digest": "sha256:2c9ed8bb8d87817540187e5941e6ece158c47b031022b7847de643d7b5fad6eb",
+          "quote": "Start here if you're new.",
+          "locator": "homepage.ts"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI006",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
+        "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
+        "quote": "Module 1.2 compares imperative commands with declarative management",
+        "locator": "philosophy-design/index.md"
+      },
+      "rationale": "Each section index confirms one listed topic: terminal, containers, Kubernetes, declarative, Git, delivery practices.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+          "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+          "quote": "Use the terminal (command line) to navigate, create, and manage files",
+          "locator": "z2t"
+        },
+        {
+          "retrieval_uri": "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
+          "snapshot_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+          "quote": "This section covers containers, Kubernetes, and cloud native architecture.",
+          "locator": "cn101"
+        },
+        {
+          "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+          "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+          "quote": "This section teaches Kubernetes concepts and practical skills for people who know containers and want to learn Kubernetes.",
+          "locator": "kb"
+        },
+        {
+          "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+          "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+          "quote": "Go deeper with Git, from repository internals to team workflows.",
+          "locator": "git"
+        },
+        {
+          "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+          "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+          "quote": "This section connects infrastructure, delivery, observation, platform, and security practices.",
+          "locator": "devops"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI007",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "This track is for **absolute beginners**.",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "First listed section is for absolute beginners; homepage says start here if new.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://a0130b8893f35f07d3663b215035ecc64b4ad2b0",
+          "snapshot_digest": "sha256:2c9ed8bb8d87817540187e5941e6ece158c47b031022b7847de643d7b5fad6eb",
+          "quote": "Start here if you're new.",
+          "locator": "homepage.ts"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI010",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "Use the terminal (command line) to navigate, create, and manage files",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Track teaches terminal, files, SSH, packages.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+          "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+          "quote": "[Servers and SSH](module-0.8-servers-and-ssh/) | 80–100 min | What servers are, how to connect remotely",
+          "locator": "0.8"
+        },
+        {
+          "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+          "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+          "quote": "[Software and Packages](module-0.9-software-and-packages/) | 80–100 min | Installing and managing software from the terminal",
+          "locator": "0.9"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI013",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
+        "snapshot_digest": "sha256:5ad580bcf4f821b3c89b46335f26250f05047334e684221da3565c192173c4d4",
+        "quote": "If that is your situation, start with [Prerequisites](../prerequisites/) first and then come back here with stronger Kubernetes basics.",
+        "locator": "cloud/index.md"
+      },
+      "rationale": "Weaker claim, supported: Cloud, Platform, Certifications and On-Premises each send learners back to this hub or list it as prerequisite.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
+          "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
+          "quote": "Start with [Fundamentals](/prerequisites/) if you are still learning the terminal, Git, containers, Kubernetes objects, YAML, or basic networking.",
+          "locator": "platform"
+        },
+        {
+          "retrieval_uri": "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
+          "snapshot_digest": "sha256:d116819b4ca1c35f63566dda2a39df4abafac23e46aff6d3127d04be1911d7cb",
+          "quote": "- [Fundamentals](../prerequisites/) — Cloud Native 101, K8s Basics",
+          "locator": "on-prem"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI014",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "you may preview the [terminal opening and prompt guide](module-0.2-what-is-a-terminal/#opening-the-terminal-and-reading-the-prompt) and [first safe-command exercise](module-0.2-what-is-a-terminal/#hands-on-exercise-your-first-terminal-session)",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Optional preview offered; anchors match Module 0.2 headings.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
+          "snapshot_digest": "sha256:a4457de7df9ee828e12266fc7055d1e59e3a6557f0c482ef93e3800495ab5145",
+          "quote": "## Opening the Terminal and Reading the Prompt",
+          "locator": "m0.2"
+        },
+        {
+          "retrieval_uri": "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
+          "snapshot_digest": "sha256:a4457de7df9ee828e12266fc7055d1e59e3a6557f0c482ef93e3800495ab5145",
+          "quote": "## Hands-On Exercise: Your First Terminal Session",
+          "locator": "m0.2"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI015",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "Then return to Module 0.1 and complete the modules in order",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Source says go to Module 0.1, modules in order."
+    },
+    {
+      "claim_id": "PI016",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "the preview does not replace the track.",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Source states preview does not replace the track."
+    },
+    {
+      "claim_id": "PI017",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "Before exercises, read each module's platform and cost notes where applicable.",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Same page has the Who Is This Track For? setup guidance matching the anchor.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+          "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+          "quote": "## Who Is This Track For?",
+          "locator": "heading"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI018",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "These ranges are the Time to Complete values from the eleven module headers.",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Recounted: table rows 0.1-0.11 = 11 modules."
+    },
+    {
+      "claim_id": "PI019",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "locally on loopback, or on an authorized cloud VM for a public test",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Absolute beginners, computer/terminal fundamentals, then serve a site locally or on an authorized VM.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+          "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+          "quote": "This track is for **absolute beginners**.",
+          "locator": "intro"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI020",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://fa05c9f061a4cd60f35e96c81efd68104af9f826",
+        "snapshot_digest": "sha256:954b4c88301175062fcbb3e58a7085451d3524f1b2e1c7ffd95826ddf297f1bd",
+        "quote": "title: \"Module 0.1: What is a Computer?\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI021",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://9380733c18c5047240c47e5ab63ea6f2064b7ea8",
+        "snapshot_digest": "sha256:a4457de7df9ee828e12266fc7055d1e59e3a6557f0c482ef93e3800495ab5145",
+        "quote": "title: \"Module 0.2: What is a Terminal?\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI022",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://346d9bed362784efed10a3d1a3551a830edf7fae",
+        "snapshot_digest": "sha256:9f9780b4151000f362b8a5a0bea0a14876a416518fbea5b635b04f0bb784567d",
+        "quote": "title: \"Module 0.3: First Terminal Commands\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI023",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://d119cae33fa0572262823213568b6b194b2b7729",
+        "snapshot_digest": "sha256:a62fd88e93385c6afbbb87e678713c4c45f2faea654c863709d209b7a1348907",
+        "quote": "title: \"Module 0.4: Files and Directories\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI024",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://c1d7259cc7d3142e71649e29ea507638a17832bc",
+        "snapshot_digest": "sha256:9c5a807dd5a05835ad5424f5366ded237365c4b9fde595cdb11cd3202fa5b555",
+        "quote": "title: \"Module 0.5: Editing Files\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI025",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://f8afd0e4f4a816d8dacf1cf3bffb6dd7b1c2bf2e",
+        "snapshot_digest": "sha256:b3e5039d7a4155a9a1b828d3db66b436473b230fe942b9bf27c3413b37209719",
+        "quote": "title: \"Module 0.6: Git Basics — Track Your Work\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI026",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://a0666484c8c0d4d10c5b44c7c4ae29ee7c714341",
+        "snapshot_digest": "sha256:203fb164064ebe6f066bdf07798fee3db3d84fc36d002cb5f2460c9a366a7f5a",
+        "quote": "title: \"Module 0.7: What is Networking?\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI027",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://74e001ab733f41b236f21b0ec0819db6df978a80",
+        "snapshot_digest": "sha256:ed2a59bdfc9f360c68e1da76d4e524c080fb9bce37a1215d88109408102a4579",
+        "quote": "title: \"Module 0.8: Servers and SSH\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI028",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://9b43496599781abb69ba1b20d89cb1ccd0569c5e",
+        "snapshot_digest": "sha256:28cb8847916f65f32f58ba4a47148258bcd917306803ad395349e226460c884a",
+        "quote": "title: \"Module 0.9: Software and Packages\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI029",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://04685f5f969e3c89f594908edda1cc28240ec3c8",
+        "snapshot_digest": "sha256:f3165aa4b56f54cb8a0452b8533af86235dbde453f2e82f5a7f2f98db1cf0b25",
+        "quote": "title: \"Module 0.10: What is the Cloud?\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI030",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://99071dd9762ff1189e2738ea9a5780cf72ecf6c5",
+        "snapshot_digest": "sha256:87ebc6a0f8177ee6e224d7730a9b8a8d61de5867d80112971a819109c36140ab",
+        "quote": "title: \"Module 0.11: Your First Server -- Putting It All Together\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI031",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
+        "snapshot_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+        "quote": "These ranges are the Time to Complete values from the five module headers.",
+        "locator": "cloud-native-101/index.md"
+      },
+      "rationale": "Recounted: 5 table rows."
+    },
+    {
+      "claim_id": "PI032",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
+        "snapshot_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+        "quote": "We then examine building Docker images and running containers, before learning to evaluate whether Kubernetes is justified for a workload. Finally, we will map out the broader Cloud Native Computing Foundation (CNCF) ecosystem",
+        "locator": "cloud-native-101/index.md"
+      },
+      "rationale": "Covers containers, Docker, Kubernetes, CNCF ecosystem."
+    },
+    {
+      "claim_id": "PI033",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+        "snapshot_digest": "sha256:c6041449aeefc71eb8af982b57c2af9997df565f9d71f94711801f389ac5f354",
+        "quote": "title: \"Module 1.1: What Are Containers?\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI034",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://ef50711763fe5ed0b0255d7c08c7abb2ce5cb7df",
+        "snapshot_digest": "sha256:b3b1e4a36e135fb983a3ae5c4991aa24dc6ce9843cd3662271c4919ddacc2257",
+        "quote": "title: \"Module 1.2: Docker Fundamentals\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI035",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://4c7168d4e4ad7d15695c7c5873e764095336f9e6",
+        "snapshot_digest": "sha256:1f06c2ec50a31a25a35cafe46d0fa6258205f912a0167d193a9874b731c19bd9",
+        "quote": "title: \"Module 1.3: What Is Kubernetes?\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI036",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://d55dfee27c3c78e1a8815243201874e20075be56",
+        "snapshot_digest": "sha256:30b1de3259883fc72090735aa32be4020cb9bebb5e8460b535337b1567a0940e",
+        "quote": "title: \"Module 1.4: The Cloud Native Ecosystem\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI037",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://04ed3a63c1bf7c630135bf15698760c14d607a9b",
+        "snapshot_digest": "sha256:2b30041aa5564a8aded090655c6dfd495e4ab2d490a985c64bf705256023d95b",
+        "quote": "title: \"Module 1.5: From Monolith to Microservices\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI038",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+        "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+        "quote": "These are planning estimates copied from the eight module headers",
+        "locator": "kubernetes-basics/index.md"
+      },
+      "rationale": "Recounted: 8 table rows."
+    },
+    {
+      "claim_id": "PI039",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+        "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+        "quote": "This section teaches Kubernetes concepts and practical skills for people who know containers and want to learn Kubernetes.",
+        "locator": "kubernetes-basics/index.md"
+      },
+      "rationale": "Covers kubectl, Pods, Deployments, Services, config, YAML.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+          "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+          "quote": "Finally, you will separate application configuration from container images using ConfigMaps and Secrets, organize resources using Namespaces and Labels, and describe desired state using YAML manifests.",
+          "locator": "para 3"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI040",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1861c60b318f129762a6a6c15f6018caed3c38ed",
+        "snapshot_digest": "sha256:bd91f877c2a1116cd31fdb5b23fb781bd02681b042bb4dfd67e8734bd2d7a1ef",
+        "quote": "title: \"Module 1.1: Your First Cluster\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI041",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://52c6b5a61b357f9ee86b0475298f34fa00e77128",
+        "snapshot_digest": "sha256:386b35f35608ee982ff46394fe8bc8e9a9264d34495eea6051486cb3de83cb1f",
+        "quote": "title: \"Module 1.2: kubectl Basics\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI042",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://308ea401d28ac31aef5e00b432e8a98c776b258f",
+        "snapshot_digest": "sha256:ac9750d3d645c1593c02c2d082f77553334a1770bb24c404d19e1e0e40e4874a",
+        "quote": "title: \"Module 1.3: Pods - The Atomic Unit\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI043",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://5b483551ba25ff1e2592d933506d84db33f11aa0",
+        "snapshot_digest": "sha256:a7ad7415f09d801cdddf865c9d0b38b569b11a30ae4342c6e60c35d594326b3d",
+        "quote": "title: \"Module 1.4: Deployments - Managing Applications\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI044",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://bd0014c67f770117fff01cd8f57fe12b338739ed",
+        "snapshot_digest": "sha256:5420975ee8008ae0a7f301bb8c8a8d5a5053369c9467397dd8fa681452803906",
+        "quote": "title: \"Module 1.5: Services - Stable Networking\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI045",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://3c5ed141caab9587ea3a9153e4dd11e3da716c27",
+        "snapshot_digest": "sha256:5fcd0f9adaa3cd7b835c62e6d0c8be95b10c144488580da80ce2324ecf13e2a0",
+        "quote": "title: \"Module 1.6: ConfigMaps and Secrets\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI046",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://bb047217c19ba0de6cd44e7582a600a5d9c3a067",
+        "snapshot_digest": "sha256:f20028b00be3b0d91100bc47831196f8145529908dc2d870c0ae7edfe6a15439",
+        "quote": "title: \"Module 1.7: Namespaces and Labels\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI047",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://368dbdbd85b3dd2e88273a22eba6cadcc90745a4",
+        "snapshot_digest": "sha256:5dd1d42a0cf0cd504aa4bbb00af9fb9abbed1edba0fa473f519df28628cd1854",
+        "quote": "title: \"Module 1.8: YAML for Kubernetes\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI048",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
+        "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
+        "quote": "These are planning estimates copied from the four module headers",
+        "locator": "philosophy-design/index.md"
+      },
+      "rationale": "Recounted: 4 table rows."
+    },
+    {
+      "claim_id": "PI049",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
+        "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
+        "quote": "this section examines the history of container orchestration, Kubernetes design choices, and the learning priorities of this curriculum.",
+        "locator": "philosophy-design/index.md"
+      },
+      "rationale": "Design choices, study planning by goal, tradeoffs, own-context assessment all stated.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
+          "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
+          "quote": "Module 1.3 helps you plan study scope by goal and points to related lessons.",
+          "locator": "p3"
+        },
+        {
+          "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
+          "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
+          "quote": "The value of a technology in your own environment requires its own assessment.",
+          "locator": "p3"
+        },
+        {
+          "retrieval_uri": "git-object://0ddb9bd09a87d3f11612f041173e1f455adb66f8",
+          "snapshot_digest": "sha256:b2e88df4d83b0b564c40fda29afb1394a8ca93a4a036b34b8af6d0630c6ef5f7",
+          "quote": "using concrete technical and ecosystem tradeoffs.",
+          "locator": "m1.1"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI050",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://0ddb9bd09a87d3f11612f041173e1f455adb66f8",
+        "snapshot_digest": "sha256:b2e88df4d83b0b564c40fda29afb1394a8ca93a4a036b34b8af6d0630c6ef5f7",
+        "quote": "title: \"Module 1.1: Why Kubernetes Won\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI051",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://cfc79c2366ddc0ce873295e2ec6597e60d739cda",
+        "snapshot_digest": "sha256:04890a7e20abe1d41891210def80266837b9219eeffac55583cfba8b85cbf924",
+        "quote": "title: \"Module 1.2: Declarative vs Imperative - The Philosophy\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI052",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://3797ba08ce5a29036369cc1e860eb657891035fe",
+        "snapshot_digest": "sha256:1e38d685b1cf2db82696a80e5fbedaba9466c3b50952ef0f84bc701d7ed637d9",
+        "quote": "title: \"Module 1.3: Plan Study Scope by Goal\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI053",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://03fd8ad29071189fe1ca910e6e96b9b5da9ab656",
+        "snapshot_digest": "sha256:b59d54f4d85d24f21b216c0fcb34bdad416eefebe34013439d4365271942aea8",
+        "quote": "title: \"Module 1.4: Dead Ends - Technologies We Skip\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI054",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+        "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+        "quote": "These are planning estimates copied from the ten module headers",
+        "locator": "git-deep-dive/index.md"
+      },
+      "rationale": "Recounted: 10 table rows."
+    },
+    {
+      "claim_id": "PI055",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+        "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+        "quote": "Explore how Git stores work, how history changes, and how to choose recovery and collaboration tools for a particular situation.",
+        "locator": "git-deep-dive/index.md"
+      },
+      "rationale": "Table covers internals, rebasing, recovery, scale, GitOps bridge.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+          "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+          "quote": "Module 8: Efficiency at Scale — Sparse Checkout and LFS",
+          "locator": "table"
+        },
+        {
+          "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+          "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+          "quote": "Module 10: Bridge to GitOps — The Infrastructure Source",
+          "locator": "table"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI056",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://d95d8ef75200f3e441d137d565789275a2bef39b",
+        "snapshot_digest": "sha256:13c452febb9b558340c7feb3667f9a2514602261c481eaa8dd12884341e3dc94",
+        "quote": "title: \"Module 1: The Ghost in the Machine — Git Internals\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI057",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://eb3262c2bfb553aa6a7b263bd5634a9f0f8a8b2d",
+        "snapshot_digest": "sha256:cac30edc73a67c299b6bfafa5f6aa651c08d9854b458d6d2c0c7df6fbca4b09e",
+        "quote": "title: \"Module 2: The Art of the Branch — Advanced Merging\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI058",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://213808cf0b0fe3bec8d716ca75caf5cc7313db0f",
+        "snapshot_digest": "sha256:452b1635946ea7833140468237912588fc405a931a3598439512414c576c4c01",
+        "quote": "title: \"Module 3: History as a Choice — Interactive Rebasing\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI059",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://a5df919a62fb3997c2606230c72ec01c26e3fe98",
+        "snapshot_digest": "sha256:0a0e4239bfde25e0f4a4d517750a2f12306c32716c850143383789e9d231810c",
+        "quote": "title: \"Module 4: The Safety Net — Undo and Recovery\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI060",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://e65e18f15eae7467b9d29479db06f336e0d1075b",
+        "snapshot_digest": "sha256:ad9b5c55f171bd72ce6f68300067ee77f064feb80311f7200c0c3550dc438b3d",
+        "quote": "title: \"Module 5: Multi-Tasking Mastery - Worktrees and Stashing\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI061",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://108ff86a3b19e2720b80637e3db5ecf6d8afac67",
+        "snapshot_digest": "sha256:c4324ce7477dc8782bcc89103efe0b021f0fa5bf939fcada8254317df37af15d",
+        "quote": "title: \"Module 6: The Digital Detective — Troubleshooting and Search\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI062",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://4d5851b7ddec6e350c548c2fb77c017d9bec901e",
+        "snapshot_digest": "sha256:6a64730802bac391ce8f56ccc9099aca7c5a213b675952f8de04b743b76b996b",
+        "quote": "title: \"Module 7: Professional Collaboration - Remotes and PRs\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI063",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://162aac3c0554950aa9b4a43623af022c4424de4c",
+        "snapshot_digest": "sha256:1bacc71b9f71fd918bc44aadeee9882825a94e57dc2acadb281c729ba75ed006",
+        "quote": "title: \"Module 8: Efficiency at Scale — Sparse Checkout and LFS\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI064",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://8c01e4ed49984f9d73868644ef18b2fd98b2b8b2",
+        "snapshot_digest": "sha256:06640f5d9c300bbcf7fb938e1fc5cb4140665756ed81dd60e8bded59552a3b0f",
+        "quote": "title: \"Module 9: Automation and Customization — Hooks and Rerere\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI065",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://73e4b4af55ba4107349bd921d9bf8e65acd882f0",
+        "snapshot_digest": "sha256:360b61e83ab3a25e010573ff0f646e908a9022a2928e6bb79a2022d1b3726dd5",
+        "quote": "title: \"Module 10: Bridge to GitOps — The Infrastructure Source\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI066",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+        "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+        "quote": "These are planning estimates copied from the six module headers",
+        "locator": "modern-devops/index.md"
+      },
+      "rationale": "Recounted: 6 table rows."
+    },
+    {
+      "claim_id": "PI067",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+        "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+        "quote": "For the section's foundation, start with **1.1–1.4** in order: IaC, GitOps, CI/CD, then observability.",
+        "locator": "modern-devops/index.md"
+      },
+      "rationale": "Names all six topics.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+          "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+          "quote": "continue to **1.5 Platform Engineering** after 1.1–1.4, then **1.6 DevSecOps** after 1.1–1.5",
+          "locator": "route"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI068",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://c33cd50384e4dffc475b39494dd06426e26f3223",
+        "snapshot_digest": "sha256:865587b81a9604b7274d682877e71f554cda3531fa3bfb5d8415e437b0c055b3",
+        "quote": "title: \"Module 1.1: Infrastructure as Code\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI069",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://73ce080619daa90c81d35481f84a2768c04c8157",
+        "snapshot_digest": "sha256:45cc12c30d645805f4df881235024e8dc768c18370a27d1e918442f7a0042948",
+        "quote": "title: \"Module 1.2: GitOps\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI070",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://9c112e7878f8d0c5ec50eb87fbbd874c366d6243",
+        "snapshot_digest": "sha256:e7f77898ded774eddf97c49d974edaa105bc40e0869b93881739495a01c26def",
+        "quote": "title: \"Module 1.3: CI/CD Pipelines\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI071",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1aa91a01315bbffade09949aa54a5b823748cd70",
+        "snapshot_digest": "sha256:2ceacdf84b9d8c2068582a73e7b8412f51de2d49461af5db3448a3911284a2b3",
+        "quote": "title: \"Module 1.4: Observability Fundamentals\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI072",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://d58f7890520c382ae0d3275c3e38675ca12cb5a9",
+        "snapshot_digest": "sha256:ba0182d8e1ebb5a5801914016cbd3822032a59ad74e213555d8f7637a91d50dc",
+        "quote": "title: \"Module 1.5: Platform Engineering Concepts\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title (label shortened) and link path match the file."
+    },
+    {
+      "claim_id": "PI073",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://cab6070a1b49ce6bf5c8a3146381cf4a430824c7",
+        "snapshot_digest": "sha256:d5db1d868a1e0eba78a88597a30d3c178c3bb05c8162fd6f89fdb07b87f1f75b",
+        "quote": "title: \"Module 1.6: Security Practices (DevSecOps)\"",
+        "locator": "frontmatter title"
+      },
+      "rationale": "Number, title and link path match the file."
+    },
+    {
+      "claim_id": "PI074",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+        "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+        "quote": "**Default next step:** [Cloud Native 101](../cloud-native-101/module-1.1-what-are-containers/)",
+        "locator": "zero-to-terminal/index.md"
+      },
+      "rationale": "Combined route supported: Zero to Terminal, Cloud Native 101, Kubernetes Basics, Philosophy & Design; Linux optional fork; Zero to Terminal, Git Deep Dive, Modern DevOps. Page line 130 (PI088) adds Kubernetes Basics before Modern DevOps.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+          "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+          "quote": "**Optional fork:** [Linux](../../linux/) if you want deeper systems knowledge before operations-heavy work.",
+          "locator": "z2t"
+        },
+        {
+          "retrieval_uri": "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
+          "snapshot_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+          "quote": "then continue to [Kubernetes Basics](../kubernetes-basics/) after Cloud Native 101.",
+          "locator": "cn101"
+        },
+        {
+          "retrieval_uri": "git-object://a5a4556cddd3bb0941f2c2ad5f4dc8a3a0a4dbec",
+          "snapshot_digest": "sha256:3a20cad98cd4a5a8f8bad7816680e98630bb9c2b8b73172e55b72e8814054bd5",
+          "quote": "After hands-on work in [Cloud Native 101](/prerequisites/cloud-native-101/) and [Kubernetes Basics](/prerequisites/kubernetes-basics/), this section examines",
+          "locator": "pd"
+        },
+        {
+          "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+          "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+          "quote": "[Modern DevOps](../modern-devops/) — the next step on the prerequisites route",
+          "locator": "git"
+        },
+        {
+          "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+          "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+          "quote": "The [prerequisites route](/prerequisites/) recommends [Git Deep Dive](/prerequisites/git-deep-dive/) before this section.",
+          "locator": "devops"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI088",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+        "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+        "quote": "Review [Kubernetes Basics](/prerequisites/kubernetes-basics/) for deployments, Services, and manifests; GitOps also lists Kubernetes fundamentals as preparation.",
+        "locator": "modern-devops/index.md"
+      },
+      "rationale": "Modern DevOps index says exactly this."
+    },
+    {
+      "claim_id": "PI075",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+        "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+        "quote": "Start here after practicing `git add`, `git commit`, and `git push`.",
+        "locator": "git-deep-dive/index.md"
+      },
+      "rationale": "Follows basic Git practice; lists Zero to Terminal Module 0.6 as prerequisite.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+          "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+          "quote": "[Zero to Terminal](../zero-to-terminal/) — especially Module 0.6 (Git Basics)",
+          "locator": "prereq"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI076",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://30d2114f2d7fa369db5c5d8120333a8a245519c4",
+        "snapshot_digest": "sha256:b4f82b5062461d3f0c6d093eba285ee3d93cdbfa77d985199e42ba6c2abb55e9",
+        "quote": "Before starting, have Docker installed and complete Cloud Native 101.",
+        "locator": "kubernetes-basics/index.md"
+      },
+      "rationale": "Weaker negative claim, supported by enumerated entry requirements: none list Git Deep Dive; no source says not required verbatim.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://f6e03ee39731c9ec728c839ad99a8910c6cd2de1",
+          "snapshot_digest": "sha256:17537e09bdcc78d7b7f72607193c5746bc32a692ba37d1e3cca14e363590f9bd",
+          "quote": "Start with a working terminal and a machine where you can install Docker for module 1.2.",
+          "locator": "cn101"
+        },
+        {
+          "retrieval_uri": "git-object://2042df6e3f9d952cd5d5feb3122ea26d8d48674d",
+          "snapshot_digest": "sha256:c6041449aeefc71eb8af982b57c2af9997df565f9d71f94711801f389ac5f354",
+          "quote": "**Prerequisites**: no prior container knowledge.",
+          "locator": "m1.1"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI077",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://7d5d7e19482916319194aba11a4b37805e48ea8a",
+        "snapshot_digest": "sha256:dcd256c9ece02d3832392f290d0a8dde54fb64209bdd96bab7be470f733c7215",
+        "quote": "The [prerequisites route](/prerequisites/) recommends [Git Deep Dive](/prerequisites/git-deep-dive/) before this section.",
+        "locator": "modern-devops/index.md"
+      },
+      "rationale": "Recommended before Modern DevOps; Git Deep Dive says CI/CD and GitOps build on it.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://707e7a5160f652fbc96eb1f84101b0451f1fd293",
+          "snapshot_digest": "sha256:16fa950903fa74915df39405e3aac18b926e90e5bcb608ce898a65f32d64e6aa",
+          "quote": "the next step on the prerequisites route; CI/CD and GitOps build directly on this course",
+          "locator": "git"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI078",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
+        "snapshot_digest": "sha256:af35dfe498ae28f0f036be236a01dca29ab6e37748891d146db8e20e27404f35",
+        "quote": "This track gives you the deep system knowledge that separates operators from debuggers.",
+        "locator": "linux/index.md"
+      },
+      "rationale": "Linux = deeper systems knowledge."
+    },
+    {
+      "claim_id": "PI079",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://c20745fb75b9638886c5da43f0c455832f4fc44a",
+        "snapshot_digest": "sha256:d037dfb033e3e9f754c1dd3d81012dc0eb37a8aba8f6df52bd39a17f12ca873b",
+        "quote": "you want external certification goals and exam-shaped structure",
+        "locator": "k8s/index.md"
+      },
+      "rationale": "Certification-oriented track."
+    },
+    {
+      "claim_id": "PI080",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
+        "snapshot_digest": "sha256:5ad580bcf4f821b3c89b46335f26250f05047334e684221da3565c192173c4d4",
+        "quote": "This track takes you from cloud fundamentals to managed Kubernetes operations",
+        "locator": "cloud/index.md"
+      },
+      "rationale": "Provider cloud foundations and managed Kubernetes."
+    },
+    {
+      "claim_id": "PI081",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
+        "snapshot_digest": "sha256:d116819b4ca1c35f63566dda2a39df4abafac23e46aff6d3127d04be1911d7cb",
+        "quote": "Data sovereignty, latency requirements, regulatory constraints, and economics drive enterprises to run Kubernetes on their own hardware.",
+        "locator": "on-premises/index.md"
+      },
+      "rationale": "Running Kubernetes on own hardware."
+    },
+    {
+      "claim_id": "PI082",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
+        "snapshot_digest": "sha256:bf15204e193f686612360d995933e29c8bbe52cebb359861c3ee566740dbee9a",
+        "quote": "- learners starting from zero AI background",
+        "locator": "ai/index.md"
+      },
+      "rationale": "Beginner AI literacy and working habits.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
+          "snapshot_digest": "sha256:bf15204e193f686612360d995933e29c8bbe52cebb359861c3ee566740dbee9a",
+          "quote": "- `AI` = literacy, disciplined use, and practical bridge work",
+          "locator": "boundary"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI083",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
+        "snapshot_digest": "sha256:67e705b4a1bca444afc5398afc1b95c8e990917fdf6caa65991eaa244af0b61d",
+        "quote": "A complete curriculum for engineers building AI and ML systems in production.",
+        "locator": "ai-ml-engineering/index.md"
+      },
+      "rationale": "Building AI systems, local-first AI, MLOps.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
+          "snapshot_digest": "sha256:67e705b4a1bca444afc5398afc1b95c8e990917fdf6caa65991eaa244af0b61d",
+          "quote": "| Learn local-first AI from a laptop or workstation |",
+          "locator": "routes"
+        },
+        {
+          "retrieval_uri": "git-object://93127eb714b4d7171f75c333ae7f66233ebc11cf",
+          "snapshot_digest": "sha256:67e705b4a1bca444afc5398afc1b95c8e990917fdf6caa65991eaa244af0b61d",
+          "quote": "| Move into MLOps / AI platform work |",
+          "locator": "routes"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI084",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
+        "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
+        "quote": "- `kubectl`, Pods, Deployments, Services, ConfigMaps, Secrets, namespaces, and labels\n- basic Linux process, file, package, service, and network troubleshooting\n- Git as a collaboration workflow, not only a file backup tool\n- cloud-native vocabulary: containers, clusters, declarative configuration, CI/CD, and observability",
+        "locator": "platform/index.md"
+      },
+      "rationale": "Checklist lists these four areas."
+    },
+    {
+      "claim_id": "PI085",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
+        "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
+        "quote": "Before this track, you should already be comfortable with:",
+        "locator": "platform/index.md"
+      },
+      "rationale": "Checklist under heading Do Not Start Here Yet (anchor).",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
+          "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
+          "quote": "## Do Not Start Here Yet",
+          "locator": "heading"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI086",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://b5e29acf92289936a433660aa294a41c39df72a4",
+        "snapshot_digest": "sha256:a271f9a86e5ccdefc031ed79495dc56a83c46895d4a5bd227b2beb8fa7cb1ddd",
+        "quote": "Before this track, you should already be comfortable with:",
+        "locator": "platform/index.md"
+      },
+      "rationale": "Each destination states entry or readiness guidance.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
+          "snapshot_digest": "sha256:5ad580bcf4f821b3c89b46335f26250f05047334e684221da3565c192173c4d4",
+          "quote": "## Do Not Start Here First If",
+          "locator": "cloud"
+        },
+        {
+          "retrieval_uri": "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
+          "snapshot_digest": "sha256:d116819b4ca1c35f63566dda2a39df4abafac23e46aff6d3127d04be1911d7cb",
+          "quote": "## Readiness Check",
+          "locator": "on-prem"
+        },
+        {
+          "retrieval_uri": "git-object://cdba9c50780e7caf071ae67a4ef18a3fba767ebc",
+          "snapshot_digest": "sha256:af35dfe498ae28f0f036be236a01dca29ab6e37748891d146db8e20e27404f35",
+          "quote": "Many learners should take Linux as a depth track, not as a complete blocker before every other path.",
+          "locator": "linux"
+        }
+      ]
+    },
+    {
+      "claim_id": "PI087",
+      "verdict": "SUPPORTED",
+      "source": {
+        "retrieval_uri": "git-object://b2faf2de07db9098c3972a49e6f13a8e8fc28aee",
+        "snapshot_digest": "sha256:bf15204e193f686612360d995933e29c8bbe52cebb359861c3ee566740dbee9a",
+        "quote": "| Strengthen technical foundations first | go to [Prerequisites](../prerequisites/) or [Linux](../linux/) |",
+        "locator": "ai/index.md"
+      },
+      "rationale": "Weaker negative claim, supported. Recounted 11+5+8+4+10+6 = 44. AI starts from zero; Cloud needs a subset; On-Prem needs not every module; route is suggested.",
+      "additional_sources": [
+        {
+          "retrieval_uri": "git-object://d9a3250cfbe75f5c70ad941c98e765d9083db77f",
+          "snapshot_digest": "sha256:5ad580bcf4f821b3c89b46335f26250f05047334e684221da3565c192173c4d4",
+          "quote": "`~6-8 hours` if you only need the cloud-facing subset",
+          "locator": "cloud"
+        },
+        {
+          "retrieval_uri": "git-object://c9ba039493965a1e626adf8e84f8ef53e5086920",
+          "snapshot_digest": "sha256:d116819b4ca1c35f63566dda2a39df4abafac23e46aff6d3127d04be1911d7cb",
+          "quote": "You do not need to finish every module in those tracks first",
+          "locator": "on-prem"
+        },
+        {
+          "retrieval_uri": "git-object://1262ab927ca5ba19fbe3f6930791fa6a97d5d388",
+          "snapshot_digest": "sha256:93b20d0a44a58acaa247140fa0610e6bbbd94c71e47defa0517f0a8b79aa2304",
+          "quote": "On the **suggested prerequisites route**",
+          "locator": "z2t"
+        }
+      ]
+    }
+  ],
+  "author": {
+    "identity": "gpt-6.1-sol",
+    "family": "openai",
+    "evidence_ref": "docs/content-upgrade/page-reviews.json#work"
+  },
+  "verifier": {
+    "identity": "kd-hub-pidx-verify-r3 (Anthropic Claude Sonnet 5.5, claude-sonnet-5-5, Claude Code harness)",
+    "family": "anthropic"
+  },
+  "run": {
+    "identity": "kd-hub-pidx-verify-r3",
+    "status": "complete"
+  }
+}
