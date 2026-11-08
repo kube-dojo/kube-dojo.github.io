@@ -73,7 +73,6 @@ Reuse with --dry-run to print the chosen plan without firing.
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import logging
 import os
@@ -113,9 +112,92 @@ MCP_SUPPORTED_AGENTS = frozenset({"claude"})
 HERMES_MCP_AGENTS = frozenset()  # hermes dispatch retired; empty by design
 HERMES_MCP_TASK_CLASSES = frozenset({"draft", "edit"})
 # review/search -> read-only sources tools; draft/edit -> write-capable author
-# tools (both curated in scripts/dispatch.py). See _import_dispatch_mcp_constants.
+# tools. See _import_dispatch_mcp_constants.
 CLAUDE_MCP_TASK_CLASSES = frozenset({"review", "search", "draft", "edit"})
 CLAUDE_MCP_AUTHOR_TASK_CLASSES = frozenset({"draft", "edit"})
+
+# Claude REVIEW/SEARCH with MCP: the read-only ``sources`` verification tools
+# plus Read. These curated lists are KubeDojo dispatch policy (#2134); the
+# shared runtime (lu_machinery) passes an explicit ``allowed_tools`` through
+# unchanged, so the policy stays here, with its only consumer.
+CLAUDE_TRANSLATION_TOOLS = (
+    "mcp__sources__verify_word,"
+    "mcp__sources__verify_words,"
+    "mcp__sources__verify_lemma,"
+    "mcp__sources__search_text,"
+    "mcp__sources__search_literary,"
+    "mcp__sources__query_pravopys,"
+    "mcp__sources__search_style_guide,"
+    "mcp__sources__query_cefr_level,"
+    "mcp__sources__search_definitions,"
+    "mcp__sources__search_esum,"
+    "mcp__sources__search_idioms,"
+    "mcp__sources__search_synonyms,"
+    "mcp__sources__translate_en_uk,"
+    "mcp__sources__query_grac,"
+    "mcp__sources__query_ulif,"
+    "mcp__sources__query_r2u,"
+    "Read"
+)
+
+# Claude AUTHORING with MCP (draft/edit task classes): write-capable tools plus
+# the same ``sources`` verification tools, so a Sonnet author can corpus-verify
+# Ukrainian terminology at write time (#2134). Kept SEPARATE from the read-only
+# CLAUDE_TRANSLATION_TOOLS so the review/search lane never gains write access.
+CLAUDE_MCP_AUTHOR_TOOLS = (
+    "Write,"
+    "Edit,"
+    "MultiEdit,"
+    "Read,"
+    "mcp__sources__verify_word,"
+    "mcp__sources__verify_words,"
+    "mcp__sources__verify_lemma,"
+    "mcp__sources__search_text,"
+    "mcp__sources__search_literary,"
+    "mcp__sources__query_pravopys,"
+    "mcp__sources__search_style_guide,"
+    "mcp__sources__query_cefr_level,"
+    "mcp__sources__search_definitions,"
+    "mcp__sources__search_esum,"
+    "mcp__sources__search_idioms,"
+    "mcp__sources__search_synonyms,"
+    "mcp__sources__translate_en_uk,"
+    "mcp__sources__query_grac,"
+    "mcp__sources__query_ulif,"
+    "mcp__sources__query_r2u"
+)
+
+# Headless Claude delegate defaults. Without a minimal ``--mcp-config`` the
+# Claude CLI loads every MCP server from the user's global config and injects
+# all tool schemas into the prompt, which can fail instantly with "Prompt is
+# too long" before the task brief runs. The shared runtime does not apply this
+# KubeDojo default, so ``fire`` and ``--dry-run`` merge it before invoking.
+CLAUDE_DELEGATE_MCP_CONFIG = REPO / "scripts" / "dispatch_config" / "claude-delegate-mcp.json"
+# Built-in Claude Code tools only — no ``mcp__*`` entries.
+CLAUDE_DELEGATE_ALLOWED_TOOLS = "Read,Write,Edit,Bash,Grep,Glob,TodoWrite,WebFetch,WebSearch"
+_DELEGATE_ENTRYPOINTS = frozenset({"delegate", "dispatch"})
+
+
+def merge_delegate_claude_tool_config(
+    agent_name: str,
+    entrypoint: str,
+    tool_config: dict | None,
+) -> dict | None:
+    """Return ``tool_config`` with minimal MCP restrictions for headless Claude.
+
+    Skips the merge when the caller already set ``mcp_config_path`` or
+    ``allowed_tools`` (the ``--mcp`` path builds its own sources allowlist).
+    """
+    if agent_name != "claude" or entrypoint not in _DELEGATE_ENTRYPOINTS:
+        return tool_config
+    if not CLAUDE_DELEGATE_MCP_CONFIG.is_file():
+        return tool_config
+    tc = dict(tool_config or {})
+    if tc.get("mcp_config_path") or tc.get("allowed_tools"):
+        return tc
+    tc["mcp_config_path"] = str(CLAUDE_DELEGATE_MCP_CONFIG)
+    tc["allowed_tools"] = CLAUDE_DELEGATE_ALLOWED_TOOLS
+    return tc
 
 # Skill auto-loading — R2 follow-up to PR #1575 and the agents_extensions/
 # layout introduced there.
@@ -406,43 +488,24 @@ def _available_hermes_mcp_servers() -> list[str]:
     return []
 
 
-def _load_dispatch_str_constant(name: str) -> str:
-    """Read a module-level string constant from ``scripts/dispatch.py`` without
-    importing it (dispatch.py is a CLI with import-time side effects). The named
-    constant must be a plain string literal (read via ast.literal_eval)."""
-    dispatch_path = REPO / "scripts" / "dispatch.py"
-    tree = ast.parse(dispatch_path.read_text(encoding="utf-8"))
-    for node in tree.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == name:
-                value = ast.literal_eval(node.value)
-                if isinstance(value, str):
-                    return value
-                raise ValueError(f"{name} must be a string")
-    raise ValueError(f"{name} not found in scripts/dispatch.py")
-
-
 def _import_dispatch_mcp_constants(task_class: str) -> tuple[str, str]:
     """Return (mcp_config_path, allowed_tools) for a claude MCP dispatch.
 
     Authoring classes (draft/edit) get the write-capable
     ``CLAUDE_MCP_AUTHOR_TOOLS``; read classes (review/search) get the read-only
-    ``CLAUDE_TRANSLATION_TOOLS``. Both are curated in scripts/dispatch.py (#2134).
+    ``CLAUDE_TRANSLATION_TOOLS`` (#2134).
     """
-    constant = (
-        "CLAUDE_MCP_AUTHOR_TOOLS"
+    allowed_tools = (
+        CLAUDE_MCP_AUTHOR_TOOLS
         if task_class in CLAUDE_MCP_AUTHOR_TASK_CLASSES
-        else "CLAUDE_TRANSLATION_TOOLS"
+        else CLAUDE_TRANSLATION_TOOLS
     )
-    return str(MCP_CONFIG_PATH), _load_dispatch_str_constant(constant)
+    return str(MCP_CONFIG_PATH), allowed_tools
 
 
 def _build_mcp_tool_config(agent: str, mcp_server: str, task_class: str) -> dict | None:
     """Build adapter ``tool_config`` for MCP tool access."""
-    sys.path.insert(0, str(REPO / "scripts"))
-    from agent_runtime.tool_config import build_mcp_tool_config
+    from lu_machinery.agent_runtime.tool_config import build_mcp_tool_config
 
     if agent == "claude":
         mcp_config_path, allowed_tools = _import_dispatch_mcp_constants(task_class)
@@ -477,9 +540,7 @@ def _dry_run_runtime_argv(
     tool_config: dict | None,
 ) -> list[str]:
     """Resolve the runtime adapter argv for dry-run verification."""
-    sys.path.insert(0, str(REPO / "scripts"))
-    from agent_runtime.delegate_config import merge_delegate_claude_tool_config
-    from agent_runtime.runner import _load_adapter
+    from lu_machinery.agent_runtime.runner import _load_adapter
 
     adapter = _load_adapter(agent)
     effective_tool_config = merge_delegate_claude_tool_config(
@@ -861,6 +922,10 @@ def fire(
         previous_dispatched = os.environ.get("KUBEDOJO_DISPATCHED")
         if agent == "codex":
             cfg = TASK_CLASSES[task_class]
+            # Only the in-tree fork CodexAdapter reads these two variables. The
+            # shared lu_machinery CodexAdapter takes effort as an argument (passed
+            # below) and has no web-search switch yet, so codex_search is not
+            # honored on the shared runtime (step-7 package-5 residual).
             os.environ["KUBEDOJO_CODEX_SEARCH"] = "1" if cfg.codex_search else "0"
             os.environ["KUBEDOJO_CODEX_EFFORT"] = cfg.codex_reasoning_effort
         env = os.environ.copy()
@@ -878,18 +943,23 @@ def fire(
             )
             session_id = None
         else:
-            sys.path.insert(0, str(REPO / "scripts"))
-            from agent_runtime.errors import (
+            from lu_machinery.agent_runtime.errors import (
                 AgentStalledError,
                 AgentTimeoutError,
                 AgentUnavailableError,
                 RateLimitedError,
             )
-            from agent_runtime.runner import invoke
+            from lu_machinery.agent_runtime.runner import invoke
 
             max_retries = 3 if agent in {"agy", "kimi"} else 1
             base_delay = 10
-            
+            # The shared runtime takes reasoning effort as an argument and does
+            # not apply the KubeDojo delegate MCP default, so both are explicit.
+            runtime_options: dict = {}
+            if agent == "codex":
+                runtime_options["effort"] = TASK_CLASSES[task_class].codex_reasoning_effort
+            runtime_tool_config = merge_delegate_claude_tool_config(agent, "delegate", tool_config)
+
             for attempt in range(max_retries):
                 try:
                     result = invoke(
@@ -899,9 +969,10 @@ def fire(
                         cwd=worktree,
                         model=model,
                         task_id=task_id,
-                        tool_config=tool_config,
+                        tool_config=runtime_tool_config,
                         entrypoint="delegate",
                         hard_timeout=timeout_s,
+                        **runtime_options,
                     )
                     ok = bool(result.ok)
                     response = result.response or ""

@@ -329,7 +329,7 @@ def test_dispatch_smart_codex_sets_search_for_draft():
             stderr_excerpt="",
         )
 
-    with patch("agent_runtime.runner.invoke", side_effect=fake_invoke):
+    with patch("lu_machinery.agent_runtime.runner.invoke", side_effect=fake_invoke):
         dispatch_smart.fire(
             agent="codex",
             task_class="draft",
@@ -364,7 +364,7 @@ def test_dispatch_smart_codex_enables_search_for_review(monkeypatch):
             stderr_excerpt="",
         )
 
-    with patch("agent_runtime.runner.invoke", side_effect=fake_invoke):
+    with patch("lu_machinery.agent_runtime.runner.invoke", side_effect=fake_invoke):
         dispatch_smart.fire(
             agent="codex",
             task_class="review",

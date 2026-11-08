@@ -17,7 +17,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import dispatch_smart  # noqa: E402
-from agent_runtime.adapters.claude import ClaudeAdapter  # noqa: E402
 
 
 def test_draft_and_edit_are_claude_mcp_task_classes() -> None:
@@ -54,6 +53,17 @@ def test_tools_target_sources_server_not_dead_rag_prefix() -> None:
         assert "mcp__sources__" in tools
 
 
+def _fork_claude_adapter():
+    """The in-tree fork ClaudeAdapter these effort tests pin.
+
+    The shared lu_machinery ClaudeAdapter is not yet verifiable here (see the
+    package-5 census), so only these adapter tests still need the fork.
+    """
+    from agent_runtime.adapters.claude import ClaudeAdapter
+
+    return ClaudeAdapter()
+
+
 def _model_and_effort(cmd: list[str]) -> tuple[str | None, str | None]:
     model = cmd[cmd.index("--model") + 1] if "--model" in cmd else None
     effort = cmd[cmd.index("--effort") + 1] if "--effort" in cmd else None
@@ -61,7 +71,7 @@ def _model_and_effort(cmd: list[str]) -> tuple[str | None, str | None]:
 
 
 def test_effort_suffix_is_stripped_to_effort_flag() -> None:
-    plan = ClaudeAdapter().build_invocation(
+    plan = _fork_claude_adapter().build_invocation(
         prompt="x", mode="workspace-write", cwd=Path("."),
         model="claude-sonnet-5-high", task_id="t", session_id=None,
         tool_config={},
@@ -70,7 +80,7 @@ def test_effort_suffix_is_stripped_to_effort_flag() -> None:
 
 
 def test_plain_model_id_is_not_stripped() -> None:
-    plan = ClaudeAdapter().build_invocation(
+    plan = _fork_claude_adapter().build_invocation(
         prompt="x", mode="read-only", cwd=Path("."),
         model="claude-opus-4-8", task_id="t", session_id=None,
         tool_config={},
@@ -81,7 +91,7 @@ def test_plain_model_id_is_not_stripped() -> None:
 
 
 def test_explicit_effort_in_tool_config_wins() -> None:
-    plan = ClaudeAdapter().build_invocation(
+    plan = _fork_claude_adapter().build_invocation(
         prompt="x", mode="read-only", cwd=Path("."),
         model="claude-sonnet-5", task_id="t", session_id=None,
         tool_config={"effort": "medium"},
@@ -93,7 +103,7 @@ def test_suffix_is_stripped_even_when_explicit_effort_set() -> None:
     """Model slug carries a -high suffix AND explicit effort is given: the suffix
     must still be stripped from --model (it is not a real model id), and the
     explicit effort wins. Regression for the codex R1 finding on #2227/#2134."""
-    plan = ClaudeAdapter().build_invocation(
+    plan = _fork_claude_adapter().build_invocation(
         prompt="x", mode="read-only", cwd=Path("."),
         model="claude-sonnet-5-high", task_id="t", session_id=None,
         tool_config={"effort": "medium"},

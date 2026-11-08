@@ -4,11 +4,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-from agent_runtime.tool_config import build_mcp_tool_config
 
 
 def test_build_mcp_tool_config_qwen_residual_hermes_lane() -> None:
     """Only residual qwen still advertises hermes_mcp_servers observability."""
+    # Pins the in-tree fork tool_config (see the package-5 census).
+    from agent_runtime.tool_config import build_mcp_tool_config
+
     tool_config, diagnostics = build_mcp_tool_config("qwen", mcp_servers=["sources"])
 
     assert tool_config == {"hermes_mcp_servers": ["sources"]}
@@ -20,6 +22,9 @@ def test_build_mcp_tool_config_qwen_residual_hermes_lane() -> None:
 
 def test_build_mcp_tool_config_deepseek_no_longer_hermes_lane() -> None:
     """DeepSeek now rides opencode — not the hermes MCP observability path."""
+    # Pins the in-tree fork tool_config (see the package-5 census).
+    from agent_runtime.tool_config import build_mcp_tool_config
+
     tool_config, diagnostics = build_mcp_tool_config("deepseek", mcp_servers=["sources"])
     # Without a matching non-hermes MCP builder, deepseek should not get
     # hermes_mcp_servers stamped (canonical agent falls through).

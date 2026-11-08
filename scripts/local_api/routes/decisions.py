@@ -15,7 +15,7 @@ from typing import Any, Callable
 from urllib.parse import unquote
 
 try:
-    from ai_agent_bridge._fts import setup_decisions_fts
+    from local_api.bridge_fts import setup_decisions_fts
     from local_api.routes.ui_fragments import (
         AFK_NOTIFY_CSS,
         DESIGN_SYSTEM_LINK,
@@ -24,7 +24,7 @@ try:
         render_search_widget,
     )
 except ModuleNotFoundError:
-    from scripts.ai_agent_bridge._fts import setup_decisions_fts
+    from scripts.local_api.bridge_fts import setup_decisions_fts
     from scripts.local_api.routes.ui_fragments import (
         AFK_NOTIFY_CSS,
         DESIGN_SYSTEM_LINK,

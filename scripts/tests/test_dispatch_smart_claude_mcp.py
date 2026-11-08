@@ -11,16 +11,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from agent_runtime.adapters.claude import ClaudeAdapter
-from agent_runtime import delegate_config as delegate_config_mod
-from agent_runtime.delegate_config import (
+import dispatch_smart
+from dispatch_smart import (
     CLAUDE_DELEGATE_ALLOWED_TOOLS,
     CLAUDE_DELEGATE_MCP_CONFIG,
     merge_delegate_claude_tool_config,
 )
-from agent_runtime import runner
-from agent_runtime.adapters.base import InvocationPlan
-from agent_runtime.result import ParseResult
 
 
 def test_delegate_mcp_fixture_is_empty_servers() -> None:
@@ -58,7 +54,7 @@ def test_merge_applies_minimal_mcp_for_claude_delegate(entrypoint: str) -> None:
 def test_merge_skips_when_fixture_missing() -> None:
     """If the minimal MCP fixture is absent, the merge is a no-op (graceful)."""
     fake_missing = SimpleNamespace(is_file=lambda: False)
-    with patch.object(delegate_config_mod, "CLAUDE_DELEGATE_MCP_CONFIG", fake_missing):
+    with patch.object(dispatch_smart, "CLAUDE_DELEGATE_MCP_CONFIG", fake_missing):
         assert merge_delegate_claude_tool_config("claude", "delegate", None) is None
         passthrough = {"is_new_session": True}
         assert (
@@ -68,6 +64,10 @@ def test_merge_skips_when_fixture_missing() -> None:
 
 
 def test_claude_adapter_emits_mcp_flags_for_delegate_tool_config() -> None:
+    # Pins the in-tree fork adapter's argv for the delegate config; the shared
+    # ClaudeAdapter's equivalent is not yet verifiable (see the package-5 census).
+    from agent_runtime.adapters.claude import ClaudeAdapter
+
     tc = merge_delegate_claude_tool_config("claude", "delegate", None)
     plan = ClaudeAdapter().build_invocation(
         prompt="brief",
@@ -87,53 +87,38 @@ def test_claude_adapter_emits_mcp_flags_for_delegate_tool_config() -> None:
     assert "mcp__" not in allowed
 
 
-def test_invoke_passes_delegate_mcp_tool_config_to_claude_adapter() -> None:
+def test_fire_passes_delegate_mcp_tool_config_to_runtime(monkeypatch, tmp_path) -> None:
+    """The shared runtime does not merge the KubeDojo delegate default; fire does."""
     captured: dict[str, object] = {}
 
-    def build_invocation(**kw):
+    def fake_invoke(agent, prompt, **kw):
+        captured["agent"] = agent
         captured["tool_config"] = kw["tool_config"]
-        return InvocationPlan(cmd=["claude", "-p"], cwd=kw["cwd"])
+        captured["entrypoint"] = kw["entrypoint"]
+        return SimpleNamespace(ok=True, response="ok", session_id=None, stderr_excerpt="")
 
-    adapter = type(
-        "StubClaude",
-        (),
-        {
-            "default_model": "claude-sonnet-4-6",
-            "supported_modes": frozenset({"read-only", "workspace-write", "danger"}),
-            "build_invocation": staticmethod(build_invocation),
-            "liveness_signal_paths": staticmethod(lambda _plan: ()),
-            "parse_response": staticmethod(
-                lambda **_kw: ParseResult(ok=True, response="ok"),
-            ),
-        },
-    )()
-    proc = SimpleNamespace(
-        returncode=0,
-        stdin=None,
-        poll=lambda: 0,
-        kill=lambda: None,
-        wait=lambda timeout=None: 0,
+    monkeypatch.setattr("lu_machinery.agent_runtime.runner.invoke", fake_invoke)
+    monkeypatch.setattr(dispatch_smart, "append_log", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        dispatch_smart,
+        "persist_response",
+        lambda task_id, *_a, **_k: dispatch_smart.PRIMARY_REPO / "logs" / f"{task_id}.txt",
     )
-    state = SimpleNamespace(stdout_lines=["ok"], stderr_lines=[])
 
-    with (
-        patch.object(runner, "_load_adapter", return_value=adapter),
-        patch.object(runner, "has_headroom", return_value=(True, "")),
-        patch.object(runner, "build_agent_env", return_value={}),
-        patch.object(runner.subprocess, "Popen", return_value=proc),
-        patch.object(runner, "start_watchdog", return_value=(state, [])),
-        patch.object(runner, "stop_watchdog"),
-        patch.object(runner, "write_record"),
-    ):
-        runner.invoke(
-            "claude",
-            "search task",
-            mode="read-only",
-            cwd=Path("/tmp"),
-            entrypoint="delegate",
-            skip_headroom_check=True,
-        )
+    code = dispatch_smart.fire(
+        agent="claude",
+        task_class="search",
+        prompt="search task",
+        mode="read-only",
+        model="claude-haiku-4-5-20251001",
+        worktree=None,
+        task_id="t-delegate",
+        timeout_s=1,
+    )
 
+    assert code == 0
+    assert captured["agent"] == "claude"
+    assert captured["entrypoint"] == "delegate"
     tc = captured["tool_config"]
     assert isinstance(tc, dict)
     assert tc["mcp_config_path"] == str(CLAUDE_DELEGATE_MCP_CONFIG)

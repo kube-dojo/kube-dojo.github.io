@@ -15,7 +15,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import dispatch_smart  # noqa: E402
-from agent_runtime.errors import AgentTimeoutError
+from lu_machinery.agent_runtime.errors import AgentTimeoutError
 
 
 def _stub_dispatch_side_effects(
@@ -52,7 +52,7 @@ def test_dispatch_smart_fire_retries_agy_after_timeout(monkeypatch, capsys: pyte
             stderr_excerpt="",
         )
 
-    monkeypatch.setattr("agent_runtime.runner.invoke", fake_invoke)
+    monkeypatch.setattr("lu_machinery.agent_runtime.runner.invoke", fake_invoke)
 
     code = dispatch_smart.fire(
         agent="agy",
@@ -90,7 +90,7 @@ def test_dispatch_smart_fire_non_agy_does_not_retry_after_failed_result(
             stderr_excerpt="not ok",
         )
 
-    monkeypatch.setattr("agent_runtime.runner.invoke", fake_invoke)
+    monkeypatch.setattr("lu_machinery.agent_runtime.runner.invoke", fake_invoke)
 
     code = dispatch_smart.fire(
         agent="codex",
