@@ -12,7 +12,6 @@ from agent_runtime.errors import (
     AgentUnavailableError,
     RateLimitedError,
 )
-from agent_runtime.registry import get_agent_entry
 
 from ._config import REPO_ROOT
 from ._db import get_db
@@ -22,9 +21,7 @@ _AGENT_NAME = "qwen"
 _AGENT_TITLE = "Qwen"
 _DEFAULT_BRIDGE_TIMEOUT_SECONDS = 900
 _NO_TIMEOUT_BRIDGE_TIMEOUT_SECONDS = 24 * 60 * 60
-_DEFAULT_MODEL = str(
-    get_agent_entry(_AGENT_NAME)["default_model"] or "qwen/qwen3.6-plus"
-)
+_DEFAULT_MODEL = "qwen/qwen3.6-plus"
 _TIMEOUT_ENV = "QWEN_BRIDGE_TIMEOUT"
 
 

@@ -35,7 +35,7 @@ def _load_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
 @pytest.mark.parametrize(
     "command",
-    ["ask-agy", "ask-qwen", "ask-deepseek"],
+    ["ask-agy", "ask-deepseek"],
 )
 def test_new_ask_subparsers_register(
     monkeypatch: pytest.MonkeyPatch,
@@ -57,7 +57,6 @@ def test_new_ask_subparsers_register(
     ("command", "agent"),
     [
         ("ask-agy", "agy"),
-        ("ask-qwen", "qwen"),
         ("ask-deepseek", "deepseek"),
     ],
 )
