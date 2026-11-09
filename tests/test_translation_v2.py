@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 
 def _load_module():
     module_path = Path(__file__).resolve().parent.parent / "scripts" / "translation_v2.py"
@@ -219,20 +221,8 @@ def test_enqueue_translation_targets_respects_limit_and_skips_synced(tmp_path: P
     _git(repo_root, "commit", "-m", "beta update")
 
     db_path = repo_root / ".pipeline/translation_v2.db"
-    cp = translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
-    enqueued = translation_v2.enqueue_translation_targets(
-        cp,
-        section="prerequisites/zero-to-terminal",
-        limit=1,
-    )
-
-    assert enqueued == ["prerequisites/zero-to-terminal/module-0.2-beta"]
-    conn = sqlite3.connect(db_path)
-    try:
-        rows = conn.execute("SELECT module_key, phase, queue_state FROM jobs").fetchall()
-    finally:
-        conn.close()
-    assert rows == [("prerequisites/zero-to-terminal/module-0.2-beta", "write", "pending")]
+    with pytest.raises(RuntimeError, match="legacy dispatcher removed"):
+        translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
 
 
 def test_translation_worker_completes_missing_module(tmp_path: Path) -> None:
@@ -244,44 +234,8 @@ def test_translation_worker_completes_missing_module(tmp_path: Path) -> None:
     _git(repo_root, "commit", "-m", "english")
 
     db_path = repo_root / ".pipeline/translation_v2.db"
-    cp = translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
-    cp.enqueue(
-        "prerequisites/zero-to-terminal/module-0.3-gamma",
-        phase="write",
-        model=translation_v2.TRANSLATE_MODEL,
-    )
-
-    def fake_translate(en_file: Path) -> bool:
-        module_key = translation_v2._module_key_for_en_path(repo_root, en_file)
-        uk_path = translation_v2._uk_path_for_module_key(repo_root, module_key)
-        _write(
-            uk_path,
-            _uk_module(
-                en_commit=translation_v2._git_head_for_file(repo_root, en_file),
-                en_file=en_file.relative_to(repo_root).as_posix(),
-            ),
-        )
-        return True
-
-    worker = translation_v2.TranslationWorker(
-        cp,
-        translate_new_fn=fake_translate,
-        fix_fn=lambda *_args, **_kwargs: True,
-    )
-    outcome = worker.run_once()
-
-    assert outcome.status == "queued_for_verify"
-    state = translation_v2.detect_module_state(
-        repo_root, "prerequisites/zero-to-terminal/module-0.3-gamma"
-    )
-    assert state["status"] == "synced"
-
-    verify = translation_v2.VerifyWorker(cp)
-    verify_outcome = verify.run_once()
-    assert verify_outcome.status == "completed"
-
-    report = translation_v2.build_status(repo_root, db_path=db_path, section="prerequisites/zero-to-terminal")
-    assert report["queue"]["counts"]["done"] == 1
+    with pytest.raises(RuntimeError, match="legacy dispatcher removed"):
+        translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
 
 
 def test_worker_loop_respects_max_calls(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -303,32 +257,21 @@ def test_worker_loop_respects_max_calls(tmp_path: Path, monkeypatch, capsys) -> 
     worker = FakeWorker()
     monkeypatch.setattr(translation_v2, "TranslationWorker", lambda *_args, **_kwargs: worker)
 
-    exit_code = translation_v2.main(
-        [
-            "--repo-root",
-            str(tmp_path),
-            "--db",
-            str(db_path),
-            "worker",
-            "loop",
-            "--max-calls",
-            "2",
-            "--sleep-seconds",
-            "0",
-        ]
-    )
-    output = capsys.readouterr().out.splitlines()
-
-    assert exit_code == 0
-    assert worker.calls == 2
-    worker_lines = [line for line in output if line.startswith("[worker]")]
-    assert len(worker_lines) == 2
-    first_payload = json.loads(worker_lines[0].split("] ", 1)[1])
-    assert first_payload["status"] == "queued_for_verify"
-    assert first_payload["module_key"] == "module-1"
-    assert first_payload["lease_id"] == "lease-1"
-    assert first_payload["attempts"] == 1
-    assert output[-1] == "worker summary: max_calls=2 successful_calls=2"
+    with pytest.raises(RuntimeError, match="legacy dispatcher removed"):
+        translation_v2.main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--db",
+                str(db_path),
+                "worker",
+                "loop",
+                "--max-calls",
+                "2",
+                "--sleep-seconds",
+                "0",
+            ]
+        )
 
 
 def test_verify_worker_requeues_write_on_quality_failure(tmp_path: Path) -> None:
@@ -357,31 +300,8 @@ def test_verify_worker_requeues_write_on_quality_failure(tmp_path: Path) -> None
     )
 
     db_path = repo_root / ".pipeline/translation_v2.db"
-    cp = translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
-    cp.enqueue(
-        "prerequisites/zero-to-terminal/module-0.4-delta",
-        phase="review",
-        model=translation_v2.VERIFY_MODEL,
-    )
-    cp.emit_event(
-        "translation_write_started",
-        module_key="prerequisites/zero-to-terminal/module-0.4-delta",
-        payload={"phase": "write"},
-    )
-
-    verify = translation_v2.VerifyWorker(cp)
-    outcome = verify.run_once()
-
-    assert outcome.status == "retry_scheduled"
-    conn = sqlite3.connect(db_path)
-    try:
-        rows = conn.execute(
-            "SELECT phase, queue_state FROM jobs WHERE module_key = ? ORDER BY id ASC",
-            ("prerequisites/zero-to-terminal/module-0.4-delta",),
-        ).fetchall()
-    finally:
-        conn.close()
-    assert rows == [("review", "completed"), ("write", "pending")]
+    with pytest.raises(RuntimeError, match="legacy dispatcher removed"):
+        translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
 
 
 def test_build_status_treats_recovered_module_as_done(tmp_path: Path) -> None:
@@ -401,18 +321,8 @@ def test_build_status_treats_recovered_module_as_done(tmp_path: Path) -> None:
     )
 
     db_path = repo_root / ".pipeline/translation_v2.db"
-    cp = translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
-    cp.enqueue(
-        "prerequisites/zero-to-terminal/module-0.5-epsilon",
-        phase="review",
-        model=translation_v2.VERIFY_MODEL,
-    )
-    verify = translation_v2.VerifyWorker(cp)
-    verify.run_once()
-
-    report = translation_v2.build_status(repo_root, db_path=db_path, section="prerequisites/zero-to-terminal")
-    assert report["queue"]["counts"]["done"] == 1
-    assert report["queue"]["counts"]["dead_letter"] == 0
+    with pytest.raises(RuntimeError, match="legacy dispatcher removed"):
+        translation_v2.ControlPlane(repo_root=repo_root, db_path=db_path)
 
 
 def test_translation_v2_status_reports_per_track_done_and_dead_letter(tmp_path: Path) -> None:

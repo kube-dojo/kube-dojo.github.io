@@ -17,14 +17,19 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from checks import ukrainian
-from dispatch import GEMINI_WRITER_MODEL
-from pipeline_v2.control_plane import (
-    DEFAULT_BUDGETS_PATH,
-    ControlPlane,
-)
 from quality.calque_review_stamp import read_status as read_calque_review_status
 from uk_sync import fix_module as uk_fix_module
 from uk_sync import translate_new_module as uk_translate_new_module
+
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
+DEFAULT_BUDGETS_PATH = None
+
+
+class ControlPlane:
+    """Stand-in for the removed pipeline control plane."""
+
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

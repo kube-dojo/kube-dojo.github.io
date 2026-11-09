@@ -152,14 +152,6 @@ builtins.print = _logged_print
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from checks import gaps, structural, ukrainian
-from dispatch import (
-    GEMINI_WRITER_MODEL,
-    ClaudeUnavailableError,
-    _is_rate_limited,
-    dispatch_agy,
-    dispatch_claude,
-    dispatch_codex,
-)
 from uk_sync import (
     CONTENT_ROOT as UK_CONTENT_ROOT,
 )
@@ -175,6 +167,26 @@ from uk_sync import (
 from uk_sync import (
     translate_new_module as uk_translate,
 )
+
+
+def _legacy_dispatcher_removed(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
+
+
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
+
+
+class ClaudeUnavailableError(RuntimeError):
+    pass
+
+
+def _is_rate_limited(*_args, **_kwargs):
+    return False
+
+
+dispatch_agy = _legacy_dispatcher_removed
+dispatch_claude = _legacy_dispatcher_removed
+dispatch_codex = _legacy_dispatcher_removed
 
 
 def dispatch_auto(prompt: str, model: str, timeout: int = 900) -> tuple[bool, str]:

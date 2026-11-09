@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-import dispatch
 from agent_runtime.redact import REDACTION, redact_jsonable, redact_text
 from ai_agent_bridge import _channels, _db, _github, _messaging
 
@@ -78,19 +77,6 @@ def test_github_comment_redacts_body_before_posting():
     assert REDACTION in posted
 
 
-def test_dispatch_github_post_redacts_body_before_commenting():
-    completed = subprocess.CompletedProcess(
-        ["gh"], 0, stdout="", stderr="",
-    )
-
-    with patch("dispatch.subprocess.run", return_value=completed) as run:
-        assert dispatch.post_to_github(123, f"leak {OPENAI_KEY}", "model") is True
-
-    posted = run.call_args.kwargs["input"]
-    assert OPENAI_KEY not in posted
-    assert REDACTION in posted
-
-
 def test_message_broker_redacts_content_and_data(tmp_path):
     db_file = tmp_path / "messages.db"
     with patch("ai_agent_bridge._config.DB_PATH", db_file), patch(
@@ -130,22 +116,3 @@ def test_channel_post_redacts_body_attachments_and_monitor_snapshot(tmp_path):
     assert GH_PAT not in msg["body"]
     assert msg["attachments"][0]["token"] == REDACTION
     assert msg["monitor_state_snapshot"]["token"] == REDACTION
-
-
-def test_dispatch_log_redacts_prompt_output_and_stderr(tmp_path):
-    with patch("dispatch.LOG_DIR", tmp_path):
-        log_path = dispatch._log(
-            "codex",
-            "model",
-            f"prompt {GH_PAT}",
-            f"output {OPENAI_KEY}",
-            False,
-            1.0,
-            f"stderr {GEMINI_KEY}",
-        )
-
-    text = log_path.read_text()
-    assert GH_PAT not in text
-    assert OPENAI_KEY not in text
-    assert GEMINI_KEY not in text
-    assert text.count(REDACTION) == 3

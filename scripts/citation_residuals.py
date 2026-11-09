@@ -29,12 +29,15 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import fetch_citation  # noqa: E402
 from citation_backfill import (  # noqa: E402
     DispatcherUnavailable,
-    dispatch_claude,
     dispatch_agy,
+    dispatch_claude,
     parse_agent_response,
 )
-from dispatch import dispatch_codex as dispatch_codex_cli  # noqa: E402
 from pipeline_common import module_lock  # noqa: E402
+
+
+def dispatch_codex_cli(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
 
 HUMAN_REVIEW_DIR = REPO_ROOT / ".pipeline" / "v3" / "human-review"
 DEFAULT_MAX_CANDIDATES = 3

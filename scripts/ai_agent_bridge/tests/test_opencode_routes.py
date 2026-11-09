@@ -13,28 +13,6 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 
-def test_openrouter_prefix_routes_to_openrouter(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An ``openrouter/`` model slug selects the OpenRouter provider.
-
-    #3872 deleted ``ai_agent_bridge._hermes._detect_provider``. The live
-    mapping with the same prefix contract is
-    ``dispatch_smart._hermes_provider_for_model``.
-    """
-    from dispatch_smart import _hermes_provider_for_model
-
-    monkeypatch.delenv("KUBEDOJO_HERMES_PROVIDER", raising=False)
-    assert (
-        _hermes_provider_for_model("openrouter/anthropic/claude-opus-4-6")
-        == "openrouter"
-    )
-    assert (
-        _hermes_provider_for_model("openrouter/qwen/qwen3.7-max")
-        == "openrouter"
-    )
-
-
 def test_opencode_command_construction(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -75,13 +53,9 @@ def test_opencode_command_construction(
 
 
 def test_task_classes_include_opencode() -> None:
-    """OpenCode stays in the supported-agent list.
+    """OpenCode stays on the live bridge agent lists."""
+    from ai_agent_bridge._channels import VALID_AGENTS
+    from ai_agent_bridge._cli import AGENT_CHOICES
 
-    The deleted combined check also asserted per-class OpenCode model
-    slugs and Hermes seats. Hermes assertions are omitted. The OpenCode
-    slugs are absent from ``TASK_CLASSES`` (removed in 76d107f60, before
-    #3872), so those equalities are not restored: they fail on live code.
-    """
-    from dispatch_smart import SUPPORTED_AGENTS
-
-    assert "opencode" in SUPPORTED_AGENTS
+    assert "opencode" in AGENT_CHOICES
+    assert "opencode" in VALID_AGENTS

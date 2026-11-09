@@ -36,7 +36,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 structural = importlib.import_module("checks.structural")
 CheckResult = structural.CheckResult
-GEMINI_WRITER_MODEL = importlib.import_module("dispatch").GEMINI_WRITER_MODEL
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
 
 
 class _CalibrationIsolatedCase(unittest.TestCase):

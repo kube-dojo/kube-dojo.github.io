@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -12,10 +13,188 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from dispatch import GEMINI_WRITER_MODEL
-from pipeline_v2.cli import _build_status_report as build_v2_status_report
 from translation_v2 import build_status as build_translation_v2_status
 from ztt_status import build_status as build_ztt_status
+
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
+
+
+
+def _current_dead_letter_rows(event_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    latest_dead_by_module: dict[str, dict[str, Any]] = {}
+    latest_recovery_order: dict[str, tuple[int, int]] = {}
+    for event in sorted(event_rows, key=lambda row: (int(row["at"]), int(row.get("id", 0)))):
+        module_key = str(event["module_key"])
+        event_type = str(event["type"])
+        at = int(event["at"])
+        event_id = int(event.get("id", 0))
+        if event_type == "dead_letter_recovered":
+            latest_recovery_order[module_key] = (at, event_id)
+            continue
+        if event_type not in {"needs_human_intervention", "module_dead_lettered"}:
+            continue
+        payload = json.loads(str(event["payload_json"] or "{}"))
+        latest_dead_by_module[module_key] = {
+            "module_key": module_key,
+            "id": event_id,
+            "reason": payload.get("reason"),
+            "rewrite_attempts": payload.get("rewrite_attempts"),
+            "at": at,
+        }
+    unresolved = [
+        row
+        for module_key, row in latest_dead_by_module.items()
+        if latest_recovery_order.get(module_key, (-1, -1))
+        < (int(row["at"]), int(row.get("id", 0)))
+    ]
+    return sorted(unresolved, key=lambda row: (row["module_key"], int(row["at"])))
+
+
+def _module_status(
+    job_state: dict[str, Any] | None,
+    event_types: set[str],
+    *,
+    dead_lettered: bool,
+) -> str:
+    pending_phases = set(job_state["pending_phases"]) if job_state else set()
+    has_leased = bool(job_state and job_state["has_leased"])
+    has_completed = bool(job_state and job_state["has_completed"])
+
+    if dead_lettered:
+        return "dead_letter"
+    if has_leased:
+        return "in_progress"
+    if "patch" in pending_phases:
+        return "pending_patch"
+    if pending_phases.intersection({"review", "check_pre"}):
+        return "pending_review"
+    if "write" in pending_phases:
+        return "pending_write"
+    if pending_phases:
+        return "pending_review"
+    if "done" in event_types or has_completed:
+        return "done"
+    return "pending_write"
+
+
+def _build_status_report(db_path: Path) -> dict[str, Any]:
+    phase_order = [
+        "pending_review",
+        "pending_write",
+        "pending_patch",
+        "done",
+        "dead_letter",
+        "in_progress",
+    ]
+    counts = {phase: 0 for phase in phase_order}
+    modules: set[str] = set()
+    job_state_by_module: dict[str, dict[str, Any]] = {}
+    event_types_by_module: dict[str, set[str]] = {}
+    attempt_counts: dict[str, int] = {}
+    dead_letter_rows: list[dict[str, Any]] = []
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        job_rows = conn.execute(
+            """
+            SELECT module_key, phase, queue_state
+            FROM jobs
+            WHERE module_key IS NOT NULL
+            ORDER BY id ASC
+            """
+        ).fetchall()
+        event_rows = conn.execute(
+            """
+            SELECT id, module_key, type, payload_json, at
+            FROM events
+            WHERE module_key IS NOT NULL
+            ORDER BY id ASC
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    for row in job_rows:
+        module_key = str(row["module_key"])
+        phase = str(row["phase"])
+        queue_state = str(row["queue_state"])
+        modules.add(module_key)
+        state = job_state_by_module.setdefault(
+            module_key,
+            {
+                "pending_phases": set(),
+                "has_leased": False,
+                "has_failed": False,
+                "has_completed": False,
+            },
+        )
+        if queue_state == "pending":
+            state["pending_phases"].add(phase)
+        elif queue_state == "leased":
+            state["has_leased"] = True
+        elif queue_state == "failed":
+            state["has_failed"] = True
+        elif queue_state == "completed":
+            state["has_completed"] = True
+
+    for row in event_rows:
+        module_key = str(row["module_key"])
+        event_type = str(row["type"])
+        modules.add(module_key)
+        event_types_by_module.setdefault(module_key, set()).add(event_type)
+        if event_type == "attempt_started":
+            attempt_counts[module_key] = attempt_counts.get(module_key, 0) + 1
+        if event_type in {"needs_human_intervention", "module_dead_lettered", "dead_letter_recovered"}:
+            dead_letter_rows.append(
+                {
+                    "module_key": module_key,
+                    "id": int(row["id"]),
+                    "type": event_type,
+                    "payload_json": str(row["payload_json"] or "{}"),
+                    "at": int(row["at"]),
+                }
+            )
+
+    unresolved_dead_letters = {
+        row["module_key"]
+        for row in _current_dead_letter_rows(dead_letter_rows)
+    }
+
+    for module_key in modules:
+        job_state = job_state_by_module.get(module_key)
+        event_types = event_types_by_module.get(module_key, set())
+        counts[_module_status(job_state, event_types, dead_lettered=module_key in unresolved_dead_letters)] += 1
+
+    pending_review_list = sorted([
+        m for m in modules
+        if _module_status(job_state_by_module.get(m), event_types_by_module.get(m, set()), dead_lettered=m in unresolved_dead_letters) == "pending_review"
+    ])
+    pending_write_list = sorted([
+        m for m in modules
+        if _module_status(job_state_by_module.get(m), event_types_by_module.get(m, set()), dead_lettered=m in unresolved_dead_letters) == "pending_write"
+    ])
+
+    total_modules = len(modules)
+    done_count = counts["done"]
+    convergence_rate = (done_count / total_modules * 100.0) if total_modules else 0.0
+    flapping_count = sum(1 for attempts in attempt_counts.values() if attempts > 3)
+
+    return {
+        "db_path": str(db_path),
+        "phase_order": phase_order,
+        "counts": counts,
+        "total_modules": total_modules,
+        "convergence_rate": convergence_rate,
+        "flapping_count": flapping_count,
+        "needs_human_count": len(unresolved_dead_letters),
+        "pending_review": pending_review_list,
+        "pending_write": pending_write_list,
+    }
+
+
+build_v2_status_report = _build_status_report
+
 
 ACTIVE_MODULE_GROUPS = (
     {

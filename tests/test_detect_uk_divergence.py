@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import detect_uk_divergence as detect
 
@@ -57,11 +59,12 @@ def test_drift_above_threshold(tmp_path: Path) -> None:
     _write(en_path, "\n".join(["---", 'title: English', "---", "", "## Body", "", "changed", *[f"x{i}" for i in range(8)]]))
     _run(tmp_path, "add", str(en_path)); _run(tmp_path, "commit", "-m", "en update")
 
-    db = tmp_path / ".pipeline/translation_v2.db"
-    summary = detect.detect_uk_divergence(repo_root=tmp_path, threshold=5, db_path=db)
+    summary = detect.detect_uk_divergence(repo_root=tmp_path, threshold=5, dry_run=True)
     assert summary["stale"][0]["module_key"] == "prerequisites/zero-to-terminal/module-0.2-beta"
-    assert summary["enqueued"] == ["prerequisites/zero-to-terminal/module-0.2-beta"]
-    assert detect.detect_uk_divergence(repo_root=tmp_path, threshold=5, dry_run=True)["enqueued"] == []
+    assert summary["enqueued"] == []
+    db = tmp_path / ".pipeline/translation_v2.db"
+    with pytest.raises(RuntimeError, match="legacy dispatcher removed"):
+        detect.detect_uk_divergence(repo_root=tmp_path, threshold=5, db_path=db)
 
 
 def test_missing_en_commit_reported(tmp_path: Path) -> None:
@@ -89,8 +92,5 @@ def test_idempotent_enqueue(tmp_path: Path) -> None:
     _run(tmp_path, "add", str(en_path)); _run(tmp_path, "commit", "-m", "en update")
 
     db = tmp_path / ".pipeline/translation_v2.db"
-    summary1 = detect.detect_uk_divergence(repo_root=tmp_path, threshold=5, db_path=db)
-    assert summary1["enqueued"] == ["prerequisites/zero-to-terminal/module-0.4-delta"]
-
-    summary2 = detect.detect_uk_divergence(repo_root=tmp_path, threshold=5, db_path=db)
-    assert summary2["enqueued"] == []
+    with pytest.raises(RuntimeError, match="legacy dispatcher removed"):
+        detect.detect_uk_divergence(repo_root=tmp_path, threshold=5, db_path=db)
