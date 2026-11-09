@@ -38,7 +38,10 @@ REPORT_FILE = REPO_ROOT / ".pipeline" / "uk-sync-report.json"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from checks import ukrainian
-from dispatch import dispatch_agy_translate
+
+
+def dispatch_agy_translate(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
 
 CHUNKED_THRESHOLD = 40_000  # chars — modules above this use section-by-section translation
 BATCH_LIMIT = 15_000  # chars — pack adjacent sections into batches up to this size

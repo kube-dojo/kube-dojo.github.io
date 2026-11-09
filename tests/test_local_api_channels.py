@@ -383,31 +383,6 @@ def _seed_bridge_thread(db_path: Path, monkeypatch) -> tuple[Any, dict[str, Any]
     return bridge_db, root, reply
 
 
-def test_api_channel_thread_events_include_message_bodies(tmp_path: Path, monkeypatch) -> None:
-    db_path = tmp_path / "messages.db"
-    _, root, reply = _seed_bridge_thread(db_path, monkeypatch)
-
-    status_code, payload, _ = local_api.route_request(
-        tmp_path,
-        f"/api/channel/{root['thread_id']}/events",
-    )
-
-    assert status_code == 200
-    assert payload["thread_id"] == root["thread_id"]
-    assert payload["channel"] == "deliberation-ui-roadmap"
-    posted_events = [
-        event for event in payload["events"] if event["event"] == "message_posted"
-    ]
-    assert [event["message_id"] for event in posted_events] == [
-        root["message_id"],
-        reply["message_id"],
-    ]
-    assert [event["body"] for event in posted_events] == [
-        "Root decision prompt",
-        "[AGREE] Reply with implementation detail",
-    ]
-
-
 def test_api_channel_thread_post_replies_into_existing_thread(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "messages.db"
     bridge_db, root, _ = _seed_bridge_thread(db_path, monkeypatch)

@@ -17,14 +17,19 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from checks import ukrainian
-from dispatch import GEMINI_WRITER_MODEL
-from pipeline_v2.control_plane import (
-    DEFAULT_BUDGETS_PATH,
-    ControlPlane,
-)
 from quality.calque_review_stamp import read_status as read_calque_review_status
 from uk_sync import fix_module as uk_fix_module
 from uk_sync import translate_new_module as uk_translate_new_module
+
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
+DEFAULT_BUDGETS_PATH = None
+
+
+class ControlPlane:
+    """Stand-in for the removed pipeline control plane."""
+
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -931,7 +936,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    control_plane = ControlPlane(repo_root=args.repo_root, db_path=args.db, budgets_path=args.budgets)
 
     def _worker_log_outcome(outcome: TranslationRunOutcome) -> None:
         attempts = None
@@ -958,6 +962,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _print_status(report)
         return 0
+
+    control_plane = ControlPlane(repo_root=args.repo_root, db_path=args.db, budgets_path=args.budgets)
 
     if args.command == "enqueue-section":
         enqueued = enqueue_translation_targets(control_plane, section=args.section, limit=args.limit)

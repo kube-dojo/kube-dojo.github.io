@@ -20,13 +20,20 @@ import yaml
 REPO_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from dispatch import (  # noqa: E402
-    GEMINI_WRITER_MODEL,
-    _is_rate_limited,
-    dispatch_agy,
-    dispatch_claude,
-    dispatch_codex,
-)
+def _legacy_dispatcher_removed(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
+
+
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
+
+
+def _is_rate_limited(*_args, **_kwargs):
+    return False
+
+
+dispatch_agy = _legacy_dispatcher_removed
+dispatch_claude = _legacy_dispatcher_removed
+dispatch_codex = _legacy_dispatcher_removed
 
 CONTENT_ROOT = REPO_ROOT / "src" / "content" / "docs"
 KUBEDOJO_LABS_DIR = Path(

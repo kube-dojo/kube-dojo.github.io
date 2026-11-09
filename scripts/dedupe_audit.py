@@ -21,7 +21,11 @@ REPO_ROOT = Path(__file__).parent.parent
 CONTENT_ROOT = REPO_ROOT / "src" / "content" / "docs"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-from dispatch import GEMINI_WRITER_MODEL, dispatch_agy  # noqa: E402
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
+
+
+def dispatch_agy(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
 
 
 def extract_title_and_topics(path: Path) -> tuple[str, list[str]]:

@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-import dispatch_smart  # noqa: E402
+import dispatch_smart
 from lu_machinery.agent_runtime.errors import AgentTimeoutError
 
 
@@ -35,7 +35,7 @@ def _stub_dispatch_side_effects(
 
 
 def test_dispatch_smart_fire_retries_agy_after_timeout(monkeypatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """agy should retry on transient errors and eventually return a successful result."""
+    """A write-class agy call retries a transient timeout. Review and search are refused (#3746)."""
 
     _stub_dispatch_side_effects(monkeypatch, task_id="agy-retry")
 
@@ -56,7 +56,7 @@ def test_dispatch_smart_fire_retries_agy_after_timeout(monkeypatch, capsys: pyte
 
     code = dispatch_smart.fire(
         agent="agy",
-        task_class="review",
+        task_class="edit",
         prompt="test prompt",
         mode="danger",
         model="gpt-5.5",

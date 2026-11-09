@@ -11,9 +11,13 @@ from pathlib import Path
 SCRIPTS_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from pipeline_v2.control_plane import ControlPlane
 import translation_v2
 import uk_sync
+
+
+class ControlPlane:
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

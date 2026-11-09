@@ -1813,13 +1813,10 @@ def build_pipeline_stuck(
         if (row.get("last_event_at") or 0) < cutoff
     ]
 
-    # Dead-lettered modules. We defer to ``pipeline_v2.cli.
-    # _current_dead_letter_rows`` for the reducer so this endpoint
-    # agrees with the pipeline's own needs_human_count. That helper
-    # sorts by ``(at, id)`` and compares recovery-event order against
-    # dead-letter-event order, so out-of-order ``at`` timestamps or
-    # ``(id)`` vs ``(at)`` skew don't cause this endpoint to
-    # disagree with the source of truth.
+    # Dead-lettered modules. The reducer lives next to the status
+    # report in ``status`` so this endpoint and the briefing agree
+    # after the pipeline workers were removed. It sorts by ``(at, id)``
+    # and compares recovery-event order against dead-letter-event order.
     dead_events = _query_sqlite_rows(
         db_path,
         """
@@ -1832,19 +1829,8 @@ def build_pipeline_stuck(
         )
         """,
     )
-    # Only swallow the "pipeline_v2 not installed at all" case,
-    # narrowed by ``exc.name`` so a transitive import failure inside
-    # pipeline_v2.cli (broken install, missing dep) doesn't silently
-    # degrade to ``dead_lettered = []`` and hide modules that need
-    # human triage. A renamed/removed ``_current_dead_letter_rows``
-    # raises ImportError (not ModuleNotFoundError) and propagates.
-    _current_dead_letter_rows = None
-    try:
-        from pipeline_v2.cli import _current_dead_letter_rows
-    except ModuleNotFoundError as exc:
-        if exc.name not in {"pipeline_v2", "pipeline_v2.cli"}:
-            raise
-    if _current_dead_letter_rows is not None and dead_events:
+    from status import _current_dead_letter_rows
+    if dead_events:
         dead_lettered = _current_dead_letter_rows(dead_events)
     else:
         dead_lettered = []
@@ -7106,7 +7092,7 @@ def _recent_commits(repo_root: Path, limit: int = 5) -> list[dict[str, Any]]:
 def _pipeline_summary_safe(repo_root: Path) -> dict[str, Any] | None:
     """Return pipeline v2 summary. None if DB absent; error dict if broken.
 
-    Shape map from ``pipeline_v2.cli._build_status_report``:
+    Shape map from ``status._build_status_report``:
       - ``counts``: {pending_review, pending_write, pending_patch,
                      in_progress, dead_letter, done}
       - ``needs_human_count``: dead-letter count after resolution
@@ -7122,7 +7108,7 @@ def _pipeline_summary_safe(repo_root: Path) -> dict[str, Any] | None:
     if not db_path.exists():
         return None
     try:
-        from pipeline_v2.cli import _build_status_report as build_v2_status_report
+        from status import _build_status_report as build_v2_status_report
         report = build_v2_status_report(db_path)
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
@@ -8066,17 +8052,10 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         db_path = repo_root / ".pipeline" / "v2.db"
         if not db_path.exists():
             return 404, {"error": "missing_db", "db_path": str(db_path)}, "application/json; charset=utf-8"
-        from pipeline_v2.cli import _build_status_report as build_v2_status_report
+        from status import _build_status_report as build_v2_status_report
         from status import _enrich_v2_with_per_track
         return 200, _enrich_v2_with_per_track(build_v2_status_report(db_path)), "application/json; charset=utf-8"
     if path == "/api/translation/v2/enqueue":
-        from translation_v2 import (
-            TRANSLATE_ESTIMATED_USD,
-            TRANSLATE_MODEL,
-            ControlPlane,
-            _has_pending_or_leased_job,
-        )
-
         from_quality = query.get("from_quality", [None])[0]
         if from_quality != "done":
             return (
@@ -8084,93 +8063,9 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
                 {"error": "invalid_from_quality", "supported": ["done"]},
                 "application/json; charset=utf-8",
             )
-
-        raw_dry_run = query.get("dry_run", ["0"])[0]
-        dry_run = raw_dry_run not in ("0", "false", "False", "FALSE", "")
-
-        board = build_quality_board(repo_root)
-        modules = board.get("modules")
-        if not isinstance(modules, list):
-            modules = []
-
-        total_modules = len(modules)
-        done_modules = [
-            item.get("module_key")
-            for item in modules
-            if str(item.get("status") or "").lower() == "done"
-        ]
-        done_modules = [key for key in done_modules if isinstance(key, str)]
-
-        db_path = repo_root / ".pipeline" / "translation_v2.db"
-        control_plane = ControlPlane(repo_root=repo_root, db_path=db_path)
-
-        skipped_reasons = {
-            "already_pending_or_leased": 0,
-            "already_completed": 0,
-            "previously_failed": 0,
-            "not_done": max(total_modules - len(done_modules), 0),
-        }
-        enqueued: list[str] = []
-
-        if db_path.exists():
-            conn = sqlite3.connect(db_path)
-            try:
-                for module_key in done_modules:
-                    if _has_pending_or_leased_job(db_path, module_key):
-                        skipped_reasons["already_pending_or_leased"] += 1
-                        continue
-
-                    terminal_row = conn.execute(
-                        "SELECT queue_state FROM jobs WHERE module_key = ? AND queue_state IN ('failed', 'completed') LIMIT 1",
-                        (module_key,),
-                    ).fetchone()
-                    if terminal_row is not None:
-                        if terminal_row[0] == "completed":
-                            skipped_reasons["already_completed"] += 1
-                        else:
-                            skipped_reasons["previously_failed"] += 1
-                        continue
-
-                    if not dry_run:
-                        control_plane.enqueue(
-                            module_key,
-                            phase="write",
-                            model=TRANSLATE_MODEL,
-                            priority=100 + len(enqueued),
-                            requested_calls=1,
-                            estimated_usd=TRANSLATE_ESTIMATED_USD,
-                        )
-                    enqueued.append(module_key)
-            finally:
-                conn.close()
-        else:
-            if not dry_run:
-                for module_key in done_modules:
-                    control_plane.enqueue(
-                        module_key,
-                        phase="write",
-                        model=TRANSLATE_MODEL,
-                        priority=100 + len(enqueued),
-                        requested_calls=1,
-                        estimated_usd=TRANSLATE_ESTIMATED_USD,
-                    )
-                    enqueued.append(module_key)
-            else:
-                enqueued = done_modules
-
         return (
-            200,
-            {
-                "enqueued": len(enqueued),
-                "skipped": (
-                    skipped_reasons["already_pending_or_leased"]
-                    + skipped_reasons["already_completed"]
-                    + skipped_reasons["previously_failed"]
-                    + skipped_reasons["not_done"]
-                ),
-                "skipped_reasons": skipped_reasons,
-                "dry_run": dry_run,
-            },
+            410,
+            {"error": "legacy dispatcher removed"},
             "application/json; charset=utf-8",
         )
     if path == "/api/translation/v2/status":

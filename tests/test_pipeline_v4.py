@@ -2,14 +2,26 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-import expand_module  # noqa: E402
 import pipeline_v4  # noqa: E402
+
+
+@dataclass
+class ExpandResult:
+    module_key: str
+    gaps_processed: list[str]
+    gaps_filled: list[str]
+    gaps_failed: list[tuple[str, str]]
+    loc_before: int
+    loc_after: int
+    diff: str
+    provenance_blocks_added: int
 
 
 MODULE_KEY = "platform/foo/module-1.1-pipeline-v4-fixture"
@@ -54,8 +66,8 @@ def _expand_result(
     gaps_failed: list[tuple[str, str]] | None = None,
     loc_before: int = 200,
     loc_after: int = 600,
-) -> expand_module.ExpandResult:
-    return expand_module.ExpandResult(
+) -> ExpandResult:
+    return ExpandResult(
         module_key=module_key,
         gaps_processed=list(gaps_filled or []),
         gaps_filled=list(gaps_filled or []),

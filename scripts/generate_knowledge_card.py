@@ -11,7 +11,15 @@ from pathlib import Path
 
 import yaml
 
-from dispatch import dispatch_codex, _is_rate_limited
+def _legacy_dispatcher_removed(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
+
+
+def _is_rate_limited(*_args, **_kwargs):
+    return False
+
+
+dispatch_codex = _legacy_dispatcher_removed
 
 REPO_ROOT = Path(__file__).parent.parent
 KNOWLEDGE_CARD_DIR = REPO_ROOT / ".pipeline" / "knowledge-cards"

@@ -146,11 +146,13 @@ CREATE TABLE IF NOT EXISTS channel_events (
 
 CREATE INDEX IF NOT EXISTS idx_channel_events_thread_event
     ON channel_events(thread_id, event_id);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_events_message_posted
-    ON channel_events (event, json_extract(payload_json, '$.message_id'))
-    WHERE event = 'message_posted';
 """
+
+# message_posted was removed. An existing database may still carry
+# idx_channel_events_message_posted. That partial index constrains only
+# rows whose event is 'message_posted', so leaving it does not affect
+# other events or channel_messages. New databases do not create it, and
+# get_db() does not drop it.
 
 
 def _tune_connection(conn: sqlite3.Connection) -> None:
@@ -298,20 +300,6 @@ def get_db():
                         """
                         CREATE INDEX IF NOT EXISTS idx_channel_events_thread_event
                         ON channel_events(thread_id, event_id)
-                        """
-                    )
-                cursor.execute(
-                    "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_channel_events_message_posted'"
-                )
-                if not cursor.fetchone():
-                    conn.execute(
-                        """
-                        CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_events_message_posted
-                        ON channel_events (
-                            event,
-                            json_extract(payload_json, '$.message_id')
-                        )
-                        WHERE event = 'message_posted'
                         """
                     )
 

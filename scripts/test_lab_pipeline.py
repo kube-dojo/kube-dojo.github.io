@@ -19,7 +19,7 @@ import sys
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import lab_pipeline as lp
-from dispatch import GEMINI_WRITER_MODEL
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
 
 
 def _write_module(path: Path, *, lab: str | dict | None = None) -> None:

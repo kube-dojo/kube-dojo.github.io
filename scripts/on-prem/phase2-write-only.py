@@ -51,7 +51,11 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 VENV_PYTHON = str((REPO_ROOT / ".venv" / "bin" / "python").resolve())
 
-from dispatch import GEMINI_WRITER_MODEL, dispatch_agy  # type: ignore  # noqa: E402
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
+
+
+def dispatch_agy(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
 
 CONTENT_ROOT = REPO_ROOT / "src" / "content" / "docs" / "on-premises"
 LOG_FILE = REPO_ROOT / ".pipeline" / "on-prem-logs" / "phase2-write-only.log"

@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-import dispatch_smart  # noqa: E402
+import dispatch_smart
 
 
 def test_draft_and_edit_are_claude_mcp_task_classes() -> None:

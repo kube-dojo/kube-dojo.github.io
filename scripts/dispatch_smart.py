@@ -22,7 +22,7 @@ Usage:
     .venv/bin/python scripts/dispatch_smart.py search --agent codex \
         "Find every place that imports agent_runtime.runner.invoke."
 
-    # Bounded edit — Codex picks GPT-6.1 Terra
+    # Bounded edit — Codex picks GPT-6.1 Sol
     .venv/bin/python scripts/dispatch_smart.py edit --agent codex \
         --worktree .worktrees/codex-fix-issue-500 \
         --new-branch codex/fix-issue-500 \
@@ -51,8 +51,8 @@ Task classes — model mapping per agent:
     class       claude                       codex            cursor
     -------     --------------------------   --------------   --------------
     search      claude-haiku-4-5-20251001    gpt-6-luna       composer-2.5
-    edit        claude-sonnet-5              gpt-6.1-terra    grok-4.7-high
-    draft       claude-sonnet-5              gpt-6.1-terra    grok-4.7-high
+    edit        claude-sonnet-5              gpt-6.1-sol      grok-4.7-high
+    draft       claude-sonnet-5              gpt-6.1-sol      grok-4.7-high
     review      claude-opus-5-5               gpt-6.1-sol      grok-4.7-high
     architect   claude-fable-5-1              gpt-6.1-sol      grok-4.7-high
 
@@ -234,14 +234,14 @@ HERMES_RETIRED_MESSAGE = (
     "Use --agent grok --model grok-4.7 for xAI content/CF "
     "(native grok CLI; replaces grok-4.6; frontier tier with Fable and Astra; "
     "grok-build is gone). "
-    "Use --agent deepseek --model deepseek-flash for DeepSeek V4.1 Flash "
+    "Use --agent deepseek --model deepseek-v4.1-flash for DeepSeek V4.1 Flash "
     "(first-party, local-only). "
     "OpenCode and Qwen are not routing seats."
 )
 
 OPENCODE_QWEN_RETIRED_MESSAGE = (
     "[smart] REFUSED: --agent opencode and --agent qwen are not routing seats. "
-    "DeepSeek V4.1 Flash is --agent deepseek --model deepseek-flash "
+    "DeepSeek V4.1 Flash is --agent deepseek --model deepseek-v4.1-flash "
     "(local-only). Cursor is --agent cursor --model grok-4.7-high. "
     "Do not route Qwen or OpenCode."
 )
@@ -253,7 +253,6 @@ class TaskClassConfig:
     default_mode: str  # "read-only" | "workspace-write" | "danger"
     default_timeout_s: int
     description: str
-    codex_search: bool = False  # opt-in per class
     # Headless Codex task classes default to high; native roles may differ.
     # Luna max is only for an unusually hard scout; do not set it here.
     codex_reasoning_effort: str = "high"
@@ -265,21 +264,20 @@ class TaskClassConfig:
 # Claude catalog: review default = claude-opus-5-5 (Opus 5.5);
 # architect/advisor = claude-fable-5-1 (Fable 5.1);
 # edit/draft = claude-sonnet-5 (Sonnet 5); search = claude-haiku-4-5-20251001.
-# Codex operator policy: Terra 6.1 handles coding/writing (edit + draft),
-# Sol 6.1 handles hard problems/review (architect + review), and GPT-6 Luna
-# remains the read-only scout. Re-probe `codex debug models` before dispatch;
-# unavailable models are not permission to substitute Astra or Fable.
+# Codex uses the shared runtime's approved set: Sol 6.1 is the default for
+# edit, draft, review and architect; GPT-6 Luna remains the read-only scout.
+# Terra is not in that set, and the shared adapter has no web-search switch.
 # Cursor is grok-4.7-high except search, which is composer-2.5.
 # Native grok search stays grok-4.7 with --reasoning-effort low.
-# DeepSeek V4.1 Flash is deepseek-flash (first-party). OpenCode and Qwen are
-# not routing seats. Native grok remains grok-4.7.
+# DeepSeek V4.1 Flash is the catalog id deepseek-v4.1-flash (first-party).
+# OpenCode and Qwen are not routing seats. Native grok remains grok-4.7.
 TASK_CLASSES: dict[str, TaskClassConfig] = {
     "search": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-haiku-4-5-20251001",
             "codex": "gpt-6-luna",
-            "deepseek": "deepseek-flash",  # V4.1 Flash, first-party, local-only
+            "deepseek": "deepseek-v4.1-flash",  # catalog id, first-party, local-only
             "grok": "grok-4.7",
             "cursor": "composer-2.5",
             "kimi": "kimi-code/k3-256k",
@@ -287,15 +285,14 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         default_mode="read-only",
         default_timeout_s=600,
         description="cheap codebase scans, file lookups, factual Q&A",
-        codex_search=False,
         grok_reasoning_effort="low",
     ),
     "edit": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6.1-terra",
-            "deepseek": "deepseek-flash",
+            "codex": "gpt-6.1-sol",
+            "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3-256k",
@@ -303,14 +300,13 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         default_mode="workspace-write",
         default_timeout_s=1800,
         description="small/medium code edits, single-file fixes",
-        codex_search=False,
     ),
     "draft": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6.1-terra",
-            "deepseek": "deepseek-flash",
+            "codex": "gpt-6.1-sol",
+            "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3-256k",
@@ -318,14 +314,13 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         default_mode="workspace-write",
         default_timeout_s=3600,
         description="prose/content drafting and expansion",
-        codex_search=True,
     ),
     "review": TaskClassConfig(
         models={
-            "agy": "gemini-4-argon-high",
+            "agy": "gemini-3.8-flash-high",
             "claude": "claude-opus-5-5",
             "codex": "gpt-6.1-sol",
-            "deepseek": "deepseek-flash",
+            "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3-256k",
@@ -333,14 +328,13 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         default_mode="read-only",
         default_timeout_s=1800,
         description="cross-family review of authored work (judgment)",
-        codex_search=True,  # reviewers MUST be able to web-verify volatile facts (#1827)
     ),
     "architect": TaskClassConfig(
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-fable-5-1",
             "codex": "gpt-6.1-sol",
-            "deepseek": "deepseek-flash",
+            "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
             "kimi": "kimi-code/k3",
@@ -348,7 +342,6 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         default_mode="workspace-write",
         default_timeout_s=3600,
         description="deep reasoning, multi-file refactors, design",
-        codex_search=True,
     ),
 }
 
@@ -913,21 +906,12 @@ def fire(
         print("[smart] mode is advisory for this router CLI")
 
     started = time.time()
-    previous_search: str | None = None
-    previous_effort: str | None = None
     previous_dispatched: str | None = None
     try:
-        previous_search = os.environ.get("KUBEDOJO_CODEX_SEARCH")
-        previous_effort = os.environ.get("KUBEDOJO_CODEX_EFFORT")
         previous_dispatched = os.environ.get("KUBEDOJO_DISPATCHED")
-        if agent == "codex":
-            cfg = TASK_CLASSES[task_class]
-            # Only the in-tree fork CodexAdapter reads these two variables. The
-            # shared lu_machinery CodexAdapter takes effort as an argument (passed
-            # below) and has no web-search switch yet, so codex_search is not
-            # honored on the shared runtime (step-7 package-5 residual).
-            os.environ["KUBEDOJO_CODEX_SEARCH"] = "1" if cfg.codex_search else "0"
-            os.environ["KUBEDOJO_CODEX_EFFORT"] = cfg.codex_reasoning_effort
+        # The shared Codex adapter takes effort as an argument and rejects
+        # models outside its approved set. It has no web-search switch, so
+        # this caller does not set the fork-only search or effort variables.
         env = os.environ.copy()
         env["KUBEDOJO_DISPATCHED"] = "1"
         os.environ.update(env)
@@ -1004,15 +988,6 @@ def fire(
         session_id = None
         stderr_excerpt = f"{type(exc).__name__}: {exc}"
     finally:
-        if agent == "codex":
-            if previous_search is None:
-                os.environ.pop("KUBEDOJO_CODEX_SEARCH", None)
-            else:
-                os.environ["KUBEDOJO_CODEX_SEARCH"] = previous_search
-            if previous_effort is None:
-                os.environ.pop("KUBEDOJO_CODEX_EFFORT", None)
-            else:
-                os.environ["KUBEDOJO_CODEX_EFFORT"] = previous_effort
         if previous_dispatched is None:
             os.environ.pop("KUBEDOJO_DISPATCHED", None)
         else:

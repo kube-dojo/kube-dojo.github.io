@@ -15,7 +15,6 @@ ab channel info <name>
 ab channel context <name> [--edit] [--show]
 ab channel tail <name> [--n N] [--thread TID]
 ab channel watch <thread_id> [--follow] [--event-stream]
-ab channel backfill-events
 
 ab post <channel> <body> [--to A,...] [--parent ID] [--corr ID]
 ab p <channel> <agent> <body>                    # shorthand
@@ -366,11 +365,6 @@ def register_channel_commands(subparsers: Any) -> None:
         help="Emit JSONL rows for machine readers",
     )
 
-    channel_sub.add_parser(
-        "backfill-events",
-        help="Backfill missing message_posted events from channel_messages",
-    )
-
     # ── top-level: post ───────────────────────────────────────────
     post_parser = subparsers.add_parser(
         "post",
@@ -548,8 +542,6 @@ def _dispatch_channel_group(args) -> int:
         return _handle_channel_tail(args)
     if sub == "watch":
         return _handle_channel_watch(args)
-    if sub == "backfill-events":
-        return _handle_channel_backfill_events(args)
     print(f"unknown subcommand: channel {sub}", file=sys.stderr)
     return 2
 
@@ -935,17 +927,6 @@ def _handle_channel_watch(args) -> int:
     except ValueError as exc:
         print(f"❌ {exc}", file=sys.stderr)
         return 1
-
-
-def _handle_channel_backfill_events(args) -> int:
-    try:
-        inserted = _channels.backfill_message_posted_events()
-    except Exception as exc:
-        _LOGGER.exception("Bridge channel event backfill failed")
-        print(f"❌ backfill failed: {exc}", file=sys.stderr)
-        return 1
-    print(f"backfill-events: inserted {inserted} message_posted event(s)")
-    return 0
 
 
 def _handle_post(args) -> int:
@@ -1421,32 +1402,6 @@ def _handle_discuss(args) -> int:
                 ok, response, stderr_excerpt = _cursor._invoke_cursor(
                     prompt_text,
                     model,
-                    timeout_s=900,
-                    cwd=cwd,
-                )
-                return Result(
-                    ok=ok,
-                    agent=agent_name,
-                    model=model,
-                    mode=mode,
-                    response=response,
-                    stderr_excerpt=stderr_excerpt or None,
-                    duration_s=time.monotonic() - started,
-                    session_id=None,
-                    rate_limited=False,
-                    stalled=False,
-                    returncode=0 if ok else 1,
-                ), None
-            if agent_name == "hermes":
-                from . import _hermes
-
-                started = time.monotonic()
-                model = _hermes._DEFAULT_MODEL
-                provider = _hermes._detect_provider(model)
-                ok, response, stderr_excerpt = _hermes._invoke_hermes(
-                    prompt_text,
-                    model,
-                    provider=provider,
                     timeout_s=900,
                     cwd=cwd,
                 )

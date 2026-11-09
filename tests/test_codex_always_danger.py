@@ -6,7 +6,9 @@ the guard cannot be silently undone.
 """
 from __future__ import annotations
 
+import importlib
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -21,7 +23,12 @@ _git_common_dir = subprocess.check_output(
     text=True,
 ).strip()
 REPO_ROOT = Path(_git_common_dir).parent.resolve()
-VENV_PYTHON = str(REPO_ROOT / ".venv/bin/python")
+
+
+def _load_dispatch_smart():
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+    return importlib.import_module("dispatch_smart")
 
 
 def test_codex_adapter_rejects_read_only_mode():
@@ -44,53 +51,6 @@ def test_codex_adapter_rejects_read_only_mode():
         )
 
 
-def test_dispatch_smart_codex_forces_danger_mode():
-    """dispatch_smart.py review --agent codex --dry-run always resolves mode=danger.
-
-    Regardless of the 'review' task class default (read-only), codex
-    dispatches must be overridden to danger before any validation runs.
-    """
-    result = subprocess.run(
-        [
-            VENV_PYTHON,
-            str(SCRIPTS_DIR / "dispatch_smart.py"),
-            "review",
-            "--agent", "codex",
-            "--dry-run",
-            "-",
-        ],
-        input="x",
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=False,
-    )
-    assert result.returncode == 0, (
-        f"dispatch_smart.py exited {result.returncode}\n"
-        f"stdout: {result.stdout}\nstderr: {result.stderr}"
-    )
-    assert "mode=danger" in result.stdout, (
-        f"Expected 'mode=danger' in stdout but got:\n{result.stdout}"
-    )
-
-
-def _load_dispatch() -> object:
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("dispatch", SCRIPTS_DIR / "dispatch.py")
-    dispatch = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(dispatch)  # type: ignore[union-attr]
-    return dispatch
-
-
-def _load_dispatch_smart() -> object:
-    import importlib
-    import sys
-
-    if str(SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(SCRIPTS_DIR))
-    return importlib.import_module("dispatch_smart")
-
-
 def _load_codex_adapter():
     import importlib
     import sys
@@ -99,22 +59,6 @@ def _load_codex_adapter():
     sys.path.insert(0, str(REPO_ROOT))
     mod = importlib.import_module("agent_runtime.adapters.codex")
     return mod
-
-
-def _capture_cmd(dispatch_fn, *args, **kwargs) -> list[str]:
-    """Call dispatch_fn, intercept _run_with_process_group, return captured cmd."""
-    dispatch = _load_dispatch()
-
-    captured_cmd: list[str] = []
-
-    def fake_run(cmd, *_args, **_kwargs):
-        captured_cmd.extend(cmd)
-        raise FileNotFoundError("no codex cli in test")
-
-    dispatch._run_with_process_group = fake_run  # type: ignore[attr-defined]
-    fn = getattr(dispatch, dispatch_fn)
-    fn(*args, **kwargs)
-    return captured_cmd
 
 
 def _codex_invocation_cmd(
@@ -179,48 +123,6 @@ def test_codex_adapter_rejects_workspace_write_mode():
             model=None,
             task_id=None,
         )
-
-
-def test_dispatch_codex_sandbox_env_ignored():
-    """KUBEDOJO_CODEX_SANDBOX env var is now ignored; cmd is always danger.
-
-    The env override was removed in this PR — the var no longer affects
-    command construction. Verify the flag is still danger even when the
-    env var is set to workspace-write.
-    """
-    import os
-    env_backup = os.environ.get("KUBEDOJO_CODEX_SANDBOX")
-    try:
-        os.environ["KUBEDOJO_CODEX_SANDBOX"] = "workspace-write"
-        cmd = _capture_cmd("dispatch_codex", "test prompt")
-    finally:
-        if env_backup is None:
-            os.environ.pop("KUBEDOJO_CODEX_SANDBOX", None)
-        else:
-            os.environ["KUBEDOJO_CODEX_SANDBOX"] = env_backup
-
-    assert "--dangerously-bypass-approvals-and-sandbox" in cmd, (
-        f"Expected danger flag even with KUBEDOJO_CODEX_SANDBOX=workspace-write, got: {cmd}"
-    )
-    assert "--full-auto" not in cmd, (
-        f"--full-auto must not appear when env var is ignored, got: {cmd}"
-    )
-
-
-def test_dispatch_codex_default_is_danger():
-    """dispatch_codex() builds a --dangerously-bypass-approvals-and-sandbox command.
-
-    Env var is gone; the flag is unconditional.
-    """
-    import os
-    os.environ.pop("KUBEDOJO_CODEX_SANDBOX", None)
-    cmd = _capture_cmd("dispatch_codex", "test prompt")
-    assert "--dangerously-bypass-approvals-and-sandbox" in cmd, (
-        f"Expected danger flag in cmd but got: {cmd}"
-    )
-    assert "--sandbox" not in cmd, (
-        f"--sandbox should not appear in danger-mode cmd, got: {cmd}"
-    )
 
 
 def test_codex_adapter_respects_search_env_off():
@@ -312,16 +214,16 @@ def test_codex_adapter_resume_search_flag_order():
     assert cmd[3] == "resume"
 
 
-def test_dispatch_smart_codex_sets_search_for_draft():
-    """dispatch_smart sets search ON for draft class dispatches."""
+def test_dispatch_smart_codex_does_not_enable_search_for_draft():
+    """Draft uses the shared runtime, which has no web-search switch."""
     dispatch_smart = _load_dispatch_smart()
-
     observed: dict[str, str] = {}
 
-    def fake_invoke(*_args, **_kwargs):
+    def fake_invoke(*_args, **kwargs):
         import os
 
         observed["search"] = os.environ.get("KUBEDOJO_CODEX_SEARCH", "")
+        observed["effort"] = kwargs.get("effort", "")
         return SimpleNamespace(
             ok=True,
             response="ok",
@@ -335,22 +237,22 @@ def test_dispatch_smart_codex_sets_search_for_draft():
             task_class="draft",
             prompt="x",
             mode="danger",
-            model="gpt-5.4-mini",
+            model="gpt-6.1-sol",
             worktree=None,
             task_id="t1",
             timeout_s=1,
         )
-    assert observed["search"] == "1"
+    assert observed["search"] == ""
+    assert observed["effort"] == "high"
 
 
-def test_dispatch_smart_codex_enables_search_for_review(monkeypatch):
-    """Reviewers can verify volatile facts; routing restores the caller's env."""
+def test_dispatch_smart_codex_leaves_caller_search_env_for_review(monkeypatch):
+    """Review does not request Codex web search, and it restores nothing it did not set."""
     import os
 
     monkeypatch.setenv("KUBEDOJO_CODEX_SEARCH", "caller-search")
     monkeypatch.setenv("KUBEDOJO_CODEX_EFFORT", "caller-effort")
     dispatch_smart = _load_dispatch_smart()
-
     observed: dict[str, str] = {}
 
     def fake_invoke(*_args, **_kwargs):
@@ -370,43 +272,14 @@ def test_dispatch_smart_codex_enables_search_for_review(monkeypatch):
             task_class="review",
             prompt="x",
             mode="read-only",
-            model="gpt-5.5",
+            model="gpt-6.1-sol",
             worktree=None,
             task_id="t2",
             timeout_s=1,
         )
-    assert observed["search"] == "1"
+    assert observed["search"] == "caller-search"
     assert os.environ["KUBEDOJO_CODEX_SEARCH"] == "caller-search"
     assert os.environ["KUBEDOJO_CODEX_EFFORT"] == "caller-effort"
-
-
-def test_dispatch_codex_includes_search():
-    """dispatch_codex() includes --search and danger mode flags."""
-    cmd = _capture_cmd("dispatch_codex", "test prompt")
-    assert "--search" in cmd, f"Expected --search in dispatch_codex cmd: {cmd}"
-    assert cmd[1] == "--search", f"Expected top-level --search in cmd: {cmd}"
-    assert "--dangerously-bypass-approvals-and-sandbox" in cmd, (
-        f"Expected danger flag in dispatch_codex cmd: {cmd}"
-    )
-
-
-def test_dispatch_codex_review_no_search():
-    """dispatch_codex_review() keeps --search off."""
-    cmd = _capture_cmd("dispatch_codex_review", "test prompt")
-    assert "--search" not in cmd, f"Expected no --search in review cmd: {cmd}"
-    assert "--dangerously-bypass-approvals-and-sandbox" in cmd, (
-        f"Expected danger flag in review cmd: {cmd}"
-    )
-
-
-def test_dispatch_codex_patch_includes_search():
-    """dispatch_codex_patch() includes --search and danger mode flags."""
-    cmd = _capture_cmd("dispatch_codex_patch", "test prompt")
-    assert "--search" in cmd, f"Expected --search in patch cmd: {cmd}"
-    assert cmd[1] == "--search", f"Expected top-level --search in patch cmd: {cmd}"
-    assert "--dangerously-bypass-approvals-and-sandbox" in cmd, (
-        f"Expected danger flag in patch cmd: {cmd}"
-    )
 
 
 def test_codex_bridge_runtime_mode_always_danger():
