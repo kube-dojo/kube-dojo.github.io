@@ -5,11 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import pytest
-
 from agent_runtime.adapters.claude import ClaudeAdapter
 from agent_runtime.adapters.deepseek import DeepSeekAdapter
-from agent_runtime.adapters.qwen import QwenAdapter
-
 
 AdapterFactory = Callable[[], object]
 
@@ -38,9 +35,8 @@ def _parse_success_case(
     [
         (ClaudeAdapter, "In this answer we discuss rate limit tradeoffs for APIs.", ""),
         (DeepSeekAdapter, "The response explains rate limit policy and mitigation patterns.", ""),
-        (QwenAdapter, "Clarification: rate limit handling is part of this summary.", ""),
     ],
-    ids=["claude", "deepseek", "qwen"],
+    ids=["claude", "deepseek"],
 )
 def test_adapter_parses_rate_limit_phrase_as_success_on_success_exit(
     adapter_factory: AdapterFactory,
@@ -55,9 +51,8 @@ def test_adapter_parses_rate_limit_phrase_as_success_on_success_exit(
     [
         (ClaudeAdapter, "", "HTTP 429: too many requests"),
         (DeepSeekAdapter, "", "rate limit reached"),
-        (QwenAdapter, "", "rate limit reached"),
     ],
-    ids=["claude", "deepseek", "qwen"],
+    ids=["claude", "deepseek"],
 )
 def test_adapter_marks_rate_limited_when_call_fails(
     adapter_factory: AdapterFactory,

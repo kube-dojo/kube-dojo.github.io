@@ -17,8 +17,7 @@ ARCHITECTURAL OVERVIEW (read this first):
         │
         ├── adapters/codex.py     → wraps `codex exec`
         ├── adapters/claude.py    → wraps `npx @anthropic-ai/claude-code -p`
-        ├── adapters/gemini.py    → wraps `gemini -m ... -y`
-        └── adapters/qwen.py      — Hermes + openrouter adapter
+        └── adapters/gemini.py    → wraps `gemini -m ... -y`
 
 DESIGN PRINCIPLES:
 
