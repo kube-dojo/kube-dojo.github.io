@@ -15,11 +15,6 @@ audit/
 calibration/v1/ledger.db
 calibration/v1/ledger.db-wal
 calibration/v1/ledger.db-shm
-calibration/v1/*/results.db
-calibration/v1/*/results.db-wal
-calibration/v1/*/results.db-shm
-calibration/v1/*/results.jsonl
-calibration/v1/*/responses/
 calibration/v1/*/reports/
 # run_wave restructured the output layout so reports live at the top of v1/
 # rather than under each run_date — also ignore.

@@ -21,9 +21,7 @@ from ._codex import (
 from ._config import GEMINI_DEFAULT_MODEL, GEMINI_REVIEW_MODEL
 from ._cursor import ask_cursor
 from ._db import get_db
-from ._deepseek import ask_deepseek
 from ._gemini import ask_gemini, converse_gemini, process_and_respond
-from ._hermes import ask_hermes
 from ._messaging import (
     acknowledge,
     acknowledge_all,
@@ -35,7 +33,6 @@ from ._messaging import (
 from ._model import check_model
 from ._opencode import ask_opencode
 from ._prompts import build_review_message
-from ._qwen import ask_qwen
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -510,63 +507,6 @@ def _build_parser() -> argparse.ArgumentParser:
     ask_agy_parser.add_argument("--review", action="store_true",
                                 help="Prepend docs/review-protocol.md")
 
-    # ask-qwen
-    ask_qwen_parser = subparsers.add_parser("ask-qwen", help="Send message AND invoke Qwen (one-step)")
-    ask_qwen_parser.add_argument("content", help="Message content (use '-' to read from stdin)")
-    ask_qwen_parser.add_argument("--task-id", help="Task ID for session tracking")
-    ask_qwen_parser.add_argument("--type", default="query", help="Message type (default: query)")
-    ask_qwen_parser.add_argument("--data", help="Path to data file to attach")
-    ask_qwen_parser.add_argument("--new-session", dest="new_session", action="store_true",
-                                 help="Force new session even if one exists")
-    ask_qwen_parser.add_argument("--from", dest="from_llm", default="gemini",
-                                 help="Sender agent family. Default: gemini")
-    ask_qwen_parser.add_argument("--from-model", dest="from_model",
-                                 help="Exact sender model ID")
-    ask_qwen_parser.add_argument("--to-model", dest="to_model",
-                                 help="Target model ID")
-    ask_qwen_parser.add_argument("--no-timeout", dest="no_timeout", action="store_true",
-                                 help="Run sync without timeout")
-    ask_qwen_parser.add_argument("--review", action="store_true",
-                                 help="Prepend docs/review-protocol.md")
-
-    # ask-deepseek
-    ask_deepseek_parser = subparsers.add_parser("ask-deepseek", help="Send message AND invoke DeepSeek (one-step)")
-    ask_deepseek_parser.add_argument("content", help="Message content (use '-' to read from stdin)")
-    ask_deepseek_parser.add_argument("--task-id", help="Task ID for session tracking")
-    ask_deepseek_parser.add_argument("--type", default="query", help="Message type (default: query)")
-    ask_deepseek_parser.add_argument("--data", help="Path to data file to attach")
-    ask_deepseek_parser.add_argument("--new-session", dest="new_session", action="store_true",
-                                     help="Force new session even if one exists")
-    ask_deepseek_parser.add_argument("--from", dest="from_llm", default="gemini",
-                                     help="Sender agent family. Default: gemini")
-    ask_deepseek_parser.add_argument("--from-model", dest="from_model",
-                                     help="Exact sender model ID")
-    ask_deepseek_parser.add_argument("--to-model", dest="to_model",
-                                     help="Target model ID")
-    ask_deepseek_parser.add_argument("--no-timeout", dest="no_timeout", action="store_true",
-                                     help="Run sync without timeout")
-    ask_deepseek_parser.add_argument("--review", action="store_true",
-                                     help="Prepend docs/review-protocol.md")
-
-    # ask-hermes
-    ask_hermes_parser = subparsers.add_parser("ask-hermes", help="Send message AND invoke Hermes (one-step)")
-    ask_hermes_parser.add_argument("content", help="Message content (use '-' to read from stdin)")
-    ask_hermes_parser.add_argument("--task-id", help="Task ID for session tracking")
-    ask_hermes_parser.add_argument("--type", default="query", help="Message type (default: query)")
-    ask_hermes_parser.add_argument("--data", help="Path to data file to attach")
-    ask_hermes_parser.add_argument("--new-session", dest="new_session", action="store_true",
-                                   help="Force new session even if one exists")
-    ask_hermes_parser.add_argument("--from", dest="from_llm", default="gemini",
-                                   help="Sender agent family. Default: gemini")
-    ask_hermes_parser.add_argument("--from-model", dest="from_model",
-                                   help="Exact sender model ID")
-    ask_hermes_parser.add_argument("--to-model", dest="to_model",
-                                   help="Target model ID")
-    ask_hermes_parser.add_argument("--no-timeout", dest="no_timeout", action="store_true",
-                                   help="Run sync without timeout")
-    ask_hermes_parser.add_argument("--review", action="store_true",
-                                   help="Prepend docs/review-protocol.md")
-
     # ask-opencode
     ask_opencode_parser = subparsers.add_parser("ask-opencode", help="Send message AND invoke OpenCode (one-step)")
     ask_opencode_parser.add_argument("content", help="Message content (use '-' to read from stdin)")
@@ -703,45 +643,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Inline message text. Mutually exclusive with --from-file.",
     )
 
-    # send-cursor-ui — Cursor Desktop bridge via `cursor-agent --resume`.
-    # New for kubedojo; learn-ukrainian deferred the cursor adapter in #2285.
-    send_cursor_ui_parser = subparsers.add_parser(
-        "send-cursor-ui",
-        help="Send a prompt to a running Cursor Desktop chat via `cursor-agent --resume`",
-    )
-    send_cursor_ui_parser.add_argument(
-        "--thread", default=None,
-        help="Cursor chat id. Omit or pass 'new' to create a fresh chat via `cursor-agent create-chat`",
-    )
-    send_cursor_ui_parser.add_argument(
-        "--bridge-id", default=None,
-        help="Correlation id (auto-generated if not given)",
-    )
-    send_cursor_ui_parser.add_argument(
-        "--cwd", default=None,
-        help="Working directory for the cursor-agent subprocess (default: caller's cwd)",
-    )
-    send_cursor_ui_parser.add_argument(
-        "--timeout", type=int, default=1800,
-        help="Max wall-clock seconds (default 1800 = 30min)",
-    )
-    send_cursor_ui_parser.add_argument(
-        "--model", default=None,
-        help="Model override (default composer-2.5 or $AB_CURSOR_UI_MODEL)",
-    )
-    send_cursor_ui_parser.add_argument(
-        "--from-file", default=None,
-        help="Read message body from a file (use '-' for stdin)",
-    )
-    send_cursor_ui_parser.add_argument(
-        "--json", action="store_true",
-        help="Print result as compact JSON (excludes verbose events list)",
-    )
-    send_cursor_ui_parser.add_argument(
-        "message", nargs="?",
-        help="Inline message text. Mutually exclusive with --from-file.",
-    )
-
     # send-agy-ui — Antigravity UI bridge via `agy --conversation ... --print`.
     send_agy_ui_parser = subparsers.add_parser(
         "send-agy-ui",
@@ -819,12 +720,6 @@ def _dispatch_command(args):
         _handle_ask_gemini(args)
     elif args.command == "ask-agy":
         _handle_ask_agy(args)
-    elif args.command == "ask-qwen":
-        _handle_ask_qwen(args)
-    elif args.command == "ask-deepseek":
-        _handle_ask_deepseek(args)
-    elif args.command == "ask-hermes":
-        _handle_ask_hermes(args)
     elif args.command == "ask-opencode":
         _handle_ask_opencode(args)
     elif args.command == "ask-cursor":
@@ -866,26 +761,6 @@ def _dispatch_command(args):
         if args.message:
             argv += [args.message]
         sys.exit(_ui_codex_cli_main(argv))
-    elif args.command == "send-cursor-ui":
-        from ._ui_cursor import cli_main as _ui_cursor_cli_main
-        argv = []
-        if args.thread:
-            argv += ["--thread", args.thread]
-        if args.bridge_id:
-            argv += ["--bridge-id", args.bridge_id]
-        if args.cwd:
-            argv += ["--cwd", args.cwd]
-        if args.timeout != 1800:
-            argv += ["--timeout", str(args.timeout)]
-        if args.model:
-            argv += ["--model", args.model]
-        if getattr(args, "json", False):
-            argv += ["--json"]
-        if args.from_file:
-            argv += ["--from-file", args.from_file]
-        if args.message is not None:
-            argv += [args.message]
-        sys.exit(_ui_cursor_cli_main(argv))
     elif args.command == "send-agy-ui":
         from ._ui_agy import cli_main as _ui_agy_cli_main
         argv = []
@@ -967,39 +842,6 @@ def _handle_ask_agy(args):
     ask_agy(content, args.task_id, args.type, data,
             args.new_session, args.from_llm, args.from_model,
             args.to_model, args.no_timeout, args.review)
-
-
-def _handle_ask_qwen(args):
-    """Handle ask-qwen subcommand."""
-    data = None
-    if args.data:
-        data = Path(args.data).read_text()
-    content = sys.stdin.read() if args.content == "-" else args.content
-    ask_qwen(content, args.task_id, args.type, data,
-             args.new_session, args.from_llm, args.from_model,
-             args.to_model, args.no_timeout, args.review)
-
-
-def _handle_ask_deepseek(args):
-    """Handle ask-deepseek subcommand."""
-    data = None
-    if args.data:
-        data = Path(args.data).read_text()
-    content = sys.stdin.read() if args.content == "-" else args.content
-    ask_deepseek(content, args.task_id, args.type, data,
-                 args.new_session, args.from_llm, args.from_model,
-                 args.to_model, args.no_timeout, args.review)
-
-
-def _handle_ask_hermes(args):
-    """Handle ask-hermes subcommand."""
-    data = None
-    if args.data:
-        data = Path(args.data).read_text()
-    content = sys.stdin.read() if args.content == "-" else args.content
-    ask_hermes(content, args.task_id, args.type, data,
-               args.new_session, args.from_llm, args.from_model,
-               args.to_model, args.no_timeout, args.review)
 
 
 def _handle_ask_opencode(args):

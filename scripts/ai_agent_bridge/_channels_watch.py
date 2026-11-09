@@ -11,7 +11,6 @@ from typing import Any, TextIO
 from ._db import get_db
 
 VALID_CHANNEL_EVENTS = (
-    "message_posted",
     "reply_started",
     "heartbeat",
     "model_cascade",

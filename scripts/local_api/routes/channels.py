@@ -582,13 +582,14 @@ def build_channel_timeline_payload(
     query_sqlite_rows_fn: Callable[..., list[dict[str, Any]]],
     since_event_id: int = 0,
     since_ts: str | None = None,
+    since_message_rowid: int = 0,
     thread_id: str | None = None,
 ) -> dict[str, Any]:
-    """Return channel events enriched with posted message bodies.
+    """Return progress events plus transcript rows from ``channel_messages``.
 
-    ``channel_events`` stores event metadata while ``channel_messages`` stores
-    prose. The browser timeline needs both, but writes must still flow through
-    the bridge primitive, so this read path joins them at render time.
+    Progress stays in ``channel_events``. The chat transcript is the message
+    table, so a post with no progress event still appears. Messages already
+    linked from an event payload are not repeated.
     """
     db_path = resolve_bridge_db_path_fn(repo_root)
     if thread_id:
@@ -692,12 +693,76 @@ def build_channel_timeline_payload(
         events.append(event)
         next_since_event_id = max(next_since_event_id, event_id)
 
+    if thread_id:
+        message_scope = "cm.thread_id = ?"
+        message_params: list[Any] = [thread_id, since_message_rowid]
+    else:
+        message_scope = "cm.channel = ?"
+        message_params = [channel_name, since_message_rowid]
+    message_since = ""
+    if since_ts:
+        message_since = "AND cm.created_at > ?"
+        message_params.append(since_ts)
+    message_rows = query_sqlite_rows_fn(
+        db_path,
+        f"""
+        SELECT
+          cm.rowid AS message_rowid,
+          cm.message_id,
+          cm.thread_id,
+          cm.from_agent,
+          cm.from_model,
+          cm.kind,
+          cm.body,
+          cm.created_at,
+          EXISTS (
+            SELECT 1 FROM channel_events ce
+            WHERE json_extract(ce.payload_json, '$.message_id') = cm.message_id
+          ) AS linked
+        FROM channel_messages cm
+        WHERE {message_scope}
+          AND cm.rowid > ?
+          {message_since}
+        ORDER BY cm.rowid ASC
+        """,
+        tuple(message_params),
+        limit=_SUPPLEMENTARY_EVENTS_LIMIT,
+    )
+    next_since_message_rowid = since_message_rowid
+    for row in message_rows:
+        rowid = int(row.get("message_rowid") or 0)
+        next_since_message_rowid = max(next_since_message_rowid, rowid)
+        if row.get("linked"):
+            continue
+        created_at = row.get("created_at")
+        events.append(
+            {
+                "event": "transcript",
+                "message_rowid": rowid,
+                "message_id": row.get("message_id"),
+                "thread_id": row.get("thread_id"),
+                "from_agent": row.get("from_agent"),
+                "from_model": row.get("from_model"),
+                "kind": row.get("kind"),
+                "body": row.get("body"),
+                "created_at": created_at,
+                "ts": created_at,
+            }
+        )
+    events.sort(
+        key=lambda item: (
+            str(item.get("ts") or ""),
+            0 if item.get("event") == "transcript" else 1,
+        )
+    )
+
     return {
         "channel": channel_name,
         "thread_id": thread_id,
         "events": events,
         "count": len(events),
         "next_since_event_id": next_since_event_id,
+        "next_since_message_rowid": next_since_message_rowid,
     }
 
 
@@ -921,6 +986,7 @@ const TIGHT_POLL_MS = 1000;
 const QUIET_RESET_MS = 30000;
 let selectedChannel = INITIAL_CHANNEL;
 let sinceId = 0;
+let sinceMessageRowId = 0;
 let currentFetchId = 0;
 let pollTimer = null;
 let lastEventType = "";
@@ -959,7 +1025,7 @@ function setText(el,value){{el.textContent=value == null ? "" : String(value);}}
 function rememberVisited(name){{if(name)localStorage.setItem(lastVisitedKey(name),new Date().toISOString());}}
 function computePollDelayMs(now=Date.now()){{if((lastEventType==="reply_started"||lastEventType==="heartbeat")&&lastNewEventAt&&now-lastNewEventAt<QUIET_RESET_MS)return TIGHT_POLL_MS;return DEFAULT_POLL_MS;}}
 function isNearBottom(){{return messageList.scrollHeight-messageList.scrollTop-messageList.clientHeight<48;}}
-function resetMessages(){{renderedMsgIds.clear();sinceId=0;lastEventType="";lastNewEventAt=0;focusedMessageIndex=-1;messageList.replaceChildren(emptyState);emptyState.style.display="block";}}
+function resetMessages(){{renderedMsgIds.clear();sinceId=0;sinceMessageRowId=0;lastEventType="";lastNewEventAt=0;focusedMessageIndex=-1;messageList.replaceChildren(emptyState);emptyState.style.display="block";}}
 function hasStructuredVotes(summary){{return !!(summary&&summary.rounds&&summary.rounds.some(round=>(round.turns||[]).some(turn=>turn.vote)));}}
 function defaultViewForSummary(summary){{if(REQUESTED_VIEW)return REQUESTED_VIEW;if(summary&&(summary.status==="converged"||summary.decision_id))return"graph";return DEFAULT_VIEW;}}
 function shortThreadId(value){{return String(value||"").slice(0,8);}}
@@ -984,10 +1050,10 @@ function appendMeta(parent,ev,agent){{const meta=document.createElement("div");m
 function appendBody(parent,body){{const div=document.createElement("div");div.className="message-body";div.textContent=body||"";parent.appendChild(div);}}
 function appendNote(ev,text,cls=""){{const key=String(ev.event_id||"")+"-"+String(ev.ts||"");if(renderedMsgIds.has(key))return;renderedMsgIds.add(key);const row=document.createElement("div");row.className="event-row "+cls;row.dataset.eventId=String(ev.event_id||"");const note=document.createElement("div");note.className="event-note";note.textContent=text;row.appendChild(note);messageList.appendChild(row);}}
 function appendMessage(ev){{const key=ev.message_id||String(ev.event_id||"")+"-"+String(ev.ts||"");if(renderedMsgIds.has(key))return;renderedMsgIds.add(key);const agent=(ev.from_agent||ev.agent||"unknown").toLowerCase();const cls=["claude","codex","gemini","user"].includes(agent)?agent:"";const row=document.createElement("article");row.className="event-row "+cls;row.dataset.messageId=key;row.dataset.eventId=String(ev.event_id||"");appendMeta(row,ev,agent);appendBody(row,ev.body||"");messageList.appendChild(row);}}
-function renderEvent(ev){{if(emptyState)emptyState.style.display="none";if(ev.event==="message_posted"&&ev.body!==undefined)appendMessage(ev);else if(ev.event==="reply_complete")appendMessage(ev);else if(ev.event==="reply_started")appendNote(ev,(ev.agent||"agent")+" started replying","");else if(ev.event==="heartbeat")appendNote(ev,"heartbeat elapsed="+(ev.elapsed_s||"?")+"s","");else if(ev.event==="delivery_failed")appendNote(ev,"delivery failed "+(ev.error_kind||""),"");else if(ev.event==="delivery_delivered")appendNote(ev,"delivered "+(ev.delivery_id||""),"");else if(ev.event==="model_cascade")appendNote(ev,"cascade "+(ev.from||"")+" -> "+(ev.to||""),"");}}
-function applyEvents(events,nextSince){{if(!events.length)return;const stick=isNearBottom();events.forEach(renderEvent);sinceId=Math.max(sinceId,nextSince||sinceId);lastEventType=events[events.length-1].event||"";lastNewEventAt=Date.now();document.getElementById("channelMeta").textContent=events.length+" new event"+(events.length===1?"":"s")+" · last "+timeAgo(events[events.length-1].ts);if(stick)messageList.scrollTop=messageList.scrollHeight;rememberVisited(selectedChannel);updateUnreadBadges();}}
+function renderEvent(ev){{if(emptyState)emptyState.style.display="none";if(ev.message_id&&ev.body!==undefined)appendMessage(ev);else if(ev.event==="reply_complete")appendMessage(ev);else if(ev.event==="reply_started")appendNote(ev,(ev.agent||"agent")+" started replying","");else if(ev.event==="heartbeat")appendNote(ev,"heartbeat elapsed="+(ev.elapsed_s||"?")+"s","");else if(ev.event==="delivery_failed")appendNote(ev,"delivery failed "+(ev.error_kind||""),"");else if(ev.event==="delivery_delivered")appendNote(ev,"delivered "+(ev.delivery_id||""),"");else if(ev.event==="model_cascade")appendNote(ev,"cascade "+(ev.from||"")+" -> "+(ev.to||""),"");}}
+function applyEvents(events,nextSince,nextMessageRowId){{sinceId=Math.max(sinceId,nextSince||sinceId);sinceMessageRowId=Math.max(sinceMessageRowId,nextMessageRowId||0);if(!events.length)return;const stick=isNearBottom();events.forEach(renderEvent);lastEventType=events[events.length-1].event||"";lastNewEventAt=Date.now();document.getElementById("channelMeta").textContent=events.length+" new event"+(events.length===1?"":"s")+" · last "+timeAgo(events[events.length-1].ts);if(stick)messageList.scrollTop=messageList.scrollHeight;rememberVisited(selectedChannel);updateUnreadBadges();}}
 function schedulePoll(){{clearTimeout(pollTimer);pollTimer=setTimeout(poll,computePollDelayMs());document.getElementById("pollState").textContent="next poll "+computePollDelayMs()/1000+"s";}}
-function poll(){{if(!selectedChannel){{schedulePoll();return;}}const myFetchId=++currentFetchId;fetch("/api/channel/"+encodeURIComponent(selectedChannel)+"/events?since_event_id="+sinceId).then(r=>r.json()).then(data=>{{if(myFetchId!==currentFetchId)return;applyEvents(data.events||[],data.next_since_event_id);}}).catch(()=>{{if(myFetchId===currentFetchId)document.getElementById("pollState").textContent="API unavailable";}}).finally(()=>{{if(myFetchId===currentFetchId)schedulePoll();}});}}
+function poll(){{if(!selectedChannel){{schedulePoll();return;}}const myFetchId=++currentFetchId;fetch("/api/channel/"+encodeURIComponent(selectedChannel)+"/events?since_event_id="+sinceId+"&since_message_rowid="+sinceMessageRowId).then(r=>r.json()).then(data=>{{if(myFetchId!==currentFetchId)return;applyEvents(data.events||[],data.next_since_event_id,data.next_since_message_rowid);}}).catch(()=>{{if(myFetchId===currentFetchId)document.getElementById("pollState").textContent="API unavailable";}}).finally(()=>{{if(myFetchId===currentFetchId)schedulePoll();}});}}
 function chooseChannel(name){{selectedChannel=name;if(!selectedChannel&&channels.length)selectedChannel=channels[0].name;document.getElementById("channelTitle").textContent=selectedChannel?"# "+selectedChannel:"Agent Deliberations";postButton.disabled=!selectedChannel;resetMessages();loadSummary();rememberVisited(selectedChannel);renderSidebar();poll();}}
 function loadChannels(){{fetch("/api/channels").then(r=>r.json()).then(data=>{{channels=data.channels||[];if(selectedChannel&&!channels.some(ch=>ch.name===selectedChannel))channels.unshift({{name:selectedChannel,event_count:0,last_event_ts:null,threads:[]}});renderSidebar();if(!hasBooted){{hasBooted=true;chooseChannel(selectedChannel);}}}}).catch(()=>{{document.getElementById("sidebarMeta").textContent="API unavailable";}});}}
 // D4.5 keybindings
@@ -1260,6 +1326,13 @@ def route_channel_api_request(
             since_event_id = int(since_raw)
         except (TypeError, ValueError):
             return 400, {"error": "invalid_since_event_id"}, "application/json; charset=utf-8"
+        try:
+            message_raw = query.get("since_message_rowid", ["0"])[0]
+            if message_raw is None:
+                raise TypeError
+            since_message_rowid = int(message_raw)
+        except (TypeError, ValueError):
+            return 400, {"error": "invalid_since_message_rowid"}, "application/json; charset=utf-8"
         since_ts = query.get("since_ts", [None])[0]
         if channel_exists_in_db(
             repo_root,
@@ -1276,6 +1349,7 @@ def route_channel_api_request(
                     query_sqlite_rows_fn=query_sqlite_rows_fn,
                     since_event_id=since_event_id,
                     since_ts=since_ts,
+                    since_message_rowid=since_message_rowid,
                 ),
                 "application/json; charset=utf-8",
             )
@@ -1294,6 +1368,7 @@ def route_channel_api_request(
                     query_sqlite_rows_fn=query_sqlite_rows_fn,
                     since_event_id=since_event_id,
                     since_ts=since_ts,
+                    since_message_rowid=since_message_rowid,
                     thread_id=name,
                 ),
                 "application/json; charset=utf-8",
