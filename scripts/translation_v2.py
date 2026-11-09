@@ -936,7 +936,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    control_plane = ControlPlane(repo_root=args.repo_root, db_path=args.db, budgets_path=args.budgets)
 
     def _worker_log_outcome(outcome: TranslationRunOutcome) -> None:
         attempts = None
@@ -963,6 +962,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _print_status(report)
         return 0
+
+    control_plane = ControlPlane(repo_root=args.repo_root, db_path=args.db, budgets_path=args.budgets)
 
     if args.command == "enqueue-section":
         enqueued = enqueue_translation_targets(control_plane, section=args.section, limit=args.limit)

@@ -398,6 +398,9 @@ def test_translation_v2_freshness_rollup_is_per_track_not_global(tmp_path: Path)
     )
 
     report = translation_v2.build_status(repo_root, db_path=db_path)
+    assert translation_v2.main(
+        ["--repo-root", str(repo_root), "--db", str(db_path), "status", "--json"]
+    ) == 0
     enriched = status_script._enrich_translation_v2_with_per_track(report)
     by_track = {item["slug"]: item for item in enriched["queue"]["per_track"]}
 
