@@ -34,7 +34,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 VENV_PYTHON = str((REPO_ROOT / ".venv" / "bin" / "python").resolve())
-from dispatch import GEMINI_WRITER_MODEL  # noqa: E402
+GEMINI_WRITER_MODEL = "gemini-3.1-pro-high"
 
 OUTPUT_DIR = Path("/tmp/writer-rigorous")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

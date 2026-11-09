@@ -104,28 +104,17 @@ def test_translation_v2_enqueue_happy_path(tmp_path: Path, monkeypatch) -> None:
         repo_root,
         "/api/translation/v2/enqueue?from_quality=done",
     )
-    assert status_code == 200
-    assert payload == {
-        "enqueued": 3,
-        "skipped": 2,
-        "skipped_reasons": {
-            "already_pending_or_leased": 1,
-            "already_completed": 0,
-            "previously_failed": 0,
-            "not_done": 1,
-        },
-        "dry_run": False,
-    }
+    assert status_code == 410
+    assert payload == {"error": "legacy dispatcher removed"}
 
     conn = sqlite3.connect(db_path)
     try:
         pending_rows = conn.execute(
-            "SELECT module_key, queue_state FROM jobs WHERE module_key NOT LIKE 'done/leased'",
+            "SELECT module_key FROM jobs WHERE queue_state = 'pending'",
         ).fetchall()
     finally:
         conn.close()
-    queued_keys = {row[0] for row in pending_rows}
-    assert queued_keys == {"done/ok-1", "done/ok-2", "done/ok-3"}
+    assert pending_rows == []
 
 
 def test_translation_v2_enqueue_dry_run_does_not_mutate_db(tmp_path: Path, monkeypatch) -> None:
@@ -139,18 +128,8 @@ def test_translation_v2_enqueue_dry_run_does_not_mutate_db(tmp_path: Path, monke
         repo_root,
         "/api/translation/v2/enqueue?from_quality=done&dry_run=1",
     )
-    assert status_code == 200
-    assert payload == {
-        "enqueued": 3,
-        "skipped": 2,
-        "skipped_reasons": {
-            "already_pending_or_leased": 1,
-            "already_completed": 0,
-            "previously_failed": 0,
-            "not_done": 1,
-        },
-        "dry_run": True,
-    }
+    assert status_code == 410
+    assert payload == {"error": "legacy dispatcher removed"}
 
     conn = sqlite3.connect(db_path)
     try:

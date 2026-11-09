@@ -15,11 +15,33 @@ from typing import Any
 import yaml
 
 from migrate_v1_to_v2 import DEFAULT_STATE_PATH
-from pipeline_v2.control_plane import DEFAULT_BUDGETS_PATH, ControlPlane
-from pipeline_v2.patch_worker import PATCH_ESTIMATED_USD, PatchWorker
-from pipeline_v2.review_worker import REVIEW_MODEL, ReviewWorker
-from pipeline_v2.write_worker import WRITE_ESTIMATED_USD, WRITE_MODEL, WriteWorker
 from v1_pipeline import find_module_path, review_audit_path_for_key
+
+DEFAULT_BUDGETS_PATH = None
+WRITE_MODEL = "removed"
+REVIEW_MODEL = "removed"
+WRITE_ESTIMATED_USD = 0.0
+PATCH_ESTIMATED_USD = 0.0
+
+
+class ControlPlane:
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
+
+
+class WriteWorker:
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
+
+
+class ReviewWorker:
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
+
+
+class PatchWorker:
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

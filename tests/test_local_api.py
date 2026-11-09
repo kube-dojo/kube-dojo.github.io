@@ -1397,52 +1397,12 @@ def test_pipeline_stuck_surfaces_unresolved_dead_letters(tmp_path: Path) -> None
     assert r["dead_lettered_count"] == len(r["dead_lettered"])
 
 
-def test_pipeline_stuck_reraises_unrelated_module_not_found(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """Codex round-6 bug: ``except ModuleNotFoundError`` also caught
-    transitive missing-import errors from inside pipeline_v2.cli
-    (broken install, missing dep). A dead-letter endpoint that
-    quietly returns ``[]`` on a broken install would hide modules
-    needing human triage. Narrowed by ``exc.name`` so only
-    "pipeline_v2[.cli] not installed" is tolerated; everything else
-    must propagate."""
-    _setup_repo(tmp_path)
-    # Plant a real dead-letter event so the import branch is reached.
-    conn = sqlite3.connect(tmp_path / ".pipeline/v2.db")
-    conn.execute(
-        "INSERT INTO events (module_key, type, payload_json, at) VALUES (?, ?, ?, ?)",
-        ("dead/one", "module_dead_lettered", "{}", 1),
-    )
-    conn.commit()
-    conn.close()
+def test_pipeline_stuck_classifies_dead_letters_without_pipeline_v2(tmp_path: Path) -> None:
+    """The stuck endpoint classifies dead letters from the local reducer.
 
-    import builtins as _builtins
-    real_import = _builtins.__import__
-
-    def _broken_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "pipeline_v2.cli" or (name == "pipeline_v2" and fromlist and "cli" in fromlist):
-            raise ModuleNotFoundError(
-                "No module named 'some_unrelated_dep'",
-                name="some_unrelated_dep",
-            )
-        return real_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(_builtins, "__import__", _broken_import)
-
-    import pytest as _pytest
-    with _pytest.raises(ModuleNotFoundError) as exc_info:
-        local_api.build_pipeline_stuck(tmp_path, threshold_seconds=60, now_seconds=100)
-    assert exc_info.value.name == "some_unrelated_dep"
-
-
-def test_pipeline_stuck_tolerates_missing_pipeline_v2(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """The flip side of the narrowing: when pipeline_v2 itself is
-    genuinely not installed, the endpoint still returns gracefully
-    with an empty dead-letter list (the rest of the stuck payload is
-    unaffected)."""
+    It no longer imports pipeline_v2, so a missing pipeline package cannot
+    blank the list or swallow an unrelated import error.
+    """
     _setup_repo(tmp_path)
     conn = sqlite3.connect(tmp_path / ".pipeline/v2.db")
     conn.execute(
@@ -1452,28 +1412,11 @@ def test_pipeline_stuck_tolerates_missing_pipeline_v2(
     conn.commit()
     conn.close()
 
-    import builtins as _builtins
-    import sys
-    real_import = _builtins.__import__
-
-    def _missing_top_level(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "pipeline_v2.cli" or (name == "pipeline_v2" and fromlist and "cli" in fromlist):
-            raise ModuleNotFoundError(
-                "No module named 'pipeline_v2'",
-                name="pipeline_v2",
-            )
-        return real_import(name, globals, locals, fromlist, level)
-
-    # Remove any cached import so the __import__ hook is actually hit.
-    for k in list(sys.modules):
-        if k.startswith("pipeline_v2"):
-            monkeypatch.delitem(sys.modules, k, raising=False)
-    monkeypatch.setattr(_builtins, "__import__", _missing_top_level)
-
     r = local_api.build_pipeline_stuck(tmp_path, threshold_seconds=60, now_seconds=100)
-    assert r["dead_lettered"] == []
-    assert r["dead_lettered_count"] == 0
-    assert r["exists"] is True  # rest of the endpoint still works
+    dead_keys = {row["module_key"] for row in r["dead_lettered"]}
+    assert "dead/two" in dead_keys
+    assert r["dead_lettered_count"] == len(r["dead_lettered"])
+    assert r["exists"] is True
 
 
 def test_pipeline_stuck_dead_letter_honors_at_timestamp_not_just_id(

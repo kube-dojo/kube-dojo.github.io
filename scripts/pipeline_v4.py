@@ -27,9 +27,35 @@ for candidate in (REPO_ROOT, SCRIPTS_DIR):
     if candidate_str not in sys.path:
         sys.path.insert(0, candidate_str)
 
-import expand_module  # noqa: E402
 import local_api  # noqa: E402
 import rubric_gaps  # noqa: E402
+
+
+class _RemovedExpandModule:
+    """Stage 2 routing stays; the dispatcher call is gone.
+
+    ``can_expand`` is the pure gap check pipeline_v4 uses to skip Stage 2.
+    ``expand_module`` is the call that used to dispatch a writer.
+    """
+
+    _HANDLERS = {
+        "no_quiz",
+        "no_mistakes",
+        "no_exercise",
+        "thin",
+        "no_outcomes",
+    }
+
+    @classmethod
+    def can_expand(cls, gaps):
+        return any(gap in cls._HANDLERS for gap in gaps)
+
+    @staticmethod
+    def expand_module(*_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
+
+
+expand_module = _RemovedExpandModule()
 
 DOCS_ROOT = REPO_ROOT / "src" / "content" / "docs"
 PIPELINE_V4_DIR = REPO_ROOT / ".pipeline" / "v4"

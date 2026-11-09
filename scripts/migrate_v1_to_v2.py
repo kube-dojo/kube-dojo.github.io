@@ -9,14 +9,19 @@ from typing import Any, Callable
 
 import yaml
 
-from pipeline_v2.control_plane import (
-    DEFAULT_BUDGETS_PATH,
-    DEFAULT_DB_PATH,
-    ControlPlane,
-    _record_event,
-)
-from pipeline_v2.review_worker import REVIEW_MODEL
-from pipeline_v2.write_worker import WRITE_MODEL
+DEFAULT_BUDGETS_PATH = None
+DEFAULT_DB_PATH = None
+REVIEW_MODEL = "removed"
+WRITE_MODEL = "removed"
+
+
+class ControlPlane:
+    def __init__(self, *_args, **_kwargs):
+        raise RuntimeError("legacy dispatcher removed")
+
+
+def _record_event(*_args, **_kwargs):
+    raise RuntimeError("legacy dispatcher removed")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
