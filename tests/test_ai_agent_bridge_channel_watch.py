@@ -65,14 +65,12 @@ def test_channel_watch_event_stream_replays_history_and_exits(capsys):
     assert captured.err == ""
     events = [json.loads(line) for line in captured.out.strip().splitlines()]
     assert [event["event"] for event in events] == [
-        "message_posted",
         "reply_started",
         "reply_complete",
     ]
     assert all(event["thread_id"] == thread_id for event in events)
-    assert events[0]["from_agent"] == "user"
-    assert events[1]["agent"] == "codex"
-    assert events[2]["chars"] == 42
+    assert events[0]["agent"] == "codex"
+    assert events[1]["chars"] == 42
 
 
 def test_channel_watch_follow_streams_new_rows():
@@ -89,7 +87,7 @@ def test_channel_watch_follow_streams_new_rows():
             "event_stream": True,
             "poll_interval_s": 0.01,
             "out": stream,
-            "max_events": 3,
+            "max_events": 2,
         },
         daemon=True,
     )
@@ -101,11 +99,10 @@ def test_channel_watch_follow_streams_new_rows():
     assert not watcher.is_alive()
     events = [json.loads(line) for line in stream.getvalue().strip().splitlines()]
     assert [event["event"] for event in events] == [
-        "message_posted",
         "reply_started",
         "delivery_delivered",
     ]
-    assert events[2]["delivery_id"] == thread["delivery_ids"][0]
+    assert events[1]["delivery_id"] == thread["delivery_ids"][0]
 
 
 def test_channel_watch_auto_migrates_missing_table():
@@ -121,8 +118,7 @@ def test_channel_watch_auto_migrates_missing_table():
     emit_reply_started(thread_id, agent="claude", model="test-model")
 
     events = read_channel_events(thread_id)
-    assert len(events) == 2
+    assert len(events) == 1
     assert [event["event"] for event in events] == [
-        "message_posted",
         "reply_started",
     ]

@@ -32,7 +32,7 @@ def _create_channel(name: str) -> None:
     channels.create_channel(name, subscribers=["claude", "gemini", "codex"])
 
 
-def test_post_endpoint_writes_message_and_message_posted_event(
+def test_post_endpoint_writes_message(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -65,18 +65,6 @@ def test_post_endpoint_writes_message_and_message_posted_event(
         assert message["channel"] == "shared"
         assert message["from_agent"] == "user"
         assert message["body"] == "hello"
-
-        event = conn.execute(
-            """
-            SELECT * FROM channel_events
-            WHERE thread_id = ? AND event = 'message_posted'
-            """,
-            (payload["thread_id"],),
-        ).fetchone()
-        assert event is not None
-        event_payload = json.loads(event["payload_json"])
-        assert event_payload["message_id"] == payload["message_id"]
-        assert event_payload["from_agent"] == "user"
     finally:
         conn.close()
 

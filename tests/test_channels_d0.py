@@ -72,35 +72,3 @@ def test_api_channels_reads_bridge_db_without_ab_db_path(
             assert [channel["name"] for channel in payload["channels"]] == ["ops"]
     finally:
         _reload_bridge_modules()
-
-
-def test_message_posted_event_round_trips_body(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    try:
-        with monkeypatch.context() as m:
-            m.setenv("AB_REPO_ROOT", str(tmp_path))
-            m.setenv("AB_DB_PATH", str(tmp_path / "messages.db"))
-            bridge_db, _, channels_watch = _reload_bridge_modules()
-            bridge_db.init_db()
-
-            channels_watch.append_channel_event(
-                "message_posted",
-                thread_id="thread-d0",
-                payload={"agent": "user", "body": "please review this"},
-            )
-
-            events = channels_watch.read_channel_events("thread-d0")
-            assert events == [
-                {
-                    "event": "message_posted",
-                    "agent": "user",
-                    "body": "please review this",
-                    "thread_id": "thread-d0",
-                    "ts": events[0]["ts"],
-                    "_event_id": 1,
-                }
-            ]
-    finally:
-        _reload_bridge_modules()

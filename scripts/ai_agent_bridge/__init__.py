@@ -32,7 +32,6 @@ from ._broker import (
     broker_cleanup,
 )
 from ._claude import ask_claude, process_for_claude
-from ._cli import interactive_mode, main, process_all_claude, process_all_gemini
 from ._codex import ask_codex, process_all_codex, process_for_codex
 from ._cursor import ask_cursor
 from ._config import (
@@ -129,12 +128,7 @@ __all__ = [
     "get_session",
     # DB
     "init_db",
-    # CLI
-    "interactive_mode",
-    "main",
-    "process_all_claude",
     "process_all_codex",
-    "process_all_gemini",
     "process_and_respond",
     "process_for_claude",
     "process_for_codex",

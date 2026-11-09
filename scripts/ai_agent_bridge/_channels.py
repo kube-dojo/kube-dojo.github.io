@@ -817,28 +817,6 @@ def post(
             ),
         )
 
-        conn.execute(
-            """
-            INSERT INTO channel_events (delivery_id, thread_id, event, payload_json, ts)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                None,
-                thread_id,
-                "message_posted",
-                json.dumps(
-                    {
-                        "message_id": message_id,
-                        "from_agent": from_agent,
-                        "round_index": round_index,
-                    },
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-                created_at,
-            ),
-        )
-
         delivery_ids = []
         for agent in to_agents or []:
             dlv_id = _new_id()
@@ -882,82 +860,6 @@ def post(
         # from the now-inside-transaction channel/parent checks.
         # Previously this was sqlite3.Error only, which left an orphan
         # lock when a ValueError escaped inside the transaction.
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-def backfill_message_posted_events() -> int:
-    """Insert missing ``message_posted`` events for existing channel messages.
-
-    The durable transcript is ``channel_messages``. ``channel_events`` is a
-    supplementary progress stream, so older messages may lack corresponding
-    event rows. Match by payload ``message_id`` to keep this idempotent even
-    when several messages share one thread.
-    """
-    conn = get_db()
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-        message_rows = conn.execute(
-            """
-            SELECT message_id, thread_id, from_agent, round_index, created_at
-            FROM channel_messages
-            ORDER BY created_at ASC, rowid ASC
-            """
-        ).fetchall()
-        event_rows = conn.execute(
-            """
-            SELECT payload_json
-            FROM channel_events
-            WHERE event = 'message_posted'
-            """
-        ).fetchall()
-
-        represented_message_ids: set[str] = set()
-        for row in event_rows:
-            payload_raw = row["payload_json"]
-            if not payload_raw:
-                continue
-            try:
-                payload = json.loads(payload_raw)
-            except json.JSONDecodeError:
-                continue
-            message_id = payload.get("message_id")
-            if isinstance(message_id, str):
-                represented_message_ids.add(message_id)
-
-        inserted = 0
-        for row in message_rows:
-            message_id = row["message_id"]
-            if message_id in represented_message_ids:
-                continue
-            conn.execute(
-                """
-                INSERT INTO channel_events (delivery_id, thread_id, event, payload_json, ts)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    None,
-                    row["thread_id"],
-                    "message_posted",
-                    json.dumps(
-                        {
-                            "message_id": message_id,
-                            "from_agent": row["from_agent"],
-                            "round_index": row["round_index"],
-                        },
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                    row["created_at"],
-                ),
-            )
-            inserted += 1
-
-        conn.commit()
-        return inserted
-    except Exception:
         conn.rollback()
         raise
     finally:
