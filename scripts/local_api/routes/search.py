@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from ai_agent_bridge._fts import setup_fts_tables
+    from local_api.bridge_fts import setup_fts_tables
     from local_api.routes.decisions import _refresh_decisions_fts
 except ModuleNotFoundError:
-    from scripts.ai_agent_bridge._fts import setup_fts_tables
+    from scripts.local_api.bridge_fts import setup_fts_tables
     from scripts.local_api.routes.decisions import _refresh_decisions_fts
 
 
