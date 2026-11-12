@@ -1,41 +1,24 @@
-"""SQLite persistence for KubeDojo telemetry (#1973).
+"""SQLite persistence for KubeDojo module-build token telemetry (#1973).
 
-- Module-build token telemetry in ``.pipeline/telemetry/module_builds.db``
-- Tool-timing telemetry in ``.pipeline/telemetry/tool_timings.db``
+Stored in ``.pipeline/telemetry/module_builds.db``.
 """
 from __future__ import annotations
 
 import sqlite3
 from collections import defaultdict
 from contextlib import closing
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 _db_path_override: Path | None = None
-_tool_timings_db_path_override: Path | None = None
-
-_TOOL_TIMING_WINDOWS = {
-    "5m": timedelta(minutes=5),
-    "15m": timedelta(minutes=15),
-    "1h": timedelta(hours=1),
-    "6h": timedelta(hours=6),
-    "24h": timedelta(hours=24),
-    "7d": timedelta(days=7),
-}
 
 
 def db_path(repo_root: Path) -> Path:
     if _db_path_override is not None:
         return _db_path_override
     return repo_root / ".pipeline" / "telemetry" / "module_builds.db"
-
-
-def tool_timings_db_path(repo_root: Path) -> Path:
-    if _tool_timings_db_path_override is not None:
-        return _tool_timings_db_path_override
-    return repo_root / ".pipeline" / "telemetry" / "tool_timings.db"
 
 
 def _isoformat_z(value: datetime) -> str:
@@ -479,163 +462,4 @@ def build_module_build_detail_payload(
         "totals": payload["totals"],
         "latest": payload["runs"][0] if payload["runs"] else None,
         "runs": payload["runs"],
-    }
-
-
-# ---------------------------------------------------------------------------
-# Tool-timing telemetry (#1973 P2)
-# ---------------------------------------------------------------------------
-
-
-def _ensure_tool_timings_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS tool_timings (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts          TEXT NOT NULL,
-            tool_name   TEXT NOT NULL,
-            duration_ms INTEGER NOT NULL,
-            tool_use_id TEXT,
-            session_id  TEXT,
-            failed      INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE INDEX IF NOT EXISTS idx_tt_ts ON tool_timings(ts);
-        CREATE INDEX IF NOT EXISTS idx_tt_name_ts ON tool_timings(tool_name, ts);
-        """
-    )
-
-
-def _percentile_ms(values: list[int], percentile: float) -> int:
-    if not values:
-        return 0
-    sorted_values = sorted(values)
-    if len(sorted_values) == 1:
-        return sorted_values[0]
-
-    rank = (len(sorted_values) - 1) * percentile
-    lower = int(rank)
-    upper = min(lower + 1, len(sorted_values) - 1)
-    fraction = rank - lower
-    return round(sorted_values[lower] + (sorted_values[upper] - sorted_values[lower]) * fraction)
-
-
-def _tool_timing_window_start(window: str) -> tuple[str, str]:
-    delta = _TOOL_TIMING_WINDOWS.get(window)
-    if delta is None:
-        window = "1h"
-        delta = _TOOL_TIMING_WINDOWS[window]
-    return window, _isoformat_z(datetime.now(UTC) - delta)
-
-
-def validate_tool_timing_ingest(payload: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ValueError("payload must be a JSON object")
-
-    tool_name = _required_text(payload.get("tool_name"), "tool_name")
-    duration_ms = payload.get("duration_ms")
-    if duration_ms is None:
-        raise ValueError("duration_ms is required")
-    try:
-        duration_val = int(duration_ms)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("duration_ms must be a non-negative integer") from exc
-    if duration_val < 0:
-        raise ValueError("duration_ms must be a non-negative integer")
-
-    return {
-        "ts": _parse_recorded_at(payload.get("ts")),
-        "tool_name": tool_name,
-        "duration_ms": duration_val,
-        "tool_use_id": _clean_text(payload.get("tool_use_id")),
-        "session_id": _clean_text(payload.get("session_id")),
-        "failed": 1 if payload.get("failed") else 0,
-    }
-
-
-def ingest_tool_timing(repo_root: Path, record: dict[str, Any]) -> None:
-    validated = validate_tool_timing_ingest(record)
-    db_file = tool_timings_db_path(repo_root)
-    with closing(_connect(db_file)) as conn:
-        _ensure_tool_timings_schema(conn)
-        conn.execute(
-            """
-            INSERT INTO tool_timings (ts, tool_name, duration_ms, tool_use_id, session_id, failed)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                validated["ts"],
-                validated["tool_name"],
-                validated["duration_ms"],
-                validated["tool_use_id"],
-                validated["session_id"],
-                validated["failed"],
-            ),
-        )
-        conn.commit()
-
-
-def tool_timing_summary(
-    repo_root: Path,
-    *,
-    window: str = "1h",
-    tool: str | None = None,
-) -> list[dict[str, Any]]:
-    window, window_start = _tool_timing_window_start(window)
-    conditions = ["ts >= ?"]
-    params: list[Any] = [window_start]
-    if tool:
-        conditions.append("tool_name = ?")
-        params.append(tool.strip())
-
-    where = " AND ".join(conditions)
-    db_file = tool_timings_db_path(repo_root)
-    with closing(_connect(db_file)) as conn:
-        _ensure_tool_timings_schema(conn)
-        rows = conn.execute(
-            f"""
-            SELECT tool_name, duration_ms, failed
-            FROM tool_timings
-            WHERE {where}
-            ORDER BY tool_name, duration_ms
-            """,
-            params,
-        ).fetchall()
-
-    durations: dict[str, list[int]] = defaultdict(list)
-    failures: dict[str, int] = defaultdict(int)
-    for row in rows:
-        tool_name = str(row["tool_name"])
-        durations[tool_name].append(int(row["duration_ms"]))
-        failures[tool_name] += int(row["failed"])
-
-    results: list[dict[str, Any]] = []
-    for tool_name, values in durations.items():
-        count = len(values)
-        results.append(
-            {
-                "tool_name": tool_name,
-                "count": count,
-                "p50_ms": _percentile_ms(values, 0.50),
-                "p95_ms": _percentile_ms(values, 0.95),
-                "p99_ms": _percentile_ms(values, 0.99),
-                "mean_ms": round(sum(values) / count),
-                "failure_count": failures[tool_name],
-            }
-        )
-
-    return sorted(results, key=lambda item: (-item["count"], item["tool_name"]))
-
-
-def build_tool_timing_payload(
-    repo_root: Path,
-    *,
-    window: str = "1h",
-    tool: str | None = None,
-) -> dict[str, Any]:
-    window, _ = _tool_timing_window_start(window)
-    tools = tool_timing_summary(repo_root, window=window, tool=tool)
-    return {
-        "generated_at": _now_z(),
-        "window": window,
-        "tools": tools,
     }
