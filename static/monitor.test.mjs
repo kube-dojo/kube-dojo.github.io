@@ -16,7 +16,7 @@ const script = readFileSync(new URL('./monitor.js', import.meta.url), 'utf8');
 const helper = readFileSync(new URL('./content-coverage.js', import.meta.url), 'utf8');
 const tick = () => new Promise(setImmediate);
 function setup(view, responder) {
-  const ids = ['monitor-refresh', 'coverage-body', 'coverage-time', 'work-body', ...['leases', 'pipeline', 'services', 'activity'].flatMap(x => [`${x}-body`, `${x}-time`])];
+  const ids = ['monitor-refresh', 'coverage-body', 'coverage-time', 'work-body', ...['leases', 'pipeline'].flatMap(x => [`${x}-body`, `${x}-time`])];
   const nodes = Object.fromEntries(ids.map(id => [id, new Element()]));
   const context = {document: {body: {dataset: {monitorView: view}}, getElementById: id => nodes[id], createElement: tag => new Element(tag)},
     fetch: responder, setInterval() {}, Date};
@@ -66,15 +66,11 @@ assert.match(race['coverage-body'].textContent, /1 of 3 pages accepted/);
 const payloads = {
   '/api/pipeline/leases': {exists: true, count: 1, active: [{module_key: '<lease>', phase: 'review', leased_by: 'worker', lease_expires_at: 1800000000}]},
   '/api/pipeline/v2/status': {total_modules: 1, counts: {done: 1}},
-  '/api/runtime/services': {total: 1, services: [{label: '<service>', status: 'running'}]},
-  '/api/activity?limit=15': {count: 1, items: [{summary: '<event>', source: 'commit', at: 1800000000}]},
 };
 let failPipeline = false;
 const ops = setup('operations', async url => failPipeline && url === '/api/pipeline/v2/status' ? {ok: false, status: 503} : response(payloads[url]));
 await tick();
 assert.match(ops['leases-body'].textContent, /<lease>/);
-assert.match(ops['services-body'].textContent, /not a service-health/);
-assert.match(ops['activity-body'].textContent, /<event>/);
 assert.match(ops['pipeline-body'].textContent, /not page acceptance/);
 failPipeline = true; await ops['monitor-refresh'].events.click();
 assert.match(ops['pipeline-body'].textContent, /Unavailable: HTTP 503/);

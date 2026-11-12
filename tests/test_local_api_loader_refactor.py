@@ -1,10 +1,9 @@
 """Regression guard for the local_api submodule-loader refactor (PR #1864).
 
-PR #1864 collapsed five near-identical ``_load_*_module()`` functions into one
-generic ``_load_local_api_submodule()`` and extracted ``render_common_theme()``
-into ui_fragments. These tests pin that the wrappers still load the real
-submodules (with their expected public API), that loads are cached, and that the
-shared theme helper returns the expected tokens.
+PR #1864 collapsed near-identical ``_load_*_module()`` functions into one
+generic ``_load_local_api_submodule()``. These tests pin that the wrappers still
+load the real submodules (with their expected public API) and that loads are
+cached.
 
 ``scripts/local_api/`` is a package, so a plain ``import local_api`` resolves to
 the package, not ``local_api.py``. Load the module file explicitly (same pattern
@@ -31,20 +30,12 @@ local_api = _load_module()
 
 
 def test_generic_loader_loads_each_submodule() -> None:
-    dec = local_api._load_decision_routes_module()
-    assert hasattr(dec, "route_decision_page_request")
-    ch = local_api._load_channel_routes_module()
-    assert hasattr(ch, "route_channel_page_request")
+    ui = local_api._load_ui_fragments_module()
+    assert hasattr(ui, "render_poll_stale_script")
     guard = local_api._load_repo_guard_module()
     assert hasattr(guard, "build_healthz_payload")
 
 
 def test_loader_caches_modules() -> None:
     # stable sys.modules key -> repeated loads return the same object
-    assert local_api._load_decision_routes_module() is local_api._load_decision_routes_module()
-
-
-def test_render_common_theme_extracted() -> None:
-    uif = local_api._load_ui_fragments_module()
-    css = uif.render_common_theme()
-    assert ":root" in css and "box-sizing" in css and "--bg" in css
+    assert local_api._load_ui_fragments_module() is local_api._load_ui_fragments_module()

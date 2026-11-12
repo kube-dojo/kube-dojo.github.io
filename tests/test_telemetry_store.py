@@ -382,30 +382,6 @@ def test_tool_timing_unknown_window_defaults_to_1h(repo_root: Path, tool_timings
     assert len(payload["tools"]) == 1
 
 
-def test_post_tool_timing_ingest(repo_root: Path, tool_timings_db: Path) -> None:
-    local_api = _load_local_api()
-
-    status, payload, _ = local_api.route_post_request(
-        repo_root,
-        "/api/telemetry/tool-timings",
-        body_bytes=json.dumps(
-            {"tool_name": "Shell", "duration_ms": 250, "failed": False}
-        ).encode("utf-8"),
-        content_type="application/json",
-    )
-    assert status == 200
-    assert payload == {"ok": True}
-
-    status, payload, _ = local_api.route_post_request(
-        repo_root,
-        "/api/telemetry/tool-timings",
-        body_bytes=json.dumps({"tool_name": "Shell", "duration_ms": -1}).encode("utf-8"),
-        content_type="application/json",
-    )
-    assert status == 400
-    assert "duration_ms" in payload["error"]
-
-
 @pytest.fixture
 def dispatch_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     logs = tmp_path / "logs"

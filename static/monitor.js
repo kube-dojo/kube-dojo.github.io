@@ -120,23 +120,6 @@
     entries.forEach(([key, value]) => out.append(listRow(key.replaceAll('_', ' '), String(value))));
     return out;
   }
-  function renderServices(data) {
-    if (!data || !Array.isArray(data.services) || !nonnegative(data.total) || data.total !== data.services.length) throw Error('Invalid service snapshot');
-    const out = el('div');
-    if (!data.services.length) out.append(el('p', 'No services listed in this snapshot.', 'monitor-note'));
-    for (const service of data.services) out.append(listRow(safeText(service.label || service.name), `Reported process status: ${safeText(service.status)}`));
-    out.append(el('p', 'Process status is not a service-health or provider-health verdict.', 'monitor-note'));
-    return out;
-  }
-  function renderActivity(data) {
-    if (!data || !Array.isArray(data.items) || !nonnegative(data.count) || data.count !== data.items.length) throw Error('Invalid activity snapshot');
-    const out = el('div');
-    if (data.errors && Object.keys(data.errors).length) out.append(el('p', 'Some activity sources are unavailable; this list may be incomplete.', 'monitor-error'));
-    if (!data.items.length) out.append(el('p', 'No recent activity in the available sources.', 'monitor-note'));
-    for (const item of data.items) out.append(listRow(safeText(item.summary || item.kind), `Source: ${safeText(item.source)}${item.module_key ? ` · ${safeText(item.module_key)}` : ''}`, timestamp(item.at) ? `Recorded ${timestamp(item.at)}` : 'Recorded time unknown'));
-    return out;
-  }
-
   async function fetchSection(id, url, render, request) {
     const body = find(`${id}-body`), stamp = find(`${id}-time`);
     stamp.textContent = 'Refreshing…';
@@ -160,8 +143,6 @@
       return Promise.all([
         fetchSection('leases', '/api/pipeline/leases', renderLeases, request),
         fetchSection('pipeline', '/api/pipeline/v2/status', renderPipeline, request),
-        fetchSection('services', '/api/runtime/services', renderServices, request),
-        fetchSection('activity', '/api/activity?limit=15', renderActivity, request),
       ]);
     }
     return fetchSection('coverage', '/api/content/coverage', renderCoverage, request);

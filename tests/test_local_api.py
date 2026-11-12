@@ -2662,7 +2662,6 @@ def test_schema_lists_phase_c_endpoints() -> None:
         "/api/pipeline/v2/events",
         "/api/pipeline/v2/stuck",
         "/api/reviews",
-        "/api/bridge/messages",
         "/api/quality/scores",
         "/api/quality/upgrade-plan",
         "/api/module/{key}/lease",
