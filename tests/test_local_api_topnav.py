@@ -27,19 +27,23 @@ def _route(tmp_path: Path, path: str) -> str:
     return body
 
 
-def test_three_primary_areas_and_grouped_tools(tmp_path: Path) -> None:
+def test_local_pages_and_three_app_links(tmp_path: Path) -> None:
     for route, active in (('/', '/'), ('/operations', '/operations'), ('/quality', '/quality')):
         page = _route(tmp_path, route)
         nav = page.split('<nav class="topnav"', 1)[1].split('</nav>', 1)[0]
-        primary, tools = nav.split('<details class="nav-tools">', 1)
-        assert len(re.findall(r'class="navlink', primary)) == 3
-        assert f'href="{active}" aria-current="page"' in primary
-        assert 'href="/channels"' in tools and 'href="/decisions"' in tools
-        assert 'href="/health"' not in nav and 'href="/pipeline"' not in nav
+        pages, apps = nav.split('<span class="nav-apps"', 1)
+        assert len(re.findall(r'class="navlink', pages)) == 6
+        assert f'href="{active}" aria-current="page"' in pages
+        assert len(re.findall(r'class="navlink', apps)) == 3
+        for href in ('http://localhost:8765/machinery', 'http://localhost:8765/', 'http://localhost:8768/'):
+            assert f'href="{href}"' in apps
+        assert 'nav-tools' not in nav
+        for gone in ('/channels', '/decisions', '/agents', '/headroom', '/benchmarks', '/health'):
+            assert f'href="{gone}"' not in nav
 
 
 def test_secondary_pages_keep_navigation_and_current_location(tmp_path: Path) -> None:
-    for route in ('/channels', '/channels/thread-123', '/decisions', '/artifacts'):
+    for route in ('/artifacts', '/telemetry', '/uk'):
         page = _route(tmp_path, route)
         key = '/' + route.strip('/').split('/')[0]
         assert f'href="{key}" aria-current="page"' in page

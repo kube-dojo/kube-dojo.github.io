@@ -25,10 +25,6 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def test_calibration_reports_are_allowed_artifacts() -> None:
-    assert "calibration/v1/reports" in local_api._ARTIFACT_ALLOWED_DIRS
-
-
 def test_artifacts_index_lists_seeded_html_by_category(tmp_path: Path) -> None:
     first = tmp_path / "audit" / "report.html"
     second = tmp_path / "docs" / "migrations" / "html-first" / "_design-system.html"
@@ -58,16 +54,18 @@ def test_artifacts_index_lists_seeded_html_by_category(tmp_path: Path) -> None:
 
 
 def test_api_artifacts_returns_json_shape(tmp_path: Path) -> None:
+    _write(tmp_path / "docs" / "audits" / "audit.md", "# Audit\n\nNotes.")
     _write(tmp_path / "docs" / "session-state" / "handoff.md", "# Handoff\n\nNotes.")
 
     status, body, content_type = local_api.route_request(tmp_path, "/api/artifacts")
 
     assert status == 200
     assert content_type == "application/json; charset=utf-8"
-    artifact = body["Handoffs (pre-s196 history)"][0]
-    assert artifact["title"] == "Handoff"
-    assert artifact["path"] == "docs/session-state/handoff.md"
-    assert artifact["url"] == "/artifacts/docs/session-state/handoff.md"
+    assert not any(category.startswith("Handoffs") for category in body)
+    artifact = body["Audits"][0]
+    assert artifact["title"] == "Audit"
+    assert artifact["path"] == "docs/audits/audit.md"
+    assert artifact["url"] == "/artifacts/docs/audits/audit.md"
     assert artifact["format"] == "md"
     assert isinstance(artifact["mtime"], float)
     assert isinstance(artifact["size_bytes"], int)
@@ -166,14 +164,13 @@ def test_artifact_nonexistent_returns_404(tmp_path: Path) -> None:
     assert status == 404
 
 
-def test_home_groups_artifacts_and_decisions_in_tools(tmp_path: Path) -> None:
+def test_home_links_artifacts_from_the_page_nav(tmp_path: Path) -> None:
     status, body, content_type = local_api.route_request(tmp_path, "/")
 
     assert status == 200
     assert "text/html" in content_type
     assert '<a class="navlink" href="/artifacts">Artifacts</a>' in body
-    menu = body.split('<div class="nav-menu">', 1)[1].split('</details>', 1)[0]
-    assert 'href="/decisions"' in menu and 'href="/artifacts"' in menu
+    assert 'href="/decisions"' not in body
     assert 'summary-card' not in body
 
 

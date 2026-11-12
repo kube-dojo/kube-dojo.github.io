@@ -17,7 +17,6 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
-from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -51,18 +50,6 @@ def _load_local_api_submodule(short_name: str, filename: str) -> Any:
     return module
 
 
-def _load_channel_routes_module() -> Any:
-    return _load_local_api_submodule("routes_channels", "routes/channels.py")
-
-
-def _load_decision_routes_module() -> Any:
-    return _load_local_api_submodule("routes_decisions", "routes/decisions.py")
-
-
-def _load_search_routes_module() -> Any:
-    return _load_local_api_submodule("routes_search", "routes/search.py")
-
-
 def _load_ui_fragments_module() -> Any:
     return _load_local_api_submodule("routes_ui_fragments", "routes/ui_fragments.py")
 
@@ -83,10 +70,6 @@ def _design_system_link() -> str:
     return _ui_fragments_module().DESIGN_SYSTEM_LINK
 
 
-def _render_page_chrome(*, include_afk: bool = False) -> str:
-    return _ui_fragments_module().render_global_chrome(include_search=True, include_afk=include_afk)
-
-
 def _poll_stale_css() -> str:
     return _ui_fragments_module().POLL_STALE_CSS
 
@@ -94,10 +77,6 @@ def _poll_stale_css() -> str:
 def _render_poll_stale_script() -> str:
     return _ui_fragments_module().render_poll_stale_script()
 
-
-_CHANNEL_ROUTES = _load_channel_routes_module()
-_DECISION_ROUTES = _load_decision_routes_module()
-_SEARCH_ROUTES = _load_search_routes_module()
 
 # Heavy imports (pipeline_v2, status, translation_v2, ztt_status) are deferred
 # into the handlers that actually need them. Measured: moving these out of the
@@ -840,8 +819,6 @@ def _build_gh_list(kind: str, state: str, limit: int) -> tuple[int, Any, str]:
 
 def _build_gh_detail(kind: str, number: int) -> tuple[int, Any, str]:
     fields = ["number", "title", "state", "labels", "assignees", "comments", "updatedAt", "url"]
-    if kind == "pr":
-        fields.append("mergeable")
     status_code, payload = _run_gh_json(
         kind,
         "view",
@@ -855,15 +832,11 @@ def _build_gh_detail(kind: str, number: int) -> tuple[int, Any, str]:
         return 502, {"error": "invalid_gh_json", "message": "expected object"}, "application/json; charset=utf-8"
     item = _normalize_gh_item(payload)
     item["comments"] = _normalize_gh_comments(payload.get("comments"))
-    if kind == "pr":
-        item["mergeable"] = payload.get("mergeable")
     return 200, item, "application/json; charset=utf-8"
 
 
 def _is_gh_path(path: str) -> bool:
-    return (
-        path in {"/api/gh/issues", "/api/gh/prs"} or path.startswith(("/api/gh/issues/", "/api/gh/prs/"))
-    )
+    return path == "/api/gh/issues" or path.startswith("/api/gh/issues/")
 
 
 def _gh_payload_etag(path: str, payload: Any) -> str:
@@ -2179,31 +2152,6 @@ def build_bridge_messages(
         "count": len(rows),
         "messages": rows,
     }
-
-
-def _build_channel_threads_index(
-    repo_root: Path,
-    *,
-    list_channels_fn,
-) -> dict[str, Any]:
-    return _CHANNEL_ROUTES.build_channel_threads_index(
-        repo_root,
-        list_channels_fn=list_channels_fn,
-        resolve_bridge_db_path_fn=_resolve_bridge_db_path,
-        query_sqlite_rows_fn=_query_sqlite_rows,
-    )
-
-
-def _build_channel_events_payload(
-    thread_id: str,
-    read_channel_events_fn,
-    since_event_id: int = 0,
-) -> dict[str, Any]:
-    return _CHANNEL_ROUTES.build_channel_events_payload(
-        thread_id,
-        read_channel_events_fn=read_channel_events_fn,
-        since_event_id=since_event_id,
-    )
 
 
 # ---- #388 dispatcher batch progress ----
@@ -4395,41 +4343,45 @@ _TOP_NAV_CSS = """
 """
 
 
-def _render_top_nav(active: str) -> str:
-    primary = [("home", "/", "Overview"), ("quality", "/quality", "Curriculum"),
-               ("operations", "/operations", "Operations")]
-    groups = {
-        "Records": [("artifacts", "/artifacts", "Artifacts"), ("decisions", "/decisions", "Decisions"),
-                    ("channels", "/channels", "Conversations")],
-        "Diagnostics": [("agents", "/agents", "Agents"), ("telemetry", "/telemetry", "Build telemetry"),
-                        ("headroom", "/headroom", "Headroom"), ("benchmarks", "/benchmarks", "Benchmarks")],
-        "Deferred work": [("uk", "/uk", "Translation")],
-    }
+# Local pages for this app, then the same three plain links every local UI shows.
+_LOCAL_NAV = (
+    ("home", "/", "Overview"),
+    ("quality", "/quality", "Curriculum"),
+    ("operations", "/operations", "Operations"),
+    ("artifacts", "/artifacts", "Artifacts"),
+    ("uk", "/uk", "Translation"),
+    ("telemetry", "/telemetry", "Build telemetry"),
+)
+_APP_NAV = (
+    ("Machinery", "http://localhost:8765/machinery"),
+    ("Learn Ukrainian", "http://localhost:8765/"),
+    ("KubeDojo", "http://localhost:8768/"),
+)
 
+
+def _render_top_nav(active: str) -> str:
     def link(item: tuple[str, str, str]) -> str:
         key, href, label = item
         current = ' aria-current="page"' if key == active else ''
         return f'<a class="navlink{" active" if key == active else ""}" href="{href}"{current}>{label}</a>'
 
-    rendered_links = "\n  ".join(link(item) for item in primary)
-    tools = "".join(f'<div class="nav-group"><strong>{label}</strong>{"".join(map(link, items))}</div>'
-                    for label, items in groups.items())
-    selected = next((label for items in groups.values() for key, _, label in items if key == active), None)
+    pages = "\n  ".join(link(item) for item in _LOCAL_NAV)
+
+    def app_link(label: str, href: str) -> str:
+        current = ' aria-current="true"' if label == "KubeDojo" else ''
+        return f'<a class="navlink" href="{href}"{current}>{label}</a>'
+
+    apps = "".join(app_link(label, href) for label, href in _APP_NAV)
     return f"""<nav class="topnav" role="navigation" aria-label="Local-API sections">
   <a class="brand" href="/">KubeDojo</a>
-  {rendered_links}
-  <details class="nav-tools"><summary>{selected or 'Tools'}</summary><div class="nav-menu">{tools}</div></details>
+  {pages}
+  <span class="nav-apps" role="group" aria-label="Local apps">{apps}</span>
 </nav>"""
 
-
-_BENCHMARK_REPORTS_REL = "calibration/v1/reports"
-_BENCHMARK_LEDGER_REL = "calibration/v1/ledger.db"
-_BENCHMARK_REPORT_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _ARTIFACT_ALLOWED_DIRS = (
     ".agent/session-state",
     "audit",
-    "calibration/v1/reports",
     "docs/architecture",
     "docs/migrations",
     "docs/session-state",
@@ -4455,19 +4407,14 @@ _ARTIFACT_ASSET_TYPES = {
 }
 _ARTIFACT_SECTION_SPECS = (
     ("Reports", "audit", ("**/*.html", "**/*.md")),
-    ("Calibration reports", "calibration/v1/reports", ("**/*.html",)),
     ("Architecture", "docs/architecture", ("**/*.html",)),
     ("Migrations", "docs/migrations", ("**/*.html", "**/*.md")),
-    ("Handoffs (live, local)", ".agent/session-state", ("*.html", "*.md")),
-    ("Handoffs (pre-s196 history)", "docs/session-state", ("*.html", "*.md")),
     ("Decisions", "docs/decisions", ("**/*.html", "**/*.md")),
-    ("Sessions", "docs/sessions", ("**/*.html", "**/*.md")),
     ("Research", "docs/research", ("**/*.html", "**/*.md")),
     ("Audits", "docs/audits", ("**/*.html", "**/*.md")),
     ("References", "docs/references", ("**/*.html", "**/*.md")),
     ("Briefs", "docs/briefs", ("**/*.html", "**/*.md")),
     ("Bug autopsies", "docs/bug-autopsies", ("**/*.html", "**/*.md")),
-    ("Dispatch briefs", "docs/dispatch-briefs", ("**/*.html", "**/*.md")),
     ("Docs", "docs", ("*.md",)),
     ("Repository root", ".", ("*.md",)),
 )
@@ -4590,7 +4537,7 @@ def build_artifacts_index(repo_root: Path, *, include_deferred: bool = False) ->
             continue
         base = repo_root / base_rel
         if not base.is_dir():
-            if category in {"Reports", "Migrations", "Handoffs", "References"}:
+            if category in {"Reports", "Migrations", "References"}:
                 grouped[category] = []
             continue
         items: list[dict[str, Any]] = []
@@ -4618,7 +4565,7 @@ def build_artifacts_index(repo_root: Path, *, include_deferred: bool = False) ->
                         "category": category,
                     }
                 )
-        if items or category not in {"Briefs", "Bug autopsies", "Dispatch briefs"}:
+        if items or category not in {"Briefs", "Bug autopsies"}:
             grouped[category] = sorted(items, key=lambda item: item["mtime"], reverse=True)
     return grouped
 
@@ -4640,16 +4587,6 @@ def _get_artifacts_index(
     index = build_artifacts_index(repo_root, include_deferred=include_deferred)
     _ARTIFACT_INDEX_CACHE[cache_key] = (now, index)
     return index
-
-
-def _latest_handoff_url(repo_root: Path) -> str | None:
-    session = build_current_session(repo_root)
-    latest = session.get("latest")
-    if isinstance(latest, dict):
-        rel = latest.get("path")
-        if isinstance(rel, str) and rel:
-            return f"/artifacts/{rel}"
-    return None
 
 
 def _collect_recent_artifacts(
@@ -4947,7 +4884,6 @@ def render_markdown_artifact_html(repo_root: Path, path: Path) -> str:
 </head>
 <body>
 {_render_top_nav("artifacts")}
-{_render_page_chrome()}
 <main class="wrap">
   <nav class="crumbs" aria-label="Breadcrumbs">{_render_artifact_breadcrumbs(rel)}</nav>
   <header class="hero">
@@ -4990,9 +4926,6 @@ def render_html_artifact_shell(repo_root: Path, rel_path: str, raw_bytes: bytes)
     raw_href = html.escape(f"/artifacts/{rel_path}?raw=1", quote=True)
     iframe_src = raw_href
     breadcrumbs = _render_artifact_breadcrumbs(rel_path)
-    benchmarks_action = ""
-    if rel_path.startswith("calibration/v1/reports/"):
-        benchmarks_action = '<a class="shell-action" href="/benchmarks">Benchmarks</a>'
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -5015,12 +4948,10 @@ def render_html_artifact_shell(repo_root: Path, rel_path: str, raw_bytes: bytes)
 </head>
 <body>
 {_render_top_nav("artifacts")}
-{_render_page_chrome()}
 <main class="wrap">
   <nav class="crumbs" aria-label="Breadcrumbs">{breadcrumbs}</nav>
   <div class="shell-toolbar">
     <a class="shell-action" href="{raw_href}">Open raw (?raw=1)</a>
-    {benchmarks_action}
     <span class="shell-action" aria-hidden="true">{safe_rel}</span>
   </div>
   <section class="artifact-shell">
@@ -5039,7 +4970,6 @@ def render_artifacts_index_html(
     total = sum(len(items) for items in artifacts.values())
     format_counts = _artifact_format_counts(artifacts)
     recent = _collect_recent_artifacts(artifacts)
-    handoff_url = _latest_handoff_url(repo_root)
     include_research = query is not None and (
         _query_is_true(query, "include_research") or query.get("include", [""])[0].strip().lower() == "research"
     )
@@ -5070,7 +5000,7 @@ def render_artifacts_index_html(
 
     section_html = []
     for category, items in artifacts.items():
-        if not items and category in {"Briefs", "Bug autopsies", "Dispatch briefs"}:
+        if not items and category in {"Briefs", "Bug autopsies"}:
             continue
         rows = []
         for item in items:
@@ -5111,11 +5041,6 @@ def render_artifacts_index_html(
 </section>"""
         )
 
-    handoff_cta = ""
-    if handoff_url:
-        handoff_cta = (
-            f'<a class="handoff-cta" href="{html.escape(handoff_url, quote=True)}">Latest handoff &rarr;</a>'
-        )
     research_note = ""
     if not include_research:
         research_note = (
@@ -5152,7 +5077,6 @@ def render_artifacts_index_html(
     .page-head {{ display:flex; justify-content:space-between; gap:20px; align-items:flex-end; margin-bottom:18px; }}
     h1 {{ margin:0; font-size:30px; letter-spacing:0; }}
     .page-sub {{ margin-top:4px; color:var(--fg-dim); font-size:14px; max-width:780px; }}
-    .handoff-cta {{ display:inline-flex; align-items:center; padding:8px 12px; border-radius:8px; border:1px solid rgba(88,166,255,0.45); background:var(--blue-bg); color:var(--blue); font-size:13px; font-weight:700; text-decoration:none; }}
     .research-note {{ color:var(--fg-dim); font-size:13px; margin:0 0 12px; }}
     .artifact-tools {{ display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(120px,0.5fr)); gap:10px; margin:16px 0; }}
     .artifact-tools input,.artifact-tools select {{ width:100%; height:36px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); color:var(--fg); padding:0 10px; font-size:13px; }}
@@ -5198,14 +5122,13 @@ def render_artifacts_index_html(
 </head>
 <body>
 {_render_top_nav("artifacts")}
-{_render_page_chrome()}
 <main class="wrap">
   <header class="page-head">
     <div>
       <h1>Artifacts</h1>
-      <div class="page-sub">Unified browser for HTML and Markdown orchestrator artifacts served through the local API.</div>
+      <div class="page-sub">Browser for the project's HTML and Markdown artifacts served through the local API.</div>
     </div>
-    <div>{handoff_cta}<span class="pill neutral">Generated {html.escape(generated)}</span></div>
+    <div><span class="pill neutral">Generated {html.escape(generated)}</span></div>
   </header>
   {research_note}
   <section class="artifact-tools" aria-label="Artifact filters">
@@ -5477,317 +5400,6 @@ def build_current_session(repo_root: Path) -> dict[str, Any]:
     }
 
 
-def _benchmark_report_dirs(repo_root: Path) -> list[Path]:
-    reports_dir = repo_root / _BENCHMARK_REPORTS_REL
-    if not reports_dir.is_dir():
-        return []
-    dirs = [
-        path
-        for path in reports_dir.iterdir()
-        if path.is_dir() and _BENCHMARK_REPORT_DIR_RE.fullmatch(path.name)
-    ]
-    return sorted(dirs, key=lambda path: path.name, reverse=True)
-
-
-def _benchmark_report_summary(repo_root: Path, report_dir: Path) -> dict[str, str]:
-    rel_dir = report_dir.relative_to(repo_root).as_posix()
-    return {
-        "date": report_dir.name,
-        "directory": rel_dir,
-        "render_url": f"http://127.0.0.1:8768/artifacts/{rel_dir}/index.html",
-    }
-
-
-def _benchmark_artifact_url(repo_root: Path, path: Path) -> str:
-    return f"/artifacts/{path.relative_to(repo_root).as_posix()}"
-
-
-def _benchmark_file_url_if_present(repo_root: Path, report_dir: Path, filename: str) -> str | None:
-    path = report_dir / filename
-    if not path.is_file():
-        return None
-    return _benchmark_artifact_url(repo_root, path)
-
-
-def _benchmark_html_file_urls(repo_root: Path, directory: Path) -> list[str]:
-    if not directory.is_dir():
-        return []
-    return [
-        _benchmark_artifact_url(repo_root, path)
-        for path in sorted(directory.glob("*.html"), key=lambda item: item.name)
-        if path.is_file()
-    ]
-
-
-def _build_benchmark_files(repo_root: Path, report_dir: Path) -> dict[str, Any]:
-    return {
-        "index": _benchmark_file_url_if_present(repo_root, report_dir, "index.html"),
-        "matrix": _benchmark_file_url_if_present(repo_root, report_dir, "matrix.html"),
-        "wave_ab": _benchmark_file_url_if_present(repo_root, report_dir, "wave-ab-report.html"),
-        "stability": _benchmark_file_url_if_present(repo_root, report_dir, "stability.html"),
-        "per_lane": _benchmark_html_file_urls(repo_root, report_dir / "per-lane"),
-        "per_model": _benchmark_html_file_urls(repo_root, report_dir / "per-model"),
-    }
-
-
-def _build_benchmark_ledger(repo_root: Path) -> dict[str, Any]:
-    ledger = {
-        "path": _BENCHMARK_LEDGER_REL,
-        "cells_total": 0,
-        "cells_scored": 0,
-        "models": 0,
-        "lanes": 0,
-    }
-    db_path = repo_root / _BENCHMARK_LEDGER_REL
-    if not db_path.is_file():
-        return ledger
-
-    queries = {
-        "cells_total": "SELECT COUNT(*) FROM cells",
-        "cells_scored": "SELECT COUNT(DISTINCT cell_id) FROM scores",
-        "models": "SELECT COUNT(DISTINCT model_id) FROM cells",
-        "lanes": "SELECT COUNT(DISTINCT lane) FROM cells",
-    }
-    try:
-        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
-    except (OSError, sqlite3.Error):
-        return ledger
-    try:
-        for key, sql in queries.items():
-            row = conn.execute(sql).fetchone()
-            ledger[key] = int(row[0] or 0) if row else 0
-    except sqlite3.Error:
-        return {
-            "path": _BENCHMARK_LEDGER_REL,
-            "cells_total": 0,
-            "cells_scored": 0,
-            "models": 0,
-            "lanes": 0,
-        }
-    finally:
-        conn.close()
-    return ledger
-
-
-def _latest_benchmark_staleness_seconds(repo_root: Path, report_dir: Path) -> float | None:
-    index_path = report_dir / "index.html"
-    db_path = repo_root / _BENCHMARK_LEDGER_REL
-    if not index_path.is_file() or not db_path.is_file():
-        return None
-
-    try:
-        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
-    except (OSError, sqlite3.Error):
-        return None
-    try:
-        row = conn.execute("SELECT MAX(scored_at) FROM scores").fetchone()
-    except sqlite3.Error:
-        return None
-    finally:
-        conn.close()
-
-    if row is None or row[0] is None:
-        return None
-
-    try:
-        scored_at = datetime.fromisoformat(str(row[0]).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if scored_at.tzinfo is None:
-        scored_at = scored_at.replace(tzinfo=UTC)
-    try:
-        rendered_at = index_path.stat().st_mtime
-    except OSError:
-        return None
-    return float(scored_at.timestamp() - rendered_at)
-
-
-def build_latest_benchmarks(repo_root: Path) -> dict[str, Any]:
-    report_dirs = _benchmark_report_dirs(repo_root)
-    if not report_dirs:
-        return {"latest": None, "predecessors": [], "total_runs": 0}
-
-    latest_dir = report_dirs[0]
-    latest: dict[str, Any] = _benchmark_report_summary(repo_root, latest_dir)
-    latest["files"] = _build_benchmark_files(repo_root, latest_dir)
-    latest["ledger"] = _build_benchmark_ledger(repo_root)
-    latest["staleness_seconds"] = _latest_benchmark_staleness_seconds(repo_root, latest_dir)
-
-    return {
-        "latest": latest,
-        "predecessors": [_benchmark_report_summary(repo_root, path) for path in report_dirs[1:11]],
-        "total_runs": len(report_dirs),
-    }
-
-
-def _benchmark_report_tile(label: str, href: str | None, subtitle: str = "") -> str:
-    safe_label = html.escape(label)
-    safe_subtitle = html.escape(subtitle) if subtitle else ""
-    subtitle_html = f'<span class="bench-tile-sub">{safe_subtitle}</span>' if safe_subtitle else ""
-    if not href:
-        return (
-            '<span class="bench-tile disabled">'
-            f'<span class="bench-tile-title">{safe_label}</span>'
-            '<span class="bench-tile-sub">not generated</span></span>'
-        )
-    safe_href = html.escape(href, quote=True)
-    return (
-        f'<a class="bench-tile" href="{safe_href}">'
-        f'<span class="bench-tile-title">{safe_label}</span>{subtitle_html}</a>'
-    )
-
-
-def _benchmark_label_from_url(url: str) -> str:
-    stem = Path(urlsplit(url).path).stem
-    return stem or url
-
-
-def _benchmark_index_href(run: dict[str, Any]) -> str | None:
-    directory = run.get("directory")
-    if not isinstance(directory, str) or not directory:
-        return None
-    return f"/artifacts/{directory}/index.html"
-
-
-def _render_benchmarks_page(repo_root: Path) -> str:
-    payload = build_latest_benchmarks(repo_root)
-    latest = payload.get("latest") if isinstance(payload.get("latest"), dict) else None
-    if latest is None:
-        return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Benchmarks - KubeDojo Local Monitor</title>
-  <link rel="stylesheet" href="/static/design-system.css" />
-</head>
-<body>
-{_render_top_nav("benchmarks")}
-{_render_page_chrome()}
-<main class="wrap">
-  <header class="hero">
-    <div><h1>Benchmarks</h1><div class="sub">Calibration report dashboard.</div></div>
-  </header>
-  <section class="kpi"><div class="label">Latest run</div><div class="value">No runs</div><div class="sub">No calibration reports found.</div></section>
-</main>
-</body></html>"""
-
-    files = latest.get("files") if isinstance(latest.get("files"), dict) else {}
-    ledger = latest.get("ledger") if isinstance(latest.get("ledger"), dict) else {}
-    date = str(latest.get("date") or "unknown")
-    cells_scored = ledger.get("cells_scored", 0)
-    cells_total = ledger.get("cells_total", 0)
-    models = ledger.get("models", 0)
-    lanes = ledger.get("lanes", 0)
-    summary = f"{cells_scored}/{cells_total} cells scored × {models} models × {lanes} lanes ({date})"
-    top_tiles = "\n".join(
-        [
-            _benchmark_report_tile("Index", files.get("index"), "run overview"),
-            _benchmark_report_tile("Matrix", files.get("matrix"), "lane × model grid"),
-            _benchmark_report_tile("Wave AB", files.get("wave_ab"), "paired comparison"),
-            _benchmark_report_tile("Stability", files.get("stability"), "replicate variance"),
-        ]
-    )
-    lane_tiles = "\n".join(
-        _benchmark_report_tile(_benchmark_label_from_url(url), url)
-        for url in files.get("per_lane", []) or []
-        if isinstance(url, str)
-    )
-    model_tiles = "\n".join(
-        _benchmark_report_tile(_benchmark_label_from_url(url), url)
-        for url in files.get("per_model", []) or []
-        if isinstance(url, str)
-    )
-    predecessors = payload.get("predecessors") if isinstance(payload.get("predecessors"), list) else []
-    history_rows = "\n".join(
-        f'<li><a href="{html.escape(href, quote=True)}">{html.escape(str(run.get("date") or "unknown"))}</a></li>'
-        for run in predecessors
-        if isinstance(run, dict) and (href := _benchmark_index_href(run))
-    )
-    history_html = f'<ul class="bench-history">{history_rows}</ul>' if history_rows else '<p class="empty-state">No prior runs</p>'
-    stability_candidates_html = ""
-    if files.get("stability"):
-        stability_candidates_html = (
-            ' The raw stability selector output is available as '
-            '<a href="/artifacts/calibration/v1/reports/stability-candidates.json">'
-            "stability-candidates.json</a>."
-        )
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Benchmarks - KubeDojo Local Monitor</title>
-  <link rel="stylesheet" href="/static/design-system.css" />
-  <style>
-    .bench-head {{ display:flex; justify-content:space-between; gap:20px; align-items:flex-end; background:var(--surface-0); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; margin-bottom:20px; }}
-    .bench-head h1 {{ margin:0 0 4px; font-size:26px; letter-spacing:0; }}
-    .bench-summary {{ color:var(--accent); font-size:15px; font-weight:800; text-align:right; }}
-    .bench-run-date {{ color:var(--fg-dim); font-size:12px; text-align:right; margin-top:4px; }}
-    .bench-kpis {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:22px; }}
-    .bench-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:12px 0 22px; }}
-    .bench-grid.compact {{ grid-template-columns:repeat(auto-fit,minmax(138px,1fr)); }}
-    .bench-tile {{ min-height:68px; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:13px 14px; background:var(--surface-0); border:1px solid var(--border); border-radius:8px; color:var(--text); text-decoration:none; }}
-    .bench-tile:hover {{ background:var(--surface-1); text-decoration:none; }}
-    .bench-tile.disabled {{ color:var(--fg-dim); opacity:.72; }}
-    .bench-tile-title {{ font-weight:800; overflow-wrap:anywhere; }}
-    .bench-tile-sub {{ color:var(--fg-dim); font-size:12px; }}
-    .bench-section h2 {{ margin-top:24px; }}
-    .bench-history {{ list-style:none; margin:10px 0 24px; padding:0; display:flex; gap:8px; flex-wrap:wrap; }}
-    .bench-history a {{ display:inline-flex; padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface-0); font-size:13px; }}
-    .bench-methodology {{ margin-top:30px; padding-top:18px; border-top:1px solid var(--border); color:var(--fg-dim); font-size:13px; }}
-    @media (max-width:720px) {{ .bench-head {{ align-items:flex-start; flex-direction:column; }} .bench-summary,.bench-run-date {{ text-align:left; }} .bench-kpis {{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
-  </style>
-</head>
-<body>
-{_render_top_nav("benchmarks")}
-{_render_page_chrome()}
-<main class="wrap">
-  <section class="bench-head">
-    <div>
-      <h1>Benchmarks</h1>
-      <div class="sub">Curated calibration report dashboard for the latest model-and-lane run.</div>
-    </div>
-    <div>
-      <div class="bench-summary">{html.escape(summary)}</div>
-      <div class="bench-run-date">Run date {html.escape(date)}</div>
-    </div>
-  </section>
-
-  <div class="bench-kpis">
-    <div class="kpi"><div class="label">Cells scored</div><div class="value">{html.escape(str(cells_scored))}</div><div class="sub">of {html.escape(str(cells_total))} cells</div></div>
-    <div class="kpi"><div class="label">Models</div><div class="value">{html.escape(str(models))}</div><div class="sub">per run</div></div>
-    <div class="kpi"><div class="label">Lanes</div><div class="value">{html.escape(str(lanes))}</div><div class="sub">evaluation lanes</div></div>
-    <div class="kpi"><div class="label">Latest run</div><div class="value">{html.escape(date)}</div><div class="sub">{html.escape(str(payload.get("total_runs", 0)))} total runs</div></div>
-  </div>
-
-  <section class="bench-section">
-    <h2>Top Reports</h2>
-    <div class="bench-grid">{top_tiles}</div>
-  </section>
-
-  <section class="bench-section">
-    <h2>Per-Lane Reports</h2>
-    <div class="bench-grid compact">{lane_tiles or '<p class="empty-state">No per-lane reports</p>'}</div>
-  </section>
-
-  <section class="bench-section">
-    <h2>Per-Model Reports</h2>
-    <div class="bench-grid compact">{model_tiles or '<p class="empty-state">No per-model reports</p>'}</div>
-  </section>
-
-  <section class="bench-section">
-    <h2>History</h2>
-    {history_html}
-  </section>
-
-  <footer class="bench-methodology">
-    The calibration dashboard tracks a {html.escape(str(lanes))}-lane × {html.escape(str(models))}-model × ~2-scorer shape, with each run publishing the aggregate index, matrix, wave-ab comparison, stability report, per-lane slices, and per-model slices.{stability_candidates_html}
-  </footer>
-</main>
-</body></html>"""
-
-
 def build_state_manifest() -> dict[str, Any]:
     """Pointer-only index for canonical cold-start state discovery."""
     return {
@@ -5833,23 +5445,10 @@ def build_state_manifest() -> dict[str, Any]:
                 "entries": [
                     {"name": "Overview", "path": "/", "purpose": "Canonical coverage and separately recorded upgrade work.", "type": "html"},
                     {"name": "Curriculum", "path": "/quality", "purpose": "Per-page acceptance evidence and recorded work.", "type": "html"},
-                    {"name": "Operations", "path": "/operations", "purpose": "Leases, pipeline, runtime services and recent activity.", "type": "html"},
+                    {"name": "Operations", "path": "/operations", "purpose": "Active leases and the pipeline snapshot.", "type": "html"},
                     {"name": "Legacy operator link", "path": "/operator", "purpose": "Redirect to active leases.", "type": "redirect", "target": "/operations#leases"},
                     {"name": "Legacy pipeline link", "path": "/pipeline", "purpose": "Redirect to the pipeline snapshot.", "type": "redirect", "target": "/operations#pipeline"},
-                    {"name": "Legacy activity link", "path": "/activity", "purpose": "Redirect to recent activity.", "type": "redirect", "target": "/operations#activity"},
-                    {"name": "Legacy health link", "path": "/health", "purpose": "Redirect to runtime services; worktrees and missing modules use their JSON APIs.", "type": "redirect", "target": "/operations#services"},
-                    {"name": "Artifacts browser", "path": "/artifacts", "purpose": "Browse HTML and Markdown orchestrator artifacts.", "type": "html_artifact"},
-                    {"name": "Decisions board", "path": "/decisions", "purpose": "Decision cards with lineage and pending status.", "type": "html"},
-                    {"name": "Channels browser", "path": "/channels", "purpose": "Bridge conversations and deliberation threads.", "type": "html"},
-                    {"name": "Benchmarks dashboard", "path": "/benchmarks", "purpose": "Latest calibration run and predecessor history.", "type": "html"},
-                ],
-            },
-            {
-                "category": "collaboration",
-                "entries": [
-                    {"name": "Channels", "path": "/channels", "purpose": "Bridge conversations and live deliberation threads.", "type": "html"},
-                    {"name": "Decisions", "path": "/decisions", "purpose": "Decision cards, pending queue, and lineage.", "type": "html"},
-                    {"name": "Pending decisions API", "path": "/api/decisions/pending", "purpose": "Pending and stale decision files for notifications.", "type": "api"},
+                    {"name": "Artifacts browser", "path": "/artifacts", "purpose": "Browse HTML and Markdown project artifacts.", "type": "html_artifact"},
                 ],
             },
             {
@@ -5895,7 +5494,7 @@ def build_state_manifest() -> dict[str, Any]:
                     {
                         "name": "Artifacts index",
                         "path": "/artifacts",
-                        "purpose": "Browseable HTML and Markdown artifact index, including current handoffs.",
+                        "purpose": "Browseable HTML and Markdown project artifact index.",
                         "type": "html_artifact",
                     },
                     {
@@ -5903,24 +5502,6 @@ def build_state_manifest() -> dict[str, Any]:
                         "path": "/api/artifacts",
                         "purpose": "JSON index of HTML and Markdown artifacts served by the artifacts route.",
                         "type": "api",
-                    },
-                ],
-            },
-            {
-                "category": "benchmarks",
-                "ui": "/benchmarks",
-                "entries": [
-                    {
-                        "name": "Latest calibration benchmark report",
-                        "path": "/api/benchmarks/latest",
-                        "purpose": "Latest calibration report artifact plus predecessor reports, ledger coverage counts, and render staleness.",
-                        "type": "api",
-                    },
-                    {
-                        "name": "Benchmarks dashboard",
-                        "path": "/benchmarks",
-                        "purpose": "Curated UI for the latest calibration run, report slices, and predecessor history.",
-                        "type": "html",
                     },
                 ],
             },
@@ -6567,7 +6148,6 @@ def render_uk_board_page_html() -> str:
 </head>
 <body>
  {_render_top_nav("uk")}
-{_render_page_chrome()}
 <main class=\"main\">
   <div class=\"page-head\">
     <div>
@@ -6626,7 +6206,6 @@ def render_quality_board_page_html() -> str:
 </head>
 <body>
  {_render_top_nav("quality")}
-{_render_page_chrome()}
 <main class=\"main\">
   <div class=\"page-head\">
     <div>
@@ -7616,7 +7195,7 @@ def build_api_schema() -> dict[str, Any]:
         },
         "endpoints": [
             {"path": "/", "desc": "Visual curriculum progress and recorded work overview", "content_type": "text/html"},
-            {"path": "/operations", "desc": "Active leases, pipeline, runtime services and recent activity", "content_type": "text/html"},
+            {"path": "/operations", "desc": "Active leases and the pipeline snapshot", "content_type": "text/html"},
             {"path": "/artifacts", "desc": "Browseable HTML and Markdown artifact index", "content_type": "text/html", "query": ["include=research", "include_research=1"]},
             {
                 "path": "/artifacts/{rel-path}",
@@ -7625,9 +7204,6 @@ def build_api_schema() -> dict[str, Any]:
             },
             {"path": "/quality", "desc": "All-page acceptance evidence and recorded upgrade work", "content_type": "text/html"},
             {"path": "/pipeline", "desc": "Compatibility redirect to /operations#pipeline"},
-            {"path": "/benchmarks", "desc": "Calibration benchmark dashboard", "content_type": "text/html"},
-            {"path": "/activity", "desc": "Compatibility redirect to /operations#activity"},
-            {"path": "/health", "desc": "Compatibility redirect to /operations#services"},
             {
                 "path": "/healthz",
                 "desc": "Liveness probe with repo-root inspection. ok=false when repo_root is not the primary checkout or .pids/api.pid references a dead/unreadable process.",
@@ -7654,11 +7230,6 @@ def build_api_schema() -> dict[str, Any]:
             {
                 "path": "/api/session/current",
                 "desc": "Latest session handoff with render/raw URLs plus up to 10 predecessors",
-                "content_type": "application/json",
-            },
-            {
-                "path": "/api/benchmarks/latest",
-                "desc": "Latest calibration benchmark report, predecessor reports, ledger coverage counts, and render staleness",
                 "content_type": "application/json",
             },
             {
@@ -7724,15 +7295,6 @@ def build_api_schema() -> dict[str, Any]:
                 "path": "/api/gh/issues/{n}",
                 "desc": "Single GitHub issue with the last 5 comments",
             },
-            {
-                "path": "/api/gh/prs",
-                "desc": "Cached GitHub pull request list for agent orientation",
-                "query": ["state=open|closed|merged|all (default open)", "limit=... (default 50, max 200)"],
-            },
-            {
-                "path": "/api/gh/prs/{n}",
-                "desc": "Single GitHub pull request with the last 5 comments and mergeable state",
-            },
             {"path": "/api/issue-watch/{n}", "desc": "Single watched GH issue state"},
             {"path": "/api/module/{key}/state", "desc": "Per-module EN+UK+lab+frontmatter+diagnostics"},
             {"path": "/api/module/{key}/orchestration/latest", "desc": "Per-module latest pipeline job+event"},
@@ -7757,23 +7319,6 @@ def build_api_schema() -> dict[str, Any]:
                 "desc": "Review audit index (omit query) or single-module log (?module=...)",
                 "query": ["module=...", "fact_check_status=verified|unverified|failed|none"],
             },
-            {
-                "path": "/api/bridge/messages",
-                "desc": ".bridge/messages.db tail",
-                "query": ["since=<ISO-8601>", "limit=... (max 500)"],
-            },
-            {"path": "/api/channels", "desc": "List deliberation channels with thread event rollups"},
-            {
-                "path": "/api/channel/{thread_id}/events",
-                "desc": "Channel thread event timeline",
-                "query": ["since_event_id=..."],
-            },
-            {"path": "/decisions", "desc": "Decision index with lineage counts", "content_type": "text/html"},
-            {"path": "/decisions/{filename}", "desc": "Plain decision markdown renderer", "content_type": "text/html"},
-            {"path": "/api/decisions", "desc": "List decision files with status and lineage counts"},
-            {"path": "/api/decisions/pending", "desc": "Pending/stale decision count for cold-start agents"},
-            {"path": "/api/decision/{filename}/lineage", "desc": "Decision lineage scanner result"},
-            {"path": "/api/search", "desc": "FTS5 search across channel messages and decision cards"},
             {"path": "/api/quality/scores", "desc": "Live heuristic rubric scores from current English module files"},
             {
                 "path": "/api/quality/board",
@@ -7798,21 +7343,6 @@ def build_api_schema() -> dict[str, Any]:
     }
 
 
-def render_channels_index_html() -> str:
-    return _CHANNEL_ROUTES.render_channels_index_html(
-        top_nav_css=_TOP_NAV_CSS,
-        render_top_nav_fn=_render_top_nav,
-    )
-
-
-def render_channel_thread_html(thread_id: str) -> str:
-    return _CHANNEL_ROUTES.render_channel_thread_html(
-        thread_id,
-        top_nav_css=_TOP_NAV_CSS,
-        render_top_nav_fn=_render_top_nav,
-    )
-
-
 def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
     parsed = urlsplit(raw_path)
     path = parsed.path.rstrip("/") or "/"
@@ -7824,10 +7354,9 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         from local_api_monitor import render_monitor_page
         operations = path == "/operations"
         return 200, render_monitor_page(operations=operations,
-            top_nav=_render_top_nav("operations" if operations else "home"),
-            chrome=_render_page_chrome()), "text/html; charset=utf-8"
-    if path in {"/operator", "/pipeline", "/activity", "/health"}:
-        anchor = {"/operator": "leases", "/pipeline": "pipeline", "/activity": "activity", "/health": "services"}[path]
+            top_nav=_render_top_nav("operations" if operations else "home")), "text/html; charset=utf-8"
+    if path in {"/operator", "/pipeline"}:
+        anchor = {"/operator": "leases", "/pipeline": "pipeline"}[path]
         return 302, f"/operations#{anchor}", "text/plain; charset=utf-8"
     if path == "/artifacts":
         return 200, render_artifacts_index_html(repo_root, query), "text/html; charset=utf-8"
@@ -7847,33 +7376,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         return 200, html, "text/html; charset=utf-8"
     if path == "/quality-board":
         return 301, "/quality", "text/plain; charset=utf-8"
-    if path == "/benchmarks":
-        return 200, _render_benchmarks_page(repo_root), "text/html; charset=utf-8"
-    if path == "/agents":
-        from agent_telemetry_page import render_agents_page_html
-        return 200, render_agents_page_html(
-            top_nav=_render_top_nav("agents"),
-            nav_css=_TOP_NAV_CSS,
-            ds_link=_design_system_link(),
-        ), "text/html; charset=utf-8"
-    if path == "/api/telemetry/agents":
-        from agent_telemetry import build_agent_telemetry
-        since_raw = query.get("since", [None])[0]
-        since_val = None
-        if since_raw:
-            try:
-                since_val = int(since_raw)
-            except (TypeError, ValueError):
-                since_val = None
-        return 200, build_agent_telemetry(repo_root, since=since_val), "application/json; charset=utf-8"
-    if path == "/headroom":
-        from headroom_stats_page import render_headroom_stats_page_html
-
-        return 200, render_headroom_stats_page_html(
-            top_nav=_render_top_nav("headroom"),
-            nav_css=_TOP_NAV_CSS,
-            ds_link=_design_system_link(),
-        ), "text/html; charset=utf-8"
     if path == "/telemetry":
         from module_build_telemetry_page import render_module_builds_page_html
 
@@ -7882,25 +7384,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
             nav_css=_TOP_NAV_CSS,
             ds_link=_design_system_link(),
         ), "text/html; charset=utf-8"
-    if path == "/api/headroom/stats":
-        import os as _hr_os
-        import urllib.request as _hr_u
-
-        _hr_host = _hr_os.environ.get("HEADROOM_HOST", "127.0.0.1")
-        _hr_port = _hr_os.environ.get("HEADROOM_PORT", "8787")
-        _hr_url = f"http://{_hr_host}:{_hr_port}/stats"
-        try:
-            with _hr_u.urlopen(_hr_url, timeout=3) as _hr_resp:
-                _hr_raw = json.loads(_hr_resp.read().decode("utf-8"))
-            _hr_payload = {
-                "ok": True,
-                "url": _hr_url,
-                "summary": _hr_raw.get("summary", {}),
-                "agent_usage": _hr_raw.get("agent_usage", {}),
-            }
-        except Exception as _hr_exc:  # noqa: BLE001 - graceful proxy-down state
-            _hr_payload = {"ok": False, "url": _hr_url, "error": f"{type(_hr_exc).__name__}: {_hr_exc}"}
-        return 200, _hr_payload, "application/json; charset=utf-8"
     if path == "/api/telemetry/module-builds":
         from telemetry_store import build_module_build_payload
 
@@ -7940,63 +7423,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
             slug=slug_part,
             limit=limit_val,
         ), "application/json; charset=utf-8"
-    if path == "/api/telemetry/tool-timings":
-        from telemetry_store import build_tool_timing_payload
-
-        window_raw = query.get("window", ["1h"])[0] or "1h"
-        tool_raw = query.get("tool", [None])[0]
-        return 200, build_tool_timing_payload(
-            repo_root,
-            window=str(window_raw),
-            tool=tool_raw,
-        ), "application/json; charset=utf-8"
-    if path == "/api/telemetry/runtime/usage":
-        from runtime_usage import build_runtime_usage_payload
-
-        days_raw = query.get("days", ["7"])[0]
-        agent_raw = query.get("agent", [None])[0]
-        task_class_raw = query.get("task_class", [None])[0]
-        try:
-            days_val = int(days_raw)
-        except (TypeError, ValueError):
-            days_val = 7
-        return 200, build_runtime_usage_payload(
-            repo_root,
-            days=days_val,
-            agent=agent_raw or None,
-            task_class=task_class_raw or None,
-        ), "application/json; charset=utf-8"
-    if path == "/api/telemetry/runtime/recent":
-        from runtime_usage import build_runtime_recent_payload
-
-        limit_raw = query.get("limit", ["50"])[0]
-        try:
-            limit_val = int(limit_raw)
-        except (TypeError, ValueError):
-            limit_val = 50
-        return 200, build_runtime_recent_payload(
-            repo_root,
-            limit=limit_val,
-        ), "application/json; charset=utf-8"
-    decision_page = _DECISION_ROUTES.route_decision_page_request(
-        repo_root,
-        path,
-        top_nav_css=_TOP_NAV_CSS,
-        render_top_nav_fn=_render_top_nav,
-        render_markdown_fn=_render_markdown_body,
-    )
-    if decision_page is not None:
-        return decision_page
-    channel_page = _CHANNEL_ROUTES.route_channel_page_request(
-        repo_root,
-        path,
-        top_nav_css=_TOP_NAV_CSS,
-        render_top_nav_fn=_render_top_nav,
-        resolve_bridge_db_path_fn=_resolve_bridge_db_path,
-        query_sqlite_rows_fn=_query_sqlite_rows,
-    )
-    if channel_page is not None:
-        return channel_page
     if path == "/healthz":
         return 200, _repo_guard_module().build_healthz_payload(repo_root), "application/json; charset=utf-8"
     if path == "/api/artifacts":
@@ -8115,21 +7541,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         except ValueError:
             return 400, {"error": "invalid_issue_number"}, "application/json; charset=utf-8"
         return _build_gh_detail("issue", number)
-    if path == "/api/gh/prs":
-        state = query.get("state", ["open"])[0] or "open"
-        if state not in {"open", "closed", "merged", "all"}:
-            state = "open"
-        try:
-            limit = int(query.get("limit", ["50"])[0])
-        except (TypeError, ValueError):
-            limit = 50
-        return _build_gh_list("pr", state, max(1, min(limit, 200)))
-    if path.startswith("/api/gh/prs/"):
-        try:
-            number = int(path.split("/")[-1])
-        except ValueError:
-            return 400, {"error": "invalid_pr_number"}, "application/json; charset=utf-8"
-        return _build_gh_detail("pr", number)
     if path == "/api/schema":
         return 200, build_api_schema(), "application/json; charset=utf-8"
     if path == "/api/state/manifest":
@@ -8146,8 +7557,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
         return 200, build_orient(repo_root), "application/json; charset=utf-8"
     if path == "/api/session/current":
         return 200, build_current_session(repo_root), "application/json; charset=utf-8"
-    if path == "/api/benchmarks/latest":
-        return 200, build_latest_benchmarks(repo_root), "application/json; charset=utf-8"
     if path == "/api/briefing/book":
         return 200, build_book_briefing(repo_root), "application/json; charset=utf-8"
     if path == "/api/cache/stats":
@@ -8191,33 +7600,6 @@ def route_request(repo_root: Path, raw_path: str) -> tuple[int, Any, str]:
                 return 404, {"error": "review_not_found", "module_key": module_key}, "application/json; charset=utf-8"
             return 200, payload, "application/json; charset=utf-8"
         return 200, build_reviews_index(repo_root, fact_check_status=fact_check_status), "application/json; charset=utf-8"
-    if path == "/api/bridge/messages":
-        since = query.get("since", [None])[0]
-        try:
-            limit = int(query.get("limit", ["100"])[0])
-        except (TypeError, ValueError):
-            limit = 100
-        return 200, build_bridge_messages(repo_root, since, limit), "application/json; charset=utf-8"
-    search_api = _SEARCH_ROUTES.route_search_request(
-        repo_root,
-        path,
-        query,
-        bridge_db_path=_resolve_bridge_db_path(repo_root),
-    )
-    if search_api is not None:
-        return search_api
-    decision_api = _DECISION_ROUTES.route_decision_api_request(repo_root, path)
-    if decision_api is not None:
-        return decision_api
-    channel_api = _CHANNEL_ROUTES.route_channel_api_request(
-        repo_root,
-        path,
-        query,
-        resolve_bridge_db_path_fn=_resolve_bridge_db_path,
-        query_sqlite_rows_fn=_query_sqlite_rows,
-    )
-    if channel_api is not None:
-        return channel_api
     if path == "/api/quality/scores":
         return 200, build_quality_scores(repo_root), "application/json; charset=utf-8"
     if path == "/api/quality/board":
@@ -8293,14 +7675,6 @@ def route_post_request(
     path = urlsplit(raw_path).path.rstrip("/") or "/"
     if path == "/api/build/run":
         return start_build_job(repo_root)
-    channel_post = _CHANNEL_ROUTES.route_channel_post_request(
-        path,
-        body_bytes=body_bytes,
-        content_type=content_type,
-        bridge_db_path=_resolve_bridge_db_path(repo_root),
-    )
-    if channel_post is not None:
-        return channel_post
     if path == "/api/telemetry/module-builds":
         from telemetry_store import upsert_run
 
@@ -8315,20 +7689,6 @@ def route_post_request(
         except ValueError as exc:
             return 400, {"error": str(exc)}, "application/json; charset=utf-8"
         return 200, {"ok": True, "run_id": run_id}, "application/json; charset=utf-8"
-    if path == "/api/telemetry/tool-timings":
-        from telemetry_store import ingest_tool_timing
-
-        if not body_bytes:
-            return 400, {"error": "empty body"}, "application/json; charset=utf-8"
-        try:
-            payload = json.loads(body_bytes.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return 400, {"error": "invalid JSON"}, "application/json; charset=utf-8"
-        try:
-            ingest_tool_timing(repo_root, payload)
-        except ValueError as exc:
-            return 400, {"error": str(exc)}, "application/json; charset=utf-8"
-        return 200, {"ok": True}, "application/json; charset=utf-8"
     return 404, {"error": "not_found", "path": path}, "application/json; charset=utf-8"
 
 
@@ -8439,7 +7799,6 @@ CACHE_POLICY: dict[str, tuple[float, Callable[[Path], tuple] | None]] = {
     "/api/schema": (600.0, None),
     "/api/state/manifest": (600.0, None),
     "/api/session/current": (30.0, None),
-    "/api/benchmarks/latest": (30.0, None),
     "/api/status/summary": (10.0, _v_v2_db),
     "/api/missing-modules/status": (30.0, None),
     "/api/activity/recent": (5.0, _v_v2_db),

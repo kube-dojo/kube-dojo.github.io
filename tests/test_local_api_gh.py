@@ -121,32 +121,11 @@ class LocalApiGitHubTests(unittest.TestCase):
         self.assertEqual(data["comments"][0]["author"], "user1")
         self.assertEqual(data["comments"][-1]["author"], "user5")
 
-    def test_pr_detail_includes_mergeable(self) -> None:
-        payload = json.dumps(
-            {
-                "number": 298,
-                "title": "PR detail",
-                "state": "OPEN",
-                "labels": [],
-                "assignees": [],
-                "comments": [],
-                "mergeable": "MERGEABLE",
-                "updatedAt": "2026-04-18T10:00:00Z",
-                "url": "https://example.test/pulls/298",
-            }
-        )
-        with tempfile.TemporaryDirectory() as tmpdir, patch.object(
-            local_api.subprocess, "run", return_value=_completed(payload)
-        ):
-            status_code, data, _ = local_api.route_request(Path(tmpdir), "/api/gh/prs/298")
-        self.assertEqual(status_code, 200)
-        self.assertEqual(data["mergeable"], "MERGEABLE")
-
     def test_gh_unavailable_returns_503(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, patch.object(
             local_api.subprocess, "run", side_effect=FileNotFoundError("gh")
         ):
-            status_code, data, _ = local_api.route_request(Path(tmpdir), "/api/gh/prs")
+            status_code, data, _ = local_api.route_request(Path(tmpdir), "/api/gh/issues")
         self.assertEqual(status_code, 503)
         self.assertEqual(data, {"error": "gh CLI not available"})
 
@@ -154,8 +133,8 @@ class LocalApiGitHubTests(unittest.TestCase):
         paths = {entry["path"] for entry in local_api.build_api_schema()["endpoints"]}
         self.assertIn("/api/gh/issues", paths)
         self.assertIn("/api/gh/issues/{n}", paths)
-        self.assertIn("/api/gh/prs", paths)
-        self.assertIn("/api/gh/prs/{n}", paths)
+        self.assertNotIn("/api/gh/prs", paths)
+        self.assertNotIn("/api/gh/prs/{n}", paths)
 
 
 if __name__ == "__main__":
