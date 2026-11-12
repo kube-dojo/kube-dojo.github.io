@@ -26,5 +26,5 @@ def test_quality_route_remains_real_page(tmp_path: Path) -> None:
     assert 'id="quality-board"' in body
     assert '<a class="navlink active" href="/quality"' in body
     assert 'href="/static/design-system.css"' in body
-    assert 'data-search-widget' in body
+    assert 'data-search-widget' not in body
 
