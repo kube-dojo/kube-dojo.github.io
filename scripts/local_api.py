@@ -4589,16 +4589,6 @@ def _get_artifacts_index(
     return index
 
 
-def _latest_handoff_url(repo_root: Path) -> str | None:
-    session = build_current_session(repo_root)
-    latest = session.get("latest")
-    if isinstance(latest, dict):
-        rel = latest.get("path")
-        if isinstance(rel, str) and rel:
-            return f"/artifacts/{rel}"
-    return None
-
-
 def _collect_recent_artifacts(
     artifacts: dict[str, list[dict[str, Any]]],
     *,
@@ -4980,7 +4970,6 @@ def render_artifacts_index_html(
     total = sum(len(items) for items in artifacts.values())
     format_counts = _artifact_format_counts(artifacts)
     recent = _collect_recent_artifacts(artifacts)
-    handoff_url = _latest_handoff_url(repo_root)
     include_research = query is not None and (
         _query_is_true(query, "include_research") or query.get("include", [""])[0].strip().lower() == "research"
     )
@@ -5052,11 +5041,6 @@ def render_artifacts_index_html(
 </section>"""
         )
 
-    handoff_cta = ""
-    if handoff_url:
-        handoff_cta = (
-            f'<a class="handoff-cta" href="{html.escape(handoff_url, quote=True)}">Latest handoff &rarr;</a>'
-        )
     research_note = ""
     if not include_research:
         research_note = (
@@ -5093,7 +5077,6 @@ def render_artifacts_index_html(
     .page-head {{ display:flex; justify-content:space-between; gap:20px; align-items:flex-end; margin-bottom:18px; }}
     h1 {{ margin:0; font-size:30px; letter-spacing:0; }}
     .page-sub {{ margin-top:4px; color:var(--fg-dim); font-size:14px; max-width:780px; }}
-    .handoff-cta {{ display:inline-flex; align-items:center; padding:8px 12px; border-radius:8px; border:1px solid rgba(88,166,255,0.45); background:var(--blue-bg); color:var(--blue); font-size:13px; font-weight:700; text-decoration:none; }}
     .research-note {{ color:var(--fg-dim); font-size:13px; margin:0 0 12px; }}
     .artifact-tools {{ display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(120px,0.5fr)); gap:10px; margin:16px 0; }}
     .artifact-tools input,.artifact-tools select {{ width:100%; height:36px; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); color:var(--fg); padding:0 10px; font-size:13px; }}
@@ -5143,9 +5126,9 @@ def render_artifacts_index_html(
   <header class="page-head">
     <div>
       <h1>Artifacts</h1>
-      <div class="page-sub">Unified browser for HTML and Markdown orchestrator artifacts served through the local API.</div>
+      <div class="page-sub">Browser for the project's HTML and Markdown artifacts served through the local API.</div>
     </div>
-    <div>{handoff_cta}<span class="pill neutral">Generated {html.escape(generated)}</span></div>
+    <div><span class="pill neutral">Generated {html.escape(generated)}</span></div>
   </header>
   {research_note}
   <section class="artifact-tools" aria-label="Artifact filters">
