@@ -24,8 +24,9 @@ Three gates (any violation => exit 1):
   2. ALLOW-LIST ABUSE: an allow-listed package's *declared* install hooks must be a
      subset of EXPECTED_HOOKS — so a compromised esbuild/sharp that adds a rogue
      preinstall is still caught.
-  3. NON-REGISTRY SOURCE: any dep resolved from git/local/tarball is flagged — those
-     bypass registry signing and DO run `prepare` on install (the `prepare` surface
+  3. NON-REGISTRY SOURCE: any dep resolved from git/local/tarball, or with no
+     `resolved` string at all, is flagged — those bypass registry signing and DO
+     run `prepare` on install (the `prepare` surface
      that npm's `hasInstallScript` does not cover; registry deps do not run `prepare`
      on `npm ci`). The only exceptions are the exact entries in
      ALLOWLIST_NON_REGISTRY: the lockfile entry at that exact path must equal the
@@ -142,9 +143,17 @@ def main(argv: list[str]) -> int:
         return 1
 
     try:
-        packages = json.loads(lockfile.read_text(encoding="utf-8")).get("packages", {})
+        data = json.loads(lockfile.read_text(encoding="utf-8"))
     except (ValueError, OSError) as exc:
         print(f"ERROR: cannot parse {lockfile}: {exc}", file=sys.stderr)
+        return 1
+    packages = data.get("packages") if isinstance(data, dict) else None
+    if not isinstance(packages, dict) or not packages:
+        print(
+            f"ERROR: {lockfile} has no `packages` map (lockfileVersion 2+ required); "
+            f"nothing can be verified",
+            file=sys.stderr,
+        )
         return 1
 
     install_hook_pkgs: list[str] = []
@@ -152,6 +161,9 @@ def main(argv: list[str]) -> int:
 
     for path, meta in packages.items():
         if not path:  # root package
+            continue
+        if not isinstance(meta, dict):
+            violations.append(f"[malformed] {path} — lockfile entry is not an object")
             continue
 
         # Local/linked deps (`file:` / workspace symlink) run `prepare` on install and
@@ -221,12 +233,14 @@ def main(argv: list[str]) -> int:
                     f"pinned entry in {mismatch} (ALLOWLIST_NON_REGISTRY requires an exact "
                     f"match)"
                 )
-        elif resolved is not None and not isinstance(resolved, str):
+        elif not isinstance(resolved, str) or not resolved:
+            # npm re-resolves an entry without `resolved` from package.json, so a
+            # missing source cannot be proven to be the registry.
             violations.append(
-                f"[non-registry] {path} — malformed `resolved` ({type(resolved).__name__}); "
-                f"cannot prove a registry source"
+                f"[non-registry] {path} — no `resolved` source in the lockfile "
+                f"({repr(resolved)[:60]}); cannot prove a registry source"
             )
-        elif resolved and not resolved.startswith(REGISTRY_PREFIX):
+        elif not resolved.startswith(REGISTRY_PREFIX):
             violations.append(
                 f"[non-registry] {path} — resolved from a non-registry source "
                 f"({resolved[:60]}); these run `prepare` on install and bypass "
