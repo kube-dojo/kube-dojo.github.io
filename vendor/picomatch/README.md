@@ -43,10 +43,16 @@ guard; `maxExtglobRecursion: false` still turns it off.
 
 `scripts/security/check_install_scripts.py` gate 3 fails on any dependency that does not
 resolve from the npm registry. This tarball is its one exception: the
-`ALLOWLIST_NON_REGISTRY` entry for `node_modules/picomatch` passes only when the lockfile
-name, version, `resolved` path and sha512 integrity all equal the values above. A rebuilt
-or swapped tarball, a bumped version or any other path still fails the gate, so changing
-this copy means updating that entry in a reviewed commit.
+`ALLOWLIST_NON_REGISTRY` entry pins the whole `node_modules/picomatch` lockfile entry
+(name, version, `resolved` path, sha512 integrity, license and engines), and the gate
+passes only when the lockfile entry at that path equals it exactly, with no key missing or
+added. A changed integrity, version, source or extra metadata (such as `bin`), or the same
+entry at any other path, still fails the gate.
+
+The gate reads the lockfile, not the tarball. The tarball bytes are checked by npm: `npm ci`
+refuses a tarball whose sha512 differs from the lockfile `integrity` (`EINTEGRITY`). So a
+changed tarball needs a new integrity in the lockfile, which the gate then rejects until
+the pinned entry is updated in a reviewed commit.
 
 ## Rebuild and verify
 
@@ -77,4 +83,5 @@ Remove this copy when either holds:
 
 Then regenerate `package-lock.json`, delete the `node_modules/picomatch` entry from
 `ALLOWLIST_NON_REGISTRY` in `scripts/security/check_install_scripts.py`, and delete this
-directory.
+directory. Until that entry is deleted, the gate fails on any other `node_modules/picomatch`
+entry, including a registry one, so the three steps land together.
