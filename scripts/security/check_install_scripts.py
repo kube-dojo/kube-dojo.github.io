@@ -24,10 +24,13 @@ Three gates (any violation => exit 1):
   2. ALLOW-LIST ABUSE: an allow-listed package's *declared* install hooks must be a
      subset of EXPECTED_HOOKS — so a compromised esbuild/sharp that adds a rogue
      preinstall is still caught.
-  3. NON-REGISTRY SOURCE: any dep resolved from git/local/tarball is flagged — those
-     bypass registry signing and DO run `prepare` on install (the `prepare` surface
+  3. NON-REGISTRY SOURCE: any dep resolved from git/local/tarball, or with no
+     `resolved` string at all, is flagged — those bypass registry signing and DO
+     run `prepare` on install (the `prepare` surface
      that npm's `hasInstallScript` does not cover; registry deps do not run `prepare`
-     on `npm ci`).
+     on `npm ci`). The only exceptions are the exact entries in
+     ALLOWLIST_NON_REGISTRY: the lockfile entry at that exact path must equal the
+     pinned entry (name, version, resolved, integrity and every other key).
 
 Adding to any allow-list is a security decision — review it in its own commit.
 
@@ -67,6 +70,33 @@ EXPECTED_HOOKS: dict[str, set[str]] = {
     "fsevents": set(),
 }
 
+# Gate-3 exceptions: non-registry entries that are explicitly audited, keyed by FULL
+# lockfile path. The lockfile entry at that path must EQUAL the pinned entry below,
+# every key and value, nothing missing and nothing added (so no extra `bin`,
+# `hasInstallScript` or other install metadata, and no registry or empty `resolved`
+# swapped in). Anything else at that path is reported as [non-registry-pin]; the
+# same entry at any other path is an ordinary [non-registry] finding. `integrity` pins
+# the tarball bytes: this script compares the recorded value, and `npm ci` enforces
+# it on install (EINTEGRITY for a swapped tarball).
+#   - node_modules/picomatch: patched picomatch 4.0.7 for GHSA-fc5q-39xc-vjpf, built
+#     from `npm pack picomatch@4.0.7` + vendor/picomatch/picomatch-4.0.7-lu.1.patch
+#     (rebuild recipe in vendor/picomatch/README.md). No scripts, no bin. REMOVE this
+#     entry, with vendor/picomatch/, when a picomatch release above 4.0.7 fixes
+#     GHSA-fc5q-39xc-vjpf, or the advisory is withdrawn.
+ALLOWLIST_NON_REGISTRY: dict[str, dict[str, object]] = {
+    "node_modules/picomatch": {
+        "name": "@learn-ukrainian/picomatch",
+        "version": "4.0.7-lu.1",
+        "resolved": "file:vendor/picomatch/learn-ukrainian-picomatch-4.0.7-lu.1.tgz",
+        "integrity": (
+            "sha512-HV+6IOKo6ObdzotW27KfsDLfpmVnT17SViHn20M/hKLLWv9QuzjNCeap7qtv8Cq+"
+            "Htk3T2Q1bNwVCbeBjZLP9Q=="
+        ),
+        "license": "MIT",
+        "engines": {"node": ">=12"},
+    },
+}
+
 INSTALL_LIFECYCLE = ("preinstall", "install", "postinstall")
 REGISTRY_PREFIX = "https://registry.npmjs.org/"
 
@@ -77,6 +107,17 @@ def name_from_lock_path(path: str) -> str:
     """Resolved package identity = the segment after the last `node_modules/`.
     Handles scopes: `node_modules/@astrojs/starlight` -> `@astrojs/starlight`."""
     return path.split("node_modules/")[-1]
+
+
+def pinned_entry_mismatch(path: str, meta: dict) -> list[str] | None:
+    """For a path in ALLOWLIST_NON_REGISTRY: the sorted keys whose values differ from
+    the pinned entry (missing and extra keys included), [] on an exact match.
+    None when the path has no pinned entry."""
+    expected = ALLOWLIST_NON_REGISTRY.get(path)
+    if expected is None:
+        return None
+    keys = expected.keys() | meta.keys()
+    return sorted(k for k in keys if meta.get(k, ...) != expected.get(k, ...))
 
 
 def declared_install_hooks(pkg_dir: Path) -> set[str] | None:
@@ -102,9 +143,17 @@ def main(argv: list[str]) -> int:
         return 1
 
     try:
-        packages = json.loads(lockfile.read_text(encoding="utf-8")).get("packages", {})
+        data = json.loads(lockfile.read_text(encoding="utf-8"))
     except (ValueError, OSError) as exc:
         print(f"ERROR: cannot parse {lockfile}: {exc}", file=sys.stderr)
+        return 1
+    packages = data.get("packages") if isinstance(data, dict) else None
+    if not isinstance(packages, dict) or not packages:
+        print(
+            f"ERROR: {lockfile} has no `packages` map (lockfileVersion 2+ required); "
+            f"nothing can be verified",
+            file=sys.stderr,
+        )
         return 1
 
     install_hook_pkgs: list[str] = []
@@ -112,6 +161,9 @@ def main(argv: list[str]) -> int:
 
     for path, meta in packages.items():
         if not path:  # root package
+            continue
+        if not isinstance(meta, dict):
+            violations.append(f"[malformed] {path} — lockfile entry is not an object")
             continue
 
         # Local/linked deps (`file:` / workspace symlink) run `prepare` on install and
@@ -170,9 +222,25 @@ def main(argv: list[str]) -> int:
                 # regardless. Residual: a same-name rogue hook added to an uninstalled
                 # OS-gated dep is caught only by lockfile-integrity diff review.
 
-        # Gate 3: non-registry source (git/local/tarball — runs `prepare`, unsigned)
-        resolved = meta.get("resolved") or ""
-        if resolved and not resolved.startswith(REGISTRY_PREFIX):
+        # Gate 3: non-registry source (git/local/tarball — runs `prepare`, unsigned).
+        # An audited path must equal its pinned entry exactly, whatever its source.
+        mismatch = pinned_entry_mismatch(path, meta)
+        resolved = meta.get("resolved")
+        if mismatch is not None:
+            if mismatch:
+                violations.append(
+                    f"[non-registry-pin] {path} — lockfile entry differs from the audited "
+                    f"pinned entry in {mismatch} (ALLOWLIST_NON_REGISTRY requires an exact "
+                    f"match)"
+                )
+        elif not isinstance(resolved, str) or not resolved:
+            # npm re-resolves an entry without `resolved` from package.json, so a
+            # missing source cannot be proven to be the registry.
+            violations.append(
+                f"[non-registry] {path} — no `resolved` source in the lockfile "
+                f"({repr(resolved)[:60]}); cannot prove a registry source"
+            )
+        elif not resolved.startswith(REGISTRY_PREFIX):
             violations.append(
                 f"[non-registry] {path} — resolved from a non-registry source "
                 f"({resolved[:60]}); these run `prepare` on install and bypass "
@@ -195,7 +263,7 @@ def main(argv: list[str]) -> int:
         print(
             "\n  This is how Miasma-class worms execute. Review the package(s) and "
             "the lockfile diff.\n  If legitimate, update ALLOWLIST_INSTALL / "
-            "EXPECTED_HOOKS in this file in a reviewed commit.",
+            "EXPECTED_HOOKS / ALLOWLIST_NON_REGISTRY in this file in a reviewed commit.",
             file=sys.stderr,
         )
         return 1

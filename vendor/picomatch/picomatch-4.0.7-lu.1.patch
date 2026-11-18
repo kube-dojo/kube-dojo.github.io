@@ -1,0 +1,207 @@
+diff -ruN a/package/lib/parse.js b3/package/lib/parse.js
+--- a/package/lib/parse.js
++++ b/package/lib/parse.js
+@@ -284,6 +284,99 @@
+   return depth;
+ };
+
++// learn-ukrainian patch for GHSA-fc5q-39xc-vjpf (CVE-2026-112366), see
++// site/vendor/picomatch/README.md in learn-ukrainian. A repeated extglob, `+(...)` or `*(...)`, backtracks
++// exponentially when one iteration can consume a variable number of
++// characters (`+(*)`, `+(*a)`, `+(a+)`, nested extglobs) or when two
++// branches can match the same text (`+(a|ab|b)`). These helpers fail
++// closed: a body they cannot prove safe is literalized by extglobClose,
++// exactly as the upstream guard already does for `*(*|x)`.
++
++const unwrapAtGroups = branch => {
++  let value = branch;
++
++  while (/^@\([^\\()[\]{}|]+\)$/.test(value)) {
++    value = value.slice(2, -1);
++  }
++
++  return value;
++};
++
++// Fixed width: only literal characters, `?` and bracket expressions, so every
++// iteration consumes the same number of characters. Any quantifier, group,
++// brace or quote fails the check, and so does any backslash: the tokenizer
++// collapses backslash runs and can then emit a following `?` as a regex
++// quantifier, so escapes are not modelled here.
++const isFixedWidthBranch = branch => !/[\\*+(){}|"]/.test(unwrapAtGroups(branch));
++
++// Bounds the decodability test below so that analysing a pattern stays cheap.
++const MAX_ALTERNATION_CHARS = 1024;
++
++// Several branches are safe to repeat only when each is a non-empty literal and
++// the branch set is uniquely decodable (Sardinas-Patterson test): then every
++// prefix of the input has at most one split into branches, so backtracking
++// visits each input position at most once. When some text has two splits
++// (`a|ab|b` on "ab"), each repetition doubles the work. The test must run on
++// the text the regex matches, so a branch may hold only characters that the
++// tokenizer emits as exactly themselves: ASCII letters and digits and a few
++// plain punctuation marks. Anything else, such as a backslash (`\w` keeps its
++// regex meaning), a NUL (the tokenizer drops it), a comma or a non-ASCII
++// character, fails closed. Under case-insensitive matching the branches are
++// compared lower-cased.
++const LITERAL_BRANCH = /^[A-Za-z0-9 _.~#%&'/:;<=>-]+$/;
++
++const isUnambiguousLiteralAlternation = (branches, caseless) => {
++  const code = new Set();
++  let size = 0;
++
++  for (const branch of branches) {
++    const value = unwrapAtGroups(branch);
++
++    if (!LITERAL_BRANCH.test(value)) {
++      return false;
++    }
++
++    const literal = caseless ? value.toLowerCase() : value;
++    size += literal.length;
++
++    if (code.has(literal) || size > MAX_ALTERNATION_CHARS) {
++      return false;
++    }
++
++    code.add(literal);
++  }
++
++  const danglingSuffixes = (words, others) => {
++    const suffixes = new Set();
++
++    for (const u of words) {
++      for (const v of others) {
++        if (u !== v && v.startsWith(u)) {
++          suffixes.add(v.slice(u.length));
++        }
++      }
++    }
++
++    return suffixes;
++  };
++
++  const seen = new Set();
++  let current = danglingSuffixes(code, code);
++
++  while (current.size > 0) {
++    const fresh = [...current].filter(suffix => !seen.has(suffix));
++
++    if (fresh.some(suffix => code.has(suffix))) {
++      return false;
++    }
++
++    fresh.forEach(suffix => seen.add(suffix));
++    current = new Set([...danglingSuffixes(fresh, code), ...danglingSuffixes(code, fresh)]);
++  }
++
++  return true;
++};
++
+ const analyzeRepeatedExtglob = (body, options) => {
+   if (options.maxExtglobRecursion === false) {
+     return { risky: false };
+@@ -343,6 +436,15 @@
+       : { risky: true };
+   }
+
++  // learn-ukrainian patch (GHSA-fc5q-39xc-vjpf): see the helpers above.
++  const rawBranches = splitTopLevel(body);
++
++  const caseless = String(options.flags || (options.nocase ? 'i' : '')).includes('i');
++
++  if (rawBranches.length === 1 ? !isFixedWidthBranch(rawBranches[0]) : !isUnambiguousLiteralAlternation(rawBranches, caseless)) {
++    return { risky: true };
++  }
++
+   return { risky: false };
+ };
+
+diff -ruN a/package/package.json b3/package/package.json
+--- a/package/package.json
++++ b/package/package.json
+@@ -1,14 +1,11 @@
+ {
+-  "name": "picomatch",
+-  "description": "Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.",
+-  "version": "4.0.7",
++  "name": "@learn-ukrainian/picomatch",
++  "version": "4.0.7-lu.1",
++  "private": true,
++  "description": "picomatch 4.0.7 with the learn-ukrainian fix for GHSA-fc5q-39xc-vjpf; see ../README.md.",
+   "homepage": "https://github.com/micromatch/picomatch",
+   "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
+-  "funding": "https://github.com/sponsors/jonschlinkert",
+   "repository": "micromatch/picomatch",
+-  "bugs": {
+-    "url": "https://github.com/micromatch/picomatch/issues"
+-  },
+   "license": "MIT",
+   "files": [
+     "index.js",
+@@ -19,65 +16,5 @@
+   "main": "index.js",
+   "engines": {
+     "node": ">=12"
+-  },
+-  "scripts": {
+-    "lint": "eslint --cache --cache-location node_modules/.cache/.eslintcache --report-unused-disable-directives --ignore-path .gitignore .",
+-    "mocha": "mocha --reporter dot",
+-    "test": "npm run lint && npm run mocha",
+-    "test:ci": "npm run test:cover",
+-    "test:cover": "nyc npm run mocha"
+-  },
+-  "devDependencies": {
+-    "eslint": "^8.57.0",
+-    "fill-range": "^7.0.1",
+-    "gulp-format-md": "^2.0.0",
+-    "mocha": "^10.4.0",
+-    "nyc": "^15.1.0"
+-  },
+-  "keywords": [
+-    "glob",
+-    "match",
+-    "picomatch"
+-  ],
+-  "nyc": {
+-    "reporter": [
+-      "html",
+-      "lcov",
+-      "text-summary",
+-      "cobertura"
+-    ]
+-  },
+-  "verb": {
+-    "toc": {
+-      "render": true,
+-      "method": "preWrite",
+-      "maxdepth": 3
+-    },
+-    "layout": "empty",
+-    "tasks": [
+-      "readme"
+-    ],
+-    "plugins": [
+-      "gulp-format-md"
+-    ],
+-    "lint": {
+-      "reflinks": true
+-    },
+-    "related": {
+-      "list": [
+-        "braces",
+-        "micromatch"
+-      ]
+-    },
+-    "reflinks": [
+-      "braces",
+-      "expand-brackets",
+-      "extglob",
+-      "fill-range",
+-      "micromatch",
+-      "minimatch",
+-      "nanomatch",
+-      "picomatch"
+-    ]
+   }
+ }
