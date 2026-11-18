@@ -20,6 +20,7 @@
     "@astrojs/starlight": "^0.42.10",
     "astro": "^7.4.12",
     "mermaid": "^12.3.0",
+    "picomatch": "file:vendor/picomatch/learn-ukrainian-picomatch-4.0.7-lu.1.tgz",
     "sharp": "^0.35.5"
   },
   "overrides": {
@@ -38,7 +39,8 @@
     "postcss-nested": "^7.0.2",
     "postcss-selector-parser": "^7.1.6",
     "http-cache-semantics": "^4.3.0",
-    "katex": "$katex"
+    "katex": "$katex",
+    "picomatch": "$picomatch"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.72.2",

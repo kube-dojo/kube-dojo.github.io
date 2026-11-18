@@ -27,7 +27,8 @@ Three gates (any violation => exit 1):
   3. NON-REGISTRY SOURCE: any dep resolved from git/local/tarball is flagged — those
      bypass registry signing and DO run `prepare` on install (the `prepare` surface
      that npm's `hasInstallScript` does not cover; registry deps do not run `prepare`
-     on `npm ci`).
+     on `npm ci`). The only exceptions are the exact entries in
+     ALLOWLIST_NON_REGISTRY (path + name + version + resolved + integrity all equal).
 
 Adding to any allow-list is a security decision — review it in its own commit.
 
@@ -67,6 +68,30 @@ EXPECTED_HOOKS: dict[str, set[str]] = {
     "fsevents": set(),
 }
 
+# Gate-3 exceptions: non-registry entries that are explicitly audited, keyed by FULL
+# lockfile path. An entry passes gate 3 only when its lockfile `name`, `version`,
+# `resolved` and `integrity` ALL equal the values below; any other value (a swapped
+# tarball, a bumped version, a different path) is still reported as [non-registry].
+# The integrity pins the committed tarball byte for byte, and `npm ci` refuses a
+# tarball whose sha512 differs. No entry here may declare an install hook: gates 1-2
+# still apply to it unchanged.
+#   - node_modules/picomatch: patched picomatch 4.0.7 for GHSA-fc5q-39xc-vjpf, built
+#     from `npm pack picomatch@4.0.7` + vendor/picomatch/picomatch-4.0.7-lu.1.patch
+#     (rebuild recipe in vendor/picomatch/README.md). No scripts. REMOVE this entry,
+#     with vendor/picomatch/, when a picomatch release above 4.0.7 fixes
+#     GHSA-fc5q-39xc-vjpf, or the advisory is withdrawn.
+ALLOWLIST_NON_REGISTRY: dict[str, dict[str, str]] = {
+    "node_modules/picomatch": {
+        "name": "@learn-ukrainian/picomatch",
+        "version": "4.0.7-lu.1",
+        "resolved": "file:vendor/picomatch/learn-ukrainian-picomatch-4.0.7-lu.1.tgz",
+        "integrity": (
+            "sha512-HV+6IOKo6ObdzotW27KfsDLfpmVnT17SViHn20M/hKLLWv9QuzjNCeap7qtv8Cq+"
+            "Htk3T2Q1bNwVCbeBjZLP9Q=="
+        ),
+    },
+}
+
 INSTALL_LIFECYCLE = ("preinstall", "install", "postinstall")
 REGISTRY_PREFIX = "https://registry.npmjs.org/"
 
@@ -77,6 +102,15 @@ def name_from_lock_path(path: str) -> str:
     """Resolved package identity = the segment after the last `node_modules/`.
     Handles scopes: `node_modules/@astrojs/starlight` -> `@astrojs/starlight`."""
     return path.split("node_modules/")[-1]
+
+
+def is_audited_non_registry(path: str, meta: dict) -> bool:
+    """True only when every pinned field of an ALLOWLIST_NON_REGISTRY entry equals the
+    lockfile entry at that exact path. Missing fields never match."""
+    expected = ALLOWLIST_NON_REGISTRY.get(path)
+    if expected is None:
+        return False
+    return all(meta.get(field) == value for field, value in expected.items())
 
 
 def declared_install_hooks(pkg_dir: Path) -> set[str] | None:
@@ -172,7 +206,11 @@ def main(argv: list[str]) -> int:
 
         # Gate 3: non-registry source (git/local/tarball — runs `prepare`, unsigned)
         resolved = meta.get("resolved") or ""
-        if resolved and not resolved.startswith(REGISTRY_PREFIX):
+        if (
+            resolved
+            and not resolved.startswith(REGISTRY_PREFIX)
+            and not is_audited_non_registry(path, meta)
+        ):
             violations.append(
                 f"[non-registry] {path} — resolved from a non-registry source "
                 f"({resolved[:60]}); these run `prepare` on install and bypass "
