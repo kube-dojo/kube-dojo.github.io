@@ -6,11 +6,10 @@ import stat
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASH = "/bin/bash"
 AUTO_FORMAT_HOOK = REPO_ROOT / ".claude" / "hooks" / "post-write-py-autoformat.sh"
-LOG_WARN_HOOK = REPO_ROOT / ".claude" / "hooks" / "pre-read-warn-large-log.sh"
+LOG_WARN_HOOK = REPO_ROOT / ".claude" / "kubedojo-hooks" / "pre-read-warn-large-log.sh"
 
 
 def run_hook(

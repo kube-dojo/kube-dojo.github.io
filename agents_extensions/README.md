@@ -15,7 +15,7 @@ in the virtual environment where you installed the locked release.
 From the KubeDojo checkout you want to configure:
 
 ```bash
-bash agents_extensions/deploy.sh
+npm run agents:deploy
 bash agents_extensions/deploy.sh --check
 ```
 
@@ -31,7 +31,7 @@ session. The configured primary supplies Codex's lifecycle hook entry points.
 Edit the product source and rerun apply and check. Commit the source files.
 Keep each developer's Claude overrides in `.claude/settings.local.json`.
 Apply before running the existing hook tests. They exercise the installed
-scripts through their actual `.claude/hooks/` paths.
+scripts through their generated paths in `.claude/`.
 
 ## Existing checkouts
 
@@ -46,10 +46,11 @@ configuration before setting aside that conflicting copy and running apply.
 ## Product guidance
 
 - `claude/hooks/` retains the KubeDojo startup, context, and post-compaction
-  guidance under `kubedojo-` names. It also holds the existing product
-  guards and their helpers. `shared/settings.json` wires the product hooks
-  alongside the release's required delegators. The release's Python guard
-  blocks a bare interpreter and suggests the configured command.
+  guidance under `kubedojo-` names. Interactive KubeDojo `PreToolUse` scripts
+  deploy from `claude/kubedojo-hooks/` to `.claude/kubedojo-hooks/`. The
+  headless Claude adapter reserves `.claude/hooks/` in `PreToolUse` for
+  release guards. The release's Python guard blocks a bare interpreter
+  and suggests the configured command.
 - `claude/rules/` holds the product rules, including
   `kubedojo-fleet-driver-routing.md`. `claude/agents/` and
   `claude/statusline/` remain the sources for the Claude agents and statusline.

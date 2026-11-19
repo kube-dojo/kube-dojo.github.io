@@ -1,6 +1,6 @@
 #!/bin/bash
 # Hook: PreToolUse (Bash) — Inject --mode danger for codex exec prompts that contain git push / gh pr create.
-source "${BASH_SOURCE[0]%/*}/_lib.sh"
+source "${BASH_SOURCE[0]%/*}/../hooks/_lib.sh"
 set -euo pipefail
 
 RAW_PAYLOAD=$(cat)

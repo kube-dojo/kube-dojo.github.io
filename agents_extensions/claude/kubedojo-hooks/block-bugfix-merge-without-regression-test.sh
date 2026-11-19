@@ -1,6 +1,6 @@
 #!/bin/bash
 # shellcheck source=.claude/hooks/_lib.sh
-source "${BASH_SOURCE[0]%/*}/_lib.sh"
+source "${BASH_SOURCE[0]%/*}/../hooks/_lib.sh"
 set -euo pipefail
 
 # Hook: PreToolUse (Bash) — block `gh pr merge` for bugfix PRs that lack a

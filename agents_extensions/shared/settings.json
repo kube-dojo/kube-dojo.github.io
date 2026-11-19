@@ -68,23 +68,23 @@
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-branch-create-in-primary.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-branch-create-in-primary.sh"
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-direct-commit-on-main.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-direct-commit-on-main.sh"
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/inject-codex-danger-mode.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/inject-codex-danger-mode.sh"
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-content-merge-without-learner-check.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-content-merge-without-learner-check.sh"
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-bugfix-merge-without-regression-test.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-bugfix-merge-without-regression-test.sh"
           }
         ]
       },
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-orchestrator-content-edits.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-orchestrator-content-edits.sh"
           }
         ]
       },
@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-agent-worktree-isolation.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-agent-worktree-isolation.sh"
           }
         ]
       },
@@ -111,7 +111,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-read-warn-large-log.sh"
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/pre-read-warn-large-log.sh"
           }
         ]
       },

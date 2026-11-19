@@ -1,5 +1,5 @@
 #!/bin/bash
-source "${BASH_SOURCE[0]%/*}/_lib.sh"
+source "${BASH_SOURCE[0]%/*}/../hooks/_lib.sh"
 set -euo pipefail
 
 # Hook: PreToolUse (Bash) — Block branch creation in the primary repo dir.

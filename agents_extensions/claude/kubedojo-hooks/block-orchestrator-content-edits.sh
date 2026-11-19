@@ -1,6 +1,6 @@
 #!/bin/bash
 # shellcheck source=.claude/hooks/_lib.sh
-source "${BASH_SOURCE[0]%/*}/_lib.sh"
+source "${BASH_SOURCE[0]%/*}/../hooks/_lib.sh"
 set -euo pipefail
 
 # Hook: PreToolUse (Edit/Write) — block direct orchestrator edits to src/content/docs.
@@ -17,7 +17,7 @@ if [ -z "$FILE_PATH" ]; then
   exit 0
 fi
 
-PROJECT_ROOT="${BASH_SOURCE[0]%/.claude/hooks/*}"
+PROJECT_ROOT="${BASH_SOURCE[0]%/.claude/kubedojo-hooks/*}"
 if [ "${FILE_PATH:0:1}" = "/" ]; then
   REL_PATH="${FILE_PATH#"$PROJECT_ROOT"/}"
 else
