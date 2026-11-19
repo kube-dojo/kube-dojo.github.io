@@ -1,6 +1,6 @@
-# Claude Code — commit team config, ignore personal/local
-.claude/settings.local.json
-.claude/projects/
+# Generated Claude Code extensions and local runtime state
+/.claude/
+/.deploy-state/
 # Local MCP server config — points at per-machine localhost servers (rag/sources on :8766)
 .mcp.json
 

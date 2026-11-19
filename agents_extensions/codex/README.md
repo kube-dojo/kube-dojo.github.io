@@ -2,7 +2,8 @@
 
 Per-agent overlay directory for OpenAI Codex. Shared skills live in
 `agents_extensions/shared/skills/`. Add Codex-specific skills, hooks, or config
-here; `agents_extensions/deploy.sh --target codex` will materialize into `.codex/`.
+here. The installed deployer writes the overlay to `.codex/` and discovers
+shared and Codex-specific skills through `.agents/skills/`.
 
 `config.toml` is the portable project config. It enables multi-agent v2 in the
 `agents` namespace, with Terra 6.1 as the default subagent model. The lead stays
@@ -11,10 +12,10 @@ problems and review use Sol 6.1. Personal named roles live in `~/.codex/agents/`
 The project overlay does not change home permissions or MCP servers.
 Headless Codex uses Terra 6.1 for `edit`/`draft`, Sol 6.1 for `review`/`architect`, and GPT-6 Luna for `search`.
 Unclassified bridge calls default to Terra 6.1; explicit per-call and `AB_CODEX_MODEL` overrides take precedence.
-Run `bash agents_extensions/deploy.sh --target codex`, then the same command
-with `--check` to verify deployment. A differing local config is preserved and
-deployment fails. Inspect its diff first; `--force-config` explicitly backs up
-the local file before replacing it. Keep host-specific settings in home config.
+Run `bash agents_extensions/deploy.sh`, then the same command with `--check`.
+A differing unowned config blocks deployment. Keep personal preferences
+in your home config and use the [migration steps](../README.md#existing-checkouts)
+if the deployer reports a conflicting project file.
 
 `start-codex.sh` also enables v2 explicitly. Set `CODEX_ENABLE_MULTI_AGENT=0`
 to disable both multi-agent and v2 for that launch, even if project config

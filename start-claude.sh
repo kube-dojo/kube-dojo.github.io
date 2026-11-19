@@ -45,17 +45,21 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
     fi
 fi
 
-# Warn (non-fatally) if any deployed extension has drifted from its source.
-# Was a dead `npm run claude:deploy` block (no such script). We deliberately do
-# NOT auto-deploy on launch: the team edits deployed copies directly often
-# enough that an auto-deploy would silently REVERT those edits. Instead just
-# flag drift so the dev can sync intentionally (source is the SSOT). The
-# `|| true` keeps `set -e` from aborting launch on a non-zero --check exit.
-# The extensions-sync CI gate is the hard backstop.
-if [ -x "$PROJECT_DIR/agents_extensions/deploy.sh" ]; then
-    bash "$PROJECT_DIR/agents_extensions/deploy.sh" --check --target claude --quiet \
-        || echo "⚠️  Extension drift: a .claude/ copy differs from its source. Sync with: bash agents_extensions/deploy.sh --target claude"
+# The installed hooks require an explicit shared-state anchor. Materialize a
+# fresh checkout, and verify an existing deployment before launching Claude.
+: "${LEARN_UKRAINIAN_PRIMARY_REPO_ROOT:?Set the shared-state checkout as described in agents_extensions/README.md}"
+export LU_PRODUCT_ROOT="$PROJECT_DIR"
+if [ -f "$PROJECT_DIR/.deploy-state/agent-deploy.v1.json" ]; then
+    if ! bash "$PROJECT_DIR/agents_extensions/deploy.sh" --check; then
+        echo "Review the deployment drift, then run bash agents_extensions/deploy.sh." >&2
+        exit 1
+    fi
+else
+    bash "$PROJECT_DIR/agents_extensions/deploy.sh"
 fi
+# Validate the same checkout and interpreter binding the installed hooks use.
+bash -c 'source "$1" && context_machinery_bootstrap "$2"' \
+    verify-agent-hook-context "$PROJECT_DIR/.claude/hooks/context-rollover-lib.sh" "$PROJECT_DIR"
 
 # Show KubeDojo status (dynamically from STATUS.md)
 echo ""

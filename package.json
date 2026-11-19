@@ -9,6 +9,7 @@
     "build": "NODE_DISABLE_COMPILE_CACHE=1 astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "agents:deploy": "bash agents_extensions/deploy.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/ tests/",

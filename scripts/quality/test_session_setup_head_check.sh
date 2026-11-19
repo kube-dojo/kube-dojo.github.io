@@ -4,7 +4,7 @@ set -euo pipefail
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOOK_SOURCE="$SCRIPT_DIR/../../.claude/hooks/session-setup.sh"
+HOOK_SOURCE="$SCRIPT_DIR/../../agents_extensions/claude/hooks/kubedojo-session-setup.sh"
 WORKROOT=$(mktemp -d)
 WORKROOT_OK=""
 STDERR_FILE=$(mktemp)
@@ -58,6 +58,13 @@ git -C "$WORKROOT_OK" init -q -b main
 git -C "$WORKROOT_OK" config user.email "ci@example.com"
 git -C "$WORKROOT_OK" config user.name "CI"
 git -C "$WORKROOT_OK" commit --allow-empty -qm init
+
+mkdir -p "$WORKROOT_OK/bin" "$WORKROOT_OK/home"
+printf '#!/bin/sh\nprintf "200"\n' > "$WORKROOT_OK/bin/curl"
+printf '#!/bin/sh\nprintf "[]\\n"\n' > "$WORKROOT_OK/bin/gh"
+chmod +x "$WORKROOT_OK/bin/"{curl,gh}
+export PATH="$WORKROOT_OK/bin:$PATH"
+export HOME="$WORKROOT_OK/home"
 
 if ! bash "$WORKROOT_OK/.claude/hooks/session-setup.sh" >/dev/null 2>&1; then
   echo "[session-setup-test] hook errored on primary=main"

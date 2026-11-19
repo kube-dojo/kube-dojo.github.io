@@ -3,9 +3,8 @@ import os
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HOOK = REPO_ROOT / ".claude" / "hooks" / "block-agent-worktree-isolation.sh"
+HOOK = REPO_ROOT / ".claude" / "kubedojo-hooks" / "block-agent-worktree-isolation.sh"
 BASH = "/bin/bash"
 
 

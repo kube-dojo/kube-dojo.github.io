@@ -1,4 +1,4 @@
-"""Tests for `.claude/hooks/block-content-merge-without-learner-check.sh`.
+"""Tests for `.claude/kubedojo-hooks/block-content-merge-without-learner-check.sh`.
 
 The hook fires on `gh pr merge` Bash commands. For content PRs (any file
 under ``src/content/docs/**``), it requires the PR body to contain a
@@ -18,9 +18,8 @@ import os
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HOOK = REPO_ROOT / ".claude" / "hooks" / "block-content-merge-without-learner-check.sh"
+HOOK = REPO_ROOT / ".claude" / "kubedojo-hooks" / "block-content-merge-without-learner-check.sh"
 BASH = "/bin/bash"
 
 

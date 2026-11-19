@@ -8,7 +8,7 @@ Accountable lead: the Codex content-upgrade task. GitHub issues/PRs and their ev
 
 **READY** and **COMPLETED** mean the same thing for a packet/child issue:
 delivered **end-to-end** for that scope. Binding checklist:
-`agents_extensions/shared/skills/drive-epic/SKILL.md` → Definition of READY / COMPLETED.
+`agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md` → Definition of READY / COMPLETED.
 
 Summary:
 

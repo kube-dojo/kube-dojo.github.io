@@ -4,9 +4,8 @@ import shlex
 import subprocess
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HOOK = REPO_ROOT / ".claude" / "hooks" / "inject-codex-danger-mode.sh"
+HOOK = REPO_ROOT / ".claude" / "kubedojo-hooks" / "inject-codex-danger-mode.sh"
 BASH = "/bin/bash"
 
 

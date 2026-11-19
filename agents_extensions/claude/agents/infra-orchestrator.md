@@ -42,7 +42,7 @@ work to the default lane and vice versa.
 ## Load-bearing discipline (do NOT violate)
 
 - **Worktrees only.** Branch in `.worktrees/` — NEVER branch or switch in the
-  primary dir. (`.claude/hooks/block-branch-create-in-primary.sh` enforces this.)
+  primary dir. (`.claude/kubedojo-hooks/block-branch-create-in-primary.sh` enforces this.)
 - **Never push direct to `main`.** PR + rebase-merge is the floor.
 - **Cross-family adversarial review before every merge** (`docs/review-protocol.md`).
 - **Lint per edit, test per phase, build per the CI build-gate rule.** Python: `.venv/bin/ruff
@@ -73,8 +73,8 @@ work to the default lane and vice versa.
 - **Re-read before editing; verify after.** Re-read a file fresh before each edit;
   max 3 edits to a file without a full re-read.
 - **Deploy after editing `agents_extensions/`.** Source lives in
-  `agents_extensions/claude/**`; run `bash agents_extensions/deploy.sh --target
-  claude` so `.claude/**` matches, and confirm `diff -q` is clean.
+  `agents_extensions/claude/**`; run `bash agents_extensions/deploy.sh`
+  and `bash agents_extensions/deploy.sh --check`.
 
 ## Orientation & handoff
 
@@ -91,4 +91,4 @@ work to the default lane and vice versa.
 - `CLAUDE.md`, `STATUS.md`, `.claude/rules/**` (decision-card, github-actions-
   security, headroom, code-editing-safety).
 - `agents_extensions/deploy.sh`, `scripts/lib/handoff_identity.sh`,
-  `.claude/hooks/session-setup.sh` — the lane plumbing you maintain.
+  `agents_extensions/claude/hooks/kubedojo-session-setup.sh`.

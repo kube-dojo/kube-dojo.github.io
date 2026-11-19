@@ -88,7 +88,7 @@ Build gate: for markdown-only content PRs the required CI job "Astro build (rend
 |------|---------|
 | `STATUS.md` | Current work, progress, blockers |
 | `.claude/rules/` | Scoped rules (quality, translation, decision-card, etc.) |
-| `.claude/settings.json` | Shared permissions (committed) |
+| `agents_extensions/shared/settings.json` | Source for shared permissions and hooks |
 | `.claude/settings.local.json` | Personal overrides (gitignored) |
 | `docs/pedagogical-framework.md` | Educational research & guidelines |
 | `docs/quality-rubric.md` | 1-5 rubric for module/lab quality |

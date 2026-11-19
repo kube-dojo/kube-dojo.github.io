@@ -1,4 +1,4 @@
-"""Unit tests for `.claude/hooks/_lib_parse_pr_ref.py`.
+"""Unit tests for `.claude/lib/_lib_parse_pr_ref.py`.
 
 Extracts the PR ref from a `gh pr merge <ref>` shell command. The
 extracted helper replaces a 20-line inline parser duplicated between
@@ -12,9 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HELPER = REPO_ROOT / ".claude" / "hooks" / "_lib_parse_pr_ref.py"
+HELPER = REPO_ROOT / ".claude" / "lib" / "_lib_parse_pr_ref.py"
 
 
 def run_helper(command: str) -> str:
