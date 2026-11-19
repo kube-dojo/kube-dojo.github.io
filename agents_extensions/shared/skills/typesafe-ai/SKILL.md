@@ -56,5 +56,5 @@ playbooks, jaggedness traps, and a minimal HTTP example.
 ## Deploy
 
 Canonical path: `agents_extensions/shared/skills/typesafe-ai/`.  
-Run `agents_extensions/deploy.sh` (or `npm run agents:deploy`) so harness mirrors
+Run `bash agents_extensions/deploy.sh` so deployed skills
 update. Do not hand-edit deployed `.claude/skills/` copies as source of truth.

@@ -1,5 +1,5 @@
 ---
-name: drive-epic
+name: kubedojo-drive-epic
 description: >-
   Model-agnostic playbook for driving one KubeDojo GitHub epic end-to-end over
   dispatch_smart and the local briefing API. Coordinates the curriculum site
@@ -29,6 +29,9 @@ If a claim (count, SHA, gate, cap, lab pass/fail) is not in fresh tool output,
 
 Sister-repo details (Killercoda layout, G04, hosted vs local evidence):
 [dual-repo.md](dual-repo.md).
+
+KubeDojo's repository rules supplement the installed delivery skills. See
+[delivery.md](delivery.md) for the local review and handoff requirements.
 
 ## Definition of READY / COMPLETED (binding — operator 2026-09-18)
 
@@ -274,7 +277,7 @@ GPT-6 Luna only scouts read-only. Choose effort for the packet and verify
 the live route. Astra and Fable require explicit operator authorization;
 a hard problem or routing card does not grant it. Other provider routes
 come from live discovery in dispatch-router. Role boundaries:
-`.claude/rules/fleet-driver-routing.md`.
+`.claude/rules/kubedojo-fleet-driver-routing.md`.
 
 After ≥3 implement dispatches this session, require ≥2 agents **and** ≥2
 task-classes/tiers, or a written `NOTE: fleet_breadth` with tool-backed

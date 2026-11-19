@@ -1,82 +1,58 @@
-# Agent Extensions for KubeDojo
+# Agent extensions for KubeDojo
 
-Git-tracked source for agent skills, hooks, and statusline assets. Extensions are
-**agent-agnostic by default** (`shared/`) with per-agent overlays (`claude/`,
-`codex/`, `cursor/`, `gemini/`).
+The release pinned by `requirements-machinery.lock` supplies the fleet skills,
+rules, and hooks. `deployment.v1.json` enrolls Claude and Codex and selects the
+KubeDojo sources in `shared/`, `claude/`, and `codex/`.
 
-## Structure
+## Apply and verify
 
-```
-agents_extensions/
-├── README.md
-├── deploy.sh
-├── shared/
-│   └── skills/                    # Used by ALL agents (also at dispatch time)
-│       ├── curriculum-writer/
-│       ├── cross-family-reviewer/
-│       ├── drive-epic/                 # epic-driver playbook (site + labs)
-│       ├── module-quality-reviewer/
-│       ├── session-handoff-writer/
-│       ├── k8s-cert-expert/
-│       └── platform-expert/
-├── claude/                        # Claude Code–specific
-│   ├── skills/
-│   │   ├── curriculum-orchestrator/
-│   │   ├── dispatch-router/
-│   │   └── cold-start/
-│   ├── hooks/
-│   │   ├── session-setup.sh
-│   │   └── context-monitor.sh
-│   └── statusline/
-│       └── statusline.sh
-├── codex/                         # Placeholder for future Codex extensions
-├── cursor/                        # Placeholder for future Cursor extensions
-└── gemini/                        # Placeholder for future Gemini extensions
-```
+Use a virtual environment containing the hash-locked machinery release. See
+the [machinery consumer installation procedure](https://github.com/learn-ukrainian/machinery/blob/v0.1.39/docs/release.md#consumers).
+Set `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` to your configured machinery
+shared-state checkout. Set `LEARN_UKRAINIAN_PYTHON` to the absolute executable
+in the virtual environment where you installed the locked release.
 
-Slash commands (`/review-module`, etc.) were retired 2026-05-21; production review
-runs through `scripts/dispatch_smart.py` and `docs/review-protocol.md`. Skills
-below remain the durable role contracts.
-
-## Deployment
-
-From the repo root:
+From the KubeDojo checkout you want to configure:
 
 ```bash
-# Deploy all agents (default): merges shared/ + per-agent/ into each hidden dir
-./agents_extensions/deploy.sh
-
-# Deploy one agent only
-./agents_extensions/deploy.sh --target claude
-
-# Quiet mode (for scripts)
-./agents_extensions/deploy.sh --quiet
+bash agents_extensions/deploy.sh
+bash agents_extensions/deploy.sh --check
 ```
 
-For Claude, `deploy.sh` merges `shared/skills/*` and `claude/skills/*` into
-`.claude/skills/`, copies `claude/hooks/*` → `.claude/hooks/`, and
-`claude/statusline/*` → `.claude/statusline/`. The script is idempotent (`cmp -s`
-change detection).
+The wrapper selects this checkout explicitly and runs
+`lu_machinery.agent_deploy`. Apply generates `.claude/`, `.codex/` and the
+shared `.agents/skills/` tree. Check verifies the bytes, modes and ownership
+manifest. It needs a successful apply first. The Claude launcher applies the
+plan on a fresh checkout and verifies existing deployments before starting
+Claude. For Codex, apply before starting an enrolled
+checkout and set `LU_PRODUCT_ROOT` to that checkout's absolute path for the
+session. The configured primary supplies Codex's lifecycle hook entry points.
 
-`start-claude.sh` may invoke deploy via `npm run claude:deploy` when configured.
+Edit the product source and rerun apply and check. Commit the source files.
+Keep each developer's Claude overrides in `.claude/settings.local.json`.
+Apply before running the existing hook tests. They exercise the installed
+scripts through their actual `.claude/hooks/` paths.
 
-## Development workflow
+## Existing checkouts
 
-1. **Edit** extensions under `agents_extensions/` (tracked in git)
-2. **Deploy** with `./agents_extensions/deploy.sh`
-3. **Test** against the materialized `.claude/` (or `.codex/`, etc.)
-4. **Commit** changes to `agents_extensions/` only — not the materialized dirs,
-   except where `.claude/` paths are intentionally tracked (skills mirror, hooks)
+Record any local edits to legacy extension copies before switching to the
+enrollment revision. Git removes the tracked copies during the update.
+Reconcile any remaining unowned files named by the deployer with the product
+sources or personal settings. A fresh checkout is also suitable. The
+deployer refuses unexpected files and differing unowned outputs, including a
+custom `.codex/config.toml`. Save any local Codex preferences in your personal
+configuration before setting aside that conflicting copy and running apply.
 
-## Creating new skills
+## Product guidance
 
-1. Choose **shared** (any agent) vs **`<agent>/`** (orchestrator-only, etc.) from
-   the skill frontmatter `description:` field.
-2. Create `agents_extensions/<shared|claude|...>/skills/your-skill/SKILL.md`
-3. Run `./agents_extensions/deploy.sh --target <agent>`
-4. Agents auto-invoke skills when the description matches the task.
-
-## Quality standards reference
-
-Module quality rubric: `docs/quality-rubric.md`. Target 8+/10 per dimension for
-production modules.
+- `claude/hooks/` retains the KubeDojo startup, context, and post-compaction
+  guidance under `kubedojo-` names. It also holds the existing product
+  guards and their helpers. `shared/settings.json` wires the product hooks
+  alongside the release's required delegators. The release's Python guard
+  blocks a bare interpreter and suggests the configured command.
+- `claude/rules/` holds the product rules, including
+  `kubedojo-fleet-driver-routing.md`. `claude/agents/` and
+  `claude/statusline/` remain the sources for the Claude agents and statusline.
+- `shared/skills/kubedojo-drive-epic/` keeps the site and labs workflow, with
+  local delivery and review requirements in its companion documentation.
+  Other KubeDojo skills stay in their existing source directories.

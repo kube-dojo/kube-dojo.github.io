@@ -21,7 +21,7 @@ from .worktree import primary_checkout_root
 
 _REPO_ROOT = primary_checkout_root(Path(__file__).resolve().parents[2])
 _RUBRIC_PATH = _REPO_ROOT / "docs" / "quality-rubric.md"
-_RULES_PATH = _REPO_ROOT / ".claude" / "rules" / "module-quality.md"
+_RULES_PATH = _REPO_ROOT / "agents_extensions" / "claude" / "rules" / "module-quality.md"
 _FRAMEWORK_PATH = _REPO_ROOT / "docs" / "pedagogical-framework.md"
 
 
@@ -63,7 +63,7 @@ def rewrite_prompt(
     better rebuilt than patched.
 
     The writer is told to preserve existing visual aids (tables, ASCII
-    diagrams, Mermaid) per ``.claude/rules/module-quality.md``, which
+    diagrams, Mermaid) per the KubeDojo module-quality rule, which
     treats them as protected assets.
     """
     rules = _read(_RULES_PATH)
@@ -183,7 +183,7 @@ def review_prompt(
 
     Bundles ``docs/quality-rubric.md`` so the reviewer has the scoring
     dimensions in context. v1 had the rubric implicit via
-    ``.claude/rules/module-quality.md`` and reviewers would drift.
+    the KubeDojo module-quality rule and reviewers would drift.
     """
     rubric = _read(_RUBRIC_PATH)
     rules = _read(_RULES_PATH)

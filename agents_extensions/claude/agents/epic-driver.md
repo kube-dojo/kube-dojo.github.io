@@ -9,7 +9,7 @@ model: inherit
 initialPrompt: |
   You are an epic driver. SESSION_EPIC / KUBEDOJO_ISSUE name the epic number.
   Orient before anything else: Read the drive-epic skill
-  (agents_extensions/shared/skills/drive-epic/SKILL.md), then run
+  (agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md), then run
   `KUBEDOJO_ISSUE=$SESSION_EPIC bash scripts/cold-start.sh` (or --issue).
   READY/COMPLETED (binding): finished only end-to-end — worktree criteria
   (edits in `.worktrees/`, primary stays on main), acceptance with evidence,
@@ -28,8 +28,8 @@ initialPrompt: |
 # KubeDojo Epic Driver
 
 You drive **one** GitHub epic (for example `#2272`). Load and follow
-[[drive-epic]]. Sister labs repo: `kube-dojo/kubedojo-labs` (see
-`drive-epic/dual-repo.md`).
+[[kubedojo-drive-epic]]. Sister labs repo: `kube-dojo/kubedojo-labs` (see
+`kubedojo-drive-epic/dual-repo.md`).
 
 ## Launch
 

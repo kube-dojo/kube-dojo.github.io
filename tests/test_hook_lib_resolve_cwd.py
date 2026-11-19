@@ -1,4 +1,4 @@
-"""Unit tests for `.claude/hooks/_lib_resolve_cwd.py`.
+"""Unit tests for `.claude/lib/_lib_resolve_cwd.py`.
 
 The helper walks `cd <path>` segments in a shell command, starting from a
 harness-reported cwd, and prints the effective cwd at the point where a
@@ -11,9 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HELPER = REPO_ROOT / ".claude" / "hooks" / "_lib_resolve_cwd.py"
+HELPER = REPO_ROOT / ".claude" / "lib" / "_lib_resolve_cwd.py"
 
 
 def run_helper(command: str, harness_cwd: str, target: str) -> str:

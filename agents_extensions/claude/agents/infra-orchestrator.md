@@ -73,8 +73,8 @@ work to the default lane and vice versa.
 - **Re-read before editing; verify after.** Re-read a file fresh before each edit;
   max 3 edits to a file without a full re-read.
 - **Deploy after editing `agents_extensions/`.** Source lives in
-  `agents_extensions/claude/**`; run `bash agents_extensions/deploy.sh --target
-  claude` so `.claude/**` matches, and confirm `diff -q` is clean.
+  `agents_extensions/claude/**`; run `bash agents_extensions/deploy.sh`
+  and `bash agents_extensions/deploy.sh --check`.
 
 ## Orientation & handoff
 
@@ -91,4 +91,4 @@ work to the default lane and vice versa.
 - `CLAUDE.md`, `STATUS.md`, `.claude/rules/**` (decision-card, github-actions-
   security, headroom, code-editing-safety).
 - `agents_extensions/deploy.sh`, `scripts/lib/handoff_identity.sh`,
-  `.claude/hooks/session-setup.sh` — the lane plumbing you maintain.
+  `agents_extensions/claude/hooks/kubedojo-session-setup.sh`.

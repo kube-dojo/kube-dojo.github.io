@@ -84,7 +84,7 @@ def _fetch_base_file(path: str, base_ref: str, base_fixture_dir: str) -> str | N
 def _split_frontmatter(text: str) -> tuple[str | None, str]:
     """Return (frontmatter_body, rest). frontmatter_body is None when the file
     has no leading YAML frontmatter block."""
-    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
     if not m:
         return None, text
     return m.group(1), text[m.end():]
@@ -176,8 +176,7 @@ def check_learner_quote(
     if not real_content_files:
         return (
             "PASS",
-            "all touched src/content/docs files are metadata-only "
-            "(no teaching prose changed)",
+            "all touched src/content/docs files are metadata-only (no teaching prose changed)",
         )
 
     lines = body.splitlines()
@@ -207,9 +206,11 @@ def check_learner_quote(
     if not quotes:
         return (
             "DENY",
-            "'## Learner check' section must contain at least one "
-            "blockquote (> ...) with >= 30 chars of verbatim text from "
-            "the touched module.",
+            (
+                "'## Learner check' section must contain at least one "
+                "blockquote (> ...) with >= 30 chars of verbatim text from "
+                "the touched module."
+            ),
         )
 
     for quote in quotes:
@@ -222,9 +223,11 @@ def check_learner_quote(
 
     return (
         "DENY",
-        "No quote in '## Learner check' was found verbatim in any of "
-        f"the touched module files: {sorted(content_files)[:3]}. Either "
-        "the quote is paraphrased or you didn't read the file.",
+        (
+            "No quote in '## Learner check' was found verbatim in any of "
+            f"the touched module files: {sorted(content_files)[:3]}. Either "
+            "the quote is paraphrased or you didn't read the file."
+        ),
     )
 
 
@@ -268,8 +271,7 @@ def check_regression_test(pr_json: str, fixture_dir: str) -> tuple[str, str]:
     if not test_paths:
         return (
             "DENY",
-            "Bugfix PR is missing a 'Regression test:' line in the body "
-            "naming a test file path.",
+            "Bugfix PR is missing a 'Regression test:' line in the body naming a test file path.",
         )
 
     files = pr.get("files") or []
@@ -280,16 +282,17 @@ def check_regression_test(pr_json: str, fixture_dir: str) -> tuple[str, str]:
         if test_path not in pr_paths:
             return (
                 "DENY",
-                f"Regression test path '{test_path}' is not part of this "
-                "PR — bugfix PRs must add or modify the regression test "
-                "in the same PR.",
+                (
+                    f"Regression test path '{test_path}' is not part of this "
+                    "PR — bugfix PRs must add or modify the regression test "
+                    "in the same PR."
+                ),
             )
         contents = _fetch_file(test_path, head_oid, fixture_dir)
         if contents is None:
             return (
                 "DENY",
-                f"Could not read regression test file '{test_path}' from "
-                "PR head — verify the path is correct.",
+                f"Could not read regression test file '{test_path}' from PR head — verify the path is correct.",
             )
         if not issue_refs:
             return (
@@ -301,10 +304,12 @@ def check_regression_test(pr_json: str, fixture_dir: str) -> tuple[str, str]:
                 return ("PASS", f"test {test_path} references issue #{issue}")
         return (
             "DENY",
-            f"Regression test '{test_path}' does not reference any of "
-            f"the issues this PR claims to fix ({sorted(issue_refs)}). "
-            "Add a comment or docstring naming the issue so the test "
-            "is traceable.",
+            (
+                f"Regression test '{test_path}' does not reference any of "
+                f"the issues this PR claims to fix ({sorted(issue_refs)}). "
+                "Add a comment or docstring naming the issue so the test "
+                "is traceable."
+            ),
         )
 
     return ("PASS", "no test paths found (unreachable)")

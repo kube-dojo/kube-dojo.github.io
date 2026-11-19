@@ -6,7 +6,7 @@
 # the fleet (dispatch_smart) — not solo volume.
 #
 # Used by: start-claude.sh, start-codex.sh, start-cursor-driver.sh
-# SessionStart (.claude/hooks/session-setup.sh) honors SESSION_EPIC when set.
+# The KubeDojo SessionStart hook honors SESSION_EPIC when set.
 
 # epic_number_from_argv "$@"
 # Echo the last --epic <N> / --epic=<N> before `--`, or nothing.
@@ -91,7 +91,7 @@ epic_driver_prompt() {
   cat <<EOF
 You are the epic driver for GitHub epic #${n}.
 
-1. Load the drive-epic skill first (Read agents_extensions/shared/skills/drive-epic/SKILL.md or .claude/skills/drive-epic/SKILL.md) and follow it — method only; live roster/caps from tools.
+1. Load the kubedojo-drive-epic skill first (Read agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md) and follow it. Read the live roster and caps from tools.
 2. Cold-start for this epic: \`KUBEDOJO_ISSUE=${n} bash scripts/cold-start.sh\` (or \`bash scripts/cold-start.sh --issue ${n}\`). SessionStart may already have run it — still act on the epic, not the default curriculum UK DO-NEXT.
 3. Before any dispatch wave: run CodexBar capacity checks (\`codexbar usage --provider both --no-color\`, plus cursor/antigravity as needed) and write a CAPACITY_CARD (pick / avoid / free). Never habit-route Codex when pace-deficit; prefer cool idle seats.
 4. Drive epic #${n} end-to-end via the fleet: inventory children on kube-dojo/kube-dojo.github.io AND kube-dojo/kubedojo-labs, dispose every open child, \`dispatch_smart\` in worktrees, exact-head cross-family review as a PR comment (not gh approve), CI green on the same SHA, rebase-merge. Do not solo-implement volume work.

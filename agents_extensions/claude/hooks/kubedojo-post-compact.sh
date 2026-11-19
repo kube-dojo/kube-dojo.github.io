@@ -37,7 +37,7 @@ KEY REMINDERS:
   - Pipeline: .venv/bin/python scripts/v1_pipeline.py status
   - UK sync: .venv/bin/python scripts/uk_sync.py detect
   - STATUS.md: read first, update before ending
-  - MEMORY: ~/.claude/projects/-Users-krisztiankoos-projects-kubedojo/memory/MEMORY.md"
+  - MEMORY: Read this checkout's Claude project memory."
 
 printf '{"additionalContext": %s}' "$(printf '%s' "CONTEXT RESTORED AFTER COMPACTION:$CONTEXT" | jq -Rs '.')"
 exit 0

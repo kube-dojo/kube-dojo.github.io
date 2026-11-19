@@ -2,7 +2,7 @@
 
 KubeDojo is an Astro/Starlight curriculum site. These instructions apply across
 agent families. Use `CLAUDE.md` for Claude-specific behavior and
-`.claude/rules/agy-workflow.md` when dispatching to the Google lane.
+`agents_extensions/claude/rules/agy-workflow.md` when dispatching to the Google lane.
 
 ## Scope and completion
 
@@ -37,7 +37,7 @@ a bounded fix and a clear return to content; do not pursue an ideal environment.
   `git fetch origin && git worktree add -b codex/<name> .worktrees/<name> origin/main`.
   Preserve unrelated pre-existing primary dirty files. Full READY closeout
   (remove worktree, delete branches) is in
-  `agents_extensions/shared/skills/drive-epic/SKILL.md` → Worktree criteria.
+  `agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md` → Worktree criteria.
 - Register each new worktree and task-owned temporary/evidence path before
   creation, and follow `docs/ops/workspace-hygiene.md` for audit, retention and
   closeout. Run the read-only audit at packet, merge and handoff milestones;
@@ -72,14 +72,14 @@ fallback, not proof of healthy services.
 | Session or pipeline coordination | `scripts/prompts/cold-start.md`, `scripts/agent_onboarding.md` |
 | Author curriculum | `agents_extensions/shared/skills/curriculum-writer/SKILL.md`, `scripts/prompts/module-writer.md` |
 | Review curriculum | `agents_extensions/shared/skills/module-quality-reviewer/SKILL.md`, `docs/quality-rubric.md`, applicable `docs/rubric-profiles/` |
-| Content structure and frontmatter | `.claude/rules/new-content-checklist.md` |
+| Content structure and frontmatter | `agents_extensions/claude/rules/new-content-checklist.md` |
 | Current quality scores | `/api/quality/scores`; the static `docs/quality-audit-results.md` is historical |
 | Agent dispatch | `scripts/dispatch_smart.py`, applicable adapter and provider workflow |
 
 Load a skill for its actual workflow, not merely because a keyword appears.
-Shared skill sources live in `agents_extensions/shared/skills`; maintain their
-tracked `.claude/skills` mirrors with `agents_extensions/deploy.sh`. Check which
-copy the current agent actually loads; local `.agents/skills` copies can drift.
+Shared skill sources live in `agents_extensions/shared/skills`. Use the
+[deployment procedure](agents_extensions/README.md) to apply and check the
+installed release and product sources. Commit changes to the sources.
 Retain exact schemas and curriculum requirements; choose implementation steps
 according to the task rather than expanding every task into the full pipeline.
 

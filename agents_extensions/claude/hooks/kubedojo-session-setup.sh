@@ -66,7 +66,8 @@ $ISSUES_LIST")
 fi
 
 # 6. Check MEMORY.md size
-MEMORY_FILE="$HOME/.claude/projects/-Users-krisztiankoos-projects-kubedojo/memory/MEMORY.md"
+PROJECT_SLUG=${PRIMARY_WORKTREE//\//-}
+MEMORY_FILE="$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 if [ -f "$MEMORY_FILE" ]; then
   MEMORY_LINES=$(wc -l < "$MEMORY_FILE" | tr -d ' ')
   if [ "$MEMORY_LINES" -gt 150 ]; then
@@ -213,7 +214,7 @@ if [ -n "${EPIC_NUM:-}" ]; then
   CONTEXT="EPIC-DRIVER SESSION — auto-oriented by the SessionStart hook. You ARE driving GitHub epic #${EPIC_NUM} (SESSION_EPIC=${EPIC_NUM}). You are NOT the default curriculum UK-volume queue and NOT the infra lane unless this epic is infra.
 
 Load-bearing discipline (do NOT violate):
-  - Read and follow the drive-epic skill before acting (agents_extensions/shared/skills/drive-epic/SKILL.md).
+  - Read and follow the kubedojo-drive-epic skill before acting (agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md).
   - Before any dispatch wave: CodexBar capacity (\`codexbar usage --provider both --no-color\` + cursor/antigravity as needed) → CAPACITY_CARD. Never habit-route Codex on pace deficit.
   - Drive via the fleet (\`dispatch_smart\` in worktrees). Do not solo-implement volume. Exact-head CF as a PR comment (not gh approve). Merge only when CI is green on the reviewed SHA.
   - Branch in .worktrees/ — NEVER branch/switch in the primary dir; never push direct to main.

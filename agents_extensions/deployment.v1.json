@@ -1,0 +1,23 @@
+{
+  "providers": [
+    "claude",
+    "codex"
+  ],
+  "sources": {
+    "shared": {
+      "path": "agents_extensions/shared",
+      "required": true
+    },
+    "claude": {
+      "path": "agents_extensions/claude",
+      "required": true
+    },
+    "codex": {
+      "path": "agents_extensions/codex",
+      "required": true
+    }
+  },
+  "preserve": [
+    ".claude/settings.local.json"
+  ]
+}

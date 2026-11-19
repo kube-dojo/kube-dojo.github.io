@@ -1,17 +1,7 @@
 name: Extensions in sync
 
-# Fails if any DEPLOYED agent-extension copy (.claude/**) has diverged from its
-# SOURCE under agents_extensions/** — i.e. someone edited a deployed copy
-# directly instead of the source, so the next `deploy.sh` would silently revert
-# it. Source is the SSOT: edit there, run `bash agents_extensions/deploy.sh`,
-# commit the synced deployed copy.
-#
-# Runs on EVERY PR (no `paths:` filter) so it can serve as a universal required
-# status check — a path-filtered required check never reports on PRs that miss
-# those paths and leaves them permanently blocked (see link-check.yml header /
-# the 2026-06-04 CI autopsy). The check is pure bash (byte compare, no installs),
-# so always-on is cheap. Scopes to --target claude: that is the complete primary
-# runtime; .codex/.cursor/.gemini are intentionally sparse.
+# Verify that a clean checkout can materialize and verify the complete plan
+# using the same pinned release as the consumer.
 on:
   pull_request:
     branches:
@@ -24,11 +14,54 @@ jobs:
   extensions-sync:
     name: Extensions in sync
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Check deployed extensions match source
-        run: bash agents_extensions/deploy.sh --check --target claude
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.14"
+
+      - name: Install the locked machinery release
+        env:
+          SETUP_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          "$SETUP_PYTHON" -m venv .venv
+          version=$(sed -nE 's/^lu-machinery==([0-9]+\.[0-9]+\.[0-9]+) .*/\1/p' requirements-machinery.lock)
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected one lu-machinery version and hash in requirements-machinery.lock" >&2
+            exit 2
+          fi
+          wheelhouse=$(mktemp -d)
+          wheel="lu_machinery-${version}-py3-none-any.whl"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --output "$wheelhouse/$wheel" \
+            "https://github.com/learn-ukrainian/machinery/releases/download/v${version}/$wheel"
+          .venv/bin/python -m pip download --only-binary=:all: --require-hashes \
+            --find-links "$wheelhouse" --dest "$wheelhouse" -r requirements-machinery.lock
+          .venv/bin/python -m pip install --no-index --require-hashes \
+            --find-links "$wheelhouse" -r requirements-machinery.lock
+
+      - name: Apply and verify the deployment
+        run: |
+          tracked=$(git ls-files -- .claude .codex .agents .deploy-state)
+          if [[ -n "$tracked" ]]; then
+            printf 'Commit deployment sources instead of generated outputs:\n%s\n' "$tracked" >&2
+            exit 1
+          fi
+          .venv/bin/python -I -m lu_machinery.agent_deploy --project-root "$GITHUB_WORKSPACE"
+          .venv/bin/python -I -m lu_machinery.agent_deploy --project-root "$GITHUB_WORKSPACE" --check
+          .venv/bin/python scripts/security/check_agent_configs.py
+
+      - name: Test deployed product hooks and configuration
+        env:
+          LEARN_UKRAINIAN_PYTHON: ${{ github.workspace }}/.venv/bin/python
+        run: |
+          bash scripts/quality/test_deploy_check.sh
+          bash scripts/quality/test_session_setup_head_check.sh
+          .venv/bin/python -m pytest -q tests/test_hook_*.py tests/test_codex_project_config.py

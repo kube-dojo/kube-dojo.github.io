@@ -44,7 +44,7 @@ if ! printf '%s\n' "$COMMAND" | grep -Eq '(^|[;&|[:space:]])gh[[:space:]]+pr[[:s
   exit 0
 fi
 
-HOOK_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+HOOK_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd -P)
 PR_REF=$(python3 "$HOOK_DIR/_lib_parse_pr_ref.py" "$COMMAND" 2>/dev/null || true)
 
 if [ -n "${KUBEDOJO_HOOK_GH_JSON:-}" ] && [ -f "${KUBEDOJO_HOOK_GH_JSON}" ]; then
