@@ -51,10 +51,10 @@ Task classes — model mapping per agent:
     class       claude                       codex            cursor
     -------     --------------------------   --------------   --------------
     search      claude-haiku-4-5-20251001    gpt-6-luna       composer-2.5
-    edit        claude-sonnet-5              gpt-6.1-sol      grok-4.7-high
-    draft       claude-sonnet-5              gpt-6.1-sol      grok-4.7-high
-    review      claude-opus-5-5               gpt-6.1-sol      grok-4.7-high
-    architect   claude-fable-5-1              gpt-6.1-sol      grok-4.7-high
+    edit        claude-sonnet-5              gpt-6.2-sol      grok-4.7-high
+    draft       claude-sonnet-5              gpt-6.2-sol      grok-4.7-high
+    review      claude-opus-5-5               gpt-6.2-sol      grok-4.7-high
+    architect   claude-fable-5-1              gpt-6.2-sol      grok-4.7-high
 
 Each dispatch is recorded to ``logs/smart_dispatch.jsonl`` for usage
 auditing. The FULL response body is also persisted to
@@ -264,7 +264,7 @@ class TaskClassConfig:
 # Claude catalog: review default = claude-opus-5-5 (Opus 5.5);
 # architect/advisor = claude-fable-5-1 (Fable 5.1);
 # edit/draft = claude-sonnet-5 (Sonnet 5); search = claude-haiku-4-5-20251001.
-# Codex uses the shared runtime's approved set: Sol 6.1 is the default for
+# Codex uses the shared runtime's approved set: Sol 6.2 is the default for
 # edit, draft, review and architect; GPT-6 Luna remains the read-only scout.
 # Terra is not in that set, and the shared adapter has no web-search switch.
 # Cursor is grok-4.7-high except search, which is composer-2.5.
@@ -291,7 +291,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6.1-sol",
+            "codex": "gpt-6.2-sol",
             "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -305,7 +305,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-sonnet-5",
-            "codex": "gpt-6.1-sol",
+            "codex": "gpt-6.2-sol",
             "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -319,7 +319,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-opus-5-5",
-            "codex": "gpt-6.1-sol",
+            "codex": "gpt-6.2-sol",
             "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
@@ -333,7 +333,7 @@ TASK_CLASSES: dict[str, TaskClassConfig] = {
         models={
             "agy": "gemini-3.8-flash-high",
             "claude": "claude-fable-5-1",
-            "codex": "gpt-6.1-sol",
+            "codex": "gpt-6.2-sol",
             "deepseek": "deepseek-v4.1-flash",
             "grok": "grok-4.7",
             "cursor": "grok-4.7-high",
