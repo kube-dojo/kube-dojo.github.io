@@ -42,7 +42,7 @@ work to the default lane and vice versa.
 ## Load-bearing discipline (do NOT violate)
 
 - **Worktrees only.** Branch in `.worktrees/` — NEVER branch or switch in the
-  primary dir. (`.claude/hooks/block-branch-create-in-primary.sh` enforces this.)
+  primary dir. (`.claude/kubedojo-hooks/block-branch-create-in-primary.sh` enforces this.)
 - **Never push direct to `main`.** PR + rebase-merge is the floor.
 - **Cross-family adversarial review before every merge** (`docs/review-protocol.md`).
 - **Lint per edit, test per phase, build per the CI build-gate rule.** Python: `.venv/bin/ruff
