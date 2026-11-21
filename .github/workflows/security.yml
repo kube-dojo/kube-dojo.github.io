@@ -8,13 +8,17 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Daily off-hour scan at 04:23 UTC (avoids :00/:15/:30/:45 cron contention).
+    - cron: '23 4 * * *'
+  workflow_dispatch:
 
 permissions: {}
 
 jobs:
   fleet-security:
     name: Fleet security
-    uses: learn-ukrainian/machinery/.github/workflows/fleet-security.yml@078285f3192049bc5d795c5c5e59339fd0c974ab
+    uses: learn-ukrainian/machinery/.github/workflows/fleet-security.yml@12f0ce5664024b1680ec9ffbfa1a2c6a4b078705
     permissions:
       contents: read
     with:
@@ -37,7 +41,8 @@ jobs:
         start-cursor-driver.sh
         start-docs.sh
       run-zizmor: true
-      run-secret-scan: true
+      # History does not change between pushes; keep secret scanning on change-driven runs only.
+      run-secret-scan: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
       run-trivy-fs: true
       # Trivy uses package-lock.json for the resolved npm graph. Python coverage is tracked in #3891.
       trivy-fs-targets: package-lock.json
