@@ -4,9 +4,9 @@ import http.client
 import importlib.util
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from threading import Thread
-from typing import Callable
 
 import pytest
 
@@ -48,6 +48,59 @@ def test_review_path_builder_rejects_traversal_module_key(tmp_path: Path) -> Non
     (tmp_path / ".pipeline" / "reviews").mkdir(parents=True)
 
     assert local_api.build_module_reviews(tmp_path, "../../etc/passwd") is None
+
+
+def test_static_path_resolution_failure_returns_typed_not_found(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("KUBEDOJO_UI_ROOT", raising=False)
+    static = tmp_path / "static"
+    static.mkdir()
+    asset = static / "fixture.css"
+    asset.write_bytes(b"/* fixture */")
+
+    for path in ("../fixture.css", str(asset), "bad\x00name.css"):
+        assert local_api.serve_static_file(tmp_path, path) == (
+            404, {"error": "not_found"}, "application/json; charset=utf-8"
+        )
+
+
+def test_static_resolved_path_must_stay_inside_base_before_stat(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("KUBEDOJO_UI_ROOT", raising=False)
+    static = tmp_path / "static"
+    static.mkdir()
+    sibling = tmp_path / "static-fixtures"
+    sibling.mkdir()
+    asset = sibling / "fixture.css"
+    asset.touch()
+    (static / "fixture.css").symlink_to(asset)
+
+    def unexpected_stat(_path: Path) -> bool:
+        pytest.fail("A rejected path reached the file-type probe")
+
+    with monkeypatch.context() as fs:
+        fs.setattr(Path, "is_file", unexpected_stat)
+        for path in ("fixture.css", "../static-fixtures/fixture.css", str(asset)):
+            assert local_api.serve_static_file(tmp_path, path) == (
+                404, {"error": "not_found"}, "application/json; charset=utf-8"
+            )
+
+
+def test_static_base_must_be_the_declared_directory_before_read(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("KUBEDOJO_UI_ROOT", raising=False)
+    fixtures = tmp_path / "fixtures"
+    fixtures.mkdir()
+    asset = fixtures / "fixture.css"
+    asset.touch()
+    (tmp_path / "static").symlink_to(fixtures, target_is_directory=True)
+
+    def unexpected_read(_path: Path) -> bytes:
+        pytest.fail("A rejected static base reached the file reader")
+
+    with monkeypatch.context() as fs:
+        fs.setattr(Path, "read_bytes", unexpected_read)
+        for path in ("fixture.css", "../fixtures/fixture.css", str(asset)):
+            assert local_api.serve_static_file(tmp_path, path) == (
+                404, {"error": "not_found"}, "application/json; charset=utf-8"
+            )
 
 
 def test_get_response_headers_do_not_split_on_crlf(monkeypatch, tmp_path: Path) -> None:
