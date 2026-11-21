@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # In-node apiserver serving-certificate renew primitives (Packet T2).
 # Source after state.sh + observe.sh with FD9 held and backup_verified.
 # No private-key egress. Rollback helpers are a separate packet.

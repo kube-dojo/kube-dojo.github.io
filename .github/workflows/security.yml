@@ -1,0 +1,59 @@
+name: Security checks
+
+on:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  fleet-security:
+    name: Fleet security
+    uses: learn-ukrainian/machinery/.github/workflows/fleet-security.yml@eb5547a8e8b534e118ab8804b759c2a6f31f1905
+    permissions:
+      contents: read
+    with:
+      run-actionlint: true
+      run-shellcheck: true
+      shellcheck-severity: error
+      # Directory targets discover *.sh. List the root and extensionless scripts explicitly.
+      shellcheck-paths: |
+        .githooks/pre-push
+        agents_extensions
+        archive
+        infra
+        scripts
+        scripts/ab
+        scripts/pipeline
+        scripts/services-up
+        services.sh
+        start-claude.sh
+        start-codex.sh
+        start-cursor-driver.sh
+        start-docs.sh
+      run-zizmor: true
+      run-secret-scan: true
+      run-trivy-fs: true
+      # Trivy uses package-lock.json for the resolved npm graph. Python coverage is tracked in #3891.
+      trivy-fs-targets: package-lock.json
+      # Sharp's optional libvips binaries are used at build time. Pages receives only static output.
+      trivy-fs-license-dispositions: |
+        package-lock.json|@img/sharp-libvips-darwin-arm64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-darwin-x64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linux-arm|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linux-arm64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linux-ppc64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linux-riscv64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linux-s390x|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linux-x64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linuxmusl-arm64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-libvips-linuxmusl-x64|LGPL-3.0-or-later
+        package-lock.json|@img/sharp-wasm32|Apache-2.0 AND LGPL-3.0-or-later AND MIT
+        package-lock.json|@img/sharp-win32-arm64|Apache-2.0 AND LGPL-3.0-or-later
+        package-lock.json|@img/sharp-win32-ia32|Apache-2.0 AND LGPL-3.0-or-later
+        package-lock.json|@img/sharp-win32-x64|Apache-2.0 AND LGPL-3.0-or-later

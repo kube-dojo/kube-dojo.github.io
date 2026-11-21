@@ -35,10 +35,14 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          files=$(git diff --name-only "$BASE_SHA" HEAD -- '*.md')
-          if [ -z "$files" ]; then
+          changed_paths=$(mktemp)
+          trap 'rm -f -- "$changed_paths"' EXIT
+          git diff --name-only -z "$BASE_SHA" HEAD -- '*.md' > "$changed_paths"
+          mapfile -d '' -t files < "$changed_paths"
+          if [ "${#files[@]}" -eq 0 ]; then
             echo "No markdown changes — nothing to check."
             exit 0
           fi
-          echo "Changed markdown:"; echo "$files"
-          python scripts/quality/check_arxiv_citations.py $files
+          echo "Changed markdown:"
+          printf '  %q\n' "${files[@]}"
+          python scripts/quality/check_arxiv_citations.py -- "${files[@]}"

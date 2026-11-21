@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Internal Linux Bash process identity and private record custody primitives.
 # Sourcing defines functions only. No launch, signalling or recovery admission.
 # Callers explicitly source the state and observation helpers.

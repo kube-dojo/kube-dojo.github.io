@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Packet T3b: resumable rollback steps + one-step continue after interruption.
 # Source after state.sh + observe.sh + renew.sh with FD9 held.
 
