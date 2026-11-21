@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 set -u
 umask 077
 source /var/lib/cka-certificate-artifacts/state.sh || exit 1

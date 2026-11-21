@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Internal read-only Bash library. Sourcing defines functions only.
 # Pass inputs explicitly: no ambient kubeconfig, context or CRI endpoint fallback.
 # Requires Bash, jq, timeout, OpenSSL 3.0, kubectl and a crictl 1.35 executable.

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Internal Linux Bash library: sourcing defines functions only.
 # Host verifies Docker identity independently; these functions do not prove it.
 # Requires root, /proc, jq, flock and GNU stat, sha256sum, mktemp, sync, mv.
