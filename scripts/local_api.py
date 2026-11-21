@@ -3411,7 +3411,7 @@ def _iso_to_epoch(value: Any) -> int | None:
     """
     if not isinstance(value, str) or not value:
         return None
-    from datetime import datetime, timezone
+    from datetime import UTC, datetime
     text = value.strip()
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
@@ -3420,7 +3420,7 @@ def _iso_to_epoch(value: Any) -> int | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return int(dt.timestamp())
 
 
@@ -5510,37 +5510,39 @@ def build_state_manifest() -> dict[str, Any]:
 
 
 def serve_static_file(repo_root: Path, rel_path: str) -> tuple[int, Any, str]:
+    not_found = 404, {"error": "not_found"}, "application/json; charset=utf-8"
     decoded = unquote(rel_path)
-    parts = decoded.split("/")
-    if not decoded or any(p in ("", ".", "..") for p in parts):
-        return 404, {"error": "not_found"}, "application/json; charset=utf-8"
-    ui_root = os.environ.get('KUBEDOJO_UI_ROOT')
-    if ui_root:
-        try:
-            root = Path(ui_root).resolve()
-            relative = root.relative_to((repo_root / '.worktrees').resolve())
-            if not Path(ui_root).is_absolute() or len(relative.parts) != 1: raise ValueError('invalid UI root')
-        except ValueError:
-            return 404, {"error": "not_found"}, "application/json; charset=utf-8"
-    else:
-        root = repo_root
-    static_dir = (root / "static").resolve()
-    if ui_root and not static_dir.is_relative_to(root):
-        return 404, {"error": "not_found"}, "application/json; charset=utf-8"
-    candidate = (static_dir / decoded).resolve()
+    if "\\" in decoded or Path(decoded).anchor or any(
+        part in ("", ".", "..") for part in decoded.split("/")
+    ):
+        return not_found
+
     try:
-        candidate.relative_to(static_dir)
-    except ValueError:
-        return 404, {"error": "not_found"}, "application/json; charset=utf-8"
-    if not candidate.is_file():
-        return 404, {"error": "not_found"}, "application/json; charset=utf-8"
-    ct = {".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8"}.get(candidate.suffix.lower())
-    if ct is None:
-        return 404, {"error": "not_found"}, "application/json; charset=utf-8"
-    try:
+        root = Path(os.path.realpath(repo_root, strict=True))
+        ui_root = os.environ.get("KUBEDOJO_UI_ROOT")
+        if ui_root:
+            configured_root = Path(ui_root)
+            if not configured_root.is_absolute():
+                return not_found
+            worktrees = root / ".worktrees"
+            root = Path(os.path.realpath(configured_root, strict=True))
+            if root.parent != worktrees:
+                return not_found
+
+        static_dir = os.path.realpath(root / "static", strict=True)
+        if Path(static_dir) != root / "static":
+            return not_found
+        resolved = os.path.realpath(os.path.join(static_dir, decoded), strict=True)
+        if not resolved.startswith(static_dir + os.sep):
+            return not_found
+
+        candidate = Path(resolved)
+        ct = {".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8"}.get(candidate.suffix.lower())
+        if ct is None or not candidate.is_file():
+            return not_found
         return 200, candidate.read_bytes(), ct
-    except OSError:
-        return 404, {"error": "not_found"}, "application/json; charset=utf-8"
+    except (OSError, ValueError):
+        return not_found
 
 
 def serve_artifact_file(

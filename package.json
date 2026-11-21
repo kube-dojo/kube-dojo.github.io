@@ -44,8 +44,8 @@
     "picomatch": "$picomatch"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.72.2",
-    "@typescript-eslint/parser": "^8.72.2",
+    "@typescript-eslint/eslint-plugin": "^8.73.0",
+    "@typescript-eslint/parser": "^8.73.0",
     "eslint": "^10.14.0",
     "happy-dom": "^21.0.4",
     "katex": "^0.19.1",
