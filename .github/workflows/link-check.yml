@@ -32,9 +32,10 @@ jobs:
       - name: Install PyYAML
         # check_site_health.py is stdlib-only, but the lab.url validator parses
         # frontmatter with a real YAML loader (robust against flow-style /
-        # inline-comment edge cases — see codex R1 on PR #1790). PyYAML is
-        # already a repo dependency (requirements.txt).
-        run: python -m pip install --upgrade "pyyaml>=6.0.3"
+        # inline-comment edge cases — see codex R1 on PR #1790).
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: \
+            -r .github/requirements/requirements-link-check.txt
 
       - name: Run site health check
         run: python scripts/check_site_health.py

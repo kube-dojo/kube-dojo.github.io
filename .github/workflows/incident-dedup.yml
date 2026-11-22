@@ -28,10 +28,8 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+      # incident_dedup_gate.py, check_incident_reuse.py, and audit_incident_reuse.py
+      # use only the Python standard library; no pip install is needed.
 
       - name: Fetch origin/main
         run: git fetch origin main --depth=1

@@ -35,7 +35,7 @@ fi
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then
     echo "Installing dependencies..."
-    npm install
+    npm ci
     echo "Dependencies installed"
 else
     echo "Dependencies found"
