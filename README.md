@@ -128,7 +128,7 @@ The site is built with [Astro](https://astro.build/) + [Starlight](https://starl
 ```bash
 npm ci
 npm run build      # build the static site to dist/
-npx astro dev      # local dev server with hot reload
+npm run dev        # local dev server with hot reload
 ```
 
 ---
