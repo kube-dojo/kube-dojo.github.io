@@ -126,9 +126,9 @@ A free, text-based curriculum for learning Kubernetes, cloud native, and platfor
 The site is built with [Astro](https://astro.build/) + [Starlight](https://starlight.astro.build/) and deployed to GitHub Pages. Content is authored in Markdown under `src/content/docs/`.
 
 ```bash
-npm install
+npm ci
 npm run build      # build the static site to dist/
-npx astro dev      # local dev server with hot reload
+npm run dev        # local dev server with hot reload
 ```
 
 ---

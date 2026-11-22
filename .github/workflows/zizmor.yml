@@ -8,6 +8,7 @@ on:
       - '.github/workflows/**'
       - '.github/actions/**'
       - '.github/dependabot.yml'
+      - '.github/requirements/**'
   push:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - '.github/workflows/**'
       - '.github/actions/**'
       - '.github/dependabot.yml'
+      - '.github/requirements/**'
 
 permissions:
   contents: read
@@ -29,8 +31,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.12"
+
       - name: Install zizmor
-        run: pip install 'zizmor==1.25.2'
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: \
+            -r .github/requirements/requirements-zizmor.txt
 
       - name: Run zizmor
         env:

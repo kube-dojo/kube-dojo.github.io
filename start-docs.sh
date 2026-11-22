@@ -32,18 +32,22 @@ if lsof -ti:$PORT > /dev/null 2>&1; then
     echo "Cleaned up port $PORT"
 fi
 
-# Check if node_modules exists
-if [ ! -d "node_modules" ]; then
+# Check if project-local Astro binary exists (not just a partial node_modules/)
+if [ ! -x "node_modules/.bin/astro" ]; then
     echo "Installing dependencies..."
-    npm install
+    npm ci
+    if [ ! -x "node_modules/.bin/astro" ]; then
+        echo "Error: node_modules/.bin/astro is missing or not executable after npm ci" >&2
+        exit 1
+    fi
     echo "Dependencies installed"
 else
     echo "Dependencies found"
 fi
 
-# Start Astro dev server
+# Start Astro dev server using the locked project-local binary (never npx)
 echo "Starting Astro dev server on http://localhost:$PORT"
-nohup npx astro dev --port $PORT > "$LOG_FILE" 2>&1 &
+nohup ./node_modules/.bin/astro dev --port "$PORT" > "$LOG_FILE" 2>&1 &
 DEV_PID=$!
 sleep 3
 
