@@ -23,7 +23,8 @@ mkdir -p "$LOGS_DIR" "$PIDS_DIR"
 # Service definitions
 declare -A SVC_CMD SVC_PORT SVC_LOG SVC_DESC
 
-SVC_CMD[dev]="npx astro dev --port 4333"
+ASTRO_BIN="./node_modules/.bin/astro"
+SVC_CMD[dev]="$ASTRO_BIN dev --port 4333"
 SVC_PORT[dev]=4333
 SVC_LOG[dev]="$LOGS_DIR/dev.log"
 SVC_DESC[dev]="Astro Dev Server (hot reload)"
@@ -94,9 +95,13 @@ _start_service() {
         return 0
     fi
 
-    echo "  Starting $name — ${SVC_DESC[$name]}..."
     cd "$PROJECT_ROOT"
+    if [[ "$name" == "dev" && ( ! -f "$ASTRO_BIN" || ! -x "$ASTRO_BIN" ) ]]; then
+        echo "  Astro executable missing or unusable at $ASTRO_BIN. Run npm ci from the project root." >&2
+        return 1
+    fi
 
+    echo "  Starting $name — ${SVC_DESC[$name]}..."
     # shellcheck disable=SC2086
     nohup ${SVC_CMD[$name]} >> "${SVC_LOG[$name]}" 2>&1 &
     local pid=$!
