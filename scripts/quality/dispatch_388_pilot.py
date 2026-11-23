@@ -503,13 +503,18 @@ def post_review_comment(pr_num: int, body: str) -> None:
 
 def merge_pr(pr_num: int) -> str | None:
     """Merge a PR through ``lu_machinery.publish.github`` and return the merge SHA."""
-    view = subprocess.run(
-        ["gh", "pr", "view", str(pr_num), "--json", "headRefOid,baseRefName"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        view = subprocess.run(
+            ["gh", "pr", "view", str(pr_num), "--json", "headRefOid,baseRefName"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        log({"event": "merge_failed", "pr": pr_num, "error": f"gh pr view error: {exc}"})
+        return None
     if view.returncode != 0:
         log({"event": "merge_failed", "pr": pr_num, "error": view.stderr.strip()})
         return None
@@ -517,6 +522,9 @@ def merge_pr(pr_num: int) -> str | None:
         pr_info = json.loads(view.stdout or "{}")
     except json.JSONDecodeError as exc:
         log({"event": "merge_failed", "pr": pr_num, "error": f"invalid pr view json: {exc}"})
+        return None
+    if not isinstance(pr_info, dict):
+        log({"event": "merge_failed", "pr": pr_num, "error": "pr view payload is not a JSON object"})
         return None
     head_oid = str(pr_info.get("headRefOid") or "").strip()
     base_ref = str(pr_info.get("baseRefName") or "main").strip()
@@ -532,8 +540,9 @@ def merge_pr(pr_num: int) -> str | None:
             cwd=REPO,
             capture_output=True,
             text=True,
+            timeout=60,
         )
-    except (publish_github.gate.PublishBlocked, ValueError, OSError) as exc:
+    except (publish_github.gate.PublishBlocked, subprocess.TimeoutExpired, ValueError, OSError) as exc:
         log({"event": "merge_failed", "pr": pr_num, "error": str(exc)})
         return None
     if queue_proc.returncode != 0:
@@ -544,7 +553,12 @@ def merge_pr(pr_num: int) -> str | None:
     except json.JSONDecodeError as exc:
         log({"event": "merge_failed", "pr": pr_num, "error": f"invalid queue-status json: {exc}"})
         return None
-    pr_node = ((queue_payload.get("data") or {}).get("repository") or {}).get("pullRequest") or {}
+    data_node = queue_payload.get("data") if isinstance(queue_payload, dict) else None
+    repo_node = data_node.get("repository") if isinstance(data_node, dict) else None
+    pr_node = repo_node.get("pullRequest") if isinstance(repo_node, dict) else None
+    if not isinstance(pr_node, dict):
+        log({"event": "merge_failed", "pr": pr_num, "error": "queue-status missing pullRequest object"})
+        return None
     if str(pr_node.get("state") or "").upper() != "OPEN":
         log({"event": "merge_failed", "pr": pr_num, "error": f"PR state is {pr_node.get('state')!r}, not OPEN"})
         return None
@@ -566,8 +580,9 @@ def merge_pr(pr_num: int) -> str | None:
             cwd=REPO,
             capture_output=True,
             text=True,
+            timeout=60,
         )
-    except (publish_github.gate.PublishBlocked, ValueError, OSError) as exc:
+    except (publish_github.gate.PublishBlocked, subprocess.TimeoutExpired, ValueError, OSError) as exc:
         log({"event": "merge_failed", "pr": pr_num, "error": str(exc)})
         return None
     if merge_proc.returncode != 0:
@@ -580,16 +595,23 @@ def merge_pr(pr_num: int) -> str | None:
     sha = merged.get("sha") if isinstance(merged, dict) else None
     if isinstance(sha, str) and sha.strip():
         return sha.strip()
-    sha_view = subprocess.run(
-        ["gh", "pr", "view", str(pr_num), "--json", "mergeCommit"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        sha_view = subprocess.run(
+            ["gh", "pr", "view", str(pr_num), "--json", "mergeCommit"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        log({"event": "merge_failed", "pr": pr_num, "error": f"mergeCommit lookup failed: {exc}"})
+        return None
     if sha_view.returncode == 0:
         try:
-            oid = (json.loads(sha_view.stdout or "{}").get("mergeCommit") or {}).get("oid")
+            sha_payload = json.loads(sha_view.stdout or "{}")
+            mc = sha_payload.get("mergeCommit") if isinstance(sha_payload, dict) else None
+            oid = mc.get("oid") if isinstance(mc, dict) else None
             if isinstance(oid, str) and oid.strip():
                 return oid.strip()
         except json.JSONDecodeError:
