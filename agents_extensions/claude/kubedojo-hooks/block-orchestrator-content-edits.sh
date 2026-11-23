@@ -28,7 +28,7 @@ if [[ "$REL_PATH" == src/content/docs/* ]]; then
   if [ "${KUBEDOJO_DISPATCHED:-0}" != "1" ]; then
     deny \
       "Edit/Write on src/content/docs/** from orchestrator is blocked; dispatch a codex/claude headless agent instead." \
-      "Use .venv/bin/python -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree (installed release; see the drive-epic skill)" \
+      "Use scripts/dispatch_smart.py edit --agent codex --worktree .worktrees/<task> --new-branch <branch>" \
       "feedback_dispatch_codex_for_code_changes.md (TOP PRIORITY memory)"
   fi
 fi
