@@ -75,6 +75,5 @@ jobs:
           LEARN_UKRAINIAN_PYTHON: ${{ github.workspace }}/.venv/bin/python
         run: |
           bash scripts/quality/test_deploy_check.sh
-          bash scripts/quality/test_session_setup_head_check.sh
           .venv/bin/python -m pytest -q tests/test_hook_*.py tests/test_codex_project_config.py \
             tests/test_quality_hooks.py tests/test_quality_prompts.py

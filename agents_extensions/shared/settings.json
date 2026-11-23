@@ -5,10 +5,6 @@
   "env": {
     "ENABLE_PROMPT_CACHING_1H": "1"
   },
-  "statusLine": {
-    "type": "command",
-    "command": "bash -lc 'command -v jq >/dev/null 2>&1 || exit 0; input=$(cat); project_dir=$(printf \"%s\" \"$input\" | jq -r \".workspace.project_dir // empty\"); script=\"$project_dir/.claude/statusline/statusline.sh\"; if [ -n \"$project_dir\" ] && [ -f \"$script\" ]; then printf \"%s\" \"$input\" | bash \"$script\"; fi'"
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -68,18 +64,6 @@
           },
           {
             "type": "command",
-            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-branch-create-in-primary.sh"
-          },
-          {
-            "type": "command",
-            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-direct-commit-on-main.sh"
-          },
-          {
-            "type": "command",
-            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/inject-codex-danger-mode.sh"
-          },
-          {
-            "type": "command",
             "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-content-merge-without-learner-check.sh"
           },
           {
@@ -94,15 +78,6 @@
           {
             "type": "command",
             "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-orchestrator-content-edits.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-agent-worktree-isolation.sh"
           }
         ]
       },
@@ -139,10 +114,6 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context-monitor.sh",
             "timeout": 5,
             "type": "command"
-          },
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/kubedojo-context-monitor.sh"
           }
         ]
       },
@@ -178,10 +149,6 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-setup.sh",
             "timeout": 10,
             "type": "command"
-          },
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/kubedojo-session-setup.sh"
           }
         ]
       }
@@ -193,10 +160,6 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-compact.sh",
             "timeout": 10,
             "type": "command"
-          },
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/kubedojo-post-compact.sh"
           }
         ]
       }

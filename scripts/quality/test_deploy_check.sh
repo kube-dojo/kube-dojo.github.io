@@ -13,7 +13,7 @@ trap cleanup EXIT
 git -C "$TMP" init -q
 cp -a "$ROOT/agents_extensions" "$TMP/"
 skill="$TMP/.claude/skills/kubedojo-drive-epic"
-hook="$TMP/.claude/hooks/kubedojo-session-setup.sh"
+hook="$TMP/.claude/hooks/post-write-py-autoformat.sh"
 
 fail=0
 ok()   { echo "  ok   $1"; }

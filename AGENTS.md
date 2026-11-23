@@ -1,8 +1,9 @@
 # AGENTS.md — KubeDojo agent instructions
 
 KubeDojo is an Astro/Starlight curriculum site. These instructions apply across
-agent families. Use `CLAUDE.md` for Claude-specific behavior and
-`agents_extensions/claude/rules/agy-workflow.md` when dispatching to the Google lane.
+agent families. Use `CLAUDE.md` for Claude-specific behavior. Fleet hooks, rules
+and skills (dispatch, review, landing, handoff) come from the installed
+lu-machinery release; `agents_extensions/` holds only the KubeDojo overlay.
 
 ## Scope and completion
 
@@ -35,9 +36,10 @@ a bounded fix and a clear return to content; do not pursue an ideal environment.
   there; never commit packet WIP on primary `main`; never push to `main`.
   Create with
   `git fetch origin && git worktree add -b codex/<name> .worktrees/<name> origin/main`.
-  Preserve unrelated pre-existing primary dirty files. Full READY closeout
-  (remove worktree, delete branches) is in
-  `agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md` → Worktree criteria.
+  Preserve unrelated pre-existing primary dirty files. Closeout (remove the
+  worktree, delete branches) follows the installed `full-send` skill; KubeDojo
+  completion criteria are in
+  `agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md`.
 - Register each new worktree and task-owned temporary/evidence path before
   creation, and follow `docs/ops/workspace-hygiene.md` for audit, retention and
   closeout. Run the read-only audit at packet, merge and handoff milestones;
@@ -74,7 +76,7 @@ fallback, not proof of healthy services.
 | Review curriculum | `agents_extensions/shared/skills/module-quality-reviewer/SKILL.md`, `docs/quality-rubric.md`, applicable `docs/rubric-profiles/` |
 | Content structure and frontmatter | `agents_extensions/claude/rules/new-content-checklist.md` |
 | Current quality scores | `/api/quality/scores`; the static `docs/quality-audit-results.md` is historical |
-| Agent dispatch | `scripts/dispatch_smart.py`, applicable adapter and provider workflow |
+| Agent dispatch | `.venv/bin/python -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree`, the installed `drive-epic` skill |
 
 Load a skill for its actual workflow, not merely because a keyword appears.
 Shared skill sources live in `agents_extensions/shared/skills`. Use the
@@ -167,8 +169,8 @@ Prefer installed named profiles only when their resolved model meets this
 policy; otherwise use an explicit allowed model with the appropriate role
 boundary. If a route is unavailable, report it rather than silently
 substituting. Verify exact identifiers against the live catalog. Headless
-dispatch defaults live in `scripts/dispatch_smart.py`; verify the resolved route
-separately from desktop profiles before using it. Same-family review still
+dispatch routes come from the installed `lu_machinery.dispatch` and its catalog;
+verify the resolved route separately from desktop profiles before using it. Same-family review still
 does not satisfy the independent cross-family merge gate.
 
 Probe CodexBar before substantive fan-out; report only aggregate usage and

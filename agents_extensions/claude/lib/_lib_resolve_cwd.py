@@ -4,9 +4,9 @@ Walks tokens left-to-right starting from a harness-reported cwd. Tracks
 `cd <path>` segments (relative to the running effective dir) until a token
 matching ``target_name`` is reached. Prints the resolved effective dir.
 
-This mirrors the same-class fix introduced in
-``block-direct-commit-on-main.sh`` (PR #1321) but is intentionally smaller:
-it only needs to handle ``cd <path>`` segments. ``gh`` (the only consumer)
+This mirrors the same-class fix introduced for direct-commit detection in
+PR #1321 but is intentionally smaller: it only needs to handle
+``cd <path>`` segments. ``gh`` (the only consumer)
 has no ``-C`` flag, so there is no per-invocation tree override to honour.
 
 Usage:

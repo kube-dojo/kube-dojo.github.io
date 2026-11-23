@@ -45,15 +45,20 @@ configuration before setting aside that conflicting copy and running apply.
 
 ## Product guidance
 
-- `claude/hooks/` retains the KubeDojo startup, context, and post-compaction
-  guidance under `kubedojo-` names. Interactive KubeDojo `PreToolUse` scripts
-  deploy from `claude/kubedojo-hooks/` to `.claude/kubedojo-hooks/`. The
-  headless Claude adapter reserves `.claude/hooks/` in `PreToolUse` for
-  release guards. The release's Python guard blocks a bare interpreter
-  and suggests the configured command.
-- `claude/rules/` holds the product rules, including
-  `kubedojo-fleet-driver-routing.md`. `claude/agents/` and
-  `claude/statusline/` remain the sources for the Claude agents and statusline.
-- `shared/skills/kubedojo-drive-epic/` keeps the site and labs workflow, with
-  local delivery and review requirements in its companion documentation.
-  Other KubeDojo skills stay in their existing source directories.
+- The release supplies every fleet hook, rule, skill and guard: session
+  start, context monitoring, post-compaction, branch and primary-checkout
+  guards, dispatch, review, landing and handoff. Do not copy or fork them
+  here; a product file with the same purpose fires twice.
+- `claude/hooks/` keeps only the shared hook library and the KubeDojo Python
+  autoformat hook. Interactive KubeDojo content `PreToolUse` scripts deploy
+  from `claude/kubedojo-hooks/` to `.claude/kubedojo-hooks/`. The headless
+  Claude adapter reserves `.claude/hooks/` in `PreToolUse` for release
+  guards. The release's Python guard blocks a bare interpreter and suggests
+  the configured command.
+- `claude/rules/` holds the KubeDojo content rules (module quality,
+  translation, Kubernetes release tracks, new-content checklist, durable
+  vendor content, GitHub Actions security, fresh session after interview).
+- `shared/skills/kubedojo-drive-epic/` is a KubeDojo overlay on the release
+  `drive-epic` skill: the site and labs workflow, with local delivery and
+  review requirements in its companion documentation. The other KubeDojo
+  skills are curriculum skills.
