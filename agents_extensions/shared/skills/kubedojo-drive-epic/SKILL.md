@@ -18,7 +18,7 @@ When the two disagree, the installed release and the rules core win.
 | Driver loop, orientation, queue, routing, handoff | `drive-epic` skill and its references |
 | Cold start and plane state | `.venv/bin/python -I -m lu_machinery.fleet_comms cold-start-board` and `plane-status` |
 | Launching the KubeDojo lane driver | `lu_machinery/start-kube-dojo-driver.sh` (lane `kube-dojo`) |
-| Dispatch | `.venv/bin/python -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...` |
+| Dispatch | `"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...`, with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set to the machinery shared-state checkout (`agents_extensions/README.md`, "Apply and verify"); without it the dispatcher refuses |
 | Review of record | `review-loop` and `local-code-review`; reviewer from `lu_machinery.review.closeout_cli resolve-reviewer` |
 | Landing and closeout | `full-send` / `full-stop` (publisher `pr-merge`, `merge_closeout`) |
 | Rollover and handoff | `thread-rollover` and the lane `handoff_note` |
@@ -30,10 +30,20 @@ resolver, never from this file.
 `block-orchestrator-content-edits.sh` refuses Claude `Edit`/`Write` on
 `src/content/docs/**` unless `KUBEDOJO_DISPATCHED=1`, and today only the legacy
 `scripts/dispatch_smart.py` sets it; a Claude worker started by
-`lu_machinery.dispatch` is refused. Route curriculum edits through
-`lu_machinery.dispatch` to a non-Claude implementer (for example Codex),
-or through the legacy dispatcher, until that exemption is migrated. KubeDojo delivery and review notes:
-[delivery.md](delivery.md). Sister-repo details: [dual-repo.md](dual-repo.md).
+`lu_machinery.dispatch` is refused. Until that exemption is migrated, route
+curriculum edits one of these two ways (both take the brief as a file):
+
+```bash
+# Fleet route, non-Claude implementer; needs LEARN_UKRAINIAN_PRIMARY_REPO_ROOT.
+"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo \
+  --agent codex --mode workspace-write --worktree --task-id <task-id> \
+  --prompt-file <brief.md> --owned-path <path>
+# Legacy route, temporary until census PR 7 retires it; the brief goes on stdin.
+.venv/bin/python scripts/dispatch_smart.py edit --agent codex \
+  --worktree .worktrees/<task> --new-branch <branch> - < <brief.md>
+```
+
+KubeDojo delivery and review notes: [delivery.md](delivery.md). Sister-repo details: [dual-repo.md](dual-repo.md).
 
 ## KubeDojo inventory
 

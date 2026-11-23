@@ -62,7 +62,8 @@ and `plane-status`, and the installed `drive-epic` skill with the KubeDojo overl
 relevant files directly; service startup and a full handoff are unnecessary.
 
 Curriculum state comes from the KubeDojo local API at `http://127.0.0.1:8768`
-(start it with `./services.sh start api`). Before claiming pipeline work, read
+(start it with `scripts/services-up --api-only`, which binds loopback and serves the
+primary checkout). Before claiming pipeline work, read
 `GET /api/pipeline/leases`. Before fixing a module, read
 `GET /api/module/{key}/state`; before re-reviewing it, read
 `GET /api/reviews?module={key}`. Use `/api/tracks/readiness` and `/api/activity`
@@ -76,7 +77,7 @@ of healthy services; `STATUS.md` is only a fallback index.
 | Review curriculum | `agents_extensions/shared/skills/module-quality-reviewer/SKILL.md`, `docs/quality-rubric.md`, applicable `docs/rubric-profiles/` |
 | Content structure and frontmatter | `agents_extensions/claude/rules/new-content-checklist.md` |
 | Current quality scores | `/api/quality/scores`; the static `docs/quality-audit-results.md` is historical |
-| Agent dispatch | `.venv/bin/python -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree`, the installed `drive-epic` skill |
+| Agent dispatch | `"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...` with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set to the machinery shared-state checkout ([agents_extensions/README.md](agents_extensions/README.md#apply-and-verify)); without it the dispatcher refuses; the installed `drive-epic` skill and the `kubedojo-drive-epic` overlay |
 
 Load a skill for its actual workflow, not merely because a keyword appears.
 Shared skill sources live in `agents_extensions/shared/skills`. Use the

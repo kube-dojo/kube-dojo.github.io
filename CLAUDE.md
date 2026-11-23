@@ -16,7 +16,10 @@ hooks.
 `.venv/bin/python -I -m lu_machinery.fleet_comms cold-start-board` and
 `plane-status`; the lane driver is launched by the release's
 `start-kube-dojo-driver.sh`. Dispatch with
-`.venv/bin/python -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree`.
+`"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...`
+with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set to the machinery shared-state checkout
+(see [`agents_extensions/README.md`](agents_extensions/README.md#apply-and-verify)); without it the
+dispatcher refuses.
 
 **Issue-driven sessions:** read the GitHub issue verbatim first.
 
@@ -26,7 +29,8 @@ hooks.
 - `GET /api/reviews?module={key}`
 
 Optional situational check: `GET /api/activity?limit=30`. Start the local API with
-`./services.sh start api` when it is down; an unreachable API is unknown state.
+`scripts/services-up --api-only` (loopback bind, primary-checkout root) when it is
+down; an unreachable API is unknown state.
 
 ## Agent Usage
 
