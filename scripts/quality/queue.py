@@ -41,23 +41,24 @@ from .state import (
 # neither resolves, default to tertiary so a human picks instead of silently
 # routing to whichever the order ended up.
 
-# Primary writer is now the agy (Antigravity) Google lane, model
-# gemini-3.1-pro-high — gemini-cli is retired (#2125). The model id is an agy
-# display slug, dispatched via the `agy` subcommand in scripts/dispatch.py.
-PRIMARY_BEGINNER = "gemini-3.1-pro-high"
-PRIMARY_ADVANCED = "gemini-3.1-pro-high"
+# Primary writer is the agy (Antigravity) Google lane at the pro tier —
+# gemini-cli is retired (#2125). The model id is an agy slug that the
+# lu-machinery model catalog admits.
+PRIMARY_BEGINNER = "gemini-4-neon-high"
+PRIMARY_ADVANCED = "gemini-4-neon-high"
 TERTIARY = "claude-opus-5-5"
 
 # Map writer-model identifiers (returned by route_writer / stored in the
 # queue doc) onto the (agent, model) tuple that ``dispatchers.dispatch``
 # expects. Kept here, not in dispatchers.py, so the queue owns the
-# vocabulary. Adding a writer means adding an entry here AND a
-# corresponding case in scripts/dispatch.py.
+# vocabulary. Adding a writer means adding an entry here.
 _MODEL_TO_AGENT: dict[str, tuple[str, str]] = {
     PRIMARY_BEGINNER: ("agy", PRIMARY_BEGINNER),
     TERTIARY: ("claude", TERTIARY),
-    # Queue rows recorded before Opus 5.5 became the default still resolve.
+    # Queue rows recorded under a retired model id still resolve to its
+    # catalog successor at the same tier.
     "claude-opus-4-8": ("claude", TERTIARY),
+    "gemini-3.1-pro-high": ("agy", PRIMARY_BEGINNER),
 }
 
 
@@ -128,7 +129,7 @@ def _tertiary_writer() -> str:
     """Resolve the tertiary writer, honouring a runtime degraded fallback.
     """
     fallback = os.environ.get("KUBEDOJO_TERTIARY_FALLBACK", "").lower().strip()
-    if fallback in {"gemini", "agy", "gemini-3.1-pro-preview", "gemini-3.1-pro-high"}:
+    if fallback in {"gemini", "agy", "gemini-3.1-pro-preview", "gemini-3.1-pro-high", "gemini-4-neon-high"}:
         return PRIMARY_BEGINNER
     return TERTIARY
 
