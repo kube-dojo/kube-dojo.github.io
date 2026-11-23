@@ -30,18 +30,11 @@ resolver, never from this file.
 `block-orchestrator-content-edits.sh` refuses Claude `Edit`/`Write` on
 `src/content/docs/**` unless `KUBEDOJO_DISPATCHED=1`, and today only the legacy
 `scripts/dispatch_smart.py` sets it; a Claude worker started by
-`lu_machinery.dispatch` is refused. Until that exemption is migrated, route
-curriculum edits one of these two ways (both take the brief as a file):
-
-```bash
-# Fleet route, non-Claude implementer; needs LEARN_UKRAINIAN_PRIMARY_REPO_ROOT.
-"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo \
-  --agent codex --mode workspace-write --worktree --task-id <task-id> \
-  --prompt-file <brief.md> --owned-path <path>
-# Legacy route, temporary until census PR 7 retires it; the brief goes on stdin.
-.venv/bin/python scripts/dispatch_smart.py edit --agent codex \
-  --worktree .worktrees/<task> --new-branch <branch> - < <brief.md>
-```
+`lu_machinery.dispatch` is refused. This is a known gap: this overlay has no
+runnable command for a Claude curriculum edit, and census PR 7 owns migrating
+the exemption. Until then, send curriculum edits to a non-Claude implementer
+through the installed `drive-epic` routing, taking the model and account from
+the resolver.
 
 KubeDojo delivery and review notes: [delivery.md](delivery.md). Sister-repo details: [dual-repo.md](dual-repo.md).
 
