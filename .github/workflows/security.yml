@@ -33,7 +33,6 @@ jobs:
         infra
         scripts
         scripts/ab
-        scripts/pipeline
         scripts/services-up
         services.sh
         start-claude.sh
