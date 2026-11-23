@@ -32,11 +32,7 @@ jobs:
         archive
         infra
         scripts
-        scripts/services-up
         services.sh
-        start-claude.sh
-        start-codex.sh
-        start-cursor-driver.sh
         start-docs.sh
       run-zizmor: true
       # History does not change between pushes; keep secret scanning on change-driven runs only.

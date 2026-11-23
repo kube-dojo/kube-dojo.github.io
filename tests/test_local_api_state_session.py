@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,11 +19,6 @@ def _load_module():
 local_api = _load_module()
 
 
-def _write(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-
-
 def _manifest_entries(body: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         entry
@@ -33,42 +27,24 @@ def _manifest_entries(body: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _seed_handoffs(repo_root: Path) -> None:
-    _write(
-        repo_root / "docs" / "session-state" / "2026-05-09-cka-part1-and-html-migration-pivot.html",
-        """
-        <!doctype html>
-        <html>
-        <body>
-        <h1>CKA Part 1 and HTML Migration Pivot</h1>
-        <p>Latest HTML handoff summary for cold-start routing.</p>
-        </body>
-        </html>
-        """,
-    )
-    _write(
-        repo_root / "docs" / "session-state" / "2026-05-08-4-content-green-canary.md",
-        """
-        # Content Green Canary
-
-        TL;DR: Previous handoff summary.
-        """,
-    )
-    _write(repo_root / "docs" / "session-state" / "archive-pre-2026-04-28.md", "# Archive")
-    _write(repo_root / "docs" / "session-state" / "handoff-without-prefix.html", "<h1>Ignored</h1>")
-
-
-def test_state_manifest_contains_cold_start_critical_paths(tmp_path: Path) -> None:
+def test_state_manifest_contains_product_discovery_paths_only(tmp_path: Path) -> None:
     status, body, content_type = local_api.route_request(tmp_path, "/api/state/manifest")
 
     assert status == 200
     assert content_type == "application/json; charset=utf-8"
     paths = {entry["path"] for entry in _manifest_entries(body)}
-    assert "/api/briefing/session" in paths
-    assert "/api/briefing/session?compact=1" in paths
     assert "/api/schema" in paths
-    assert "/api/session/current" in paths
-    assert "/api/benchmarks/latest" not in paths
+    assert "/api/pipeline/leases" in paths
+    assert "/api/tracks/readiness" in paths
+    for removed in (
+        "/api/briefing/session",
+        "/api/briefing/session?compact=1",
+        "/api/session/current",
+        "/api/orient",
+        "/api/git/worktrees",
+        "/api/benchmarks/latest",
+    ):
+        assert removed not in paths
 
 
 def test_state_manifest_entries_are_well_formed(tmp_path: Path) -> None:
@@ -81,49 +57,39 @@ def test_state_manifest_entries_are_well_formed(tmp_path: Path) -> None:
         assert entry["purpose"]
 
 
-def test_current_session_returns_latest_key(tmp_path: Path) -> None:
-    _seed_handoffs(tmp_path)
-
-    status, body, content_type = local_api.route_request(tmp_path, "/api/session/current")
-
-    assert status == 200
-    assert content_type == "application/json; charset=utf-8"
-    assert "latest" in body
-    assert body["latest"]["filename"] == "2026-05-09-cka-part1-and-html-migration-pivot.html"
-
-
-def test_current_session_latest_date_matches_filename_prefix(tmp_path: Path) -> None:
-    _seed_handoffs(tmp_path)
-
-    _, body, _ = local_api.route_request(tmp_path, "/api/session/current")
-
-    latest = body["latest"]
-    assert latest["date"] == re.match(r"^\d{4}-\d{2}-\d{2}", latest["filename"]).group(0)
-
-
-def test_current_session_predecessor_is_not_newer_than_latest(tmp_path: Path) -> None:
-    _seed_handoffs(tmp_path)
-
-    _, body, _ = local_api.route_request(tmp_path, "/api/session/current")
-
-    assert body["predecessors"][0]["date"] <= body["latest"]["date"]
+def test_removed_machinery_routes_return_404(tmp_path: Path) -> None:
+    for path in (
+        "/api/briefing/session",
+        "/api/orient",
+        "/api/session/current",
+        "/api/runtime/services",
+        "/api/activity",
+        "/api/activity/recent",
+        "/api/git/worktree",
+        "/api/git/worktrees",
+        "/api/git/cleanup",
+        "/api/gh/issues",
+        "/api/gh/issues/1",
+    ):
+        status, payload, _ = local_api.route_request(tmp_path, path)
+        assert status == 404, f"expected 404 for {path}, got {status}"
+        assert payload["error"] == "not_found"
 
 
-def test_current_session_excludes_archive_and_prefixless_files(tmp_path: Path) -> None:
-    _seed_handoffs(tmp_path)
+def test_healthz_uses_lu_machinery_repo_root(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    (primary / ".git" / "worktrees" / "wt1").mkdir(parents=True)
+    worktree = tmp_path / "wt1"
+    worktree.mkdir()
+    (worktree / ".git").write_text(f"gitdir: {primary / '.git' / 'worktrees' / 'wt1'}\n", encoding="utf-8")
 
-    _, body, _ = local_api.route_request(tmp_path, "/api/session/current")
+    status_ok, payload_ok, _ = local_api.route_request(primary, "/healthz")
+    assert status_ok == 200
+    assert payload_ok["ok"] is True
+    assert payload_ok["primary_repo_root"] == str(primary.resolve())
 
-    filenames = {body["latest"]["filename"], *(item["filename"] for item in body["predecessors"])}
-    assert "archive-pre-2026-04-28.md" not in filenames
-    assert "handoff-without-prefix.html" not in filenames
-    assert body["total_handoffs"] == 2
-
-
-def test_current_session_contains_at_least_one_html_handoff(tmp_path: Path) -> None:
-    _seed_handoffs(tmp_path)
-
-    _, body, _ = local_api.route_request(tmp_path, "/api/session/current")
-
-    handoffs = [body["latest"], *body["predecessors"]]
-    assert any(item["format"] == "html" for item in handoffs)
+    status_wt, payload_wt, _ = local_api.route_request(worktree, "/healthz")
+    assert status_wt == 200
+    assert payload_wt["ok"] is False
+    assert payload_wt["primary_repo_root"] == str(primary.resolve())
+    assert any("not the primary checkout" in w for w in payload_wt["warnings"])

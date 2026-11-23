@@ -13,8 +13,10 @@ if [ "$TOOL_NAME" != "Edit" ] && [ "$TOOL_NAME" != "Write" ]; then
   exit 0
 fi
 
-# Skip inside dispatch pipelines (set by scripts/dispatch*.py)
-if [ "${KUBEDOJO_DISPATCHED:-0}" = "1" ]; then
+# Skip inside dispatched worker sessions (set by lu_machinery/dispatcher/environment.py:163)
+DISPATCH_TASK_ID="${LEARN_UKRAINIAN_DISPATCH_TASK_ID:-}"
+DISPATCH_TASK_ID="${DISPATCH_TASK_ID//[[:space:]]/}"
+if [ -n "$DISPATCH_TASK_ID" ]; then
   exit 0
 fi
 

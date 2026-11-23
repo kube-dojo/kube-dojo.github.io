@@ -133,7 +133,7 @@ Start conservative; adjust from receipts + outcomes. **Adopted defaults** (see [
 
 **State:** open PRs, author/auditor families, CI, CodexBar/capacity blurb, path lists.  
 **Questions (one call):** `next_action` Choice · `author_agent` Choice · `cf_agent` Choice · `parallel_ok` Noul · `path_disjoint` Noul · `difficulty` Score.  
-**Code:** map choices → `dispatch_smart` argv; if conf low, pick a safe default seat yourself.
+**Code:** map choices → `lu_machinery.dispatch` argv; if conf low, pick a safe default seat yourself.
 
 ### B. Ukrainian / Cyrillic row qualification (open-model-data)
 

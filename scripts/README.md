@@ -77,14 +77,13 @@ python scripts/local_api.py --host 0.0.0.0 --port 8768
 5. `/api/translation/v2/status?section=prerequisites/zero-to-terminal`
 6. `/api/labs/status`
 7. `/api/ztt/status`
-8. `/api/git/worktree`
-9. `/api/issue-watch/248`
-10. `/api/module/<module-key>/state`
-11. `/api/module/<module-key>/orchestration/latest`
+8. `/api/issue-watch/248`
+9. `/api/module/<module-key>/state`
+10. `/api/module/<module-key>/orchestration/latest`
 
 **Why it exists:**
 1. Reduces repeated shell/file probes for stable state
-2. Exposes deterministic JSON for pipeline, translation, labs, worktree, and module-level views
+2. Exposes deterministic JSON for pipeline, translation, labs, and module-level views
 3. Adds a lightweight local dashboard so the API is easier to inspect without curl-only workflows
 
 ---
@@ -125,62 +124,6 @@ python scripts/translation_v2.py watchdog sweep
    - `worker`: translate or refresh the Ukrainian module
    - `verify-worker`: run deterministic freshness + Ukrainian quality verification
 4. Retries failed modules without blocking whole-section progress
-
----
-
-## dispatch.py
-
-Direct CLI dispatch for Gemini and Claude — calls CLIs as subprocesses with no broker or database.
-
-### Quick Usage
-
-```bash
-# Review a module (--review adds KubeDojo review context)
-python scripts/dispatch.py gemini \
-  "Review docs/k8s/cka/part3-services-networking/module-3.5-gateway-api.md for technical accuracy" \
-  --review
-
-# Review a GitHub issue and post result as comment
-python scripts/dispatch.py gemini \
-  "Review issue #66: $(gh issue view 66 --json body --jq .body)" \
-  --review --github 66
-
-# Review a diff
-python scripts/dispatch.py gemini \
-  "Review this diff for accuracy: $(git diff HEAD~3..HEAD -- docs/)" \
-  --review
-
-# Read prompt from stdin
-cat prompt.txt | python scripts/dispatch.py gemini - --review
-
-# Use Claude for expansion
-python scripts/dispatch.py claude "Expand this draft to full depth..."
-```
-
-### Programmatic Usage
-
-```python
-from scripts.dispatch import GEMINI_WRITER_MODEL, dispatch_gemini_with_retry, post_to_github
-
-ok, output = dispatch_gemini_with_retry("Review this module...", review=True)
-if ok:
-    post_to_github(66, output, GEMINI_WRITER_MODEL)
-```
-
-### Review Criteria
-
-Gemini reviews KubeDojo content against these criteria (auto-injected with `--review`):
-- **Technical accuracy**: K8s commands correct and runnable, version numbers accurate
-- **Exam alignment**: Content matches current CNCF exam curriculum
-- **Completeness**: Acceptance criteria thorough, edge cases covered
-- **Junior-friendly**: Beginner-accessible, "why" explained not just "what"
-
-### Architecture
-
-- **No broker** — direct `subprocess.Popen` / `subprocess.run` calls to `gemini` and `claude` CLIs
-- **Streaming** — Gemini output streams to stdout in real-time
-- **Retry** — exponential backoff on rate limits (default 3 retries)
-- **GitHub integration** — posts reviews as issue comments via `gh` CLI (with chunking for long reviews)
 
 ---
 

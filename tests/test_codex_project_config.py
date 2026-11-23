@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -77,27 +76,3 @@ def test_default_deploy_refuses_config_drift_before_other_agents(deployment):
     target.write_text('model = "preserve-me"\n')
     assert run().returncode == 2
     assert not (target.parent.parent / ".claude/settings.json").exists()
-
-
-@pytest.mark.parametrize("enabled", ["1", "0"])
-def test_launcher_sets_v2_and_honors_multi_agent_opt_out(tmp_path, enabled):
-    binary_dir = tmp_path / ".local/bin"
-    binary_dir.mkdir(parents=True)
-    fake_codex = binary_dir / "codex"
-    fake_codex.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "$CLI_CAPTURE"\n')
-    fake_codex.chmod(0o755)
-    capture = tmp_path / "argv"
-    env = dict(os.environ)
-    env.pop("CODEX_EPIC", None)
-    env.update(HOME=str(tmp_path), CODEX_TARGET="main", CODEX_ENABLE_MULTI_AGENT=enabled, CLI_CAPTURE=str(capture))
-    result = subprocess.run(
-        ["bash", str(ROOT / "start-codex.sh"), "--main", "--model", "chosen-model"],
-        env=env, capture_output=True, text=True, check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    args = capture.read_text().splitlines()
-    assert args[1:5] == [
-        "--enable" if enabled == "1" else "--disable", "multi_agent", "-c",
-        f"features.multi_agent_v2.enabled={'true' if enabled == '1' else 'false'}",
-    ]
-    assert args[-2:] == ["--model", "chosen-model"]

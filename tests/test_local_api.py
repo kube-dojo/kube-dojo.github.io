@@ -264,24 +264,6 @@ def _setup_repo(repo_root: Path) -> tuple[str, Path]:
     return module_key, en_path
 
 
-def test_build_worktree_status_classifies_source_and_generated_changes(tmp_path: Path) -> None:
-    repo_root = tmp_path
-    _init_repo(repo_root)
-    _write(repo_root / "src/content/docs/prerequisites/zero-to-terminal/module-0.1-alpha.md", _module_frontmatter())
-    _git(repo_root, "add", ".")
-    _git(repo_root, "commit", "-m", "initial")
-
-    _write(repo_root / "src/content/docs/prerequisites/zero-to-terminal/module-0.1-alpha.md", "changed\n")
-    _write(repo_root / "dist/index.html", "generated\n")
-
-    status = local_api.build_worktree_status(repo_root)
-
-    assert status["ok"] is True
-    assert status["dirty"] is True
-    assert status["categories"]["source"] == 1
-    assert status["categories"]["generated"] == 1
-
-
 def test_route_request_serves_summary_and_module_endpoints(tmp_path: Path) -> None:
     repo_root = tmp_path
     module_key, _ = _setup_repo(repo_root)
@@ -306,17 +288,6 @@ def test_route_request_serves_summary_and_module_endpoints(tmp_path: Path) -> No
     assert missing_modules["active_exact"]["missing"] > 0
     assert missing_modules["deferred"]["missing_min"] == 3
 
-    status_code, services, _ = local_api.route_request(repo_root, "/api/runtime/services")
-    assert status_code == 200
-    assert services["stopped"] >= 1
-    # New shape: total/running/stopped/stale always present; per-service fields include uptime + stale flag.
-    assert services["total"] == services["running"] + services["stopped"] + services["stale"]
-    api_entry = next(s for s in services["services"] if s["name"] == "api")
-    assert api_entry["status"] == "stopped"
-    assert api_entry["uptime_seconds"] is None
-    assert api_entry["stale_pid_file"] is False
-    assert api_entry["known"] is True
-
     status_code, module_state, _ = local_api.route_request(
         repo_root, f"/api/module/{module_key}/state"
     )
@@ -333,7 +304,7 @@ def test_route_request_serves_summary_and_module_endpoints(tmp_path: Path) -> No
     assert latest["translation_v2"]["latest_event"]["type"] == "translation_verified"
 
 
-def test_route_request_serves_recent_activity_and_navigation_status(tmp_path: Path) -> None:
+def test_route_request_serves_navigation_status(tmp_path: Path) -> None:
     repo_root = tmp_path
     _init_repo(repo_root)
 
@@ -343,35 +314,6 @@ def test_route_request_serves_recent_activity_and_navigation_status(tmp_path: Pa
     _write(module_path, _module_frontmatter())
     _git(repo_root, "add", ".")
     _git(repo_root, "commit", "-m", "add ai track")
-
-    watch_path = repo_root / ".pipeline" / "issue-watch" / "248.json"
-    watch_path.parent.mkdir(parents=True, exist_ok=True)
-    watch_path.write_text(
-        json.dumps(
-            {
-                "number": 248,
-                "title": "Review batch",
-                "url": "https://example.test/issues/248",
-                "state": "OPEN",
-                "updatedAt": "2026-04-16T09:00:00Z",
-                "comments": [
-                    {
-                        "url": "https://example.test/issues/248#issuecomment-1",
-                        "createdAt": "2026-04-16T09:00:00Z",
-                        "author": {"login": "user1"},
-                        "body": "feedback",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    status_code, recent, _ = local_api.route_request(repo_root, "/api/activity/recent")
-    assert status_code == 200
-    assert recent["recent_commits"]
-    assert recent["recent_commits"][0]["subject"] == "add ai track"
-    assert recent["watched_issue"]["number"] == 248
 
     status_code, navigation, _ = local_api.route_request(repo_root, "/api/navigation/status")
     assert status_code == 200
@@ -386,6 +328,9 @@ def test_route_request_serves_recent_activity_and_navigation_status(tmp_path: Pa
 def test_route_request_serves_delivery_status(tmp_path: Path) -> None:
     repo_root = tmp_path
     _init_repo(repo_root)
+    venv_python = repo_root / ".venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(sys.executable)
     _write(repo_root / "src/content/docs/prerequisites/index.md", "---\ntitle: P\n---\n")
     _write(repo_root / "dist/index.html", "built\n")
     _write(
@@ -400,36 +345,6 @@ def test_route_request_serves_delivery_status(tmp_path: Path) -> None:
     assert payload["site_health"]["ok"] is True
     assert payload["site_health"]["warnings"] == 3
     assert payload["site_health"]["stats"]["modules"] == 4
-
-
-def test_runtime_services_detects_stale_pid_and_discovers_unknown_workers(tmp_path: Path) -> None:
-    repo_root = tmp_path
-    pids_dir = repo_root / ".pids"
-    pids_dir.mkdir()
-
-    # Stale known service: pid file points at a PID that's definitely not alive.
-    (pids_dir / "api.pid").write_text("999999\n", encoding="utf-8")
-    # Running known service: use our own PID so the existence probe succeeds.
-    import os as _os
-    (pids_dir / "dev.pid").write_text(f"{_os.getpid()}\n", encoding="utf-8")
-    # Discovered (not in RUNTIME_SERVICES) stale worker.
-    (pids_dir / "adhoc-worker.pid").write_text("999998\n", encoding="utf-8")
-
-    payload = local_api.build_runtime_services_status(repo_root)
-
-    by_name = {s["name"]: s for s in payload["services"]}
-    assert by_name["api"]["status"] == "stale"
-    assert by_name["api"]["stale_pid_file"] is True
-    assert by_name["dev"]["status"] == "running"
-    assert by_name["dev"]["uptime_seconds"] is not None
-    assert by_name["dev"]["uptime_seconds"] >= 0
-    assert "adhoc-worker" in by_name
-    assert by_name["adhoc-worker"]["known"] is False
-    assert by_name["adhoc-worker"]["status"] == "stale"
-
-    assert payload["stale"] >= 2
-    assert payload["running"] >= 1
-    assert payload["total"] == payload["running"] + payload["stopped"] + payload["stale"]
 
 
 def test_route_request_supports_translation_section_and_missing_db(tmp_path: Path) -> None:
@@ -632,58 +547,28 @@ def test_route_request_returns_json_error_on_sqlite_schema_drift(tmp_path: Path)
         server.server_close()
 
 
-def test_pid_reuse_detection_marks_old_process_as_stale(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """If the live process started long before the pid file was written, the
-    pid file is treated as stale (PID was reused by an unrelated process)."""
-    import os as _os
-
-    pid_path = tmp_path / "reused.pid"
-    pid_path.write_text(f"{_os.getpid()}\n", encoding="utf-8")
-    # Stub process age to simulate a long-running process that predates the
-    # pid file by much more than the reuse slack.
-    monkeypatch.setattr(
-        local_api,
-        "_process_age_seconds",
-        lambda pid: local_api._PID_REUSE_SLACK_SECONDS + 3600.0,
-    )
-    probe = local_api._inspect_pid_file(pid_path)
-    assert probe["status"] == "stale"
-    assert probe["stale_pid_file"] is True
-
-
-def test_pid_fresh_process_reports_running(tmp_path: Path, monkeypatch) -> None:
-    import os as _os
-
-    pid_path = tmp_path / "fresh.pid"
-    pid_path.write_text(f"{_os.getpid()}\n", encoding="utf-8")
-    # Process age within the slack window -> should report running.
-    monkeypatch.setattr(local_api, "_process_age_seconds", lambda pid: 5.0)
-    probe = local_api._inspect_pid_file(pid_path)
-    assert probe["status"] == "running"
-    assert probe["stale_pid_file"] is False
-    assert probe["uptime_seconds"] == 5.0
-
-
-def test_pid_reuse_helper_handles_missing_process() -> None:
-    # Very high PID that's almost certainly not a live process.
-    assert local_api._process_age_seconds(999_999) is None
-
-
-def test_api_schema_advertises_new_endpoints() -> None:
+def test_api_schema_advertises_product_endpoints() -> None:
     schema = local_api.build_api_schema()
     assert schema["version"] == 1
     paths = {e["path"] for e in schema["endpoints"]}
-    # Must advertise new endpoints so agents can discover them without
-    # reading this file.
-    assert "/api/briefing/session" in paths
     assert "/api/schema" in paths
-    assert "/api/git/worktrees" in paths
-    assert "/api/git/worktree" in paths  # singular still there
-    assert "/api/activity/recent" in paths
     assert "/api/navigation/status" in paths
     assert "/api/delivery/status" in paths
+    assert "/api/content/coverage" in paths
+    for removed in (
+        "/api/briefing/session",
+        "/api/orient",
+        "/api/session/current",
+        "/api/runtime/services",
+        "/api/activity",
+        "/api/activity/recent",
+        "/api/git/worktree",
+        "/api/git/worktrees",
+        "/api/git/cleanup",
+        "/api/gh/issues",
+        "/api/gh/issues/{n}",
+    ):
+        assert removed not in paths
     assert "conventions" in schema
     assert "errors" in schema["conventions"]
 
@@ -881,42 +766,6 @@ def test_cached_response_does_not_cache_errors(tmp_path: Path) -> None:
     assert calls["n"] == 2
 
 
-def test_build_worktrees_list_returns_primary(tmp_path: Path) -> None:
-    repo_root = tmp_path
-    _init_repo(repo_root)
-    _write(repo_root / "README.md", "hi\n")
-    _git(repo_root, "add", ".")
-    _git(repo_root, "commit", "-m", "initial")
-    result = local_api.build_worktrees_list(repo_root)
-    assert result["ok"] is True
-    assert result["count"] >= 1
-    paths = [w["path"] for w in result["worktrees"]]
-    assert str(repo_root) in paths
-
-
-def test_session_briefing_serves_compact_snapshot(tmp_path: Path) -> None:
-    _setup_repo(tmp_path)
-    # Write a STATUS.md that the briefing will parse.
-    _write(
-        tmp_path / "STATUS.md",
-        "# status\n\n## TODO\n\n- [ ] finish alpha\n- [ ] finish beta\n\n"
-        "## Blockers\n\n- slow CI\n",
-    )
-    briefing = local_api.build_session_briefing(tmp_path)
-    assert set(briefing).issuperset(
-        {"snapshot", "workspace", "services", "pipelines", "focus", "blockers", "next_reads"}
-    )
-    assert briefing["focus"][:2] == ["finish alpha", "finish beta"]
-    assert briefing["blockers"] == ["slow CI"]
-
-    # Compact drops next_reads, links, and the worktrees list.
-    compact = local_api._compact_briefing(briefing)
-    assert "next_reads" not in compact
-    assert "links" not in compact
-    assert "worktrees" not in compact["workspace"]
-    assert compact["workspace"]["worktrees_total"] == briefing["workspace"]["worktrees_total"]
-
-
 def test_serve_request_sets_etag_and_matches_on_replay(tmp_path: Path) -> None:
     _setup_repo(tmp_path)
     _write(
@@ -933,32 +782,6 @@ def test_serve_request_sets_etag_and_matches_on_replay(tmp_path: Path) -> None:
     assert body1 == body2
     # And If-None-Match match semantics should accept it.
     assert local_api._match_etag(etag1, etag2)
-
-
-def test_background_snapshot_exposes_freshness_metadata() -> None:
-    calls = {"n": 0}
-
-    def builder():
-        calls["n"] += 1
-        return {"value": calls["n"]}
-
-    snap = local_api.BackgroundSnapshot(
-        key="test-snap-1",
-        interval_seconds=60.0,
-        builder=builder,
-    )
-    # Before any refresh runs.
-    data, meta = snap.get()
-    assert data is None
-    assert meta["freshness_state"] == "refreshing"
-
-    snap.refresh_blocking()
-    data, meta = snap.get()
-    assert data == {"value": 1}
-    assert meta["freshness_state"] == "fresh"
-    assert meta["refresh_error"] is None
-    assert meta["refresh_duration_ms"] is not None
-    assert meta["refresh_in_flight"] is False
 
 
 def test_sqlite_version_key_detects_wal_only_write(tmp_path: Path) -> None:
@@ -1081,160 +904,6 @@ def test_cache_keyed_by_repo_root(tmp_path: Path) -> None:
     assert key_a != key_b
     # With no repo_root the key falls back to path only (backward-compat).
     assert local_api._normalized_cache_key("/api/schema", {}) == "/api/schema"
-
-
-def test_status_md_cache_isolates_per_path(tmp_path: Path) -> None:
-    """Regression: STATUS.md cache was process-global, one entry.
-    Different repos' STATUS.md files must resolve independently.
-    """
-    status_a = tmp_path / "a" / "STATUS.md"
-    status_b = tmp_path / "b" / "STATUS.md"
-    status_a.parent.mkdir()
-    status_b.parent.mkdir()
-    status_a.write_text(
-        "# a\n\n## TODO\n\n- [ ] task from A\n", encoding="utf-8"
-    )
-    status_b.write_text(
-        "# b\n\n## TODO\n\n- [ ] task from B\n", encoding="utf-8"
-    )
-    data_a = local_api._parse_status_md(status_a)
-    data_b = local_api._parse_status_md(status_b)
-    assert data_a["focus"] == ["task from A"]
-    assert data_b["focus"] == ["task from B"]
-
-
-def test_background_snapshot_serializes_concurrent_builds() -> None:
-    """Regression: the "single in-flight" guarantee required a build
-    lock. refresh_blocking() called from one thread while the daemon
-    thread also tries to refresh must not produce overlapping builders.
-
-    Deterministic — no sleeps. An instrumented build lock signals when
-    the second caller reaches lock contention, so the test proves that
-    B actually attempted entry before A released (not just that B
-    happened not to finish first).
-    """
-    import threading
-
-    class _InstrumentedLock:
-        """Substitute for ``BackgroundSnapshot._build_lock`` that records
-        a ``waiter_entered`` event the second time ``acquire`` is called
-        while the lock is held, so the test can synchronize on ``B is
-        now waiting`` without sleeping."""
-
-        def __init__(self) -> None:
-            self._inner = threading.Lock()
-            self.waiter_entered = threading.Event()
-            self._acquire_attempts = 0
-            self._counter_lock = threading.Lock()
-
-        def acquire(self, timeout: float = -1.0) -> bool:
-            with self._counter_lock:
-                self._acquire_attempts += 1
-                attempt = self._acquire_attempts
-            if attempt >= 2 and self._inner.locked():
-                # Signal BEFORE the blocking acquire so the driver can
-                # release A after confirming B has reached contention.
-                self.waiter_entered.set()
-            if timeout < 0:
-                self._inner.acquire()
-                return True
-            return self._inner.acquire(timeout=timeout)
-
-        def release(self) -> None:
-            self._inner.release()
-
-    running_now = {"n": 0}
-    max_concurrent = {"n": 0}
-    release_builder = threading.Event()
-    in_builder = threading.Event()
-    counter_lock = threading.Lock()
-
-    def slow_builder():
-        with counter_lock:
-            running_now["n"] += 1
-            max_concurrent["n"] = max(max_concurrent["n"], running_now["n"])
-        in_builder.set()
-        # Park inside the builder until the test explicitly releases.
-        release_builder.wait(timeout=5.0)
-        with counter_lock:
-            running_now["n"] -= 1
-        return {"ok": True}
-
-    snap = local_api.BackgroundSnapshot(
-        key="concurrency-test",
-        interval_seconds=60.0,
-        builder=slow_builder,
-    )
-    instrumented = _InstrumentedLock()
-    snap._build_lock = instrumented  # type: ignore[assignment]
-
-    # Thread A enters the builder and parks there.
-    t_a = threading.Thread(target=snap.refresh_blocking)
-    t_a.start()
-    assert in_builder.wait(timeout=3.0), "builder A never entered"
-
-    # Thread B also attempts to acquire the build lock. It must block.
-    t_b = threading.Thread(target=snap.refresh_blocking)
-    t_b.start()
-    assert instrumented.waiter_entered.wait(timeout=3.0), (
-        "B did not reach lock contention before A released — test invalid"
-    )
-
-    # Release A; B proceeds into the builder sequentially.
-    release_builder.set()
-    t_a.join(timeout=3.0)
-    t_b.join(timeout=3.0)
-    assert not t_a.is_alive() and not t_b.is_alive()
-    assert max_concurrent["n"] == 1, "two builders ran concurrently"
-
-
-def test_refresh_blocking_honors_timeout() -> None:
-    """refresh_blocking(timeout=...) must return False if the build
-    lock cannot be acquired before the timeout elapses."""
-    import threading
-
-    release = threading.Event()
-    in_builder = threading.Event()
-
-    def slow_builder():
-        in_builder.set()
-        release.wait(timeout=3.0)
-        return {"ok": True}
-
-    snap = local_api.BackgroundSnapshot(
-        key="timeout-test",
-        interval_seconds=60.0,
-        builder=slow_builder,
-    )
-    # Thread A holds the build lock.
-    t_a = threading.Thread(target=snap.refresh_blocking)
-    t_a.start()
-    assert in_builder.wait(timeout=3.0)
-
-    # Caller B asks with a small timeout. Lock is held; return False fast.
-    ok = snap.refresh_blocking(timeout=0.05)
-    assert ok is False, "timeout path must return False"
-
-    release.set()
-    t_a.join(timeout=3.0)
-    # Once A releases, a follow-up call succeeds.
-    assert snap.refresh_blocking(timeout=3.0) is True
-
-
-def test_background_snapshot_reports_degraded_on_builder_error() -> None:
-    def builder():
-        raise RuntimeError("boom")
-
-    snap = local_api.BackgroundSnapshot(
-        key="test-snap-2",
-        interval_seconds=60.0,
-        builder=builder,
-    )
-    snap.refresh_blocking()
-    data, meta = snap.get()
-    assert data is None
-    assert meta["freshness_state"] == "degraded"
-    assert "RuntimeError: boom" in (meta["refresh_error"] or "")
 
 
 def test_pipeline_leases_lists_active_only(tmp_path: Path) -> None:
@@ -1710,7 +1379,7 @@ def test_safe_review_filename_validation() -> None:
     )
 
 
-def test_reviews_route_filter_module_state_diag_and_briefing_unverified(tmp_path: Path) -> None:
+def test_reviews_route_filter_and_module_state_diag_unverified(tmp_path: Path) -> None:
     module_key, _ = _setup_repo(tmp_path)
     _write(
         tmp_path / ".pipeline/reviews/prerequisites__zero-to-terminal__module-0.1-alpha.md",
@@ -1724,89 +1393,6 @@ def test_reviews_route_filter_module_state_diag_and_briefing_unverified(tmp_path
 
     state = local_api.build_module_state(tmp_path, module_key)
     assert "fact_check_unverified" in _diag_codes(state["diagnostics"])
-
-    briefing = local_api.build_session_briefing(tmp_path)
-    assert any("unverified fact claims" in alert for alert in briefing["alerts"])
-    assert any(row.get("reason") == "fact_check_unverified" for row in briefing["action_rows"])
-
-
-def test_resolve_bridge_db_path_precedence(tmp_path: Path, monkeypatch) -> None:
-    """Codex round-1 bug: we hardcoded .bridge/messages.db but the
-    Python bridge default is .mcp/servers/message-broker/messages.db.
-    Resolution must honor $AB_DB_PATH first, then fall through."""
-    repo = tmp_path
-    monkeypatch.delenv("AB_DB_PATH", raising=False)
-    p = local_api._resolve_bridge_db_path(repo)
-    assert p == repo / ".bridge" / "messages.db"
-
-    mcp_path = repo / ".mcp" / "servers" / "message-broker" / "messages.db"
-    mcp_path.parent.mkdir(parents=True)
-    mcp_path.write_bytes(b"")
-    assert local_api._resolve_bridge_db_path(repo) == mcp_path
-
-    bridge_path = repo / ".bridge" / "messages.db"
-    bridge_path.parent.mkdir(parents=True)
-    bridge_path.write_bytes(b"")
-    assert local_api._resolve_bridge_db_path(repo) == bridge_path
-
-    override = tmp_path / "custom.db"
-    override.write_bytes(b"")
-    monkeypatch.setenv("AB_DB_PATH", str(override))
-    assert local_api._resolve_bridge_db_path(repo) == override
-
-
-def test_resolve_bridge_db_path_honors_nonexistent_override(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """Codex round-2 bug: $AB_DB_PATH must win even when the override
-    file doesn't yet exist. Previously we only used it when present,
-    silently reading the wrong DB on a fresh override."""
-    repo = tmp_path
-    bridge_path = repo / ".bridge" / "messages.db"
-    bridge_path.parent.mkdir(parents=True)
-    bridge_path.write_bytes(b"")
-    not_yet_created = tmp_path / "future.db"
-    monkeypatch.setenv("AB_DB_PATH", str(not_yet_created))
-    resolved = local_api._resolve_bridge_db_path(repo)
-    assert resolved == not_yet_created
-    assert not resolved.exists()
-
-
-def test_bridge_messages_filters_and_previews(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("AB_DB_PATH", raising=False)
-    db_path = tmp_path / ".bridge" / "messages.db"
-    db_path.parent.mkdir(parents=True)
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        CREATE TABLE messages (
-          id INTEGER PRIMARY KEY,
-          task_id TEXT, from_llm TEXT, to_llm TEXT, message_type TEXT,
-          content TEXT, data TEXT, timestamp TEXT, acknowledged INTEGER,
-          status TEXT
-        )
-        """
-    )
-    long_content = "y" * 800
-    for i, ts in enumerate(["2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z", "2026-03-01T00:00:00Z"]):
-        conn.execute(
-            "INSERT INTO messages (task_id, from_llm, to_llm, message_type, content, timestamp, "
-            "acknowledged, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (f"t{i}", "claude", "codex", "review", long_content, ts, 0, "sent"),
-        )
-    conn.commit()
-    conn.close()
-
-    all_ = local_api.build_bridge_messages(tmp_path, since=None, limit=10)
-    assert all_["count"] == 3
-    # Long content trimmed to preview.
-    first = all_["messages"][0]
-    assert "content" not in first  # replaced by preview
-    assert first["content_full_length"] == 800
-    assert first["content_preview"].endswith("(truncated)")
-
-    since = local_api.build_bridge_messages(tmp_path, since="2026-02-01T00:00:00Z", limit=10)
-    assert since["count"] == 2
 
 
 def test_quality_scores_use_current_modules_not_stale_audit_markdown(tmp_path: Path) -> None:
@@ -2394,166 +1980,6 @@ def test_module_state_orchestration_surfaces_pipeline_rejection(tmp_path: Path) 
     assert "pipeline_rejected" in codes
 
 
-def test_briefing_has_actions_and_top_modules(tmp_path: Path) -> None:
-    """Schema-tweak #263: briefing gains ``actions.active/blocked/next``
-    and ``top_modules`` so Codex and Claude both see what to touch next."""
-    _setup_repo(tmp_path)
-    _write(
-        tmp_path / "STATUS.md",
-        "# status\n\n## TODO\n\n- [ ] task one\n",
-    )
-    import time as _time
-    now_s = int(_time.time())
-    conn = sqlite3.connect(tmp_path / ".pipeline/v2.db")
-    conn.execute(
-        "INSERT INTO jobs (module_key, phase, queue_state, leased_by, lease_id, "
-        "leased_at, lease_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ("active/module", "write", "leased", "codex", "l-live", now_s - 10, now_s + 300),
-    )
-    conn.commit()
-    conn.close()
-    briefing = local_api.build_session_briefing(tmp_path)
-    assert "actions" in briefing
-    # Codex round-2 request: ``active`` instead of ``now`` — that bucket
-    # is read-only ("currently owned"), not "what I should touch".
-    assert set(briefing["actions"].keys()) == {"active", "blocked", "next"}
-    assert any("codex" in entry for entry in briefing["actions"]["active"])
-    assert "top_modules" in briefing
-    reasons = {m.get("reason") for m in briefing["top_modules"]}
-    assert "active_lease" in reasons
-
-
-def test_briefing_action_rows_carry_structured_bucket_and_endpoint(tmp_path: Path) -> None:
-    """Codex Phase D review round 3: the dashboard was reverse-parsing
-    label strings to find drill endpoints, which misroutes when the
-    same module appears in multiple buckets and drops links for
-    non-module rows. ``action_rows[]`` carries {bucket, label,
-    module_key, phase, reason, endpoint} per row so consumers render
-    directly."""
-    _setup_repo(tmp_path)
-    _write(tmp_path / "STATUS.md", "# s\n\n## TODO\n\n- [ ] x\n")
-    now_s = int(time.time())
-    conn = sqlite3.connect(tmp_path / ".pipeline/v2.db")
-    # Active lease -> action_rows entry in 'active' bucket with a
-    # /api/module/{key}/state endpoint.
-    conn.execute(
-        "INSERT INTO jobs (module_key, phase, queue_state, leased_by, lease_id, "
-        "leased_at, lease_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ("live/mod", "write", "leased", "codex", "l-1", now_s - 10, now_s + 600),
-    )
-    # Stale lease on a different module -> action_rows entry in
-    # 'blocked' bucket with a /api/pipeline/v2/events?module= endpoint.
-    conn.execute(
-        "INSERT INTO jobs (module_key, phase, queue_state, leased_by, lease_id, "
-        "leased_at, lease_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ("stale/mod", "review", "leased", "claude", "l-2",
-         now_s - 10_000, now_s + 600),
-    )
-    conn.commit()
-    conn.close()
-
-    briefing = local_api.build_session_briefing(tmp_path)
-    rows = briefing.get("action_rows")
-    assert isinstance(rows, list) and rows, "action_rows must be present"
-
-    active = [r for r in rows if r["bucket"] == "active"]
-    blocked = [r for r in rows if r["bucket"] == "blocked"]
-    assert any(r.get("module_key") == "live/mod" for r in active)
-    assert any(r.get("module_key") == "stale/mod" for r in blocked)
-
-    live_row = next(r for r in active if r.get("module_key") == "live/mod")
-    assert live_row.get("reason") == "active_lease"
-    assert live_row.get("endpoint") == "/api/module/live/mod/state"
-
-    stale_row = next(r for r in blocked if r.get("module_key") == "stale/mod")
-    assert stale_row.get("reason") in {"stale_lease", "stuck_in_state"}
-    # Must point at the events timeline, NOT the state endpoint.
-    assert "pipeline/v2/events" in (stale_row.get("endpoint") or "")
-
-    # Labels must equal the strings in actions.{bucket} so the old
-    # flat view is still derivable from action_rows.
-    active_labels = [r["label"] for r in active]
-    assert list(briefing["actions"]["active"]) == active_labels
-
-
-def test_briefing_action_rows_link_non_module_rows(tmp_path: Path) -> None:
-    """Codex Phase D review round 3 bug 2: rows with no ``module_key``
-    (e.g. ``N job(s) ready to pick up``) previously dropped their drill
-    endpoint in the dashboard because the JS only kept endpoints for
-    rows with a module key. ``action_rows[]`` must carry the endpoint
-    even when module_key is None."""
-    _setup_repo(tmp_path)
-    _write(tmp_path / "STATUS.md", "# s\n\n## TODO\n\n- [ ] x\n")
-    # Seed a pending job so queue_head.ready > 0 and the ``ready_queue``
-    # next row fires.
-    conn = sqlite3.connect(tmp_path / ".pipeline/v2.db")
-    conn.execute(
-        "INSERT INTO jobs (module_key, phase, queue_state) VALUES (?, ?, ?)",
-        ("ready/one", "write", "pending"),
-    )
-    conn.commit()
-    conn.close()
-
-    briefing = local_api.build_session_briefing(tmp_path)
-    rows = briefing.get("action_rows") or []
-    ready_rows = [r for r in rows if r.get("reason") == "ready_queue"]
-    assert ready_rows, "ready_queue row must appear in action_rows"
-    r = ready_rows[0]
-    assert r["bucket"] == "next"
-    assert r.get("module_key") is None
-    assert r.get("endpoint") == "/api/pipeline/v2/status"
-
-
-def test_briefing_top_modules_surfaces_pipeline_dead_letter(
-    tmp_path: Path,
-) -> None:
-    """Codex round-2 comment: briefing should surface pipeline
-    dead-letter count as a structured reason in top_modules, not
-    buried in pipelines.v2."""
-    _setup_repo(tmp_path)
-    _write(tmp_path / "STATUS.md", "# s\n\n## TODO\n\n- [ ] x\n")
-
-    # The v2 pipeline classifies a module as dead-letter when it has
-    # seen a ``module_dead_lettered`` event and no ``dead_letter_
-    # recovered`` since. Fixture a minimal job + event pair so
-    # ``_build_status_report`` returns ``counts.dead_letter == 1``.
-    conn = sqlite3.connect(tmp_path / ".pipeline/v2.db")
-    conn.execute(
-        "INSERT INTO jobs (module_key, phase, queue_state) VALUES (?, ?, ?)",
-        ("dead/one", "write", "failed"),
-    )
-    conn.execute(
-        "INSERT INTO events (module_key, type, payload_json, at) VALUES (?, ?, ?, ?)",
-        ("dead/one", "module_dead_lettered", "{}", 1),
-    )
-    conn.commit()
-    conn.close()
-
-    briefing = local_api.build_session_briefing(tmp_path)
-    reasons = {m.get("reason") for m in briefing["top_modules"]}
-    assert "pipeline_dead_letter" in reasons
-
-
-def test_briefing_critical_quality_not_in_actions_next(tmp_path: Path) -> None:
-    """Critical-rubric modules stay on ``critical_quality`` + alerts;
-    they must not crowd ``actions.next`` (gaps-first orchestration)."""
-    _setup_repo(tmp_path)
-    _write(tmp_path / "STATUS.md", "# s\n\n## TODO\n\n- [ ] x\n")
-    _seed_quality_module(tmp_path, "k8s/cka/module-2.8-bad-stub", title="Module 2.8: Bad Stub", filler_lines=30)
-    with local_api._QUALITY_AUDIT_CACHE_LOCK:
-        local_api._QUALITY_AUDIT_CACHE.clear()
-    briefing = local_api.build_session_briefing(tmp_path)
-    assert briefing["critical_quality"], "critical modules must surface on dedicated field"
-    next_rows = [r for r in briefing.get("action_rows") or [] if r.get("bucket") == "next"]
-    assert not any(r.get("reason") == "critical_quality" for r in next_rows)
-    assert not any(
-        "rubric-critical rewrite" in (label or "")
-        for label in briefing["actions"]["next"]
-    )
-    top_reasons = {m.get("reason") for m in briefing["top_modules"]}
-    assert "critical_quality" not in top_reasons
-
-
 def test_quality_scores_uncited_fixture_is_critical(tmp_path: Path) -> None:
     """Citation deficiency must remain visible after the live corpus improves."""
     for slug, cited in [("cited", True), ("uncited", False)]:
@@ -2582,78 +2008,6 @@ def test_unknown_lexer_fallback_escapes_code() -> None:
     assert "<script>" not in rendered
 
 
-def test_compact_briefing_keeps_actions_and_top_modules(tmp_path: Path) -> None:
-    """Compact mode strips navigation aids but MUST keep the
-    actionable fields — that's the whole point."""
-    _setup_repo(tmp_path)
-    _write(tmp_path / "STATUS.md", "# status\n\n## TODO\n\n- [ ] x\n")
-    briefing = local_api.build_session_briefing(tmp_path)
-    compact = local_api._compact_briefing(briefing)
-    assert "actions" in compact
-    assert "top_modules" in compact
-    assert "next_reads" not in compact
-    assert "links" not in compact
-
-
-def test_worktrees_list_includes_dirty_counts(tmp_path: Path) -> None:
-    """Schema-tweak #263: each worktree entry now carries a ``counts``
-    dict so operators see which worktree is lively without shelling
-    into each one."""
-    repo = tmp_path
-    _init_repo(repo)
-    _write(repo / "README.md", "hi\n")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-m", "initial")
-    _write(repo / "README.md", "hi\n\nmore\n")
-
-    result = local_api.build_worktrees_list(repo)
-    assert result["ok"] is True
-    assert result["count"] >= 1
-    first = result["worktrees"][0]
-    assert "counts" in first
-    counts = first["counts"]
-    assert counts is not None
-    assert counts["total"] >= 1
-    assert counts["unstaged"] >= 1
-    assert first["dirty"] is True
-
-
-def test_worktree_counts_total_counts_paths_not_statuses(tmp_path: Path) -> None:
-    """Codex round-2 bug: counts.total used staged+unstaged+untracked,
-    which double-counts a file that is both staged AND unstaged. That
-    made sibling-worktree counts incomparable with the primary
-    worktree's. Fix: total is the number of unique paths reported by
-    ``git status --porcelain=v1``."""
-    repo = tmp_path
-    _init_repo(repo)
-    _write(repo / "README.md", "v1\n")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-m", "initial")
-
-    # Stage a change, then edit the same file again so git reports
-    # both a staged and an unstaged modification for one path.
-    _write(repo / "README.md", "v2\n")
-    _git(repo, "add", "README.md")
-    _write(repo / "README.md", "v3\n")
-
-    counts = local_api._worktree_dirty_counts(repo)
-    assert counts is not None
-    assert counts["total"] == 1  # one path, not two
-    assert counts["staged"] >= 1
-    assert counts["unstaged"] >= 1
-
-
-def test_worktree_counts_dirty_is_none_when_unreadable(tmp_path: Path) -> None:
-    """Codex round-2 bug: a failed ``git status`` was folded into
-    dirty=False, which is a false negative. Unreadable worktrees must
-    surface as dirty=None so "unknown" and "clean" are distinguishable."""
-    # Path that exists but isn't a git repo.
-    non_repo = tmp_path / "not-a-repo"
-    non_repo.mkdir()
-    counts = local_api._worktree_dirty_counts(non_repo)
-    assert counts is None
-
-
 def test_schema_lists_phase_c_endpoints() -> None:
     schema = local_api.build_api_schema()
     paths = {e["path"] for e in schema["endpoints"]}
@@ -2669,198 +2023,7 @@ def test_schema_lists_phase_c_endpoints() -> None:
         assert expected in paths, f"/api/schema missing {expected}"
 
 
-def test_schema_lists_phase_d_endpoints() -> None:
-    schema = local_api.build_api_schema()
-    paths = {e["path"] for e in schema["endpoints"]}
-    for expected in ("/api/activity",):
-        assert expected in paths, f"/api/schema missing {expected}"
-
-
 # ---- Phase D: merged activity feed ----
-
-
-def test_activity_feed_empty_repo_returns_no_items(tmp_path: Path) -> None:
-    """Nothing committed, no pipeline v2 db, no bridge db — feed returns
-    empty items with zeroed source counts, not a crash."""
-    _init_repo(tmp_path)
-    result = local_api.build_activity_feed(tmp_path, limit=10)
-    assert result["count"] == 0
-    assert result["items"] == []
-    assert result["source_counts"] == {
-        "commit": 0,
-        "pipeline_event": 0,
-        "bridge_message": 0,
-    }
-
-
-def test_activity_feed_merges_commits_and_pipeline_events_sorted(tmp_path: Path) -> None:
-    """Commits + pipeline events must come back in a single newest-first
-    stream with the declared source labels."""
-    repo = tmp_path
-    _init_repo(repo)
-    _write(repo / "README.md", "v1\n")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-m", "first commit")
-    _write(repo / "README.md", "v2\n")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-m", "second commit")
-
-    db_path = repo / ".pipeline" / "v2.db"
-    _init_v2_db(db_path, module_key="k8s/cka/module-1.1-foo")
-    now = int(time.time())
-    # Re-timestamp the seeded event into the window so it shows up.
-    conn = sqlite3.connect(db_path)
-    conn.execute("UPDATE events SET at = ? WHERE module_key = ?",
-                 (now - 60, "k8s/cka/module-1.1-foo"))
-    conn.commit()
-    conn.close()
-
-    feed = local_api.build_activity_feed(repo, limit=20, now_seconds=now)
-    sources = [it["source"] for it in feed["items"]]
-    assert "commit" in sources
-    assert "pipeline_event" in sources
-    ats = [int(it["at"]) for it in feed["items"]]
-    assert ats == sorted(ats, reverse=True), "items must be newest-first"
-    assert feed["source_counts"]["commit"] >= 2
-    assert feed["source_counts"]["pipeline_event"] >= 1
-
-
-def test_activity_feed_since_filter_excludes_old_commits(tmp_path: Path) -> None:
-    """``since_seconds`` must be passed through to ``git log --since=@``
-    so a tight window doesn't return the entire repo history."""
-    repo = tmp_path
-    _init_repo(repo)
-    _write(repo / "README.md", "v1\n")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-m", "old commit")
-    future = int(time.time()) + 10_000
-    feed = local_api.build_activity_feed(
-        repo, since_seconds=future, limit=20, now_seconds=future + 60
-    )
-    assert feed["source_counts"]["commit"] == 0
-    assert feed["count"] == 0
-
-
-def test_activity_feed_rejects_invalid_since_via_route(tmp_path: Path) -> None:
-    """The /api/activity handler returns 400 for garbage ``since`` values
-    rather than anchoring the feed at epoch 0."""
-    _init_repo(tmp_path)
-    status, payload, _ = local_api.route_request(tmp_path, "/api/activity?since=not-a-date")
-    assert status == 400
-    assert payload["error"] == "invalid_since"
-
-
-def test_activity_feed_orders_pipeline_events_by_at_not_id(tmp_path: Path) -> None:
-    """Codex Phase D review: the activity feed must pull pipeline-event
-    candidates ordered by ``at`` DESC, not ``id`` DESC. Otherwise a
-    backfilled row (high ``id``, old ``at``) can fill the per-source
-    cap and push a genuinely newer event out of the candidate set, so
-    the merged top-N wouldn't actually be chronological."""
-    repo = tmp_path
-    _init_repo(repo)
-    db_path = repo / ".pipeline" / "v2.db"
-    _init_v2_db(db_path, module_key="seed/mod")
-
-    now = 1_000_000
-    # Stream three rows in (id-ascending) order:
-    #   id=1   at=now-100   ← oldest
-    #   id=2   at=now-3000  ← BACKFILL (high id, old at)
-    #   id=3   at=now-50    ← newest
-    # ``id DESC`` would yield [3, 2, 1]. With limit=2, that drops id=1
-    # but keeps the backfill. ``at DESC`` must yield [3, 1, 2], so
-    # limit=2 keeps [id=3, id=1] — the two truly newest rows.
-    conn = sqlite3.connect(db_path)
-    conn.execute("DELETE FROM events")
-    conn.executemany(
-        "INSERT INTO events (id, module_key, type, lease_id, payload_json, at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        [
-            (101, "seed/mod", "attempt_started", None, "{}", now - 100),
-            (102, "seed/mod", "backfilled",      None, "{}", now - 3000),
-            (103, "seed/mod", "attempt_ended",   None, "{}", now - 50),
-        ],
-    )
-    conn.commit()
-    conn.close()
-
-    feed = local_api.build_activity_feed(
-        repo, since_seconds=now - 5000, limit=2, now_seconds=now
-    )
-    event_items = [it for it in feed["items"] if it["source"] == "pipeline_event"]
-    kinds = [it["kind"] for it in event_items]
-    # The newest two by ``at`` are id=103 (attempt_ended) and id=101
-    # (attempt_started). The backfill (id=102) must NOT win over them.
-    assert "attempt_ended" in kinds
-    assert "attempt_started" in kinds
-    assert "backfilled" not in kinds
-
-
-def test_activity_feed_bridge_filter_keeps_fractional_and_offset_iso(tmp_path: Path) -> None:
-    """Codex Phase D review: bridge-row filtering used a lexical string
-    compare against an ISO ``...Z`` cutoff. That drops rows whose
-    absolute time is LATER but whose ISO string sorts BEFORE (fractional
-    seconds, ``+00:00`` offsets). Filtering must run through
-    ``_iso_to_epoch`` on the Python side."""
-    repo = tmp_path
-    _init_repo(repo)
-    bridge_dir = repo / ".bridge"
-    bridge_dir.mkdir()
-    bdb = bridge_dir / "messages.db"
-    conn = sqlite3.connect(bdb)
-    conn.executescript(
-        """
-        CREATE TABLE messages (
-          id INTEGER PRIMARY KEY,
-          task_id TEXT,
-          from_llm TEXT,
-          to_llm TEXT,
-          message_type TEXT,
-          content TEXT,
-          timestamp TEXT,
-          acknowledged INTEGER DEFAULT 0,
-          status TEXT
-        );
-        """
-    )
-    # Cutoff is 2026-01-01T00:00:00Z (= epoch 1767225600). These two
-    # messages are at +0.5s and +0.000001s after the cutoff — both
-    # must be KEPT. A lexical compare against "2026-01-01T00:00:00Z"
-    # drops them because ``.``/``+`` sort before ``Z``.
-    conn.executemany(
-        "INSERT INTO messages (id, task_id, from_llm, to_llm, message_type, "
-        "content, timestamp, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            (1, "t", "a", "b", "query", "hi", "2026-01-01T00:00:00.500Z", "delivered"),
-            (2, "t", "a", "b", "query", "hi", "2026-01-01T00:00:00.000001+00:00", "delivered"),
-            # This one IS before the cutoff and must be dropped.
-            (3, "t", "a", "b", "query", "hi", "2025-12-31T23:59:00Z", "delivered"),
-        ],
-    )
-    conn.commit()
-    conn.close()
-
-    cutoff = 1767225600  # 2026-01-01T00:00:00Z
-    feed = local_api.build_activity_feed(
-        repo, since_seconds=cutoff, limit=50, now_seconds=cutoff + 3600
-    )
-    bridge_ids = {it["ref"]["message_id"] for it in feed["items"] if it["source"] == "bridge_message"}
-    assert 1 in bridge_ids
-    assert 2 in bridge_ids
-    assert 3 not in bridge_ids
-
-
-def test_activity_feed_accepts_iso_since(tmp_path: Path) -> None:
-    """ISO-8601 ``since`` values should parse the same as epoch seconds."""
-    _init_repo(tmp_path)
-    _write(tmp_path / "README.md", "v1\n")
-    _git(tmp_path, "add", ".")
-    _git(tmp_path, "commit", "-m", "initial")
-    status, payload, _ = local_api.route_request(
-        tmp_path, "/api/activity?since=1970-01-01T00:00:00Z&limit=5"
-    )
-    assert status == 200
-    assert isinstance(payload, dict)
-    assert payload["since_seconds"] == 0
 
 
 # ---- Phase D: per-section track readiness ----
@@ -3093,15 +2256,6 @@ def test_schema_lists_tracks_readiness() -> None:
     assert "/api/tracks/readiness" in paths
 
 
-def test_iso_to_epoch_round_trip() -> None:
-    """``_iso_to_epoch`` must accept both ``Z`` and ``+00:00`` forms."""
-    assert local_api._iso_to_epoch("1970-01-01T00:00:00Z") == 0
-    assert local_api._iso_to_epoch("1970-01-01T00:00:00+00:00") == 0
-    assert local_api._iso_to_epoch("bogus") is None
-    assert local_api._iso_to_epoch(None) is None
-    assert local_api._iso_to_epoch("") is None
-
-
 def test_cli_starts_server_and_reports_host_port(tmp_path: Path) -> None:
     repo_root = tmp_path
     _init_repo(repo_root)
@@ -3112,7 +2266,7 @@ def test_cli_starts_server_and_reports_host_port(tmp_path: Path) -> None:
     env.pop("PYTHONUNBUFFERED", None)
     process = subprocess.Popen(
         [
-            str(primary / ".venv/bin/python"),
+            sys.executable,
             str(project / "scripts/local_api.py"),
             "--host",
             "127.0.0.1",
@@ -3139,263 +2293,6 @@ def test_cli_starts_server_and_reports_host_port(tmp_path: Path) -> None:
     finally:
         process.terminate()
         process.wait(timeout=5)
-
-
-def _seed_commit(repo: Path) -> None:
-    _init_repo(repo)
-    (repo / "a.txt").write_text("seed", encoding="utf-8")
-    _git(repo, "add", ".")
-    _git(repo, "commit", "-m", "seed")
-    # Normalize: `git init` defaults to `master` on older git; the hygiene
-    # check keys on `main`. Force it so tests don't silently depend on the
-    # host machine's init.defaultBranch setting.
-    _git(repo, "branch", "-M", "main")
-
-
-def test_git_cleanup_report_fails_closed(tmp_path: Path, monkeypatch) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _seed_commit(repo)
-    clean = tmp_path / "clean"
-    dirty = tmp_path / "dirty"
-    unknown = tmp_path / "unknown"
-    for path in (clean, dirty, unknown):
-        _git(repo, "worktree", "add", "-b", path.name, str(path), "main")
-    _write(dirty / "untracked.txt", "keep me")
-    _git(repo, "branch", "gone")
-    _git(repo, "worktree", "add", str(tmp_path / "gone"), "gone")
-    _write(tmp_path / "gone" / "new.txt", "unmerged")
-    _git(tmp_path / "gone", "add", "new.txt")
-    _git(tmp_path / "gone", "commit", "-m", "unmerged")
-    _git(repo, "config", "branch.gone.remote", "origin")
-    _git(repo, "config", "branch.gone.merge", "refs/heads/gone")
-    _git(repo, "remote", "add", "origin", str(tmp_path / "missing-remote"))
-    _git(repo, "branch", "bare_gone", "gone")
-    _git(repo, "config", "branch.bare_gone.remote", "origin")
-    _git(repo, "config", "branch.bare_gone.merge", "refs/heads/bare_gone")
-    _git(repo, "branch", "bare_merged", "main")
-    _git(repo, "tag", "main", "gone")
-    _git(repo, "tag", "clean", "refs/heads/clean")
-    _git(repo, "tag", "dirty", "refs/heads/dirty")
-    locked = tmp_path / "locked"
-    detached = tmp_path / "detached"
-    _git(repo, "worktree", "add", "-b", "locked", str(locked), "refs/heads/main")
-    _git(repo, "worktree", "lock", str(locked))
-    _git(repo, "worktree", "add", "--detach", str(detached), "refs/heads/main")
-    real_counts = local_api._worktree_dirty_counts
-    monkeypatch.setattr(
-        local_api, "_worktree_dirty_counts",
-        lambda path: None if path == unknown else real_counts(path),
-    )
-
-    status, report, _ = local_api.route_request(repo, "/api/git/cleanup")
-    assert status == 200 and report["ok"] is True
-    assert {wt["branch"] for wt in report["prunable_worktrees"]} == {"clean"}
-    assert report["counts"]["worktrees"] == 1
-    assert not {"clean", "dirty", "unknown", "gone"} & {
-        branch["name"] for branch in report["prunable_branches"]
-    }
-    assert {branch["name"] for branch in report["prunable_branches"]} == {"bare_merged"}
-    review = {wt["branch"]: wt["blockers"] for wt in report["review_worktrees"]}
-    assert "uncommitted-changes" in review["dirty"]
-    assert "status-unknown" in review["unknown"]
-    assert "merge-unverified" in review["gone"]
-    assert "primary-worktree" in review["main"]
-    assert "locked" in review["locked"]
-    assert "detached-or-unknown" in review[None]
-    assert {branch["name"] for branch in report["review_branches"]} == {"gone", "bare_gone"}
-    assert "preserve ignored artifacts" in report["hint"]
-
-
-def test_git_cleanup_inventory_failure_blocks_branches(tmp_path: Path, monkeypatch) -> None:
-    _seed_commit(tmp_path)
-    _git(tmp_path, "branch", "merged")
-    partial = {
-        "path": str(tmp_path / "partial"), "branch": "merged", "head": "abc",
-        "counts": {"total": 0}, "locked": False, "detached": False,
-    }
-    primary = {**partial, "path": str(tmp_path), "branch": "main"}
-    monkeypatch.setattr(
-        local_api, "build_worktrees_list", lambda _: {"ok": False, "worktrees": [primary, partial]},
-    )
-    report = local_api.build_git_cleanup_report(tmp_path)
-    assert report["prunable_branches"] == []
-    assert report["prunable_worktrees"] == []
-    assert "worktree-inventory-unavailable" in report["review_worktrees"][1]["blockers"]
-    assert report["blockers"] == ["worktree-inventory-unavailable"]
-
-
-def test_git_cleanup_reports_failed_git_probes(tmp_path: Path, monkeypatch) -> None:
-    _seed_commit(tmp_path)
-    _git(tmp_path, "branch", "merged")
-    run = local_api.subprocess.run
-    failed = {"command": "worktree"}
-
-    def failing(cmd, **kwargs):
-        if cmd[1] == failed["command"] or (failed["command"] == "upstream" and "--format=%(refname)\t%(upstream:track)" in cmd):
-            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="unavailable")
-        return run(cmd, **kwargs)
-
-    monkeypatch.setattr(local_api.subprocess, "run", failing)
-    for command, blocker in (("worktree", "worktree-inventory-unavailable"),
-                             ("for-each-ref", "merge-inventory-unavailable"),
-                             ("upstream", "upstream-inventory-unavailable")):
-        failed["command"] = command
-        report = local_api.build_git_cleanup_report(tmp_path)
-        assert not report["prunable_branches"] and not report["prunable_worktrees"]
-        assert blocker in report["blockers"]
-
-
-def _stash_with_date(repo: Path, ts: int, message: str) -> None:
-    """Create a stash whose committer timestamp is `ts` (unix seconds).
-
-    `git stash push` honors GIT_COMMITTER_DATE / GIT_AUTHOR_DATE, so we
-    can back-date a stash for age-bucket tests without mutating refs by
-    hand. Uses -u so a fresh untracked file qualifies — without it, git
-    exits 0 with "No local changes to save" and the caller silently gets
-    an empty stash list.
-    """
-    env = {
-        **os.environ,
-        "GIT_COMMITTER_DATE": f"@{ts} +0000",
-        "GIT_AUTHOR_DATE": f"@{ts} +0000",
-    }
-    (repo / f"stash-{ts}.txt").write_text("modified", encoding="utf-8")
-    subprocess.run(
-        ["git", "stash", "push", "-u", "-m", message],
-        cwd=repo, env=env, check=True, capture_output=True,
-    )
-    r = subprocess.run(
-        ["git", "stash", "list"],
-        cwd=repo, capture_output=True, text=True, check=True,
-    )
-    if not r.stdout.strip():
-        raise RuntimeError("stash push did not actually create a stash")
-
-
-def test_git_hygiene_clean_repo_emits_nothing(tmp_path: Path) -> None:
-    _seed_commit(tmp_path)
-    worktree = local_api.build_worktree_status(tmp_path)
-    worktrees = local_api.build_worktrees_list(tmp_path)
-    assert local_api._git_hygiene_signals(tmp_path, worktree, worktrees) == []
-
-
-def test_git_hygiene_flags_stash_older_than_seven_days(tmp_path: Path) -> None:
-    _seed_commit(tmp_path)
-    _stash_with_date(tmp_path, int(time.time()) - 10 * 86400, "ancient")
-    worktree = local_api.build_worktree_status(tmp_path)
-    worktrees = local_api.build_worktrees_list(tmp_path)
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, worktrees)
-    assert any("older than 7 days" in a for a in alerts)
-
-
-def test_git_hygiene_flags_stash_older_than_one_day(tmp_path: Path) -> None:
-    _seed_commit(tmp_path)
-    _stash_with_date(tmp_path, int(time.time()) - 2 * 86400, "stale")
-    worktree = local_api.build_worktree_status(tmp_path)
-    worktrees = local_api.build_worktrees_list(tmp_path)
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, worktrees)
-    # 2-day-old stash is "stale" not "ancient"; 7-day wording should not appear.
-    assert any("older than 24h" in a for a in alerts)
-    assert not any("older than 7 days" in a for a in alerts)
-
-
-def test_git_hygiene_ignores_fresh_stash(tmp_path: Path) -> None:
-    _seed_commit(tmp_path)
-    _stash_with_date(tmp_path, int(time.time()) - 60, "fresh")
-    worktree = local_api.build_worktree_status(tmp_path)
-    worktrees = local_api.build_worktrees_list(tmp_path)
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, worktrees)
-    # Under 24h — no stash-age alert should fire.
-    assert not any("stash(es)" in a for a in alerts)
-
-
-def test_git_hygiene_ancient_suppresses_stale_message(tmp_path: Path) -> None:
-    # When a repo has BOTH >7-day and >24h stashes, only the >7-day line
-    # fires — we'd rather the operator see the worst offender than two
-    # competing lines about the same pile. The ancient-count excludes
-    # stale-only stashes (counts aren't double-counted).
-    _seed_commit(tmp_path)
-    _stash_with_date(tmp_path, int(time.time()) - 10 * 86400, "ancient")
-    _stash_with_date(tmp_path, int(time.time()) - 2 * 86400, "merely-stale")
-    worktree = local_api.build_worktree_status(tmp_path)
-    worktrees = local_api.build_worktrees_list(tmp_path)
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, worktrees)
-    ancient_lines = [a for a in alerts if "older than 7 days" in a]
-    stale_lines = [a for a in alerts if "older than 24h" in a]
-    assert len(ancient_lines) == 1
-    assert stale_lines == []
-    assert "1 stash(es)" in ancient_lines[0]  # only the >7d one counted
-
-
-def test_git_hygiene_tolerates_malformed_stash_list_output(
-    tmp_path: Path, monkeypatch
-) -> None:
-    # `git stash list --format=%ct` should always be one unix-timestamp
-    # per line, but we guard against weird states (half-broken stash
-    # ref, future git version) so a freak output never crashes the
-    # briefing. Pin that best-effort behavior.
-    _seed_commit(tmp_path)
-    worktree = local_api.build_worktree_status(tmp_path)
-    worktrees = local_api.build_worktrees_list(tmp_path)
-
-    ancient_ts = int(time.time()) - 10 * 86400
-    real_run = local_api.subprocess.run
-
-    def fake_run(cmd, **kwargs):
-        if list(cmd[:4]) == ["git", "stash", "list", "--format=%ct"]:
-            class _R:
-                returncode = 0
-                stdout = f"garbage\n{ancient_ts}\n\nnot-a-number\n"
-            return _R()
-        return real_run(cmd, **kwargs)
-
-    monkeypatch.setattr(local_api.subprocess, "run", fake_run)
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, worktrees)
-    # One valid numeric line interpreted as a real >7d stash; junk ignored.
-    assert any("older than 7 days" in a and "1 stash(es)" in a for a in alerts)
-
-
-def test_git_hygiene_flags_detached_worktree(tmp_path: Path) -> None:
-    _seed_commit(tmp_path)
-    worktree = local_api.build_worktree_status(tmp_path)
-    fake = {
-        "worktrees": [
-            {"path": str(tmp_path), "branch": "main", "detached": False},
-            {"path": "/tmp/stale-detached", "branch": None, "detached": True},
-        ]
-    }
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, fake)
-    assert any("detached HEAD" in a for a in alerts)
-
-
-def test_git_hygiene_flags_dirty_main(tmp_path: Path) -> None:
-    _seed_commit(tmp_path)
-    (tmp_path / "b.txt").write_text("uncommitted leak", encoding="utf-8")
-    _git(tmp_path, "add", "b.txt")
-    worktree = local_api.build_worktree_status(tmp_path)
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, {"worktrees": []})
-    assert any("uncommitted" in a and "on main" in a for a in alerts)
-
-
-def test_git_hygiene_silent_on_dirty_non_main_branch(tmp_path: Path) -> None:
-    _seed_commit(tmp_path)
-    _git(tmp_path, "checkout", "-b", "feature-x")
-    (tmp_path / "b.txt").write_text("wip", encoding="utf-8")
-    worktree = local_api.build_worktree_status(tmp_path)
-    alerts = local_api._git_hygiene_signals(tmp_path, worktree, {"worktrees": []})
-    # Dirty branches other than main are normal working state, not drift.
-    assert not any("uncommitted" in a for a in alerts)
-
-
-def test_session_briefing_surfaces_git_hygiene_alert(tmp_path: Path) -> None:
-    _setup_repo(tmp_path)
-    _stash_with_date(tmp_path, int(time.time()) - 10 * 86400, "ancient-audit-work")
-    briefing = local_api.build_session_briefing(tmp_path)
-    assert any(
-        "git hygiene" in a and "older than 7 days" in a
-        for a in briefing["alerts"]
-    )
 
 
 def _seed_book_chapter(

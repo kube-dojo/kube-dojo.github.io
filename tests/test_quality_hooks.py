@@ -20,7 +20,7 @@ def run_hook(
     env_overrides: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env.pop("KUBEDOJO_DISPATCHED", None)
+    env.pop("LEARN_UKRAINIAN_DISPATCH_TASK_ID", None)
     env["CLAUDE_PROJECT_DIR"] = str(primary)
     if env_overrides:
         env.update(env_overrides)
@@ -113,7 +113,7 @@ def test_autoformat_skips_non_py_file(tmp_path: Path) -> None:
 
 
 def test_autoformat_skips_when_dispatched(tmp_path: Path) -> None:
-    """KUBEDOJO_DISPATCHED=1 → hook skips entirely, no ruff invoked."""
+    """Non-empty LEARN_UKRAINIAN_DISPATCH_TASK_ID → hook skips entirely, no ruff invoked."""
     primary = tmp_path / "kubedojo"
     primary.mkdir()
     make_ruff_mock(primary / ".venv" / "bin", check_exits=1)
@@ -125,7 +125,7 @@ def test_autoformat_skips_when_dispatched(tmp_path: Path) -> None:
         AUTO_FORMAT_HOOK,
         make_py_payload(str(py_file)),
         primary,
-        env_overrides={"KUBEDOJO_DISPATCHED": "1"},
+        env_overrides={"LEARN_UKRAINIAN_DISPATCH_TASK_ID": "kd-task-1"},
     )
 
     assert result.returncode == 0

@@ -20,16 +20,27 @@ fi
 PROJECT_ROOT="${BASH_SOURCE[0]%/.claude/kubedojo-hooks/*}"
 if [ "${FILE_PATH:0:1}" = "/" ]; then
   REL_PATH="${FILE_PATH#"$PROJECT_ROOT"/}"
+  if [ "$REL_PATH" = "$FILE_PATH" ] && [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+    REL_PATH="${FILE_PATH#"${CLAUDE_PROJECT_DIR%/}"/}"
+  fi
 else
   REL_PATH="$FILE_PATH"
 fi
+while [[ "$REL_PATH" == ./* ]]; do
+  REL_PATH="${REL_PATH#./}"
+done
 
 if [[ "$REL_PATH" == src/content/docs/* ]]; then
-  if [ "${KUBEDOJO_DISPATCHED:-0}" != "1" ]; then
+  # Dispatched workers receive LEARN_UKRAINIAN_DISPATCH_TASK_ID from the
+  # installed lu_machinery dispatcher (lu_machinery/dispatcher/environment.py:163,
+  # worker.py:575, write_boundary.py:1072). Empty/whitespace fails closed.
+  DISPATCH_TASK_ID="${LEARN_UKRAINIAN_DISPATCH_TASK_ID:-}"
+  DISPATCH_TASK_ID="${DISPATCH_TASK_ID//[[:space:]]/}"
+  if [ -z "$DISPATCH_TASK_ID" ]; then
     deny \
-      "Edit/Write on src/content/docs/** from orchestrator is blocked; dispatch a codex/claude headless agent instead." \
-      "Use scripts/dispatch_smart.py edit --agent codex --worktree .worktrees/<task> --new-branch <branch>" \
-      "feedback_dispatch_codex_for_code_changes.md (TOP PRIORITY memory)"
+      "Edit/Write on src/content/docs/** from orchestrator is blocked; dispatch a worker instead." \
+      "Use \"\$LEARN_UKRAINIAN_PYTHON\" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ..." \
+      "installed drive-epic skill and kubedojo-drive-epic overlay"
   fi
 fi
 

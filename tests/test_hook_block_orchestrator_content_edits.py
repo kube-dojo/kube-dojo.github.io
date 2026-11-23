@@ -15,7 +15,7 @@ def run_hook_payload(
     env_overrides: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env.pop("KUBEDOJO_DISPATCHED", None)
+    env.pop("LEARN_UKRAINIAN_DISPATCH_TASK_ID", None)
     env["CLAUDE_PROJECT_DIR"] = str(primary)
     if env_overrides:
         env.update(env_overrides)
@@ -57,6 +57,23 @@ def test_edit_src_content_docs_denied_when_undispatched(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert "blocked" in result.stderr
+    assert "lu_machinery.dispatch" in result.stderr
+    assert "dispatch_smart.py" not in result.stderr
+
+
+def test_edit_src_content_docs_denied_when_dispatch_task_id_blank(tmp_path: Path) -> None:
+    primary = tmp_path / "kubedojo"
+    primary.mkdir()
+
+    for blank in ("", "   \t "):
+        result = run_edit_hook(
+            "Edit",
+            "src/content/docs/foo.md",
+            primary,
+            env_overrides={"LEARN_UKRAINIAN_DISPATCH_TASK_ID": blank},
+        )
+        assert result.returncode == 2
+        assert "blocked" in result.stderr
 
 
 def test_edit_src_content_docs_allowed_when_dispatched(tmp_path: Path) -> None:
@@ -67,7 +84,7 @@ def test_edit_src_content_docs_allowed_when_dispatched(tmp_path: Path) -> None:
         "Edit",
         "src/content/docs/foo.md",
         primary,
-        env_overrides={"KUBEDOJO_DISPATCHED": "1"},
+        env_overrides={"LEARN_UKRAINIAN_DISPATCH_TASK_ID": "kd-content-task-1"},
     )
 
     assert result.returncode == 0
@@ -91,7 +108,7 @@ def test_write_src_content_docs_allowed_when_dispatched(tmp_path: Path) -> None:
         "Write",
         "src/content/docs/foo.md",
         primary,
-        env_overrides={"KUBEDOJO_DISPATCHED": "1"},
+        env_overrides={"LEARN_UKRAINIAN_DISPATCH_TASK_ID": "kd-content-task-2"},
     )
 
     assert result.returncode == 0
@@ -106,7 +123,7 @@ def test_edit_outside_src_content_docs_allowed(tmp_path: Path) -> None:
         "Edit",
         "docs/research/foo.html",
         primary,
-        env_overrides={"KUBEDOJO_DISPATCHED": "1"},
+        env_overrides={"LEARN_UKRAINIAN_DISPATCH_TASK_ID": "kd-content-task-3"},
     )
 
     assert result.returncode == 0
@@ -145,7 +162,7 @@ def test_edit_malformed_payload_fails_open(tmp_path: Path) -> None:
     primary = tmp_path / "kubedojo"
     primary.mkdir()
     env = os.environ.copy()
-    env.pop("KUBEDOJO_DISPATCHED", None)
+    env.pop("LEARN_UKRAINIAN_DISPATCH_TASK_ID", None)
     env["CLAUDE_PROJECT_DIR"] = str(primary)
     result = subprocess.run(
         [BASH, str(HOOK)],
