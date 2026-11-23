@@ -260,42 +260,44 @@ def dispatch_writer(candidate: dict, prompt: str, timeout: int = 900) -> tuple[b
             "-m", model,
             prompt,
         ]
-    elif family == "gemini":
-        cmd = [
-            VENV_PYTHON,
-            str(REPO_ROOT / "scripts" / "dispatch.py"),
-            "gemini", "-",
-            "--model", model,
-        ]
-    elif family == "anthropic":
-        cmd = [
-            VENV_PYTHON,
-            str(REPO_ROOT / "scripts" / "dispatch.py"),
-            "claude", "-",
-            "--model", model,
-        ]
-    else:
-        return False, f"unknown family: {family}"
-
-    try:
-        if family in ("gemini", "anthropic"):
-            result = subprocess.run(
-                cmd, input=prompt, capture_output=True, text=True,
-                timeout=timeout, cwd=str(REPO_ROOT),
-            )
-        else:
+        try:
             result = subprocess.run(
                 cmd, capture_output=True, text=True,
                 timeout=timeout, cwd=str(REPO_ROOT),
             )
-    except subprocess.TimeoutExpired:
-        return False, "TIMEOUT"
-    except FileNotFoundError as e:
-        return False, f"CLI not found: {e}"
+        except subprocess.TimeoutExpired:
+            return False, "TIMEOUT"
+        except FileNotFoundError as e:
+            return False, f"CLI not found: {e}"
+        if result.returncode != 0:
+            return False, f"exit {result.returncode}: {result.stderr[:500]}"
+        return True, result.stdout
+    if family in ("gemini", "anthropic"):
+        from lu_machinery.agent_runtime.errors import (
+            AgentRuntimeError,
+            AgentTimeoutError,
+        )
+        from lu_machinery.agent_runtime.runner import invoke
 
-    if result.returncode != 0:
-        return False, f"exit {result.returncode}: {result.stderr[:500]}"
-    return True, result.stdout
+        runtime_agent = "agy" if family == "gemini" else "claude"
+        try:
+            res = invoke(
+                runtime_agent,
+                prompt,
+                mode="read-only",
+                cwd=REPO_ROOT,
+                model=model,
+                entrypoint="writer_calibration",
+                hard_timeout=timeout,
+            )
+        except AgentTimeoutError:
+            return False, "TIMEOUT"
+        except AgentRuntimeError as e:
+            return False, str(e)[:500]
+        if not res.ok:
+            return False, f"exit {res.returncode}: {(res.stderr_excerpt or res.response or '')[:500]}"
+        return True, res.response or ""
+    return False, f"unknown family: {family}"
 
 
 def dispatch_fact_checker(section_text: str, section_topic_label: str) -> tuple[bool, str]:

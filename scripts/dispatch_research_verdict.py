@@ -317,8 +317,8 @@ def agy_verdict_prompt(*, slug: str, contract: str) -> str:
 
 
 def fire(agent: str, *, prompt: str, slug: str) -> tuple[bool, str]:
-    from agent_runtime.runner import invoke
-    from agent_runtime.errors import RateLimitedError, AgentTimeoutError
+    from lu_machinery.agent_runtime.errors import AgentTimeoutError, RateLimitedError
+    from lu_machinery.agent_runtime.runner import invoke
 
     if agent == "codex":
         # gpt-5.5 + model_reasoning_effort=high are pinned in

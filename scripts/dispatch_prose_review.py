@@ -366,8 +366,8 @@ def prose_quality_prompt(*, slug: str, pr_num: int,
 
 
 def fire(reviewer: str, *, prompt: str, slug: str) -> tuple[bool, str]:
-    from agent_runtime.runner import invoke
-    from agent_runtime.errors import RateLimitedError, AgentTimeoutError
+    from lu_machinery.agent_runtime.errors import AgentTimeoutError, RateLimitedError
+    from lu_machinery.agent_runtime.runner import invoke
 
     if reviewer == "claude":
         model = "claude-opus-4-8"

@@ -25,7 +25,6 @@ import datetime as _dt
 import hashlib
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -692,53 +691,30 @@ def _normalize_claim_pool_refs(
 
 
 def dispatch_codex(prompt: str, *, task_id: str) -> tuple[bool, str]:
-    """Send the prompt through scripts/ab ask-codex; return (ok, response_text)."""
-    cmd = [
-        "scripts/ab", "ask-codex",
-        "--task-id", task_id,
-        "--from", "claude",
-        "--new-session",
-        "-",
-    ]
-    try:
-        proc = subprocess.run(
-            cmd,
-            input=prompt,
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=900,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return False, "timeout_after_900s"
-    if proc.returncode != 0:
-        return False, proc.stderr or proc.stdout
-    return _extract_bridge_response(proc.stdout)
-
-
-_BRIDGE_MSG_RE = re.compile(r"Message sent to Claude \(ID: (\d+)\)")
-
-
-def _extract_bridge_response(stdout: str) -> tuple[bool, str]:
-    match = _BRIDGE_MSG_RE.search(stdout)
-    if not match:
-        return False, f"no_response_message_id_in_bridge_stdout:\n{stdout[-400:]}"
-    msg_id = match.group(1)
-    read = subprocess.run(
-        ["scripts/ab", "read", msg_id],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
+    """Send the prompt through lu_machinery.agent_runtime; return (ok, response_text)."""
+    from lu_machinery.agent_runtime.errors import (
+        AgentRuntimeError,
+        AgentTimeoutError,
     )
-    if read.returncode != 0:
-        return False, read.stderr
-    body = read.stdout
-    # Strip the bridge envelope header — everything before the 60-char rule.
-    parts = body.split("=" * 60, 1)
-    return True, (parts[1] if len(parts) == 2 else body).strip()
+    from lu_machinery.agent_runtime.runner import invoke
+
+    try:
+        result = invoke(
+            "codex",
+            prompt,
+            mode="read-only",
+            cwd=REPO_ROOT,
+            task_id=task_id,
+            entrypoint="consult",
+            hard_timeout=900,
+        )
+    except AgentTimeoutError:
+        return False, "timeout_after_900s"
+    except AgentRuntimeError as exc:
+        return False, str(exc)
+    if not result.ok:
+        return False, (result.stderr_excerpt or result.response or "").strip()
+    return True, (result.response or "").strip()
 
 
 #: Default Gemini timeout, correct for whole-module research/inject

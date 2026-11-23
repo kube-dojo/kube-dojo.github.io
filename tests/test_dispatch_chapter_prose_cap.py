@@ -16,15 +16,24 @@ def isolated(tmp_path, monkeypatch):
     class AgentTimeoutError(Exception):
         pass
 
-    runner = ModuleType("agent_runtime.runner")
+    runner = ModuleType("lu_machinery.agent_runtime.runner")
     runner.invoke = MagicMock(side_effect=AssertionError("unexpected provider invocation"))
-    errors = ModuleType("agent_runtime.errors")
+    errors = ModuleType("lu_machinery.agent_runtime.errors")
     errors.RateLimitedError = RateLimitedError
     errors.AgentTimeoutError = AgentTimeoutError
-    package = ModuleType("agent_runtime")
-    package.__path__ = []
-    for name, module in (("agent_runtime", package), ("agent_runtime.runner", runner),
-                         ("agent_runtime.errors", errors)):
+    runtime_pkg = ModuleType("lu_machinery.agent_runtime")
+    runtime_pkg.__path__ = []
+    runtime_pkg.runner = runner
+    runtime_pkg.errors = errors
+    top_pkg = ModuleType("lu_machinery")
+    top_pkg.__path__ = []
+    top_pkg.agent_runtime = runtime_pkg
+    for name, module in (
+        ("lu_machinery", top_pkg),
+        ("lu_machinery.agent_runtime", runtime_pkg),
+        ("lu_machinery.agent_runtime.runner", runner),
+        ("lu_machinery.agent_runtime.errors", errors),
+    ):
         monkeypatch.setitem(sys.modules, name, module)
     setup = MagicMock(return_value=(tmp_path, "test-branch"))
     monkeypatch.setattr(prose, "setup_worktree", setup)
