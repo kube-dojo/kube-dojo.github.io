@@ -16,7 +16,7 @@ When the two disagree, the installed release and the rules core win.
 | Concern | Source of truth (installed release) |
 | --- | --- |
 | Driver loop, orientation, queue, routing, handoff | `drive-epic` skill and its references |
-| Cold start and plane state | `.venv/bin/python -I -m lu_machinery.fleet_comms cold-start-board` and `plane-status` |
+| Cold start and plane state | `"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms cold-start-board` and `"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms plane-status`, with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set as for Dispatch below |
 | Launching the KubeDojo lane driver | `lu_machinery/start-kube-dojo-driver.sh` (lane `kube-dojo`) |
 | Dispatch | `"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...`, with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set to the machinery shared-state checkout (`agents_extensions/README.md`, "Apply and verify"); without it the dispatcher refuses |
 | Review of record | `review-loop` and `local-code-review`; reviewer from `lu_machinery.review.closeout_cli resolve-reviewer` |

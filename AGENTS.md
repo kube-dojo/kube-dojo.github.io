@@ -56,8 +56,10 @@ a bounded fix and a clear return to content; do not pursue an ideal environment.
 ## Read context when it applies
 
 For issue-driven or pipeline work, read the issue verbatim, then orient with the
-installed release: `.venv/bin/python -I -m lu_machinery.fleet_comms cold-start-board`
-and `plane-status`, and the installed `drive-epic` skill with the KubeDojo overlay
+installed release: `"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms cold-start-board`
+and `"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms plane-status`, with
+`LEARN_UKRAINIAN_PYTHON` and `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set as
+[`agents_extensions/README.md`](agents_extensions/README.md) describes, and the installed `drive-epic` skill with the KubeDojo overlay
 `kubedojo-drive-epic`. For a self-contained documentation or code edit, inspect the
 relevant files directly; service startup and a full handoff are unnecessary.
 

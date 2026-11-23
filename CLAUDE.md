@@ -13,8 +13,9 @@ hooks.
 
 **Drivers:** load the installed `drive-epic` skill and the KubeDojo overlay
 `kubedojo-drive-epic`. Orient with
-`.venv/bin/python -I -m lu_machinery.fleet_comms cold-start-board` and
-`plane-status`; the lane driver is launched by the release's
+`"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms cold-start-board` and
+`"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms plane-status` (both
+need `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT`, below); the lane driver is launched by the release's
 `start-kube-dojo-driver.sh`. Dispatch with
 `"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...`
 with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set to the machinery shared-state checkout
