@@ -50,8 +50,10 @@ configuration before setting aside that conflicting copy and running apply.
   guards, dispatch, review, landing and handoff. Do not copy or fork them
   here; a product file with the same purpose fires twice.
 - `claude/hooks/` keeps only the shared hook library and the KubeDojo Python
-  autoformat hook. Interactive KubeDojo content `PreToolUse` scripts deploy
-  from `claude/kubedojo-hooks/` to `.claude/kubedojo-hooks/`. The headless
+  autoformat hook. Interactive KubeDojo `PreToolUse` scripts deploy
+  from `claude/kubedojo-hooks/` to `.claude/kubedojo-hooks/`: the content
+  hooks, and `block-direct-commit-on-main.sh`, kept because the release's
+  guards do not refuse a `git commit` on the primary checkout's `main`. The headless
   Claude adapter reserves `.claude/hooks/` in `PreToolUse` for release
   guards. The release's Python guard blocks a bare interpreter and suggests
   the configured command.

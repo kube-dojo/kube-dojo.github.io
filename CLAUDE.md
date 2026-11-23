@@ -25,8 +25,8 @@ hooks.
 - `GET /api/module/{key}/state`
 - `GET /api/reviews?module={key}`
 
-Optional situational check: `GET /api/activity?limit=30`. KubeDojo API recipes:
-[`scripts/agent_onboarding.md`](scripts/agent_onboarding.md).
+Optional situational check: `GET /api/activity?limit=30`. Start the local API with
+`./services.sh start api` when it is down; an unreachable API is unknown state.
 
 ## Agent Usage
 

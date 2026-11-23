@@ -24,7 +24,15 @@ When the two disagree, the installed release and the rules core win.
 | Rollover and handoff | `thread-rollover` and the lane `handoff_note` |
 
 Live roster, caps and routes are read fresh from the catalog and the
-resolver, never from this file. KubeDojo delivery and review notes:
+resolver, never from this file.
+
+**Curriculum edits by Claude workers.** The KubeDojo content hook
+`block-orchestrator-content-edits.sh` refuses Claude `Edit`/`Write` on
+`src/content/docs/**` unless `KUBEDOJO_DISPATCHED=1`, and today only the legacy
+`scripts/dispatch_smart.py` sets it; a Claude worker started by
+`lu_machinery.dispatch` is refused. Route curriculum edits through
+`lu_machinery.dispatch` to a non-Claude implementer (for example Codex),
+or through the legacy dispatcher, until that exemption is migrated. KubeDojo delivery and review notes:
 [delivery.md](delivery.md). Sister-repo details: [dual-repo.md](dual-repo.md).
 
 ## KubeDojo inventory

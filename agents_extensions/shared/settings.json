@@ -64,6 +64,10 @@
           },
           {
             "type": "command",
+            "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-direct-commit-on-main.sh"
+          },
+          {
+            "type": "command",
             "command": "/bin/bash \"$CLAUDE_PROJECT_DIR\"/.claude/kubedojo-hooks/block-content-merge-without-learner-check.sh"
           },
           {
