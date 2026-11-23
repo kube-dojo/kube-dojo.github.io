@@ -5,7 +5,7 @@
 # Delegates to Gemini Pro: read docs/migration-decisions.md and the AI/ML
 # hub, then add "See also" links from existing modules to the new track.
 #
-# Gemini edits files directly via dispatch.py with no extra wrapper —
+# Delegates to AGY via lu_machinery.dispatch —
 # review with `git diff` before committing.
 #
 
@@ -37,8 +37,8 @@ Rules:
   - Output a final list of every file you modified.
 '
 
-log "Dispatching cross-linking task to Gemini Pro"
-"$PY" scripts/dispatch.py gemini "$PROMPT" --review
+log "Dispatching cross-linking task to AGY (lu_machinery.dispatch)"
+"$PY" -m lu_machinery.dispatch dispatch --repo kube-dojo --agent agy --model gemini-4-neon-high --mode workspace-write --worktree --prompt "$PROMPT"
 
 log "Done. Review with: git diff --stat"
 log "Commit when satisfied."

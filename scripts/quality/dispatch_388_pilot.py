@@ -45,13 +45,13 @@ WRITER_BRIEF = REPO / "scripts/prompts/module-writer.md"
 VENV_PYTHON = PRIMARY_REPO / ".venv" / "bin" / "python"
 
 sys.path.insert(0, str(REPO / "scripts"))
-from agent_runtime.errors import (
+from lu_machinery.agent_runtime.errors import (
     AgentTimeoutError,
     AgentUnavailableError,
     RateLimitedError,
 )
-from agent_runtime.runner import invoke
-from lib.pr_merge import PrMergeError, merge_when_green
+from lu_machinery.agent_runtime.runner import invoke
+from lu_machinery.publish import github as publish_github
 
 
 def module_slug_for_pipeline(module_path: str) -> str:
@@ -502,10 +502,99 @@ def post_review_comment(pr_num: int, body: str) -> None:
 
 
 def merge_pr(pr_num: int) -> str | None:
+    """Merge a PR through ``lu_machinery.publish.github`` and return the merge SHA."""
+    view = subprocess.run(
+        ["gh", "pr", "view", str(pr_num), "--json", "headRefOid,baseRefName"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if view.returncode != 0:
+        log({"event": "merge_failed", "pr": pr_num, "error": view.stderr.strip()})
+        return None
     try:
-        return merge_when_green(pr_num, repo=REPO)
-    except PrMergeError as exc:
+        pr_info = json.loads(view.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        log({"event": "merge_failed", "pr": pr_num, "error": f"invalid pr view json: {exc}"})
+        return None
+    head_oid = str(pr_info.get("headRefOid") or "").strip()
+    base_ref = str(pr_info.get("baseRefName") or "main").strip()
+    if not head_oid:
+        log({"event": "merge_failed", "pr": pr_num, "error": "missing headRefOid"})
+        return None
+
+    try:
+        queue_proc = publish_github.read(
+            "queue-status",
+            number=pr_num,
+            branch=base_ref,
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+        )
+    except (publish_github.gate.PublishBlocked, ValueError, OSError) as exc:
         log({"event": "merge_failed", "pr": pr_num, "error": str(exc)})
+        return None
+    if queue_proc.returncode != 0:
+        log({"event": "merge_failed", "pr": pr_num, "error": (queue_proc.stderr or queue_proc.stdout or "").strip()})
+        return None
+    try:
+        queue_payload = json.loads(queue_proc.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        log({"event": "merge_failed", "pr": pr_num, "error": f"invalid queue-status json: {exc}"})
+        return None
+    pr_node = ((queue_payload.get("data") or {}).get("repository") or {}).get("pullRequest") or {}
+    if str(pr_node.get("state") or "").upper() != "OPEN":
+        log({"event": "merge_failed", "pr": pr_num, "error": f"PR state is {pr_node.get('state')!r}, not OPEN"})
+        return None
+    live_head = str(pr_node.get("headRefOid") or "").strip()
+    if live_head != head_oid:
+        log({"event": "merge_failed", "pr": pr_num, "error": f"head moved ({head_oid} -> {live_head})"})
+        return None
+    is_queue = pr_node.get("isMergeQueueEnabled")
+    if not isinstance(is_queue, bool):
+        log({"event": "merge_failed", "pr": pr_num, "error": "missing boolean isMergeQueueEnabled"})
+        return None
+
+    try:
+        merge_proc = publish_github.publish(
+            "pr-merge",
+            number=pr_num,
+            match_head=head_oid,
+            expect_queue="true" if is_queue else "false",
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+        )
+    except (publish_github.gate.PublishBlocked, ValueError, OSError) as exc:
+        log({"event": "merge_failed", "pr": pr_num, "error": str(exc)})
+        return None
+    if merge_proc.returncode != 0:
+        log({"event": "merge_failed", "pr": pr_num, "error": (merge_proc.stderr or merge_proc.stdout or "").strip()})
+        return None
+    try:
+        merged = json.loads(merge_proc.stdout or "{}")
+    except json.JSONDecodeError:
+        merged = {}
+    sha = merged.get("sha") if isinstance(merged, dict) else None
+    if isinstance(sha, str) and sha.strip():
+        return sha.strip()
+    sha_view = subprocess.run(
+        ["gh", "pr", "view", str(pr_num), "--json", "mergeCommit"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if sha_view.returncode == 0:
+        try:
+            oid = (json.loads(sha_view.stdout or "{}").get("mergeCommit") or {}).get("oid")
+            if isinstance(oid, str) and oid.strip():
+                return oid.strip()
+        except json.JSONDecodeError:
+            pass
+    log({"event": "merge_failed", "pr": pr_num, "error": "merged but mergeCommit oid unavailable"})
     return None
 
 

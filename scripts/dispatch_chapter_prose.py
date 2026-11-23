@@ -435,9 +435,8 @@ def _prose_committed_on_branch(worktree: Path, prose_path: str) -> bool:
 
 def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
                log_path: Path, prose_path: str) -> bool:
-    sys.path.insert(0, str(REPO / "scripts"))
-    from agent_runtime.errors import AgentTimeoutError, RateLimitedError
-    from agent_runtime.runner import invoke
+    from lu_machinery.agent_runtime.errors import AgentTimeoutError, RateLimitedError
+    from lu_machinery.agent_runtime.runner import invoke
 
     if agent == "agy":
         # agy pro draft lane (replaced the retired gemini-cli, #2125/#2230).

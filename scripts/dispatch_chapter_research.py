@@ -29,7 +29,6 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 from textwrap import dedent
 
@@ -267,8 +266,7 @@ def stage_files(worktree: Path, files: list[Path]) -> list[Path]:
 def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
                   log_path: Path, agent: str) -> int:
     """Run the dispatch in the current process, tee output to log."""
-    sys.path.insert(0, str(REPO / "scripts"))
-    from agent_runtime.runner import invoke
+    from lu_machinery.agent_runtime.runner import invoke
 
     cfg = AGENT_DEFAULTS[agent]
     model = str(cfg["model"])

@@ -56,7 +56,6 @@ LOGS_DIR = STATE_DIR / "logs"
 PROMPTS_DIR = REPO_ROOT / "scripts" / "prompts"
 
 _VENV_PYTHON = str(REPO_ROOT / ".venv" / "bin" / "python")
-DISPATCH = str(REPO_ROOT / "scripts" / "dispatch.py")
 AUDIT_SCRIPT = str(REPO_ROOT / "scripts" / "audit_teaching_quality.py")
 
 WORKER_CAP = 3
@@ -592,13 +591,39 @@ def write_one(state: dict[str, Any], args: argparse.Namespace) -> None:
     t0 = time.time()
     try:
         if args.writer.startswith("gemini"):
-            cmd = [
-                _VENV_PYTHON, DISPATCH, "gemini", "-",
-                "--model", args.writer,
-                "--timeout", str(args.timeout)
-            ]
-            with log.open("w", encoding="utf-8") as fh:
-                result = subprocess.run(cmd, input=prompt, stdout=fh, stderr=subprocess.STDOUT, text=True, timeout=args.timeout, cwd=str(REPO_ROOT))
+            from lu_machinery.agent_runtime.errors import (
+                AgentRuntimeError,
+                AgentTimeoutError,
+            )
+            from lu_machinery.agent_runtime.runner import invoke
+
+            try:
+                res = invoke(
+                    "agy",
+                    prompt,
+                    mode="read-only",
+                    cwd=REPO_ROOT,
+                    model=args.writer,
+                    entrypoint="quality_pipeline",
+                    hard_timeout=args.timeout,
+                )
+            except AgentTimeoutError:
+                _git_checkout(current)
+                record_failure(state, f"agy timeout after {args.timeout}s")
+                return
+            except AgentRuntimeError as exc:
+                _git_checkout(current)
+                record_failure(state, f"agy error: {exc}")
+                return
+            log.write_text(
+                (res.response or "") + "\n---STDERR---\n" + (res.stderr_excerpt or ""),
+                encoding="utf-8",
+            )
+            if not res.ok:
+                _git_checkout(current)
+                record_failure(state, f"agy rc={res.returncode} (see {log})")
+                return
+            result = None
         else:
             # Writer pipeline path: keep search + danger mode for live-corroborated module edits.
             cmd = [
@@ -619,7 +644,7 @@ def write_one(state: dict[str, Any], args: argparse.Namespace) -> None:
         record_failure(state, "codex CLI not found on PATH")
         return
     elapsed = time.time() - t0
-    if result.returncode != 0:
+    if result is not None and result.returncode != 0:
         _git_checkout(current)
         record_failure(state, f"codex rc={result.returncode} (see {log})")
         return
@@ -773,22 +798,40 @@ def _extract_json(text: str) -> dict | None:
 
 
 def review_one(state: dict[str, Any], args: argparse.Namespace) -> None:
-    """WRITE_DONE → REVIEW_APPROVED or REVIEW_CHANGES. Gemini cross-family."""
+    """WRITE_DONE → REVIEW_APPROVED or REVIEW_CHANGES. AGY cross-family."""
+    from lu_machinery.agent_runtime.errors import (
+        AgentRuntimeError,
+        AgentTimeoutError,
+    )
+    from lu_machinery.agent_runtime.runner import invoke
+
     slug = state["slug"]
     prompt = _review_prompt(state)
-    cmd = [_VENV_PYTHON, DISPATCH, "gemini", "-", "--model", args.reviewer, "--timeout", str(args.timeout)]
     log = log_path_for(slug, "review")
     t0 = time.time()
     try:
-        result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=args.timeout + 30)
-    except subprocess.TimeoutExpired:
-        record_failure(state, f"review timeout after {args.timeout + 30}s")
+        res = invoke(
+            "agy",
+            prompt,
+            mode="read-only",
+            cwd=REPO_ROOT,
+            model=args.reviewer,
+            entrypoint="quality_pipeline",
+            hard_timeout=args.timeout,
+        )
+    except AgentTimeoutError:
+        record_failure(state, f"review timeout after {args.timeout}s")
         return
-    log.write_text((result.stdout or "") + "\n---STDERR---\n" + (result.stderr or ""), encoding="utf-8")
-    if result.returncode != 0:
-        record_failure(state, f"gemini review rc={result.returncode} (see {log})")
+    except AgentRuntimeError as exc:
+        record_failure(state, f"review error: {exc}")
         return
-    parsed = _extract_json(result.stdout)
+    stdout = res.response or ""
+    stderr = res.stderr_excerpt or ""
+    log.write_text(stdout + "\n---STDERR---\n" + stderr, encoding="utf-8")
+    if not res.ok:
+        record_failure(state, f"agy review rc={res.returncode} (see {log})")
+        return
+    parsed = _extract_json(stdout)
     if parsed is None:
         record_failure(state, f"review parse_error (see {log})")
         return

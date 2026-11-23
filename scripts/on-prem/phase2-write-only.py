@@ -3,7 +3,7 @@
 
 Bypasses the v1 pipeline's review/check/score retry loop. Per module:
 
-  1. WRITE — call the chosen writer model (default: scripts/dispatch.py writer pin)
+  1. WRITE — call the chosen writer model (via lu_machinery.agent_runtime)
   2. SAVE — write the module markdown to disk
   3. FACT-CHECK — call the calibrated fact-grounder (gpt-5.3-codex-spark) on
      the just-written module, produce a structured ledger (SUPPORTED /
@@ -371,20 +371,29 @@ def dispatch_writer(prompt: str, writer_model: str) -> tuple[bool, str]:
             return False, result.stderr[:500]
         return True, extract_section_from_codex_output(result.stdout)
     if writer_model.startswith("claude"):
-        cmd = [
-            VENV_PYTHON, str(REPO_ROOT / "scripts" / "dispatch.py"),
-            "claude", "-", "--model", writer_model,
-        ]
+        from lu_machinery.agent_runtime.errors import (
+            AgentRuntimeError,
+            AgentTimeoutError,
+        )
+        from lu_machinery.agent_runtime.runner import invoke
+
         try:
-            result = subprocess.run(
-                cmd, input=prompt, capture_output=True, text=True,
-                timeout=900, cwd=str(REPO_ROOT),
+            res = invoke(
+                "claude",
+                prompt,
+                mode="read-only",
+                cwd=REPO_ROOT,
+                model=writer_model,
+                entrypoint="on_prem_phase2",
+                hard_timeout=900,
             )
-        except subprocess.TimeoutExpired:
+        except AgentTimeoutError:
             return False, "TIMEOUT"
-        if result.returncode != 0:
-            return False, result.stderr[:500]
-        return True, result.stdout
+        except AgentRuntimeError as exc:
+            return False, str(exc)[:500]
+        if not res.ok:
+            return False, (res.stderr_excerpt or res.response or "")[:500]
+        return True, res.response or ""
     return False, f"unknown writer model: {writer_model}"
 
 
