@@ -4,39 +4,34 @@ KubeDojo — free, open-source cloud native curriculum.
 
 ## Agent Orientation (first call on a cold start)
 
-**FIRST ACTION, every session — no exceptions:** invoke the
-`curriculum-orchestrator` skill via the Skill tool. This loads the
-orchestrator role into context (queue ownership, dispatch routing, PR
-hygiene, handoff discipline) before any other work. Apply this even on
-issue-driven sessions — the issue is *what* to work on; the skill is
-*how* to drive it.
+Fleet machinery (session start, context and compaction hooks, guards,
+dispatch, review, landing, handoff) comes from the installed lu-machinery
+release, deployed by `npm run agents:deploy` (see
+[`agents_extensions/README.md`](agents_extensions/README.md)). This repository
+keeps only the KubeDojo overlay: curriculum skills, content rules and content
+hooks.
 
-**Issue-driven sessions:** read the GitHub issue verbatim, then run one script:
+**Drivers:** load the installed `drive-epic` skill and the KubeDojo overlay
+`kubedojo-drive-epic`. Orient with
+`"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms cold-start-board` and
+`"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms plane-status` (both
+need `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT`, below); the lane driver is launched by the release's
+`start-kube-dojo-driver.sh`. Dispatch with
+`"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...`
+with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set to the machinery shared-state checkout
+(see [`agents_extensions/README.md`](agents_extensions/README.md#apply-and-verify)); without it the
+dispatcher refuses.
 
-```bash
-KUBEDOJO_ISSUE=N bash scripts/cold-start.sh
-```
+**Issue-driven sessions:** read the GitHub issue verbatim first.
 
-Standalone session: `bash scripts/cold-start.sh` (add `--manifest` for route discovery).
-
-The script is API-first: services-up, `git status`, pending Decision Cards, then compact
-briefing + orient punch-line + session handoff pointer. It exits 0 with a `STATUS.md`
-fallback when the API is down. Full ritual: [`scripts/prompts/cold-start.md`](scripts/prompts/cold-start.md).
-Individual curl recipes: [`scripts/agent_onboarding.md`](scripts/agent_onboarding.md).
-
-Only read the underlying handoff file (`.agent/session-state/<date>-*.md`; pre-s196 history in `docs/session-state/`) when briefing/orient
-leave a real narrative-why gap. Respect `.claude/rules/decision-card.md` for pending decisions.
-
-**Before you claim/fix/re-review work**:
+**Before you claim/fix/re-review curriculum work** (KubeDojo local API, `http://127.0.0.1:8768`):
 - `GET /api/pipeline/leases`
 - `GET /api/module/{key}/state`
 - `GET /api/reviews?module={key}`
 
-Optional situational check: `GET /api/activity?limit=30`.
-
-Standalone session = main orchestrator. Drive the queue; ask only on irreversible or ambiguous actions.
-
-Full agent recipe: [`scripts/agent_onboarding.md`](scripts/agent_onboarding.md).
+Optional situational check: `GET /api/activity?limit=30`. Start the local API with
+`scripts/services-up --api-only` (loopback bind, primary-checkout root) when it is
+down; an unreachable API is unknown state.
 
 ## Agent Usage
 
@@ -45,9 +40,13 @@ Full agent recipe: [`scripts/agent_onboarding.md`](scripts/agent_onboarding.md).
 - Batch direct tool calls in one message when possible (3 Greps > 3 agents).
 - Keep sessions long (`/continue`) — cache hits are ~95% within a session.
 
-## Multi-agent deliberation (`ab discuss`)
+## Decisions
 
-For high-leverage decisions only (architecture, threshold freezes, contested NEEDS CHANGES, bets affecting 100+ modules). Use `scripts/ab discuss <channel> --with claude,codex,agy --max-rounds 3` (agy is the Google lane; gemini-cli is retired, #2125/#2230). See `.claude/rules/decision-card.md` for the full protocol (deliberation not quorum; emit a Decision Card on disagreement only). Scan `docs/decisions/pending/` at cold start.
+High-leverage decisions (architecture, threshold freezes, contested reviews,
+bets affecting 100+ modules) follow the installed rules core: consultation,
+designated approval and independent review stay distinct, and discussion is
+never a review of record. Pending decisions are recorded in
+`docs/decisions/pending/`; scan it at cold start.
 
 ## Project Overview
 
@@ -69,7 +68,7 @@ For high-leverage decisions only (architecture, threshold freezes, contested NEE
 
 1. **Orient via `/api/briefing/session`** (see *Agent Orientation* above). `STATUS.md` is the fallback when the API is down.
 2. Use `scripts/prompts/module-writer.md` for new modules
-3. Send completed work to the designated cross-family reviewer (see `docs/review-protocol.md`) before closing issues
+3. Send completed work through the installed `review-loop` skill (independent, cross-family, exact-head; see also `docs/review-protocol.md`) before closing issues
 4. **At session end**: write a lean handoff BRIEF (~2-5KB, YAML frontmatter + bullets) to `.agent/session-state/YYYY-MM-DD-session-NN-<topic>.md` — **Markdown, in the agent dir, never through git/PRs** (AI→AI local agent state; user directives s190b + s196, lu parity #3768/#4704). `docs/session-state/` = tracked pre-s196 history. Then update the LIVE index **`.agent/STATUS.md`** (machine-local, gitignored; preferred by the briefing API — seed from the tracked `STATUS.md` if missing) — promote the new file to "Latest handoff", shift the previous Latest into "Predecessor chain", refresh "Cross-thread notes" / `## TODO` / `## Blockers`. The tracked `STATUS.md` holds durable sections and changes via PR only. **Do NOT inline the full handoff into STATUS.md** — it is an index, not a log. The briefing API (`scripts/local_api.py:_parse_status_md`) parses `## TODO` (unchecked `- [ ]`) and `## Blockers` (`- `) from STATUS.md, so keep those headings populated.
 
 ## Build & Serve
@@ -87,7 +86,7 @@ Build gate: for markdown-only content PRs the required CI job "Astro build (rend
 | File | Purpose |
 |------|---------|
 | `STATUS.md` | Current work, progress, blockers |
-| `.claude/rules/` | Scoped rules (quality, translation, decision-card, etc.) |
+| `.claude/rules/` | Deployed rules: the release core plus KubeDojo content rules (quality, translation, etc.) |
 | `agents_extensions/shared/settings.json` | Source for shared permissions and hooks |
 | `.claude/settings.local.json` | Personal overrides (gitignored) |
 | `docs/pedagogical-framework.md` | Educational research & guidelines |
@@ -95,7 +94,7 @@ Build gate: for markdown-only content PRs the required CI job "Astro build (rend
 | `scripts/prompts/module-writer.md` | Standard prompt for module creation |
 | `docs/pins/kubernetes.yaml` | Exam pin vs latest-stable minors + kind node images |
 | `docs/release-maintenance/kubernetes-minor-release-playbook.md` | Standing trigger for each new Kubernetes minor |
-| `scripts/dispatch.py` / `scripts/dispatch_smart.py` | CLI dispatchers |
+| `lu_machinery.dispatch` (installed release) | Fleet dispatcher (`--repo kube-dojo`) |
 | `astro.config.mjs` | Starlight config (sidebar, i18n, theme) |
 
 ## Curriculum Structure

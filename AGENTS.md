@@ -1,8 +1,9 @@
 # AGENTS.md — KubeDojo agent instructions
 
 KubeDojo is an Astro/Starlight curriculum site. These instructions apply across
-agent families. Use `CLAUDE.md` for Claude-specific behavior and
-`agents_extensions/claude/rules/agy-workflow.md` when dispatching to the Google lane.
+agent families. Use `CLAUDE.md` for Claude-specific behavior. Fleet hooks, rules
+and skills (dispatch, review, landing, handoff) come from the installed
+lu-machinery release; `agents_extensions/` holds only the KubeDojo overlay.
 
 ## Scope and completion
 
@@ -35,9 +36,10 @@ a bounded fix and a clear return to content; do not pursue an ideal environment.
   there; never commit packet WIP on primary `main`; never push to `main`.
   Create with
   `git fetch origin && git worktree add -b codex/<name> .worktrees/<name> origin/main`.
-  Preserve unrelated pre-existing primary dirty files. Full READY closeout
-  (remove worktree, delete branches) is in
-  `agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md` → Worktree criteria.
+  Preserve unrelated pre-existing primary dirty files. Closeout (remove the
+  worktree, delete branches) follows the installed `full-send` skill; KubeDojo
+  completion criteria are in
+  `agents_extensions/shared/skills/kubedojo-drive-epic/SKILL.md`.
 - Register each new worktree and task-owned temporary/evidence path before
   creation, and follow `docs/ops/workspace-hygiene.md` for audit, retention and
   closeout. Run the read-only audit at packet, merge and handoff milestones;
@@ -53,28 +55,31 @@ a bounded fix and a clear return to content; do not pursue an ideal environment.
 
 ## Read context when it applies
 
-For issue-driven or pipeline work, read the issue verbatim, then run
-`KUBEDOJO_ISSUE=N bash scripts/cold-start.sh` (omit the variable without an issue).
-This starts services and reports workspace, decisions, briefing, and handoff
-pointers. For a self-contained documentation or code edit, inspect the relevant
-files directly; service startup and a full handoff are unnecessary.
+For issue-driven or pipeline work, read the issue verbatim, then orient with the
+installed release: `"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms cold-start-board`
+and `"$LEARN_UKRAINIAN_PYTHON" -I -m lu_machinery.fleet_comms plane-status`, with
+`LEARN_UKRAINIAN_PYTHON` and `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set as
+[`agents_extensions/README.md`](agents_extensions/README.md) describes, and the installed `drive-epic` skill with the KubeDojo overlay
+`kubedojo-drive-epic`. For a self-contained documentation or code edit, inspect the
+relevant files directly; service startup and a full handoff are unnecessary.
 
-Before claiming pipeline work, read `GET /api/pipeline/leases`. Before fixing a
-module, read `GET /api/module/{key}/state`; before re-reviewing it, read
-`GET /api/reviews?module={key}`. The API base is `http://127.0.0.1:8768`.
-Use `/api/tracks/readiness` and `/api/activity` for curriculum-wide coordination.
-Read a full handoff only when the briefing leaves a relevant gap. If the API is
-down, cold-start exits 0 with a `STATUS.md` excerpt and handoff path; this is a
-fallback, not proof of healthy services.
+Curriculum state comes from the KubeDojo local API at `http://127.0.0.1:8768`
+(start it with `scripts/services-up --api-only`, which binds loopback and serves the
+primary checkout). Before claiming pipeline work, read
+`GET /api/pipeline/leases`. Before fixing a module, read
+`GET /api/module/{key}/state`; before re-reviewing it, read
+`GET /api/reviews?module={key}`. Use `/api/tracks/readiness` and `/api/activity`
+for curriculum-wide coordination. An unreachable API is unknown state, not proof
+of healthy services; `STATUS.md` is only a fallback index.
 
 | Task | Relevant context |
 |---|---|
-| Session or pipeline coordination | `scripts/prompts/cold-start.md`, `scripts/agent_onboarding.md` |
+| Session or pipeline coordination | installed `drive-epic` skill, `kubedojo-drive-epic` overlay, the local API endpoints above |
 | Author curriculum | `agents_extensions/shared/skills/curriculum-writer/SKILL.md`, `scripts/prompts/module-writer.md` |
 | Review curriculum | `agents_extensions/shared/skills/module-quality-reviewer/SKILL.md`, `docs/quality-rubric.md`, applicable `docs/rubric-profiles/` |
 | Content structure and frontmatter | `agents_extensions/claude/rules/new-content-checklist.md` |
 | Current quality scores | `/api/quality/scores`; the static `docs/quality-audit-results.md` is historical |
-| Agent dispatch | `scripts/dispatch_smart.py`, applicable adapter and provider workflow |
+| Agent dispatch | `"$LEARN_UKRAINIAN_PYTHON" -m lu_machinery.dispatch dispatch --repo kube-dojo --worktree ...` with `LEARN_UKRAINIAN_PRIMARY_REPO_ROOT` set to the machinery shared-state checkout ([agents_extensions/README.md](agents_extensions/README.md#apply-and-verify)); without it the dispatcher refuses; the installed `drive-epic` skill and the `kubedojo-drive-epic` overlay |
 
 Load a skill for its actual workflow, not merely because a keyword appears.
 Shared skill sources live in `agents_extensions/shared/skills`. Use the
@@ -167,8 +172,8 @@ Prefer installed named profiles only when their resolved model meets this
 policy; otherwise use an explicit allowed model with the appropriate role
 boundary. If a route is unavailable, report it rather than silently
 substituting. Verify exact identifiers against the live catalog. Headless
-dispatch defaults live in `scripts/dispatch_smart.py`; verify the resolved route
-separately from desktop profiles before using it. Same-family review still
+dispatch routes come from the installed `lu_machinery.dispatch` and its catalog;
+verify the resolved route separately from desktop profiles before using it. Same-family review still
 does not satisfy the independent cross-family merge gate.
 
 Probe CodexBar before substantive fan-out; report only aggregate usage and

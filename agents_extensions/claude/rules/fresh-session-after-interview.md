@@ -42,7 +42,7 @@ Do NOT use when:
 
 1. Finish the interview, summarize the decision in chat with the rationale.
 2. **Write the decision to durable storage** before closing the session:
-   - In a `## DECISION REQUIRED` Card per `.claude/rules/decision-card.md`, OR
+   - In a `## DECISION REQUIRED` card under `docs/decisions/pending/`, OR
    - In a `docs/decisions/{date}-{slug}.md` ADR, OR
    - In a GitHub issue body.
 3. Either:
@@ -68,5 +68,5 @@ opinions before framing user concerns") applied to the agent's own bias.
 
 - Issue: kube-dojo/kube-dojo.github.io#1381
 - Zodchii post #2: https://x.com/zodchiii/status/2057071039314542668
-- `.claude/rules/decision-card.md` — durable-decision convention
+- `docs/decisions/` — durable-decision records
 - Memory: `feedback_no_yes_man.md` — adjacent practice for user-facing bias
