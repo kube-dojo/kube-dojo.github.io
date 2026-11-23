@@ -138,7 +138,7 @@ def main() -> int:
     ap.add_argument("--module", action="append", default=[], help="Specific module path (may repeat)")
     ap.add_argument("--all", action="store_true", help="Audit all English content modules")
     ap.add_argument("--workers", type=int, default=1, help="Parallel workers (cap 3)")
-    ap.add_argument("--model", default="gemini-3-flash-preview", help="Gemini model")
+    ap.add_argument("--model", default="gemini-4-hydrogen-medium", help="AGY (Gemini) model")
     ap.add_argument("--timeout", type=int, default=300, help="Per-module timeout seconds")
     ap.add_argument("--force", action="store_true", help="Re-audit even if output exists")
     args = ap.parse_args()

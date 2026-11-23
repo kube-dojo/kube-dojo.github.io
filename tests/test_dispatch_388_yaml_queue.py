@@ -43,7 +43,6 @@ def isolated_pilot(tmp_path, monkeypatch):
     mocks = {name: MagicMock(return_value=("VERDICT: APPROVE", "APPROVE")) for name in reviewers}
     for name, mock in mocks.items():
         monkeypatch.setattr(pilot, f"dispatch_{name}_review", mock)
-    monkeypatch.setattr(pilot, "merge_pr", MagicMock(return_value="abc123"))
     monkeypatch.setattr(pilot, "dispatch_backfill", MagicMock(return_value=True))
     monkeypatch.setattr(pilot, "make_worktree", MagicMock(return_value=tmp_path))
     monkeypatch.setattr(pilot, "post_review_comment", MagicMock())

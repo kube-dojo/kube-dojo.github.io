@@ -314,7 +314,6 @@
       "Bash(cp *)",
       "Bash(mv *)",
       "Bash(npx markdownlint-cli2 *)",
-      "Bash(scripts/ab *)",
       "Read",
       "Write",
       "Edit",

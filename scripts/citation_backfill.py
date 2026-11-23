@@ -1067,7 +1067,8 @@ def run_research(
     task_id = f"citation-research-{normalized_key.replace('/', '-')}-{_dt.datetime.now(_dt.UTC).strftime('%Y%m%dT%H%M%SZ')}"
     if agent == "codex":
         ok, raw = dispatch_codex(prompt, task_id=task_id)
-        model = "gpt-5.3-codex-spark"  # codex default; bridge may override
+        # dispatch_codex passes no model: the lu-machinery release default runs.
+        model = "codex:release-default"
     elif agent == "agy":
         ok, raw = dispatch_agy(prompt)
         model = "gemini-3.1-pro-high"

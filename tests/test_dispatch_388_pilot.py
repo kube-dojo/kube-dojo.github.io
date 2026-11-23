@@ -135,7 +135,6 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
-         patch("scripts.quality.dispatch_388_pilot.merge_pr", return_value="abc123") as mock_merge, \
          patch("scripts.quality.dispatch_388_pilot.dispatch_backfill", return_value=True) as mock_backfill, \
          patch("scripts.quality.dispatch_388_pilot.post_review_comment") as mock_post_review, \
          patch("scripts.quality.dispatch_388_pilot.time.sleep"), \
@@ -145,7 +144,7 @@ def test_main_approve_holds_merge_and_backfill_for_all_queued_items(tmp_path, ca
     assert rc == 0
     assert reviewer.call_count == 2
     assert mock_post_review.call_count == 2
-    mock_merge.assert_not_called()
+    assert not hasattr(pilot, "merge_pr")  # the pilot has no merge path at all
     mock_backfill.assert_not_called()
     events = [c.args[0]["event"] for c in mock_log.call_args_list]
     assert events.count("source_acceptance_unverified") == 2
@@ -193,14 +192,13 @@ def test_main_nonapprove_verdicts_remain_held(tmp_path, verdict, expected_event)
          patch("scripts.quality.dispatch_388_pilot.make_worktree", return_value=tmp_path), \
          patch("scripts.quality.dispatch_388_pilot.dispatch_codex", return_value=codex_result), \
          patch("scripts.quality.dispatch_388_pilot.build_reviewer_cascade", return_value=[("claude", reviewer)]), \
-         patch("scripts.quality.dispatch_388_pilot.merge_pr") as mock_merge, \
          patch("scripts.quality.dispatch_388_pilot.dispatch_backfill") as mock_backfill, \
          patch("scripts.quality.dispatch_388_pilot.post_review_comment"), \
          patch("scripts.quality.dispatch_388_pilot.time.sleep"), \
          patch("scripts.quality.dispatch_388_pilot.log") as mock_log:
         assert pilot.main(["--input", str(queue)]) == 0
 
-    mock_merge.assert_not_called()
+    assert not hasattr(pilot, "merge_pr")  # the pilot has no merge path at all
     mock_backfill.assert_not_called()
     events = [c.args[0]["event"] for c in mock_log.call_args_list]
     assert expected_event in events

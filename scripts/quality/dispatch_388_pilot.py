@@ -3,7 +3,7 @@
 
 For each module path in --input (default scripts/quality/pilot-2026-05-02.txt):
   1. Worktree at .worktrees/codex-388-pilot-<slug> from origin/main
-  2. Codex (gpt-5.5, mode=danger) rewrites per module-rewriter-388.md,
+  2. Codex (release default model, mode=danger) rewrites per module-rewriter-388.md,
      runs verifier, commits, pushes, opens PR
   3. Cross-family review on the PR (agy — the Google lane — with claude/qwen fallback)
   4. APPROVE       -> retain PR/review and hold for a real source-acceptance receipt
@@ -51,7 +51,6 @@ from lu_machinery.agent_runtime.errors import (
     RateLimitedError,
 )
 from lu_machinery.agent_runtime.runner import invoke
-from lu_machinery.publish import github as publish_github
 
 
 def module_slug_for_pipeline(module_path: str) -> str:
@@ -239,7 +238,7 @@ def dispatch_codex(module_path: str, wt: Path, slug: str):
             prompt=codex_prompt(module_path),
             mode="danger",
             cwd=wt,
-            model="gpt-5.5",
+            model=None,  # lu-machinery release default Codex model
             task_id=f"388-pilot-{slug}",
             entrypoint="dispatch",
             hard_timeout=5400,  # 90 min
@@ -356,7 +355,7 @@ def dispatch_claude_review(pr_num: int, module_path: str, slug: str):
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="read-only",
             cwd=REPO,
-            model="claude-sonnet-4-6",
+            model="claude-sonnet-5-5",
             task_id=f"388-pilot-review-claude-{slug}",
             entrypoint="dispatch",
             hard_timeout=300,
@@ -423,7 +422,7 @@ def dispatch_deepseek_review(pr_num: int, module_path: str, slug: str):
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="workspace-write",  # deepseek benefits from terminal+file access
             cwd=REPO,
-            model="deepseek-v4-pro",
+            model=None,  # lu-machinery release default DeepSeek model
             task_id=f"388-pilot-review-deepseek-{slug}",
             entrypoint="dispatch",
             hard_timeout=600,
@@ -443,7 +442,7 @@ def dispatch_agy_review(pr_num: int, module_path: str, slug: str):
     for the Google One / unpaid tier. Run-time:
     - mode=danger required (dispatch_smart enforces this for agy)
     - no `model=` arg — agy picks model via its TUI panel (env override:
-      KUBEDOJO_AGY_MODEL; adapter default gemini-3.5-flash-high)
+      KUBEDOJO_AGY_MODEL; else the lu-machinery release's default AGY model)
 
     Failure shapes and how they surface to the cascade:
     - Quota-exhausted: invoke returns ok=False, response="" — this function
@@ -499,125 +498,6 @@ def post_review_comment(pr_num: int, body: str) -> None:
          f"## Cross-family review (#388 pilot)\n\n{body}"],
         cwd=REPO, check=False,
     )
-
-
-def merge_pr(pr_num: int) -> str | None:
-    """Merge a PR through ``lu_machinery.publish.github`` and return the merge SHA."""
-    try:
-        view = subprocess.run(
-            ["gh", "pr", "view", str(pr_num), "--json", "headRefOid,baseRefName"],
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        log({"event": "merge_failed", "pr": pr_num, "error": f"gh pr view error: {exc}"})
-        return None
-    if view.returncode != 0:
-        log({"event": "merge_failed", "pr": pr_num, "error": view.stderr.strip()})
-        return None
-    try:
-        pr_info = json.loads(view.stdout or "{}")
-    except json.JSONDecodeError as exc:
-        log({"event": "merge_failed", "pr": pr_num, "error": f"invalid pr view json: {exc}"})
-        return None
-    if not isinstance(pr_info, dict):
-        log({"event": "merge_failed", "pr": pr_num, "error": "pr view payload is not a JSON object"})
-        return None
-    head_oid = str(pr_info.get("headRefOid") or "").strip()
-    base_ref = str(pr_info.get("baseRefName") or "main").strip()
-    if not head_oid:
-        log({"event": "merge_failed", "pr": pr_num, "error": "missing headRefOid"})
-        return None
-
-    try:
-        queue_proc = publish_github.read(
-            "queue-status",
-            number=pr_num,
-            branch=base_ref,
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except (publish_github.gate.PublishBlocked, subprocess.TimeoutExpired, ValueError, OSError) as exc:
-        log({"event": "merge_failed", "pr": pr_num, "error": str(exc)})
-        return None
-    if queue_proc.returncode != 0:
-        log({"event": "merge_failed", "pr": pr_num, "error": (queue_proc.stderr or queue_proc.stdout or "").strip()})
-        return None
-    try:
-        queue_payload = json.loads(queue_proc.stdout or "{}")
-    except json.JSONDecodeError as exc:
-        log({"event": "merge_failed", "pr": pr_num, "error": f"invalid queue-status json: {exc}"})
-        return None
-    data_node = queue_payload.get("data") if isinstance(queue_payload, dict) else None
-    repo_node = data_node.get("repository") if isinstance(data_node, dict) else None
-    pr_node = repo_node.get("pullRequest") if isinstance(repo_node, dict) else None
-    if not isinstance(pr_node, dict):
-        log({"event": "merge_failed", "pr": pr_num, "error": "queue-status missing pullRequest object"})
-        return None
-    if str(pr_node.get("state") or "").upper() != "OPEN":
-        log({"event": "merge_failed", "pr": pr_num, "error": f"PR state is {pr_node.get('state')!r}, not OPEN"})
-        return None
-    live_head = str(pr_node.get("headRefOid") or "").strip()
-    if live_head != head_oid:
-        log({"event": "merge_failed", "pr": pr_num, "error": f"head moved ({head_oid} -> {live_head})"})
-        return None
-    is_queue = pr_node.get("isMergeQueueEnabled")
-    if not isinstance(is_queue, bool):
-        log({"event": "merge_failed", "pr": pr_num, "error": "missing boolean isMergeQueueEnabled"})
-        return None
-
-    try:
-        merge_proc = publish_github.publish(
-            "pr-merge",
-            number=pr_num,
-            match_head=head_oid,
-            expect_queue="true" if is_queue else "false",
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except (publish_github.gate.PublishBlocked, subprocess.TimeoutExpired, ValueError, OSError) as exc:
-        log({"event": "merge_failed", "pr": pr_num, "error": str(exc)})
-        return None
-    if merge_proc.returncode != 0:
-        log({"event": "merge_failed", "pr": pr_num, "error": (merge_proc.stderr or merge_proc.stdout or "").strip()})
-        return None
-    try:
-        merged = json.loads(merge_proc.stdout or "{}")
-    except json.JSONDecodeError:
-        merged = {}
-    sha = merged.get("sha") if isinstance(merged, dict) else None
-    if isinstance(sha, str) and sha.strip():
-        return sha.strip()
-    try:
-        sha_view = subprocess.run(
-            ["gh", "pr", "view", str(pr_num), "--json", "mergeCommit"],
-            cwd=REPO,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        log({"event": "merge_failed", "pr": pr_num, "error": f"mergeCommit lookup failed: {exc}"})
-        return None
-    if sha_view.returncode == 0:
-        try:
-            sha_payload = json.loads(sha_view.stdout or "{}")
-            mc = sha_payload.get("mergeCommit") if isinstance(sha_payload, dict) else None
-            oid = mc.get("oid") if isinstance(mc, dict) else None
-            if isinstance(oid, str) and oid.strip():
-                return oid.strip()
-        except json.JSONDecodeError:
-            pass
-    log({"event": "merge_failed", "pr": pr_num, "error": "merged but mergeCommit oid unavailable"})
-    return None
 
 
 def recheck_module_source_acceptance(worktree: Path, module_path: str) -> dict[str, object]:

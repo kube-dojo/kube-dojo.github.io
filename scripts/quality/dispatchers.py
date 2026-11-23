@@ -111,10 +111,15 @@ def dispatch(
     ``cwd`` defaults to the primary checkout. Pass the worktree path when
     dispatching a writer — Codex's file operations anchor to cwd.
 
-    ``tools_disabled=True`` forces text-only output (no Edit/Write/Bash
-    tool use) for Claude by passing ``tool_config={"allowed_tools": ""}``.
-    Legacy ``"gemini"`` callers route through the ``"agy"`` adapter while
-    preserving ``agent="gemini"`` on the returned :class:`DispatchResult`.
+    Every call runs in ``read-only`` mode. Codex enforces that with its
+    read-only sandbox; AGY runs read-only only on the runtime's bounded
+    reviewer route, so AGY calls request it. Claude's read-only mode still
+    honours allow rules from checkout settings, so ``tools_disabled=True``
+    (text-only writer/reviewer output) asks the runtime for its read-only
+    tool set (``--tools Read,Grep,Glob,LS``): no edit, write or shell tool
+    exists in that run. Legacy ``"gemini"`` callers route through the
+    ``"agy"`` adapter while preserving ``agent="gemini"`` on the returned
+    :class:`DispatchResult`.
 
     Raises :class:`DispatcherUnavailable` when the runtime signals a
     temporary refusal (rate limit, budget, peak hours, unavailable).
@@ -125,7 +130,11 @@ def dispatch(
         raise ValueError(f"unknown agent {agent!r}; expected one of {sorted(VALID_AGENTS)}")
 
     runtime_agent = "agy" if agent == "gemini" else agent
-    tool_config = {"allowed_tools": ""} if (tools_disabled and agent == "claude") else None
+    tool_config: dict[str, bool] | None = None
+    if runtime_agent == "agy":
+        tool_config = {"reviewer_tools": True}
+    elif runtime_agent == "claude" and tools_disabled:
+        tool_config = {"discussion_readonly": True}
 
     t0 = time.monotonic()
     try:
@@ -179,7 +188,7 @@ def dispatch(
         returncode=rc,
         duration_sec=duration,
         agent=agent,
-        model=model,
+        model=res.model or model,
     )
 
 
@@ -212,8 +221,7 @@ def tiebreaker_agent() -> Agent:
     codex/claude writer/reviewer rotation, so its verdict is structurally
     independent (replaces the retired gemini-cli, #2125). The tiebreaker is
     dispatched via ``dispatch(reviewer, ...)`` in stages.py WITHOUT an explicit
-    model, so it resolves to ``dispatch.py``'s ``AGY_DEFAULT_MODEL``
-    (gemini-3.1-pro-high). See #2125 note: to pin the flash review model here
-    the tiebreaker dispatch would need to pass ``model=``.
+    model, so it resolves to the lu-machinery release's default AGY model.
+    To pin a review model here the tiebreaker dispatch would pass ``model=``.
     """
     return "agy"

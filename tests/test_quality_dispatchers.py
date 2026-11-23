@@ -53,15 +53,24 @@ def test_dispatcher_unavailable_is_runtime_error() -> None:
 
 
 class _FakeRuntimeResult:
-    def __init__(self, *, ok: bool = True, response: str = "", stderr_excerpt: str = "", returncode: int | None = 0):
+    def __init__(
+        self,
+        *,
+        ok: bool = True,
+        response: str = "",
+        stderr_excerpt: str = "",
+        returncode: int | None = 0,
+        model: str | None = None,
+    ):
         self.ok = ok
+        self.model = model
         self.response = response
         self.stderr_excerpt = stderr_excerpt
         self.returncode = returncode
 
 
 def test_dispatch_result_fields_populated(monkeypatch) -> None:
-    """Dispatch surfaces response/stderr/returncode/duration from agent_runtime."""
+    """Dispatch surfaces response/stderr/returncode/duration from lu_machinery.agent_runtime."""
     captured: dict = {}
 
     def fake_invoke(agent, prompt, **kwargs):
@@ -121,9 +130,10 @@ def test_dispatch_timeout_returns_failure(monkeypatch) -> None:
     assert "timeout" in result.stderr.lower()
 
 
-def test_dispatch_passes_empty_allowed_tools_for_claude_when_tools_disabled(monkeypatch) -> None:
-    """Claude writer/reviewer dispatches must disable tools via ``tool_config``
-    so the CLI returns text-only output rather than editing files in cwd."""
+def test_dispatch_requests_read_only_tool_set_for_claude_when_tools_disabled(monkeypatch) -> None:
+    """Claude writer/reviewer dispatches must run without edit, write or shell
+    tools so the CLI returns text-only output rather than editing files in cwd.
+    Read-only mode alone still honours checkout allow rules for Claude."""
     captured: dict = {}
 
     def capture_invoke(agent, prompt, **kwargs):
@@ -133,7 +143,8 @@ def test_dispatch_passes_empty_allowed_tools_for_claude_when_tools_disabled(monk
 
     monkeypatch.setattr(dispatchers, "invoke", capture_invoke)
     dispatchers.dispatch("claude", "prompt", timeout=10, tools_disabled=True)
-    assert captured["kwargs"]["tool_config"] == {"allowed_tools": ""}
+    assert captured["kwargs"]["mode"] == "read-only"
+    assert captured["kwargs"]["tool_config"] == {"discussion_readonly": True}
 
 
 def test_dispatch_omits_tool_config_when_not_requested(monkeypatch) -> None:
@@ -150,7 +161,8 @@ def test_dispatch_omits_tool_config_when_not_requested(monkeypatch) -> None:
 
 
 def test_dispatch_tools_disabled_only_for_claude(monkeypatch) -> None:
-    """Codex/Gemini do not set Claude tool_config when tools_disabled=True."""
+    """Codex keeps its read-only sandbox; AGY always asks for the bounded
+    reviewer route, which is the only route that admits read-only AGY."""
     captured: dict = {}
 
     def capture_invoke(agent, prompt, **kwargs):
@@ -162,4 +174,4 @@ def test_dispatch_tools_disabled_only_for_claude(monkeypatch) -> None:
     assert captured["kwargs"]["tool_config"] is None
     captured.clear()
     dispatchers.dispatch("gemini", "prompt", timeout=10, tools_disabled=True)
-    assert captured["kwargs"]["tool_config"] is None
+    assert captured["kwargs"]["tool_config"] == {"reviewer_tools": True}

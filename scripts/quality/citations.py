@@ -231,8 +231,8 @@ def default_verifier(prompt: str) -> DispatchResult:
     """Production verifier — agy flash (Google lane), short per-URL timeout.
 
     gemini-cli is retired (#2125); the flash-tier review model on the agy lane
-    is gemini-3.5-flash-high."""
-    return dispatch("agy", prompt, timeout=60, model="gemini-3.5-flash-high")
+    is gemini-4-hydrogen-medium."""
+    return dispatch("agy", prompt, timeout=60, model="gemini-4-hydrogen-medium")
 
 
 def verify_citation(

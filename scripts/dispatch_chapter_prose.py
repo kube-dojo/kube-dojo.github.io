@@ -17,8 +17,8 @@ do not invent examples, do not expand beyond the approved Prose
 Capacity Plan.
 
 The 2026-04-28 → 2026-04-29 difference: previously the expansion role
-went to Claude opus by default; now it goes to Codex (gpt-5.5,
-reasoning=high) because gpt-5.5 has wider weekly bandwidth and
+went to Claude opus by default; now it goes to Codex (the lu-machinery
+release's default Codex model) because Codex has wider weekly bandwidth and
 Codex's source-discipline instinct is the strongest of the three
 families. Claude opus stays in the loop as the source-fidelity
 reviewer (independent fresh session), and as the expansion fallback.
@@ -57,7 +57,13 @@ from textwrap import dedent
 
 import yaml
 
-REPO = Path("/Users/krisztiankoos/projects/kubedojo")
+_CHECKOUT = Path(__file__).resolve().parents[1]
+# The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
+REPO = (
+    Path(*_CHECKOUT.parts[: _CHECKOUT.parts.index(".worktrees")])
+    if ".worktrees" in _CHECKOUT.parts
+    else _CHECKOUT
+)
 
 CONTRACT_FILES = ["brief.md", "sources.md", "scene-sketches.md",
                   "timeline.md", "people.md", "infrastructure-log.md",
@@ -391,7 +397,7 @@ def _expansion_prompt(*, agent_label: str, slug: str, ch_num: int,
 def codex_prompt(*, slug: str, ch_num: int, cap_words: int,
                  staged_paths: dict[str, str], prose_path: str) -> str:
     return _expansion_prompt(
-        agent_label="Codex (gpt-5.5, default expander)",
+        agent_label="Codex (default expander)",
         slug=slug, ch_num=ch_num, cap_words=cap_words,
         staged_paths=staged_paths, prose_path=prose_path,
     )
@@ -445,22 +451,22 @@ def fire_phase(*, agent: str, prompt: str, worktree: Path, task_id: str,
         # intentionally NOT honored — it would inject a retired gemini-cli slug.
         # Sister var KUBEDOJO_AGY_REVIEW_MODEL in dispatch_prose_review.py.
         import os
-        model = os.environ.get("KUBEDOJO_AGY_DRAFT_MODEL", "gemini-3.1-pro-high")
+        model = os.environ.get("KUBEDOJO_AGY_DRAFT_MODEL", "gemini-4-neon-high")
         timeout = 2400
         mode = "workspace-write"
     elif agent == "codex":
-        # gpt-5.5 + model_reasoning_effort=high pinned in
-        # ~/.codex/config.toml. Codex needs `danger` mode (not
+        # model=None takes the lu-machinery release's default Codex
+        # model (catalog-admitted). Codex needs `danger` mode (not
         # workspace-write) so it can self-commit on the worktree
         # branch — workspace-write blocks
         # `.git/worktrees/<name>/index.lock` as documented in
         # `feedback_codex_workspace_write_default.md` and observed
         # again 2026-04-29 on the Ch03 fix-applier dispatch.
-        model = "gpt-5.5"
+        model = None
         timeout = 3600
         mode = "danger"
     elif agent == "claude":
-        model = "claude-opus-4-8"
+        model = "claude-opus-5-5"
         timeout = 3600
         mode = "workspace-write"
     else:

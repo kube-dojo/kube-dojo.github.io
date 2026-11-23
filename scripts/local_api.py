@@ -2074,8 +2074,8 @@ def _resolve_bridge_db_path(repo_root: Path) -> Path:
          ``exists=False`` when that happens. (Codex round-2 caught that
          previously we only honored AB_DB_PATH when the file already
          existed — quietly reading the wrong DB on a fresh override.)
-      2. ``.bridge/messages.db`` — set by the ``scripts/ab`` wrapper
-         and by the repo setup guide; the repo convention.
+      2. ``.bridge/messages.db`` — the legacy bridge database path
+         from the repo setup guide; the repo convention.
       3. ``.mcp/servers/message-broker/messages.db`` — the upstream
          Python default when no wrapper is used.
     Within 2 and 3, the first existing file wins; if neither exists,

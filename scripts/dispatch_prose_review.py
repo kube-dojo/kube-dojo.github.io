@@ -13,7 +13,7 @@ Per the 2026-04-29 prose pipeline pivot
 (`docs/research/ai-history/TEAM_WORKFLOW.md` § 5b–7):
 
 - Claude opus does **source-fidelity** review on Codex-expanded prose.
-- Codex (gpt-5.5) does **prose-quality** review on Claude-expanded prose
+- Codex does **prose-quality** review on Claude-expanded prose
   (the Claude-default cohort, Ch01-05).
 - Gemini does **prose-quality** review when Codex bandwidth is exhausted.
 
@@ -36,7 +36,13 @@ import sys
 from pathlib import Path
 from textwrap import dedent
 
-REPO = Path("/Users/krisztiankoos/projects/kubedojo")
+_CHECKOUT = Path(__file__).resolve().parents[1]
+# The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
+REPO = (
+    Path(*_CHECKOUT.parts[: _CHECKOUT.parts.index(".worktrees")])
+    if ".worktrees" in _CHECKOUT.parts
+    else _CHECKOUT
+)
 sys.path.insert(0, str(REPO / "scripts"))
 
 CONTRACT_FILES = ["brief.md", "sources.md", "scene-sketches.md",
@@ -370,11 +376,11 @@ def fire(reviewer: str, *, prompt: str, slug: str) -> tuple[bool, str]:
     from lu_machinery.agent_runtime.runner import invoke
 
     if reviewer == "claude":
-        model = "claude-opus-4-8"
+        model = "claude-opus-5-5"
         timeout = 1500
     elif reviewer == "codex":
-        # gpt-5.5 + model_reasoning_effort=high pinned in ~/.codex/config.toml
-        model = "gpt-5.5"
+        # None takes the lu-machinery release's default Codex model.
+        model = None
         timeout = 1500
     elif reviewer == "agy":
         # agy pro lane (replaced the retired gemini-cli, #2125/#2230). Pro
@@ -384,7 +390,7 @@ def fire(reviewer: str, *, prompt: str, slug: str) -> tuple[bool, str]:
         # KUBEDOJO_AGY_REVIEW_MODEL. The legacy KUBEDOJO_GEMINI_REVIEW_MODEL is
         # intentionally NOT honored — it would inject a retired gemini-cli slug.
         import os
-        model = os.environ.get("KUBEDOJO_AGY_REVIEW_MODEL", "gemini-3.1-pro-high")
+        model = os.environ.get("KUBEDOJO_AGY_REVIEW_MODEL", "gemini-4-neon-high")
         timeout = 900
     else:
         raise ValueError(reviewer)
@@ -398,6 +404,8 @@ def fire(reviewer: str, *, prompt: str, slug: str) -> tuple[bool, str]:
             task_id=f"prose-review-{slug}-{reviewer}",
             entrypoint="consult",
             hard_timeout=timeout,
+            # AGY runs read-only only on its bounded reviewer route.
+            tool_config={"reviewer_tools": True} if reviewer == "agy" else None,
         )
         return r.ok, (r.response or "")
     except (RateLimitedError, AgentTimeoutError) as e:

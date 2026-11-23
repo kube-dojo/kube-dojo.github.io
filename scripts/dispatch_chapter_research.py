@@ -32,21 +32,26 @@ import subprocess
 from pathlib import Path
 from textwrap import dedent
 
-REPO = Path("/Users/krisztiankoos/projects/kubedojo")
+_CHECKOUT = Path(__file__).resolve().parents[1]
+# The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
+REPO = (
+    Path(*_CHECKOUT.parts[: _CHECKOUT.parts.index(".worktrees")])
+    if ".worktrees" in _CHECKOUT.parts
+    else _CHECKOUT
+)
 
 
 AGENT_DEFAULTS: dict[str, dict[str, object]] = {
     "claude": {
-        "model": "claude-opus-4-8",
+        "model": "claude-opus-5-5",
         "owner_label": "Claude",
         # Keep claude-opus pegged at 60 min; mirrors prior behavior.
         "hard_timeout": 3600,
     },
     "codex": {
-        # gpt-5.5 + reasoning=high is set in ~/.codex/config.toml as the
-        # user-level default; passing model="gpt-5.5" here keeps it
-        # explicit per reference_codex_models.md.
-        "model": "gpt-5.5",
+        # None takes the lu-machinery release's default Codex model, so a
+        # catalog retirement never strands this dispatcher on a dead pin.
+        "model": None,
         "owner_label": "Codex",
         "hard_timeout": 3600,
     },
@@ -172,7 +177,7 @@ def make_prompt(*, ch_num: int, slug: str, supersede_pr: int | None,
 
         ## Workflow
 
-        1. `cd /Users/krisztiankoos/projects/kubedojo/.worktrees/{agent}-394-ch{ch_num:02d}-research`
+        1. `cd {REPO}/.worktrees/{agent}-394-ch{ch_num:02d}-research`
         2. Read TEAM_WORKFLOW, the Ch11 templates, the existing
            legacy chapter dir and prose if any, the staged files if
            any.
@@ -269,7 +274,7 @@ def fire_dispatch(*, worktree: Path, prompt: str, task_id: str,
     from lu_machinery.agent_runtime.runner import invoke
 
     cfg = AGENT_DEFAULTS[agent]
-    model = str(cfg["model"])
+    model = cfg["model"]
     timeout = int(cfg["hard_timeout"])  # type: ignore[arg-type]
     print(f"[dispatch] firing {agent} ({model}) on {task_id} ...")
     result = invoke(
