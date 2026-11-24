@@ -432,6 +432,12 @@ def main() -> int:
     p.add_argument("--no-post", action="store_true",
                    help="print review to stdout instead of posting")
     args = p.parse_args()
+    import os
+    override = os.environ.get("KUBEDOJO_AGY_REVIEW_MODEL")
+    if args.reviewer == "agy" and override:
+        from lu_machinery.review.model_catalog import retired_model_refusal
+        if refusal := retired_model_refusal(override):
+            p.error(f"KUBEDOJO_AGY_REVIEW_MODEL={override!r}: {refusal}")
 
     meta = fetch_pr_meta(args.pr_num)
     prose_branch = meta["headRefName"]

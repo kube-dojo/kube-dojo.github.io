@@ -5,7 +5,7 @@ queue (Issue #394). Generalized 2026-04-28 evening so Parts 6/7 can flip
 to Codex when Claude's weekly credit pool is throttled. Each call spins
 up a fresh `<agent>/394-ch{N}-research` worktree off main, drops a
 focused prompt that points the headless agent at the chapter slug
-directory, and fires `agent_runtime.runner.invoke` in workspace-write
+directory, and fires `lu_machinery.agent_runtime.runner.invoke` in danger
 mode with the agent's right model + reasoning settings.
 
 Usage:

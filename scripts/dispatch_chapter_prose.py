@@ -50,6 +50,7 @@ expand a pre-drafted file.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -60,7 +61,7 @@ import yaml
 _CHECKOUT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_CHECKOUT / "scripts"))
 
-from quality.writer_commit import Snapshot, produced, rev, snapshot
+from quality.writer_commit import GIT_TIMEOUT_S, Snapshot, produced, rev, snapshot
 
 # The primary checkout: dispatch worktrees live under <primary>/.worktrees/.
 REPO = (
@@ -451,10 +452,13 @@ def _prose_committed_since(worktree: Path, prose_path: str, branch: str,
     if rev(worktree, "HEAD") != final:
         print(f"[fire] chapter not delivered: HEAD is not {branch}", file=sys.stderr)
         return False
-    status = subprocess.run(
-        ["git", "status", "--porcelain", "--", prose_path],
-        cwd=worktree, capture_output=True, text=True, check=False,
-    )
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--", prose_path],
+            cwd=worktree, capture_output=True, text=True, check=False, timeout=GIT_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        status = subprocess.CompletedProcess([], 124, "", "")
     if status.returncode != 0 or status.stdout.strip():
         print(f"[fire] chapter not delivered: uncommitted changes to {prose_path}", file=sys.stderr)
         return False
@@ -595,6 +599,11 @@ def main() -> int:
     phases = [s.strip() for s in args.phases.split(",") if s.strip()]
     if not phases:
         p.error("--phases must name at least one phase")
+    override = os.environ.get("KUBEDOJO_AGY_DRAFT_MODEL")
+    if "agy" in phases and override:
+        from lu_machinery.review.model_catalog import retired_model_refusal
+        if refusal := retired_model_refusal(override):
+            p.error(f"KUBEDOJO_AGY_DRAFT_MODEL={override!r}: {refusal}")
 
     verdicts = ""
     if args.verdict_notes_pr is not None:

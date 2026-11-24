@@ -146,6 +146,9 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=300, help="Per-module timeout seconds")
     ap.add_argument("--force", action="store_true", help="Re-audit even if output exists")
     args = ap.parse_args()
+    from lu_machinery.review.model_catalog import retired_model_refusal
+    if refusal := retired_model_refusal(args.model):
+        ap.error(f"--model {args.model!r}: {refusal}")
 
     if args.workers > 3:
         print(f"workers capped 3 (requested {args.workers})", file=sys.stderr)

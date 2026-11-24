@@ -157,12 +157,13 @@ def test_recovered_commit_success_still_checks_actual_output(isolated, monkeypat
 
 def _git(cwd, *args):
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
-                   cwd=cwd, check=True, capture_output=True)
+                   cwd=cwd, check=True, capture_output=True, timeout=60)
 
 
 @pytest.mark.parametrize(("writer", "success"), [
     ("idle", False), ("uncommitted", False), ("reverted", False), ("rollback", False),
-    ("other_branch", False), ("fast_forward_prior", False), ("committed", True),
+    ("other_branch", False), ("fast_forward_prior", False), ("ff_edit_revert", False),
+    ("committed", True), ("commit_after_prior", True),
 ])
 def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_path, capsys, writer, success):
     """Defect class: a writer reports success but this phase left no new, net,
@@ -170,8 +171,9 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
     bytes written but never committed, which the later push would leave
     behind; a commit followed by its reversal; a reset to an older commit; a
     commit on another branch; or a fast-forward to output that existed before
-    the phase, such as an earlier run's branch), so the pipeline must not
-    advance on it."""
+    the phase, such as an earlier run's branch, also when followed by an edit
+    and its reversal), so the pipeline must not advance on it. New work on top
+    of earlier output is still accepted."""
     arguments(monkeypatch, phases="agy")
     path = isolated["path"]
     path.parent.mkdir(parents=True)
@@ -187,15 +189,20 @@ def test_phase_success_without_artifact_change_fails(isolated, monkeypatch, tmp_
     _git(tmp_path, "checkout", "-q", "test-branch")
 
     def provider(*args, **kwargs):
-        if writer == "fast_forward_prior":
+        if writer in ("fast_forward_prior", "ff_edit_revert", "commit_after_prior"):
             _git(tmp_path, "merge", "-q", "--ff-only", "prior-output")
+        if writer == "ff_edit_revert":
+            path.write_text("temporary", encoding="utf-8")
+            _git(tmp_path, "commit", "-q", "-am", "temporary")
+            path.write_text("prior output", encoding="utf-8")
+            _git(tmp_path, "commit", "-q", "-am", "revert temporary")
         if writer == "rollback":
             _git(tmp_path, "reset", "-q", "--hard", "HEAD~1")
         if writer == "other_branch":
             _git(tmp_path, "checkout", "-q", "-b", "elsewhere")
-        if writer in ("uncommitted", "reverted", "other_branch", "committed"):
+        if writer in ("uncommitted", "reverted", "other_branch", "committed", "commit_after_prior"):
             path.write_text("one two", encoding="utf-8")
-        if writer in ("reverted", "other_branch", "committed"):
+        if writer in ("reverted", "other_branch", "committed", "commit_after_prior"):
             _git(tmp_path, "commit", "-q", "-am", "draft")
         if writer == "reverted":
             path.write_text("stub", encoding="utf-8")

@@ -55,10 +55,17 @@ TERTIARY = "claude-opus-5-5"
 _MODEL_TO_AGENT: dict[str, tuple[str, str]] = {
     PRIMARY_BEGINNER: ("agy", PRIMARY_BEGINNER),
     TERTIARY: ("claude", TERTIARY),
-    # Queue rows recorded under a retired model id still resolve to its
-    # catalog successor at the same tier.
+    # Queue rows record the id their slot held when they were routed. Every id
+    # a slot has ever held (git history of PRIMARY_BEGINNER, PRIMARY_ADVANCED
+    # and TERTIARY) resolves to the slot's current holder: the documented
+    # successor, never a guess. Any other id stays unknown and is refused.
+    "claude-opus-4-7": ("claude", TERTIARY),
     "claude-opus-4-8": ("claude", TERTIARY),
+    "gemini-3.1-pro-preview": ("agy", PRIMARY_BEGINNER),
     "gemini-3.1-pro-high": ("agy", PRIMARY_BEGINNER),
+    # gpt-5.5 held PRIMARY_ADVANCED until the advanced slot moved to the
+    # Google lane (dd33ad2ba); its successor is that slot's current holder.
+    "gpt-5.5": ("agy", PRIMARY_ADVANCED),
 }
 
 

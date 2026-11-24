@@ -13,11 +13,15 @@ their callers prove the delivery from git state instead:
   commit only when it strictly descends from the start, at least one commit
   in its history touches the artifact and was reachable from none of the
   pre-dispatch tips (or from a known prior output such as an earlier published
-  PR head), the artifact differs from the start, and the artifact exists.
+  PR head), the artifact differs both from the start and from every
+  pre-dispatch commit the new commits build on (the prior-output boundary),
+  and the artifact exists.
 
 An idle run, an uncommitted write, a commit followed by its reversal, a reset
-to an older commit, a fast-forward to output that existed before dispatch and
-an unrelated commit are each refused with a typed reason.
+to an older commit, a fast-forward to output that existed before dispatch
+(also when followed by an edit and its reversal) and an unrelated commit are
+each refused with a typed reason. Every git call is bounded; an expired or
+failed call refuses with ``git_error``.
 """
 from __future__ import annotations
 
@@ -34,10 +38,18 @@ class Snapshot:
     prior_tips: tuple[str, ...]
 
 
+GIT_TIMEOUT_S = 120
+
+
 def _git(worktree: Path, *args: str, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=worktree, input=stdin, capture_output=True, text=True, check=False,
-    )
+    argv = ["git", *args]
+    try:
+        return subprocess.run(
+            argv, cwd=worktree, input=stdin, capture_output=True, text=True, check=False,
+            timeout=GIT_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(argv, 124, "", f"git timed out after {GIT_TIMEOUT_S}s")
 
 
 def rev(worktree: Path, ref: str) -> str | None:
@@ -92,11 +104,17 @@ def produced(worktree: Path, before: Snapshot, artifact: str, ref: str = "HEAD")
         return final, "git_error"
     if not fresh.stdout.strip():
         return final, "no_new_artifact_commit"
-    diff = _git(worktree, "diff", "--name-only", before.start, final, "--", artifact)
-    if diff.returncode != 0:
+    boundary = _git(worktree, "rev-list", "--boundary", "--stdin", final,
+                    stdin="".join(f"^{s}\n" for s in excluded))
+    if boundary.returncode != 0:
         return final, "git_error"
-    if not diff.stdout.strip():
-        return final, "no_net_change"
+    bases = {before.start} | {line[1:] for line in boundary.stdout.split() if line.startswith("-")}
+    for base in sorted(bases):
+        diff = _git(worktree, "diff", "--name-only", base, final, "--", artifact)
+        if diff.returncode != 0:
+            return final, "git_error"
+        if not diff.stdout.strip():
+            return final, "no_net_change"
     tree = _git(worktree, "ls-tree", "-r", "--name-only", final, "--", artifact)
     if tree.returncode != 0 or not tree.stdout.strip():
         return final, "artifact_missing"

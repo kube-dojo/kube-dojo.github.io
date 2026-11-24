@@ -86,6 +86,28 @@ def _module_path_for_marker(module_path: str) -> str:
     return normalized
 
 
+def repo_relative_module(module_path: str) -> str | None:
+    """The queue entry as a validated ``src/content/docs/...`` path, or ``None``.
+
+    Queue rows may name a module relative to the repository or absolutely
+    under this checkout or the primary one. Everything downstream (the writer
+    prompt, the commit check in the module worktree, source acceptance) uses
+    the one repository-relative form; anything else is refused.
+    """
+    path = Path(module_path)
+    if path.is_absolute():
+        for root in (REPO, PRIMARY_REPO):
+            if path.is_relative_to(root):
+                path = path.relative_to(root)
+                break
+        else:
+            return None
+    rel = path.as_posix()
+    if ".." in path.parts or not rel.startswith("src/content/docs/") or not rel.endswith(".md"):
+        return None
+    return rel
+
+
 def _module_budget_slug(module_path: str) -> str:
     module = Path(module_path)
     if not module.is_absolute():
@@ -320,23 +342,41 @@ def orchestrator_open_pr(slug: str, module_path: str, codex_response: str) -> in
     return pr_num
 
 
-def _published_branch_head(slug: str) -> str | None:
-    """The head the module's PR branch already has on GitHub, if any."""
-    ls = subprocess.run(
-        ["git", "ls-remote", "origin", f"refs/heads/codex/388-pilot-{slug}"],
-        cwd=REPO, capture_output=True, text=True, check=False,
-    )
+REMOTE_TIMEOUT_S = 120
+
+
+def _published_branch_head(slug: str) -> tuple[bool, str | None]:
+    """``(looked_up, head)`` for the module's PR branch on GitHub.
+
+    ``(True, None)`` means the branch is confirmed absent; ``(False, None)``
+    means the lookup failed or timed out, so the published baseline is unknown.
+    """
+    try:
+        ls = subprocess.run(
+            ["git", "ls-remote", "--exit-code", "origin", f"refs/heads/codex/388-pilot-{slug}"],
+            cwd=REPO, capture_output=True, text=True, check=False, timeout=REMOTE_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return False, None
+    if ls.returncode == 2:  # --exit-code: the remote answered and has no such ref
+        return True, None
     fields = ls.stdout.split() if ls.returncode == 0 else []
-    return fields[0] if fields else None
+    return (True, fields[0]) if fields else (False, None)
 
 
-def writer_snapshot(wt: Path, slug: str) -> Snapshot:
-    """Pre-dispatch state for :func:`writer_committed_module`.
+def writer_snapshot(wt: Path, slug: str) -> Snapshot | None:
+    """Pre-dispatch state for :func:`writer_committed_module`, or ``None``.
 
     The worktree is reused across runs, so earlier output may sit on a local
     branch, in a reflog or only on GitHub; all of it counts as prior output.
+    ``None`` means that baseline is unknown (the GitHub lookup failed or the
+    local read failed), and the module must not be dispatched.
     """
-    return snapshot(wt, "HEAD", prior_outputs=(_published_branch_head(slug),))
+    looked_up, published = _published_branch_head(slug)
+    if not looked_up:
+        return None
+    before = snapshot(wt, "HEAD", prior_outputs=(published,))
+    return before if before.start is not None else None
 
 
 def writer_committed_module(wt: Path, module_path: str, before: Snapshot) -> tuple[bool, dict[str, str | None]]:
@@ -363,11 +403,14 @@ def published_head_matches(pr_num: int, wt: Path, checked_head: str | None) -> t
     fallback branch probe. Review must see the commit the writer made, so a
     stale or unpublished head stops here.
     """
-    remote = subprocess.run(
-        ["gh", "pr", "view", str(pr_num), "--json", "headRefOid", "--jq", ".headRefOid"],
-        cwd=wt, capture_output=True, text=True, check=False,
-    )
-    pr_head = remote.stdout.strip() if remote.returncode == 0 else None
+    try:
+        remote = subprocess.run(
+            ["gh", "pr", "view", str(pr_num), "--json", "headRefOid", "--jq", ".headRefOid"],
+            cwd=wt, capture_output=True, text=True, check=False, timeout=REMOTE_TIMEOUT_S,
+        )
+        pr_head = remote.stdout.strip() if remote.returncode == 0 else None
+    except subprocess.TimeoutExpired:
+        pr_head = None
     detail = {"local_head": checked_head, "pr_head": pr_head, "reason": "pr_head_not_published"}
     return bool(checked_head) and checked_head == pr_head, detail
 
@@ -704,7 +747,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.max and args.max > 0:
         queue = queue[: args.max]
     log({"event": "pilot_start", "count": len(queue), "input": str(input_file), "repo": str(REPO)})
-    for module_path, requested_budget in queue:
+    for queued_path, requested_budget in queue:
+        module_path = repo_relative_module(queued_path)
+        if module_path is None:
+            log({"event": "module_skip", "module": queued_path, "reason": "module_path_outside_repo"})
+            continue
         if requested_budget is not None:  # declared for visibility only; never a writer target or gate
             _write_budget_sidecar(module_path, requested_budget)
             log({"event": "budget_sidecar_written", "module": module_path, "body_words_min": requested_budget})
@@ -716,6 +763,9 @@ def main(argv: list[str] | None = None) -> int:
             log({"event": "worktree_error", "module": module_path, "error": repr(e)})
             continue
         before = writer_snapshot(wt, slug)
+        if before is None:
+            log({"event": "module_skip", "module": module_path, "reason": "published_baseline_unknown"})
+            continue
         codex_result = dispatch_codex(module_path, wt, slug)
         if codex_result is None or not codex_result.ok:
             log({"event": "module_skip", "module": module_path, "reason": "codex_failed"})
