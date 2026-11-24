@@ -68,11 +68,20 @@ def _git_path(repo_root: Path, *args: str) -> Path | None:
     return Path(os.fsdecode(out)).resolve()
 
 
-def _main_tree_of(path: Path, common: Path) -> bool:
-    """True when ``path`` is the main working tree of the repository whose common dir is ``common``."""
+def _verified_main_tree(path: Path, common: Path) -> Path | None:
+    """The working tree Git reports for ``path``, if it is the main tree of ``common``.
+
+    Git is asked for the top level from ``path`` (which may be a directory
+    inside the checkout, a metadata directory with ``core.worktree`` set, or
+    the checkout itself), and that top level is accepted only when its own
+    git directory is the repository's common directory.
+    """
     top = _git_path(path, "rev-parse", "--path-format=absolute", "--show-toplevel")
-    git_dir = _git_path(path, "rev-parse", "--path-format=absolute", "--git-dir")
-    return top == path.resolve() and git_dir == common
+    if top is None:
+        return None
+    top_git_dir = _git_path(top, "rev-parse", "--path-format=absolute", "--git-dir")
+    top_level = _git_path(top, "rev-parse", "--path-format=absolute", "--show-toplevel")
+    return top if top_git_dir == common and top_level == top else None
 
 
 def _primary_checkout(repo_root: Path) -> Path | None:
@@ -83,9 +92,9 @@ def _primary_checkout(repo_root: Path) -> Path | None:
     one whose metadata lives elsewhere (``--separate-git-dir``), and then the
     answer is its own top level. For a linked worktree, the first entry of
     ``git worktree list --porcelain`` is only a candidate: Git names the
-    metadata directory there when the main tree keeps its metadata apart, so
-    the candidate, or else its parent, is accepted only when Git confirms it
-    is the main working tree of the same repository. The KubeDojo API is a
+    metadata directory there when the main tree keeps its metadata apart. The
+    top level Git reports from the candidate, or else from its parent, is
+    accepted only when its git directory is the same common directory. The KubeDojo API is a
     product service and runs on the product interpreter, which does not
     install lu-machinery, so it asks Git directly. ``None`` when Git cannot
     answer or confirm, which the health check reports as critical.
@@ -109,8 +118,9 @@ def _primary_checkout(repo_root: Path) -> Path | None:
         return None
     candidate = Path(os.fsdecode(first[len(b"worktree "):])).resolve()
     for path in (candidate, candidate.parent):
-        if _main_tree_of(path, common):
-            return path
+        verified = _verified_main_tree(path, common)
+        if verified is not None:
+            return verified
     return None
 
 
