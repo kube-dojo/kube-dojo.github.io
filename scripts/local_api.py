@@ -100,8 +100,10 @@ def _primary_checkout(repo_root: Path) -> Path | None:
     ``git worktree list --porcelain`` is only a candidate: Git names the
     metadata directory there when the main tree keeps its metadata apart. The
     top level Git reports from the candidate, or else from its nearest
-    ancestor (a nested repository in between is passed over), is accepted only
-    when its git directory is the same common directory. The KubeDojo API is a
+    ancestor, or else from an ancestor of the linked worktree itself (a main
+    tree that holds its worktrees under ``.worktrees/``), is accepted only
+    when its git directory is the same common directory; a nested repository
+    in between is passed over. The KubeDojo API is a
     product service and runs on the product interpreter, which does not
     install lu-machinery, so it asks Git directly. ``None`` when Git cannot
     answer or confirm, which the health check reports as critical.
@@ -117,18 +119,22 @@ def _primary_checkout(repo_root: Path) -> Path | None:
     recorded = _verified_main_tree(common, common, explicit=True)
     if recorded is not None:
         return recorded
+    places: list[Path] = []
     try:
         listing = subprocess.run(
             ["git", "-C", str(repo_root), "worktree", "list", "--porcelain", "-z"],
             check=False, capture_output=True, timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return None
-    first = listing.stdout.split(b"\0", 1)[0] if listing.returncode == 0 else b""
-    if not first.startswith(b"worktree "):
-        return None
-    candidate = Path(os.fsdecode(first[len(b"worktree "):])).resolve()
-    for path in (candidate, *candidate.parents):
+        listing = None
+    first = listing.stdout.split(b"\0", 1)[0] if listing and listing.returncode == 0 else b""
+    if first.startswith(b"worktree "):
+        candidate = Path(os.fsdecode(first[len(b"worktree "):])).resolve()
+        places += [candidate, *candidate.parents]
+    # A linked worktree inside the main tree (``.worktrees/``) when Git lists
+    # only the metadata directory.
+    places += top.parents
+    for path in dict.fromkeys(places):
         verified = _verified_main_tree(path, common)
         if verified is not None:
             return verified
