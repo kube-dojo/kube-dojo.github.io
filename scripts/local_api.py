@@ -68,15 +68,19 @@ def _git_path(repo_root: Path, *args: str) -> Path | None:
     return Path(os.fsdecode(out)).resolve()
 
 
-def _verified_main_tree(path: Path, common: Path) -> Path | None:
+def _verified_main_tree(path: Path, common: Path, *, explicit: bool = False) -> Path | None:
     """The working tree Git reports for ``path``, if it is the main tree of ``common``.
 
     Git is asked for the top level from ``path`` (which may be a directory
     inside the checkout, a metadata directory with ``core.worktree`` set, or
     the checkout itself), and that top level is accepted only when its own
-    git directory is the repository's common directory.
+    git directory is the repository's common directory. With ``explicit``,
+    the first question names ``common`` as the git directory instead of
+    relying on discovery, which ``safe.bareRepository=explicit`` refuses
+    inside a metadata directory.
     """
-    top = _git_path(path, "rev-parse", "--path-format=absolute", "--show-toplevel")
+    named = (f"--git-dir={common}",) if explicit else ()
+    top = _git_path(path, *named, "rev-parse", "--path-format=absolute", "--show-toplevel")
     if top is None:
         return None
     top_git_dir = _git_path(top, "rev-parse", "--path-format=absolute", "--git-dir")
@@ -90,7 +94,9 @@ def _primary_checkout(repo_root: Path) -> Path | None:
     A checkout is the main working tree exactly when its git directory is the
     repository's common directory; that holds for an ordinary checkout and for
     one whose metadata lives elsewhere (``--separate-git-dir``), and then the
-    answer is its own top level. For a linked worktree, the first entry of
+    answer is its own top level. For a linked worktree, a main tree the
+    metadata itself records (``core.worktree``) is asked for first, naming the
+    common directory explicitly. Otherwise the first entry of
     ``git worktree list --porcelain`` is only a candidate: Git names the
     metadata directory there when the main tree keeps its metadata apart. The
     top level Git reports from the candidate, or else from its nearest
@@ -107,6 +113,10 @@ def _primary_checkout(repo_root: Path) -> Path | None:
         return None
     if git_dir == common:
         return top
+    # A main tree recorded in the metadata itself (``core.worktree``).
+    recorded = _verified_main_tree(common, common, explicit=True)
+    if recorded is not None:
+        return recorded
     try:
         listing = subprocess.run(
             ["git", "-C", str(repo_root), "worktree", "list", "--porcelain", "-z"],
