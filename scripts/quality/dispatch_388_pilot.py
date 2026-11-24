@@ -168,11 +168,14 @@ def _queue_from_file(input_file: Path) -> list[tuple[str, int | None]]:
                 continue
             loaded.append((path, int(budget_value)))
         return loaded
-    # splitlines() removes only the record delimiter; the rest of the line is
-    # validated as given, so a padded spelling is refused, not trimmed.
+    # Records are universal-newline lines: read_text() folds \r\n and \r into
+    # \n, and only \n splits. (str.splitlines() would also split on vertical
+    # tab, form feed, U+001C-U+001E, U+0085, U+2028 and U+2029 and so drop
+    # them from a row.) The rest of each line is validated as given, so a
+    # padded spelling is refused, not trimmed.
     return [
         (line, None)
-        for line in input_file.read_text(encoding="utf-8").splitlines()
+        for line in input_file.read_text(encoding="utf-8").split("\n")
         if line.strip() and not line.lstrip().startswith("#")
     ]
 
