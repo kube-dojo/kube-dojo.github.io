@@ -43,6 +43,7 @@ import hashlib
 import html.parser
 import http.client
 import json
+import posixpath
 import re
 import urllib.error
 import urllib.parse
@@ -125,6 +126,125 @@ def _html_to_text(body: str) -> str:
 
 
 _ALLOWLIST_CACHE: dict[str, Any] | None = None
+_HOST_ENTRY_RE = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$"
+)
+
+
+class _UniqueKeySafeLoader(yaml.SafeLoader):
+    """Safe YAML loader that rejects duplicate mapping keys fail-closed."""
+
+
+def _construct_unique_mapping(
+    loader: _UniqueKeySafeLoader,
+    node: yaml.MappingNode,
+    deep: bool = False,
+) -> dict[Any, Any]:
+    mapping: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise ValueError(f"Duplicate YAML key in citation allowlist: {key!r}")
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_UniqueKeySafeLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    _construct_unique_mapping,
+)
+
+
+def _normalize_url_host(raw_host: str) -> str | None:
+    """Normalize a parsed URL hostname without trimming whitespace (fail-closed)."""
+    if not raw_host or any(ch.isspace() for ch in raw_host):
+        return None
+    host = raw_host.lower().removeprefix("www.")
+    return host or None
+
+
+def _validate_config_host(raw_host: str, *, kind: str) -> str:
+    if not isinstance(raw_host, str) or raw_host != raw_host.strip():
+        raise ValueError(f"Invalid {kind} entry: {raw_host!r}")
+    lowered = raw_host.lower()
+    if not _HOST_ENTRY_RE.fullmatch(lowered):
+        raise ValueError(f"Invalid {kind} entry: {raw_host!r}")
+    norm = lowered.removeprefix("www.")
+    if not _HOST_ENTRY_RE.fullmatch(norm):
+        raise ValueError(f"Invalid {kind} entry: {raw_host!r}")
+    return norm
+
+
+def _host_matches(host: str, domain: str) -> bool:
+    return host == domain or host.endswith("." + domain)
+
+
+def _normalize_path(raw_path: str) -> str:
+    """Decode percent-encoding, normalize slashes and dot-segments, lowercase."""
+    decoded = urllib.parse.unquote(raw_path or "/").replace("\\", "/")
+    # Collapse repeated slashes before normpath so POSIX's leading '//' rule cannot bypass prefix checks.
+    collapsed = re.sub(r"/+", "/", decoded)
+    if not collapsed.startswith("/"):
+        collapsed = "/" + collapsed
+    return posixpath.normpath(collapsed).lower()
+
+
+def _parse_excluded(allow: dict[str, Any]) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+    """Validate and normalize the optional ``excluded`` allowlist section fail-closed."""
+    if "excluded" not in allow:
+        return (), ()
+    raw_excluded = allow["excluded"]
+    if not isinstance(raw_excluded, dict):
+        raise TypeError("Citation allowlist `excluded` section must be a mapping")
+    unknown_keys = set(raw_excluded) - {"hosts", "path_prefixes"}
+    if unknown_keys:
+        raise ValueError(
+            f"Citation allowlist `excluded` has unsupported keys: {sorted(unknown_keys)}"
+        )
+
+    hosts: list[str] = []
+    if "hosts" in raw_excluded:
+        raw_hosts = raw_excluded["hosts"]
+        if not isinstance(raw_hosts, list):
+            raise TypeError("Citation allowlist `excluded.hosts` must be a list")
+        hosts = [_validate_config_host(item, kind="excluded host") for item in raw_hosts]
+
+    prefixes: list[tuple[str, str]] = []
+    if "path_prefixes" in raw_excluded:
+        raw_prefixes = raw_excluded["path_prefixes"]
+        if not isinstance(raw_prefixes, list):
+            raise TypeError("Citation allowlist `excluded.path_prefixes` must be a list")
+        for item in raw_prefixes:
+            if not isinstance(item, str) or item != item.strip() or "/" not in item:
+                raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
+            host_part, path_part = item.split("/", 1)
+            norm_host = _validate_config_host(host_part, kind="excluded path_prefix")
+            if (
+                not path_part
+                or path_part.startswith("/")
+                or any(ch.isspace() or ord(ch) < 32 or ch in "?#:\\;%" for ch in path_part)
+                or any(seg in {".", ".."} for seg in path_part.split("/"))
+            ):
+                raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
+            norm_prefix = _normalize_path("/" + path_part)
+            if norm_prefix == "/":
+                raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
+            prefixes.append((norm_host, norm_prefix))
+
+    return tuple(hosts), tuple(prefixes)
+
+
+def _is_excluded(host: str, norm_path: str, allow: dict[str, Any]) -> bool:
+    excluded_hosts, excluded_prefixes = _parse_excluded(allow)
+    if any(_host_matches(host, d) for d in excluded_hosts):
+        return True
+    for excl_host, excl_prefix in excluded_prefixes:
+        if _host_matches(host, excl_host) and (
+            norm_path == excl_prefix
+            or norm_path.startswith((excl_prefix + "/", excl_prefix + ";"))
+        ):
+            return True
+    return False
 
 
 def _load_allowlist() -> dict[str, Any]:
@@ -136,25 +256,37 @@ def _load_allowlist() -> dict[str, Any]:
             f"Citation allowlist not found at {ALLOWLIST_PATH}. The pipeline "
             "will reject every URL as off_allowlist without it."
         )
-    loaded = yaml.safe_load(ALLOWLIST_PATH.read_text(encoding="utf-8"))
-    _ALLOWLIST_CACHE = loaded if isinstance(loaded, dict) else {"tiers": {}, "claim_class_priority": {}}
+    loaded = yaml.load(
+        ALLOWLIST_PATH.read_text(encoding="utf-8"),
+        Loader=_UniqueKeySafeLoader,
+    )
+    if not isinstance(loaded, dict):
+        raise TypeError("Citation allowlist root must be a YAML mapping")
+    _parse_excluded(loaded)
+    _ALLOWLIST_CACHE = loaded
     return _ALLOWLIST_CACHE
 
 
 def allowlist_tier(url: str) -> str | None:
-    """Return the first tier whose domains match the URL's host, else None."""
+    """Return the first tier whose domains match the URL's host unless excluded, else None."""
     try:
-        host = urllib.parse.urlparse(url).hostname or ""
+        parsed = urllib.parse.urlsplit(url)
+        raw_host = parsed.hostname or ""
     except ValueError:
         return None
-    host = host.lower().removeprefix("www.")
+    host = _normalize_url_host(raw_host)
+    if host is None:
+        return None
+    norm_path = _normalize_path(parsed.path)
     allow = _load_allowlist()
+    if _is_excluded(host, norm_path, allow):
+        return None
     for tier, domains in (allow.get("tiers") or {}).items():
         if not isinstance(domains, list):
             continue
         for dom in domains:
-            d = str(dom).lower()
-            if host == d or host.endswith("." + d):
+            d = str(dom).strip().lower()
+            if d and _host_matches(host, d):
                 return str(tier)
     return None
 
@@ -249,6 +381,10 @@ def fetch(url: str, *, refresh: bool = False, timeout: int = DEFAULT_TIMEOUT) ->
     if not refresh:
         cached = _load_cached(url)
         if cached is not None:
+            final_url = cached.get("final_url")
+            cached["allowlist_tier"] = (
+                allowlist_tier(final_url) if isinstance(final_url, str) and final_url else None
+            )
             return cached
 
     meta, body = _fetch_once(url, timeout=timeout)
@@ -332,6 +468,19 @@ _DRY_RUN_URLS: list[tuple[str, str | None]] = [
     ("https://status.cloud.google.com/", "vendor"),
     ("https://developer.mozilla.org/en-US/docs/Web/HTTP", "general"),
     ("https://en.wikipedia.org/wiki/Kubernetes", "general"),
+    # Official pages on #3916 hosts that also have user-content exclusions.
+    ("https://nginx.org/en/docs/http/load_balancing.html", "upstream"),
+    ("https://blog.nginx.org/blog/celebrating-20-years-of-nginx", "upstream"),
+    ("https://curl.se/docs/manpage.html", "upstream"),
+    ("https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_system_capabilities", "vendor"),
+    # Project-hosted user content on allowlisted domains — MUST report allowlist_tier=null.
+    ("https://forum.nginx.org/read.php?2,250000", None),
+    ("https://community.nginx.org/t/example/123", None),
+    ("https://trac.nginx.org/nginx/ticket/1234", None),
+    ("https://mailman.nginx.org/pipermail/nginx/", None),
+    ("https://forums.developer.apple.com/forums/thread/12345", None),
+    ("https://developer.apple.com/forums/thread/12345", None),
+    ("https://curl.se/mail/lib-2017-02/0075.html", None),
     # Intentionally off-allowlist — MUST report allowlist_tier=null.
     ("https://medium.com/example", None),
 ]

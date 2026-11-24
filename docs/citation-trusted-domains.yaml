@@ -5,7 +5,8 @@
 # Citations whose host is not on this list auto-reject at the deterministic
 # gate. Expanding the list is a committed config change, never a per-module
 # override. Use bare domains or narrow official documentation hosts;
-# subdomains match via label-boundary suffix checks in scripts/fetch_citation.py.
+# subdomains match via label-boundary suffix checks in scripts/fetch_citation.py,
+# except hosts and path prefixes listed under `excluded` (which fail closed).
 #
 # When a claim class does not match any tier below, it falls through to
 # `general` (which is intentionally narrow). Research prompts should prefer
@@ -139,6 +140,23 @@ tiers:
                               # the same claim is covered upstream.
     - gs.statcounter.com      # market-share statistics (OS usage etc.);
                               # surfaces often in Fundamentals modules.
+
+# Project-hosted user-content exclusions (forums, trackers, mailing-list
+# archives) that share a bare domain with an allowlisted official host.
+# Evaluated before `tiers` in scripts/fetch_citation.py; matching URLs
+# fail closed (allowlist_tier returns None).
+excluded:
+  # Subdomains matched with the same www-stripped label-boundary suffix rule as `tiers`.
+  hosts:
+    - forum.nginx.org            # NGINX user forum / mailing-list mirror
+    - community.nginx.org        # NGINX user community forum
+    - trac.nginx.org             # historical NGINX Trac issue tracker (user tickets/comments)
+    - mailman.nginx.org          # NGINX mailing-list archives
+    - forums.developer.apple.com # Apple Developer Forums subdomain
+  # "<host>/<path>" prefixes matched by host suffix + normalized path-segment boundary.
+  path_prefixes:
+    - curl.se/mail               # curl mailing-list archives
+    - developer.apple.com/forums # canonical Apple Developer Forums path
 
 # Claim-class → tier preference ordering. Research prompt consults this
 # when picking a URL for a given claim; the first tier that returns a
