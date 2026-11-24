@@ -43,6 +43,7 @@ import hashlib
 import html.parser
 import http.client
 import json
+import posixpath
 import re
 import urllib.error
 import urllib.parse
@@ -127,6 +128,84 @@ def _html_to_text(body: str) -> str:
 _ALLOWLIST_CACHE: dict[str, Any] | None = None
 
 
+def _normalize_host(raw_host: str) -> str:
+    return raw_host.strip().lower().removeprefix("www.")
+
+
+def _host_matches(host: str, domain: str) -> bool:
+    return host == domain or host.endswith("." + domain)
+
+
+def _normalize_path(raw_path: str) -> str:
+    """Decode percent-encoding, normalize slashes and dot-segments, lowercase."""
+    decoded = urllib.parse.unquote(raw_path or "/").replace("\\", "/")
+    # Collapse repeated slashes before normpath so POSIX's leading '//' rule cannot bypass prefix checks.
+    collapsed = re.sub(r"/+", "/", decoded)
+    if not collapsed.startswith("/"):
+        collapsed = "/" + collapsed
+    return posixpath.normpath(collapsed).lower()
+
+
+def _parse_excluded(raw_excluded: Any) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+    """Validate and normalize the optional ``excluded`` allowlist section fail-closed."""
+    if raw_excluded is None:
+        return (), ()
+    if not isinstance(raw_excluded, dict):
+        raise TypeError("Citation allowlist `excluded` section must be a mapping")
+    unknown_keys = set(raw_excluded) - {"hosts", "path_prefixes"}
+    if unknown_keys:
+        raise ValueError(
+            f"Citation allowlist `excluded` has unsupported keys: {sorted(unknown_keys)}"
+        )
+
+    raw_hosts = raw_excluded.get("hosts")
+    hosts: list[str] = []
+    if raw_hosts is not None:
+        if not isinstance(raw_hosts, list):
+            raise TypeError("Citation allowlist `excluded.hosts` must be a list")
+        for item in raw_hosts:
+            if not isinstance(item, str) or any(ch in item for ch in ("/", ":", " ", "\t", "\n")):
+                raise ValueError(f"Invalid excluded host entry: {item!r}")
+            norm_host = _normalize_host(item)
+            if not norm_host:
+                raise ValueError(f"Invalid excluded host entry: {item!r}")
+            hosts.append(norm_host)
+
+    raw_prefixes = raw_excluded.get("path_prefixes")
+    prefixes: list[tuple[str, str]] = []
+    if raw_prefixes is not None:
+        if not isinstance(raw_prefixes, list):
+            raise TypeError("Citation allowlist `excluded.path_prefixes` must be a list")
+        for item in raw_prefixes:
+            if not isinstance(item, str) or "/" not in item:
+                raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
+            host_part, path_part = item.split("/", 1)
+            if any(ch in host_part for ch in (":", " ", "\t", "\n")) or any(
+                ch in path_part for ch in ("?", "#")
+            ):
+                raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
+            norm_host = _normalize_host(host_part)
+            norm_prefix = _normalize_path("/" + path_part)
+            if not norm_host or norm_prefix == "/":
+                raise ValueError(f"Invalid excluded path_prefix entry: {item!r}")
+            prefixes.append((norm_host, norm_prefix))
+
+    return tuple(hosts), tuple(prefixes)
+
+
+def _is_excluded(host: str, norm_path: str, allow: dict[str, Any]) -> bool:
+    excluded_hosts, excluded_prefixes = _parse_excluded(allow.get("excluded"))
+    if any(_host_matches(host, d) for d in excluded_hosts):
+        return True
+    for excl_host, excl_prefix in excluded_prefixes:
+        if _host_matches(host, excl_host) and (
+            norm_path == excl_prefix
+            or norm_path.startswith((excl_prefix + "/", excl_prefix + ";"))
+        ):
+            return True
+    return False
+
+
 def _load_allowlist() -> dict[str, Any]:
     global _ALLOWLIST_CACHE
     if _ALLOWLIST_CACHE is not None:
@@ -137,24 +216,32 @@ def _load_allowlist() -> dict[str, Any]:
             "will reject every URL as off_allowlist without it."
         )
     loaded = yaml.safe_load(ALLOWLIST_PATH.read_text(encoding="utf-8"))
-    _ALLOWLIST_CACHE = loaded if isinstance(loaded, dict) else {"tiers": {}, "claim_class_priority": {}}
+    allow = loaded if isinstance(loaded, dict) else {"tiers": {}, "claim_class_priority": {}}
+    _parse_excluded(allow.get("excluded"))
+    _ALLOWLIST_CACHE = allow
     return _ALLOWLIST_CACHE
 
 
 def allowlist_tier(url: str) -> str | None:
-    """Return the first tier whose domains match the URL's host, else None."""
+    """Return the first tier whose domains match the URL's host unless excluded, else None."""
     try:
-        host = urllib.parse.urlparse(url).hostname or ""
+        parsed = urllib.parse.urlsplit(url)
+        raw_host = parsed.hostname or ""
     except ValueError:
         return None
-    host = host.lower().removeprefix("www.")
+    host = _normalize_host(raw_host)
+    if not host:
+        return None
+    norm_path = _normalize_path(parsed.path)
     allow = _load_allowlist()
+    if _is_excluded(host, norm_path, allow):
+        return None
     for tier, domains in (allow.get("tiers") or {}).items():
         if not isinstance(domains, list):
             continue
         for dom in domains:
-            d = str(dom).lower()
-            if host == d or host.endswith("." + d):
+            d = str(dom).strip().lower()
+            if d and _host_matches(host, d):
                 return str(tier)
     return None
 
@@ -332,6 +419,19 @@ _DRY_RUN_URLS: list[tuple[str, str | None]] = [
     ("https://status.cloud.google.com/", "vendor"),
     ("https://developer.mozilla.org/en-US/docs/Web/HTTP", "general"),
     ("https://en.wikipedia.org/wiki/Kubernetes", "general"),
+    # Official pages on #3916 hosts that also have user-content exclusions.
+    ("https://nginx.org/en/docs/http/load_balancing.html", "upstream"),
+    ("https://blog.nginx.org/blog/celebrating-20-years-of-nginx", "upstream"),
+    ("https://curl.se/docs/manpage.html", "upstream"),
+    ("https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_system_capabilities", "vendor"),
+    # Project-hosted user content on allowlisted domains — MUST report allowlist_tier=null.
+    ("https://forum.nginx.org/read.php?2,250000", None),
+    ("https://community.nginx.org/t/example/123", None),
+    ("https://trac.nginx.org/nginx/ticket/1234", None),
+    ("https://mailman.nginx.org/pipermail/nginx/", None),
+    ("https://forums.developer.apple.com/forums/thread/12345", None),
+    ("https://developer.apple.com/forums/thread/12345", None),
+    ("https://curl.se/mail/lib-2017-02/0075.html", None),
     # Intentionally off-allowlist — MUST report allowlist_tier=null.
     ("https://medium.com/example", None),
 ]
