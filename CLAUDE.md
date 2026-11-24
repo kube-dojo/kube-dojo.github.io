@@ -30,8 +30,8 @@ dispatcher refuses.
 - `GET /api/reviews?module={key}`
 
 Optional situational check: `GET /api/content/coverage` or `GET /api/tracks/readiness`.
-Start the local API with `./services.sh start api` (primary checkout) or
-`.venv/bin/python scripts/local_api.py` when it is down; an unreachable API is unknown state.
+Start the local API from the primary checkout with
+`.venv/bin/python scripts/local_api.py` (binds 127.0.0.1:8768 by default) when it is down; an unreachable API is unknown state.
 
 ## Agent Usage
 

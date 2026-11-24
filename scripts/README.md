@@ -65,8 +65,7 @@ python scripts/status.py --json
 Read-only deterministic local API for repo and pipeline state.
 
 ```bash
-python scripts/local_api.py
-python scripts/local_api.py --host 0.0.0.0 --port 8768
+python scripts/local_api.py          # 127.0.0.1:8768; the API is unauthenticated, keep it on loopback
 ```
 
 **First endpoints:**

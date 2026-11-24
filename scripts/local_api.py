@@ -21,8 +21,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from lu_machinery.common.repo_root import main_checkout_root
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
@@ -56,12 +54,32 @@ def _ui_fragments_module() -> Any:
     return _load_ui_fragments_module()
 
 
+def _primary_checkout(repo_root: Path) -> Path | None:
+    """The primary checkout that owns ``repo_root``, from Git's common directory.
+
+    The KubeDojo API is a product service and runs on the product interpreter,
+    which does not install lu-machinery, so it asks Git directly. ``None`` when
+    Git cannot answer, which the health check reports as critical.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            check=False, capture_output=True, text=True, errors="replace", timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    common = result.stdout.strip() if result.returncode == 0 else ""
+    return Path(common).parent.resolve() if common else None
+
+
 def _inspect_repo_root(repo_root: Path) -> dict[str, object]:
     """Validate that the local API is serving from the primary checkout."""
     resolved = repo_root.resolve()
-    primary = main_checkout_root(resolved).resolve()
+    primary = _primary_checkout(resolved)
     warnings: list[str] = []
-    if resolved != primary:
+    if primary is None:
+        warnings.append(f"repo_root {resolved}: the primary checkout cannot be determined (git rev-parse failed).")
+    elif resolved != primary:
         warnings.append(
             f"repo_root {resolved} is not the primary checkout ({primary}); "
             "artifact routes may 404 if this process outlives a worktree removal."
@@ -84,12 +102,14 @@ def _inspect_repo_root(repo_root: Path) -> dict[str, object]:
             try:
                 os.kill(pid, 0)
             except PermissionError:
-                pass
+                warnings.append(
+                    "api pid file references a process this user cannot signal; its state cannot be verified."
+                )
             except OSError:
                 warnings.append("api pid file references a dead process.")
     return {
         "repo_root": str(resolved),
-        "primary_repo_root": str(primary),
+        "primary_repo_root": str(primary) if primary is not None else None,
         "process_cwd": str(cwd) if cwd is not None else None,
         "warnings": warnings,
     }
@@ -101,7 +121,12 @@ def _build_healthz_payload(repo_root: Path) -> dict[str, object]:
         warning
         for warning in inspection["warnings"]
         if isinstance(warning, str)
-        and (warning.startswith("repo_root ") or "dead process" in warning or "unreadable" in warning)
+        and (
+            warning.startswith("repo_root ")
+            or "dead process" in warning
+            or "unreadable" in warning
+            or "cannot be verified" in warning
+        )
     ]
     return {
         "ok": not critical,

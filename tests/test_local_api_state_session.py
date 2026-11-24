@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -76,12 +77,14 @@ def test_removed_machinery_routes_return_404(tmp_path: Path) -> None:
         assert payload["error"] == "not_found"
 
 
-def test_healthz_uses_lu_machinery_repo_root(tmp_path: Path) -> None:
+def test_healthz_reports_primary_checkout_from_git(tmp_path: Path) -> None:
     primary = tmp_path / "primary"
-    (primary / ".git" / "worktrees" / "wt1").mkdir(parents=True)
+    primary.mkdir()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+    subprocess.run([*git, "init", "-q"], cwd=primary, check=True, timeout=60)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "base"], cwd=primary, check=True, timeout=60)
     worktree = tmp_path / "wt1"
-    worktree.mkdir()
-    (worktree / ".git").write_text(f"gitdir: {primary / '.git' / 'worktrees' / 'wt1'}\n", encoding="utf-8")
+    subprocess.run([*git, "worktree", "add", "-q", str(worktree)], cwd=primary, check=True, timeout=60)
 
     status_ok, payload_ok, _ = local_api.route_request(primary, "/healthz")
     assert status_ok == 200

@@ -1,6 +1,6 @@
 # Agent Onboarding — KubeDojo Local API Recipes
 
-Concrete `curl` recipes for inspecting KubeDojo curriculum and pipeline state on the local API (`http://127.0.0.1:8768`). Start it from the primary checkout with `./services.sh start api` or `.venv/bin/python scripts/local_api.py`.
+Concrete `curl` recipes for inspecting KubeDojo curriculum and pipeline state on the local API (`http://127.0.0.1:8768`). Start it from the primary checkout with `.venv/bin/python scripts/local_api.py` (binds 127.0.0.1:8768 by default).
 
 ## 1. Fleet orientation, dispatch and review
 
