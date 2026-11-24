@@ -478,6 +478,14 @@ def _write_in_worktree(
     slug = st["slug"]
     writer = st["writer"]
     writer_model = st.get("writer_model")  # set by route_one (queue-driven)
+    if writer_model:
+        # A row routed before a catalog retirement resumes on the queue's
+        # documented successor; an id the queue does not own goes to the
+        # runtime unchanged, whose admission refuses it with its reason.
+        try:
+            writer, writer_model = queue.model_to_agent(writer_model)
+        except ValueError:
+            pass
     track = (st.get("route") or {}).get("track", "rewrite")
     module_rel = st["module_path"]
 

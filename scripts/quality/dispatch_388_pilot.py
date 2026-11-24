@@ -163,9 +163,18 @@ def slugify(path: str) -> str:
     return module_slug_for_pipeline(path)
 
 
+def module_worktree(slug: str) -> Path:
+    """The isolated checkout the writer and every write-capable reviewer use.
+
+    The release refuses write-capable modes in the primary checkout, so
+    reviewer rungs that need danger or workspace-write run here too.
+    """
+    return REPO / f".worktrees/codex-388-pilot-{slug}"
+
+
 def make_worktree(slug: str, module_path: str) -> Path:
     branch = f"codex/388-pilot-{slug}"
-    wt = REPO / f".worktrees/codex-388-pilot-{slug}"
+    wt = module_worktree(slug)
     if wt.exists():
         marker = wt / ".module_path"
         if not marker.exists():
@@ -390,7 +399,7 @@ def dispatch_qwen_review(pr_num: int, module_path: str, slug: str):
             agent_name="qwen",
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="workspace-write",  # qwen benefits from terminal+file tools (curl, gh pr diff)
-            cwd=REPO,
+            cwd=module_worktree(slug),
             task_id=f"388-pilot-review-qwen-{slug}",
             entrypoint="dispatch",
             hard_timeout=600,
@@ -421,7 +430,7 @@ def dispatch_deepseek_review(pr_num: int, module_path: str, slug: str):
             agent_name="deepseek",
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="workspace-write",  # deepseek benefits from terminal+file access
-            cwd=REPO,
+            cwd=module_worktree(slug),
             model=None,  # lu-machinery release default DeepSeek model
             task_id=f"388-pilot-review-deepseek-{slug}",
             entrypoint="dispatch",
@@ -461,7 +470,7 @@ def dispatch_agy_review(pr_num: int, module_path: str, slug: str):
             agent_name="agy",
             prompt=cross_family_review_prompt(pr_num, module_path),  # reuse same prompt
             mode="danger",  # required for agy in headless dispatch
-            cwd=REPO,
+            cwd=module_worktree(slug),
             task_id=f"388-pilot-review-agy-{slug}",
             entrypoint="dispatch",
             hard_timeout=900,
