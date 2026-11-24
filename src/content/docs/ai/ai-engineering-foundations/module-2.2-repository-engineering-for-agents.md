@@ -199,52 +199,22 @@ For L3, the repository becomes operational, not only descriptive, because every 
 
 ## The bootstrap stack for this repository
 
-KubeDojo’s stack is intentionally split into three concrete layers with concrete ownership and exit semantics:
-bootstrap policy, scoped constraints, and runtime truth.
-This is not theoretical layering.
-It is the exact path an agent follows before it performs a single read-heavy exploration command.
+KubeDojo organizes startup around three layers. Repository-wide rules give agents a starting point, scoped guidance sets requirements for specific tasks, and commands and APIs report current state.
 
-The bootstrap policy layer starts in `AGENTS.md` and `CLAUDE.md`.
-`AGENTS.md` enforces Codex-compatible startup behavior for all toolchains and makes refusal-to-follow instructions explicit: no `git log` first, issue-first onboarding, and mandatory pre-submission gates.
-`CLAUDE.md` then defines execution rhythm for Anthropic sessions: issue context, API-first orientation, pipeline awareness, handoff discipline, and module handoff format.
-Because both files are small and stable, they can be loaded quickly and remain durable under repeated invocation.
+Start with `AGENTS.md` for the repository-wide rules and `CLAUDE.md` for Claude-specific guidance.
+Run `git status --short --branch` from the repository root to see the current branch and any local changes. For issue-driven work, read the issue to establish the scope before exploring unrelated files.
+For a self-contained edit, open the affected files and follow the checks named in `AGENTS.md`.
 
-`scripts/cold-start.sh` is the first concrete implementation of that policy.
-It is API-first: it boots services, prints `git status`, lists `docs/decisions/pending`, and emits `/api/briefing/session`, `/api/orient`, and `/api/session/current`.
-That gives one deterministic session posture before any repository exploration.
-If `KUBEDOJO_ISSUE` is set or `--issue` is passed, it prints task-specific issue context first; if `--manifest` is used, it appends `/api/state/manifest`.
-On API failure it does not block the task; it degrades to `STATUS.md` and latest handoff path, prints an explicit fallback block, and exits `0`.
-The explicit exit code is itself part of the contract because it avoids ambiguous startup dead-ends.
+For fleet coordination, follow the instructions for the installed `lu-machinery` release. For live curriculum state, follow the local API recipes in `scripts/agent_onboarding.md`.
+They show which queries answer whether someone already holds a module lease, what condition the module is in, and whether a review exists.
+If the local API is unreachable or the lease data is unavailable, the current lease state is unknown. Use `STATUS.md` as an index, and defer any claim that requires a live lease check until you can verify it.
 
-This chain is not an implementation detail, it is the onboarding state machine.
-If `/api/briefing/session?compact=1` is reachable, `cold-start.sh` gives one canonical shape the next layer can trust: issue reminder, workspace state, pending decisions, compact briefing, orient, and session chain.
-If it cannot reach the API after five attempts, the script still returns usable context by printing `STATUS.md` excerpts and an extracted `docs/session-state/` handoff path.
-That branch is intentionally safe because it prioritizes forward momentum while making the source of truth explicitly visible when network trust drops.
+The scoped curriculum rules live under `agents_extensions/claude/rules/` and are deployed to `.claude/rules/`.
+Read `module-quality.md` and `new-content-checklist.md` when the task calls for them. Keeping the detailed checks in scoped files gives agents a short starting point and a direct route to the rules they need.
 
-The runtime stack then stitches this startup output to the scoped files.
-`CLAUDE.md` points to `.claude/rules/module-quality.md` and `.claude/rules/new-content-checklist.md`, both of which define concrete, machine-checkable constraints for module structure, outcomes, and command sets.
-The rules layer then maps the bootstrap posture to local run instructions: pre-submit check list, lab checks, and module-level gate expectations.
-If one of those files is stale, this is already observable as a broken interface, because every task now has to pass through those checks before it proceeds.
-
-That is the compositional model.
-`AGENTS.md` gives you startup invariants.
-`.claude/rules/*` gives you current procedural constraints.
-The scripts and API layer gives you live evidence.
-You keep one responsibility per layer, and in failure, the failure mode always includes where to repair.
-
-The scoped constraint layer is anchored in `.claude/rules/*`.
-`AGENTS.md` references `.claude/rules/module-quality.md` for quality gates and `.claude/rules/new-content-checklist.md` for publishability requirements.
-`module-quality.md` defines structural checks (`Did You Know` count, section count expectations, anti-pseudocode), while the checklist file maps those to concrete command-line gates such as frontmatter checks, health checks, and build steps.
-This keeps high-stability expectations in root files and low-latency operational constraints in scoped rules.
-
-The runtime truth layer for this lab combines scripts and endpoint contracts.
-`scripts/agent_onboarding.md` provides executable recipes for `curl`ing state (`/api/pipeline/leases`, `/api/module/.../state`, `/api/reviews`) and known failure transitions.
+The live checks and the lab exercise serve different purposes.
 `scripts/print-run-contract.sh` is a lab-created parser script you build in the practical exercise, used to check contract paths deterministically.
-Together these scripts close the bootstrap loop by turning expectations into verifiable state.
-
-The practical design implication is visible in this exact repository.
-A future task should be able to read AGENTS/CLAUDE, follow deterministic startup outputs, then execute scope-specific checks without manual discovery.
-If any of those layers grows beyond context-safe limits, the result is not just noisy docs, it is broken agent legibility.
+Together these examples show how to keep durable rules in files and check current conditions when the task calls for them.
 
 ## The docs-as-system-of-record model
 
@@ -349,36 +319,24 @@ A repository talks back when it provides machine-readable failure signals at the
 In KubeDojo, this means three endpoints are tied into one operational loop: concurrency (`/api/pipeline/leases`), state (`/api/module/{key}/state`), and historical review (`/api/reviews?module={key}`).
 This is not just observability; it is control flow.
 
-Failure scenario 1: duplicate ownership before claim.
-Agent workflow is: `GET /api/pipeline/leases` → decide whether a module is currently claimed.
-If the list includes the target module, `/api/module/{key}/state` still provides confirmation in `lease` with `held`, `leased_by`, and `seconds_to_expiry`.
-That means the repo has already decided this is a concurrent-write risk.
-The correct path is to abort claim attempts, either wait until expiry or choose a different module.
-Only then does the same agent proceed to validation and patching.
-This single check prevents duplicate branch collisions without human arbitration.
-
-The failure branch is deterministic.
-If a lease is active, agents should choose either waiting for `seconds_to_expiry` or a different target module instead of forcing conflicting writes.
-The important lesson is that conflict control happens at the protocol boundary, not in review comments.
-That makes concurrency safe even when two agents discover the same key in the same five minutes.
+In the first scenario, an agent is about to claim a module that someone else is working on.
+`GET /api/pipeline/leases` lists active leases. The response from `/api/module/{key}/state` includes the lease information for the target module.
+If another agent holds the lease, wait for its release or choose a different module. If the lease index returns `exists: false`, the data is unavailable even if the active list is empty.
+Treat these reads as evidence for deciding what to do next. The claim itself goes through the curriculum workflow.
 
 Failure scenario 2: invalid module state before edit.
-The same `/api/module/{key}/state` call can return `diagnostics[]` entries with stable `code` values such as `frontmatter_no_title`, `rubric_poor`, `uk_state_missing`, or `lease_held`.
+The same `/api/module/{key}/state` call can return `diagnostics[]` entries with stable `code` values such as `frontmatter_no_title`, `rubric_poor`, `uk_translation_missing`, or `lease_held`.
 Each diagnostic record includes `severity`, `summary`, and optionally `next_action`.
 That is the key design signal: failures are not just booleans.
 When `next_action` says `GET /api/labs/status`, the agent can switch to lab health checks.
-When it says `GET /api/tracks/readiness` or review-related routing, the agent can move from content edits to governance tasks without guessing.
+When it says `GET /api/quality/scores`, the agent can inspect the reported rubric scores.
 This is how `diagnostics[]` turns unknown failures into deterministic remediation steps.
 The same payload also contains `english_path`, `ukrainian_path`, and `fact_ledger` presence flags.
-That lets an agent stop guessing and instead branch by evidence:
-if frontmatter is missing title, open source path first;
-if translation is stale, check `GET /api/translation/v2/status`;
-if facts are missing, run `pipeline enqueue`.
-Each branch has an endpoint-backed next action, so remediation is machine-consistent.
+If the frontmatter lacks a title, open the source file. If the translation is stale, check `GET /api/translation/v2/status`. The diagnostic directs the agent to the relevant file or query.
 
 Failure scenario 3: stale review path or unresolved evidence.
 An agent asks `/api/reviews?module={key}` before making final edits.
-If the module has never been reviewed, the API returns `{"error":"review_not_found"}` and that becomes a hard stop signal for merge attempts.
+If the module has no recorded review, the API returns `{"error":"review_not_found"}` with HTTP 404. Check which review the task requires before proceeding.
 If a review exists but lacks evidence, `fact_check_unverified` in state and a warning diagnostic indicates additional fix pass needed before rework can proceed.
 This scenario preserves review integrity while keeping the failure local and machine-readable.
 
@@ -548,7 +506,7 @@ A repository that can be used by agents should expose four primary documents:
 ### Orientation document
 
 This is the first file an agent should always be able to resolve.
-In KubeDojo, root `CLAUDE.md` and scripts entrypoints serve this role.
+In KubeDojo, the root `AGENTS.md` serves this role and points to instructions for specific tasks.
 
 ### Standards and review document
 
@@ -643,7 +601,7 @@ An effective minimum set in this model has seven files/components, and removing 
 
 - `AGENTS.md` or equivalent.
 - `CLAUDE.md` or equivalent.
-- `scripts/cold-start` equivalent.
+- one documented startup sequence that checks the worktree and identifies the task.
 - one `local` API or script to query current run context.
 - one module checklist for review.
 - one quality entrypoint check.
@@ -654,20 +612,9 @@ If a repository lacks at least one component, the repo is not currently “agent
 ## Worked example: repository design walkthrough
 
 KubeDojo is a concrete example of the same layered model that this module is trying to teach.
-KubeDojo gives a full lifecycle stack in a single repo.
-At root, AGENTS and CLAUDE define onboarding sequence, pre-submit discipline, and operational anti-pattern boundaries.
-The project-specific escalation path is visible in practice through `docs/decisions/pending/`, `STATUS.md`, and the handoff pointer printed by `scripts/cold-start.sh`.
-In other words, the conversation about what to do next is never hidden in a single stale note; it is surfaced through contract files, endpoint snapshots, and explicit handoff artifacts.
-
-To see this as a concrete control chain, trace one onboarding run from a stale state.
-`cold-start.sh` prints branch status, pending decisions, orientation payload, and session state first.
-If any of that is missing because the API is down, the same script still emits `STATUS.md` and a parsed handoff path rather than forcing a hard-stop.
-This gives a deterministic fallback path and prevents the repository from stalling an agent mid-problem because one service endpoint is temporarily unhealthy.
-
-`scripts/agent_onboarding.md` binds those ideas together in a concrete runbook:
-issue-aware cold start, compact briefing, orientation, review discovery, and a defined pre-claim policy.
-It explicitly references endpoint behavior (`/api/pipeline/leases`, `/api/module/{key}/state`, `/api/reviews`) and the expected failure envelopes for each.
-That makes this repository legible because the contract can be validated from one place without guessing command precedence.
+Suppose an issue asks you to fix a lesson. The root instructions tell you which worktree to use and which checks to run. Git reports the branch and local changes, and the issue identifies the lesson and the expected fix.
+If you need to claim the module through the curriculum workflow, use `/api/pipeline/leases` before taking ownership. An active lease tells you to leave the module with its current owner. An unavailable API leaves that decision pending.
+`scripts/agent_onboarding.md` points to the lease check, the module state endpoint (`/api/module/{key}/state`), and the review endpoint (`/api/reviews`). Each query answers a specific question at the point where you need the answer.
 
 The module design pattern deepens when you compare the `scripts/local_api.py` state model.
 `/api/module/{key}/state` merges filesystem checks, translation status, review status, and active lease data into one payload.
@@ -676,28 +623,12 @@ Instead, they read one response and branch deterministically.
 This is exactly the "talk-back" contract this module is teaching.
 
 In that state payload, three details are especially practical:
-`lease` prevents overlap, `diagnostics[]` replaces hand-wavy status language, and `next_action` gives the next concrete endpoint to query.
+`lease` shows whether the module is held, `diagnostics[]` identifies specific problems, and `next_action`, when present, points to a follow-up check.
 That means the repository does not merely tell an agent what is wrong; it prescribes which verification step should happen next.
 The difference matters because one `state` call can substitute for dozens of tribal-knowledge rules.
 
-A strong contrast is `learn-ukrainian` where the pattern is organized around role-first execution.
-In KubeDojo's `agents_extensions/` tree (renamed from `claude_extensions/` to reflect multi-agent use), role behavior is encoded as data, not prose alone:
-`shared/skills/` holds agent-agnostic contracts (writers, reviewers, domain experts), while `claude/skills/` holds Claude-orchestrator overlays such as `curriculum-orchestrator` and `dispatch-router`.
-`deploy.sh` merges shared plus per-agent sources into each agent's hidden directory (`.claude/` today; `.codex/`, `.cursor/`, `.gemini/` as those agents gain content).
-Scoped `.claude/rules/` enforce workflow details; execution boundaries are made enforceable in `settings.json` and `settings.local.json`, which separate `read`, `write`, `edit`, and `bash` permissions by operation category and route with `allow`/`ask`.
-This repo does not center role boundaries for their own sake; it does so so role confusion cannot become a silent repository bug.
-
-The contrast is useful because it surfaces two valid design trajectories.
-KubeDojo keeps startup logic and pipeline checks at the repository root and lets scoped rules express workflow details.
-learn-ukrainian keeps role and dispatch policy in its extensions folder and then pushes execution permissions down through `settings.json` and command classes.
-Both can work for large multi-agent systems, and both remain maintainable because each layer stores one kind of truth and exposes failure semantics.
-The deeper design lesson is not choosing one repo over the other; it is selecting where startup, identity, and permission truth lives so that the same endpoint contract can remain stable over time.
-
-Both repositories are real and comparable, but they prioritize different seams.
-KubeDojo leads with durable bootstrap policy plus scoped runtime validation.
-learn-ukrainian leads with role identity plus operation permissions.
-The design lesson is not “choose one model.”
-It is: if responsibility shifts from onboarding to execution, you must shift the contract location from root policy to role-specific permission and still keep feedback hooks identical: startup, state, review, and deterministic next actions.
+KubeDojo's `agents_extensions/` holds the project's curriculum rules and skills. The pinned `lu-machinery` release supplies shared fleet operations such as orientation, dispatch, and review. The deployment procedure in `agents_extensions/README.md` explains how the two fit together.
+The root instructions can stay short when they point to the maintained procedure for each task. An agent editing a lesson can find the curriculum rules without loading fleet coordination instructions.
 
 ## Layer-by-layer design rubric
 
@@ -917,8 +848,8 @@ A deep-dive path gives long-term correctness.
 Quick-start path:
 Use this path when the repo is first loaded and you need a deterministic confidence baseline before any content edits.
 
-- run cold-start,
-- review state,
+- check the branch and local changes with `git status --short --branch`,
+- read the task and check live state when the workflow requires it,
 - open module index,
 - run module checks.
 
@@ -996,7 +927,7 @@ The exit code is the contract you can wire directly into CI gates or pre-commit 
 
 - L0: AGENTS.md
 - L1: CLAUDE.md
-- L2: .claude/rules/
+- L2: agents_extensions/claude/rules/
 - L3: src/content/docs/ai/ai-engineering-foundations/module-2.2-repository-engineering-for-agents.md
 ```
 
@@ -1039,7 +970,7 @@ echo "contract_check: PASSED"
 
 3. Set one explicit stale-rule policy:
 
-Before any task-write step, run `scripts/print-run-contract.sh`.
+Before editing, run `bash scripts/print-run-contract.sh`.
 Success is defined as exit `0`, exactly one `contract_check: PASSED`, and every contract entry rendering as `OK EXISTS`.
 Failure must stop execution immediately:
 
@@ -1052,7 +983,7 @@ You can still run patch edits after the script passes, but not before.
 Why this is a stronger pattern than string matching:
 string checks are easy to pass with formatting drift.
 parsing enforces that the contract format itself is understood by the verifier, so every line under `L0`–`L3` is validated consistently.
-It is the same reason `cold-start.sh` uses `scripts/services-up`, `AGENTS.md`, and API posture before task execution: each phase emits machine-readable preconditions before mutation.
+Apply the same principle to startup checks. Decide which conditions each task requires and verify those conditions before making changes.
 
 Suggested extension for lab rigor (optional) is to make stale checks enforceable over time.
 You can add a duplicate L-level key detector, require that every referenced file exists and is non-empty, and emit a deterministic warning for trailing slash normalization.
@@ -1065,7 +996,7 @@ This pre-write transcript is expected and should stop the task before mutation b
 
 
 ```text
-$ scripts/print-run-contract.sh
+$ bash scripts/print-run-contract.sh
 MISSING CLAUDE.md
 contract_check: FAILED with 1 missing references
 ```
@@ -1075,7 +1006,7 @@ If the contract file itself is removed, the transcript should look like:
 If this happens, execution is blocked and must be treated as a hard pre-condition failure until the manifest is restored.
 
 ```text
-$ scripts/print-run-contract.sh
+$ bash scripts/print-run-contract.sh
 MISSING_FILE repo-contract.md
 ```
 
@@ -1206,8 +1137,11 @@ D) Root ownership is enough for all scoped folders.
 - [AGENTS.md repository (GitHub)](https://github.com/agentsmd/agents.md)
 - [AGENTS.md example source file](https://raw.githubusercontent.com/agentsmd/agents.md/main/AGENTS.md)
 - [KubeDojo CLAUDE.md](https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/main/CLAUDE.md)
-- [KubeDojo module-quality rules](https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/main/.claude/rules/module-quality.md)
-- [KubeDojo new-content checklist](https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/main/.claude/rules/new-content-checklist.md)
+- [KubeDojo agent instructions](https://github.com/kube-dojo/kube-dojo.github.io/blob/main/AGENTS.md)
+- [KubeDojo local API recipes](https://github.com/kube-dojo/kube-dojo.github.io/blob/main/scripts/agent_onboarding.md)
+- [KubeDojo agent extension deployment](https://github.com/kube-dojo/kube-dojo.github.io/blob/main/agents_extensions/README.md)
+- [KubeDojo module-quality rules](https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/main/agents_extensions/claude/rules/module-quality.md)
+- [KubeDojo new-content checklist](https://raw.githubusercontent.com/kube-dojo/kube-dojo.github.io/main/agents_extensions/claude/rules/new-content-checklist.md)
 - [Starlight sidebar architecture](https://starlight.astro.build/guides/sidebar/)
 - [Starlight frontmatter reference](https://starlight.astro.build/reference/frontmatter/)
 - [Astro routing guide](https://docs.astro.build/en/guides/routing/)
